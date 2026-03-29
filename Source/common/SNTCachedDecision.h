@@ -27,7 +27,7 @@
 @interface SNTCachedDecision : NSObject <NSCopying>
 
 - (instancetype)init;
-- (instancetype)initWithEndpointSecurityFile:(const es_file_t *)esFile;
+- (instancetype)initWithEndpointSecurityFile:(const es_file_t*)esFile;
 - (instancetype)initWithVnode:(SantaVnode)vnode NS_DESIGNATED_INITIALIZER;
 
 /// Creates a new decision seeded with only the identity fields (SHA-256, code
@@ -35,34 +35,34 @@
 /// All evaluation-output fields (decision, cacheable, customMsg, etc.) start
 /// at their defaults so that a fresh policy evaluation is not polluted by
 /// stale state from the prior run.
-- (instancetype)initWithCachedIdentity:(SNTCachedDecision *)previous;
+- (instancetype)initWithCachedIdentity:(SNTCachedDecision*)previous;
 
 @property SantaVnode vnodeId;
 @property SNTEventState decision;
 @property SNTClientMode decisionClientMode;
-@property NSString *decisionExtra;
-@property NSString *sha256;
+@property NSString* decisionExtra;
+@property NSString* sha256;
 
-@property NSString *certSHA256;
-@property NSString *certCommonName;
-@property NSArray<MOLCertificate *> *certChain;
-@property NSString *teamID;
-@property NSString *signingID;
-@property NSString *rawSigningID;
-@property NSString *cdhash;
-@property NSDictionary *entitlements;
-@property NSDictionary *rawEntitlements;
+@property NSString* certSHA256;
+@property NSString* certCommonName;
+@property NSArray<MOLCertificate*>* certChain;
+@property NSString* teamID;
+@property NSString* signingID;
+@property NSString* rawSigningID;
+@property NSString* cdhash;
+@property NSDictionary* entitlements;
+@property NSDictionary* rawEntitlements;
 @property BOOL entitlementsFiltered;
 @property BOOL platformBinary;
 @property uint32_t codesigningFlags;
 @property SNTSigningStatus signingStatus;
-@property NSDate *secureSigningTime;
-@property NSDate *signingTime;
+@property NSDate* secureSigningTime;
+@property NSDate* signingTime;
 
-@property NSString *quarantineURL;
+@property NSString* quarantineURL;
 
-@property NSString *customMsg;
-@property NSString *customURL;
+@property NSString* customMsg;
+@property NSString* customURL;
 @property BOOL silentBlock;
 
 @property BOOL staticRule;
@@ -70,6 +70,6 @@
 @property BOOL cacheable;
 @property BOOL holdAndAsk;
 @property BOOL silentTouchID;
-@property NSNumber *touchIDCooldownMinutes;  // nil = no caching (prompt every time)
+@property NSNumber* touchIDCooldownMinutes;  // nil = no caching (prompt every time)
 
 @end

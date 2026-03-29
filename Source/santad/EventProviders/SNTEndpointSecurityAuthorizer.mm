@@ -34,9 +34,9 @@ using santa::EventDisposition;
 using santa::Message;
 
 @interface SNTEndpointSecurityAuthorizer ()
-@property SNTCompilerController *compilerController;
-@property SNTExecutionController *execController;
-@property NSMutableArray<id<SNTEndpointSecurityProbe>> *probes;
+@property SNTCompilerController* compilerController;
+@property SNTExecutionController* execController;
+@property NSMutableArray<id<SNTEndpointSecurityProbe>>* probes;
 @property BOOL enabled;
 @end
 
@@ -47,8 +47,8 @@ using santa::Message;
 
 - (instancetype)initWithESAPI:(std::shared_ptr<EndpointSecurityAPI>)esApi
                       metrics:(std::shared_ptr<santa::ESMetricsObserver>)metrics
-               execController:(SNTExecutionController *)execController
-           compilerController:(SNTCompilerController *)compilerController
+               execController:(SNTExecutionController*)execController
+           compilerController:(SNTCompilerController*)compilerController
               authResultCache:(std::shared_ptr<AuthResultCache>)authResultCache
                     ttyWriter:(std::shared_ptr<santa::TTYWriter>)ttyWriter {
   self = [super initWithESAPI:std::move(esApi)
@@ -67,11 +67,11 @@ using santa::Message;
   return self;
 }
 
-- (NSString *)description {
+- (NSString*)description {
   return @"Authorizer";
 }
 
-- (bool)respondToMessage:(const santa::Message &)msg
+- (bool)respondToMessage:(const santa::Message&)msg
           withAuthResult:(es_auth_result_t)result
        forcePreventCache:(BOOL)forcePreventCache {
   // Don't let the ES framework cache DENY results. Santa only flushes ES cache
@@ -106,9 +106,9 @@ using santa::Message;
     return;
   }
 
-  const es_process_t *targetProc = msg->event.exec.target;
+  const es_process_t* targetProc = msg->event.exec.target;
 
-  SNTCachedDecision *cd = nil;
+  SNTCachedDecision* cd = nil;
 
   while (true) {
     santa::CachedAuthResult cacheEntry = self->_authResultCache->CheckCache(targetProc->executable);
@@ -166,12 +166,12 @@ using santa::Message;
 
   [self.execController validateExecEvent:msg
                           cachedDecision:cd
-                              postAction:^bool(SNTAction action, SNTCachedDecision *cd) {
+                              postAction:^bool(SNTAction action, SNTCachedDecision* cd) {
                                 return [self postAction:action forMessage:msg withDecision:cd];
                               }];
 }
 
-- (void)handleMessage:(Message &&)esMsg
+- (void)handleMessage:(Message&&)esMsg
     recordEventMetrics:(void (^)(EventDisposition))recordEventMetrics {
   switch (esMsg->event_type) {
     case ES_EVENT_TYPE_AUTH_EXEC:
@@ -203,8 +203,8 @@ using santa::Message;
 }
 
 - (bool)postAction:(SNTAction)action
-        forMessage:(const Message &)esMsg
-      withDecision:(SNTCachedDecision *)cd {
+        forMessage:(const Message&)esMsg
+      withDecision:(SNTCachedDecision*)cd {
   es_auth_result_t authResult;
   bool cacheable = true;
 

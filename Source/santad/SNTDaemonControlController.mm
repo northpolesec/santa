@@ -69,9 +69,9 @@ double watchdogCPUPeak = 0;
 double watchdogRAMPeak = 0;
 
 @interface SNTDaemonControlController ()
-@property SNTNotificationQueue *notQueue;
-@property SNTSyncdQueue *syncdQueue;
-@property SNTNetworkExtensionQueue *netExtQueue;
+@property SNTNotificationQueue* notQueue;
+@property SNTSyncdQueue* syncdQueue;
+@property SNTNetworkExtensionQueue* netExtQueue;
 @property dispatch_queue_t generalQ;
 @property dispatch_queue_t commandQ;
 @property dispatch_queue_t netFlowQ;
@@ -85,12 +85,14 @@ double watchdogRAMPeak = 0;
 ///
 ///  Called to get cache counts (root cache count, non-root cache count).
 ///
-@property(copy) NSArray<NSNumber *> * (^cacheCountsBlock)(void);
+@property(copy) NSArray<NSNumber*>* (^cacheCountsBlock)(void);
 
 ///
 ///  Called to check the cache for a given vnode ID.
 ///
 @property(copy) SNTAction (^checkCacheBlock)(SantaVnode);
+
+@property(copy) void (^metricsExportBlock)(void (^reply)(BOOL));
 
 @end
 
@@ -100,15 +102,16 @@ double watchdogRAMPeak = 0;
   std::shared_ptr<santa::TemporaryMonitorMode> _temporaryMonitorMode;
 }
 
-- (instancetype)initWithNotificationQueue:(SNTNotificationQueue *)notQueue
-                               syncdQueue:(SNTSyncdQueue *)syncdQueue
-                        netExtensionQueue:(SNTNetworkExtensionQueue *)netExtQueue
+- (instancetype)initWithNotificationQueue:(SNTNotificationQueue*)notQueue
+                               syncdQueue:(SNTSyncdQueue*)syncdQueue
+                        netExtensionQueue:(SNTNetworkExtensionQueue*)netExtQueue
                                    logger:(std::shared_ptr<santa::Logger>)logger
                                watchItems:(std::shared_ptr<santa::WatchItems>)watchItems
                           flushCacheBlock:(void (^)(santa::FlushCacheMode,
                                                     santa::FlushCacheReason))flushCacheBlock
-                          cacheCountBlock:(NSArray<NSNumber *> * (^)(void))cacheCountBlock
-                          checkCacheBlock:(SNTAction (^)(SantaVnode))checkCacheBlock {
+                          cacheCountBlock:(NSArray<NSNumber*>* (^)(void))cacheCountBlock
+                          checkCacheBlock:(SNTAction (^)(SantaVnode))checkCacheBlock
+                       metricsExportBlock:(void (^)(void (^reply)(BOOL)))metricsExportBlock {
   self = [super init];
   if (self) {
     _logger = logger;
@@ -119,6 +122,7 @@ double watchdogRAMPeak = 0;
     _flushCacheBlock = flushCacheBlock;
     _cacheCountsBlock = cacheCountBlock;
     _checkCacheBlock = checkCacheBlock;
+    _metricsExportBlock = metricsExportBlock;
 
     _generalQ = dispatch_queue_create_with_target(
         "com.northpolesec.santa.generalXPCq", DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL,
@@ -134,7 +138,7 @@ double watchdogRAMPeak = 0;
 
     _temporaryMonitorMode = santa::TemporaryMonitorMode::Create(
         [SNTConfigurator configurator], _notQueue,
-        ^(SNTStoredTemporaryMonitorModeAuditEvent *auditEvent) {
+        ^(SNTStoredTemporaryMonitorModeAuditEvent* auditEvent) {
           [[SNTDatabaseController eventTable] addStoredEvent:auditEvent];
           [syncdQueue addStoredEvent:auditEvent];
         });
@@ -145,7 +149,7 @@ double watchdogRAMPeak = 0;
 #pragma mark Cache ops
 
 - (void)cacheCounts:(void (^)(uint64_t, uint64_t))reply {
-  NSArray<NSNumber *> *counts = self.cacheCountsBlock();
+  NSArray<NSNumber*>* counts = self.cacheCountsBlock();
   reply([counts[0] unsignedLongLongValue], [counts[1] unsignedLongLongValue]);
 }
 
@@ -161,7 +165,7 @@ double watchdogRAMPeak = 0;
 #pragma mark Database ops
 
 - (void)databaseRuleCounts:(void (^)(RuleCounts ruleTypeCounts))reply {
-  SNTRuleTable *rdb = [SNTDatabaseController ruleTable];
+  SNTRuleTable* rdb = [SNTDatabaseController ruleTable];
   __block RuleCounts ruleCounts{
       .binary = [rdb binaryRuleCount],
       .certificate = [rdb certificateRuleCount],
@@ -175,7 +179,7 @@ double watchdogRAMPeak = 0;
 
   // Update counts with data from StaticRules configuration
   [[rdb cachedStaticRules]
-      enumerateKeysAndObjectsUsingBlock:^(NSString *key, SNTRule *rule, BOOL *stop) {
+      enumerateKeysAndObjectsUsingBlock:^(NSString* key, SNTRule* rule, BOOL* stop) {
         switch (rule.type) {
           case SNTRuleTypeCDHash: ruleCounts.cdhash++; break;
           case SNTRuleTypeBinary: ruleCounts.binary++; break;
@@ -195,15 +199,15 @@ double watchdogRAMPeak = 0;
   reply(ruleCounts);
 }
 
-- (void)databaseRuleAddExecutionRules:(NSArray<SNTRule *> *)executionRules
-                      fileAccessRules:(NSArray<SNTFileAccessRule *> *)fileAccessRules
+- (void)databaseRuleAddExecutionRules:(NSArray<SNTRule*>*)executionRules
+                      fileAccessRules:(NSArray<SNTFileAccessRule*>*)fileAccessRules
                           ruleCleanup:(SNTRuleCleanup)cleanupType
                                source:(SNTRuleAddSource)source
-                                reply:(void (^)(BOOL, NSArray<NSError *> *error))reply {
+                                reply:(void (^)(BOOL, NSArray<NSError*>* error))reply {
 #ifndef DEBUG
-  SNTConfigurator *config = [SNTConfigurator configurator];
+  SNTConfigurator* config = [SNTConfigurator configurator];
   if (source == SNTRuleAddSourceSantactl && (config.syncBaseURL || config.staticRules.count > 0)) {
-    NSError *error;
+    NSError* error;
     [SNTError populateError:&error
                    withCode:SNTErrorCodeManualRulesDisabled
                     message:@"Rejected by the Santa daemon"
@@ -213,7 +217,7 @@ double watchdogRAMPeak = 0;
   }
 #endif
 
-  SNTRuleTable *ruleTable = [SNTDatabaseController ruleTable];
+  SNTRuleTable* ruleTable = [SNTDatabaseController ruleTable];
 
   // If any rules are added that are not plain allowlist rules, then flush decision cache.
   // In particular, the addition of allowlist compiler rules should cause a cache flush.
@@ -221,7 +225,7 @@ double watchdogRAMPeak = 0;
   BOOL flushCache = ((cleanupType != SNTRuleCleanupNone) || (fileAccessRules.count > 0) ||
                      [ruleTable addedRulesShouldFlushDecisionCache:executionRules]);
 
-  NSArray<NSError *> *errors;
+  NSArray<NSError*>* errors;
   BOOL success = [ruleTable addExecutionRules:executionRules
                               fileAccessRules:fileAccessRules
                                   ruleCleanup:cleanupType
@@ -245,27 +249,27 @@ double watchdogRAMPeak = 0;
   reply([[SNTDatabaseController eventTable] pendingEventsCount]);
 }
 
-- (void)databaseEventsPending:(void (^)(NSArray<SNTStoredEvent *> *events))reply {
+- (void)databaseEventsPending:(void (^)(NSArray<SNTStoredEvent*>* events))reply {
   reply([[SNTDatabaseController eventTable] pendingEvents]);
 }
 
-- (void)databaseRemoveEventsWithIDs:(NSArray *)ids {
+- (void)databaseRemoveEventsWithIDs:(NSArray*)ids {
   [[SNTDatabaseController eventTable] deleteEventsWithIds:ids];
 }
 
-- (void)databaseRuleForIdentifiers:(SNTRuleIdentifiers *)identifiers
-                             reply:(void (^)(SNTRule *))reply {
+- (void)databaseRuleForIdentifiers:(SNTRuleIdentifiers*)identifiers
+                             reply:(void (^)(SNTRule*))reply {
   reply([[SNTDatabaseController ruleTable] executionRuleForIdentifiers:[identifiers toStruct]]);
 }
 
-- (void)staticDecisionForFilePath:(NSString *)filePath
-                      identifiers:(SNTRuleIdentifiers *)identifiers
-                            reply:(void (^)(SNTRule *rule, NSString *decision))reply {
-  SNTRule *rule =
+- (void)staticDecisionForFilePath:(NSString*)filePath
+                      identifiers:(SNTRuleIdentifiers*)identifiers
+                            reply:(void (^)(SNTRule* rule, NSString* decision))reply {
+  SNTRule* rule =
       [[SNTDatabaseController ruleTable] executionRuleForIdentifiers:[identifiers toStruct]];
 
   if (rule) {
-    NSString *action;
+    NSString* action;
     switch (rule.state) {
       case SNTRuleStateBlock:
       case SNTRuleStateSilentBlock: action = @"Denied by rule"; break;
@@ -275,7 +279,7 @@ double watchdogRAMPeak = 0;
     return;
   }
 
-  SNTConfigurator *config = [SNTConfigurator configurator];
+  SNTConfigurator* config = [SNTConfigurator configurator];
 
   // CEL fallback rules cannot be evaluated statically (they require an
   // ActivationCallbackBlock with process-level context like ancestors and
@@ -287,7 +291,7 @@ double watchdogRAMPeak = 0;
   }
 
   // Check blocked path regex (mirrors SNTPolicyProcessor.fileIsScopeBlocked:)
-  NSRegularExpression *blockedRe = config.blockedPathRegex;
+  NSRegularExpression* blockedRe = config.blockedPathRegex;
   if (blockedRe && [blockedRe numberOfMatchesInString:filePath
                                               options:0
                                                 range:NSMakeRange(0, filePath.length)]) {
@@ -301,7 +305,7 @@ double watchdogRAMPeak = 0;
   // already has dedicated "Page Zero" and "Validation" keys for these checks.
 
   // Check allowed path regex (mirrors SNTPolicyProcessor.fileIsScopeAllowed:)
-  NSRegularExpression *allowedRe = config.allowedPathRegex;
+  NSRegularExpression* allowedRe = config.allowedPathRegex;
   if (allowedRe && [allowedRe numberOfMatchesInString:filePath
                                               options:0
                                                 range:NSMakeRange(0, filePath.length)]) {
@@ -323,9 +327,9 @@ double watchdogRAMPeak = 0;
   }
 }
 
-- (void)dataFileAccessRuleForTarget:(NSString *)path reply:(void (^)(NSString *, NSString *))reply {
-  __block NSString *ruleName;
-  __block NSString *ruleVersion;
+- (void)dataFileAccessRuleForTarget:(NSString*)path reply:(void (^)(NSString*, NSString*))reply {
+  __block NSString* ruleName;
+  __block NSString* ruleVersion;
 
   _watchItems->FindPoliciesForTargets(^(santa::LookupPolicyBlock lookup_policy_block) {
     std::optional<std::shared_ptr<santa::WatchItemPolicyBase>> policy =
@@ -343,12 +347,12 @@ double watchdogRAMPeak = 0;
   reply([SNTConfigurator configurator].staticRules.count);
 }
 
-- (void)retrieveAllExecutionRules:(void (^)(NSArray<SNTRule *> *, NSError *))reply {
+- (void)retrieveAllExecutionRules:(void (^)(NSArray<SNTRule*>*, NSError*))reply {
 #ifndef DEBUG
-  SNTConfigurator *config = [SNTConfigurator configurator];
+  SNTConfigurator* config = [SNTConfigurator configurator];
   // Do not return any rules if syncBaseURL or static rules are set and return an error.
   if (config.syncBaseURL || config.staticRules.count) {
-    NSError *error;
+    NSError* error;
     [SNTError populateError:&error
                    withCode:SNTErrorCodeManualRulesDisabled
                      format:@"SyncBaseURL is set"];
@@ -357,24 +361,24 @@ double watchdogRAMPeak = 0;
   }
 #endif
 
-  NSArray<SNTRule *> *rules = [[SNTDatabaseController ruleTable] retrieveAllExecutionRules];
+  NSArray<SNTRule*>* rules = [[SNTDatabaseController ruleTable] retrieveAllExecutionRules];
   reply(rules, nil);
 }
 
 - (void)retrieveAllFileAccessRules:
-    (void (^)(NSDictionary<NSString *, NSDictionary *> *fileAccessRules, NSError *error))reply {
+    (void (^)(NSDictionary<NSString*, NSDictionary*>* fileAccessRules, NSError* error))reply {
 #ifdef DEBUG
   reply([[SNTDatabaseController ruleTable] retrieveAllFileAccessRules], nil);
 #else
-  NSError *err = [SNTError
+  NSError* err = [SNTError
       createErrorWithFormat:@"File access rule retrieval not supported in release builds."];
   reply(nil, err);
 
 #endif
 }
 
-- (void)databaseRulesHash:(void (^)(NSString *, NSString *))reply {
-  SNTRuleTableRulesHash *rulesHash = [[SNTDatabaseController ruleTable] hashOfHashes];
+- (void)databaseRulesHash:(void (^)(NSString*, NSString*))reply {
+  SNTRuleTableRulesHash* rulesHash = [[SNTDatabaseController ruleTable] hashOfHashes];
   reply(rulesHash.executionRulesHash, rulesHash.fileAccessRulesHash);
 }
 
@@ -388,8 +392,8 @@ double watchdogRAMPeak = 0;
   reply(watchdogCPUEvents, watchdogRAMEvents, watchdogCPUPeak, watchdogRAMPeak);
 }
 
-- (void)watchItemsState:(void (^)(BOOL, uint64_t, NSString *,
-                                  santa::WatchItems::DataSource dataSource, NSString *,
+- (void)watchItemsState:(void (^)(BOOL, uint64_t, NSString*,
+                                  santa::WatchItems::DataSource dataSource, NSString*,
                                   NSTimeInterval))reply {
   std::optional<WatchItemsState> optionalState = self->_watchItems->State();
 
@@ -407,11 +411,11 @@ double watchdogRAMPeak = 0;
   reply([[SNTConfigurator configurator] clientMode]);
 }
 
-- (void)fullSyncLastSuccess:(void (^)(NSDate *))reply {
+- (void)fullSyncLastSuccess:(void (^)(NSDate*))reply {
   reply([[SNTConfigurator configurator] fullSyncLastSuccess]);
 }
 
-- (void)ruleSyncLastSuccess:(void (^)(NSDate *))reply {
+- (void)ruleSyncLastSuccess:(void (^)(NSDate*))reply {
   reply([[SNTConfigurator configurator] ruleSyncLastSuccess]);
 }
 
@@ -427,14 +431,14 @@ double watchdogRAMPeak = 0;
   reply([[SNTConfigurator configurator] blockUnencryptedRemovableMediaMount]);
 }
 
-- (void)remountUSBMode:(void (^)(NSArray<NSString *> *))reply {
+- (void)remountUSBMode:(void (^)(NSArray<NSString*>*))reply {
   reply([[SNTConfigurator configurator] remountUSBMode]);
 }
 
-- (void)blockNetworkMount:(void (^)(NSNumber *))reply {
+- (void)blockNetworkMount:(void (^)(NSNumber*))reply {
   // If blocking network mounts is enabled, respond with the number of
   // host exceptions, otherwise nil.
-  SNTConfigurator *configurator = [SNTConfigurator configurator];
+  SNTConfigurator* configurator = [SNTConfigurator configurator];
   reply(configurator.blockNetworkMount ? @(configurator.allowedNetworkMountHosts.count) : nil);
 }
 
@@ -462,8 +466,8 @@ double watchdogRAMPeak = 0;
   reply([SNTConfigurator configurator].disableUnknownEventUpload);
 }
 
-- (void)updateSyncSettings:(SNTConfigBundle *)result reply:(void (^)(void))reply {
-  SNTConfigurator *configurator = [SNTConfigurator configurator];
+- (void)updateSyncSettings:(SNTConfigBundle*)result reply:(void (^)(void))reply {
+  SNTConfigurator* configurator = [SNTConfigurator configurator];
 
   [result clientMode:^(SNTClientMode m) {
     [configurator setSyncServerClientMode:m];
@@ -473,14 +477,14 @@ double watchdogRAMPeak = 0;
     [configurator setSyncTypeRequired:val];
   }];
 
-  [result allowlistRegex:^(NSString *val) {
+  [result allowlistRegex:^(NSString* val) {
     [configurator
         setSyncServerAllowedPathRegex:[NSRegularExpression regularExpressionWithPattern:val
                                                                                 options:0
                                                                                   error:NULL]];
   }];
 
-  [result blocklistRegex:^(NSString *val) {
+  [result blocklistRegex:^(NSString* val) {
     [configurator
         setSyncServerBlockedPathRegex:[NSRegularExpression regularExpressionWithPattern:val
                                                                                 options:0
@@ -495,7 +499,7 @@ double watchdogRAMPeak = 0;
     [configurator setSyncServerBlockUnencryptedRemovableMediaMount:val];
   }];
 
-  [result remountUSBMode:^(NSArray *val) {
+  [result remountUSBMode:^(NSArray* val) {
     [configurator setRemountUSBMode:val];
   }];
 
@@ -503,11 +507,11 @@ double watchdogRAMPeak = 0;
     [configurator setSyncServerBlockNetworkMount:val];
   }];
 
-  [result bannedNetworkMountBlockMessage:^(NSString *val) {
+  [result bannedNetworkMountBlockMessage:^(NSString* val) {
     [configurator setSyncServerBannedNetworkMountBlockMessage:val];
   }];
 
-  [result allowedNetworkMountHosts:^(NSArray<NSString *> *val) {
+  [result allowedNetworkMountHosts:^(NSArray<NSString*>* val) {
     [configurator setSyncServerAllowedNetworkMountHosts:val];
   }];
 
@@ -527,62 +531,62 @@ double watchdogRAMPeak = 0;
     [configurator setDisableUnknownEventUpload:val];
   }];
 
-  [result overrideFileAccessAction:^(NSString *val) {
+  [result overrideFileAccessAction:^(NSString* val) {
     [configurator setSyncServerOverrideFileAccessAction:val];
   }];
 
-  [result exportConfiguration:^(SNTExportConfiguration *val) {
+  [result exportConfiguration:^(SNTExportConfiguration* val) {
     LOGD(@"Received export configuration: %@", val);
     [configurator setSyncServerExportConfig:val];
   }];
 
-  [result fullSyncLastSuccess:^(NSDate *val) {
+  [result fullSyncLastSuccess:^(NSDate* val) {
     [configurator setFullSyncLastSuccess:val];
   }];
 
-  [result ruleSyncLastSuccess:^(NSDate *val) {
+  [result ruleSyncLastSuccess:^(NSDate* val) {
     [configurator setFullSyncLastSuccess:val];
   }];
 
-  [result modeTransition:^(SNTModeTransition *val) {
+  [result modeTransition:^(SNTModeTransition* val) {
     // The _temporaryMonitorMode object is responsible for updating configurator as appropriate
     _temporaryMonitorMode->NewModeTransitionReceived(val);
   }];
 
-  [result networkExtensionSettings:^(SNTSyncNetworkExtensionSettings *val) {
+  [result networkExtensionSettings:^(SNTSyncNetworkExtensionSettings* val) {
     [configurator setSyncServerSyncNetworkExtensionSettings:val];
   }];
 
-  [result pushTokenChain:^(NSArray<NSString *> *val) {
+  [result pushTokenChain:^(NSArray<NSString*>* val) {
     [configurator setSyncServerPushTokenChain:val];
   }];
 
-  [result telemetryFilterExpressions:^(NSArray<NSString *> *val) {
+  [result telemetryFilterExpressions:^(NSArray<NSString*>* val) {
     [configurator setSyncServerTelemetryFilterExpressions:val];
   }];
 
-  [result celFallbackRules:^(NSArray<SNTCELFallbackRule *> *val) {
-    NSData *oldData = [SNTCELFallbackRule serializeArray:[configurator celFallbackRules]];
-    NSData *newData = [SNTCELFallbackRule serializeArray:val];
+  [result celFallbackRules:^(NSArray<SNTCELFallbackRule*>* val) {
+    NSData* oldData = [SNTCELFallbackRule serializeArray:[configurator celFallbackRules]];
+    NSData* newData = [SNTCELFallbackRule serializeArray:val];
     [configurator setSyncServerCELFallbackRules:val];
     if (oldData != newData && ![oldData isEqualToData:newData] && self.flushCacheBlock) {
       self.flushCacheBlock(FlushCacheMode::kAllCaches, FlushCacheReason::kCELFallbackRulesChanged);
     }
   }];
 
-  [result eventDetailURL:^(NSString *val) {
+  [result eventDetailURL:^(NSString* val) {
     [configurator setSyncServerEventDetailURL:val];
   }];
 
-  [result eventDetailText:^(NSString *val) {
+  [result eventDetailText:^(NSString* val) {
     [configurator setSyncServerEventDetailText:val];
   }];
 
-  [result fileAccessEventDetailURL:^(NSString *val) {
+  [result fileAccessEventDetailURL:^(NSString* val) {
     [configurator setSyncServerFileAccessEventDetailURL:val];
   }];
 
-  [result fileAccessEventDetailText:^(NSString *val) {
+  [result fileAccessEventDetailText:^(NSString* val) {
     [configurator setSyncServerFileAccessEventDetailText:val];
   }];
 
@@ -597,18 +601,18 @@ double watchdogRAMPeak = 0;
   reply();
 }
 
-- (void)retrieveStatsState:(void (^)(NSDate *, NSString *))reply {
+- (void)retrieveStatsState:(void (^)(NSDate*, NSString*))reply {
   reply([[SNTConfigurator configurator] lastStatsSubmissionTimestamp],
         [[SNTConfigurator configurator] lastStatsSubmissionVersion]);
 }
 
-- (void)saveStatsSubmissionAttemptTime:(NSDate *)timestamp version:(NSString *)version {
+- (void)saveStatsSubmissionAttemptTime:(NSDate*)timestamp version:(NSString*)version {
   [[SNTConfigurator configurator] saveStatsSubmissionAttemptTime:timestamp version:version];
 }
 
 #pragma mark Command Ops
 
-- (void)killProcesses:(SNTKillRequest *)killRequest reply:(void (^)(SNTKillResponse *))reply {
+- (void)killProcesses:(SNTKillRequest*)killRequest reply:(void (^)(SNTKillResponse*))reply {
   // Perform work asynchronously to not hold up processing other XPC messages
   dispatch_async(self.commandQ, ^{
     reply(santa::KillingMachine(killRequest));
@@ -617,17 +621,30 @@ double watchdogRAMPeak = 0;
 
 #pragma mark Metrics Ops
 
-- (void)metrics:(void (^)(NSDictionary *))reply {
-  SNTMetricSet *metricSet = [SNTMetricSet sharedInstance];
+- (void)metrics:(void (^)(NSDictionary*))reply {
+  SNTMetricSet* metricSet = [SNTMetricSet sharedInstance];
   reply([metricSet export]);
+}
+
+- (void)exportMetrics:(void (^)(BOOL))reply {
+  if (![[SNTConfigurator configurator] exportMetrics]) {
+    reply(NO);
+    return;
+  }
+
+  if (self.metricsExportBlock) {
+    self.metricsExportBlock(reply);
+  } else {
+    reply(NO);
+  }
 }
 
 #pragma mark GUI Ops
 
-- (void)setNotificationListener:(NSXPCListenerEndpoint *)listener {
+- (void)setNotificationListener:(NSXPCListenerEndpoint*)listener {
   // This will leak the underlying NSXPCConnection when "fast user switching" occurs.
   // It is not worth the trouble to fix. Maybe future self will feel differently.
-  MOLXPCConnection *c = [[MOLXPCConnection alloc] initClientWithListener:listener];
+  MOLXPCConnection* c = [[MOLXPCConnection alloc] initClientWithListener:listener];
   c.remoteInterface = [SNTXPCNotifierInterface notifierInterface];
   [c resume];
   self.notQueue.notifierConnection = c;
@@ -640,25 +657,25 @@ double watchdogRAMPeak = 0;
   // Instead of reusing the existing connection, create a new connection to the sync service.
   // Otherwise, the isFCMListening message would potentially be queued behind various long lived
   // sync operations.
-  MOLXPCConnection *conn = [SNTXPCSyncServiceInterface configuredConnection];
+  MOLXPCConnection* conn = [SNTXPCSyncServiceInterface configuredConnection];
   [conn resume];
   [conn.remoteObjectProxy pushNotificationStatus:^(SNTPushNotificationStatus response) {
     reply(response);
   }];
 }
 
-- (void)pushNotificationServerAddress:(void (^)(NSString *))reply {
+- (void)pushNotificationServerAddress:(void (^)(NSString*))reply {
   // This message should be handled in a timely manner, santactl status waits for the response.
   // Instead of reusing the existing connection, create a new connection to the sync service.
   // Otherwise, the message would potentially be queued behind various long lived sync operations.
-  MOLXPCConnection *conn = [SNTXPCSyncServiceInterface configuredConnection];
+  MOLXPCConnection* conn = [SNTXPCSyncServiceInterface configuredConnection];
   [conn resume];
-  [conn.remoteObjectProxy pushNotificationServerAddress:^(NSString *serverAddress) {
+  [conn.remoteObjectProxy pushNotificationServerAddress:^(NSString* serverAddress) {
     reply(serverAddress);
   }];
 }
 
-- (void)postRuleSyncNotificationForApplication:(NSString *)app reply:(void (^)(void))reply {
+- (void)postRuleSyncNotificationForApplication:(NSString*)app reply:(void (^)(void))reply {
   [[self.notQueue.notifierConnection remoteObjectProxy] postRuleSyncNotificationForApplication:app];
   reply();
 }
@@ -670,9 +687,9 @@ double watchdogRAMPeak = 0;
 ///  @param event The offending event, fileBundleHash & fileBundleBinaryCount need to be populated.
 ///  @param events Next bundle events.
 ///
-- (void)syncBundleEvent:(SNTStoredExecutionEvent *)event
-          relatedEvents:(NSArray<SNTStoredExecutionEvent *> *)events {
-  SNTEventTable *eventTable = [SNTDatabaseController eventTable];
+- (void)syncBundleEvent:(SNTStoredExecutionEvent*)event
+          relatedEvents:(NSArray<SNTStoredExecutionEvent*>*)events {
+  SNTEventTable* eventTable = [SNTDatabaseController eventTable];
 
   // Delete the event cached by the execution controller.
   [eventTable deleteEventWithId:event.idx];
@@ -707,7 +724,7 @@ double watchdogRAMPeak = 0;
 
 #pragma mark Control Ops
 
-- (BOOL)verifyPathIsSanta:(NSString *)path {
+- (BOOL)verifyPathIsSanta:(NSString*)path {
   if (path.length == 0) {
     LOGE(@"No path provided");
     return NO;
@@ -719,8 +736,8 @@ double watchdogRAMPeak = 0;
     return NO;
   }
 
-  NSError *err;
-  MOLCodesignChecker *cc = [[MOLCodesignChecker alloc] initWithBinaryPath:path error:&err];
+  NSError* err;
+  MOLCodesignChecker* cc = [[MOLCodesignChecker alloc] initWithBinaryPath:path error:&err];
 
   if (err) {
     LOGE(@"Failed to validate install path: %@", err);
@@ -736,26 +753,26 @@ double watchdogRAMPeak = 0;
   return YES;
 }
 
-- (void)setAppOwnershipAndPermissions:(NSString *)path {
-  NSFileManager *fm = [NSFileManager defaultManager];
-  NSDirectoryEnumerator<NSURL *> *dirEnumerator = [fm enumeratorAtURL:[NSURL fileURLWithPath:path]
-                                           includingPropertiesForKeys:nil
-                                                              options:0
-                                                         errorHandler:nil];
+- (void)setAppOwnershipAndPermissions:(NSString*)path {
+  NSFileManager* fm = [NSFileManager defaultManager];
+  NSDirectoryEnumerator<NSURL*>* dirEnumerator = [fm enumeratorAtURL:[NSURL fileURLWithPath:path]
+                                          includingPropertiesForKeys:nil
+                                                             options:0
+                                                        errorHandler:nil];
 
-  NSDictionary<NSFileAttributeKey, id> *attrs = @{
+  NSDictionary<NSFileAttributeKey, id>* attrs = @{
     NSFileOwnerAccountID : @(0),       // root
     NSFileGroupOwnerAccountID : @(0),  // wheel
   };
 
-  void (^SetAttrs)(NSString *) = ^void(NSString *filePath) {
-    NSError *error;
+  void (^SetAttrs)(NSString*) = ^void(NSString* filePath) {
+    NSError* error;
     if (![fm setAttributes:attrs ofItemAtPath:filePath error:&error]) {
       LOGW(@"Unable to set ownership: %@: %@", filePath, error);
     }
   };
 
-  for (NSURL *file in dirEnumerator) {
+  for (NSURL* file in dirEnumerator) {
     SetAttrs(file.path);
   }
 
@@ -764,13 +781,13 @@ double watchdogRAMPeak = 0;
 
 - (void)reloadSystemExtension {
   LOGI(@"Trigger SystemExtension activation");
-  NSTask *t = [[NSTask alloc] init];
+  NSTask* t = [[NSTask alloc] init];
   t.launchPath = [@(kSantaAppPath) stringByAppendingString:@"/Contents/MacOS/Santa"];
   t.arguments = @[ @"--load-system-extension" ];
   [t launch];
 }
 
-- (void)installSantaApp:(NSString *)tempPath reply:(void (^)(BOOL))reply {
+- (void)installSantaApp:(NSString*)tempPath reply:(void (^)(BOOL))reply {
   LOGI(@"Trigger Santa installation from: %@", tempPath);
 
   if ([[SNTConfigurator configurator] isSyncV2Enabled] && santa::SNTIsLiteAppBundle(tempPath)) {
@@ -787,9 +804,9 @@ double watchdogRAMPeak = 0;
 
   [self setAppOwnershipAndPermissions:tempPath];
 
-  NSString *installPath = @(kSantaAppPath);
-  NSFileManager *fm = [NSFileManager defaultManager];
-  NSError *error;
+  NSString* installPath = @(kSantaAppPath);
+  NSFileManager* fm = [NSFileManager defaultManager];
+  NSError* error;
 
   if (![fm removeItemAtPath:installPath error:&error]) {
     LOGE(@"Failed to remove %@: %@", installPath, error);
@@ -810,7 +827,7 @@ double watchdogRAMPeak = 0;
 
 - (void)reloadNetworkExtension {
   LOGI(@"Trigger Santa Network Extension (Content Filter) activation");
-  NSTask *t = [[NSTask alloc] init];
+  NSTask* t = [[NSTask alloc] init];
   t.launchPath = [@(kSantaAppPath) stringByAppendingString:@"/Contents/MacOS/Santa"];
   t.arguments = @[ @"--load-network-extension" ];
   [t launch];
@@ -826,11 +843,11 @@ double watchdogRAMPeak = 0;
   LOGI(@"Trigger santanetd (network extension) installation");
 
   // Verify the network extension bundle exists
-  NSString *netdBundlePath =
+  NSString* netdBundlePath =
       [@(kSantaAppPath) stringByAppendingString:@"/Contents/Library/SystemExtensions/"
                                                 @"com.northpolesec.santa.netd.systemextension"];
 
-  NSFileManager *fm = [NSFileManager defaultManager];
+  NSFileManager* fm = [NSFileManager defaultManager];
   BOOL isDir;
   if (![fm fileExistsAtPath:netdBundlePath isDirectory:&isDir] || !isDir) {
     LOGE(@"Network extension bundle not found at: %@", netdBundlePath);
@@ -864,11 +881,11 @@ double watchdogRAMPeak = 0;
   reply([self.netExtQueue shouldInstallNetworkExtension]);
 }
 
-- (void)registerNetworkExtensionWithProtocolVersion:(NSString *)protocolVersion
-                                              reply:(void (^)(SNTNetworkExtensionSettings *settings,
-                                                              NSString *santaProtocolVersion,
-                                                              NSError *error))reply {
-  NSError *error;
+- (void)registerNetworkExtensionWithProtocolVersion:(NSString*)protocolVersion
+                                              reply:(void (^)(SNTNetworkExtensionSettings* settings,
+                                                              NSString* santaProtocolVersion,
+                                                              NSError* error))reply {
+  NSError* error;
 
   if (![[SNTConfigurator configurator] isSyncV2Enabled]) {
     [SNTError populateError:&error
@@ -878,7 +895,7 @@ double watchdogRAMPeak = 0;
     return;
   }
 
-  SNTNetworkExtensionSettings *settings =
+  SNTNetworkExtensionSettings* settings =
       [self.netExtQueue handleRegistrationWithProtocolVersion:protocolVersion error:&error];
   reply(settings, kSantaNetworkExtensionProtocolVersion, error);
 
@@ -899,20 +916,20 @@ double watchdogRAMPeak = 0;
   });
 }
 
-- (void)requestTemporaryMonitorModeWithDurationMinutes:(NSNumber *)requestedDuration
-                                                 reply:(void (^)(uint32_t, NSError *))reply {
-  NSError *err;
+- (void)requestTemporaryMonitorModeWithDurationMinutes:(NSNumber*)requestedDuration
+                                                 reply:(void (^)(uint32_t, NSError*))reply {
+  NSError* err;
   uint32_t duration = _temporaryMonitorMode->RequestMinutes(requestedDuration, &err);
   reply(duration, err);
 }
 
-- (void)temporaryMonitorModeSecondsRemaining:(void (^)(NSNumber *))reply {
+- (void)temporaryMonitorModeSecondsRemaining:(void (^)(NSNumber*))reply {
   std::optional<uint64_t> secsRemaining = _temporaryMonitorMode->SecondsRemaining();
   reply(secsRemaining.has_value() ? @(*secsRemaining) : nil);
 }
 
-- (void)cancelTemporaryMonitorMode:(void (^)(NSError *))reply {
-  NSError *err;
+- (void)cancelTemporaryMonitorMode:(void (^)(NSError*))reply {
+  NSError* err;
   if (!_temporaryMonitorMode->Cancel()) {
     err = [SNTError createErrorWithFormat:@"Machine is not currently in temporary Monitor Mode"];
   }
@@ -925,9 +942,9 @@ double watchdogRAMPeak = 0;
 
 #pragma mark Network Extension Ops
 
-- (void)reportNetworkFlows:(NSArray<SNDProcessFlows *> *)processFlows
-               windowStart:(NSDate *)windowStart
-                 windowEnd:(NSDate *)windowEnd
+- (void)reportNetworkFlows:(NSArray<SNDProcessFlows*>*)processFlows
+               windowStart:(NSDate*)windowStart
+                 windowEnd:(NSDate*)windowEnd
                      reply:(void (^)(void))reply {
   dispatch_async(self.netFlowQ, ^{
     [self.netExtQueue handleNetworkFlows:processFlows windowStart:windowStart windowEnd:windowEnd];
@@ -935,12 +952,12 @@ double watchdogRAMPeak = 0;
   reply();
 }
 
-- (void)networkExtensionLoadedBundleVersionInfo:(void (^)(NSDictionary *bundleInfo))reply {
+- (void)networkExtensionLoadedBundleVersionInfo:(void (^)(NSDictionary* bundleInfo))reply {
   [self.netExtQueue networkExtensionBundleVersionInfo:reply];
 }
 
 - (void)networkExtensionEnabled:(void (^)(BOOL enabled))reply {
-  SNTSyncNetworkExtensionSettings *settings =
+  SNTSyncNetworkExtensionSettings* settings =
       [[SNTConfigurator configurator] syncNetworkExtensionSettings];
   reply(settings ? settings.enable : NO);
 }

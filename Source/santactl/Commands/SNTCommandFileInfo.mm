@@ -34,55 +34,55 @@
 #import "Source/santactl/SNTCommandController.h"
 
 // file info keys
-static NSString *const kPath = @"Path";
-static NSString *const kBundleName = @"Bundle Name";
-static NSString *const kBundleVersion = @"Bundle Version";
-static NSString *const kBundleVersionStr = @"Bundle Version Str";
-static NSString *const kDownloadReferrerURL = @"Download Referrer URL";
-static NSString *const kDownloadURL = @"Download URL";
-static NSString *const kDownloadTimestamp = @"Download Timestamp";
-static NSString *const kDownloadAgent = @"Download Agent";
-static NSString *const kType = @"Type";
-static NSString *const kPageZero = @"Page Zero";
-static NSString *const kCodeSigned = @"Code-signed";
-static NSString *const kValidation = @"Validation";
-static NSString *const kAssessment = @"Security Assessment";
-static NSString *const kRule = @"Rule";
-static NSString *const kDecision = @"Expected Decision";
-static NSString *const kSigningChain = @"Signing Chain";
-static NSString *const kUniversalSigningChain = @"Universal Signing Chain";
-static NSString *const kTeamID = @"Team ID";
-static NSString *const kSigningID = @"Signing ID";
-static NSString *const kCDHash = @"CDHash";
-static NSString *const kEntitlements = @"Entitlements";
-static NSString *const kSecureSigningTime = @"Secure Signing Time";
-static NSString *const kSigningTime = @"Signing Time";
+static NSString* const kPath = @"Path";
+static NSString* const kBundleName = @"Bundle Name";
+static NSString* const kBundleVersion = @"Bundle Version";
+static NSString* const kBundleVersionStr = @"Bundle Version Str";
+static NSString* const kDownloadReferrerURL = @"Download Referrer URL";
+static NSString* const kDownloadURL = @"Download URL";
+static NSString* const kDownloadTimestamp = @"Download Timestamp";
+static NSString* const kDownloadAgent = @"Download Agent";
+static NSString* const kType = @"Type";
+static NSString* const kPageZero = @"Page Zero";
+static NSString* const kCodeSigned = @"Code-signed";
+static NSString* const kValidation = @"Validation";
+static NSString* const kAssessment = @"Security Assessment";
+static NSString* const kRule = @"Rule";
+static NSString* const kDecision = @"Expected Decision";
+static NSString* const kSigningChain = @"Signing Chain";
+static NSString* const kUniversalSigningChain = @"Universal Signing Chain";
+static NSString* const kTeamID = @"Team ID";
+static NSString* const kSigningID = @"Signing ID";
+static NSString* const kCDHash = @"CDHash";
+static NSString* const kEntitlements = @"Entitlements";
+static NSString* const kSecureSigningTime = @"Secure Signing Time";
+static NSString* const kSigningTime = @"Signing Time";
 
 // signing chain keys
-static NSString *const kCommonName = @"Common Name";
-static NSString *const kOrganization = @"Organization";
-static NSString *const kOrganizationalUnit = @"Organizational Unit";
-static NSString *const kValidFrom = @"Valid From";
-static NSString *const kValidUntil = @"Valid Until";
+static NSString* const kCommonName = @"Common Name";
+static NSString* const kOrganization = @"Organization";
+static NSString* const kOrganizationalUnit = @"Organizational Unit";
+static NSString* const kValidFrom = @"Valid From";
+static NSString* const kValidUntil = @"Valid Until";
 
 // shared file info & signing chain keys
-static NSString *const kSHA256 = @"SHA-256";
-static NSString *const kSHA1 = @"SHA-1";
+static NSString* const kSHA256 = @"SHA-256";
+static NSString* const kSHA1 = @"SHA-1";
 
 // bundle info keys
-static NSString *const kBundleInfo = @"Bundle Info";
-static NSString *const kBundlePath = @"Main Bundle Path";
-static NSString *const kBundleID = @"Main Bundle ID";
-static NSString *const kBundleHash = @"Bundle Hash";
-static NSString *const kBundleHashes = @"Bundle Hashes";
+static NSString* const kBundleInfo = @"Bundle Info";
+static NSString* const kBundlePath = @"Main Bundle Path";
+static NSString* const kBundleID = @"Main Bundle ID";
+static NSString* const kBundleHash = @"Bundle Hash";
+static NSString* const kBundleHashes = @"Bundle Hashes";
 
 // Message displayed when daemon communication fails
-static NSString *const kCommunicationErrorMsg = @"Could not communicate with daemon";
+static NSString* const kCommunicationErrorMsg = @"Could not communicate with daemon";
 
 // Used by longHelpText to display a list of valid keys passed in as an array.
-NSString *formattedStringForKeyArray(NSArray<NSString *> *array) {
-  NSMutableString *result = [[NSMutableString alloc] init];
-  for (NSString *key in array) {
+NSString* formattedStringForKeyArray(NSArray<NSString*>* array) {
+  NSMutableString* result = [[NSMutableString alloc] init];
+  for (NSString* key in array) {
     [result appendString:[NSString stringWithFormat:@"                       \"%@\"\n", key]];
   }
   return result;
@@ -97,9 +97,9 @@ NSString *formattedStringForKeyArray(NSArray<NSString *> *array) {
 @property(nonatomic) BOOL enableEntitlements;
 @property(nonatomic) BOOL filterInclusive;
 @property(nonatomic) BOOL enableVerify;
-@property(nonatomic) NSNumber *certIndex;
-@property(nonatomic, copy) NSArray<NSString *> *outputKeyList;
-@property(nonatomic, copy) NSDictionary<NSString *, NSRegularExpression *> *outputFilters;
+@property(nonatomic) NSNumber* certIndex;
+@property(nonatomic, copy) NSArray<NSString*>* outputKeyList;
+@property(nonatomic, copy) NSDictionary<NSString*, NSRegularExpression*>* outputFilters;
 
 // Flag indicating when to use TTY colors
 @property(readonly, nonatomic) BOOL prettyOutput;
@@ -111,19 +111,19 @@ NSString *formattedStringForKeyArray(NSArray<NSString *> *array) {
 @property(nonatomic) BOOL daemonUnavailable;
 
 // Common date formatter
-@property(nonatomic) NSISO8601DateFormatter *dateFormatter;
+@property(nonatomic) NSISO8601DateFormatter* dateFormatter;
 
 // Maximum length of output key name, used for formatting
 @property(nonatomic) NSUInteger maxKeyWidth;
 
 // Valid key lists
-@property(readonly, nonatomic) NSArray<NSString *> *fileInfoKeys;
-@property(readonly, nonatomic) NSArray<NSString *> *signingChainKeys;
+@property(readonly, nonatomic) NSArray<NSString*>* fileInfoKeys;
+@property(readonly, nonatomic) NSArray<NSString*>* signingChainKeys;
 
 // Block type to be used with propertyMap values.  The first SNTCommandFileInfo parameter
 // is really required only for the the rule property getter which needs access to the daemon
 // connection, but downloadTimestamp & signingChain also use it for a shared date formatter.
-typedef id (^SNTAttributeBlock)(SNTCommandFileInfo *, SNTFileInfo *);
+typedef id (^SNTAttributeBlock)(SNTCommandFileInfo*, SNTFileInfo*);
 
 // on read generated properties
 @property(readonly, copy, nonatomic) SNTAttributeBlock path;
@@ -153,7 +153,7 @@ typedef id (^SNTAttributeBlock)(SNTCommandFileInfo *, SNTFileInfo *);
 @property(readonly, copy, nonatomic) SNTAttributeBlock signingTime;
 
 // Mapping between property string keys and SNTAttributeBlocks
-@property(nonatomic) NSDictionary<NSString *, SNTAttributeBlock> *propertyMap;
+@property(nonatomic) NSDictionary<NSString*, SNTAttributeBlock>* propertyMap;
 
 // Serial queue and dispatch group used for printing output
 @property(nonatomic) dispatch_queue_t printQueue;
@@ -175,11 +175,11 @@ REGISTER_COMMAND_NAME(@"fileinfo")
   return NO;
 }
 
-+ (NSString *)shortHelpText {
++ (NSString*)shortHelpText {
   return @"Prints information about a file.";
 }
 
-+ (NSString *)longHelpText {
++ (NSString*)longHelpText {
   return [NSString
       stringWithFormat:
           @"The details provided will be the same ones Santa uses to make a decision\n"
@@ -228,11 +228,11 @@ REGISTER_COMMAND_NAME(@"fileinfo")
           formattedStringForKeyArray(self.signingChainKeys)];
 }
 
-+ (NSSet<NSString *> *)aliases {
++ (NSSet<NSString*>*)aliases {
   return [NSSet setWithArray:@[ @"fi" ]];
 }
 
-+ (NSArray<NSString *> *)fileInfoKeys {
++ (NSArray<NSString*>*)fileInfoKeys {
   return @[
     kPath,
     kSHA256,
@@ -262,12 +262,12 @@ REGISTER_COMMAND_NAME(@"fileinfo")
   ];
 }
 
-+ (NSArray<NSString *> *)signingChainKeys {
++ (NSArray<NSString*>*)signingChainKeys {
   return
       @[ kSHA256, kSHA1, kCommonName, kOrganization, kOrganizationalUnit, kValidFrom, kValidUntil ];
 }
 
-- (instancetype)initWithDaemonConnection:(MOLXPCConnection *)daemonConn {
+- (instancetype)initWithDaemonConnection:(MOLXPCConnection*)daemonConn {
   self = [super initWithDaemonConnection:daemonConn];
   if (self) {
     _dateFormatter = [[NSISO8601DateFormatter alloc] init];
@@ -310,68 +310,68 @@ REGISTER_COMMAND_NAME(@"fileinfo")
 #pragma mark property getters
 
 - (SNTAttributeBlock)path {
-  return ^id(SNTCommandFileInfo *cmd, SNTFileInfo *fileInfo) {
+  return ^id(SNTCommandFileInfo* cmd, SNTFileInfo* fileInfo) {
     return fileInfo.path;
   };
 }
 
 - (SNTAttributeBlock)sha256 {
-  return ^id(SNTCommandFileInfo *cmd, SNTFileInfo *fileInfo) {
+  return ^id(SNTCommandFileInfo* cmd, SNTFileInfo* fileInfo) {
     return fileInfo.SHA256;
   };
 }
 
 - (SNTAttributeBlock)sha1 {
-  return ^id(SNTCommandFileInfo *cmd, SNTFileInfo *fileInfo) {
+  return ^id(SNTCommandFileInfo* cmd, SNTFileInfo* fileInfo) {
     return fileInfo.SHA1;
   };
 }
 
 - (SNTAttributeBlock)bundleName {
-  return ^id(SNTCommandFileInfo *cmd, SNTFileInfo *fileInfo) {
+  return ^id(SNTCommandFileInfo* cmd, SNTFileInfo* fileInfo) {
     return fileInfo.bundleName;
   };
 }
 
 - (SNTAttributeBlock)bundleVersion {
-  return ^id(SNTCommandFileInfo *cmd, SNTFileInfo *fileInfo) {
+  return ^id(SNTCommandFileInfo* cmd, SNTFileInfo* fileInfo) {
     return fileInfo.bundleVersion;
   };
 }
 
 - (SNTAttributeBlock)bundleVersionStr {
-  return ^id(SNTCommandFileInfo *cmd, SNTFileInfo *fileInfo) {
+  return ^id(SNTCommandFileInfo* cmd, SNTFileInfo* fileInfo) {
     return fileInfo.bundleShortVersionString;
   };
 }
 
 - (SNTAttributeBlock)downloadReferrerURL {
-  return ^id(SNTCommandFileInfo *cmd, SNTFileInfo *fileInfo) {
+  return ^id(SNTCommandFileInfo* cmd, SNTFileInfo* fileInfo) {
     return fileInfo.quarantineRefererURL;
   };
 }
 
 - (SNTAttributeBlock)downloadURL {
-  return ^id(SNTCommandFileInfo *cmd, SNTFileInfo *fileInfo) {
+  return ^id(SNTCommandFileInfo* cmd, SNTFileInfo* fileInfo) {
     return fileInfo.quarantineDataURL;
   };
 }
 
 - (SNTAttributeBlock)downloadTimestamp {
-  return ^id(SNTCommandFileInfo *cmd, SNTFileInfo *fileInfo) {
+  return ^id(SNTCommandFileInfo* cmd, SNTFileInfo* fileInfo) {
     return [cmd.dateFormatter stringFromDate:fileInfo.quarantineTimestamp];
   };
 }
 
 - (SNTAttributeBlock)downloadAgent {
-  return ^id(SNTCommandFileInfo *cmd, SNTFileInfo *fileInfo) {
+  return ^id(SNTCommandFileInfo* cmd, SNTFileInfo* fileInfo) {
     return fileInfo.quarantineAgentBundleID;
   };
 }
 
 - (SNTAttributeBlock)type {
-  return ^id(SNTCommandFileInfo *cmd, SNTFileInfo *fileInfo) {
-    NSArray *archs = [fileInfo architectures];
+  return ^id(SNTCommandFileInfo* cmd, SNTFileInfo* fileInfo) {
+    NSArray* archs = [fileInfo architectures];
     if (archs.count == 0) {
       return [fileInfo humanReadableFileType];
     }
@@ -381,7 +381,7 @@ REGISTER_COMMAND_NAME(@"fileinfo")
 }
 
 - (SNTAttributeBlock)pageZero {
-  return ^id(SNTCommandFileInfo *cmd, SNTFileInfo *fileInfo) {
+  return ^id(SNTCommandFileInfo* cmd, SNTFileInfo* fileInfo) {
     if ([fileInfo isMissingPageZero]) {
       return @"__PAGEZERO segment missing/bad!";
     }
@@ -390,22 +390,22 @@ REGISTER_COMMAND_NAME(@"fileinfo")
 }
 
 - (SNTAttributeBlock)codeSigned {
-  return ^id(SNTCommandFileInfo *cmd, SNTFileInfo *fileInfo) {
+  return ^id(SNTCommandFileInfo* cmd, SNTFileInfo* fileInfo) {
     return [fileInfo codesignStatus];
   };
 }
 
 - (SNTAttributeBlock)validation {
-  return ^id(SNTCommandFileInfo *cmd, SNTFileInfo *fileInfo) {
-    NSArray *archs = [fileInfo architectures];
+  return ^id(SNTCommandFileInfo* cmd, SNTFileInfo* fileInfo) {
+    NSArray* archs = [fileInfo architectures];
     if (archs.count == 0) return nil;
 
-    MOLCodesignChecker *csc = [fileInfo codesignCheckerWithError:NULL];
+    MOLCodesignChecker* csc = [fileInfo codesignCheckerWithError:NULL];
     if (!csc) return nil;
 
-    NSMutableArray *results = [NSMutableArray arrayWithCapacity:archs.count];
-    for (NSString *arch in archs) {
-      NSString *status = [csc validationStatusForArchitecture:arch];
+    NSMutableArray* results = [NSMutableArray arrayWithCapacity:archs.count];
+    for (NSString* arch in archs) {
+      NSString* status = [csc validationStatusForArchitecture:arch];
       if (status) {
         [results addObject:@{@"arch" : arch, @"status" : status}];
       }
@@ -415,28 +415,28 @@ REGISTER_COMMAND_NAME(@"fileinfo")
 }
 
 - (SNTAttributeBlock)assessment {
-  return ^id(SNTCommandFileInfo *cmd, SNTFileInfo *fileInfo) {
+  return ^id(SNTCommandFileInfo* cmd, SNTFileInfo* fileInfo) {
     // Assessment only applies to Mach-O binaries
     if (!fileInfo.isMachO) return nil;
 
     // Verify spctl is the expected Apple platform binary before executing
-    static NSString *const spctlPath = @"/usr/sbin/spctl";
-    MOLCodesignChecker *spctlChecker = [[MOLCodesignChecker alloc] initWithBinaryPath:spctlPath];
+    static NSString* const spctlPath = @"/usr/sbin/spctl";
+    MOLCodesignChecker* spctlChecker = [[MOLCodesignChecker alloc] initWithBinaryPath:spctlPath];
     if (!spctlChecker.platformBinary ||
         ![spctlChecker.signingID isEqualToString:@"com.apple.spctl"]) {
       return @"Unable to locate suitable spctl binary";
     }
 
-    NSTask *task = [[NSTask alloc] init];
+    NSTask* task = [[NSTask alloc] init];
     task.executableURL = [NSURL fileURLWithPath:spctlPath];
     task.arguments = @[ @"--assess", @"-vv", fileInfo.path ];
 
-    NSPipe *stdoutPipe = [NSPipe pipe];
-    NSPipe *stderrPipe = [NSPipe pipe];
+    NSPipe* stdoutPipe = [NSPipe pipe];
+    NSPipe* stderrPipe = [NSPipe pipe];
     task.standardOutput = stdoutPipe;
     task.standardError = stderrPipe;
 
-    NSError *error;
+    NSError* error;
     if (![task launchAndReturnError:&error]) {
       return [NSString stringWithFormat:@"Failed to run spctl: %@", error.localizedDescription];
     }
@@ -453,10 +453,10 @@ REGISTER_COMMAND_NAME(@"fileinfo")
       return @"spctl timed out";
     }
 
-    NSData *stdoutData = [stdoutPipe.fileHandleForReading readDataToEndOfFile];
-    NSData *stderrData = [stderrPipe.fileHandleForReading readDataToEndOfFile];
+    NSData* stdoutData = [stdoutPipe.fileHandleForReading readDataToEndOfFile];
+    NSData* stderrData = [stderrPipe.fileHandleForReading readDataToEndOfFile];
 
-    NSMutableString *output = [NSMutableString string];
+    NSMutableString* output = [NSMutableString string];
     if (stdoutData.length > 0) {
       [output appendString:[[NSString alloc] initWithData:stdoutData
                                                  encoding:NSUTF8StringEncoding]];
@@ -467,13 +467,13 @@ REGISTER_COMMAND_NAME(@"fileinfo")
                                                  encoding:NSUTF8StringEncoding]];
     }
 
-    NSString *trimmed =
+    NSString* trimmed =
         [output stringByTrimmingCharactersInSet:[NSCharacterSet newlineCharacterSet]];
     return trimmed.length > 0 ? trimmed : nil;
   };
 }
 
-static void ResumeDaemonConnection(SNTCommandFileInfo *cmd) {
+static void ResumeDaemonConnection(SNTCommandFileInfo* cmd) {
   static dispatch_once_t token;
   dispatch_once(&token, ^{
     [cmd.daemonConn resume];
@@ -481,14 +481,14 @@ static void ResumeDaemonConnection(SNTCommandFileInfo *cmd) {
 }
 
 - (SNTAttributeBlock)rule {
-  return ^id(SNTCommandFileInfo *cmd, SNTFileInfo *fileInfo) {
+  return ^id(SNTCommandFileInfo* cmd, SNTFileInfo* fileInfo) {
     // If we previously were unable to connect, don't try again.
     if (cmd.daemonUnavailable) return kCommunicationErrorMsg;
     ResumeDaemonConnection(cmd);
     dispatch_semaphore_t sema = dispatch_semaphore_create(0);
 
-    NSError *err;
-    MOLCodesignChecker *csc = [fileInfo codesignCheckerWithError:&err];
+    NSError* err;
+    MOLCodesignChecker* csc = [fileInfo codesignCheckerWithError:&err];
     SNTSigningStatus signingStatus = SigningStatus(csc, err);
 
     struct RuleIdentifiers identifiers = {
@@ -501,16 +501,16 @@ static void ResumeDaemonConnection(SNTCommandFileInfo *cmd) {
 
     // If the binary is signed with a dev cert, see if a rule would've
     // matched if it were prod signed.
-    SNTRuleIdentifiers *lookupIdentifiers =
+    SNTRuleIdentifiers* lookupIdentifiers =
         signingStatus == SNTSigningStatusDevelopment
             ? [[SNTRuleIdentifiers alloc] initWithRuleIdentifiers:identifiers]
             : [[SNTRuleIdentifiers alloc] initWithRuleIdentifiers:identifiers
                                                  andSigningStatus:signingStatus];
 
-    __block NSString *output = @"None";
+    __block NSString* output = @"None";
     id<SNTDaemonControlXPC> rop = [cmd.daemonConn remoteObjectProxy];
     [rop databaseRuleForIdentifiers:lookupIdentifiers
-                              reply:^(SNTRule *r) {
+                              reply:^(SNTRule* r) {
                                 if (signingStatus == SNTSigningStatusDevelopment &&
                                     (r.type == SNTRuleTypeSigningID ||
                                      r.type == SNTRuleTypeTeamID)) {
@@ -534,13 +534,13 @@ static void ResumeDaemonConnection(SNTCommandFileInfo *cmd) {
 }
 
 - (SNTAttributeBlock)decision {
-  return ^id(SNTCommandFileInfo *cmd, SNTFileInfo *fileInfo) {
+  return ^id(SNTCommandFileInfo* cmd, SNTFileInfo* fileInfo) {
     if (cmd.daemonUnavailable) return kCommunicationErrorMsg;
     ResumeDaemonConnection(cmd);
     dispatch_semaphore_t sema = dispatch_semaphore_create(0);
 
-    NSError *err;
-    MOLCodesignChecker *csc = [fileInfo codesignCheckerWithError:&err];
+    NSError* err;
+    MOLCodesignChecker* csc = [fileInfo codesignCheckerWithError:&err];
     SNTSigningStatus signingStatus = SigningStatus(csc, err);
 
     struct RuleIdentifiers identifiers = {
@@ -551,18 +551,18 @@ static void ResumeDaemonConnection(SNTCommandFileInfo *cmd) {
         .teamID = csc.teamID,
     };
 
-    SNTRuleIdentifiers *lookupIdentifiers =
+    SNTRuleIdentifiers* lookupIdentifiers =
         signingStatus == SNTSigningStatusDevelopment
             ? [[SNTRuleIdentifiers alloc] initWithRuleIdentifiers:identifiers]
             : [[SNTRuleIdentifiers alloc] initWithRuleIdentifiers:identifiers
                                                  andSigningStatus:signingStatus];
 
-    __block NSString *output;
+    __block NSString* output;
     id<SNTDaemonControlXPC> rop = [cmd.daemonConn remoteObjectProxy];
     [rop
         staticDecisionForFilePath:fileInfo.path
                       identifiers:lookupIdentifiers
-                            reply:^(SNTRule *r, NSString *decisionStr) {
+                            reply:^(SNTRule* r, NSString* decisionStr) {
                               if (signingStatus == SNTSigningStatusDevelopment && r &&
                                   (r.type == SNTRuleTypeSigningID || r.type == SNTRuleTypeTeamID)) {
                                 output = [NSString
@@ -585,11 +585,11 @@ static void ResumeDaemonConnection(SNTCommandFileInfo *cmd) {
 }
 
 - (SNTAttributeBlock)signingChain {
-  return ^id(SNTCommandFileInfo *cmd, SNTFileInfo *fileInfo) {
-    MOLCodesignChecker *csc = [fileInfo codesignCheckerWithError:NULL];
+  return ^id(SNTCommandFileInfo* cmd, SNTFileInfo* fileInfo) {
+    MOLCodesignChecker* csc = [fileInfo codesignCheckerWithError:NULL];
     if (!csc.certificates.count) return nil;
-    NSMutableArray *certs = [[NSMutableArray alloc] initWithCapacity:csc.certificates.count];
-    for (MOLCertificate *c in csc.certificates) {
+    NSMutableArray* certs = [[NSMutableArray alloc] initWithCapacity:csc.certificates.count];
+    for (MOLCertificate* c in csc.certificates) {
       [certs addObject:@{
         kSHA256 : c.SHA256 ?: @"null",
         kSHA1 : c.SHA1 ?: @"null",
@@ -605,25 +605,25 @@ static void ResumeDaemonConnection(SNTCommandFileInfo *cmd) {
 }
 
 - (SNTAttributeBlock)universalSigningChain {
-  return ^id(SNTCommandFileInfo *cmd, SNTFileInfo *fileInfo) {
-    MOLCodesignChecker *csc = [fileInfo codesignCheckerWithError:NULL];
+  return ^id(SNTCommandFileInfo* cmd, SNTFileInfo* fileInfo) {
+    MOLCodesignChecker* csc = [fileInfo codesignCheckerWithError:NULL];
     if (csc.certificates.count) return nil;
     if (!csc.universalSigningInformation) return nil;
-    NSMutableArray *universal = [NSMutableArray array];
-    for (NSDictionary *arch in csc.universalSigningInformation) {
+    NSMutableArray* universal = [NSMutableArray array];
+    for (NSDictionary* arch in csc.universalSigningInformation) {
       [universal addObject:@{@"arch" : arch.allKeys.firstObject}];
       int flags = [arch.allValues.firstObject[(__bridge id)kSecCodeInfoFlags] intValue];
       if (flags & kSecCodeSignatureAdhoc) {
         [universal addObject:@{@"ad-hoc" : @YES}];
         continue;
       }
-      NSArray *certs = arch.allValues.firstObject[(__bridge id)kSecCodeInfoCertificates];
-      NSArray *chain = [MOLCertificate certificatesFromArray:certs];
+      NSArray* certs = arch.allValues.firstObject[(__bridge id)kSecCodeInfoCertificates];
+      NSArray* chain = [MOLCertificate certificatesFromArray:certs];
       if (!chain.count) {
         [universal addObject:@{@"unsigned" : @YES}];
         continue;
       }
-      for (MOLCertificate *c in chain) {
+      for (MOLCertificate* c in chain) {
         [universal addObject:@{
           kSHA256 : c.SHA256 ?: @"null",
           kSHA1 : c.SHA1 ?: @"null",
@@ -635,8 +635,8 @@ static void ResumeDaemonConnection(SNTCommandFileInfo *cmd) {
         }];
       }
     }
-    NSMutableSet *set = [NSMutableSet set];
-    for (NSDictionary *cert in universal) {
+    NSMutableSet* set = [NSMutableSet set];
+    for (NSDictionary* cert in universal) {
       if (cert[@"arch"]) continue;
       [set addObject:cert];
     }
@@ -645,44 +645,44 @@ static void ResumeDaemonConnection(SNTCommandFileInfo *cmd) {
 }
 
 - (SNTAttributeBlock)teamID {
-  return ^id(SNTCommandFileInfo *cmd, SNTFileInfo *fileInfo) {
-    MOLCodesignChecker *csc = [fileInfo codesignCheckerWithError:NULL];
+  return ^id(SNTCommandFileInfo* cmd, SNTFileInfo* fileInfo) {
+    MOLCodesignChecker* csc = [fileInfo codesignCheckerWithError:NULL];
     return csc.teamID;
   };
 }
 
 - (SNTAttributeBlock)signingID {
-  return ^id(SNTCommandFileInfo *cmd, SNTFileInfo *fileInfo) {
-    MOLCodesignChecker *csc = [fileInfo codesignCheckerWithError:NULL];
+  return ^id(SNTCommandFileInfo* cmd, SNTFileInfo* fileInfo) {
+    MOLCodesignChecker* csc = [fileInfo codesignCheckerWithError:NULL];
 
     return FormatSigningID(csc);
   };
 }
 
 - (SNTAttributeBlock)cdhash {
-  return ^id(SNTCommandFileInfo *cmd, SNTFileInfo *fileInfo) {
-    MOLCodesignChecker *csc = [fileInfo codesignCheckerWithError:NULL];
+  return ^id(SNTCommandFileInfo* cmd, SNTFileInfo* fileInfo) {
+    MOLCodesignChecker* csc = [fileInfo codesignCheckerWithError:NULL];
     return csc.cdhash;
   };
 }
 
 - (SNTAttributeBlock)entitlements {
-  return ^id(SNTCommandFileInfo *cmd, SNTFileInfo *fileInfo) {
-    MOLCodesignChecker *csc = [fileInfo codesignCheckerWithError:NULL];
+  return ^id(SNTCommandFileInfo* cmd, SNTFileInfo* fileInfo) {
+    MOLCodesignChecker* csc = [fileInfo codesignCheckerWithError:NULL];
     return csc.entitlements ?: @{};
   };
 }
 
 - (SNTAttributeBlock)secureSigningTime {
-  return ^id(SNTCommandFileInfo *cmd, SNTFileInfo *fileInfo) {
-    MOLCodesignChecker *csc = [fileInfo codesignCheckerWithError:NULL];
+  return ^id(SNTCommandFileInfo* cmd, SNTFileInfo* fileInfo) {
+    MOLCodesignChecker* csc = [fileInfo codesignCheckerWithError:NULL];
     return [cmd.dateFormatter stringFromDate:csc.secureSigningTime] ?: @"None";
   };
 }
 
 - (SNTAttributeBlock)signingTime {
-  return ^id(SNTCommandFileInfo *cmd, SNTFileInfo *fileInfo) {
-    MOLCodesignChecker *csc = [fileInfo codesignCheckerWithError:NULL];
+  return ^id(SNTCommandFileInfo* cmd, SNTFileInfo* fileInfo) {
+    MOLCodesignChecker* csc = [fileInfo codesignCheckerWithError:NULL];
     return [cmd.dateFormatter stringFromDate:csc.signingTime] ?: @"None";
   };
 }
@@ -690,10 +690,10 @@ static void ResumeDaemonConnection(SNTCommandFileInfo *cmd) {
 #pragma mark -
 
 // Entry point for the command.
-- (void)runWithArguments:(NSArray *)arguments {
+- (void)runWithArguments:(NSArray*)arguments {
   if (!arguments.count) [self printErrorUsageAndExit:@"No arguments"];
 
-  NSArray *filePaths = [self parseArguments:arguments];
+  NSArray* filePaths = [self parseArguments:arguments];
 
   if (!self.outputKeyList || !self.outputKeyList.count) {
     if (self.certIndex) {
@@ -704,7 +704,7 @@ static void ResumeDaemonConnection(SNTCommandFileInfo *cmd) {
   }
   // Figure out max field width from list of keys
   self.maxKeyWidth = 0;
-  for (NSString *key in self.outputKeyList) {
+  for (NSString* key in self.outputKeyList) {
     if (key.length > self.maxKeyWidth) self.maxKeyWidth = key.length;
   }
 
@@ -713,15 +713,15 @@ static void ResumeDaemonConnection(SNTCommandFileInfo *cmd) {
   // still enclosed in brackets.
   if (self.jsonOutput) printf("[\n");
 
-  NSFileManager *fm = [NSFileManager defaultManager];
-  NSString *cwd = [fm currentDirectoryPath];
+  NSFileManager* fm = [NSFileManager defaultManager];
+  NSString* cwd = [fm currentDirectoryPath];
 
   // Dispatch group for tasks printing to stdout.
   self.printGroup = dispatch_group_create();
 
   [filePaths enumerateObjectsWithOptions:NSEnumerationConcurrent
-                              usingBlock:^(NSString *path, NSUInteger idx, BOOL *stop) {
-                                NSString *fullPath = [path stringByStandardizingPath];
+                              usingBlock:^(NSString* path, NSUInteger idx, BOOL* stop) {
+                                NSString* fullPath = [path stringByStandardizingPath];
                                 if (path.length && [path characterAtIndex:0] != '/') {
                                   fullPath = [cwd stringByAppendingPathComponent:fullPath];
                                 }
@@ -743,8 +743,8 @@ static void ResumeDaemonConnection(SNTCommandFileInfo *cmd) {
 
 // Print out file info for the object at the given path or, if path is a directory and the
 // --recursive flag is set, print out file info for all objects in directory tree.
-- (void)recurseAtPath:(NSString *)path {
-  NSFileManager *fm = [NSFileManager defaultManager];
+- (void)recurseAtPath:(NSString*)path {
+  NSFileManager* fm = [NSFileManager defaultManager];
   BOOL isDir = NO, isBundle = NO;
   if (![fm fileExistsAtPath:path isDirectory:&isDir]) {
     dispatch_group_async(self.printGroup, self.printQueue, ^{
@@ -754,11 +754,11 @@ static void ResumeDaemonConnection(SNTCommandFileInfo *cmd) {
   }
 
   if (isDir) {
-    NSBundle *bundle = [NSBundle bundleWithPath:path];
+    NSBundle* bundle = [NSBundle bundleWithPath:path];
     isBundle = bundle && [bundle bundleIdentifier];
   }
 
-  NSOperationQueue *operationQueue = [[NSOperationQueue alloc] init];
+  NSOperationQueue* operationQueue = [[NSOperationQueue alloc] init];
   operationQueue.qualityOfService = NSQualityOfServiceUserInitiated;
 
   // Limit the number of concurrent operations to 2. By default it is unlimited. Querying for the
@@ -787,11 +787,11 @@ static void ResumeDaemonConnection(SNTCommandFileInfo *cmd) {
   operationQueue.maxConcurrentOperationCount = 2;
 
   if (isDir && self.recursive) {
-    NSDirectoryEnumerator *dirEnum = [fm enumeratorAtPath:path];
-    NSString *file = [dirEnum nextObject];
+    NSDirectoryEnumerator* dirEnum = [fm enumeratorAtPath:path];
+    NSString* file = [dirEnum nextObject];
     while (file) {
       @autoreleasepool {
-        NSString *filepath = [path stringByAppendingPathComponent:file];
+        NSString* filepath = [path stringByAppendingPathComponent:file];
         BOOL exists = [fm fileExistsAtPath:filepath isDirectory:&isDir];
         if (!(exists && isDir)) {  // don't display anything for a directory path
           [operationQueue addOperationWithBlock:^{
@@ -814,14 +814,14 @@ static void ResumeDaemonConnection(SNTCommandFileInfo *cmd) {
   [operationQueue waitUntilAllOperationsAreFinished];
 }
 
-- (BOOL)shouldOutputValueToDictionary:(NSMutableDictionary *)outputDict
-                          valueForKey:(NSString * (^)(NSString *key))valueForKey {
+- (BOOL)shouldOutputValueToDictionary:(NSMutableDictionary*)outputDict
+                          valueForKey:(NSString* (^)(NSString* key))valueForKey {
   if (self.outputFilters.count == 0) return YES;
 
   int matches = 0;
-  for (NSString *key in self.outputFilters) {
-    NSString *value = valueForKey(key);
-    NSRegularExpression *regex = self.outputFilters[key];
+  for (NSString* key in self.outputFilters) {
+    NSString* value = valueForKey(key);
+    NSRegularExpression* regex = self.outputFilters[key];
     if (![regex firstMatchInString:value options:0 range:NSMakeRange(0, value.length)]) continue;
     // If this is a value we want to show, store it in the output dictionary.
     // This does a linear search on an array, but it's a small array.
@@ -837,8 +837,8 @@ static void ResumeDaemonConnection(SNTCommandFileInfo *cmd) {
 // Prints out the info for a single (non-directory) file.  Which info is printed is controlled
 // by the keys in self.outputKeyList.
 // TODO: Refactor so this method is testable.
-- (void)printInfoForFile:(NSString *)path {
-  SNTFileInfo *fileInfo = [[SNTFileInfo alloc] initWithPath:path];
+- (void)printInfoForFile:(NSString*)path {
+  SNTFileInfo* fileInfo = [[SNTFileInfo alloc] initWithPath:path];
   if (!fileInfo) {
     dispatch_group_async(self.printGroup, self.printQueue, ^{
       TEE_LOGE(@"Invalid or empty file: %@", path);
@@ -847,13 +847,13 @@ static void ResumeDaemonConnection(SNTCommandFileInfo *cmd) {
   }
 
   // First build up a dictionary containing all the information we want to print out
-  NSMutableDictionary *outputDict = [NSMutableDictionary dictionary];
+  NSMutableDictionary* outputDict = [NSMutableDictionary dictionary];
   if (self.certIndex) {
     int index = [self.certIndex intValue];
 
     // --cert-index flag implicitly means that we want only the signing chain.  So we find the
     // specified certificate in the signing chain, then print out values for all keys in cert.
-    NSArray *signingChain = self.propertyMap[kSigningChain](self, fileInfo);
+    NSArray* signingChain = self.propertyMap[kSigningChain](self, fileInfo);
     if (!signingChain || !signingChain.count) return;  // check signing chain isn't empty
     if (index < 0) {
       index = (int)signingChain.count - -(index);
@@ -867,11 +867,11 @@ static void ResumeDaemonConnection(SNTCommandFileInfo *cmd) {
         return;
       }
     }
-    NSDictionary *cert = signingChain[index];
+    NSDictionary* cert = signingChain[index];
 
     // Check if we should skip over this item based on outputFilters.
     BOOL shouldOutput = [self shouldOutputValueToDictionary:nil
-                                                valueForKey:^NSString *(NSString *key) {
+                                                valueForKey:^NSString*(NSString* key) {
                                                   return cert[key] ?: @"";
                                                 }];
     if (!shouldOutput) {
@@ -879,7 +879,7 @@ static void ResumeDaemonConnection(SNTCommandFileInfo *cmd) {
     }
 
     // Filter out the info we want now, in case JSON output
-    for (NSString *key in self.outputKeyList) {
+    for (NSString* key in self.outputKeyList) {
       outputDict[key] = cert[key];
     }
   } else {
@@ -888,7 +888,7 @@ static void ResumeDaemonConnection(SNTCommandFileInfo *cmd) {
     // However we also don't want to recompute info, so we save any values that we plan to show.
     BOOL shouldOutput =
         [self shouldOutputValueToDictionary:outputDict
-                                valueForKey:^NSString *(NSString *key) {
+                                valueForKey:^NSString*(NSString* key) {
                                   return self.propertyMap[key](self, fileInfo) ?: @"";
                                 }];
     if (!shouldOutput) {
@@ -896,19 +896,19 @@ static void ResumeDaemonConnection(SNTCommandFileInfo *cmd) {
     }
 
     // Then fill the outputDict with the rest of the missing values.
-    for (NSString *key in self.outputKeyList) {
+    for (NSString* key in self.outputKeyList) {
       if (outputDict[key]) continue;  // ignore keys that we've already set due to a filter
       outputDict[key] = self.propertyMap[key](self, fileInfo);
     }
 
     if (self.bundleInfo) {
-      SNTStoredExecutionEvent *se = [[SNTStoredExecutionEvent alloc] init];
+      SNTStoredExecutionEvent* se = [[SNTStoredExecutionEvent alloc] init];
       se.fileBundlePath = fileInfo.bundlePath;
 
-      MOLXPCConnection *bc = [SNTXPCBundleServiceInterface configuredConnection];
+      MOLXPCConnection* bc = [SNTXPCBundleServiceInterface configuredConnection];
       [bc resume];
 
-      __block NSMutableDictionary *bundleInfo = [[NSMutableDictionary alloc] init];
+      __block NSMutableDictionary* bundleInfo = [[NSMutableDictionary alloc] init];
 
       bundleInfo[kBundlePath] = fileInfo.bundle.bundlePath;
       bundleInfo[kBundleID] = fileInfo.bundle.bundleIdentifier;
@@ -918,13 +918,13 @@ static void ResumeDaemonConnection(SNTCommandFileInfo *cmd) {
       [[bc remoteObjectProxy]
           hashBundleBinariesForEvent:se
                             listener:nil
-                               reply:^(NSString *hash, NSArray<SNTStoredExecutionEvent *> *events,
-                                       NSNumber *time) {
+                               reply:^(NSString* hash, NSArray<SNTStoredExecutionEvent*>* events,
+                                       NSNumber* time) {
                                  bundleInfo[kBundleHash] = hash;
 
-                                 NSMutableArray *bundleHashes = [[NSMutableArray alloc] init];
+                                 NSMutableArray* bundleHashes = [[NSMutableArray alloc] init];
 
-                                 for (SNTStoredExecutionEvent *event in events) {
+                                 for (SNTStoredExecutionEvent* event in events) {
                                    [bundleHashes addObject:@{
                                      kSHA256 : event.fileSHA256,
                                      kPath : event.filePath
@@ -964,11 +964,11 @@ static void ResumeDaemonConnection(SNTCommandFileInfo *cmd) {
   // c) are we displaying a cert?
   BOOL singleKey =
       (self.outputKeyList.count == 1 && ![self.outputKeyList.firstObject isEqual:kSigningChain]);
-  NSMutableString *output = [NSMutableString string];
+  NSMutableString* output = [NSMutableString string];
   if (self.jsonOutput) {
     [output appendString:[self jsonStringForDictionary:outputDict]];
   } else {
-    for (NSString *key in self.outputKeyList) {
+    for (NSString* key in self.outputKeyList) {
       if (![outputDict objectForKey:key]) continue;
       if ([key isEqual:kSigningChain] || [key isEqual:kUniversalSigningChain]) {
         [output appendString:[self stringForSigningChain:outputDict[key] key:key]];
@@ -1011,13 +1011,13 @@ static void ResumeDaemonConnection(SNTCommandFileInfo *cmd) {
 //   self.outputKeyList from multiple possible --key arguments
 //   self.outputFilters from multiple possible --filter arguments
 // and returns any non-flag args as path names in an NSArray.
-- (NSArray *)parseArguments:(NSArray<NSString *> *)arguments {
-  NSMutableArray *paths = [NSMutableArray array];
-  NSMutableOrderedSet *keys = [NSMutableOrderedSet orderedSet];
-  NSMutableDictionary *filters = [NSMutableDictionary dictionary];
+- (NSArray*)parseArguments:(NSArray<NSString*>*)arguments {
+  NSMutableArray* paths = [NSMutableArray array];
+  NSMutableOrderedSet* keys = [NSMutableOrderedSet orderedSet];
+  NSMutableDictionary* filters = [NSMutableDictionary dictionary];
   NSUInteger nargs = [arguments count];
   for (NSUInteger i = 0; i < nargs; i++) {
-    NSString *arg = [arguments objectAtIndex:i];
+    NSString* arg = [arguments objectAtIndex:i];
     if ([arg caseInsensitiveCompare:@"--json"] == NSOrderedSame) {
       self.jsonOutput = YES;
     } else if ([arg caseInsensitiveCompare:@"--cert-index"] == NSOrderedSame) {
@@ -1029,7 +1029,7 @@ static void ResumeDaemonConnection(SNTCommandFileInfo *cmd) {
         [self printErrorUsageAndExit:@"\n--cert-index requires an argument"];
       }
       int index = 0;
-      NSScanner *scanner = [NSScanner scannerWithString:arguments[i]];
+      NSScanner* scanner = [NSScanner scannerWithString:arguments[i]];
       if (![scanner scanInt:&index] || !scanner.atEnd) {
         [self printErrorUsageAndExit:
                   [NSString stringWithFormat:@"\n\"%@\" is an invalid argument for --cert-index\n",
@@ -1057,11 +1057,11 @@ static void ResumeDaemonConnection(SNTCommandFileInfo *cmd) {
                                              @" (with no spaces around \"=\")",
                                              arguments[i]]];
       }
-      NSString *key = [arguments[i] substringToIndex:range.location];
-      NSString *rhs = [arguments[i] substringFromIndex:range.location + 1];
+      NSString* key = [arguments[i] substringToIndex:range.location];
+      NSString* rhs = [arguments[i] substringFromIndex:range.location + 1];
       // Convert right-hand side of '=' into a regular expression object.
-      NSError *error;
-      NSRegularExpression *regex =
+      NSError* error;
+      NSRegularExpression* regex =
           [NSRegularExpression regularExpressionWithPattern:rhs
                                                     options:NSRegularExpressionCaseInsensitive
                                                       error:&error];
@@ -1099,15 +1099,15 @@ static void ResumeDaemonConnection(SNTCommandFileInfo *cmd) {
 
   // Do some error checking before returning to make sure that specified keys are valid.
   if (self.certIndex) {
-    NSArray *validKeys = [[self class] signingChainKeys];
-    for (NSString *key in keys) {
+    NSArray* validKeys = [[self class] signingChainKeys];
+    for (NSString* key in keys) {
       if (![validKeys containsObject:key]) {
         [self printErrorUsageAndExit:
                   [NSString
                       stringWithFormat:@"\n\"%@\" is an invalid key when using --cert-index", key]];
       }
     }
-    for (NSString *key in filters) {
+    for (NSString* key in filters) {
       if (![validKeys containsObject:key]) {
         [self printErrorUsageAndExit:
                   [NSString
@@ -1116,8 +1116,8 @@ static void ResumeDaemonConnection(SNTCommandFileInfo *cmd) {
       }
     }
   } else {
-    NSArray *validKeys = [[self class] fileInfoKeys];
-    for (NSString *key in keys) {
+    NSArray* validKeys = [[self class] fileInfoKeys];
+    for (NSString* key in keys) {
       if (![validKeys containsObject:key]) {
         [self
             printErrorUsageAndExit:[NSString stringWithFormat:@"\n\"%@\" is an invalid key", key]];
@@ -1132,7 +1132,7 @@ static void ResumeDaemonConnection(SNTCommandFileInfo *cmd) {
         self.enableVerify = YES;
       }
     }
-    for (NSString *key in filters) {
+    for (NSString* key in filters) {
       if (![validKeys containsObject:key] || [key isEqualToString:kSigningChain]) {
         [self
             printErrorUsageAndExit:[NSString
@@ -1148,20 +1148,20 @@ static void ResumeDaemonConnection(SNTCommandFileInfo *cmd) {
   return paths.copy;
 }
 
-- (NSString *)jsonStringForDictionary:(NSDictionary *)dict {
-  NSData *jsonData = [NSJSONSerialization dataWithJSONObject:dict
+- (NSString*)jsonStringForDictionary:(NSDictionary*)dict {
+  NSData* jsonData = [NSJSONSerialization dataWithJSONObject:dict
                                                      options:NSJSONWritingPrettyPrinted
                                                        error:NULL];
   return [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
 }
 
-- (NSString *)stringForSigningChain:(NSArray *)signingChain key:(NSString *)key {
+- (NSString*)stringForSigningChain:(NSArray*)signingChain key:(NSString*)key {
   if (!signingChain) return @"";
-  NSMutableString *result = [NSMutableString string];
+  NSMutableString* result = [NSMutableString string];
   [result appendFormat:@"%@:\n", key];
   int i = 1;
-  NSArray<NSString *> *certKeys = [[self class] signingChainKeys];
-  for (NSDictionary *cert in signingChain) {
+  NSArray<NSString*>* certKeys = [[self class] signingChainKeys];
+  for (NSDictionary* cert in signingChain) {
     if ([cert isEqual:[NSNull null]]) continue;
     if (cert[@"arch"]) {
       [result appendFormat:@"  %2@\n", [@"Architecture: " stringByAppendingString:cert[@"arch"]]];
@@ -1181,11 +1181,11 @@ static void ResumeDaemonConnection(SNTCommandFileInfo *cmd) {
   return result.copy;
 }
 
-- (NSString *)stringForCertificate:(NSDictionary *)cert withKeys:(NSArray *)keys index:(int)index {
+- (NSString*)stringForCertificate:(NSDictionary*)cert withKeys:(NSArray*)keys index:(int)index {
   if (!cert) return @"";
-  NSMutableString *result = [NSMutableString string];
+  NSMutableString* result = [NSMutableString string];
   BOOL firstKey = YES;
-  for (NSString *key in keys) {
+  for (NSString* key in keys) {
     if (firstKey) {
       [result appendFormat:@"   %2d. %-20s: %@\n", index, key.UTF8String, cert[key]];
       firstKey = NO;
@@ -1196,8 +1196,8 @@ static void ResumeDaemonConnection(SNTCommandFileInfo *cmd) {
   return result.copy;
 }
 
-- (NSString *)stringForBundleInfo:(NSDictionary *)bundleInfo key:(NSString *)key {
-  NSMutableString *result = [NSMutableString string];
+- (NSString*)stringForBundleInfo:(NSDictionary*)bundleInfo key:(NSString*)key {
+  NSMutableString* result = [NSMutableString string];
 
   [result appendFormat:@"%@:\n", key];
 
@@ -1206,24 +1206,24 @@ static void ResumeDaemonConnection(SNTCommandFileInfo *cmd) {
   [result appendFormat:@"       %-20s: %@\n", kBundleHash.UTF8String, bundleInfo[kBundleHash]];
 
   int i = 0;
-  for (NSDictionary *hashPath in bundleInfo[kBundleHashes]) {
+  for (NSDictionary* hashPath in bundleInfo[kBundleHashes]) {
     [result appendFormat:@"          %3d. %@  %@\n", ++i, hashPath[kSHA256], hashPath[kPath]];
   }
 
   return [result copy];
 }
 
-- (NSString *)stringForEntitlements:(NSDictionary *)entitlements key:(NSString *)key {
+- (NSString*)stringForEntitlements:(NSDictionary*)entitlements key:(NSString*)key {
   if (!entitlements.count) {
     return [NSString stringWithFormat:@"%-*s: None\n", (int)self.maxKeyWidth, key.UTF8String];
   }
 
-  NSMutableString *result = [NSMutableString string];
+  NSMutableString* result = [NSMutableString string];
   [result appendFormat:@"%@:\n", key];
   __block int i = 0;
-  [entitlements enumerateKeysAndObjectsUsingBlock:^(NSString *key, id obj, BOOL *stop) {
+  [entitlements enumerateKeysAndObjectsUsingBlock:^(NSString* key, id obj, BOOL* stop) {
     if ([obj isKindOfClass:[NSNumber class]]) {
-      NSNumber *objNumber = (NSNumber *)obj;
+      NSNumber* objNumber = (NSNumber*)obj;
       BOOL val = [objNumber boolValue];
       // If the value of the entitlement is false the app is not claiming it,
       // so don't print it.
@@ -1241,30 +1241,30 @@ static void ResumeDaemonConnection(SNTCommandFileInfo *cmd) {
   return result.copy;
 }
 
-- (NSString *)stringForValidation:(NSArray *)validation {
+- (NSString*)stringForValidation:(NSArray*)validation {
   if (!validation.count) return @"";
-  NSMutableString *result = [NSMutableString string];
+  NSMutableString* result = [NSMutableString string];
   [result appendFormat:@"%@:\n", kValidation];
   int i = 0;
-  for (NSDictionary *archInfo in validation) {
-    NSString *arch = archInfo[@"arch"];
-    NSString *status = archInfo[@"status"];
-    NSString *archLabel = [NSString stringWithFormat:@"%d. %@", ++i, arch];
+  for (NSDictionary* archInfo in validation) {
+    NSString* arch = archInfo[@"arch"];
+    NSString* status = archInfo[@"status"];
+    NSString* archLabel = [NSString stringWithFormat:@"%d. %@", ++i, arch];
     [result
         appendFormat:@"    %-*s: %@\n", (int)self.maxKeyWidth - 4, archLabel.UTF8String, status];
   }
   return result.copy;
 }
 
-- (NSString *)stringForAssessment:(NSString *)assessment filePath:(NSString *)filePath {
+- (NSString*)stringForAssessment:(NSString*)assessment filePath:(NSString*)filePath {
   if (!assessment.length) return @"";
 
-  NSArray<NSString *> *lines = [assessment componentsSeparatedByString:@"\n"];
-  NSMutableArray<NSString *> *processedLines = [NSMutableArray arrayWithCapacity:lines.count];
+  NSArray<NSString*>* lines = [assessment componentsSeparatedByString:@"\n"];
+  NSMutableArray<NSString*>* processedLines = [NSMutableArray arrayWithCapacity:lines.count];
 
   // Process lines, stripping the file path prefix if present
-  NSString *pathPrefix = [NSString stringWithFormat:@"%@: ", filePath];
-  for (NSString *line in lines) {
+  NSString* pathPrefix = [NSString stringWithFormat:@"%@: ", filePath];
+  for (NSString* line in lines) {
     if ([line hasPrefix:pathPrefix]) {
       [processedLines addObject:[line substringFromIndex:pathPrefix.length]];
     } else {
@@ -1272,14 +1272,14 @@ static void ResumeDaemonConnection(SNTCommandFileInfo *cmd) {
     }
   }
 
-  NSMutableString *result = [NSMutableString string];
+  NSMutableString* result = [NSMutableString string];
 
   // First line with label
   [result appendFormat:@"%-*s: %@\n", (int)self.maxKeyWidth, kAssessment.UTF8String,
                        processedLines.firstObject];
 
   // Subsequent lines indented to align after ": "
-  NSString *indent = [@"" stringByPaddingToLength:self.maxKeyWidth + 2
+  NSString* indent = [@"" stringByPaddingToLength:self.maxKeyWidth + 2
                                        withString:@" "
                                   startingAtIndex:0];
   for (NSUInteger i = 1; i < processedLines.count; i++) {

@@ -35,22 +35,22 @@
 #import "Source/santad/SNTSyncdQueue.h"
 #import "src/santanetd/SNDProcessFlows.h"
 
-NSString *const kSantaNetworkExtensionProtocolVersion = @"1.0";
+NSString* const kSantaNetworkExtensionProtocolVersion = @"1.0";
 
 @interface SNTNetworkExtensionQueue () {
   std::shared_ptr<santa::Logger> _logger;
 }
-@property MOLXPCConnection *netExtConnection;
-@property(readwrite) NSString *connectedProtocolVersion;
-@property NSArray<SNTKVOManager *> *kvoWatchers;
-@property(weak) SNTNotificationQueue *notifierQueue;
-@property(weak) SNTSyncdQueue *syncdQueue;
+@property MOLXPCConnection* netExtConnection;
+@property(readwrite) NSString* connectedProtocolVersion;
+@property NSArray<SNTKVOManager*>* kvoWatchers;
+@property(weak) SNTNotificationQueue* notifierQueue;
+@property(weak) SNTSyncdQueue* syncdQueue;
 @end
 
 @implementation SNTNetworkExtensionQueue
 
-- (instancetype)initWithNotifierQueue:(SNTNotificationQueue *)notifierQueue
-                           syncdQueue:(SNTSyncdQueue *)syncdQueue
+- (instancetype)initWithNotifierQueue:(SNTNotificationQueue*)notifierQueue
+                           syncdQueue:(SNTSyncdQueue*)syncdQueue
                                logger:(std::shared_ptr<santa::Logger>)logger {
   self = [super init];
   if (self) {
@@ -64,8 +64,8 @@ NSString *const kSantaNetworkExtensionProtocolVersion = @"1.0";
       [[SNTKVOManager alloc] initWithObject:[SNTConfigurator configurator]
                                    selector:@selector(syncNetworkExtensionSettings)
                                        type:[SNTSyncNetworkExtensionSettings class]
-                                   callback:^(SNTSyncNetworkExtensionSettings *oldValue,
-                                              SNTSyncNetworkExtensionSettings *newValue) {
+                                   callback:^(SNTSyncNetworkExtensionSettings* oldValue,
+                                              SNTSyncNetworkExtensionSettings* newValue) {
                                      // Treat nil as equivalent to enable == NO (the default state).
                                      if (oldValue.enable == newValue.enable) {
                                        return;
@@ -82,7 +82,7 @@ NSString *const kSantaNetworkExtensionProtocolVersion = @"1.0";
           initWithObject:[SNTConfigurator configurator]
                 selector:@selector(syncBaseURL)
                     type:[NSURL class]
-                callback:^(NSURL *oldValue, NSURL *newValue) {
+                callback:^(NSURL* oldValue, NSURL* newValue) {
                   if ((!newValue && !oldValue) ||
                       ([newValue.absoluteString isEqualToString:oldValue.absoluteString])) {
                     return;
@@ -101,14 +101,14 @@ NSString *const kSantaNetworkExtensionProtocolVersion = @"1.0";
   return self;
 }
 
-- (void)handleSettingsChanged:(SNTSyncNetworkExtensionSettings *)settings {
-  MOLXPCConnection *conn = self.netExtConnection;
+- (void)handleSettingsChanged:(SNTSyncNetworkExtensionSettings*)settings {
+  MOLXPCConnection* conn = self.netExtConnection;
   if (!conn) {
     LOGW(@"Network extension connection unavailable; skipping settings update");
     return;
   }
 
-  SNTNetworkExtensionSettings *netExtSettings =
+  SNTNetworkExtensionSettings* netExtSettings =
       [self generateSettingsForProtocolVersion:self.connectedProtocolVersion];
   if (!netExtSettings) {
     LOGW(@"Failed to generate settings for protocol version %@", self.connectedProtocolVersion);
@@ -134,9 +134,9 @@ NSString *const kSantaNetworkExtensionProtocolVersion = @"1.0";
   }
 }
 
-- (void)handleNetworkFlows:(NSArray<SNDProcessFlows *> *)processFlows
-               windowStart:(NSDate *)windowStart
-                 windowEnd:(NSDate *)windowEnd {
+- (void)handleNetworkFlows:(NSArray<SNDProcessFlows*>*)processFlows
+               windowStart:(NSDate*)windowStart
+                 windowEnd:(NSDate*)windowEnd {
   if (![self shouldInstallNetworkExtension] || !processFlows.count) {
     return;
   }
@@ -152,13 +152,13 @@ NSString *const kSantaNetworkExtensionProtocolVersion = @"1.0";
       .tv_nsec = static_cast<long>((endSecs - static_cast<time_t>(endSecs)) * NSEC_PER_SEC),
   };
 
-  for (SNDProcessFlows *pf in processFlows) {
+  for (SNDProcessFlows* pf in processFlows) {
     _logger->LogNetworkFlows(pf, windowStartTS, windowEndTS);
   }
 }
 
-- (SNTNetworkExtensionSettings *)handleRegistrationWithProtocolVersion:(NSString *)protocolVersion
-                                                                 error:(NSError **)error {
+- (SNTNetworkExtensionSettings*)handleRegistrationWithProtocolVersion:(NSString*)protocolVersion
+                                                                error:(NSError**)error {
   if (self.netExtConnection) {
     LOGW(@"Network extension attempting to register but already connected, clearing stale "
          @"connection");
@@ -175,12 +175,12 @@ NSString *const kSantaNetworkExtensionProtocolVersion = @"1.0";
   }
 
   // Validate protocol version matches "major.minor" format
-  NSString *pattern = @"^\\d+\\.\\d+$";
-  NSRegularExpression *regex = [NSRegularExpression regularExpressionWithPattern:pattern
+  NSString* pattern = @"^\\d+\\.\\d+$";
+  NSRegularExpression* regex = [NSRegularExpression regularExpressionWithPattern:pattern
                                                                          options:0
                                                                            error:nil];
   NSRange range = NSMakeRange(0, protocolVersion.length);
-  NSTextCheckingResult *match = [regex firstMatchInString:protocolVersion options:0 range:range];
+  NSTextCheckingResult* match = [regex firstMatchInString:protocolVersion options:0 range:range];
 
   if (!match) {
     [SNTError populateError:error
@@ -218,7 +218,7 @@ NSString *const kSantaNetworkExtensionProtocolVersion = @"1.0";
 
   WEAKIFY(self);
 
-  MOLXPCConnection *conn = [SNTXPCNetworkExtensionInterface configuredConnection];
+  MOLXPCConnection* conn = [SNTXPCNetworkExtensionInterface configuredConnection];
   conn.invalidationHandler = ^{
     STRONGIFY(self);
     LOGI(@"Network extension connection invalidated, clearing state");
@@ -236,23 +236,23 @@ NSString *const kSantaNetworkExtensionProtocolVersion = @"1.0";
   self.connectedProtocolVersion = nil;
 }
 
-- (std::pair<int, int>)protocolVersionComponents:(NSString *)protocolVersion {
-  NSArray<NSString *> *components = [protocolVersion componentsSeparatedByString:@"."];
+- (std::pair<int, int>)protocolVersionComponents:(NSString*)protocolVersion {
+  NSArray<NSString*>* components = [protocolVersion componentsSeparatedByString:@"."];
   return std::make_pair<int, int>([components[0] intValue], [components[1] intValue]);
 }
 
 - (BOOL)shouldInstallNetworkExtension {
-  SNTConfigurator *configurator = [SNTConfigurator configurator];
+  SNTConfigurator* configurator = [SNTConfigurator configurator];
   return [configurator isSyncV2Enabled] && [configurator syncNetworkExtensionSettings].enable;
 }
 
-- (void)networkExtensionBundleVersionInfo:(void (^)(NSDictionary *bundleInfo))reply {
+- (void)networkExtensionBundleVersionInfo:(void (^)(NSDictionary* bundleInfo))reply {
   if (!self.netExtConnection) {
     reply(nil);
     return;
   }
 
-  [[self.netExtConnection remoteObjectProxy] bundleVersionInfo:^(NSDictionary *bundleInfo) {
+  [[self.netExtConnection remoteObjectProxy] bundleVersionInfo:^(NSDictionary* bundleInfo) {
     reply(bundleInfo);
   }];
 }
@@ -268,16 +268,16 @@ NSString *const kSantaNetworkExtensionProtocolVersion = @"1.0";
   }
 
   // Read the on-disk version first. If unreadable, skip install (nothing to install).
-  SNTFileInfo *onDiskInfo = [[SNTFileInfo alloc] initWithPath:@(kSantaNetdPath)];
-  NSString *onDiskVersion = [onDiskInfo bundleVersion];
+  SNTFileInfo* onDiskInfo = [[SNTFileInfo alloc] initWithPath:@(kSantaNetdPath)];
+  NSString* onDiskVersion = [onDiskInfo bundleVersion];
   if (!onDiskVersion) {
     LOGD(@"Unable to read on-disk network extension version, skipping install");
     return NO;
   }
 
-  __block NSString *loadedVersion;
+  __block NSString* loadedVersion;
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-  [self networkExtensionBundleVersionInfo:^(NSDictionary *bundleInfo) {
+  [self networkExtensionBundleVersionInfo:^(NSDictionary* bundleInfo) {
     loadedVersion = bundleInfo[@"CFBundleVersion"];
     dispatch_semaphore_signal(sema);
   }];
@@ -302,13 +302,13 @@ NSString *const kSantaNetworkExtensionProtocolVersion = @"1.0";
   return YES;
 }
 
-- (SNTNetworkExtensionSettings *)generateSettingsForProtocolVersion:(NSString *)protocolVersion {
+- (SNTNetworkExtensionSettings*)generateSettingsForProtocolVersion:(NSString*)protocolVersion {
   if (!protocolVersion) {
     return nil;
   }
 
   auto [majorVersion, _] = [self protocolVersionComponents:protocolVersion];
-  SNTSyncNetworkExtensionSettings *syncSettings =
+  SNTSyncNetworkExtensionSettings* syncSettings =
       [[SNTConfigurator configurator] syncNetworkExtensionSettings];
 
   BOOL enable = NO;

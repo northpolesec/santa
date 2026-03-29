@@ -20,10 +20,10 @@
 
 @interface SNTNetworkMountMessageWindowController : SNTMessageWindowController <NSWindowDelegate>
 
-@property(readonly) SNTStoredNetworkMountEvent *event;
-@property(readonly) SNTConfigBundle *configBundle;
+@property(readonly) SNTStoredNetworkMountEvent* event;
+@property(readonly) SNTConfigBundle* configBundle;
 
-- (instancetype)initWithEvent:(SNTStoredNetworkMountEvent *)event
-                 configBundle:(SNTConfigBundle *)configBundle;
+- (instancetype)initWithEvent:(SNTStoredNetworkMountEvent*)event
+                 configBundle:(SNTConfigBundle*)configBundle;
 
 @end

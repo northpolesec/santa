@@ -40,11 +40,11 @@ REGISTER_COMMAND_NAME(@"checkcache")
   return YES;
 }
 
-+ (NSString *)shortHelpText {
++ (NSString*)shortHelpText {
   return @"Prints the authorization status of a file in the cache.";
 }
 
-+ (NSString *)longHelpText {
++ (NSString*)longHelpText {
   return @"Prints the authorization status of a file in the cache.\n"
          @"\n"
          @"IMPORTANT: This command is intended for development purposes only.\n";
@@ -54,7 +54,7 @@ REGISTER_COMMAND_NAME(@"checkcache")
   return YES;
 }
 
-- (void)runWithArguments:(NSArray *)arguments {
+- (void)runWithArguments:(NSArray*)arguments {
   SantaVnode vnodeID = [self vnodeIDForFile:arguments.firstObject];
   [[self.daemonConn synchronousRemoteObjectProxy]
       checkCacheForVnodeID:vnodeID
@@ -75,7 +75,7 @@ REGISTER_COMMAND_NAME(@"checkcache")
                  }];
 }
 
-- (SantaVnode)vnodeIDForFile:(NSString *)path {
+- (SantaVnode)vnodeIDForFile:(NSString*)path {
   struct stat fstat = {};
   stat(path.fileSystemRepresentation, &fstat);
   SantaVnode ret = {.fsid = fstat.st_dev, .fileid = fstat.st_ino};

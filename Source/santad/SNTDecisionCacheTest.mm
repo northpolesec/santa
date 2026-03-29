@@ -28,8 +28,8 @@
 #import "Source/santad/SNTDatabaseController.h"
 #import "Source/santad/SNTDecisionCache.h"
 
-SNTCachedDecision *MakeCachedDecision(struct stat sb, SNTEventState decision) {
-  SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+SNTCachedDecision* MakeCachedDecision(struct stat sb, SNTEventState decision) {
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
 
   cd.decision = decision;
   cd.sha256 = @"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
@@ -54,7 +54,7 @@ SNTCachedDecision *MakeCachedDecision(struct stat sb, SNTEventState decision) {
 }
 
 - (void)testBasicOperation {
-  SNTDecisionCache *dc = [SNTDecisionCache sharedCache];
+  SNTDecisionCache* dc = [SNTDecisionCache sharedCache];
 
   struct stat sb = MakeStat();
 
@@ -62,11 +62,11 @@ SNTCachedDecision *MakeCachedDecision(struct stat sb, SNTEventState decision) {
   XCTAssertNil([dc cachedDecisionForFile:sb]);
 
   // Add the item to the cache
-  SNTCachedDecision *cd = MakeCachedDecision(sb, SNTEventStateAllowTeamID);
+  SNTCachedDecision* cd = MakeCachedDecision(sb, SNTEventStateAllowTeamID);
   [dc cacheDecision:cd];
 
   // Ensure the item exists in the cache
-  SNTCachedDecision *cachedCD = [dc cachedDecisionForFile:sb];
+  SNTCachedDecision* cachedCD = [dc cachedDecisionForFile:sb];
   XCTAssertNotNil(cachedCD);
   XCTAssertEqual(cachedCD.decision, cd.decision);
   XCTAssertEqual(cachedCD.vnodeId.fileid, cd.vnodeId.fileid);
@@ -77,16 +77,16 @@ SNTCachedDecision *MakeCachedDecision(struct stat sb, SNTEventState decision) {
 }
 
 - (void)testResetTimestampForCachedDecision {
-  SNTDecisionCache *dc = [SNTDecisionCache sharedCache];
+  SNTDecisionCache* dc = [SNTDecisionCache sharedCache];
   struct stat sb = MakeStat();
-  SNTCachedDecision *cd = MakeCachedDecision(sb, SNTEventStateAllowTransitive);
+  SNTCachedDecision* cd = MakeCachedDecision(sb, SNTEventStateAllowTransitive);
 
   [dc cacheDecision:cd];
 
   OCMStub([self.mockDatabaseController ruleTable]).andReturn(self.mockRuleDatabase);
 
   OCMExpect([self.mockRuleDatabase
-      resetTimestampForExecutionRule:[OCMArg checkWithBlock:^BOOL(SNTRule *rule) {
+      resetTimestampForExecutionRule:[OCMArg checkWithBlock:^BOOL(SNTRule* rule) {
         return [rule.identifier isEqualToString:cd.sha256] &&
                rule.state == SNTRuleStateAllowTransitive && rule.type == SNTRuleTypeBinary;
       }]]);

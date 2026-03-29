@@ -22,20 +22,20 @@
 #import "Source/common/SNTStoredFileAccessEvent.h"
 
 @interface SNTFileAccessMessageWindowController ()
-@property NSString *customMessage;
-@property NSString *customURL;
-@property NSString *customText;
-@property SNTConfigState *configState;
-@property SNTStoredFileAccessEvent *event;
+@property NSString* customMessage;
+@property NSString* customURL;
+@property NSString* customText;
+@property SNTConfigState* configState;
+@property SNTStoredFileAccessEvent* event;
 @end
 
 @implementation SNTFileAccessMessageWindowController
 
-- (instancetype)initWithEvent:(SNTStoredFileAccessEvent *)event
-                customMessage:(nullable NSString *)message
-                    customURL:(nullable NSString *)url
-                   customText:(nullable NSString *)text
-                  configState:(nullable SNTConfigState *)configState {
+- (instancetype)initWithEvent:(SNTStoredFileAccessEvent*)event
+                customMessage:(nullable NSString*)message
+                    customURL:(nullable NSString*)url
+                   customText:(nullable NSString*)text
+                  configState:(nullable SNTConfigState*)configState {
   self = [super init];
   if (self) {
     _event = event;
@@ -70,7 +70,7 @@
   [super showWindow:sender];
 }
 
-- (NSString *)messageHash {
+- (NSString*)messageHash {
   // The hash for display de-duplication/silencing purposes is a combination of:
   // 1. The current file access rule version
   // 2. The name of the rule that was violated

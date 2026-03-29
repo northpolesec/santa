@@ -15,37 +15,37 @@
 #import <Foundation/Foundation.h>
 
 @interface SNTKillRequest : NSObject <NSSecureCoding>
-@property(readonly) NSString *uuid;
+@property(readonly) NSString* uuid;
 @end
 
 @interface SNTKillRequestRunningProcess : SNTKillRequest <NSSecureCoding>
 @property(readonly) int pid;
 @property(readonly) int pidversion;
-@property(readonly) NSString *bootSessionUUID;
+@property(readonly) NSString* bootSessionUUID;
 
-- (instancetype)initWithUUID:(NSString *)uuid
+- (instancetype)initWithUUID:(NSString*)uuid
                          pid:(int)pid
                   pidversion:(int)pidversion
-             bootSessionUUID:(NSString *)bootSessionUUID;
+             bootSessionUUID:(NSString*)bootSessionUUID;
 @end
 
 @interface SNTKillRequestCDHash : SNTKillRequest <NSSecureCoding>
-@property(readonly) NSString *cdhash;
+@property(readonly) NSString* cdhash;
 
-- (instancetype)initWithUUID:(NSString *)uuid cdHash:(NSString *)cdhash;
+- (instancetype)initWithUUID:(NSString*)uuid cdHash:(NSString*)cdhash;
 @end
 
 @interface SNTKillRequestSigningID : SNTKillRequest <NSSecureCoding>
-@property(readonly) NSString *teamID;
-@property(readonly) NSString *signingID;
+@property(readonly) NSString* teamID;
+@property(readonly) NSString* signingID;
 
-- (instancetype)initWithUUID:(NSString *)uuid signingID:(NSString *)signingID;
+- (instancetype)initWithUUID:(NSString*)uuid signingID:(NSString*)signingID;
 @end
 
 @interface SNTKillRequestTeamID : SNTKillRequest <NSSecureCoding>
-@property(readonly) NSString *teamID;
+@property(readonly) NSString* teamID;
 
-- (instancetype)initWithUUID:(NSString *)uuid teamID:(NSString *)teamID;
+- (instancetype)initWithUUID:(NSString*)uuid teamID:(NSString*)teamID;
 @end
 
 typedef NS_ENUM(NSInteger, SNTKilledProcessError) {
@@ -74,11 +74,11 @@ typedef NS_ENUM(NSInteger, SNTKillResponseError) {
 };
 
 @interface SNTKillResponse : NSObject <NSSecureCoding>
-@property(readonly) NSArray<SNTKilledProcess *> *killedProcesses;
+@property(readonly) NSArray<SNTKilledProcess*>* killedProcesses;
 @property(readonly) SNTKillResponseError error;
 
-- (instancetype)initWithKilledProcesses:(NSArray<SNTKilledProcess *> *)killedProcesses;
+- (instancetype)initWithKilledProcesses:(NSArray<SNTKilledProcess*>*)killedProcesses;
 - (instancetype)initWithError:(SNTKillResponseError)error;
 - (instancetype)initWithError:(SNTKillResponseError)error
-              killedProcesses:(NSArray<SNTKilledProcess *> *)killedProcesses;
+              killedProcesses:(NSArray<SNTKilledProcess*>*)killedProcesses;
 @end

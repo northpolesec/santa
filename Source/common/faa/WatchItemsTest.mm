@@ -57,30 +57,30 @@ using santa::WatchItemsState;
 
 namespace santa {
 
-extern bool ParseConfig(NSDictionary *config, SetSharedDataWatchItemPolicy *data_policies,
-                        SetSharedProcessWatchItemPolicy *proc_policies, uint64_t *rules_loaded,
-                        NSError **err);
-extern bool IsWatchItemNameValid(id key, NSError **err);
-extern bool ParseConfigSingleWatchItem(NSString *name, std::string_view policy_version,
-                                       NSDictionary *watch_item,
-                                       SetSharedDataWatchItemPolicy *data_policies,
-                                       SetSharedProcessWatchItemPolicy *proc_policies,
-                                       NSError **err);
-extern std::variant<Unit, SetPairPathAndType> VerifyConfigWatchItemPaths(NSArray<id> *paths,
-                                                                         NSError **err);
-std::variant<Unit, SetWatchItemProcess> VerifyConfigWatchItemProcesses(NSDictionary *watch_item,
-                                                                       NSError **err);
-extern std::optional<WatchItemRuleType> GetRuleType(NSString *rule_type);
-extern std::vector<std::string> FindMatches(NSString *path);
+extern bool ParseConfig(NSDictionary* config, SetSharedDataWatchItemPolicy* data_policies,
+                        SetSharedProcessWatchItemPolicy* proc_policies, uint64_t* rules_loaded,
+                        NSError** err);
+extern bool IsWatchItemNameValid(id key, NSError** err);
+extern bool ParseConfigSingleWatchItem(NSString* name, std::string_view policy_version,
+                                       NSDictionary* watch_item,
+                                       SetSharedDataWatchItemPolicy* data_policies,
+                                       SetSharedProcessWatchItemPolicy* proc_policies,
+                                       NSError** err);
+extern std::variant<Unit, SetPairPathAndType> VerifyConfigWatchItemPaths(NSArray<id>* paths,
+                                                                         NSError** err);
+std::variant<Unit, SetWatchItemProcess> VerifyConfigWatchItemProcesses(NSDictionary* watch_item,
+                                                                       NSError** err);
+extern std::optional<WatchItemRuleType> GetRuleType(NSString* rule_type);
+extern std::vector<std::string> FindMatches(NSString* path);
 
 class WatchItemsPeer : public WatchItems {
  public:
-  WatchItemsPeer(NSString *config_path, dispatch_queue_t q,
+  WatchItemsPeer(NSString* config_path, dispatch_queue_t q,
                  void (^periodic_task_complete_f)(void) = nullptr)
       : WatchItems(MakeKey(), WatchItems::DataSource::kDetachedConfig, config_path, nil, q,
                    periodic_task_complete_f) {}
 
-  WatchItemsPeer(NSDictionary *config, dispatch_queue_t q,
+  WatchItemsPeer(NSDictionary* config, dispatch_queue_t q,
                  void (^periodic_task_complete_f)(void) = nullptr)
       : WatchItems(MakeKey(), WatchItems::DataSource::kEmbeddedConfig, nil, config, q,
                    periodic_task_complete_f) {}
@@ -110,7 +110,7 @@ static constexpr std::string_view kBadPolicyName("__BAD_NAME__");
 static constexpr std::string_view kBadPolicyPath("__BAD_PATH__");
 static constexpr std::string_view kVersion("v0.1");
 
-NSString *MakeTestDirPath(NSString *target, NSString *root = nil) {
+NSString* MakeTestDirPath(NSString* target, NSString* root = nil) {
   if (![target hasPrefix:@"/"]) {
     target = [NSString stringWithFormat:@"/%@", target];
   }
@@ -119,7 +119,7 @@ NSString *MakeTestDirPath(NSString *target, NSString *root = nil) {
               : [NSString stringWithFormat:@"%@", target];
 };
 
-static std::string MakePathTarget(std::string path, NSString *root = nil) {
+static std::string MakePathTarget(std::string path, NSString* root = nil) {
   return root ? std::string(root.UTF8String) + "/" + path : path;
 }
 
@@ -127,13 +127,15 @@ static std::shared_ptr<DataWatchItemPolicy> MakeBadPolicy() {
   return std::make_shared<DataWatchItemPolicy>(kBadPolicyName, kVersion, kBadPolicyPath);
 }
 
-static NSMutableDictionary *WrapWatchItemsConfig(NSDictionary *config) {
+static NSMutableDictionary* WrapWatchItemsConfig(NSDictionary* config) {
   return [@{@"Version" : @(kVersion.data()), @"WatchItems" : [config mutableCopy]} mutableCopy];
 }
 
 struct BlockGenResult {
-  std::vector<std::optional<std::shared_ptr<WatchItemPolicyBase>>> &targetPolicies;
-  IterateTargetsBlock(^blockGen)(std::vector<std::string>);
+  std::vector<std::optional<std::shared_ptr<WatchItemPolicyBase>>>& targetPolicies;
+  // clang-format off
+  IterateTargetsBlock (^blockGen)(std::vector<std::string>);
+  // clang-format on
 };
 
 BlockGenResult CreatePolicyBlockGen() {
@@ -143,7 +145,7 @@ BlockGenResult CreatePolicyBlockGen() {
   auto blockGen = ^IterateTargetsBlock(std::vector<std::string> paths) {
     targetPolicies->clear();
     return ^(santa::LookupPolicyBlock block) {
-      for (const auto &path : paths) {
+      for (const auto& path : paths) {
         targetPolicies->push_back(block(path));
       }
     };
@@ -153,8 +155,8 @@ BlockGenResult CreatePolicyBlockGen() {
 }
 
 @interface WatchItemsTest : XCTestCase
-@property NSFileManager *fileMgr;
-@property NSString *testDir;
+@property NSFileManager* fileMgr;
+@property NSString* testDir;
 @property dispatch_queue_t q;
 @end
 
@@ -178,8 +180,8 @@ BlockGenResult CreatePolicyBlockGen() {
   XCTAssertTrue([self.fileMgr removeItemAtPath:self.testDir error:nil]);
 }
 
-- (void)createTestDirStructure:(NSArray *)fs rootedAt:(NSString *)root {
-  NSString *origCwd = [self.fileMgr currentDirectoryPath];
+- (void)createTestDirStructure:(NSArray*)fs rootedAt:(NSString*)root {
+  NSString* origCwd = [self.fileMgr currentDirectoryPath];
   XCTAssertNotNil(origCwd);
   XCTAssertTrue([self.fileMgr changeCurrentDirectoryPath:root]);
 
@@ -204,7 +206,7 @@ BlockGenResult CreatePolicyBlockGen() {
   XCTAssertTrue([self.fileMgr changeCurrentDirectoryPath:origCwd]);
 }
 
-- (void)createTestDirStructure:(NSArray *)fs {
+- (void)createTestDirStructure:(NSArray*)fs {
   [self createTestDirStructure:fs rootedAt:self.testDir];
 }
 
@@ -257,13 +259,13 @@ BlockGenResult CreatePolicyBlockGen() {
     },
   ]];
 
-  NSDictionary *aAllFilesPolicy =
+  NSDictionary* aAllFilesPolicy =
       @{kWatchItemConfigKeyPaths : @[ MakeTestDirPath(@"a/*", self.testDir) ]};
-  NSDictionary *configAllFilesOriginalA =
+  NSDictionary* configAllFilesOriginalA =
       WrapWatchItemsConfig(@{@"all_files_orig" : aAllFilesPolicy});
-  NSDictionary *configAllFilesRenameA =
+  NSDictionary* configAllFilesRenameA =
       WrapWatchItemsConfig(@{@"all_files_rename" : aAllFilesPolicy});
-  NSDictionary *configAllFilesOriginalB = WrapWatchItemsConfig(@{
+  NSDictionary* configAllFilesOriginalB = WrapWatchItemsConfig(@{
     @"all_files_orig" : @{kWatchItemConfigKeyPaths : @[ MakeTestDirPath(@"b/*", self.testDir) ]}
   });
 
@@ -275,7 +277,7 @@ BlockGenResult CreatePolicyBlockGen() {
   // Changes in config dictionary will update policy info even if the
   // filesystem didn't change.
   {
-    auto watchItems = std::make_shared<WatchItemsPeer>((NSString *)nil, nullptr);
+    auto watchItems = std::make_shared<WatchItemsPeer>((NSString*)nil, nullptr);
     watchItems->ReloadConfig(configAllFilesOriginalA);
 
     watchItems->FindPoliciesForTargets(blockGen({af1Path}));
@@ -294,7 +296,7 @@ BlockGenResult CreatePolicyBlockGen() {
 
   // Changes to fileystem structure are reflected when a config is reloaded
   {
-    auto watchItems = std::make_shared<WatchItemsPeer>((NSString *)nil, nullptr);
+    auto watchItems = std::make_shared<WatchItemsPeer>((NSString*)nil, nullptr);
     watchItems->ReloadConfig(configAllFilesOriginalA);
 
     watchItems->FindPoliciesForTargets(blockGen({af2Path}));
@@ -311,22 +313,22 @@ BlockGenResult CreatePolicyBlockGen() {
   // Ensure watch item policy memory is properly handled
   [self createTestDirStructure:@[ @"f1", @"f2", @"weird1" ]];
 
-  NSDictionary *fFiles = @{
+  NSDictionary* fFiles = @{
     kWatchItemConfigKeyPaths : @[ @{
       kWatchItemConfigKeyPathsPath : MakeTestDirPath(@"f?", self.testDir),
       kWatchItemConfigKeyPathsIsPrefix : @(NO),
     } ]
   };
-  NSDictionary *weirdFiles = @{
+  NSDictionary* weirdFiles = @{
     kWatchItemConfigKeyPaths : @[ @{
       kWatchItemConfigKeyPathsPath : MakeTestDirPath(@"weird?", self.testDir),
       kWatchItemConfigKeyPathsIsPrefix : @(NO),
     } ]
   };
 
-  NSString *configFile = @"config.plist";
-  NSDictionary *firstConfig = WrapWatchItemsConfig(@{@"f_files" : fFiles});
-  NSDictionary *secondConfig =
+  NSString* configFile = @"config.plist";
+  NSDictionary* firstConfig = WrapWatchItemsConfig(@{@"f_files" : fFiles});
+  NSDictionary* secondConfig =
       WrapWatchItemsConfig(@{@"f_files" : fFiles, @"weird_files" : weirdFiles});
 
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
@@ -374,7 +376,7 @@ BlockGenResult CreatePolicyBlockGen() {
   // Test multiple, more comprehensive policies before/after config reload
   // Note: This test doesn't use glob chars, so no need to create FS artifacts since
   // paths that don't require expansion will always be watched.
-  NSMutableDictionary *config = WrapWatchItemsConfig(@{
+  NSMutableDictionary* config = WrapWatchItemsConfig(@{
     @"foo_subdir" : @{
       kWatchItemConfigKeyPaths : @[ @{
         kWatchItemConfigKeyPathsPath : @"/foo",
@@ -383,7 +385,7 @@ BlockGenResult CreatePolicyBlockGen() {
     }
   });
 
-  auto watchItems = std::make_shared<WatchItemsPeer>((NSString *)nil, nullptr);
+  auto watchItems = std::make_shared<WatchItemsPeer>((NSString*)nil, nullptr);
   auto [targetPolicies, blockGen] = CreatePolicyBlockGen();
 
   // Resultant vector is same size as input vector
@@ -411,7 +413,7 @@ BlockGenResult CreatePolicyBlockGen() {
         {"/does/not/exist", kBadPolicyName},
     };
 
-    for (const auto &kv : pathToPolicyName) {
+    for (const auto& kv : pathToPolicyName) {
       watchItems->FindPoliciesForTargets(blockGen({MakePathTarget(kv.first)}));
       XCTAssertCStringEqual(targetPolicies[0].value_or(MakeBadPolicy())->version.data(),
                             kVersion.data());
@@ -427,7 +429,7 @@ BlockGenResult CreatePolicyBlockGen() {
   }
 
   // Add a new policy and reload the config
-  NSDictionary *barTxtFilePolicy = @{
+  NSDictionary* barTxtFilePolicy = @{
     kWatchItemConfigKeyPaths : @[ @{
       kWatchItemConfigKeyPathsPath : @"/foo/bar.txt",
       kWatchItemConfigKeyPathsIsPrefix : @(NO),
@@ -447,7 +449,7 @@ BlockGenResult CreatePolicyBlockGen() {
         {"/does/not/exist", kBadPolicyName},
     };
 
-    for (const auto &kv : pathToPolicyName) {
+    for (const auto& kv : pathToPolicyName) {
       watchItems->FindPoliciesForTargets(blockGen({MakePathTarget(kv.first)}));
       XCTAssertCStringEqual(targetPolicies[0].value_or(MakeBadPolicy())->name.c_str(),
                             kv.second.data());
@@ -455,7 +457,7 @@ BlockGenResult CreatePolicyBlockGen() {
   }
 
   // Add a catch-all policy that should only affect the previously non-matching path
-  NSDictionary *catchAllFilePolicy = @{
+  NSDictionary* catchAllFilePolicy = @{
     kWatchItemConfigKeyPaths : @[ @{
       kWatchItemConfigKeyPathsPath : @"/",
       kWatchItemConfigKeyPathsIsPrefix : @(YES),
@@ -475,7 +477,7 @@ BlockGenResult CreatePolicyBlockGen() {
         {"/does/not/exist", "slash_everything"},
     };
 
-    for (const auto &kv : pathToPolicyName) {
+    for (const auto& kv : pathToPolicyName) {
       watchItems->FindPoliciesForTargets(blockGen({MakePathTarget(kv.first)}));
       XCTAssertCStringEqual(targetPolicies[0].value_or(MakeBadPolicy())->name.c_str(),
                             kv.second.data());
@@ -495,7 +497,7 @@ BlockGenResult CreatePolicyBlockGen() {
         {"/does/not/exist", "slash_everything"},
     };
 
-    for (const auto &kv : pathToPolicyName) {
+    for (const auto& kv : pathToPolicyName) {
       watchItems->FindPoliciesForTargets(blockGen({MakePathTarget(kv.first)}));
       XCTAssertCStringEqual(targetPolicies[0].value_or(MakeBadPolicy())->name.c_str(),
                             kv.second.data());
@@ -505,7 +507,7 @@ BlockGenResult CreatePolicyBlockGen() {
 
 - (void)testVerifyConfigWatchItemPaths {
   std::variant<Unit, SetPairPathAndType> path_list;
-  NSError *err;
+  NSError* err;
 
   // Test no paths specified
   path_list = VerifyConfigWatchItemPaths(@[], &err);
@@ -548,7 +550,7 @@ BlockGenResult CreatePolicyBlockGen() {
 
 - (void)testVerifyConfigWatchItemProcesses {
   std::variant<Unit, SetWatchItemProcess> proc_list;
-  NSError *err;
+  NSError* err;
 
   // Non-existent process list parses successfully, but has no items
   proc_list = VerifyConfigWatchItemProcesses(@{}, &err);
@@ -783,7 +785,7 @@ BlockGenResult CreatePolicyBlockGen() {
   XCTAssertTrue(std::holds_alternative<Unit>(proc_list));
 
   // Test valid CDHash
-  NSString *cdhash = RepeatedString(@"A", CS_CDHASH_LEN * 2);
+  NSString* cdhash = RepeatedString(@"A", CS_CDHASH_LEN * 2);
   std::vector<uint8_t> cdhashBytes(cdhash.length / 2);
   std::fill(cdhashBytes.begin(), cdhashBytes.end(), 0xAA);
   proc_list = VerifyConfigWatchItemProcesses(
@@ -814,7 +816,7 @@ BlockGenResult CreatePolicyBlockGen() {
   XCTAssertTrue(std::holds_alternative<Unit>(proc_list));
 
   // Test valid Cert Hash
-  NSString *certHash = RepeatedString(@"A", CC_SHA256_DIGEST_LENGTH * 2);
+  NSString* certHash = RepeatedString(@"A", CC_SHA256_DIGEST_LENGTH * 2);
   proc_list = VerifyConfigWatchItemProcesses(@{
     kWatchItemConfigKeyProcesses : @[ @{kWatchItemConfigKeyProcessesCertificateSha256 : certHash} ]
   },
@@ -872,7 +874,7 @@ BlockGenResult CreatePolicyBlockGen() {
   XCTAssertEqual(std::get<SetWatchItemProcess>(proc_list).size(), 2);
 
   // Ensure each of the procs in the set is in the set of expected procs
-  for (const auto &p : std::get<SetWatchItemProcess>(proc_list)) {
+  for (const auto& p : std::get<SetWatchItemProcess>(proc_list)) {
     XCTAssertEqual(expectedProcs.count(p), 1);
   }
 }
@@ -902,7 +904,7 @@ BlockGenResult CreatePolicyBlockGen() {
 }
 
 - (void)testParseConfig {
-  NSError *err;
+  NSError* err;
   SetSharedDataWatchItemPolicy data_policies;
   SetSharedProcessWatchItemPolicy proc_policies;
   uint64_t num_rules;
@@ -1023,7 +1025,7 @@ BlockGenResult CreatePolicyBlockGen() {
 - (void)testParseConfigSingleWatchItemGeneral {
   SetSharedDataWatchItemPolicy data_policies;
   SetSharedProcessWatchItemPolicy proc_policies;
-  NSError *err;
+  NSError* err;
 
   // There must be valid Paths in a watch item
   XCTAssertFalse(
@@ -1052,7 +1054,7 @@ BlockGenResult CreatePolicyBlockGen() {
   // Options keys must be valid types
   {
     // Check bool option keys
-    for (NSString *key in @[
+    for (NSString* key in @[
            kWatchItemConfigKeyOptionsAllowReadAccess,
            kWatchItemConfigKeyOptionsAuditOnly,
            kWatchItemConfigKeyOptionsInvertProcessExceptions,
@@ -1180,7 +1182,7 @@ BlockGenResult CreatePolicyBlockGen() {
 - (void)testParseConfigSingleWatchItemPolicies {
   SetSharedDataWatchItemPolicy data_policies;
   SetSharedProcessWatchItemPolicy proc_policies;
-  NSError *err;
+  NSError* err;
 
   // Data FAA - Test multiple paths, options, and processes
   data_policies.clear();
@@ -1190,7 +1192,7 @@ BlockGenResult CreatePolicyBlockGen() {
       WatchItemProcess("pb", "", "", {}, "", false),
   };
 
-  NSMutableDictionary *singleWatchItemConfig = [@{
+  NSMutableDictionary* singleWatchItemConfig = [@{
     kWatchItemConfigKeyPaths : @[
       @"a", @{kWatchItemConfigKeyPathsPath : @"b", kWatchItemConfigKeyPathsIsPrefix : @(YES)}
     ],
@@ -1223,7 +1225,7 @@ BlockGenResult CreatePolicyBlockGen() {
   XCTAssertEqual(proc_policies.size(), 0);
   XCTAssertEqual(data_policies.size(), 2);
   // Ensure each of the procs in the set is in the set of expected procs
-  for (const auto &p : data_policies) {
+  for (const auto& p : data_policies) {
     XCTAssertEqual(expectedDataPolicies.count(p), 1);
   }
 
@@ -1247,10 +1249,10 @@ BlockGenResult CreatePolicyBlockGen() {
 }
 
 - (void)testState {
-  NSString *configPath = @"my_config_path";
+  NSString* configPath = @"my_config_path";
   NSTimeInterval startTime = [[NSDate date] timeIntervalSince1970];
 
-  NSMutableDictionary *config = WrapWatchItemsConfig(@{
+  NSMutableDictionary* config = WrapWatchItemsConfig(@{
     @"rule1" : @{kWatchItemConfigKeyPaths : @[ @"abc" ]},
     @"rule2" : @{kWatchItemConfigKeyPaths : @[ @"xyz" ]}
   });
@@ -1274,7 +1276,7 @@ BlockGenResult CreatePolicyBlockGen() {
 }
 
 - (void)testPathPatternExpectations {
-  NSMutableDictionary *config = WrapWatchItemsConfig(@{
+  NSMutableDictionary* config = WrapWatchItemsConfig(@{
     @"rule1" : @{kWatchItemConfigKeyPaths : @[ @"abc", @"xyz*" ]},
   });
 
@@ -1353,7 +1355,7 @@ BlockGenResult CreatePolicyBlockGen() {
           ]
         } ]];
 
-  NSString * (^MakeTestDirPath)(NSString *) = ^NSString *(NSString *target) {
+  NSString* (^MakeTestDirPath)(NSString*) = ^NSString*(NSString* target) {
     if (![target hasPrefix:@"/"]) {
       target = [NSString stringWithFormat:@"/%@", target];
     }
@@ -1407,7 +1409,7 @@ BlockGenResult CreatePolicyBlockGen() {
   XCTAssertCppStringEndsWith(matches[0], "/tmp");
 
   // Test path without a leading slash to ensure the function forces it
-  NSString *path = MakeTestDirPath(@"*");
+  NSString* path = MakeTestDirPath(@"*");
   path = [path substringFromIndex:1];
   matches = FindMatches(path);
   XCTAssertEqual(matches.size(), 1);
@@ -1450,13 +1452,13 @@ BlockGenResult CreatePolicyBlockGen() {
     },
   ]];
 
-  std::string (^MakeTestDirPathTarget)(NSString *) = ^(NSString *target) {
+  std::string (^MakeTestDirPathTarget)(NSString*) = ^(NSString* target) {
     return MakePathTarget([[NSString stringWithFormat:@"%@%@", self.testDir, target] UTF8String]);
   };
 
-  std::shared_ptr<DataWatchItemPolicy> (^MakeDataPolicy)(std::string, NSString *) =
-      ^std::shared_ptr<DataWatchItemPolicy>(std::string name, NSString *path) {
-    NSString *full = [NSString stringWithFormat:@"%@%@", self.testDir, path];
+  std::shared_ptr<DataWatchItemPolicy> (^MakeDataPolicy)(std::string, NSString*) =
+      ^std::shared_ptr<DataWatchItemPolicy>(std::string name, NSString* path) {
+    NSString* full = [NSString stringWithFormat:@"%@%@", self.testDir, path];
     return std::make_shared<DataWatchItemPolicy>(name, "v1", full.UTF8String,
                                                  WatchItemPathType::kPrefix);
   };

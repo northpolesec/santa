@@ -19,18 +19,18 @@
 namespace santa {
 
 const NSUInteger kTeamIDLength = 10;
-NSString *const kPlatformTeamID = @"platform";
-NSString *const kPlatformTeamIDPrefix = @"platform:";
+NSString* const kPlatformTeamID = @"platform";
+NSString* const kPlatformTeamIDPrefix = @"platform:";
 
-bool IsValidTeamID(NSString *tid) {
-  static NSCharacterSet *nonAlnum = [[NSCharacterSet
+bool IsValidTeamID(NSString* tid) {
+  static NSCharacterSet* nonAlnum = [[NSCharacterSet
       characterSetWithCharactersInString:
           @"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"] invertedSet];
   return tid.length == kTeamIDLength &&
          [tid rangeOfCharacterFromSet:nonAlnum].location == NSNotFound;
 }
 
-bool IsValidSigningID(NSString *sid) {
+bool IsValidSigningID(NSString* sid) {
   if (sid.length > kPlatformTeamIDPrefix.length && [sid hasPrefix:kPlatformTeamIDPrefix]) {
     return true;
   } else if (sid.length > kTeamIDLength + 1 && [sid characterAtIndex:kTeamIDLength] == ':') {
@@ -40,14 +40,14 @@ bool IsValidSigningID(NSString *sid) {
   }
 }
 
-bool IsValidCDHash(NSString *cdhash) {
-  static NSCharacterSet *nonHex =
+bool IsValidCDHash(NSString* cdhash) {
+  static NSCharacterSet* nonHex =
       [[NSCharacterSet characterSetWithCharactersInString:@"0123456789abcdefABCDEF"] invertedSet];
   return cdhash.length == CS_CDHASH_LEN * 2 &&
          [cdhash rangeOfCharacterFromSet:nonHex].location == NSNotFound;
 }
 
-std::pair<NSString *, NSString *> SplitSigningID(NSString *sid) {
+std::pair<NSString*, NSString*> SplitSigningID(NSString* sid) {
   if (!IsValidSigningID(sid)) {
     return {nil, nil};
   }

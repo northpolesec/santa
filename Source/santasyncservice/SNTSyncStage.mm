@@ -35,15 +35,15 @@ using santa::NSStringToUTF8String;
 
 @interface SNTSyncStage ()
 
-@property(readwrite) NSURLSession *urlSession;
-@property(readwrite) SNTSyncState *syncState;
-@property(readwrite) MOLXPCConnection *daemonConn;
+@property(readwrite) NSURLSession* urlSession;
+@property(readwrite) SNTSyncState* syncState;
+@property(readwrite) MOLXPCConnection* daemonConn;
 
 @end
 
 @implementation SNTSyncStage
 
-- (nullable instancetype)initWithState:(nonnull SNTSyncState *)syncState {
+- (nullable instancetype)initWithState:(nonnull SNTSyncState*)syncState {
   self = [super init];
   if (self) {
     _syncState = syncState;
@@ -58,12 +58,12 @@ using santa::NSStringToUTF8String;
   __builtin_unreachable();
 }
 
-- (NSString *)stageURL {
+- (NSString*)stageURL {
   [self doesNotRecognizeSelector:_cmd];
   __builtin_unreachable();
 }
 
-- (NSMutableURLRequest *)requestWithMessage:(google::protobuf::Message *)message {
+- (NSMutableURLRequest*)requestWithMessage:(google::protobuf::Message*)message {
   if (!message) return [self requestWithData:[NSData data] contentType:nil];
 
 #ifndef SANTA_STORE_SYNC_JSON
@@ -84,13 +84,13 @@ using santa::NSStringToUTF8String;
   absl::Status status = google::protobuf::json::MessageToJsonString(*message, &json, options);
 
   if (!status.ok()) {
-    NSString *errStr = [NSString
+    NSString* errStr = [NSString
         stringWithFormat:@"Failed to convert protobuf to JSON: %s", status.ToString().c_str()];
     SLOGE(@"%@", errStr);
     return nil;
   }
 
-  NSData *data = [NSData dataWithBytes:json.data() length:json.size()];
+  NSData* data = [NSData dataWithBytes:json.data() length:json.size()];
 
 #ifdef SANTA_STORE_SYNC_JSON
   [self storeJSON:data withMessageType:santa::StringToNSString(message->GetTypeName())];
@@ -99,17 +99,17 @@ using santa::NSStringToUTF8String;
   return [self requestWithData:data contentType:@"application/json"];
 }
 
-- (NSMutableURLRequest *)requestWithData:(NSData *)requestBody contentType:(NSString *)contentType {
+- (NSMutableURLRequest*)requestWithData:(NSData*)requestBody contentType:(NSString*)contentType {
   if (!contentType.length) contentType = @"application/octet-stream";
 
-  NSMutableURLRequest *req = [[NSMutableURLRequest alloc] initWithURL:[self stageURL]];
+  NSMutableURLRequest* req = [[NSMutableURLRequest alloc] initWithURL:[self stageURL]];
   [req setHTTPMethod:@"POST"];
   [req setValue:contentType forHTTPHeaderField:@"Content-Type"];
-  NSString *xsrfHeader = self.syncState.xsrfTokenHeader ?: kDefaultXSRFTokenHeader;
+  NSString* xsrfHeader = self.syncState.xsrfTokenHeader ?: kDefaultXSRFTokenHeader;
   [req setValue:self.syncState.xsrfToken forHTTPHeaderField:xsrfHeader];
 
-  NSData *compressed;
-  NSString *contentEncodingHeader;
+  NSData* compressed;
+  NSString* contentEncodingHeader;
 
   switch (self.syncState.contentEncoding) {
     case SNTSyncContentEncodingNone: break;
@@ -136,12 +136,12 @@ using santa::NSStringToUTF8String;
   return req;
 }
 
-- (NSData *)dataFromRequest:(NSURLRequest *)request
-                    timeout:(NSTimeInterval)timeout
-                      error:(NSError **)error {
-  NSHTTPURLResponse *response;
-  NSError *requestError;
-  NSData *data;
+- (NSData*)dataFromRequest:(NSURLRequest*)request
+                   timeout:(NSTimeInterval)timeout
+                     error:(NSError**)error {
+  NSHTTPURLResponse* response;
+  NSError* requestError;
+  NSData* data;
 
   int maxAttempts = 5;
   for (int attempt = 1; attempt <= maxAttempts; ++attempt) {
@@ -167,8 +167,8 @@ using santa::NSStringToUTF8String;
     if ((response.statusCode == 403 || requestError.code == NSURLErrorClientCertificateRequired ||
          requestError.code == NSURLErrorCannotParseResponse) &&
         [self fetchXSRFToken]) {
-      NSMutableURLRequest *mutableRequest = [request mutableCopy];
-      NSString *xsrfHeader = self.syncState.xsrfTokenHeader ?: kDefaultXSRFTokenHeader;
+      NSMutableURLRequest* mutableRequest = [request mutableCopy];
+      NSString* xsrfHeader = self.syncState.xsrfTokenHeader ?: kDefaultXSRFTokenHeader;
       [mutableRequest setValue:self.syncState.xsrfToken forHTTPHeaderField:xsrfHeader];
       request = mutableRequest;
       continue;
@@ -178,7 +178,7 @@ using santa::NSStringToUTF8String;
   // If the final attempt resulted in an error, log the error and return nil.
   if (response.statusCode != 200) {
     long code = response.statusCode;
-    NSString *errStr = [NSHTTPURLResponse localizedStringForStatusCode:response.statusCode];
+    NSString* errStr = [NSHTTPURLResponse localizedStringForStatusCode:response.statusCode];
     if (requestError.localizedDescription) {
       code = (long)requestError.code;
       errStr = requestError.localizedDescription;
@@ -190,11 +190,11 @@ using santa::NSStringToUTF8String;
   return data;
 }
 
-- (NSError *)performRequest:(NSURLRequest *)request
-                intoMessage:(google::protobuf::Message *)message
-                    timeout:(NSTimeInterval)timeout {
-  NSError *error;
-  NSData *data = [self dataFromRequest:request timeout:timeout error:&error];
+- (NSError*)performRequest:(NSURLRequest*)request
+               intoMessage:(google::protobuf::Message*)message
+                   timeout:(NSTimeInterval)timeout {
+  NSError* error;
+  NSData* data = [self dataFromRequest:request timeout:timeout error:&error];
   if (error) {
     SLOGE(@"Error performing request: %@", error.localizedDescription);
     return error;
@@ -205,8 +205,8 @@ using santa::NSStringToUTF8String;
 
 #ifndef SANTA_STORE_SYNC_JSON
   if ([[SNTConfigurator configurator] syncEnableProtoTransfer]) {
-    if (!message->ParseFromString(std::string((const char *)data.bytes, data.length))) {
-      NSString *errStr = @"Failed to parse response proto into message";
+    if (!message->ParseFromString(std::string((const char*)data.bytes, data.length))) {
+      NSString* errStr = @"Failed to parse response proto into message";
       SLOGE(@"%@", errStr);
       [SNTError populateError:&error withCode:SNTErrorCodeFailedToParseProto format:@"%@", errStr];
       return error;
@@ -218,15 +218,15 @@ using santa::NSStringToUTF8String;
   google::protobuf::json::ParseOptions options{
       .ignore_unknown_fields = true,
   };
-  NSString *jsonData = [[NSString alloc] initWithData:[self stripXssi:data]
+  NSString* jsonData = [[NSString alloc] initWithData:[self stripXssi:data]
                                              encoding:NSUTF8StringEncoding];
   absl::Status status =
       google::protobuf::json::JsonStringToMessage(NSStringToUTF8String(jsonData), message, options);
   if (!status.ok()) {
-    NSString *errStr = [NSString stringWithFormat:@"Failed to parse response JSON into message: %s",
+    NSString* errStr = [NSString stringWithFormat:@"Failed to parse response JSON into message: %s",
                                                   status.ToString().c_str()];
     SLOGE(@"%@", errStr);
-    NSError *error;
+    NSError* error;
     [SNTError populateError:&error withCode:SNTErrorCodeFailedToParseJSON format:@"%@", errStr];
     return error;
   }
@@ -245,20 +245,20 @@ using santa::NSStringToUTF8String;
   @param error  Return the error details
   @returns data, The HTTP body of the response
 */
-- (NSData *)performRequest:(NSURLRequest *)request
-                   timeout:(NSTimeInterval)timeout
-                  response:(out NSHTTPURLResponse **)response
-                     error:(out NSError **)error {
-  __block NSData *_data;
-  __block NSHTTPURLResponse *_response;
-  __block NSError *_error;
+- (NSData*)performRequest:(NSURLRequest*)request
+                  timeout:(NSTimeInterval)timeout
+                 response:(out NSHTTPURLResponse**)response
+                    error:(out NSError**)error {
+  __block NSData* _data;
+  __block NSHTTPURLResponse* _response;
+  __block NSError* _error;
 
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-  NSURLSessionDataTask *task = [self.urlSession
+  NSURLSessionDataTask* task = [self.urlSession
       dataTaskWithRequest:request
-        completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+        completionHandler:^(NSData* data, NSURLResponse* response, NSError* error) {
           if ([response isKindOfClass:[NSHTTPURLResponse class]]) {
-            _response = (NSHTTPURLResponse *)response;
+            _response = (NSHTTPURLResponse*)response;
           }
           _data = data;
           _error = error;
@@ -275,15 +275,15 @@ using santa::NSStringToUTF8String;
   return _data;
 }
 
-- (NSData *)stripXssi:(NSData *)data {
+- (NSData*)stripXssi:(NSData*)data {
   static const char xssiOne[5] = {')', ']', '}', '\'', '\n'};
   static const char xssiTwo[3] = {']', ')', '}'};
   if (data.length >= sizeof(xssiOne) &&
-      strncmp((const char *)data.bytes, xssiOne, sizeof(xssiOne)) == 0) {
+      strncmp((const char*)data.bytes, xssiOne, sizeof(xssiOne)) == 0) {
     return [data subdataWithRange:NSMakeRange(sizeof(xssiOne), data.length - sizeof(xssiOne))];
   }
   if (data.length >= sizeof(xssiTwo) &&
-      strncmp((const char *)data.bytes, xssiTwo, sizeof(xssiTwo)) == 0) {
+      strncmp((const char*)data.bytes, xssiTwo, sizeof(xssiTwo)) == 0) {
     return [data subdataWithRange:NSMakeRange(sizeof(xssiTwo), data.length - sizeof(xssiTwo))];
   }
   return data;
@@ -292,16 +292,16 @@ using santa::NSStringToUTF8String;
 - (BOOL)fetchXSRFToken {
   BOOL success = NO;
   if (!self.syncState.xsrfToken.length) {  // only fetch token once per session
-    NSString *stageName = [@"xsrf" stringByAppendingFormat:@"/%@", self.syncState.machineID];
-    NSURL *u = [NSURL URLWithString:stageName relativeToURL:self.syncState.syncBaseURL];
-    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:u];
+    NSString* stageName = [@"xsrf" stringByAppendingFormat:@"/%@", self.syncState.machineID];
+    NSURL* u = [NSURL URLWithString:stageName relativeToURL:self.syncState.syncBaseURL];
+    NSMutableURLRequest* request = [NSMutableURLRequest requestWithURL:u];
     [request setHTTPMethod:@"POST"];
-    NSHTTPURLResponse *response;
+    NSHTTPURLResponse* response;
     [self performRequest:request timeout:10 response:&response error:NULL];
     if (response.statusCode == 200) {
-      NSDictionary *headers = [response allHeaderFields];
+      NSDictionary* headers = [response allHeaderFields];
       self.syncState.xsrfToken = headers[kDefaultXSRFTokenHeader];
-      NSString *xsrfTokenHeader = headers[kXSRFTokenHeader];
+      NSString* xsrfTokenHeader = headers[kXSRFTokenHeader];
       self.syncState.xsrfTokenHeader = xsrfTokenHeader.length ? xsrfTokenHeader : nil;
       SLOGD(@"Retrieved new XSRF token");
       success = YES;
@@ -317,9 +317,9 @@ using santa::NSStringToUTF8String;
 // all sync requests will be stored, in JSON form, to /var/db/santa/storedsyncs.
 // As santasyncservice runs as nobody, this directory must already exist and be
 // owned by the nobody user.
-- (void)storeJSON:(NSData *)json withMessageType:(NSString *)msgType {
-  NSError *err;
-  NSString *path = [NSString stringWithFormat:@"/var/db/santa/storedsyncs/%@.%f.json", msgType,
+- (void)storeJSON:(NSData*)json withMessageType:(NSString*)msgType {
+  NSError* err;
+  NSString* path = [NSString stringWithFormat:@"/var/db/santa/storedsyncs/%@.%f.json", msgType,
                                               [NSDate date].timeIntervalSince1970];
   [json writeToURL:[NSURL fileURLWithPath:path] options:NSDataWritingAtomic error:&err];
   if (err) {

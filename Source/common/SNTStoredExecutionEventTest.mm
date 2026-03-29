@@ -24,19 +24,19 @@
 
 @implementation StoredEventTest
 
-- (NSString *)bundleExample {
-  NSString *rp = [[NSBundle bundleForClass:[self class]] resourcePath];
+- (NSString*)bundleExample {
+  NSString* rp = [[NSBundle bundleForClass:[self class]] resourcePath];
   return [rp stringByAppendingPathComponent:@"testdata/BundleExample.app"];
 }
 
-- (NSString *)developerSignedExecutableExample {
+- (NSString*)developerSignedExecutableExample {
   return [[NSBundle bundleForClass:[self class]] pathForResource:@"signed-with-teamid" ofType:nil];
 }
 
 - (void)testBundleEvent {
-  NSString *path = [self bundleExample];
-  SNTFileInfo *fi = [[SNTFileInfo alloc] initWithPath:path];
-  SNTStoredExecutionEvent *sut = [[SNTStoredExecutionEvent alloc] initWithFileInfo:fi];
+  NSString* path = [self bundleExample];
+  SNTFileInfo* fi = [[SNTFileInfo alloc] initWithPath:path];
+  SNTStoredExecutionEvent* sut = [[SNTStoredExecutionEvent alloc] initWithFileInfo:fi];
 
   XCTAssertNotNil(sut);
   XCTAssertEqualObjects(sut.filePath, fi.path);
@@ -45,9 +45,9 @@
 }
 
 - (void)testDeveloperSignedEvent {
-  NSString *path = [self developerSignedExecutableExample];
-  SNTFileInfo *fi = [[SNTFileInfo alloc] initWithPath:path];
-  SNTStoredExecutionEvent *sut = [[SNTStoredExecutionEvent alloc] initWithFileInfo:fi];
+  NSString* path = [self developerSignedExecutableExample];
+  SNTFileInfo* fi = [[SNTFileInfo alloc] initWithPath:path];
+  SNTStoredExecutionEvent* sut = [[SNTStoredExecutionEvent alloc] initWithFileInfo:fi];
 
   XCTAssertNotNil(sut);
   XCTAssertEqualObjects(sut.filePath, fi.path);
@@ -61,8 +61,8 @@
 }
 
 - (void)testProductionSignedEvent {
-  SNTFileInfo *fi = [[SNTFileInfo alloc] initWithPath:@"/usr/bin/yes"];
-  SNTStoredExecutionEvent *sut = [[SNTStoredExecutionEvent alloc] initWithFileInfo:fi];
+  SNTFileInfo* fi = [[SNTFileInfo alloc] initWithPath:@"/usr/bin/yes"];
+  SNTStoredExecutionEvent* sut = [[SNTStoredExecutionEvent alloc] initWithFileInfo:fi];
 
   XCTAssertNotNil(sut);
   XCTAssertEqualObjects(sut.filePath, fi.path);

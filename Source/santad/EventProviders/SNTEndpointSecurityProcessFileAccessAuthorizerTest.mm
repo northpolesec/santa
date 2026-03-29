@@ -76,7 +76,7 @@ void SetExpectationsForProcessFileAccessAuthorizerInit(
                                                           0, 0, nil, nil);
   auto mockFAAProxy = std::make_shared<santa::ProcessFAAPolicyProcessorProxy>(mockFAA);
 
-  SNTEndpointSecurityProcessFileAccessAuthorizer *procFAAClient =
+  SNTEndpointSecurityProcessFileAccessAuthorizer* procFAAClient =
       [[SNTEndpointSecurityProcessFileAccessAuthorizer alloc] initWithESAPI:mockESApi
                                                                     metrics:nullptr
                                                          faaPolicyProcessor:mockFAAProxy
@@ -84,7 +84,7 @@ void SetExpectationsForProcessFileAccessAuthorizerInit(
 
   [procFAAClient enable];
 
-  for (const auto &event : expectedEventSubs) {
+  for (const auto& event : expectedEventSubs) {
     XCTAssertNoThrow(santa::EventTypeToString(event));
   }
 
@@ -125,7 +125,7 @@ void SetExpectationsForProcessFileAccessAuthorizerInit(
     checkPolicyBlockResult = block(pwip);
   };
 
-  SNTEndpointSecurityProcessFileAccessAuthorizer *procFAAClient =
+  SNTEndpointSecurityProcessFileAccessAuthorizer* procFAAClient =
       [[SNTEndpointSecurityProcessFileAccessAuthorizer alloc] initWithESAPI:mockESApi
                                                                     metrics:nullptr
                                                          faaPolicyProcessor:mockFAAProxy

@@ -22,31 +22,31 @@
 
 namespace santa {
 
-static inline pid_t Pid(const audit_token_t &tok) {
+static inline pid_t Pid(const audit_token_t& tok) {
   return audit_token_to_pid(tok);
 }
 
-static inline int Pidversion(const audit_token_t &tok) {
+static inline int Pidversion(const audit_token_t& tok) {
   return audit_token_to_pidversion(tok);
 }
 
-static inline uid_t RealUser(const audit_token_t &tok) {
+static inline uid_t RealUser(const audit_token_t& tok) {
   return audit_token_to_ruid(tok);
 }
 
-static inline gid_t RealGroup(const audit_token_t &tok) {
+static inline gid_t RealGroup(const audit_token_t& tok) {
   return audit_token_to_rgid(tok);
 }
 
-static inline uid_t EffectiveUser(const audit_token_t &tok) {
+static inline uid_t EffectiveUser(const audit_token_t& tok) {
   return audit_token_to_euid(tok);
 }
 
-static inline gid_t EffectiveGroup(const audit_token_t &tok) {
+static inline gid_t EffectiveGroup(const audit_token_t& tok) {
   return audit_token_to_egid(tok);
 }
 
-static inline std::pair<pid_t, int> PidPidversion(const audit_token_t &tok) {
+static inline std::pair<pid_t, int> PidPidversion(const audit_token_t& tok) {
   return {Pid(tok), Pidversion(tok)};
 }
 
@@ -66,16 +66,12 @@ static inline audit_token_t MakeStubAuditToken(pid_t pid, int pidver) {
   };
 }
 
-static inline std::optional<audit_token_t> GetMyAuditToken() {
-  audit_token_t tok;
-  mach_msg_type_number_t count = TASK_AUDIT_TOKEN_COUNT;
-  if (task_info(mach_task_self(), TASK_AUDIT_TOKEN, (task_info_t)&tok,
-                &count) != KERN_SUCCESS) {
-    return std::nullopt;
-  }
+std::optional<audit_token_t> GetMyAuditToken();
 
-  return std::make_optional(tok);
-}
+/// Look up the current audit token for a running process by pid.
+/// Uses mach task ports: task_name_for_pid + task_info(TASK_AUDIT_TOKEN).
+/// Returns false if the process doesn't exist or the lookup fails.
+bool AuditTokenForPid(pid_t pid, audit_token_t* token);
 
 }  // namespace santa
 

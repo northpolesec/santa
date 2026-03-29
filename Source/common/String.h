@@ -26,27 +26,27 @@
 
 namespace santa {
 
-static inline std::string_view NSStringToUTF8StringView(NSString *str) {
+static inline std::string_view NSStringToUTF8StringView(NSString* str) {
   return std::string_view(str.UTF8String, [str lengthOfBytesUsingEncoding:NSUTF8StringEncoding]);
 }
 
-static inline std::string NSStringToUTF8String(NSString *str) {
+static inline std::string NSStringToUTF8String(NSString* str) {
   return std::string(str.UTF8String, [str lengthOfBytesUsingEncoding:NSUTF8StringEncoding]);
 }
 
-static inline NSString *StringToNSString(const std::string &str) {
+static inline NSString* StringToNSString(const std::string& str) {
   return [NSString stringWithUTF8String:str.c_str()];
 }
 
-static inline NSString *StringToNSString(const char *str) {
+static inline NSString* StringToNSString(const char* str) {
   return [NSString stringWithUTF8String:str];
 }
 
-static inline NSString *StringToNSString(std::string_view str) {
+static inline NSString* StringToNSString(std::string_view str) {
   return [NSString stringWithUTF8String:str.data()];
 }
 
-static inline NSString *OptionalStringToNSString(const std::optional<std::string> &optional_str) {
+static inline NSString* OptionalStringToNSString(const std::optional<std::string>& optional_str) {
   std::string str = optional_str.value_or("");
   if (str.length() == 0) {
     return nil;
@@ -63,11 +63,11 @@ static inline std::string StringTokenToString(es_string_token_t es_str) {
   return std::string(es_str.data, es_str.length);
 }
 
-static inline NSString *StringTokenToNSString(es_string_token_t es_str) {
+static inline NSString* StringTokenToNSString(es_string_token_t es_str) {
   return StringToNSString(es_str.data);
 }
 
-static inline std::string BufToHexString(const uint8_t *buf, size_t bufsize) {
+static inline std::string BufToHexString(const uint8_t* buf, size_t bufsize) {
   static constexpr char hex_chars[] = "0123456789abcdef";
 
   if (!buf) {
@@ -85,8 +85,8 @@ static inline std::string BufToHexString(const uint8_t *buf, size_t bufsize) {
   return hex_str;
 }
 
-static inline std::string BufToHexString(NSData *data) {
-  return BufToHexString(static_cast<const uint8_t *>(data.bytes), data.length);
+static inline std::string BufToHexString(NSData* data) {
+  return BufToHexString(static_cast<const uint8_t*>(data.bytes), data.length);
 }
 
 static inline std::vector<uint8_t> HexStringToBuf(std::string_view str) {
@@ -106,7 +106,7 @@ static inline std::vector<uint8_t> HexStringToBuf(std::string_view str) {
   return bytes;
 }
 
-static inline std::vector<uint8_t> HexStringToBuf(NSString *str) {
+static inline std::vector<uint8_t> HexStringToBuf(NSString* str) {
   return HexStringToBuf(NSStringToUTF8StringView(str));
 }
 

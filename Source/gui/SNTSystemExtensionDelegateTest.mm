@@ -31,7 +31,7 @@
 }
 
 - (void)testDelegateForSantadActivation {
-  SNTSystemExtensionDelegate *delegate = [SNTSystemExtensionDelegate delegateForSantadActivation];
+  SNTSystemExtensionDelegate* delegate = [SNTSystemExtensionDelegate delegateForSantadActivation];
 
   XCTAssertNotNil(delegate);
   XCTAssertFalse(delegate.isNetworkExtension);
@@ -42,7 +42,7 @@
 }
 
 - (void)testDelegateForSantadDeactivation {
-  SNTSystemExtensionDelegate *delegate = [SNTSystemExtensionDelegate delegateForSantadDeactivation];
+  SNTSystemExtensionDelegate* delegate = [SNTSystemExtensionDelegate delegateForSantadDeactivation];
 
   XCTAssertNotNil(delegate);
   XCTAssertFalse(delegate.isNetworkExtension);
@@ -53,7 +53,7 @@
 }
 
 - (void)testDelegateForSantanetdActivation {
-  SNTSystemExtensionDelegate *delegate =
+  SNTSystemExtensionDelegate* delegate =
       [SNTSystemExtensionDelegate delegateForSantanetdActivation];
 
   XCTAssertNotNil(delegate);
@@ -65,7 +65,7 @@
 }
 
 - (void)testDelegateForSantanetdDeactivation {
-  SNTSystemExtensionDelegate *delegate =
+  SNTSystemExtensionDelegate* delegate =
       [SNTSystemExtensionDelegate delegateForSantanetdDeactivation];
 
   XCTAssertNotNil(delegate);
@@ -77,20 +77,20 @@
 }
 
 - (void)testRequestDelegateIsSetCorrectly {
-  SNTSystemExtensionDelegate *delegate = [SNTSystemExtensionDelegate delegateForSantadActivation];
+  SNTSystemExtensionDelegate* delegate = [SNTSystemExtensionDelegate delegateForSantadActivation];
 
   XCTAssertEqualObjects(delegate.request.delegate, delegate);
 }
 
 - (void)testSubmitAndExitAsync {
-  SNTSystemExtensionDelegate *delegate = [SNTSystemExtensionDelegate delegateForSantadActivation];
+  SNTSystemExtensionDelegate* delegate = [SNTSystemExtensionDelegate delegateForSantadActivation];
 
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
 
   id managerMock = OCMClassMock([OSSystemExtensionManager class]);
 
   OCMStub([managerMock sharedManager]).andReturn(managerMock);
-  OCMStub([managerMock submitRequest:delegate.request]).andDo(^(NSInvocation *invocation) {
+  OCMStub([managerMock submitRequest:delegate.request]).andDo(^(NSInvocation* invocation) {
     dispatch_semaphore_signal(sema);
   });
 

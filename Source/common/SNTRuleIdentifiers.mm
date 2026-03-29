@@ -33,11 +33,11 @@
 
 - (instancetype)initWithRuleIdentifiers:(struct RuleIdentifiers)ri
                        andSigningStatus:(SNTSigningStatus)signingStatus {
-  NSString *cdhash;
-  NSString *binarySHA256;
-  NSString *signingID;
-  NSString *certificateSHA256;
-  NSString *teamID;
+  NSString* cdhash;
+  NSString* binarySHA256;
+  NSString* signingID;
+  NSString* certificateSHA256;
+  NSString* teamID;
 
   // Waterfall thru the signing status in order of most-to-least permissive
   // in terms of identifiers allowed for policy match search. Fields from
@@ -93,7 +93,7 @@
   return YES;
 }
 
-- (instancetype)initWithCoder:(NSCoder *)decoder {
+- (instancetype)initWithCoder:(NSCoder*)decoder {
   self = [self init];
   if (self) {
     DECODE(decoder, cdhash, NSString);
@@ -105,7 +105,7 @@
   return self;
 }
 
-- (void)encodeWithCoder:(NSCoder *)coder {
+- (void)encodeWithCoder:(NSCoder*)coder {
   ENCODE(coder, cdhash);
   ENCODE(coder, binarySHA256);
   ENCODE(coder, signingID);

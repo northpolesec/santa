@@ -20,7 +20,7 @@
 @interface SNTKVOManager ()
 @property KVOCallback callback;
 @property Class expectedType;
-@property NSString *keyPath;
+@property NSString* keyPath;
 @property id object;
 @end
 
@@ -32,7 +32,7 @@
                       callback:(KVOCallback)callback {
   self = [super self];
   if (self) {
-    NSString *selectorName = NSStringFromSelector(selector);
+    NSString* selectorName = NSStringFromSelector(selector);
     if (![object respondsToSelector:selector]) {
       LOGE(@"Attempt to add observer for an unknown selector (%@) for object (%@)", selectorName,
            [object class]);
@@ -56,10 +56,10 @@
   [self.object removeObserver:self forKeyPath:self.keyPath context:NULL];
 }
 
-- (void)observeValueForKeyPath:(NSString *)keyPath
+- (void)observeValueForKeyPath:(NSString*)keyPath
                       ofObject:(id)object
-                        change:(NSDictionary<NSString *, id> *)change
-                       context:(void *)context {
+                        change:(NSDictionary<NSString*, id>*)change
+                       context:(void*)context {
   id oldValue = [change[NSKeyValueChangeOldKey] isKindOfClass:self.expectedType]
                     ? change[NSKeyValueChangeOldKey]
                     : nil;

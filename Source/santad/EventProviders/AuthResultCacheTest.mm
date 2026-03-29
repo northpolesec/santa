@@ -37,7 +37,7 @@ using santa::FlushCacheMode;
 using santa::FlushCacheReason;
 
 namespace santa {
-extern NSString *const FlushCacheReasonToString(FlushCacheReason reason);
+extern NSString* const FlushCacheReasonToString(FlushCacheReason reason);
 }  // namespace santa
 
 using santa::FlushCacheReasonToString;
@@ -61,7 +61,7 @@ static inline es_file_t MakeCacheableFile(uint64_t devno, uint64_t ino) {
 
 static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uint64_t root_count,
                                      uint64_t nonroot_count) {
-  NSArray<NSNumber *> *counts = cache->CacheCounts();
+  NSArray<NSNumber*>* counts = cache->CacheCounts();
 
   XCTAssertNotNil(counts);
   XCTAssertEqual([counts count], 2);
@@ -153,7 +153,7 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
   // be notified when the mock is called.
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
   OCMStub([client clearCache])
-      .andDo(^(NSInvocation *invocation) {
+      .andDo(^(NSInvocation* invocation) {
         dispatch_semaphore_signal(sema);
       })
       .andReturn(true);
@@ -262,7 +262,7 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
 
   es_file_t rootFile = MakeCacheableFile(RootDevno(), 111);
 
-  SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
   cd.sha256 = @"abc123";
   cd.certSHA256 = @"cert456";
 
@@ -319,7 +319,7 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
 }
 
 - (void)testFlushCacheReasonToString {
-  std::map<FlushCacheReason, NSString *> reasonToString = {
+  std::map<FlushCacheReason, NSString*> reasonToString = {
       {FlushCacheReason::kClientModeChanged, @"ClientModeChanged"},
       {FlushCacheReason::kPathRegexChanged, @"PathRegexChanged"},
       {FlushCacheReason::kRulesChanged, @"RulesChanged"},
@@ -331,7 +331,7 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
       {FlushCacheReason::kCELFallbackRulesChanged, @"CELFallbackRulesChanged"},
   };
 
-  for (const auto &kv : reasonToString) {
+  for (const auto& kv : reasonToString) {
     XCTAssertEqualObjects(FlushCacheReasonToString(kv.first), kv.second);
   }
 

@@ -21,12 +21,12 @@
 #import "Source/santametricservice/Formats/SNTMetricFormatTestHelper.h"
 
 @interface SNTCommandMetrics (Testing)
-- (void)prettyPrintMetrics:(NSDictionary *)metircs asJSON:(BOOL)exportJSON;
-- (NSDictionary *)filterMetrics:(NSDictionary *)metrics withArguments:(NSArray *)args;
+- (void)prettyPrintMetrics:(NSDictionary*)metircs asJSON:(BOOL)exportJSON;
+- (NSDictionary*)filterMetrics:(NSDictionary*)metrics withArguments:(NSArray*)args;
 @end
 
 @interface SNTCommandMetricsTest : XCTestCase
-@property NSString *tempDir;
+@property NSString* tempDir;
 @property id mockConfigurator;
 @end
 
@@ -35,7 +35,7 @@
 - (void)setUp {
   // create a temp dir
   char dirTemplate[] = "/tmp/sntcommandmetrictest.XXXXXXX";
-  char *tempPath = mkdtemp(dirTemplate);
+  char* tempPath = mkdtemp(dirTemplate);
 
   if (tempPath == NULL) {
     NSLog(@"Unable to make temp directory");
@@ -57,7 +57,7 @@
 
 - (void)tearDown {
   // delete the temp dir
-  NSError *err;
+  NSError* err;
   [[NSFileManager defaultManager] removeItemAtPath:self.tempDir error:&err];
 
   if (err != nil) {
@@ -68,19 +68,19 @@
 }
 
 - (void)testPrettyPrintingJSON {
-  NSError *err;
-  NSString *path = [[NSBundle bundleForClass:[self class]] resourcePath];
+  NSError* err;
+  NSString* path = [[NSBundle bundleForClass:[self class]] resourcePath];
   path = [path stringByAppendingPathComponent:@"Commands/testdata/metrics-prettyprint.json"];
 
-  NSString *goldenFileContents = [[NSString alloc]
+  NSString* goldenFileContents = [[NSString alloc]
       initWithData:[NSData dataWithContentsOfFile:path options:NSDataReadingUncached error:&err]
           encoding:NSUTF8StringEncoding];
 
   XCTAssertNil(err, @"failed to read golden file %@ for testPrettyPrintingJSON", path);
 
-  SNTCommandMetrics *metricsCmd = [[SNTCommandMetrics alloc] init];
+  SNTCommandMetrics* metricsCmd = [[SNTCommandMetrics alloc] init];
 
-  NSString *outputPath = [NSString pathWithComponents:@[ self.tempDir, @"test.data" ]];
+  NSString* outputPath = [NSString pathWithComponents:@[ self.tempDir, @"test.data" ]];
 
   // redirect stdout
   int fd = open([outputPath UTF8String], O_TRUNC | O_WRONLY | O_CREAT, 0600);
@@ -95,7 +95,7 @@
   dup2(saved_stdout, fileno(stdout));
 
   // open test file assert equal with golden file
-  NSString *commandOutput =
+  NSString* commandOutput =
       [[NSString alloc] initWithData:[NSData dataWithContentsOfFile:outputPath]
                             encoding:NSUTF8StringEncoding];
   XCTAssertEqualObjects(goldenFileContents, commandOutput,
@@ -103,19 +103,19 @@
 }
 
 - (void)testPrettyPrinting {
-  NSError *err;
-  NSString *path = [[NSBundle bundleForClass:[self class]] resourcePath];
+  NSError* err;
+  NSString* path = [[NSBundle bundleForClass:[self class]] resourcePath];
   path = [path stringByAppendingPathComponent:@"Commands/testdata/metrics-prettyprint.txt"];
 
-  NSString *goldenFileContents = [[NSString alloc]
+  NSString* goldenFileContents = [[NSString alloc]
       initWithData:[NSData dataWithContentsOfFile:path options:NSDataReadingUncached error:&err]
           encoding:NSUTF8StringEncoding];
 
   XCTAssertNil(err, @"failed to read golden file %@ for testPrettyPrinting", path);
 
-  SNTCommandMetrics *metricsCmd = [[SNTCommandMetrics alloc] init];
+  SNTCommandMetrics* metricsCmd = [[SNTCommandMetrics alloc] init];
 
-  NSString *outputPath = [NSString pathWithComponents:@[ self.tempDir, @"test.data" ]];
+  NSString* outputPath = [NSString pathWithComponents:@[ self.tempDir, @"test.data" ]];
 
   // redirect stdout
   int fd = open([outputPath UTF8String], O_TRUNC | O_WRONLY | O_CREAT, 0600);
@@ -130,7 +130,7 @@
   dup2(saved_stdout, fileno(stdout));
 
   // open test file assert equal with golden file
-  NSString *commandOutput =
+  NSString* commandOutput =
       [[NSString alloc] initWithData:[NSData dataWithContentsOfFile:outputPath]
                             encoding:NSUTF8StringEncoding];
   XCTAssertEqualObjects(goldenFileContents, commandOutput,
@@ -138,10 +138,10 @@
 }
 
 - (void)testFiltering {
-  SNTCommandMetrics *metricsCmd = [[SNTCommandMetrics alloc] init];
+  SNTCommandMetrics* metricsCmd = [[SNTCommandMetrics alloc] init];
 
-  NSDictionary *metricDict = [SNTMetricFormatTestHelper createValidMetricsDictionary];
-  NSDictionary *filtered;
+  NSDictionary* metricDict = [SNTMetricFormatTestHelper createValidMetricsDictionary];
+  NSDictionary* filtered;
 
   filtered = [metricsCmd filterMetrics:metricDict withArguments:@[]];
   XCTAssertEqualObjects(metricDict[@"metrics"], filtered[@"metrics"], @"No filtering with no args");
@@ -151,11 +151,11 @@
                         @"No filtering with no metric args");
 
   filtered = [metricsCmd filterMetrics:metricDict withArguments:@[ @"--json", @"/santa" ]];
-  XCTAssertEqual(((NSDictionary *)filtered[@"metrics"]).count, 3,
+  XCTAssertEqual(((NSDictionary*)filtered[@"metrics"]).count, 3,
                  @"Expected filter of metrics with /santa to return 3 metrics");
 
   filtered = [metricsCmd filterMetrics:metricDict withArguments:@[ @"/build", @"/santa" ]];
-  XCTAssertEqual(((NSDictionary *)filtered[@"metrics"]).count, 4,
+  XCTAssertEqual(((NSDictionary*)filtered[@"metrics"]).count, 4,
                  @"Expected filter of metrics with /build and /santa to return 4 metrics");
 }
 

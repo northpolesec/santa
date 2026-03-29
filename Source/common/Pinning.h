@@ -20,10 +20,10 @@
 namespace santa {
 
 // Return whether or not the domain of the given URL is pinned
-bool IsDomainPinned(NSURL *url);
+bool IsDomainPinned(NSURL* url);
 
 // Return the set of pinned certificate PEMs
-NSString *PinnedCertPEMs();
+NSString* PinnedCertPEMs();
 
 }  // namespace santa
 

@@ -35,11 +35,11 @@ REGISTER_COMMAND_NAME(@"install")
   return YES;
 }
 
-+ (NSString *)shortHelpText {
++ (NSString*)shortHelpText {
   return @"Instruct the daemon to install Santa.app or santanetd.";
 }
 
-+ (NSString *)longHelpText {
++ (NSString*)longHelpText {
   return @"Instruct the daemon to install Santa.app.\n"
          @"Options:\n"
          @"  --network-extension:  Install and activate the santanetd content filter instead.\n"
@@ -50,10 +50,10 @@ REGISTER_COMMAND_NAME(@"install")
   return YES;
 }
 
-- (void)runWithArguments:(NSArray *)arguments {
+- (void)runWithArguments:(NSArray*)arguments {
   BOOL installNetworkExtension = NO;
 
-  for (NSString *arg in arguments) {
+  for (NSString* arg in arguments) {
     if ([arg caseInsensitiveCompare:@"--network-extension"] == NSOrderedSame) {
       installNetworkExtension = YES;
       break;
@@ -101,7 +101,7 @@ REGISTER_COMMAND_NAME(@"install")
 }
 
 - (void)installSantaApp {
-  NSString *installFromPath = @"/var/db/santa/migration/Santa.app";
+  NSString* installFromPath = @"/var/db/santa/migration/Santa.app";
   int64_t secondsToWait = 15;
 
   TEE_LOGI(@"Asking daemon to install: %@", installFromPath);

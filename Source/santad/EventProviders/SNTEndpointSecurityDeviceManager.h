@@ -30,8 +30,8 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-typedef void (^SNTDeviceBlockCallback)(SNTDeviceEvent *event, SNTStoredUSBMountEvent *usbEvent);
-typedef void (^SNTNetworkMountCallback)(SNTStoredNetworkMountEvent *event);
+typedef void (^SNTDeviceBlockCallback)(SNTDeviceEvent* event, SNTStoredUSBMountEvent* usbEvent);
+typedef void (^SNTNetworkMountCallback)(SNTStoredNetworkMountEvent* event);
 
 /*
  * Manages DiskArbitration and EndpointSecurity to monitor/block/remount USB
@@ -42,7 +42,7 @@ typedef void (^SNTNetworkMountCallback)(SNTStoredNetworkMountEvent *event);
 
 @property(nonatomic, readwrite) BOOL blockUSBMount;
 @property(nonatomic, readwrite) BOOL blockUnencryptedRemovableMediaMount;
-@property(nonatomic, readwrite, nullable) NSArray<NSString *> *remountArgs;
+@property(nonatomic, readwrite, nullable) NSArray<NSString*>* remountArgs;
 @property(nonatomic, nullable) SNTDeviceBlockCallback deviceBlockCallback;
 @property(nonatomic, nullable) SNTNetworkMountCallback networkMountCallback;
 
@@ -53,7 +53,7 @@ typedef void (^SNTNetworkMountCallback)(SNTStoredNetworkMountEvent *event);
                         authResultCache:(std::shared_ptr<santa::AuthResultCache>)authResultCache
                           blockUSBMount:(BOOL)blockUSBMount
     blockUnencryptedRemovableMediaMount:(BOOL)blockUnencryptedRemovableMediaMount
-                         remountUSBMode:(nullable NSArray<NSString *> *)remountUSBMode
+                         remountUSBMode:(nullable NSArray<NSString*>*)remountUSBMode
                      startupPreferences:(SNTDeviceManagerStartupPreferences)startupPrefs;
 
 @end

@@ -29,23 +29,23 @@ typedef struct SantaVnode {
   ino_t fileid;
 
 #ifdef __cplusplus
-  bool operator==(const SantaVnode &rhs) const {
+  bool operator==(const SantaVnode& rhs) const {
     return fsid == rhs.fsid && fileid == rhs.fileid;
   }
 
-  static inline SantaVnode VnodeForFile(const struct stat &sb) {
+  static inline SantaVnode VnodeForFile(const struct stat& sb) {
     return SantaVnode{
         .fsid = sb.st_dev,
         .fileid = sb.st_ino,
     };
   }
 
-  static inline SantaVnode VnodeForFile(const es_file_t *es_file) {
+  static inline SantaVnode VnodeForFile(const es_file_t* es_file) {
     return VnodeForFile(es_file->stat);
   }
 
   template <typename H>
-  friend H AbslHashValue(H h, const SantaVnode &v) {
+  friend H AbslHashValue(H h, const SantaVnode& v) {
     return H::combine(std::move(h), v.fsid, v.fileid);
   }
 #endif

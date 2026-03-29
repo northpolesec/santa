@@ -33,23 +33,23 @@ class TTYWriter {
   TTYWriter(dispatch_queue_t q, bool silent_tty_mode);
 
   // Moves can be safe, but not currently needed/implemented
-  TTYWriter(TTYWriter &&other) = delete;
-  TTYWriter &operator=(TTYWriter &&rhs) = delete;
+  TTYWriter(TTYWriter&& other) = delete;
+  TTYWriter& operator=(TTYWriter&& rhs) = delete;
 
   // No copies
-  TTYWriter(const TTYWriter &other) = delete;
-  TTYWriter &operator=(const TTYWriter &other) = delete;
+  TTYWriter(const TTYWriter& other) = delete;
+  TTYWriter& operator=(const TTYWriter& other) = delete;
 
-  static bool CanWrite(const es_process_t *proc);
+  static bool CanWrite(const es_process_t* proc);
 
-  void Write(const es_process_t *proc, NSString * (^messageCreator)(void));
-  void Write(const es_process_t *proc, NSString *msg);
-  void WriteWithoutSignal(const es_process_t *proc, NSString *msg);
+  void Write(const es_process_t* proc, NSString* (^messageCreator)(void));
+  void Write(const es_process_t* proc, NSString* msg);
+  void WriteWithoutSignal(const es_process_t* proc, NSString* msg);
 
   void EnableSilentTTYMode(bool silent_tty_mode);
 
  private:
-  void Write(const es_process_t *proc, bool send_signal, NSString * (^messageCreator)(void));
+  void Write(const es_process_t* proc, bool send_signal, NSString* (^messageCreator)(void));
 
   dispatch_queue_t q_;
   std::atomic<bool> silent_tty_mode_;

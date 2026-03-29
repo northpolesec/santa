@@ -28,11 +28,11 @@
 ///  sync server.
 ///
 @protocol SNTSyncServiceXPC
-- (void)postEventsToSyncServer:(NSArray<SNTStoredEvent *> *)events reply:(void (^)(BOOL))reply;
-- (void)postBundleEventToSyncServer:(SNTStoredExecutionEvent *)event
+- (void)postEventsToSyncServer:(NSArray<SNTStoredEvent*>*)events reply:(void (^)(BOOL))reply;
+- (void)postBundleEventToSyncServer:(SNTStoredExecutionEvent*)event
                               reply:(void (^)(SNTBundleEventAction))reply;
 - (void)pushNotificationStatus:(void (^)(SNTPushNotificationStatus))reply;
-- (void)pushNotificationServerAddress:(void (^)(NSString *))reply;
+- (void)pushNotificationServerAddress:(void (^)(NSString*))reply;
 
 // The syncservice regularly syncs with a configured sync server. Use this method to sync out of
 // band. The syncservice ensures syncs do not run concurrently.
@@ -47,9 +47,12 @@
 //
 // Pass true to isClean to perform a clean sync, defaults to false.
 //
-- (void)syncWithLogListener:(NSXPCListenerEndpoint *)logListener
+- (void)syncWithLogListener:(NSXPCListenerEndpoint*)logListener
                    syncType:(SNTSyncType)syncType
                       reply:(void (^)(SNTSyncStatusType))reply;
+
+// Publish metrics to the sync server. The metrics dictionary is the output of SNTMetricSet export.
+- (void)publishMetrics:(NSDictionary*)metrics reply:(void (^)(BOOL))reply;
 
 // Spindown the syncservice. The syncservice will not automatically start back up.
 // A new connection to the syncservice will bring it back up. This allows us to avoid running
@@ -64,8 +67,8 @@
 // Check sync server connectivity by making a preflight test request using the syncservice's
 // existing session configuration (auth, certs, headers, proxy). Returns the HTTP status code
 // and a human-readable description. Status 0 indicates a connection error.
-- (void)checkSyncServerStatus:(NSXPCListenerEndpoint *)logListener
-                        reply:(void (^)(NSInteger statusCode, NSString *description))reply;
+- (void)checkSyncServerStatus:(NSXPCListenerEndpoint*)logListener
+                        reply:(void (^)(NSInteger statusCode, NSString* description))reply;
 
 @end
 
@@ -75,18 +78,18 @@
 ///  Returns an initialized NSXPCInterface for the SNTSyncServiceXPC protocol.
 ///  Ensures any methods that accept custom classes as arguments are set-up before returning.
 ///
-+ (NSXPCInterface *)syncServiceInterface;
++ (NSXPCInterface*)syncServiceInterface;
 
 ///
 ///  Returns the MachService ID for this service.
 ///
-+ (NSString *)serviceID;
++ (NSString*)serviceID;
 
 ///
 ///  Retrieve a pre-configured MOLXPCConnection for communicating with syncservice.
 ///  Connections just needs any handlers set and then can be resumed and used.
 ///
-+ (MOLXPCConnection *)configuredConnection;
++ (MOLXPCConnection*)configuredConnection;
 
 @end
 
@@ -95,5 +98,5 @@
 ///  the syncservice during a user initiated sync.
 ///
 @protocol SNTSyncServiceLogReceiverXPC
-- (void)didReceiveLog:(NSString *)log withType:(os_log_type_t)logType;
+- (void)didReceiveLog:(NSString*)log withType:(os_log_type_t)logType;
 @end

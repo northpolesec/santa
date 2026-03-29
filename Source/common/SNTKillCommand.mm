@@ -19,12 +19,12 @@
 #include "Source/common/CoderMacros.h"
 
 @interface SNTKillRequest ()
-- (instancetype)initWithUUID:(NSString *)uuid;
+- (instancetype)initWithUUID:(NSString*)uuid;
 @end
 
 @implementation SNTKillRequest
 
-- (instancetype)initWithUUID:(NSString *)uuid {
+- (instancetype)initWithUUID:(NSString*)uuid {
   self = [super init];
   if (self) {
     _uuid = uuid;
@@ -36,11 +36,11 @@
   return YES;
 }
 
-- (void)encodeWithCoder:(NSCoder *)coder {
+- (void)encodeWithCoder:(NSCoder*)coder {
   ENCODE(coder, uuid);
 }
 
-- (instancetype)initWithCoder:(NSCoder *)decoder {
+- (instancetype)initWithCoder:(NSCoder*)decoder {
   self = [super init];
   if (self) {
     DECODE(decoder, uuid, NSString);
@@ -55,10 +55,10 @@
 //
 @implementation SNTKillRequestRunningProcess
 
-- (instancetype)initWithUUID:(NSString *)uuid
+- (instancetype)initWithUUID:(NSString*)uuid
                          pid:(int)pid
                   pidversion:(int)pidversion
-             bootSessionUUID:(NSString *)bootSessionUUID {
+             bootSessionUUID:(NSString*)bootSessionUUID {
   if (pid == 0 || pidversion == 0) {
     return nil;
   } else {
@@ -69,7 +69,7 @@
           lowercaseString];
     } else {
       // If an NSUUID could not be initialized, see if it is the short version
-      static NSCharacterSet *nonHex = [[NSCharacterSet
+      static NSCharacterSet* nonHex = [[NSCharacterSet
           characterSetWithCharactersInString:@"0123456789abcdefABCDEF"] invertedSet];
       if (bootSessionUUID.length == 32 &&
           [bootSessionUUID rangeOfCharacterFromSet:nonHex].location == NSNotFound) {
@@ -93,14 +93,14 @@
   return YES;
 }
 
-- (void)encodeWithCoder:(NSCoder *)coder {
+- (void)encodeWithCoder:(NSCoder*)coder {
   [super encodeWithCoder:coder];
   ENCODE_BOXABLE(coder, pid);
   ENCODE_BOXABLE(coder, pidversion);
   ENCODE(coder, bootSessionUUID);
 }
 
-- (instancetype)initWithCoder:(NSCoder *)decoder {
+- (instancetype)initWithCoder:(NSCoder*)decoder {
   self = [super initWithCoder:decoder];
   if (self) {
     DECODE_SELECTOR(decoder, pid, NSNumber, intValue);
@@ -117,7 +117,7 @@
 //
 @implementation SNTKillRequestCDHash
 
-- (instancetype)initWithUUID:(NSString *)uuid cdHash:(NSString *)cdhash {
+- (instancetype)initWithUUID:(NSString*)uuid cdHash:(NSString*)cdhash {
   if (!santa::IsValidCDHash(cdhash)) {
     return nil;
   }
@@ -133,12 +133,12 @@
   return YES;
 }
 
-- (void)encodeWithCoder:(NSCoder *)coder {
+- (void)encodeWithCoder:(NSCoder*)coder {
   [super encodeWithCoder:coder];
   ENCODE(coder, cdhash);
 }
 
-- (instancetype)initWithCoder:(NSCoder *)decoder {
+- (instancetype)initWithCoder:(NSCoder*)decoder {
   self = [super initWithCoder:decoder];
   if (self) {
     DECODE(decoder, cdhash, NSString);
@@ -153,7 +153,7 @@
 //
 @implementation SNTKillRequestSigningID
 
-- (instancetype)initWithUUID:(NSString *)uuid signingID:(NSString *)signingID {
+- (instancetype)initWithUUID:(NSString*)uuid signingID:(NSString*)signingID {
   auto [tid, sid] = santa::SplitSigningID(signingID);
   if (!tid || !sid) {
     return nil;
@@ -171,13 +171,13 @@
   return YES;
 }
 
-- (void)encodeWithCoder:(NSCoder *)coder {
+- (void)encodeWithCoder:(NSCoder*)coder {
   [super encodeWithCoder:coder];
   ENCODE(coder, teamID);
   ENCODE(coder, signingID);
 }
 
-- (instancetype)initWithCoder:(NSCoder *)decoder {
+- (instancetype)initWithCoder:(NSCoder*)decoder {
   self = [super initWithCoder:decoder];
   if (self) {
     DECODE(decoder, teamID, NSString);
@@ -193,7 +193,7 @@
 //
 @implementation SNTKillRequestTeamID
 
-- (instancetype)initWithUUID:(NSString *)uuid teamID:(NSString *)teamID {
+- (instancetype)initWithUUID:(NSString*)uuid teamID:(NSString*)teamID {
   if (!santa::IsValidTeamID(teamID)) {
     return nil;
   }
@@ -209,12 +209,12 @@
   return YES;
 }
 
-- (void)encodeWithCoder:(NSCoder *)coder {
+- (void)encodeWithCoder:(NSCoder*)coder {
   [super encodeWithCoder:coder];
   ENCODE(coder, teamID);
 }
 
-- (instancetype)initWithCoder:(NSCoder *)decoder {
+- (instancetype)initWithCoder:(NSCoder*)decoder {
   self = [super initWithCoder:decoder];
   if (self) {
     DECODE(decoder, teamID, NSString);
@@ -243,13 +243,13 @@
   return YES;
 }
 
-- (void)encodeWithCoder:(NSCoder *)coder {
+- (void)encodeWithCoder:(NSCoder*)coder {
   ENCODE_BOXABLE(coder, pid);
   ENCODE_BOXABLE(coder, pidversion);
   ENCODE_BOXABLE(coder, error);
 }
 
-- (instancetype)initWithCoder:(NSCoder *)decoder {
+- (instancetype)initWithCoder:(NSCoder*)decoder {
   self = [super init];
   if (self) {
     DECODE_SELECTOR(decoder, pid, NSNumber, intValue);
@@ -266,7 +266,7 @@
 //
 @implementation SNTKillResponse
 
-- (instancetype)initWithKilledProcesses:(NSArray<SNTKilledProcess *> *)killedProcesses {
+- (instancetype)initWithKilledProcesses:(NSArray<SNTKilledProcess*>*)killedProcesses {
   return [self initWithError:SNTKillResponseErrorNone killedProcesses:killedProcesses];
 }
 
@@ -275,7 +275,7 @@
 }
 
 - (instancetype)initWithError:(SNTKillResponseError)error
-              killedProcesses:(NSArray<SNTKilledProcess *> *)killedProcesses {
+              killedProcesses:(NSArray<SNTKilledProcess*>*)killedProcesses {
   self = [super init];
   if (self) {
     _error = error;
@@ -288,12 +288,12 @@
   return YES;
 }
 
-- (void)encodeWithCoder:(NSCoder *)coder {
+- (void)encodeWithCoder:(NSCoder*)coder {
   ENCODE_BOXABLE(coder, error);
   ENCODE(coder, killedProcesses);
 }
 
-- (instancetype)initWithCoder:(NSCoder *)decoder {
+- (instancetype)initWithCoder:(NSCoder*)decoder {
   self = [super init];
   if (self) {
     DECODE_SELECTOR(decoder, error, NSNumber, integerValue);

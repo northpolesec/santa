@@ -42,7 +42,7 @@ class TimerBridge : public Timer<TimerBridge> {
 
 - (instancetype)initWithMinInterval:(uint32_t)minInterval
                         maxInterval:(uint32_t)maxInterval
-                               name:(NSString *)name
+                               name:(NSString*)name
                         fireOnStart:(BOOL)fireOnStart
                      rescheduleMode:(SNTTimerRescheduleMode)rescheduleMode
                            qosClass:(qos_class_t)qosClass

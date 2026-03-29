@@ -24,22 +24,22 @@
 ///
 ///  Designated initializer.
 ///
-- (instancetype)initWithDatabaseQueue:(FMDatabaseQueue *)db;
+- (instancetype)initWithDatabaseQueue:(FMDatabaseQueue*)db;
 
 ///
 ///  Subclasses should override this method to apply schema updates. The passed in version nubmer
 ///  is the current version of the table. The return value is the new version of the table. If
 ///  updating the table failed, return a negative number. If there was no update to apply, return 0.
 ///
-- (uint32_t)initializeDatabase:(FMDatabase *)db fromVersion:(uint32_t)version;
+- (uint32_t)initializeDatabase:(FMDatabase*)db fromVersion:(uint32_t)version;
 
 ///
 ///  Wrappers around the respective FMDatabaseQueue methods. If the object we initialized with was
 ///  a database queue, these just pass through. If the object we initialized with was an FMDatabase
 ///  we just call the block with the database, potentially wrapping in a transaction.
 ///
-- (void)inDatabase:(void (^)(FMDatabase *db))block;
-- (void)inTransaction:(void (^)(FMDatabase *db, BOOL *rollback))block;
+- (void)inDatabase:(void (^)(FMDatabase* db))block;
+- (void)inTransaction:(void (^)(FMDatabase* db, BOOL* rollback))block;
 
 ///  Vacuum the database
 - (void)vacuum;

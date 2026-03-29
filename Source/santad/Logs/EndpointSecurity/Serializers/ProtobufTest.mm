@@ -62,11 +62,11 @@ using santa::Serializer;
 namespace pbv1 = ::santa::pb::v1;
 
 namespace santa {
-extern void EncodeCodeSignature(::pbv1::CodeSignature *pb_code_sig, const es_cdhash_t cdhash,
+extern void EncodeCodeSignature(::pbv1::CodeSignature* pb_code_sig, const es_cdhash_t cdhash,
                                 es_string_token_t sid, es_string_token_t tid,
-                                NSDate *secure_signing_time = nil, NSDate *signing_time = nil);
-extern void EncodeExitStatus(::pbv1::Exit *pbExit, int exitStatus);
-extern void EncodeEntitlements(::pbv1::Execution *pb_exec, SNTCachedDecision *cd);
+                                NSDate* secure_signing_time = nil, NSDate* signing_time = nil);
+extern void EncodeExitStatus(::pbv1::Exit* pbExit, int exitStatus);
+extern void EncodeEntitlements(::pbv1::Execution* pb_exec, SNTCachedDecision* cd);
 extern ::pbv1::Execution::Decision GetDecisionEnum(SNTEventState event_state);
 extern ::pbv1::Execution::Reason GetReasonEnum(SNTEventState event_state);
 extern ::pbv1::Execution::Mode GetModeEnum(SNTClientMode mode);
@@ -96,7 +96,7 @@ using santa::EncodeExitStatus;
 @interface ProtobufTest : XCTestCase
 @property id mockConfigurator;
 @property id mockDecisionCache;
-@property SNTCachedDecision *testCachedDecision;
+@property SNTCachedDecision* testCachedDecision;
 @end
 
 JsonPrintOptions DefaultJsonPrintOptions() {
@@ -108,8 +108,8 @@ JsonPrintOptions DefaultJsonPrintOptions() {
   return options;
 }
 
-NSString *ConstructFilename(es_event_type_t eventType, NSString *variant = nil) {
-  NSString *name;
+NSString* ConstructFilename(es_event_type_t eventType, NSString* variant = nil) {
+  NSString* name;
   switch (eventType) {
     case ES_EVENT_TYPE_NOTIFY_CLOSE: name = @"close"; break;
     case ES_EVENT_TYPE_NOTIFY_EXCHANGEDATA: name = @"exchangedata"; break;
@@ -154,20 +154,20 @@ NSString *ConstructFilename(es_event_type_t eventType, NSString *variant = nil) 
   }
 }
 
-NSString *LoadTestJson(NSString *jsonFileName, uint32_t version) {
+NSString* LoadTestJson(NSString* jsonFileName, uint32_t version) {
   if (!jsonFileName) {
     return nil;
   }
 
-  NSString *path = [NSString pathWithComponents:@[
+  NSString* path = [NSString pathWithComponents:@[
     [[NSBundle bundleForClass:[ProtobufTest class]] resourcePath],
     @"protobuf",
     [NSString stringWithFormat:@"v%u", version],
     jsonFileName,
   ]];
 
-  NSError *err = nil;
-  NSString *jsonData = [NSString stringWithContentsOfFile:path
+  NSError* err = nil;
+  NSString* jsonData = [NSString stringWithContentsOfFile:path
                                                  encoding:NSUTF8StringEncoding
                                                     error:&err];
 
@@ -178,17 +178,17 @@ NSString *LoadTestJson(NSString *jsonFileName, uint32_t version) {
   return jsonData;
 }
 
-bool CompareTime(const Timestamp &timestamp, struct timespec ts) {
+bool CompareTime(const Timestamp& timestamp, struct timespec ts) {
   return timestamp.seconds() == ts.tv_sec && timestamp.nanos() == ts.tv_nsec;
 }
 
-NSDate *NSDateFromProtobuf(const Timestamp &timestamp) {
+NSDate* NSDateFromProtobuf(const Timestamp& timestamp) {
   NSTimeInterval timeInterval = static_cast<NSTimeInterval>(timestamp.seconds());
   timeInterval += static_cast<NSTimeInterval>(timestamp.nanos()) / NSEC_PER_SEC;
   return [NSDate dateWithTimeIntervalSince1970:timeInterval];
 }
 
-const google::protobuf::Message &SantaMessageEvent(const ::pbv1::SantaMessage &santaMsg) {
+const google::protobuf::Message& SantaMessageEvent(const ::pbv1::SantaMessage& santaMsg) {
   switch (santaMsg.event_case()) {
     case ::pbv1::SantaMessage::kExecution: return santaMsg.execution();
     case ::pbv1::SantaMessage::kFork: return santaMsg.fork();
@@ -224,22 +224,22 @@ const google::protobuf::Message &SantaMessageEvent(const ::pbv1::SantaMessage &s
   }
 }
 
-std::string ConvertMessageToJsonString(const ::pbv1::SantaMessage &santaMsg) {
+std::string ConvertMessageToJsonString(const ::pbv1::SantaMessage& santaMsg) {
   JsonPrintOptions options = DefaultJsonPrintOptions();
-  const google::protobuf::Message &message = SantaMessageEvent(santaMsg);
+  const google::protobuf::Message& message = SantaMessageEvent(santaMsg);
 
   std::string json;
   XCTAssertTrue(MessageToJsonString(message, &json, options).ok());
   return json;
 }
 
-NSDictionary *FindDelta(NSDictionary *want, NSDictionary *got) {
-  NSMutableDictionary *delta = [NSMutableDictionary dictionary];
+NSDictionary* FindDelta(NSDictionary* want, NSDictionary* got) {
+  NSMutableDictionary* delta = [NSMutableDictionary dictionary];
   delta[@"want"] = [NSMutableDictionary dictionary];
   delta[@"got"] = [NSMutableDictionary dictionary];
 
   // Find objects in `want` that don't exist or are different in `got`.
-  [want enumerateKeysAndObjectsUsingBlock:^(id key, id obj, BOOL *stop) {
+  [want enumerateKeysAndObjectsUsingBlock:^(id key, id obj, BOOL* stop) {
     id otherObj = got[key];
 
     if (!otherObj) {
@@ -252,7 +252,7 @@ NSDictionary *FindDelta(NSDictionary *want, NSDictionary *got) {
   }];
 
   // Find objects in `got` that don't exist in `want`
-  [got enumerateKeysAndObjectsUsingBlock:^(id key, id obj, BOOL *stop) {
+  [got enumerateKeysAndObjectsUsingBlock:^(id key, id obj, BOOL* stop) {
     id aObj = want[key];
 
     if (!aObj) {
@@ -266,8 +266,8 @@ NSDictionary *FindDelta(NSDictionary *want, NSDictionary *got) {
 
 void SerializeAndCheck(es_event_type_t eventType,
                        bool (^shouldHandleMessageSetup)(std::shared_ptr<MockEndpointSecurityAPI>,
-                                                        es_message_t *),
-                       SNTDecisionCache *decisionCache, bool json, NSString *variant) {
+                                                        es_message_t*),
+                       SNTDecisionCache* decisionCache, bool json, NSString* variant) {
   std::shared_ptr<MockEndpointSecurityAPI> mockESApi = std::make_shared<MockEndpointSecurityAPI>();
 
   for (uint32_t cur_version = MinSupportedESMessageVersion(eventType);
@@ -296,8 +296,8 @@ void SerializeAndCheck(es_event_type_t eventType,
     // Copy some values we need to check later before the object is moved out of this funciton
     struct timespec enrichmentTime;
     struct timespec msgTime;
-    NSString *wantData = std::visit(
-        [&msgTime, &enrichmentTime, variant](const EnrichedEventType &enrichedEvent) {
+    NSString* wantData = std::visit(
+        [&msgTime, &enrichmentTime, variant](const EnrichedEventType& enrichedEvent) {
           msgTime = enrichedEvent->time;
           enrichmentTime = enrichedEvent.enrichment_time();
 
@@ -328,14 +328,14 @@ void SerializeAndCheck(es_event_type_t eventType,
     XCTAssertTrue(CompareTime(santaMsg.event_time(), msgTime));
 
     // Convert JSON strings to objects and compare each key-value set.
-    NSError *jsonError;
-    NSData *objectData = [wantData dataUsingEncoding:NSUTF8StringEncoding];
-    NSDictionary *wantJSONDict =
+    NSError* jsonError;
+    NSData* objectData = [wantData dataUsingEncoding:NSUTF8StringEncoding];
+    NSDictionary* wantJSONDict =
         [NSJSONSerialization JSONObjectWithData:objectData
                                         options:NSJSONReadingMutableContainers
                                           error:&jsonError];
     XCTAssertNil(jsonError, @"failed to parse want data as JSON");
-    NSDictionary *gotJSONDict = [NSJSONSerialization
+    NSDictionary* gotJSONDict = [NSJSONSerialization
         JSONObjectWithData:[NSData dataWithBytes:gotData.data() length:gotData.length()]
                    options:NSJSONReadingMutableContainers
                      error:&jsonError];
@@ -354,11 +354,11 @@ void SerializeAndCheck(es_event_type_t eventType,
 // Legacy variant. Now wraps `messageSetup` in a small block to always return `true`
 void SerializeAndCheck(es_event_type_t eventType,
                        void (^messageSetup)(std::shared_ptr<MockEndpointSecurityAPI>,
-                                            es_message_t *),
-                       SNTDecisionCache *decisionCache, bool json, NSString *variant) {
+                                            es_message_t*),
+                       SNTDecisionCache* decisionCache, bool json, NSString* variant) {
   return SerializeAndCheck(
       eventType,
-      ^bool(std::shared_ptr<MockEndpointSecurityAPI> esapi, es_message_t *msg) {
+      ^bool(std::shared_ptr<MockEndpointSecurityAPI> esapi, es_message_t* msg) {
         messageSetup(esapi, msg);
         return true;
       },
@@ -366,10 +366,10 @@ void SerializeAndCheck(es_event_type_t eventType,
 }
 
 void SerializeAndCheckNonESEvents(
-    uint32_t minAssociatedESVersion, es_event_type_t eventType, NSString *filename,
-    bool (^messageSetup)(std::shared_ptr<MockEndpointSecurityAPI>, es_message_t *),
+    uint32_t minAssociatedESVersion, es_event_type_t eventType, NSString* filename,
+    bool (^messageSetup)(std::shared_ptr<MockEndpointSecurityAPI>, es_message_t*),
     std::vector<uint8_t> (^RunSerializer)(std::shared_ptr<Serializer> serializer,
-                                          const Message &msg)) {
+                                          const Message& msg)) {
   std::shared_ptr<MockEndpointSecurityAPI> mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   mockESApi->SetExpectationsRetainReleaseMessage();
   std::shared_ptr<Serializer> bs = Protobuf::Create(mockESApi, nil);
@@ -401,7 +401,7 @@ void SerializeAndCheckNonESEvents(
     ::pbv1::SantaMessage santaMsg;
     XCTAssertTrue(santaMsg.ParseFromString(protoStr));
     std::string got = ConvertMessageToJsonString(santaMsg);
-    NSString *wantData = LoadTestJson(filename, esMsg.version);
+    NSString* wantData = LoadTestJson(filename, esMsg.version);
 
     XCTAssertEqualObjects([NSString stringWithUTF8String:got.c_str()], wantData,
                           @"Result does not match expectations. Version: %d, Filename: %@",
@@ -459,29 +459,29 @@ void SerializeAndCheckNonESEvents(
 }
 
 - (void)serializeAndCheckEvent:(es_event_type_t)eventType
-                       variant:(NSString *)variant
+                       variant:(NSString*)variant
       shouldHandleMessageSetup:(bool (^)(std::shared_ptr<MockEndpointSecurityAPI>,
-                                         es_message_t *))shouldHandleMessageSetup {
+                                         es_message_t*))shouldHandleMessageSetup {
   SerializeAndCheck(eventType, shouldHandleMessageSetup, self.mockDecisionCache, false, variant);
 }
 
 - (void)serializeAndCheckEvent:(es_event_type_t)eventType
                   messageSetup:(void (^)(std::shared_ptr<MockEndpointSecurityAPI>,
-                                         es_message_t *))messageSetup
+                                         es_message_t*))messageSetup
                           json:(BOOL)json {
   SerializeAndCheck(eventType, messageSetup, self.mockDecisionCache, (bool)json, nil);
 }
 
 - (void)serializeAndCheckEvent:(es_event_type_t)eventType
                   messageSetup:(void (^)(std::shared_ptr<MockEndpointSecurityAPI>,
-                                         es_message_t *))messageSetup {
+                                         es_message_t*))messageSetup {
   SerializeAndCheck(eventType, messageSetup, self.mockDecisionCache, false, nil);
 }
 
 - (void)serializeAndCheckEvent:(es_event_type_t)eventType
                   messageSetup:(void (^)(std::shared_ptr<MockEndpointSecurityAPI>,
-                                         es_message_t *))messageSetup
-                       variant:(NSString *)variant {
+                                         es_message_t*))messageSetup
+                       variant:(NSString*)variant {
   SerializeAndCheck(eventType, messageSetup, self.mockDecisionCache, false, variant);
 }
 
@@ -490,7 +490,7 @@ void SerializeAndCheckNonESEvents(
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_CLOSE
                   messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                 es_message_t *esMsg) {
+                                 es_message_t* esMsg) {
                     esMsg->event.close.modified = true;
                     esMsg->event.close.target = &file;
                   }];
@@ -502,7 +502,7 @@ void SerializeAndCheckNonESEvents(
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_EXCHANGEDATA
                   messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                 es_message_t *esMsg) {
+                                 es_message_t* esMsg) {
                     esMsg->event.exchangedata.file1 = &file1;
                     esMsg->event.exchangedata.file2 = &file2;
                   }];
@@ -532,7 +532,7 @@ void SerializeAndCheckNonESEvents(
       {SNTEventStateAllowCELFallback, ::pbv1::Execution::DECISION_ALLOW},
   };
 
-  for (const auto &kv : stateToDecision) {
+  for (const auto& kv : stateToDecision) {
     XCTAssertEqual(santa::GetDecisionEnum(kv.first), kv.second, @"Bad decision for state: %llu",
                    kv.first);
   }
@@ -589,7 +589,7 @@ void SerializeAndCheckNonESEvents(
       {(SNTClientMode)123, ::pbv1::Execution::MODE_UNKNOWN},
   };
 
-  for (const auto &kv : clientModeToExecMode) {
+  for (const auto& kv : clientModeToExecMode) {
     XCTAssertEqual(santa::GetModeEnum(kv.first), kv.second, @"Bad mode for client mode: %ld",
                    kv.first);
   }
@@ -610,7 +610,7 @@ void SerializeAndCheckNonESEvents(
       {11 /* PROX_FDTYPE_NEXUS */, ::pbv1::FileDescriptor::FD_TYPE_NEXUS},
   };
 
-  for (const auto &kv : fdtypeToEnumType) {
+  for (const auto& kv : fdtypeToEnumType) {
     XCTAssertEqual(santa::GetFileDescriptorType(kv.first), kv.second,
                    @"Bad fd type name for fdtype: %u", kv.first);
   }
@@ -633,7 +633,7 @@ void SerializeAndCheckNonESEvents(
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_EXEC
                   messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                 es_message_t *esMsg) {
+                                 es_message_t* esMsg) {
                     esMsg->event.exec.target = &procTarget;
                     esMsg->event.exec.cwd = &fileCwd;
                     esMsg->event.exec.script = &fileScript;
@@ -684,7 +684,7 @@ void SerializeAndCheckNonESEvents(
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_EXEC
                   messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                 es_message_t *esMsg) {
+                                 es_message_t* esMsg) {
                     esMsg->event.exec.target = &procTarget;
                     esMsg->event.exec.cwd = &fileCwd;
                     esMsg->event.exec.script = &fileScript;
@@ -725,7 +725,7 @@ void SerializeAndCheckNonESEvents(
   {
     ::pbv1::Execution pbExec;
 
-    SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+    SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
     cd.entitlements = @{@"com.northpolesec.test" : @(YES)};
 
     XCTAssertEqual(0, pbExec.entitlement_info().entitlements_size());
@@ -743,7 +743,7 @@ void SerializeAndCheckNonESEvents(
   {
     ::pbv1::Execution pbExec;
 
-    SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+    SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
     cd.entitlements = @{@"com.northpolesec.test" : @(YES), @"com.northpolesec.test2" : @(NO)};
     cd.entitlementsFiltered = YES;
 
@@ -762,13 +762,13 @@ void SerializeAndCheckNonESEvents(
   // When entitlements are clipped, `entitlements_filtered` is set to true
   {
     ::pbv1::Execution pbExec;
-    NSMutableDictionary *ents = [NSMutableDictionary dictionary];
+    NSMutableDictionary* ents = [NSMutableDictionary dictionary];
 
     for (int i = 0; i < 100; i++) {
       ents[[NSString stringWithFormat:@"k%d", i]] = @(i);
     }
 
-    SNTCachedDecision *cd = [[SNTCachedDecision alloc] init];
+    SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
     cd.entitlements = ents;
 
     XCTAssertEqual(0, pbExec.entitlement_info().entitlements_size());
@@ -788,15 +788,15 @@ void SerializeAndCheckNonESEvents(
   memset(cdhash, 'A', sizeof(cdhash));
   es_string_token_t sid = MakeESStringToken("my.sid");
   es_string_token_t tid = MakeESStringToken("my.tid");
-  NSDate *secSigningTime = [NSDate dateWithTimeIntervalSince1970:1753333333.123];
-  NSDate *signingTime = [NSDate dateWithTimeIntervalSince1970:1754444444.456];
+  NSDate* secSigningTime = [NSDate dateWithTimeIntervalSince1970:1753333333.123];
+  NSDate* signingTime = [NSDate dateWithTimeIntervalSince1970:1754444444.456];
 
   // Encode with no signing times specified
   {
     ::pbv1::CodeSignature cs;
     EncodeCodeSignature(&cs, cdhash, sid, tid);
     XCTAssertCppStringEqual(cs.cdhash(),
-                            std::string(reinterpret_cast<const char *>(cdhash), sizeof(cdhash)));
+                            std::string(reinterpret_cast<const char*>(cdhash), sizeof(cdhash)));
     XCTAssertCppStringEqual(cs.signing_id(), sid.data);
     XCTAssertCppStringEqual(cs.team_id(), tid.data);
     XCTAssertFalse(cs.has_secure_signing_time());
@@ -807,7 +807,7 @@ void SerializeAndCheckNonESEvents(
   {
     ::pbv1::CodeSignature cs;
     EncodeCodeSignature(&cs, cdhash, sid, tid, secSigningTime);
-    NSDate *got = NSDateFromProtobuf(cs.secure_signing_time());
+    NSDate* got = NSDateFromProtobuf(cs.secure_signing_time());
     XCTAssertEqualObjects(got, secSigningTime);
     XCTAssertFalse(cs.has_signing_time());
   }
@@ -816,7 +816,7 @@ void SerializeAndCheckNonESEvents(
   {
     ::pbv1::CodeSignature cs;
     EncodeCodeSignature(&cs, cdhash, sid, tid, secSigningTime, signingTime);
-    NSDate *got = NSDateFromProtobuf(cs.secure_signing_time());
+    NSDate* got = NSDateFromProtobuf(cs.secure_signing_time());
     XCTAssertEqualObjects(got, secSigningTime);
     got = NSDateFromProtobuf(cs.signing_time());
     XCTAssertEqualObjects(got, signingTime);
@@ -826,7 +826,7 @@ void SerializeAndCheckNonESEvents(
 - (void)testSerializeMessageExit {
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_EXIT
                   messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                 es_message_t *esMsg) {
+                                 es_message_t* esMsg) {
                     esMsg->event.exit.stat = W_EXITCODE(1, 0);
                   }];
 }
@@ -863,7 +863,7 @@ void SerializeAndCheckNonESEvents(
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_FORK
                   messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                 es_message_t *esMsg) {
+                                 es_message_t* esMsg) {
                     esMsg->event.fork.child = &procChild;
                   }];
 }
@@ -875,7 +875,7 @@ void SerializeAndCheckNonESEvents(
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_LINK
                   messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                 es_message_t *esMsg) {
+                                 es_message_t* esMsg) {
                     esMsg->event.link.source = &fileSource;
                     esMsg->event.link.target_dir = &fileTargetDir;
                     esMsg->event.link.target_filename = targetTok;
@@ -889,7 +889,7 @@ void SerializeAndCheckNonESEvents(
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_RENAME
                   messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                 es_message_t *esMsg) {
+                                 es_message_t* esMsg) {
                     esMsg->event.rename.source = &fileSource;
                     // Test new and existing destination types
                     if (esMsg->version == 4) {
@@ -909,7 +909,7 @@ void SerializeAndCheckNonESEvents(
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_UNLINK
                   messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                 es_message_t *esMsg) {
+                                 es_message_t* esMsg) {
                     esMsg->event.unlink.target = &fileTarget;
                     esMsg->event.unlink.parent_dir = &fileTargetParent;
                   }];
@@ -918,7 +918,7 @@ void SerializeAndCheckNonESEvents(
 - (void)testSerializeMessageCodesigningInvalidated {
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_CS_INVALIDATED
                   messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                 es_message_t *esMsg) {
+                                 es_message_t* esMsg) {
                   }
                           json:NO];
 }
@@ -930,7 +930,7 @@ void SerializeAndCheckNonESEvents(
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_CLONE
                   messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                 es_message_t *esMsg) {
+                                 es_message_t* esMsg) {
                     esMsg->event.clone.source = &fileSource;
                     esMsg->event.clone.target_dir = &fileTargetDir;
                     esMsg->event.clone.target_name = targetTok;
@@ -944,7 +944,7 @@ void SerializeAndCheckNonESEvents(
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_COPYFILE
                   messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                 es_message_t *esMsg) {
+                                 es_message_t* esMsg) {
                     esMsg->event.copyfile.source = &fileSource;
                     esMsg->event.copyfile.target_dir = &fileTargetDir;
                     esMsg->event.copyfile.target_name = targetTok;
@@ -969,7 +969,7 @@ void SerializeAndCheckNonESEvents(
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_LW_SESSION_LOGIN
                   messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                 es_message_t *esMsg) {
+                                 es_message_t* esMsg) {
                     esMsg->event.lw_session_login = &lwLogin;
                   }];
 }
@@ -982,7 +982,7 @@ void SerializeAndCheckNonESEvents(
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_LW_SESSION_LOGOUT
                   messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                 es_message_t *esMsg) {
+                                 es_message_t* esMsg) {
                     esMsg->event.lw_session_logout = &lwLogout;
                   }];
 }
@@ -995,7 +995,7 @@ void SerializeAndCheckNonESEvents(
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_LW_SESSION_LOCK
                   messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                 es_message_t *esMsg) {
+                                 es_message_t* esMsg) {
                     esMsg->event.lw_session_lock = &lwLock;
                   }];
 }
@@ -1008,7 +1008,7 @@ void SerializeAndCheckNonESEvents(
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_LW_SESSION_UNLOCK
                   messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                 es_message_t *esMsg) {
+                                 es_message_t* esMsg) {
                     esMsg->event.lw_session_unlock = &lwUnlock;
                   }];
 }
@@ -1028,7 +1028,7 @@ void SerializeAndCheckNonESEvents(
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_SCREENSHARING_ATTACH
                   messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                 es_message_t *esMsg) {
+                                 es_message_t* esMsg) {
                     esMsg->event.screensharing_attach = &attach;
                   }];
 
@@ -1041,7 +1041,7 @@ void SerializeAndCheckNonESEvents(
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_SCREENSHARING_ATTACH
                   messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                 es_message_t *esMsg) {
+                                 es_message_t* esMsg) {
                     esMsg->event.screensharing_attach = &attach;
                   }
                        variant:@"unset_fields"];
@@ -1057,7 +1057,7 @@ void SerializeAndCheckNonESEvents(
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_SCREENSHARING_DETACH
                   messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                 es_message_t *esMsg) {
+                                 es_message_t* esMsg) {
                     esMsg->event.screensharing_detach = &detach;
                   }];
 }
@@ -1075,7 +1075,7 @@ void SerializeAndCheckNonESEvents(
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_OPENSSH_LOGIN
                   messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                 es_message_t *esMsg) {
+                                 es_message_t* esMsg) {
                     esMsg->event.openssh_login = &sshLogin;
                   }];
 
@@ -1088,7 +1088,7 @@ void SerializeAndCheckNonESEvents(
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_OPENSSH_LOGIN
                   messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                 es_message_t *esMsg) {
+                                 es_message_t* esMsg) {
                     esMsg->event.openssh_login = &sshLogin;
                   }
                        variant:@"failed_attempt"];
@@ -1104,7 +1104,7 @@ void SerializeAndCheckNonESEvents(
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_OPENSSH_LOGOUT
                   messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                 es_message_t *esMsg) {
+                                 es_message_t* esMsg) {
                     esMsg->event.openssh_logout = &sshLogout;
                   }];
 }
@@ -1120,7 +1120,7 @@ void SerializeAndCheckNonESEvents(
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_LOGIN_LOGIN
                   messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                 es_message_t *esMsg) {
+                                 es_message_t* esMsg) {
                     esMsg->event.login_login = &login;
                   }];
 
@@ -1130,7 +1130,7 @@ void SerializeAndCheckNonESEvents(
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_LOGIN_LOGIN
                   messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                 es_message_t *esMsg) {
+                                 es_message_t* esMsg) {
                     esMsg->event.login_login = &login;
                   }
                        variant:@"failed_attempt"];
@@ -1145,7 +1145,7 @@ void SerializeAndCheckNonESEvents(
       {(es_address_type_t)1234, ::pbv1::SocketAddress::TYPE_UNKNOWN},
   };
 
-  for (const auto &kv : esToSantaAddrType) {
+  for (const auto& kv : esToSantaAddrType) {
     XCTAssertEqual(santa::GetSocketAddressType(kv.first), kv.second);
   }
 }
@@ -1165,7 +1165,7 @@ void SerializeAndCheckNonESEvents(
       {(es_openssh_login_result_type_t)1234, ::pbv1::OpenSSHLogin::RESULT_UNKNOWN},
   };
 
-  for (const auto &kv : esToSantaOpenSSHResultType) {
+  for (const auto& kv : esToSantaOpenSSHResultType) {
     XCTAssertEqual(santa::GetOpenSSHLoginResultType(kv.first), kv.second);
   }
 }
@@ -1194,7 +1194,7 @@ void SerializeAndCheckNonESEvents(
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_AUTHENTICATION
                        variant:@"od"
       shouldHandleMessageSetup:^bool(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                     es_message_t *esMsg) {
+                                     es_message_t* esMsg) {
         esMsg->event.authentication = &authenticationEvent;
         return true;
       }];
@@ -1204,7 +1204,7 @@ void SerializeAndCheckNonESEvents(
     [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_AUTHENTICATION
                          variant:@"od_missing_auth_instigator"
         shouldHandleMessageSetup:^bool(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                       es_message_t *esMsg) {
+                                       es_message_t* esMsg) {
           if (esMsg->version < 8) {
             return false;
           }
@@ -1223,7 +1223,7 @@ void SerializeAndCheckNonESEvents(
       {(es_touchid_mode_t)1234, ::pbv1::AuthenticationTouchID::MODE_UNKNOWN},
   };
 
-  for (const auto &kv : esToSantaTouchIDMode) {
+  for (const auto& kv : esToSantaTouchIDMode) {
     XCTAssertEqual(santa::GetAuthenticationTouchIDMode(kv.first), kv.second);
   }
 }
@@ -1254,7 +1254,7 @@ void SerializeAndCheckNonESEvents(
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_AUTHENTICATION
                        variant:@"touchid"
       shouldHandleMessageSetup:^bool(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                     es_message_t *esMsg) {
+                                     es_message_t* esMsg) {
         esMsg->event.authentication = &authenticationEvent;
         return true;
       }];
@@ -1264,7 +1264,7 @@ void SerializeAndCheckNonESEvents(
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_AUTHENTICATION
                        variant:@"touchid_no_uid"
       shouldHandleMessageSetup:^bool(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                     es_message_t *esMsg) {
+                                     es_message_t* esMsg) {
         esMsg->event.authentication = &authenticationEvent;
         return true;
       }];
@@ -1274,7 +1274,7 @@ void SerializeAndCheckNonESEvents(
     [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_AUTHENTICATION
                          variant:@"touchid_missing_auth_instigator"
         shouldHandleMessageSetup:^bool(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                       es_message_t *esMsg) {
+                                       es_message_t* esMsg) {
           if (esMsg->version < 8) {
             return false;
           }
@@ -1309,7 +1309,7 @@ void SerializeAndCheckNonESEvents(
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_AUTHENTICATION
                        variant:@"token"
       shouldHandleMessageSetup:^bool(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                     es_message_t *esMsg) {
+                                     es_message_t* esMsg) {
         esMsg->event.authentication = &authenticationEvent;
         return true;
       }];
@@ -1319,7 +1319,7 @@ void SerializeAndCheckNonESEvents(
     [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_AUTHENTICATION
                          variant:@"token_missing_auth_instigator"
         shouldHandleMessageSetup:^bool(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                       es_message_t *esMsg) {
+                                       es_message_t* esMsg) {
           if (esMsg->version < 8) {
             return false;
           }
@@ -1338,7 +1338,7 @@ void SerializeAndCheckNonESEvents(
       {(es_auto_unlock_type_t)1234, ::pbv1::AuthenticationAutoUnlock::TYPE_UNKNOWN},
   };
 
-  for (const auto &kv : esToSantaAutoUnlockType) {
+  for (const auto& kv : esToSantaAutoUnlockType) {
     XCTAssertEqual(santa::GetAuthenticationAutoUnlockType(kv.first), kv.second);
   }
 }
@@ -1358,7 +1358,7 @@ void SerializeAndCheckNonESEvents(
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_AUTHENTICATION
                        variant:@"auto_unlock"
       shouldHandleMessageSetup:^bool(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                     es_message_t *esMsg) {
+                                     es_message_t* esMsg) {
         esMsg->event.authentication = &authenticationEvent;
         return true;
       }];
@@ -1368,7 +1368,7 @@ void SerializeAndCheckNonESEvents(
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_AUTHENTICATION
                        variant:@"auto_unlock_missing_uid"
       shouldHandleMessageSetup:^bool(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                     es_message_t *esMsg) {
+                                     es_message_t* esMsg) {
         esMsg->event.authentication = &authenticationEvent;
         return true;
       }];
@@ -1384,7 +1384,7 @@ void SerializeAndCheckNonESEvents(
       {(es_btm_item_type_t)1234, ::pbv1::LaunchItem::ITEM_TYPE_UNKNOWN},
   };
 
-  for (const auto &kv : launchItemTypeToEnum) {
+  for (const auto& kv : launchItemTypeToEnum) {
     XCTAssertEqual(santa::GetBTMLaunchItemType(kv.first), kv.second);
   }
 }
@@ -1424,7 +1424,7 @@ void SerializeAndCheckNonESEvents(
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_ADD
                   messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                 es_message_t *esMsg) {
+                                 es_message_t* esMsg) {
                     esMsg->event.btm_launch_item_add = &launchItem;
                   }];
 
@@ -1435,7 +1435,7 @@ void SerializeAndCheckNonESEvents(
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_ADD
                   messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                 es_message_t *esMsg) {
+                                 es_message_t* esMsg) {
                     esMsg->event.btm_launch_item_add = &launchItem;
                   }
                        variant:@"relative"];
@@ -1444,7 +1444,7 @@ void SerializeAndCheckNonESEvents(
   item.item_type = ES_BTM_ITEM_TYPE_AGENT;
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_ADD
                   messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                 es_message_t *esMsg) {
+                                 es_message_t* esMsg) {
                     esMsg->event.btm_launch_item_add = &launchItem;
                   }
                        variant:@"relative_null_app"];
@@ -1453,7 +1453,7 @@ void SerializeAndCheckNonESEvents(
   launchItem.instigator = &instigatorProc;
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_ADD
                   messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                 es_message_t *esMsg) {
+                                 es_message_t* esMsg) {
                     esMsg->event.btm_launch_item_add = &launchItem;
                   }
                        variant:@"null_app"];
@@ -1493,7 +1493,7 @@ void SerializeAndCheckNonESEvents(
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_REMOVE
                   messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                 es_message_t *esMsg) {
+                                 es_message_t* esMsg) {
                     esMsg->event.btm_launch_item_remove = &launchItem;
                   }];
 
@@ -1504,7 +1504,7 @@ void SerializeAndCheckNonESEvents(
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_REMOVE
                   messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                 es_message_t *esMsg) {
+                                 es_message_t* esMsg) {
                     esMsg->event.btm_launch_item_remove = &launchItem;
                   }
                        variant:@"relative"];
@@ -1514,7 +1514,7 @@ void SerializeAndCheckNonESEvents(
   item.item_type = ES_BTM_ITEM_TYPE_AGENT;
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_REMOVE
                   messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                 es_message_t *esMsg) {
+                                 es_message_t* esMsg) {
                     esMsg->event.btm_launch_item_remove = &launchItem;
                   }
                        variant:@"relative_null_app"];
@@ -1530,7 +1530,7 @@ void SerializeAndCheckNonESEvents(
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_XP_MALWARE_DETECTED
                   messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                 es_message_t *esMsg) {
+                                 es_message_t* esMsg) {
                     esMsg->event.xp_malware_detected = &xp;
                   }];
 }
@@ -1550,14 +1550,14 @@ void SerializeAndCheckNonESEvents(
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_XP_MALWARE_REMEDIATED
                   messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                 es_message_t *esMsg) {
+                                 es_message_t* esMsg) {
                     esMsg->event.xp_malware_remediated = &xp;
                   }];
 
   xp.remediated_process_audit_token = NULL;
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_XP_MALWARE_REMEDIATED
                   messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                 es_message_t *esMsg) {
+                                 es_message_t* esMsg) {
                     esMsg->event.xp_malware_remediated = &xp;
                   }
                        variant:@"null_token"];
@@ -1585,7 +1585,7 @@ void SerializeAndCheckNonESEvents(
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_GATEKEEPER_USER_OVERRIDE
                   messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                 es_message_t *esMsg) {
+                                 es_message_t* esMsg) {
                     esMsg->event.gatekeeper_user_override = &gatekeeper;
                   }];
 
@@ -1594,7 +1594,7 @@ void SerializeAndCheckNonESEvents(
   gatekeeper.signing_info = NULL;
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_GATEKEEPER_USER_OVERRIDE
                   messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                 es_message_t *esMsg) {
+                                 es_message_t* esMsg) {
                     esMsg->event.gatekeeper_user_override = &gatekeeper;
                   }
                        variant:@"path_only"];
@@ -1615,7 +1615,7 @@ void SerializeAndCheckNonESEvents(
       {(es_tcc_identity_type_t)1234, ::pbv1::TCCModification::IDENTITY_TYPE_UNKNOWN},
   };
 
-  for (const auto &kv : identityTypeToString) {
+  for (const auto& kv : identityTypeToString) {
     XCTAssertEqual(santa::GetTCCIdentityType(kv.first), kv.second);
   }
 }
@@ -1627,7 +1627,7 @@ void SerializeAndCheckNonESEvents(
       {(es_tcc_event_type_t)1234, ::pbv1::TCCModification::EVENT_TYPE_UNKNOWN},
   };
 
-  for (const auto &kv : eventTypeToString) {
+  for (const auto& kv : eventTypeToString) {
     XCTAssertEqual(santa::GetTCCEventType(kv.first), kv.second);
   }
 }
@@ -1651,7 +1651,7 @@ void SerializeAndCheckNonESEvents(
            ::pbv1::TCCModification::AUTHORIZATION_RIGHT_UNKNOWN},
       };
 
-  for (const auto &kv : authRightToString) {
+  for (const auto& kv : authRightToString) {
     XCTAssertEqual(santa::GetTCCAuthorizationRight(kv.first), kv.second);
   }
 }
@@ -1688,7 +1688,7 @@ void SerializeAndCheckNonESEvents(
            ::pbv1::TCCModification::AUTHORIZATION_REASON_UNKNOWN},
       };
 
-  for (const auto &kv : authReasonToString) {
+  for (const auto& kv : authReasonToString) {
     XCTAssertEqual(santa::GetTCCAuthorizationReason(kv.first), kv.second);
   }
 }
@@ -1720,7 +1720,7 @@ void SerializeAndCheckNonESEvents(
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_TCC_MODIFY
                   messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                 es_message_t *esMsg) {
+                                 es_message_t* esMsg) {
                     esMsg->event.tcc_modify = &tcc;
                   }];
 
@@ -1730,7 +1730,7 @@ void SerializeAndCheckNonESEvents(
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_TCC_MODIFY
                   messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                 es_message_t *esMsg) {
+                                 es_message_t* esMsg) {
                     esMsg->event.tcc_modify = &tcc;
                   }
                        variant:@"null_trigger"];
@@ -1739,7 +1739,7 @@ void SerializeAndCheckNonESEvents(
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_TCC_MODIFY
                   messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                 es_message_t *esMsg) {
+                                 es_message_t* esMsg) {
                     esMsg->event.tcc_modify = &tcc;
                   }
                        variant:@"null_trigger_responsible"];
@@ -1748,7 +1748,7 @@ void SerializeAndCheckNonESEvents(
 
   [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_TCC_MODIFY
                   messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
-                                 es_message_t *esMsg) {
+                                 es_message_t* esMsg) {
                     esMsg->event.tcc_modify = &tcc;
                   }
                        variant:@"null_everything"];
@@ -1770,7 +1770,7 @@ void SerializeAndCheckNonESEvents(
       {(es_event_type_t)1234, ::pbv1::FileAccess::ACCESS_TYPE_UNKNOWN},
   };
 
-  for (const auto &kv : eventTypeToAccessType) {
+  for (const auto& kv : eventTypeToAccessType) {
     XCTAssertEqual(santa::GetAccessType(kv.first), kv.second);
   }
 }
@@ -1790,7 +1790,7 @@ void SerializeAndCheckNonESEvents(
           {(FileAccessPolicyDecision)1234, ::pbv1::FileAccess::POLICY_DECISION_UNKNOWN},
   };
 
-  for (const auto &kv : policyDecisionEnumToProto) {
+  for (const auto& kv : policyDecisionEnumToProto) {
     XCTAssertEqual(santa::GetPolicyDecision(kv.first), kv.second);
   }
 }
@@ -1801,12 +1801,12 @@ void SerializeAndCheckNonESEvents(
 
   SerializeAndCheckNonESEvents(
       6, ES_EVENT_TYPE_AUTH_OPEN, @"file_access.json",
-      ^bool(std::shared_ptr<MockEndpointSecurityAPI> mockESApi, es_message_t *esMsg) {
+      ^bool(std::shared_ptr<MockEndpointSecurityAPI> mockESApi, es_message_t* esMsg) {
         esMsg->event.open.file = &openFile;
         // Prime message path targets
         return true;
       },
-      ^std::vector<uint8_t>(std::shared_ptr<Serializer> serializer, const Message &msg) {
+      ^std::vector<uint8_t>(std::shared_ptr<Serializer> serializer, const Message& msg) {
         return serializer->SerializeFileAccess(
             "policy_version", "policy_name", msg, Enricher().Enrich(*msg->process), 0,
             Enricher().Enrich(openFile), FileAccessPolicyDecision::kDenied, "abc123");
@@ -1814,12 +1814,12 @@ void SerializeAndCheckNonESEvents(
 
   SerializeAndCheckNonESEvents(
       6, ES_EVENT_TYPE_AUTH_OPEN, @"file_access_not_enriched.json",
-      ^bool(std::shared_ptr<MockEndpointSecurityAPI> mockESApi, es_message_t *esMsg) {
+      ^bool(std::shared_ptr<MockEndpointSecurityAPI> mockESApi, es_message_t* esMsg) {
         esMsg->event.open.file = &openFile;
         // Prime message path targets
         return true;
       },
-      ^std::vector<uint8_t>(std::shared_ptr<Serializer> serializer, const Message &msg) {
+      ^std::vector<uint8_t>(std::shared_ptr<Serializer> serializer, const Message& msg) {
         return serializer->SerializeFileAccess(
             "policy_version", "policy_name", msg, Enricher().Enrich(*msg->process), 0,
             santa::EnrichedFile(std::nullopt, std::nullopt, std::nullopt),
@@ -1828,14 +1828,14 @@ void SerializeAndCheckNonESEvents(
 
   SerializeAndCheckNonESEvents(
       6, ES_EVENT_TYPE_AUTH_LINK, @"file_access_target_without_file.json",
-      ^bool(std::shared_ptr<MockEndpointSecurityAPI> mockESApi, es_message_t *esMsg) {
+      ^bool(std::shared_ptr<MockEndpointSecurityAPI> mockESApi, es_message_t* esMsg) {
         esMsg->event.link.source = &openFile;
         esMsg->event.link.target_dir = &linkTargetDir;
         esMsg->event.link.target_filename = MakeESStringToken("tgt_link_name");
         // Prime message path targets
         return true;
       },
-      ^std::vector<uint8_t>(std::shared_ptr<Serializer> serializer, const Message &msg) {
+      ^std::vector<uint8_t>(std::shared_ptr<Serializer> serializer, const Message& msg) {
         return serializer->SerializeFileAccess(
             "policy_version", "policy_name", msg, Enricher().Enrich(*msg->process), 1,
             santa::EnrichedFile(std::nullopt, std::nullopt, std::nullopt),
@@ -1845,12 +1845,12 @@ void SerializeAndCheckNonESEvents(
   // This state shouldn't be possible. But ensure the code handles it.
   SerializeAndCheckNonESEvents(
       6, ES_EVENT_TYPE_AUTH_OPEN, @"file_access_no_event_not_enriched.json",
-      ^bool(std::shared_ptr<MockEndpointSecurityAPI> mockESApi, es_message_t *esMsg) {
+      ^bool(std::shared_ptr<MockEndpointSecurityAPI> mockESApi, es_message_t* esMsg) {
         esMsg->event.open.file = &openFile;
         // Note: Intentionally not priming message targets
         return false;
       },
-      ^std::vector<uint8_t>(std::shared_ptr<Serializer> serializer, const Message &msg) {
+      ^std::vector<uint8_t>(std::shared_ptr<Serializer> serializer, const Message& msg) {
         return serializer->SerializeFileAccess(
             "policy_version", "policy_name", msg, Enricher().Enrich(*msg->process), 0,
             santa::EnrichedFile(std::nullopt, std::nullopt, std::nullopt),
@@ -1860,12 +1860,12 @@ void SerializeAndCheckNonESEvents(
   // This state shouldn't be possible. But ensure the code handles it.
   SerializeAndCheckNonESEvents(
       6, ES_EVENT_TYPE_AUTH_OPEN, @"file_access_bad_path_target.json",
-      ^bool(std::shared_ptr<MockEndpointSecurityAPI> mockESApi, es_message_t *esMsg) {
+      ^bool(std::shared_ptr<MockEndpointSecurityAPI> mockESApi, es_message_t* esMsg) {
         esMsg->event.open.file = &openFile;
         // Prime message path targets
         return true;
       },
-      ^std::vector<uint8_t>(std::shared_ptr<Serializer> serializer, const Message &msg) {
+      ^std::vector<uint8_t>(std::shared_ptr<Serializer> serializer, const Message& msg) {
         return serializer->SerializeFileAccess(
             "policy_version", "policy_name", msg, Enricher().Enrich(*msg->process), 111,
             santa::EnrichedFile(std::nullopt, std::nullopt, std::nullopt),
@@ -1877,17 +1877,17 @@ void SerializeAndCheckNonESEvents(
   __block es_file_t closeFile = MakeESFile("close_file", MakeStat(300));
   SerializeAndCheckNonESEvents(
       1, ES_EVENT_TYPE_NOTIFY_CLOSE, @"allowlist.json",
-      ^bool(std::shared_ptr<MockEndpointSecurityAPI> mockESApi, es_message_t *esMsg) {
+      ^bool(std::shared_ptr<MockEndpointSecurityAPI> mockESApi, es_message_t* esMsg) {
         esMsg->event.close.target = &closeFile;
         return false;
       },
-      ^std::vector<uint8_t>(std::shared_ptr<Serializer> serializer, const Message &msg) {
+      ^std::vector<uint8_t>(std::shared_ptr<Serializer> serializer, const Message& msg) {
         return serializer->SerializeAllowlist(msg, "hash_value", "close_file");
       });
 }
 
 - (void)testSerializeBundleHashingEvent {
-  SNTStoredExecutionEvent *se = [[SNTStoredExecutionEvent alloc] init];
+  SNTStoredExecutionEvent* se = [[SNTStoredExecutionEvent alloc] init];
 
   se.fileSHA256 = @"file_hash";
   se.fileBundleHash = @"file_bundle_hash";
@@ -1903,7 +1903,7 @@ void SerializeAndCheckNonESEvents(
   XCTAssertTrue(santaMsg.ParseFromString(protoStr));
   XCTAssertTrue(santaMsg.has_bundle());
 
-  const ::pbv1::Bundle &pbBundle = santaMsg.bundle();
+  const ::pbv1::Bundle& pbBundle = santaMsg.bundle();
 
   ::pbv1::Hash pbHash = pbBundle.file_hash();
   XCTAssertEqualObjects(@(pbHash.hash().c_str()), se.fileSHA256);
@@ -1920,7 +1920,7 @@ void SerializeAndCheckNonESEvents(
 }
 
 - (void)testSerializeDiskAppearedAllowed {
-  NSDictionary *props = @{
+  NSDictionary* props = @{
     @"DADevicePath" : @"",
     @"DADeviceVendor" : @"vendor",
     @"DADeviceModel" : @"model",
@@ -1938,7 +1938,7 @@ void SerializeAndCheckNonESEvents(
   XCTAssertTrue(santaMsg.ParseFromString(protoStr));
   XCTAssertTrue(santaMsg.has_disk());
 
-  const ::pbv1::Disk &pbDisk = santaMsg.disk();
+  const ::pbv1::Disk& pbDisk = santaMsg.disk();
 
   XCTAssertEqual(pbDisk.action(), ::pbv1::Disk::ACTION_APPEARED);
 
@@ -1958,7 +1958,7 @@ void SerializeAndCheckNonESEvents(
 }
 
 - (void)testSerializeDiskAppearedBlocked {
-  NSDictionary *props = @{
+  NSDictionary* props = @{
     @"DAVolumePath" : [NSURL URLWithString:@"/Volumes/USB"],
     @"DAVolumeKind" : @"smbfs",
     @"SNTMountFromName" : @"/dev/disk2s1",
@@ -1971,7 +1971,7 @@ void SerializeAndCheckNonESEvents(
   XCTAssertTrue(santaMsg.ParseFromString(protoStr));
   XCTAssertTrue(santaMsg.has_disk());
 
-  const ::pbv1::Disk &pbDisk = santaMsg.disk();
+  const ::pbv1::Disk& pbDisk = santaMsg.disk();
 
   XCTAssertEqual(pbDisk.action(), ::pbv1::Disk::ACTION_BLOCKED);
 
@@ -1988,7 +1988,7 @@ void SerializeAndCheckNonESEvents(
 }
 
 - (void)testSerializeDiskDisppeared {
-  NSDictionary *props = @{
+  NSDictionary* props = @{
     @"DADevicePath" : @"",
     @"DADeviceVendor" : @"vendor",
     @"DADeviceModel" : @"model",
@@ -2006,7 +2006,7 @@ void SerializeAndCheckNonESEvents(
   XCTAssertTrue(santaMsg.ParseFromString(protoStr));
   XCTAssertTrue(santaMsg.has_disk());
 
-  const ::pbv1::Disk &pbDisk = santaMsg.disk();
+  const ::pbv1::Disk& pbDisk = santaMsg.disk();
 
   XCTAssertEqual(pbDisk.action(), ::pbv1::Disk::ACTION_DISAPPEARED);
 

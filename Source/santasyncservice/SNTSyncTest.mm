@@ -43,20 +43,20 @@
 
 // Prevent Zlib compression during testing
 @implementation NSData (Zlib)
-- (NSData *)zlibCompressed {
+- (NSData*)zlibCompressed {
   return nil;
 }
-- (NSData *)gzipCompressed {
+- (NSData*)gzipCompressed {
   return nil;
 }
 @end
 
 @interface SNTSyncStage (XSSI)
-- (NSData *)stripXssi:(NSData *)data;
+- (NSData*)stripXssi:(NSData*)data;
 @end
 
 @interface SNTSyncManager (Testing)
-- (SNTSyncStatusType)preflightWithSyncState:(SNTSyncState *)syncState;
+- (SNTSyncStatusType)preflightWithSyncState:(SNTSyncState*)syncState;
 - (void)rescheduleTimerQueue:(dispatch_source_t)timerQueue secondsFromNow:(uint64_t)seconds;
 - (void)startReachability;
 @property(nonatomic) dispatch_source_t fullSyncTimer;
@@ -68,7 +68,7 @@
 @end
 
 @interface SNTSyncTest : XCTestCase
-@property SNTSyncState *syncState;
+@property SNTSyncState* syncState;
 @property id<SNTDaemonControlXPC> daemonConnRop;
 @property id configMock;
 @end
@@ -135,18 +135,18 @@
       macros but you must return YES to indicate the request is the one intended to
       be stubbed. Returning NO means this stub is not applied.
 */
-- (void)stubRequestBody:(NSData *)respData
-               response:(NSURLResponse *)resp
-                  error:(NSError *)err
-          validateBlock:(BOOL (^)(NSURLRequest *req))validateBlock {
-  if (!respData) respData = (NSData *)[NSNull null];
+- (void)stubRequestBody:(NSData*)respData
+               response:(NSURLResponse*)resp
+                  error:(NSError*)err
+          validateBlock:(BOOL (^)(NSURLRequest* req))validateBlock {
+  if (!respData) respData = (NSData*)[NSNull null];
   if (!resp) resp = [self responseWithCode:200 headerDict:nil];
-  if (!err) err = (NSError *)[NSNull null];
+  if (!err) err = (NSError*)[NSNull null];
 
   // Cast the value into an NSURLRequest to save callers doing it.
   BOOL (^validateBlockWrapper)(id value) = ^BOOL(id value) {
     if (!validateBlock) return YES;
-    NSURLRequest *req = (NSURLRequest *)value;
+    NSURLRequest* req = (NSURLRequest*)value;
     return validateBlock(req);
   };
 
@@ -162,7 +162,7 @@
   @param headerDict A dictionary of HTTP headers to add to the response.
   @returns An initialized NSHTTPURLResponse.
 */
-- (NSHTTPURLResponse *)responseWithCode:(NSInteger)code headerDict:(NSDictionary *)headerDict {
+- (NSHTTPURLResponse*)responseWithCode:(NSInteger)code headerDict:(NSDictionary*)headerDict {
   return [[NSHTTPURLResponse alloc] initWithURL:[NSURL URLWithString:@"a"]
                                      statusCode:code
                                     HTTPVersion:@"1.1"
@@ -175,8 +175,8 @@
   @param request The request to parse the dictionary from.
   @returns The JSON dictionary or nil if parsing failed.
 */
-- (NSDictionary *)dictFromRequest:(NSURLRequest *)request {
-  NSData *bod = [request HTTPBody];
+- (NSDictionary*)dictFromRequest:(NSURLRequest*)request {
+  NSData* bod = [request HTTPBody];
   if (bod) return [NSJSONSerialization JSONObjectWithData:bod options:0 error:NULL];
   return nil;
 }
@@ -187,7 +187,7 @@
   @param dict, The dictionary of values
   @return A JSON-encoded representation of the dictionary as NSData
 */
-- (NSData *)dataFromDict:(NSDictionary *)dict {
+- (NSData*)dataFromDict:(NSDictionary*)dict {
   return [NSJSONSerialization dataWithJSONObject:dict options:0 error:NULL];
 }
 
@@ -197,8 +197,8 @@
   @param file, The name of the file.
   @returns The contents of the named file, or nil.
 */
-- (NSData *)dataFromFixture:(NSString *)file {
-  NSString *path = [[NSBundle bundleForClass:[self class]] pathForResource:file ofType:nil];
+- (NSData*)dataFromFixture:(NSString*)file {
+  NSString* path = [[NSBundle bundleForClass:[self class]] pathForResource:file ofType:nil];
   XCTAssertNotNil(path, @"failed to load testdata: %@", file);
   return [NSData dataWithContentsOfFile:path];
 }
@@ -218,10 +218,10 @@
 #pragma mark - SNTSyncStage Tests
 
 - (void)testStripXssi {
-  SNTSyncStage *sut = [[SNTSyncStage alloc] initWithState:self.syncState];
+  SNTSyncStage* sut = [[SNTSyncStage alloc] initWithState:self.syncState];
 
   char wantChar[3] = {'"', 'a', '"'};
-  NSData *want = [NSData dataWithBytes:wantChar length:3];
+  NSData* want = [NSData dataWithBytes:wantChar length:3];
 
   char dOne[8] = {')', ']', '}', '\'', '\n', '"', 'a', '"'};
   XCTAssertEqualObjects([sut stripXssi:[NSData dataWithBytes:dOne length:8]], want, @"");
@@ -243,11 +243,11 @@
   // The XSRF fetching code is inside a dispatch_once.
 
   // Stub initial failing request
-  NSURLResponse *resp = [self responseWithCode:403 headerDict:nil];
+  NSURLResponse* resp = [self responseWithCode:403 headerDict:nil];
   [self stubRequestBody:nil
                response:resp
                   error:nil
-          validateBlock:^BOOL(NSURLRequest *req) {
+          validateBlock:^BOOL(NSURLRequest* req) {
             // Only return the 403 response if the request is the initial fetch
             // without any attached token.
             return ([req.URL.absoluteString containsString:@"/a/"] &&
@@ -259,7 +259,7 @@
   [self stubRequestBody:nil
                response:resp
                   error:nil
-          validateBlock:^BOOL(NSURLRequest *req) {
+          validateBlock:^BOOL(NSURLRequest* req) {
             // Only return the XSRF token from the /xsrf/ handler.
             return [req.URL.absoluteString containsString:@"/xsrf/"];
           }];
@@ -269,29 +269,29 @@
       stubRequestBody:nil
              response:nil
                 error:nil
-        validateBlock:^BOOL(NSURLRequest *req) {
+        validateBlock:^BOOL(NSURLRequest* req) {
           // Only return the successful request at the original URL when the XSRF token
           // is correctly attached.
           return ([req.URL.absoluteString containsString:@"/a/"] &&
                   [[req valueForHTTPHeaderField:@"X-XSRF-TOKEN"] isEqualToString:@"my-xsrf-token"]);
         }];
 
-  NSString *stageName = [@"a" stringByAppendingFormat:@"/%@", self.syncState.machineID];
-  NSURL *u1 = [NSURL URLWithString:stageName relativeToURL:self.syncState.syncBaseURL];
+  NSString* stageName = [@"a" stringByAppendingFormat:@"/%@", self.syncState.machineID];
+  NSURL* u1 = [NSURL URLWithString:stageName relativeToURL:self.syncState.syncBaseURL];
 
-  SNTSyncStage *sut = [[SNTSyncStage alloc] initWithState:self.syncState];
-  NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:u1];
+  SNTSyncStage* sut = [[SNTSyncStage alloc] initWithState:self.syncState];
+  NSMutableURLRequest* req = [NSMutableURLRequest requestWithURL:u1];
   XCTAssertNil([sut performRequest:req intoMessage:NULL timeout:5]);
   XCTAssertEqualObjects(self.syncState.xsrfToken, @"my-xsrf-token");
 }
 
 - (void)testBaseFetchXSRFTokenHeaderRedirect {
   // Stub initial failing request
-  NSURLResponse *resp = [self responseWithCode:403 headerDict:nil];
+  NSURLResponse* resp = [self responseWithCode:403 headerDict:nil];
   [self stubRequestBody:nil
                response:resp
                   error:nil
-          validateBlock:^BOOL(NSURLRequest *req) {
+          validateBlock:^BOOL(NSURLRequest* req) {
             // Only return the 403 response if the request is the initial fetch
             // without any attached token.
             return ([req.URL.absoluteString containsString:@"/a/"] &&
@@ -307,7 +307,7 @@
   [self stubRequestBody:nil
                response:resp
                   error:nil
-          validateBlock:^BOOL(NSURLRequest *req) {
+          validateBlock:^BOOL(NSURLRequest* req) {
             // Only return the XSRF token from the /xsrf/ handler.
             return [req.URL.absoluteString containsString:@"/xsrf/"];
           }];
@@ -316,7 +316,7 @@
   [self stubRequestBody:nil
                response:nil
                   error:nil
-          validateBlock:^BOOL(NSURLRequest *req) {
+          validateBlock:^BOOL(NSURLRequest* req) {
             // Only return the successful request at the original URL when the XSRF token
             // is correctly attached.
             return ([req.URL.absoluteString containsString:@"/a/"] &&
@@ -324,11 +324,11 @@
                         isEqualToString:@"my-xsrf-token"]);
           }];
 
-  NSString *stageName = [@"a" stringByAppendingFormat:@"/%@", self.syncState.machineID];
-  NSURL *u1 = [NSURL URLWithString:stageName relativeToURL:self.syncState.syncBaseURL];
+  NSString* stageName = [@"a" stringByAppendingFormat:@"/%@", self.syncState.machineID];
+  NSURL* u1 = [NSURL URLWithString:stageName relativeToURL:self.syncState.syncBaseURL];
 
-  SNTSyncStage *sut = [[SNTSyncStage alloc] initWithState:self.syncState];
-  NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:u1];
+  SNTSyncStage* sut = [[SNTSyncStage alloc] initWithState:self.syncState];
+  NSMutableURLRequest* req = [NSMutableURLRequest requestWithURL:u1];
   XCTAssertNil([sut performRequest:req intoMessage:NULL timeout:5]);
   XCTAssertEqualObjects(self.syncState.xsrfToken, @"my-xsrf-token");
 }
@@ -337,22 +337,22 @@
 
 - (void)testPreflightBasicResponse {
   [self setupDefaultDaemonConnResponses];
-  SNTSyncPreflight *sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
+  SNTSyncPreflight* sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
 
-  NSData *respData = [self dataFromFixture:@"sync_preflight_basic.json"];
+  NSData* respData = [self dataFromFixture:@"sync_preflight_basic.json"];
   [self
       stubRequestBody:respData
              response:nil
                 error:nil
-        validateBlock:^BOOL(NSURLRequest *req) {
-          NSData *gotReqData = [req HTTPBody];
-          NSData *expectedReqData =
+        validateBlock:^BOOL(NSURLRequest* req) {
+          NSData* gotReqData = [req HTTPBody];
+          NSData* expectedReqData =
               [self dataFromFixture:(self.syncState.isSyncV2) ? @"sync_preflight_request_v2.json"
                                                               : @"sync_preflight_request.json"];
 
-          NSString *gotReq = [[NSString alloc] initWithData:gotReqData
+          NSString* gotReq = [[NSString alloc] initWithData:gotReqData
                                                    encoding:NSUTF8StringEncoding];
-          NSString *expectedReq = [[NSString alloc] initWithData:expectedReqData
+          NSString* expectedReq = [[NSString alloc] initWithData:expectedReqData
                                                         encoding:NSUTF8StringEncoding];
 
           XCTAssertEqualObjects(gotReq, expectedReq);
@@ -370,22 +370,22 @@
 
 - (void)testPreflightTurnOnBlockUSBMount {
   [self setupDefaultDaemonConnResponses];
-  SNTSyncPreflight *sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
+  SNTSyncPreflight* sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
 
-  NSData *respData = [self dataFromFixture:@"sync_preflight_turn_on_blockusb.json"];
+  NSData* respData = [self dataFromFixture:@"sync_preflight_turn_on_blockusb.json"];
   [self stubRequestBody:respData response:nil error:nil validateBlock:nil];
 
   XCTAssertTrue([sut sync]);
   XCTAssertEqualObjects(self.syncState.blockUSBMount, @1);
-  NSArray<NSString *> *wantRemountUSBMode = @[ @"rdonly", @"noexec" ];
+  NSArray<NSString*>* wantRemountUSBMode = @[ @"rdonly", @"noexec" ];
   XCTAssertEqualObjects(self.syncState.remountUSBMode, wantRemountUSBMode);
 }
 
 - (void)testPreflightTurnOffBlockUSBMount {
   [self setupDefaultDaemonConnResponses];
-  SNTSyncPreflight *sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
+  SNTSyncPreflight* sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
 
-  NSData *respData = [self dataFromFixture:@"sync_preflight_turn_off_blockusb.json"];
+  NSData* respData = [self dataFromFixture:@"sync_preflight_turn_off_blockusb.json"];
   [self stubRequestBody:respData response:nil error:nil validateBlock:nil];
 
   XCTAssertTrue([sut sync]);
@@ -394,9 +394,9 @@
 
 - (void)testPreflightBlockUSBMountAbsent {
   [self setupDefaultDaemonConnResponses];
-  SNTSyncPreflight *sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
+  SNTSyncPreflight* sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
 
-  NSData *respData = [self dataFromFixture:@"sync_preflight_blockusb_absent.json"];
+  NSData* respData = [self dataFromFixture:@"sync_preflight_blockusb_absent.json"];
   [self stubRequestBody:respData response:nil error:nil validateBlock:nil];
 
   XCTAssertTrue([sut sync]);
@@ -405,9 +405,9 @@
 
 - (void)testPreflightTurnOnBlockUnencryptedRemovableMedia {
   [self setupDefaultDaemonConnResponses];
-  SNTSyncPreflight *sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
+  SNTSyncPreflight* sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
 
-  NSData *respData =
+  NSData* respData =
       [@"{\"client_mode\": \"LOCKDOWN\", \"batch_size\": 100, "
        @"\"block_unencrypted_removable_media\": true, "
        @"\"remount_usb_mode\": [\"rdonly\", \"noexec\"]}" dataUsingEncoding:NSUTF8StringEncoding];
@@ -415,15 +415,15 @@
 
   XCTAssertTrue([sut sync]);
   XCTAssertEqualObjects(self.syncState.blockUnencryptedRemovableMediaMount, @1);
-  NSArray<NSString *> *wantRemountUSBMode = @[ @"rdonly", @"noexec" ];
+  NSArray<NSString*>* wantRemountUSBMode = @[ @"rdonly", @"noexec" ];
   XCTAssertEqualObjects(self.syncState.remountUSBMode, wantRemountUSBMode);
 }
 
 - (void)testPreflightTurnOffBlockUnencryptedRemovableMedia {
   [self setupDefaultDaemonConnResponses];
-  SNTSyncPreflight *sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
+  SNTSyncPreflight* sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
 
-  NSData *respData =
+  NSData* respData =
       [@"{\"client_mode\": \"LOCKDOWN\", \"batch_size\": 100, "
        @"\"block_unencrypted_removable_media\": false}" dataUsingEncoding:NSUTF8StringEncoding];
   [self stubRequestBody:respData response:nil error:nil validateBlock:nil];
@@ -434,9 +434,9 @@
 
 - (void)testPreflightBlockUnencryptedRemovableMediaAbsent {
   [self setupDefaultDaemonConnResponses];
-  SNTSyncPreflight *sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
+  SNTSyncPreflight* sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
 
-  NSData *respData = [self dataFromFixture:@"sync_preflight_blockusb_absent.json"];
+  NSData* respData = [self dataFromFixture:@"sync_preflight_blockusb_absent.json"];
   [self stubRequestBody:respData response:nil error:nil validateBlock:nil];
 
   XCTAssertTrue([sut sync]);
@@ -445,9 +445,9 @@
 
 - (void)testPreflightOverrideFileAccessAction {
   [self setupDefaultDaemonConnResponses];
-  SNTSyncPreflight *sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
+  SNTSyncPreflight* sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
 
-  NSData *respData = [@"{\"override_file_access_action\": \"AuditOnly\", \"client_mode\": "
+  NSData* respData = [@"{\"override_file_access_action\": \"AuditOnly\", \"client_mode\": "
                       @"\"LOCKDOWN\", \"batch_size\": 100}" dataUsingEncoding:NSUTF8StringEncoding];
 
   [self stubRequestBody:respData response:nil error:nil validateBlock:nil];
@@ -458,9 +458,9 @@
 
 - (void)testPreflightOverrideFileAccessActionAbsent {
   [self setupDefaultDaemonConnResponses];
-  SNTSyncPreflight *sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
+  SNTSyncPreflight* sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
 
-  NSData *respData = [@"{\"client_mode\": \"LOCKDOWN\", \"batch_size\": 100}"
+  NSData* respData = [@"{\"client_mode\": \"LOCKDOWN\", \"batch_size\": 100}"
       dataUsingEncoding:NSUTF8StringEncoding];
 
   [self stubRequestBody:respData response:nil error:nil validateBlock:nil];
@@ -475,14 +475,14 @@
   OCMStub([mockPreflight alloc]).andReturn(mockPreflight);
   OCMStub([mockPreflight initWithState:OCMOCK_ANY]).andReturn(mockPreflight);
 
-  SNTSyncState *ss = [[SNTSyncState alloc] init];
-  SNTSyncManager *sm = [[SNTSyncManager alloc] initWithDaemonConnection:nil];
+  SNTSyncState* ss = [[SNTSyncState alloc] init];
+  SNTSyncManager* sm = [[SNTSyncManager alloc] initWithDaemonConnection:nil];
   id smPartialMock = OCMPartialMock(sm);
   OCMStub([smPartialMock startReachability]);
   sm.pushNotifications = [[SNTPushClientNATS alloc] initWithSyncDelegate:nil];
 
   // Simulate preflight failure
-  OCMStub([(SNTSyncPreflight *)mockPreflight sync]).andReturn(NO);
+  OCMStub([(SNTSyncPreflight*)mockPreflight sync]).andReturn(NO);
 
   // Expect that we reschedule when push is enabled to the lower time value
   OCMExpect([smPartialMock rescheduleTimerQueue:sm.fullSyncTimer
@@ -497,18 +497,18 @@
   OCMStub([mockPreflight alloc]).andReturn(mockPreflight);
   OCMStub([mockPreflight initWithState:OCMOCK_ANY]).andReturn(mockPreflight);
 
-  SNTSyncState *ss = [[SNTSyncState alloc] init];
-  SNTSyncManager *sm = [[SNTSyncManager alloc] initWithDaemonConnection:nil];
+  SNTSyncState* ss = [[SNTSyncState alloc] init];
+  SNTSyncManager* sm = [[SNTSyncManager alloc] initWithDaemonConnection:nil];
   id smPartialMock = OCMPartialMock(sm);
   OCMStub([smPartialMock startReachability]);
 
   // Simulate a previously received updated push interval
-  SNTPushClientNATS *nats = [[SNTPushClientNATS alloc] initWithSyncDelegate:nil];
+  SNTPushClientNATS* nats = [[SNTPushClientNATS alloc] initWithSyncDelegate:nil];
   nats.fullSyncInterval = 2;
   sm.pushNotifications = nats;
 
   // Simulate preflight failure
-  OCMStub([(SNTSyncPreflight *)mockPreflight sync]).andReturn(NO);
+  OCMStub([(SNTSyncPreflight*)mockPreflight sync]).andReturn(NO);
 
   // Expect that we reschedule when push is enabled to the lower time value
   OCMExpect([smPartialMock rescheduleTimerQueue:sm.fullSyncTimer secondsFromNow:2]);
@@ -523,9 +523,9 @@
   }
 
   [self setupDefaultDaemonConnResponses];
-  SNTSyncPreflight *sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
+  SNTSyncPreflight* sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
 
-  NSData *respData =
+  NSData* respData =
       [@"{\"mode_transition\": { \"revoke\": true }}" dataUsingEncoding:NSUTF8StringEncoding];
 
   [self stubRequestBody:respData response:nil error:nil validateBlock:nil];
@@ -541,9 +541,9 @@
   }
 
   [self setupDefaultDaemonConnResponses];
-  SNTSyncPreflight *sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
+  SNTSyncPreflight* sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
 
-  NSData *respData = [@"{\"mode_transition\": "
+  NSData* respData = [@"{\"mode_transition\": "
                       @"{ \"on_demand_monitor_mode\": "
                       @"{ \"max_minutes\": 100, \"default_duration_minutes\": 50 } } }"
       dataUsingEncoding:NSUTF8StringEncoding];
@@ -557,7 +557,7 @@
 }
 
 - (void)testPreflightDatabaseCounts {
-  SNTSyncPreflight *sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
+  SNTSyncPreflight* sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
 
   struct RuleCounts ruleCounts = {
       .binary = 5,
@@ -576,8 +576,8 @@
   [self stubRequestBody:nil
                response:nil
                   error:nil
-          validateBlock:^BOOL(NSURLRequest *req) {
-            NSDictionary *requestDict = [self dictFromRequest:req];
+          validateBlock:^BOOL(NSURLRequest* req) {
+            NSDictionary* requestDict = [self dictFromRequest:req];
             XCTAssertEqualObjects(requestDict[kCDHashRuleCount], @(ruleCounts.cdhash));
             XCTAssertEqualObjects(requestDict[kBinaryRuleCount], @(ruleCounts.binary));
             XCTAssertEqualObjects(requestDict[kCertificateRuleCount], @(ruleCounts.certificate));
@@ -601,8 +601,8 @@
 - (void)cleanSyncPreflightRequiredSyncType:(SNTSyncType)requestedSyncType
                     expectcleanSyncRequest:(BOOL)expectcleanSyncRequest
                           expectedSyncType:(SNTSyncType)expectedSyncType
-                                  response:(NSDictionary *)resp {
-  SNTSyncPreflight *sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
+                                  response:(NSDictionary*)resp {
+  SNTSyncPreflight* sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
 
   struct RuleCounts ruleCounts = {};
   OCMStub([self.daemonConnRop
@@ -612,12 +612,12 @@
   OCMStub([self.daemonConnRop
       syncTypeRequired:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(requestedSyncType), nil])]);
 
-  NSData *respData = [self dataFromDict:resp];
+  NSData* respData = [self dataFromDict:resp];
   [self stubRequestBody:respData
                response:nil
                   error:nil
-          validateBlock:^BOOL(NSURLRequest *req) {
-            NSDictionary *requestDict = [self dictFromRequest:req];
+          validateBlock:^BOOL(NSURLRequest* req) {
+            NSDictionary* requestDict = [self dictFromRequest:req];
             if (expectcleanSyncRequest) {
               XCTAssertEqualObjects(requestDict[kRequestCleanSync], @YES);
             } else {
@@ -823,9 +823,9 @@
 
 - (void)testPreflightLockdown {
   [self setupDefaultDaemonConnResponses];
-  SNTSyncPreflight *sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
+  SNTSyncPreflight* sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
 
-  NSData *respData = [self dataFromFixture:@"sync_preflight_lockdown.json"];
+  NSData* respData = [self dataFromFixture:@"sync_preflight_lockdown.json"];
   [self stubRequestBody:respData response:nil error:nil validateBlock:nil];
 
   [sut sync];
@@ -835,9 +835,9 @@
 
 - (void)testPreflightStandalone {
   [self setupDefaultDaemonConnResponses];
-  SNTSyncPreflight *sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
+  SNTSyncPreflight* sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
 
-  NSData *respData = [self dataFromFixture:@"sync_preflight_standalone.json"];
+  NSData* respData = [self dataFromFixture:@"sync_preflight_standalone.json"];
   [self stubRequestBody:respData response:nil error:nil validateBlock:nil];
 
   [sut sync];
@@ -848,15 +848,15 @@
 #pragma mark - SNTSyncEventUpload Tests
 
 - (void)testEventUploadBasic {
-  SNTSyncEventUpload *sut = [[SNTSyncEventUpload alloc] initWithState:self.syncState];
+  SNTSyncEventUpload* sut = [[SNTSyncEventUpload alloc] initWithState:self.syncState];
   self.syncState.eventBatchSize = 50;
 
-  NSSet *allowedClasses = [NSSet setWithObjects:[NSArray class], [SNTStoredEvent class], nil];
+  NSSet* allowedClasses = [NSSet setWithObjects:[NSArray class], [SNTStoredEvent class], nil];
 
-  NSData *eventData = [self dataFromFixture:@"sync_eventupload_input_basic.plist"];
+  NSData* eventData = [self dataFromFixture:@"sync_eventupload_input_basic.plist"];
 
-  NSError *err;
-  NSArray *events = [NSKeyedUnarchiver unarchivedObjectOfClasses:allowedClasses
+  NSError* err;
+  NSArray* events = [NSKeyedUnarchiver unarchivedObjectOfClasses:allowedClasses
                                                         fromData:eventData
                                                            error:&err];
   XCTAssertNil(err);
@@ -867,13 +867,13 @@
   [self stubRequestBody:nil
                response:nil
                   error:nil
-          validateBlock:^BOOL(NSURLRequest *req) {
-            NSDictionary *requestDict = [self dictFromRequest:req];
-            NSArray *events = requestDict[kEvents];
+          validateBlock:^BOOL(NSURLRequest* req) {
+            NSDictionary* requestDict = [self dictFromRequest:req];
+            NSArray* events = requestDict[kEvents];
 
             XCTAssertEqual(events.count, 2);
 
-            NSDictionary *event = events[0];
+            NSDictionary* event = events[0];
             XCTAssertEqualObjects(
                 event[kFileSHA256],
                 @"fb2c6a695f556367f141f0c069695078c5e35e9154de35cb0fbd017af5be194e");
@@ -887,10 +887,10 @@
             XCTAssertEqualObjects(event[kPPID], @(1));
             XCTAssertEqualObjects(event[kExecutionTime], @(1751111111));
 
-            NSArray *certs = event[kSigningChain];
+            NSArray* certs = event[kSigningChain];
             XCTAssertEqual(certs.count, 3);
 
-            NSDictionary *cert = [certs firstObject];
+            NSDictionary* cert = [certs firstObject];
             XCTAssertEqualObjects(
                 cert[kCertSHA256],
                 @"d84db96af8c2e60ac4c851a21ec460f6f84e0235beb17d24a78712b9b021ed57");
@@ -920,7 +920,7 @@
             XCTAssertEqualObjects(event[@"rule_name"], @"MyRule");
             XCTAssertEqualObjects(event[@"rule_version"], @"MyRuleVersion");
             XCTAssertEqualObjects(event[@"target"], @"/you/are/being/watched");
-            XCTAssertEqual(((NSArray *)event[@"process_chain"]).count, 2);
+            XCTAssertEqual(((NSArray*)event[@"process_chain"]).count, 2);
             XCTAssertEqualObjects(event[@"process_chain"][0][kFilePath], @"/bin/mkdir");
             XCTAssertEqualObjects(event[@"process_chain"][0][kCDHash],
                                   @"dda76477475094e82d21fd5e219e4b526a72661b");
@@ -977,15 +977,15 @@
 }
 
 - (void)testEventUploadBundleAndQuarantineData {
-  SNTSyncEventUpload *sut = [[SNTSyncEventUpload alloc] initWithState:self.syncState];
+  SNTSyncEventUpload* sut = [[SNTSyncEventUpload alloc] initWithState:self.syncState];
   sut = OCMPartialMock(sut);
 
-  NSSet *allowedClasses = [NSSet setWithObjects:[NSArray class], [SNTStoredEvent class], nil];
+  NSSet* allowedClasses = [NSSet setWithObjects:[NSArray class], [SNTStoredEvent class], nil];
 
-  NSData *eventData = [self dataFromFixture:@"sync_eventupload_input_quarantine.plist"];
+  NSData* eventData = [self dataFromFixture:@"sync_eventupload_input_quarantine.plist"];
 
-  NSError *err;
-  NSArray *events = [NSKeyedUnarchiver unarchivedObjectOfClasses:allowedClasses
+  NSError* err;
+  NSArray* events = [NSKeyedUnarchiver unarchivedObjectOfClasses:allowedClasses
                                                         fromData:eventData
                                                            error:&err];
   XCTAssertNil(err);
@@ -995,13 +995,13 @@
   [self stubRequestBody:nil
                response:nil
                   error:nil
-          validateBlock:^BOOL(NSURLRequest *req) {
-            NSDictionary *requestDict = [self dictFromRequest:req];
-            NSArray *events = requestDict[kEvents];
+          validateBlock:^BOOL(NSURLRequest* req) {
+            NSDictionary* requestDict = [self dictFromRequest:req];
+            NSArray* events = requestDict[kEvents];
 
             XCTAssertEqual(events.count, 1);
 
-            NSDictionary *event = [events firstObject];
+            NSDictionary* event = [events firstObject];
             XCTAssertEqualObjects(event[kFileBundleID], @"com.luckymarmot.Paw");
             XCTAssertEqualObjects(event[kFileBundlePath], @"/Applications/Paw.app");
             XCTAssertEqualObjects(event[kFileBundleVersion], @"2003004001");
@@ -1020,16 +1020,16 @@
 }
 
 - (void)testEventUploadBatching {
-  SNTSyncEventUpload *sut = [[SNTSyncEventUpload alloc] initWithState:self.syncState];
+  SNTSyncEventUpload* sut = [[SNTSyncEventUpload alloc] initWithState:self.syncState];
   self.syncState.eventBatchSize = 1;
   sut = OCMPartialMock(sut);
 
-  NSSet *allowedClasses = [NSSet setWithObjects:[NSArray class], [SNTStoredEvent class], nil];
+  NSSet* allowedClasses = [NSSet setWithObjects:[NSArray class], [SNTStoredEvent class], nil];
 
-  NSData *eventData = [self dataFromFixture:@"sync_eventupload_input_basic.plist"];
+  NSData* eventData = [self dataFromFixture:@"sync_eventupload_input_basic.plist"];
 
-  NSError *err;
-  NSArray *events = [NSKeyedUnarchiver unarchivedObjectOfClasses:allowedClasses
+  NSError* err;
+  NSArray* events = [NSKeyedUnarchiver unarchivedObjectOfClasses:allowedClasses
                                                         fromData:eventData
                                                            error:&err];
   XCTAssertNil(err);
@@ -1041,7 +1041,7 @@
   [self stubRequestBody:nil
                response:nil
                   error:nil
-          validateBlock:^BOOL(NSURLRequest *req) {
+          validateBlock:^BOOL(NSURLRequest* req) {
             requestCount++;
             return YES;
           }];
@@ -1064,14 +1064,14 @@
 #pragma mark - SNTSyncRuleDownload Tests
 
 - (void)testRuleDownload {
-  SNTSyncRuleDownload *sut = [[SNTSyncRuleDownload alloc] initWithState:self.syncState];
+  SNTSyncRuleDownload* sut = [[SNTSyncRuleDownload alloc] initWithState:self.syncState];
 
-  NSData *respData = [self dataFromFixture:@"sync_ruledownload_batch1.json"];
+  NSData* respData = [self dataFromFixture:@"sync_ruledownload_batch1.json"];
   [self stubRequestBody:respData
                response:nil
                   error:nil
-          validateBlock:^BOOL(NSURLRequest *req) {
-            NSDictionary *requestDict = [self dictFromRequest:req];
+          validateBlock:^BOOL(NSURLRequest* req) {
+            NSDictionary* requestDict = [self dictFromRequest:req];
             // Return the first batch of rules when the cursor is nil,
             // this is the initial request.
             return requestDict[@"cursor"] == nil;
@@ -1081,8 +1081,8 @@
   [self stubRequestBody:respData
                response:nil
                   error:nil
-          validateBlock:^BOOL(NSURLRequest *req) {
-            NSDictionary *requestDict = [self dictFromRequest:req];
+          validateBlock:^BOOL(NSURLRequest* req) {
+            NSDictionary* requestDict = [self dictFromRequest:req];
             // Return the second batch of rules when the cursor is not nil,
             // this is the subsequent request.
             return requestDict[@"cursor"] != nil;
@@ -1100,7 +1100,7 @@
                                                                reply:([OCMArg invokeBlock])]);
   [sut sync];
 
-  NSArray *rules = @[
+  NSArray* rules = @[
     [[SNTRule alloc]
         initWithIdentifier:@"ee382e199f7eda58863a93a7854b930ade35798bc6856ee8e6ab6ce9277f0eab"
                      state:SNTRuleStateBlock
@@ -1136,9 +1136,9 @@
 }
 
 - (void)testRuleDownloadCel {
-  SNTSyncRuleDownload *sut = [[SNTSyncRuleDownload alloc] initWithState:self.syncState];
+  SNTSyncRuleDownload* sut = [[SNTSyncRuleDownload alloc] initWithState:self.syncState];
 
-  NSData *respData = [self dataFromFixture:@"sync_ruledownload_with_cel_1.json"];
+  NSData* respData = [self dataFromFixture:@"sync_ruledownload_with_cel_1.json"];
   [self stubRequestBody:respData response:nil error:nil validateBlock:nil];
 
   // Stub out the call to invoke the block, verification of the input is later
@@ -1156,7 +1156,7 @@
   SNTRuleState state = self.syncState.isSyncV2 ? SNTRuleStateCELv2 : SNTRuleStateCEL;
 
   // Both rules should get sent to the daemon. It will reject the second one.
-  NSArray *rules = @[
+  NSArray* rules = @[
     [[SNTRule alloc]
         initWithIdentifier:@"AAAAAAAAAA"
                      state:state
@@ -1183,13 +1183,13 @@
 
 - (void)testPostflightBasicResponse {
   [self setupDefaultDaemonConnResponses];
-  SNTSyncPostflight *sut = [[SNTSyncPostflight alloc] initWithState:self.syncState];
+  SNTSyncPostflight* sut = [[SNTSyncPostflight alloc] initWithState:self.syncState];
 
   [self stubRequestBody:nil
                response:nil
                   error:nil
-          validateBlock:^BOOL(NSURLRequest *req) {
-            NSDictionary *requestDict = [self dictFromRequest:req];
+          validateBlock:^BOOL(NSURLRequest* req) {
+            NSDictionary* requestDict = [self dictFromRequest:req];
             XCTAssertEqualObjects(requestDict[@"rulesHash"], @"the-hash");
             if (self.syncState.isSyncV2) {
               XCTAssertEqualObjects(requestDict[@"fileAccessRulesHash"], @"the-faa-hash");

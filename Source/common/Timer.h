@@ -93,14 +93,14 @@ class Timer : public std::enable_shared_from_this<Timer<T>> {
       // If rescheduling on the trailing edge, Stop the timer and then
       // restart if requested.
       StopTimerSerialized();
-      if (static_cast<T *>(this)->OnTimer()) {
+      if (static_cast<T*>(this)->OnTimer()) {
         // When restarting the timer on the trailing edge, always wait one cycle.
         StartTimerSerialized(OnStart::kWaitOneCycle);
       }
     } else {
       // If rescheduling on the leading edge, the timer will have already
       // started, but stop it if requested.
-      if (!static_cast<T *>(this)->OnTimer()) {
+      if (!static_cast<T*>(this)->OnTimer()) {
         StopTimerSerialized();
       }
     }

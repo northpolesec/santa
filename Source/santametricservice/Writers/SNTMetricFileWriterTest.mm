@@ -17,7 +17,7 @@
 #import "Source/santametricservice/Writers/SNTMetricFileWriter.h"
 
 @interface SNTMetricFileWriterTest : XCTestCase
-@property NSString *tempDir;
+@property NSString* tempDir;
 @end
 
 @implementation SNTMetricFileWriterTest
@@ -25,7 +25,7 @@
 - (void)setUp {
   // create a temp dir
   char dirTemplate[] = "/tmp/sntmetricfileoutputtest.XXXXXXX";
-  char *tempPath = mkdtemp(dirTemplate);
+  char* tempPath = mkdtemp(dirTemplate);
 
   if (tempPath == NULL) {
     NSLog(@"Unable to make temp directory");
@@ -39,7 +39,7 @@
 
 - (void)tearDown {
   // delete the temp dir
-  NSError *err;
+  NSError* err;
   [[NSFileManager defaultManager] removeItemAtPath:self.tempDir error:&err];
 
   if (err != nil) {
@@ -48,31 +48,31 @@
 }
 
 - (void)testWritingToNonFileURLFails {
-  NSString *testURL = @"http://www.google.com";
+  NSString* testURL = @"http://www.google.com";
 
-  SNTMetricFileWriter *fileWriter = [[SNTMetricFileWriter alloc] init];
+  SNTMetricFileWriter* fileWriter = [[SNTMetricFileWriter alloc] init];
 
-  NSError *err;
+  NSError* err;
 
-  NSData *firstLine = [@"AAAAAAAA" dataUsingEncoding:NSUTF8StringEncoding];
+  NSData* firstLine = [@"AAAAAAAA" dataUsingEncoding:NSUTF8StringEncoding];
 
-  NSArray<NSData *> *input = @[ firstLine ];
+  NSArray<NSData*>* input = @[ firstLine ];
 
   BOOL result = [fileWriter write:input toURL:[NSURL URLWithString:testURL] error:&err];
   XCTAssertFalse(result);
 }
 
 - (void)testWritingDataToFileWorks {
-  NSURL *url = [NSURL fileURLWithPathComponents:@[ self.tempDir, @"test.data" ]];
+  NSURL* url = [NSURL fileURLWithPathComponents:@[ self.tempDir, @"test.data" ]];
 
-  SNTMetricFileWriter *fileWriter = [[SNTMetricFileWriter alloc] init];
+  SNTMetricFileWriter* fileWriter = [[SNTMetricFileWriter alloc] init];
 
-  NSError *err;
+  NSError* err;
 
-  NSData *firstLine = [@"AAAAAAAA" dataUsingEncoding:NSUTF8StringEncoding];
-  NSData *secondLine = [@"BBBBBBBB" dataUsingEncoding:NSUTF8StringEncoding];
+  NSData* firstLine = [@"AAAAAAAA" dataUsingEncoding:NSUTF8StringEncoding];
+  NSData* secondLine = [@"BBBBBBBB" dataUsingEncoding:NSUTF8StringEncoding];
 
-  NSArray<NSData *> *input = @[ firstLine ];
+  NSArray<NSData*>* input = @[ firstLine ];
 
   BOOL success = [fileWriter write:input toURL:url error:&err];
 
@@ -82,8 +82,8 @@
   const char newline[1] = {'\n'};
 
   // Read file ensure it only contains the first line followed by a Newline
-  NSData *testFileContents = [NSData dataWithContentsOfFile:url.path];
-  NSMutableData *expected = [NSMutableData dataWithData:firstLine];
+  NSData* testFileContents = [NSData dataWithContentsOfFile:url.path];
+  NSMutableData* expected = [NSMutableData dataWithData:firstLine];
 
   [expected appendBytes:newline length:1];
 
@@ -104,12 +104,12 @@
 }
 
 - (void)testThatPassingANilOrNullErrorDoesNotCrash {
-  NSString *testFile = [NSString pathWithComponents:@[ @"file://", self.tempDir, @"test.data" ]];
-  NSURL *url = [NSURL URLWithString:testFile];
+  NSString* testFile = [NSString pathWithComponents:@[ @"file://", self.tempDir, @"test.data" ]];
+  NSURL* url = [NSURL URLWithString:testFile];
 
-  SNTMetricFileWriter *fileWriter = [[SNTMetricFileWriter alloc] init];
+  SNTMetricFileWriter* fileWriter = [[SNTMetricFileWriter alloc] init];
 
-  NSData *firstLine = [@"AAAAAAAA" dataUsingEncoding:NSUTF8StringEncoding];
+  NSData* firstLine = [@"AAAAAAAA" dataUsingEncoding:NSUTF8StringEncoding];
 
   BOOL success = [fileWriter write:@[ firstLine ] toURL:url error:nil];
   XCTAssertTrue(success);

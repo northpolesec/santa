@@ -39,24 +39,24 @@
 namespace santa::santad::process_tree {
 
 void ProcessTree::BackfillInsertChildren(
-    absl::flat_hash_map<pid_t, std::vector<Process>> &parent_map,
-    std::shared_ptr<Process> parent, const Process &unlinked_proc) {
+    absl::flat_hash_map<pid_t, std::vector<BackfilledProcess>>& parent_map,
+    std::shared_ptr<Process> parent, const BackfilledProcess& backfilled_proc) {
   auto proc = std::make_shared<Process>(
-      unlinked_proc.pid_, unlinked_proc.effective_cred_,
+      backfilled_proc.pid, backfilled_proc.cred,
       // Re-use shared pointers from parent if value equivalent
-      (parent && *(unlinked_proc.program_) == *(parent->program_))
+      (parent && *(backfilled_proc.program) == *(parent->program_))
           ? parent->program_
-          : unlinked_proc.program_,
+          : backfilled_proc.program,
       parent);
   {
     absl::MutexLock lock(mtx_);
-    map_.emplace(unlinked_proc.pid_, proc);
+    map_.emplace(backfilled_proc.pid, proc);
   }
 
   // The only case where we should not have a parent is the root processes
   // (e.g. init, kthreadd).
   if (parent) {
-    for (auto &annotator : annotators_) {
+    for (auto& annotator : annotators_) {
       annotator->AnnotateFork(*this, *(proc->parent_), *proc);
       if (proc->program_ != proc->parent_->program_) {
         annotator->AnnotateExec(*this, *(proc->parent_), *proc);
@@ -64,12 +64,12 @@ void ProcessTree::BackfillInsertChildren(
     }
   }
 
-  for (const Process &child : parent_map[unlinked_proc.pid_.pid]) {
+  for (const BackfilledProcess& child : parent_map[backfilled_proc.pid.pid]) {
     BackfillInsertChildren(parent_map, proc, child);
   }
 }
 
-void ProcessTree::HandleFork(uint64_t timestamp, const Process &parent,
+void ProcessTree::HandleFork(uint64_t timestamp, const Process& parent,
                              const Pid new_pid) {
   if (Step(timestamp)) {
     std::shared_ptr<Process> child;
@@ -79,13 +79,13 @@ void ProcessTree::HandleFork(uint64_t timestamp, const Process &parent,
                                         parent.program_, map_[parent.pid_]);
       map_.emplace(new_pid, child);
     }
-    for (const auto &annotator : annotators_) {
+    for (const auto& annotator : annotators_) {
       annotator->AnnotateFork(*this, parent, *child);
     }
   }
 }
 
-void ProcessTree::HandleExec(uint64_t timestamp, const Process &p,
+void ProcessTree::HandleExec(uint64_t timestamp, const Process& p,
                              const Pid new_pid, const Program prog,
                              const Cred c) {
   if (Step(timestamp)) {
@@ -100,13 +100,13 @@ void ProcessTree::HandleExec(uint64_t timestamp, const Process &p,
       remove_at_.push_back({timestamp, p.pid_});
       map_.emplace(new_proc->pid_, new_proc);
     }
-    for (const auto &annotator : annotators_) {
+    for (const auto& annotator : annotators_) {
       annotator->AnnotateExec(*this, p, *new_proc);
     }
   }
 }
 
-void ProcessTree::HandleExit(uint64_t timestamp, const Process &p) {
+void ProcessTree::HandleExit(uint64_t timestamp, const Process& p) {
   if (Step(timestamp)) {
     absl::MutexLock lock(mtx_);
     remove_at_.push_back({timestamp, p.pid_});
@@ -145,7 +145,7 @@ bool ProcessTree::Step(uint64_t timestamp) {
   for (auto it = remove_at_.begin(); it != remove_at_.end();) {
     if (it->first < new_cutoff) {
       if (auto target = GetLocked(it->second);
-          target && (*target)->refcnt_ > 0) {
+          target && (*target)->refcnt_.load(std::memory_order_relaxed) > 0) {
         (*target)->tombstoned_ = true;
       } else {
         map_.erase(it->second);
@@ -159,22 +159,28 @@ bool ProcessTree::Step(uint64_t timestamp) {
   return true;
 }
 
-void ProcessTree::RetainProcess(std::vector<struct Pid> &pids) {
-  absl::MutexLock lock(mtx_);
-  for (const struct Pid &p : pids) {
+void ProcessTree::RetainProcess(const PidList& pids) {
+  // Reader lock suffices: we only need the map to be stable for lookup.
+  // relaxed is safe because the increment has no dependent memory operations —
+  // we are only bumping a counter.
+  absl::ReaderMutexLock lock(mtx_);
+  for (const struct Pid& p : pids) {
     auto proc = GetLocked(p);
     if (proc) {
-      (*proc)->refcnt_++;
+      (*proc)->refcnt_.fetch_add(1, std::memory_order_relaxed);
     }
   }
 }
 
-void ProcessTree::ReleaseProcess(std::vector<struct Pid> &pids) {
+void ProcessTree::ReleaseProcess(const PidList& pids) {
   absl::MutexLock lock(mtx_);
-  for (const struct Pid &p : pids) {
+  for (const struct Pid& p : pids) {
     auto proc = GetLocked(p);
     if (proc) {
-      if (--(*proc)->refcnt_ == 0 && (*proc)->tombstoned_) {
+      // relaxed is safe: the exclusive lock provides ordering for
+      // tombstoned_ and map_.erase().
+      if ((*proc)->refcnt_.fetch_sub(1, std::memory_order_relaxed) == 1 &&
+          (*proc)->tombstoned_) {
         map_.erase(p);
       }
     }
@@ -187,10 +193,10 @@ Annotation get/set
 ---
 */
 
-void ProcessTree::AnnotateProcess(const Process &p,
+void ProcessTree::AnnotateProcess(const Process& p,
                                   std::shared_ptr<const Annotator> a) {
   absl::MutexLock lock(mtx_);
-  const Annotator &x = *a;
+  const Annotator& x = *a;
   map_[p.pid_]->annotations_.emplace(std::type_index(typeid(x)), std::move(a));
 }
 
@@ -201,7 +207,7 @@ ProcessTree::ExportAnnotations(const Pid p) {
     return std::nullopt;
   }
   ::santa::pb::v1::process_tree::Annotations a;
-  for (const auto &[_, annotation] : (*proc)->annotations_) {
+  for (const auto& [_, annotation] : (*proc)->annotations_) {
     if (auto x = annotation->Proto(); x) a.MergeFrom(*x);
   }
   return a;
@@ -229,12 +235,12 @@ void ProcessTree::Iterate(
   {
     absl::ReaderMutexLock lock(mtx_);
     procs.reserve(map_.size());
-    for (auto &[_, proc] : map_) {
+    for (auto& [_, proc] : map_) {
       procs.push_back(proc);
     }
   }
 
-  for (auto &p : procs) {
+  for (auto& p : procs) {
     f(p);
   }
 }
@@ -254,21 +260,21 @@ std::optional<std::shared_ptr<Process>> ProcessTree::GetLocked(
   return it->second;
 }
 
-std::shared_ptr<const Process> ProcessTree::GetParent(const Process &p) const {
+std::shared_ptr<const Process> ProcessTree::GetParent(const Process& p) const {
   return p.parent_;
 }
 
 #if SANTA_PROCESS_TREE_DEBUG
-void ProcessTree::DebugDump(std::ostream &stream) const {
+void ProcessTree::DebugDump(std::ostream& stream) const {
   absl::ReaderMutexLock lock(mtx_);
   stream << map_.size() << " processes" << std::endl;
   DebugDumpLocked(stream, 0, 0);
 }
 
-void ProcessTree::DebugDumpLocked(std::ostream &stream, int depth,
+void ProcessTree::DebugDumpLocked(std::ostream& stream, int depth,
                                   pid_t ppid) const
     ABSL_SHARED_LOCKS_REQUIRED(mtx_) {
-  for (auto &[_, process] : map_) {
+  for (auto& [_, process] : map_) {
     if ((ppid == 0 && !process->parent_) ||
         (process->parent_ && process->parent_->pid_.pid == ppid)) {
       stream << std::string(2 * depth, ' ') << process->pid_.pid
@@ -282,7 +288,7 @@ void ProcessTree::DebugDumpLocked(std::ostream &stream, int depth,
 absl::StatusOr<std::shared_ptr<ProcessTree>> CreateTree(
     std::vector<std::unique_ptr<Annotator>> annotations) {
   absl::flat_hash_set<std::type_index> seen;
-  for (const auto &annotator : annotations) {
+  for (const auto& annotator : annotations) {
     if (seen.count(std::type_index(typeid(annotator)))) {
       return absl::InvalidArgumentError(
           "Multiple annotators of the same class");
@@ -303,8 +309,7 @@ Tokens
 ----
 */
 
-ProcessToken::ProcessToken(std::shared_ptr<ProcessTree> tree,
-                           std::vector<struct Pid> pids)
+ProcessToken::ProcessToken(std::shared_ptr<ProcessTree> tree, PidList pids)
     : state_(std::make_shared<State>(std::move(tree), std::move(pids))) {
   if (state_->tree) {
     state_->tree->RetainProcess(state_->pids);

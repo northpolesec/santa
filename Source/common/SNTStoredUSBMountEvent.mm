@@ -18,12 +18,12 @@
 
 @implementation SNTStoredUSBMountEvent
 
-- (instancetype)initWithDeviceModel:(NSString *)deviceModel
-                       deviceVendor:(NSString *)deviceVendor
-                        mountOnName:(NSString *)mountOnName
-                           protocol:(NSString *)protocol
+- (instancetype)initWithDeviceModel:(NSString*)deviceModel
+                       deviceVendor:(NSString*)deviceVendor
+                        mountOnName:(NSString*)mountOnName
+                           protocol:(NSString*)protocol
                            decision:(SNTStoredUSBMountEventDecision)decision
-                        remountArgs:(NSArray<NSString *> *)remountArgs
+                        remountArgs:(NSArray<NSString*>*)remountArgs
                         isEncrypted:(BOOL)isEncrypted {
   self = [super init];
   if (self) {
@@ -43,7 +43,7 @@
   return YES;
 }
 
-- (void)encodeWithCoder:(NSCoder *)coder {
+- (void)encodeWithCoder:(NSCoder*)coder {
   [super encodeWithCoder:coder];
   ENCODE(coder, uuid);
   ENCODE(coder, deviceModel);
@@ -55,7 +55,7 @@
   ENCODE_BOXABLE(coder, isEncrypted);
 }
 
-- (instancetype)initWithCoder:(NSCoder *)decoder {
+- (instancetype)initWithCoder:(NSCoder*)decoder {
   self = [super initWithCoder:decoder];
   if (self) {
     DECODE(decoder, uuid, NSString);
@@ -70,7 +70,7 @@
   return self;
 }
 
-- (NSString *)description {
+- (NSString*)description {
   return [NSString stringWithFormat:@"SNTStoredUSBMountEvent[%@]: %@ %@ on: %@", self.idx,
                                     self.deviceVendor, self.deviceModel, self.mountOnName];
 }
@@ -79,7 +79,7 @@
   return YES;
 }
 
-- (NSString *)uniqueID {
+- (NSString*)uniqueID {
   // Dedupe on URL / mountOnName
   return [NSString stringWithFormat:@"%@", self.mountOnName];
 }

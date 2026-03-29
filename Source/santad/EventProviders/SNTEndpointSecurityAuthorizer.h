@@ -31,8 +31,8 @@
 
 - (instancetype)initWithESAPI:(std::shared_ptr<santa::EndpointSecurityAPI>)esApi
                       metrics:(std::shared_ptr<santa::ESMetricsObserver>)metrics
-               execController:(SNTExecutionController *)execController
-           compilerController:(SNTCompilerController *)compilerController
+               execController:(SNTExecutionController*)execController
+           compilerController:(SNTCompilerController*)compilerController
               authResultCache:(std::shared_ptr<santa::AuthResultCache>)authResultCache
                     ttyWriter:(std::shared_ptr<santa::TTYWriter>)ttyWriter;
 

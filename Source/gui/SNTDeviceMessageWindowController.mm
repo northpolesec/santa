@@ -24,7 +24,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 @implementation SNTDeviceMessageWindowController
 
-- (instancetype)initWithEvent:(SNTDeviceEvent *)event {
+- (instancetype)initWithEvent:(SNTDeviceEvent*)event {
   self = [super init];
   if (self) {
     _event = event;
@@ -44,7 +44,7 @@ NS_ASSUME_NONNULL_BEGIN
   [super showWindow:sender];
 }
 
-- (NSString *)messageHash {
+- (NSString*)messageHash {
   return self.event.mntonname;
 }
 

@@ -29,28 +29,28 @@
 #import "Source/gui/SNTNotificationManager.h"
 
 @interface SNTStatusItemManager ()
-@property SNTAboutWindowController *aboutWindowController;
-@property(strong, nonatomic, readwrite) NSStatusItem *statusItem;
-@property SNTKVOManager *kvoEnableMenuItem;
+@property SNTAboutWindowController* aboutWindowController;
+@property(strong, nonatomic, readwrite) NSStatusItem* statusItem;
+@property SNTKVOManager* kvoEnableMenuItem;
 
 // Sync items
-@property NSMenuItem *syncMenuItem;
+@property NSMenuItem* syncMenuItem;
 
 // Temporary monitor mode items
-@property(atomic, strong) NSTimer *temporaryMonitorModeTimer;
-@property(atomic, strong) NSDate *temporaryMonitorModeExpiration;
-@property(atomic, strong) NSTimer *iconTintTimer;
-@property NSMenuItem *temporaryMonitorModeMenuItem;
-@property NSMenuItem *temporaryMonitorModeRefreshItem;
+@property(atomic, strong) NSTimer* temporaryMonitorModeTimer;
+@property(atomic, strong) NSDate* temporaryMonitorModeExpiration;
+@property(atomic, strong) NSTimer* iconTintTimer;
+@property NSMenuItem* temporaryMonitorModeMenuItem;
+@property NSMenuItem* temporaryMonitorModeRefreshItem;
 
 // Reset silences item
-@property NSMenuItem *resetSilencesMenuItem;
+@property NSMenuItem* resetSilencesMenuItem;
 
 // Countdown formatter
-@property(nonatomic, strong) NSDateComponentsFormatter *countdownFormatter;
+@property(nonatomic, strong) NSDateComponentsFormatter* countdownFormatter;
 @end
 
-static NSString *const kNotificationSilencesKey = @"SilencedNotifications";
+static NSString* const kNotificationSilencesKey = @"SilencedNotifications";
 
 @implementation SNTStatusItemManager
 
@@ -70,7 +70,7 @@ static NSString *const kNotificationSilencesKey = @"SilencedNotifications";
         [[SNTKVOManager alloc] initWithObject:[SNTConfigurator configurator]
                                      selector:@selector(enableMenuItem)
                                          type:[NSNumber class]
-                                     callback:^(NSNumber *oldValue, NSNumber *newValue) {
+                                     callback:^(NSNumber* oldValue, NSNumber* newValue) {
                                        STRONGIFY(self);
                                        // If user has an override, admin config changes don't affect
                                        // the menu item visibility
@@ -118,10 +118,10 @@ static NSString *const kNotificationSilencesKey = @"SilencedNotifications";
   [self setMenuItemImageWithTintColor:nil];
 
   // Create the menu
-  NSMenu *menu = [[NSMenu alloc] init];
+  NSMenu* menu = [[NSMenu alloc] init];
 
   // Add version string and about menu item
-  NSString *santaVersionString = [NSString
+  NSString* santaVersionString = [NSString
       stringWithFormat:@"Santa v%@%@",
                        [[NSBundle mainBundle] infoDictionary][@"CFBundleShortVersionString"],
                        santa::SNTIsLiteInstall() ? @" (Lite)" : @""];
@@ -164,16 +164,16 @@ static NSString *const kNotificationSilencesKey = @"SilencedNotifications";
 
 - (void)retrieveTMMState {
   // Check whether temporary monitor mode is available and if we're currently in it.
-  MOLXPCConnection *daemonConn = [SNTXPCControlInterface configuredConnection];
+  MOLXPCConnection* daemonConn = [SNTXPCControlInterface configuredConnection];
   [daemonConn resume];
   [[daemonConn synchronousRemoteObjectProxy]
       checkTemporaryMonitorModePolicyAvailable:^(BOOL available) {
         [self setTemporaryMonitorModePolicyAvailable:available];
       }];
   [[daemonConn synchronousRemoteObjectProxy]
-      temporaryMonitorModeSecondsRemaining:^(NSNumber *seconds) {
+      temporaryMonitorModeSecondsRemaining:^(NSNumber* seconds) {
         if (seconds) {
-          NSDate *expiry = [NSDate dateWithTimeIntervalSinceNow:[seconds intValue]];
+          NSDate* expiry = [NSDate dateWithTimeIntervalSinceNow:[seconds intValue]];
           [self enterMonitorModeWithExpiration:expiry];
         }
       }];
@@ -191,7 +191,7 @@ static NSString *const kNotificationSilencesKey = @"SilencedNotifications";
   }
 }
 
-- (void)updateTitle:(NSString *)title {
+- (void)updateTitle:(NSString*)title {
   self.statusItem.button.title = title ?: @"";
 }
 
@@ -208,11 +208,11 @@ static NSString *const kNotificationSilencesKey = @"SilencedNotifications";
 }
 
 - (void)tmmRefreshItemClicked:(id)sender {
-  MOLXPCConnection *daemonConn = [SNTXPCControlInterface configuredConnection];
+  MOLXPCConnection* daemonConn = [SNTXPCControlInterface configuredConnection];
   [daemonConn resume];
   [[daemonConn synchronousRemoteObjectProxy]
       requestTemporaryMonitorModeWithDurationMinutes:0
-                                               reply:^(uint32 minutes, NSError *err) {
+                                               reply:^(uint32 minutes, NSError* err) {
                                                  if (err) {
                                                    // TODO: Handle this properly
                                                    NSLog(@"Failed to refresh TMM");
@@ -222,11 +222,11 @@ static NSString *const kNotificationSilencesKey = @"SilencedNotifications";
 }
 
 - (void)tmmMenuItemClicked:(id)sender {
-  MOLXPCConnection *daemonConn = [SNTXPCControlInterface configuredConnection];
+  MOLXPCConnection* daemonConn = [SNTXPCControlInterface configuredConnection];
   [daemonConn resume];
 
   if (self.temporaryMonitorModeExpiration) {
-    [[daemonConn synchronousRemoteObjectProxy] cancelTemporaryMonitorMode:^(NSError *err) {
+    [[daemonConn synchronousRemoteObjectProxy] cancelTemporaryMonitorMode:^(NSError* err) {
       if (err) {
         [self notificationWithIdentifier:@"tmm_cancel_failed_notification"
                                  andBody:err.localizedDescription];
@@ -235,12 +235,12 @@ static NSString *const kNotificationSilencesKey = @"SilencedNotifications";
   } else {
     [[daemonConn synchronousRemoteObjectProxy]
         requestTemporaryMonitorModeWithDurationMinutes:0
-                                                 reply:^(uint32 minutes, NSError *err) {
+                                                 reply:^(uint32 minutes, NSError* err) {
                                                    if (err) {
                                                      [self temporarilyTintIconWithColor:
                                                                [NSColor
                                                                    colorNamed:@"SyncFailureColor"]];
-                                                     NSString *failureDescription;
+                                                     NSString* failureDescription;
                                                      switch (err.code) {
                                                        case SNTErrorCodeTMMNoPolicy:
                                                          failureDescription = NSLocalizedString(
@@ -302,7 +302,7 @@ static NSString *const kNotificationSilencesKey = @"SilencedNotifications";
     NSApp.activationPolicy = NSApplicationActivationPolicyAccessory;
   }
 
-  NSAlert *alert = [[NSAlert alloc] init];
+  NSAlert* alert = [[NSAlert alloc] init];
   alert.messageText = NSLocalizedString(@"Reset Silenced Notifications",
                                         @"Title for reset silences confirmation dialog");
   alert.informativeText =
@@ -317,7 +317,7 @@ static NSString *const kNotificationSilencesKey = @"SilencedNotifications";
   alert.window.level = NSPopUpMenuWindowLevel;
 
   if ([alert runModal] == NSAlertFirstButtonReturn) {
-    NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
+    NSUserDefaults* ud = [NSUserDefaults standardUserDefaults];
     [ud removeObjectForKey:kNotificationSilencesKey];
   }
 
@@ -332,7 +332,7 @@ static NSString *const kNotificationSilencesKey = @"SilencedNotifications";
 - (BOOL)hasVisibleWindows {
   __block BOOL hasVisibleWindows = NO;
   [NSApp enumerateWindowsWithOptions:0
-                          usingBlock:^(NSWindow *_Nonnull window, BOOL *_Nonnull stop) {
+                          usingBlock:^(NSWindow* _Nonnull window, BOOL* _Nonnull stop) {
                             if ([window isKindOfClass:NSClassFromString(@"NSStatusBarWindow")]) {
                               return;
                             }
@@ -347,7 +347,7 @@ static NSString *const kNotificationSilencesKey = @"SilencedNotifications";
 
   dispatch_async(dispatch_get_global_queue(0, 0), ^{
     // Connect to sync service and call sync.
-    MOLXPCConnection *ss = [SNTXPCSyncServiceInterface configuredConnection];
+    MOLXPCConnection* ss = [SNTXPCSyncServiceInterface configuredConnection];
     ss.invalidationHandler = ^(void) {
       dispatch_async(dispatch_get_main_queue(), ^{
         self.syncMenuItem.target = self;
@@ -390,7 +390,7 @@ static NSString *const kNotificationSilencesKey = @"SilencedNotifications";
   });
 }
 
-- (void)enterMonitorModeWithExpiration:(NSDate *)expiration {
+- (void)enterMonitorModeWithExpiration:(NSDate*)expiration {
   self.temporaryMonitorModeExpiration = expiration;
 
   // Invalidate any existing timer
@@ -403,13 +403,13 @@ static NSString *const kNotificationSilencesKey = @"SilencedNotifications";
   // Create a timer that updates the countdown display. Using a 5 second interval is sufficient
   // since the displayed units are days/hours/minutes which change infrequently.
   dispatch_async(dispatch_get_main_queue(), ^{
-    __block NSString *previousTitle = nil;
+    __block NSString* previousTitle = nil;
 
     // Fire immediately to set the initial title, then repeat every 5 seconds.
     self.temporaryMonitorModeTimer = [NSTimer
         scheduledTimerWithTimeInterval:5.0
                                repeats:YES
-                                 block:^(NSTimer *timer) {
+                                 block:^(NSTimer* timer) {
                                    if (!self.temporaryMonitorModeExpiration) {
                                      [self leaveMonitorMode];
                                      return;
@@ -424,7 +424,7 @@ static NSString *const kNotificationSilencesKey = @"SilencedNotifications";
                                      return;
                                    }
 
-                                   NSString *title = [self.countdownFormatter
+                                   NSString* title = [self.countdownFormatter
                                        stringFromDate:[NSDate now]
                                                toDate:self.temporaryMonitorModeExpiration];
                                    if (![title isEqualToString:previousTitle]) {
@@ -451,27 +451,27 @@ static NSString *const kNotificationSilencesKey = @"SilencedNotifications";
   self.temporaryMonitorModeRefreshItem.hidden = !available;
 }
 
-- (NSMenuItem *)menuItemWithTitle:(NSString *)title andAction:(SEL)action {
-  NSMenuItem *i = [[NSMenuItem alloc] initWithTitle:title action:action keyEquivalent:@""];
+- (NSMenuItem*)menuItemWithTitle:(NSString*)title andAction:(SEL)action {
+  NSMenuItem* i = [[NSMenuItem alloc] initWithTitle:title action:action keyEquivalent:@""];
   i.target = self;
   return i;
 }
 
-- (BOOL)validateMenuItem:(NSMenuItem *)menuItem {
+- (BOOL)validateMenuItem:(NSMenuItem*)menuItem {
   if (menuItem == self.resetSilencesMenuItem) {
-    NSUserDefaults *ud = [NSUserDefaults standardUserDefaults];
-    NSDictionary *silences = [ud objectForKey:kNotificationSilencesKey];
+    NSUserDefaults* ud = [NSUserDefaults standardUserDefaults];
+    NSDictionary* silences = [ud objectForKey:kNotificationSilencesKey];
     return silences.count > 0;
   }
   return YES;
 }
 
-- (void)notificationWithIdentifier:(NSString *)identifier andBody:(NSString *)body {
-  UNMutableNotificationContent *content = [[UNMutableNotificationContent alloc] init];
+- (void)notificationWithIdentifier:(NSString*)identifier andBody:(NSString*)body {
+  UNMutableNotificationContent* content = [[UNMutableNotificationContent alloc] init];
   content.title = @"Santa";
   content.body = body;
 
-  UNNotificationRequest *req = [UNNotificationRequest requestWithIdentifier:identifier
+  UNNotificationRequest* req = [UNNotificationRequest requestWithIdentifier:identifier
                                                                     content:content
                                                                     trigger:nil];
   [[UNUserNotificationCenter currentNotificationCenter] addNotificationRequest:req
@@ -480,18 +480,18 @@ static NSString *const kNotificationSilencesKey = @"SilencedNotifications";
 
 #pragma mark - User Menu Item Override
 
-- (NSNumber *)userMenuItemEnabledOverride {
+- (NSNumber*)userMenuItemEnabledOverride {
   return [[NSUserDefaults standardUserDefaults] objectForKey:kEnableMenuItemUserOverride];
 }
 
 /// Returns YES if the menu item should be enabled, considering user override and admin config.
 - (BOOL)effectiveMenuItemEnabled {
-  NSNumber *userOverride = [self userMenuItemEnabledOverride];
+  NSNumber* userOverride = [self userMenuItemEnabledOverride];
   return userOverride ? [userOverride boolValue] : [SNTConfigurator configurator].enableMenuItem;
 }
 
 /// The override state was changed, re-evaluate whether the menu item should be shown.
-- (void)userMenuItemOverrideChanged:(NSNotification *)notification {
+- (void)userMenuItemOverrideChanged:(NSNotification*)notification {
   BOOL enabled = [self effectiveMenuItemEnabled];
   if (enabled) {
     [self setupStatusBarItem];
@@ -502,7 +502,7 @@ static NSString *const kNotificationSilencesKey = @"SilencedNotifications";
 
 #pragma mark - Icon Tinting
 
-- (void)temporarilyTintIconWithColor:(NSColor *)color {
+- (void)temporarilyTintIconWithColor:(NSColor*)color {
   dispatch_async(dispatch_get_main_queue(), ^{
     [self.iconTintTimer invalidate];
     self.iconTintTimer = nil;
@@ -511,15 +511,15 @@ static NSString *const kNotificationSilencesKey = @"SilencedNotifications";
     self.iconTintTimer =
         [NSTimer scheduledTimerWithTimeInterval:2.0
                                         repeats:NO
-                                          block:^(NSTimer *_Nonnull timer) {
+                                          block:^(NSTimer* _Nonnull timer) {
                                             [self setMenuItemImageWithTintColor:nil];
                                             self.iconTintTimer = nil;
                                           }];
   });
 }
 
-- (void)setMenuItemImageWithTintColor:(NSColor *)tintColor {
-  NSImage *original = [NSImage imageNamed:@"MenuItem"];
+- (void)setMenuItemImageWithTintColor:(NSColor*)tintColor {
+  NSImage* original = [NSImage imageNamed:@"MenuItem"];
   if (!original) return;
   [original setTemplate:YES];
   original.size = NSMakeSize(24.0, 16.0);
@@ -529,7 +529,7 @@ static NSString *const kNotificationSilencesKey = @"SilencedNotifications";
     return;
   }
 
-  NSImage *tinted = [original copy];
+  NSImage* tinted = [original copy];
   [tinted lockFocus];
   [tintColor set];
   NSRectFillUsingOperation(NSMakeRect(0, 0, tinted.size.width, tinted.size.height),

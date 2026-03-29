@@ -16,8 +16,8 @@
 #import "SNTMetricSet.h"
 #import "SNTCommonEnums.h"
 
-NSString *SNTMetricMakeStringFromMetricType(SNTMetricType metricType) {
-  NSString *typeStr;
+NSString* SNTMetricMakeStringFromMetricType(SNTMetricType metricType) {
+  NSString* typeStr;
   switch (metricType) {
     case SNTMetricTypeConstantBool: typeStr = @"SNTMetricTypeConstantBool"; break;
     case SNTMetricTypeConstantString: typeStr = @"SNTMetricTypeConstantString"; break;
@@ -51,7 +51,7 @@ NSString *SNTMetricMakeStringFromMetricType(SNTMetricType metricType) {
 - (void)setDouble:(double)value;
 
 /** Set the string value. */
-- (void)setString:(NSString *)value;
+- (void)setString:(NSString*)value;
 
 /** Set the BOOL string value. */
 - (void)setBool:(BOOL)value;
@@ -66,7 +66,7 @@ NSString *SNTMetricMakeStringFromMetricType(SNTMetricType metricType) {
 /** Getters */
 - (long long)getInt64Value;
 - (double)getDoubleValue;
-- (NSString *)getStringValue;
+- (NSString*)getStringValue;
 @end
 
 @implementation SNTMetricValue {
@@ -77,16 +77,16 @@ NSString *SNTMetricMakeStringFromMetricType(SNTMetricType metricType) {
   double _doubleValue;
 
   /** The string value for the SNTMetricValue, if set. */
-  NSString *_stringValue;
+  NSString* _stringValue;
 
   /** The boolean value for the SNTMetricValue, if set. */
   BOOL _boolValue;
 
   /** The first time this cell got created in the current process. */
-  NSDate *_creationTime;
+  NSDate* _creationTime;
 
   /** The last time that the counter value was changed. */
-  NSDate *_lastUpdate;
+  NSDate* _lastUpdate;
 }
 
 - (instancetype)init {
@@ -131,14 +131,14 @@ NSString *SNTMetricMakeStringFromMetricType(SNTMetricType metricType) {
   }
 }
 
-- (void)setString:(NSString *)value {
+- (void)setString:(NSString*)value {
   @synchronized(self) {
     _stringValue = [value copy];
     _lastUpdate = [NSDate date];
   }
 }
 
-- (NSString *)getStringValue {
+- (NSString*)getStringValue {
   @synchronized(self) {
     return [_stringValue copy];
   }
@@ -163,16 +163,16 @@ NSString *SNTMetricMakeStringFromMetricType(SNTMetricType metricType) {
   }
 }
 
-- (NSDate *)getLastUpdatedTimestamp {
-  NSDate *updated = nil;
+- (NSDate*)getLastUpdatedTimestamp {
+  NSDate* updated = nil;
   @synchronized(self) {
     updated = [_lastUpdate copy];
   }
   return updated;
 }
 
-- (NSDate *)getCreatedTimestamp {
-  NSDate *created = nil;
+- (NSDate*)getCreatedTimestamp {
+  NSDate* created = nil;
   @synchronized(self) {
     created = [_creationTime copy];
   }
@@ -183,22 +183,22 @@ NSString *SNTMetricMakeStringFromMetricType(SNTMetricType metricType) {
 @implementation SNTMetric {
  @private
   /** Fully qualified metric name e.g. /ops/security/santa. */
-  NSString *_name;
+  NSString* _name;
   /** A help text for the metric to be exported to be exported. **/
-  NSString *_help;
+  NSString* _help;
 
   /** Sorted list of the fieldNames **/
-  NSArray<NSString *> *_fieldNames;
+  NSArray<NSString*>* _fieldNames;
   /** Mapping of field values to actual metric values (e.g. metric /proc/cpu_usage @"mode"=@"user"
    * -> 0.89 */
-  NSMutableDictionary<NSArray<NSString *> *, SNTMetricValue *> *_metricsForFieldValues;
+  NSMutableDictionary<NSArray<NSString*>*, SNTMetricValue*>* _metricsForFieldValues;
   /** the type of metric this is e.g. counter, gauge etc. **/
   SNTMetricType _type;
 }
 
-- (instancetype)initWithName:(NSString *)name
-                  fieldNames:(NSArray<NSString *> *)fieldNames
-                    helpText:(NSString *)help
+- (instancetype)initWithName:(NSString*)name
+                  fieldNames:(NSArray<NSString*>*)fieldNames
+                    helpText:(NSString*)help
                         type:(SNTMetricType)type {
   self = [super init];
   if (self) {
@@ -211,11 +211,11 @@ NSString *SNTMetricMakeStringFromMetricType(SNTMetricType metricType) {
   return self;
 }
 
-- (NSString *)name {
+- (NSString*)name {
   return _name;
 }
 
-- (BOOL)hasSameSchemaAsMetric:(SNTMetric *)other {
+- (BOOL)hasSameSchemaAsMetric:(SNTMetric*)other {
   if (![other isKindOfClass:[self class]]) {
     return NO;
   }
@@ -225,9 +225,9 @@ NSString *SNTMetricMakeStringFromMetricType(SNTMetricType metricType) {
 
 /** Retrieves the SNTMetricValue for a given field value.
    Creates a new SNTMetricValue if none is present. */
-- (SNTMetricValue *)metricValueForFieldValues:(NSArray<NSString *> *)fieldValues {
+- (SNTMetricValue*)metricValueForFieldValues:(NSArray<NSString*>*)fieldValues {
   NSParameterAssert(fieldValues.count == _fieldNames.count);
-  SNTMetricValue *metricValue = nil;
+  SNTMetricValue* metricValue = nil;
   @synchronized(self) {
     metricValue = _metricsForFieldValues[fieldValues];
 
@@ -242,10 +242,10 @@ NSString *SNTMetricMakeStringFromMetricType(SNTMetricType metricType) {
   return metricValue;
 }
 
-- (NSDictionary *)encodeMetricValueForFieldValues:(NSArray<NSString *> *)fieldValues {
-  SNTMetricValue *metricValue = _metricsForFieldValues[fieldValues];
+- (NSDictionary*)encodeMetricValueForFieldValues:(NSArray<NSString*>*)fieldValues {
+  SNTMetricValue* metricValue = _metricsForFieldValues[fieldValues];
 
-  NSMutableDictionary *fieldDict = [[NSMutableDictionary alloc] init];
+  NSMutableDictionary* fieldDict = [[NSMutableDictionary alloc] init];
 
   fieldDict[@"created"] = [metricValue getCreatedTimestamp];
   fieldDict[@"last_updated"] = [metricValue getLastUpdatedTimestamp];
@@ -272,8 +272,8 @@ NSString *SNTMetricMakeStringFromMetricType(SNTMetricType metricType) {
   return fieldDict;
 }
 
-- (NSDictionary *)export {
-  NSMutableDictionary *metricDict = [NSMutableDictionary dictionaryWithCapacity:_fieldNames.count];
+- (NSDictionary*)export {
+  NSMutableDictionary* metricDict = [NSMutableDictionary dictionaryWithCapacity:_fieldNames.count];
   metricDict[@"type"] = [NSNumber numberWithInt:(int)_type];
   metricDict[@"fields"] = [[NSMutableDictionary alloc] init];
   metricDict[@"description"] = [_help copy];
@@ -281,9 +281,9 @@ NSString *SNTMetricMakeStringFromMetricType(SNTMetricType metricType) {
   if (_fieldNames.count == 0) {
     metricDict[@"fields"][@""] = @[ [self encodeMetricValueForFieldValues:@[]] ];
   } else {
-    NSMutableArray *fieldVals = [[NSMutableArray alloc] init];
+    NSMutableArray* fieldVals = [[NSMutableArray alloc] init];
 
-    for (NSArray<NSString *> *fieldValues in _metricsForFieldValues) {
+    for (NSArray<NSString*>* fieldValues in _metricsForFieldValues) {
       [fieldVals addObject:[self encodeMetricValueForFieldValues:fieldValues]];
     }
     metricDict[@"fields"][[_fieldNames componentsJoinedByString:@","]] = fieldVals;
@@ -294,17 +294,17 @@ NSString *SNTMetricMakeStringFromMetricType(SNTMetricType metricType) {
 
 @implementation SNTMetricCounter
 
-- (instancetype)initWithName:(NSString *)name
-                  fieldNames:(NSArray<NSString *> *)fieldNames
-                    helpText:(NSString *)helpText {
+- (instancetype)initWithName:(NSString*)name
+                  fieldNames:(NSArray<NSString*>*)fieldNames
+                    helpText:(NSString*)helpText {
   return [super initWithName:name
                   fieldNames:fieldNames
                     helpText:helpText
                         type:SNTMetricTypeCounter];
 }
 
-- (void)incrementBy:(long long)step forFieldValues:(NSArray<NSString *> *)fieldValues {
-  SNTMetricValue *metricValue = [self metricValueForFieldValues:fieldValues];
+- (void)incrementBy:(long long)step forFieldValues:(NSArray<NSString*>*)fieldValues {
+  SNTMetricValue* metricValue = [self metricValueForFieldValues:fieldValues];
 
   if (!metricValue) {
     return;
@@ -312,12 +312,12 @@ NSString *SNTMetricMakeStringFromMetricType(SNTMetricType metricType) {
   [metricValue addInt64:step];
 }
 
-- (void)incrementForFieldValues:(NSArray<NSString *> *)fieldValues {
+- (void)incrementForFieldValues:(NSArray<NSString*>*)fieldValues {
   [self incrementBy:1 forFieldValues:fieldValues];
 }
 
-- (long long)getCountForFieldValues:(NSArray<NSString *> *)fieldValues {
-  SNTMetricValue *metricValue = [self metricValueForFieldValues:fieldValues];
+- (long long)getCountForFieldValues:(NSArray<NSString*>*)fieldValues {
+  SNTMetricValue* metricValue = [self metricValueForFieldValues:fieldValues];
 
   if (!metricValue) {
     return -1;
@@ -328,22 +328,22 @@ NSString *SNTMetricMakeStringFromMetricType(SNTMetricType metricType) {
 @end
 
 @implementation SNTMetricInt64Gauge
-- (instancetype)initWithName:(NSString *)name
-                  fieldNames:(NSArray<NSString *> *)fieldNames
-                    helpText:(NSString *)helpText {
+- (instancetype)initWithName:(NSString*)name
+                  fieldNames:(NSArray<NSString*>*)fieldNames
+                    helpText:(NSString*)helpText {
   return [super initWithName:name
                   fieldNames:fieldNames
                     helpText:helpText
                         type:SNTMetricTypeGaugeInt64];
 }
 
-- (void)set:(long long)value forFieldValues:(NSArray<NSString *> *)fieldValues {
-  SNTMetricValue *metricValue = [self metricValueForFieldValues:fieldValues];
+- (void)set:(long long)value forFieldValues:(NSArray<NSString*>*)fieldValues {
+  SNTMetricValue* metricValue = [self metricValueForFieldValues:fieldValues];
   [metricValue setInt64:value];
 }
 
-- (long long)getGaugeValueForFieldValues:(NSArray<NSString *> *)fieldValues {
-  SNTMetricValue *metricValue = [self metricValueForFieldValues:fieldValues];
+- (long long)getGaugeValueForFieldValues:(NSArray<NSString*>*)fieldValues {
+  SNTMetricValue* metricValue = [self metricValueForFieldValues:fieldValues];
 
   if (!metricValue) {
     return -1;
@@ -355,22 +355,22 @@ NSString *SNTMetricMakeStringFromMetricType(SNTMetricType metricType) {
 
 @implementation SNTMetricDoubleGauge
 
-- (instancetype)initWithName:(NSString *)name
-                  fieldNames:(NSArray<NSString *> *)fieldNames
-                    helpText:(NSString *)text {
+- (instancetype)initWithName:(NSString*)name
+                  fieldNames:(NSArray<NSString*>*)fieldNames
+                    helpText:(NSString*)text {
   return [super initWithName:name
                   fieldNames:fieldNames
                     helpText:text
                         type:SNTMetricTypeGaugeDouble];
 }
 
-- (void)set:(double)value forFieldValues:(NSArray<NSString *> *)fieldValues {
-  SNTMetricValue *metricValue = [self metricValueForFieldValues:fieldValues];
+- (void)set:(double)value forFieldValues:(NSArray<NSString*>*)fieldValues {
+  SNTMetricValue* metricValue = [self metricValueForFieldValues:fieldValues];
   [metricValue setDouble:value];
 }
 
-- (double)getGaugeValueForFieldValues:(NSArray<NSString *> *)fieldValues {
-  SNTMetricValue *metricValue = [self metricValueForFieldValues:fieldValues];
+- (double)getGaugeValueForFieldValues:(NSArray<NSString*>*)fieldValues {
+  SNTMetricValue* metricValue = [self metricValueForFieldValues:fieldValues];
 
   if (!metricValue) {
     return -1;
@@ -381,22 +381,22 @@ NSString *SNTMetricMakeStringFromMetricType(SNTMetricType metricType) {
 @end
 
 @implementation SNTMetricStringGauge
-- (instancetype)initWithName:(NSString *)name
-                  fieldNames:(NSArray<NSString *> *)fieldNames
-                    helpText:(NSString *)text {
+- (instancetype)initWithName:(NSString*)name
+                  fieldNames:(NSArray<NSString*>*)fieldNames
+                    helpText:(NSString*)text {
   return [super initWithName:name
                   fieldNames:fieldNames
                     helpText:text
                         type:SNTMetricTypeGaugeString];
 }
 
-- (void)set:(NSString *)value forFieldValues:(NSArray<NSString *> *)fieldValues {
-  SNTMetricValue *metricValue = [self metricValueForFieldValues:fieldValues];
+- (void)set:(NSString*)value forFieldValues:(NSArray<NSString*>*)fieldValues {
+  SNTMetricValue* metricValue = [self metricValueForFieldValues:fieldValues];
   [metricValue setString:value];
 }
 
-- (NSString *)getStringValueForFieldValues:(NSArray<NSString *> *)fieldValues {
-  SNTMetricValue *metricValue = [self metricValueForFieldValues:fieldValues];
+- (NSString*)getStringValueForFieldValues:(NSArray<NSString*>*)fieldValues {
+  SNTMetricValue* metricValue = [self metricValueForFieldValues:fieldValues];
 
   if (!metricValue) {
     return nil;
@@ -407,22 +407,22 @@ NSString *SNTMetricMakeStringFromMetricType(SNTMetricType metricType) {
 @end
 
 @implementation SNTMetricBooleanGauge
-- (instancetype)initWithName:(NSString *)name
-                  fieldNames:(NSArray<NSString *> *)fieldNames
-                    helpText:(NSString *)helpText {
+- (instancetype)initWithName:(NSString*)name
+                  fieldNames:(NSArray<NSString*>*)fieldNames
+                    helpText:(NSString*)helpText {
   return [super initWithName:name
                   fieldNames:fieldNames
                     helpText:helpText
                         type:SNTMetricTypeGaugeBool];
 }
 
-- (void)set:(BOOL)value forFieldValues:(NSArray<NSString *> *)fieldValues {
-  SNTMetricValue *metricValue = [self metricValueForFieldValues:fieldValues];
+- (void)set:(BOOL)value forFieldValues:(NSArray<NSString*>*)fieldValues {
+  SNTMetricValue* metricValue = [self metricValueForFieldValues:fieldValues];
   [metricValue setBool:value];
 }
 
-- (BOOL)getBoolValueForFieldValues:(NSArray<NSString *> *)fieldValues {
-  SNTMetricValue *metricValue = [self metricValueForFieldValues:fieldValues];
+- (BOOL)getBoolValueForFieldValues:(NSArray<NSString*>*)fieldValues {
+  SNTMetricValue* metricValue = [self metricValueForFieldValues:fieldValues];
 
   if (!metricValue) {
     return false;
@@ -440,16 +440,16 @@ NSString *SNTMetricMakeStringFromMetricType(SNTMetricType metricType) {
 @implementation SNTMetricSet {
  @private
   /** Labels that are used to identify the entity to that all metrics apply to. */
-  NSMutableDictionary<NSString *, NSString *> *_rootLabels;
+  NSMutableDictionary<NSString*, NSString*>* _rootLabels;
   /** Registered metrics keyed by name */
-  NSMutableDictionary<NSString *, SNTMetric *> *_metrics;
+  NSMutableDictionary<NSString*, SNTMetric*>* _metrics;
 
   /** Callbacks to update metric values before exporting metrics */
-  NSMutableArray<void (^)(void)> *_callbacks;
+  NSMutableArray<void (^)(void)>* _callbacks;
 }
 
 + (instancetype)sharedInstance {
-  static SNTMetricSet *sharedMetrics;
+  static SNTMetricSet* sharedMetrics;
   static dispatch_once_t onceToken;
 
   dispatch_once(&onceToken, ^{
@@ -469,7 +469,7 @@ NSString *SNTMetricMakeStringFromMetricType(SNTMetricType metricType) {
   return self;
 }
 
-- (instancetype)initWithHostname:(NSString *)hostname username:(NSString *)username {
+- (instancetype)initWithHostname:(NSString*)hostname username:(NSString*)username {
   self = [super init];
   if (self) {
     _rootLabels = [[NSMutableDictionary alloc] init];
@@ -487,21 +487,21 @@ NSString *SNTMetricMakeStringFromMetricType(SNTMetricType metricType) {
   _metrics = [[NSMutableDictionary alloc] init];
 }
 
-- (void)addRootLabel:(NSString *)label value:(NSString *)value {
+- (void)addRootLabel:(NSString*)label value:(NSString*)value {
   @synchronized(self) {
     _rootLabels[label] = value;
   }
 }
 
-- (void)removeRootLabel:(NSString *)label {
+- (void)removeRootLabel:(NSString*)label {
   @synchronized(self) {
     [_rootLabels removeObjectForKey:label];
   }
 }
 
-- (SNTMetric *)registerMetric:(nonnull SNTMetric *)metric {
+- (SNTMetric*)registerMetric:(nonnull SNTMetric*)metric {
   @synchronized(self) {
-    SNTMetric *oldMetric = _metrics[[metric name]];
+    SNTMetric* oldMetric = _metrics[[metric name]];
     if ([oldMetric hasSameSchemaAsMetric:metric]) {
       return oldMetric;
     }
@@ -517,98 +517,96 @@ NSString *SNTMetricMakeStringFromMetricType(SNTMetricType metricType) {
   }
 }
 
-- (SNTMetricCounter *)counterWithName:(NSString *)name
-                           fieldNames:(NSArray<NSString *> *)fieldNames
-                             helpText:(NSString *)helpText {
-  SNTMetricCounter *c = [[SNTMetricCounter alloc] initWithName:name
+- (SNTMetricCounter*)counterWithName:(NSString*)name
+                          fieldNames:(NSArray<NSString*>*)fieldNames
+                            helpText:(NSString*)helpText {
+  SNTMetricCounter* c = [[SNTMetricCounter alloc] initWithName:name
                                                     fieldNames:fieldNames
                                                       helpText:helpText];
-  return (SNTMetricCounter *)[self registerMetric:c];
+  return (SNTMetricCounter*)[self registerMetric:c];
 }
 
-- (SNTMetricInt64Gauge *)int64GaugeWithName:(NSString *)name
-                                 fieldNames:(NSArray<NSString *> *)fieldNames
-                                   helpText:(NSString *)helpText {
-  SNTMetricInt64Gauge *g = [[SNTMetricInt64Gauge alloc] initWithName:name
+- (SNTMetricInt64Gauge*)int64GaugeWithName:(NSString*)name
+                                fieldNames:(NSArray<NSString*>*)fieldNames
+                                  helpText:(NSString*)helpText {
+  SNTMetricInt64Gauge* g = [[SNTMetricInt64Gauge alloc] initWithName:name
                                                           fieldNames:fieldNames
                                                             helpText:helpText];
-  return (SNTMetricInt64Gauge *)[self registerMetric:g];
+  return (SNTMetricInt64Gauge*)[self registerMetric:g];
 }
 
-- (SNTMetricDoubleGauge *)doubleGaugeWithName:(NSString *)name
-                                   fieldNames:(NSArray<NSString *> *)fieldNames
-                                     helpText:(NSString *)helpText {
-  SNTMetricDoubleGauge *g = [[SNTMetricDoubleGauge alloc] initWithName:name
+- (SNTMetricDoubleGauge*)doubleGaugeWithName:(NSString*)name
+                                  fieldNames:(NSArray<NSString*>*)fieldNames
+                                    helpText:(NSString*)helpText {
+  SNTMetricDoubleGauge* g = [[SNTMetricDoubleGauge alloc] initWithName:name
                                                             fieldNames:fieldNames
                                                               helpText:helpText];
 
-  return (SNTMetricDoubleGauge *)[self registerMetric:g];
+  return (SNTMetricDoubleGauge*)[self registerMetric:g];
 }
 
-- (SNTMetricStringGauge *)stringGaugeWithName:(NSString *)name
-                                   fieldNames:(NSArray<NSString *> *)fieldNames
-                                     helpText:(NSString *)helpText {
-  SNTMetricStringGauge *s = [[SNTMetricStringGauge alloc] initWithName:name
+- (SNTMetricStringGauge*)stringGaugeWithName:(NSString*)name
+                                  fieldNames:(NSArray<NSString*>*)fieldNames
+                                    helpText:(NSString*)helpText {
+  SNTMetricStringGauge* s = [[SNTMetricStringGauge alloc] initWithName:name
                                                             fieldNames:fieldNames
                                                               helpText:helpText];
 
-  return (SNTMetricStringGauge *)[self registerMetric:s];
+  return (SNTMetricStringGauge*)[self registerMetric:s];
 }
 
-- (SNTMetricBooleanGauge *)booleanGaugeWithName:(NSString *)name
-                                     fieldNames:(NSArray<NSString *> *)fieldNames
-                                       helpText:(NSString *)helpText {
-  SNTMetricBooleanGauge *b = [[SNTMetricBooleanGauge alloc] initWithName:name
+- (SNTMetricBooleanGauge*)booleanGaugeWithName:(NSString*)name
+                                    fieldNames:(NSArray<NSString*>*)fieldNames
+                                      helpText:(NSString*)helpText {
+  SNTMetricBooleanGauge* b = [[SNTMetricBooleanGauge alloc] initWithName:name
                                                               fieldNames:fieldNames
                                                                 helpText:helpText];
 
-  return (SNTMetricBooleanGauge *)[self registerMetric:b];
+  return (SNTMetricBooleanGauge*)[self registerMetric:b];
 }
 
-- (void)addConstantStringWithName:(NSString *)name
-                         helpText:(NSString *)helpText
-                            value:(NSString *)value {
-  SNTMetric *metric = [[SNTMetric alloc] initWithName:name
+- (void)addConstantStringWithName:(NSString*)name
+                         helpText:(NSString*)helpText
+                            value:(NSString*)value {
+  SNTMetric* metric = [[SNTMetric alloc] initWithName:name
                                            fieldNames:@[]
                                              helpText:helpText
                                                  type:SNTMetricTypeConstantString];
 
-  SNTMetricValue *metricValue = [metric metricValueForFieldValues:@[]];
+  SNTMetricValue* metricValue = [metric metricValueForFieldValues:@[]];
   [metricValue setString:value];
   [self registerMetric:metric];
 }
 
-- (void)addConstantIntegerWithName:(NSString *)name
-                          helpText:(NSString *)helpText
+- (void)addConstantIntegerWithName:(NSString*)name
+                          helpText:(NSString*)helpText
                              value:(long long)value {
-  SNTMetric *metric = [[SNTMetric alloc] initWithName:name
+  SNTMetric* metric = [[SNTMetric alloc] initWithName:name
                                            fieldNames:@[]
                                              helpText:helpText
                                                  type:SNTMetricTypeConstantInt64];
 
-  SNTMetricValue *metricValue = [metric metricValueForFieldValues:@[]];
+  SNTMetricValue* metricValue = [metric metricValueForFieldValues:@[]];
   [metricValue setInt64:value];
   [self registerMetric:metric];
 }
 
-- (void)addConstantBooleanWithName:(NSString *)name
-                          helpText:(NSString *)helpText
-                             value:(BOOL)value {
-  SNTMetric *metric = [[SNTMetric alloc] initWithName:name
+- (void)addConstantBooleanWithName:(NSString*)name helpText:(NSString*)helpText value:(BOOL)value {
+  SNTMetric* metric = [[SNTMetric alloc] initWithName:name
                                            fieldNames:@[]
                                              helpText:helpText
                                                  type:SNTMetricTypeConstantBool];
 
-  SNTMetricValue *metricValue = [metric metricValueForFieldValues:@[]];
+  SNTMetricValue* metricValue = [metric metricValueForFieldValues:@[]];
   [metricValue setBool:value];
   [self registerMetric:metric];
 }
 
 /** Export current state of the SNTMetricSet as an NSDictionary. */
-- (NSDictionary *)export {
-  NSDictionary *exported;
+- (NSDictionary*)export {
+  NSDictionary* exported;
 
-  NSArray *callbacks;
+  NSArray* callbacks;
   @synchronized(self) {
     callbacks = [_callbacks mutableCopy];
   }
@@ -619,12 +617,12 @@ NSString *SNTMetricMakeStringFromMetricType(SNTMetricType metricType) {
   }
 
   @synchronized(self) {
-    NSMutableDictionary *exportDict = [[NSMutableDictionary alloc] init];
+    NSMutableDictionary* exportDict = [[NSMutableDictionary alloc] init];
     exportDict[@"root_labels"] = [_rootLabels copy];
     exportDict[@"metrics"] = [[NSMutableDictionary alloc] init];
 
     // TODO(markowsky) Sort the metrics so we always get the same output.
-    for (NSString *metricName in _metrics) {
+    for (NSString* metricName in _metrics) {
       exportDict[@"metrics"][metricName] = [_metrics[metricName] export];
     }
 
@@ -634,28 +632,29 @@ NSString *SNTMetricMakeStringFromMetricType(SNTMetricType metricType) {
 }
 
 // Returns a human readble string from an SNTMetricFormat type
-NSString *SNTMetricStringFromMetricFormatType(SNTMetricFormatType format) {
+NSString* SNTMetricStringFromMetricFormatType(SNTMetricFormatType format) {
   switch (format) {
     case SNTMetricFormatTypeRawJSON: return @"rawjson";
     case SNTMetricFormatTypeMonarchJSON: return @"monarchjson";
+    case SNTMetricFormatTypeProto: return @"proto";
     default: return @"Unknown Metric Format";
   }
 }
 
-NSDictionary *SNTMetricConvertDatesToISO8601Strings(NSDictionary *metrics) {
-  NSMutableDictionary *mutableMetrics = [metrics mutableCopy];
+NSDictionary* SNTMetricConvertDatesToISO8601Strings(NSDictionary* metrics) {
+  NSMutableDictionary* mutableMetrics = [metrics mutableCopy];
 
-  NSISO8601DateFormatter *formatter = [[NSISO8601DateFormatter alloc] init];
+  NSISO8601DateFormatter* formatter = [[NSISO8601DateFormatter alloc] init];
   formatter.formatOptions =
       NSISO8601DateFormatWithInternetDateTime | NSISO8601DateFormatWithFractionalSeconds;
 
-  for (NSString *metricName in mutableMetrics[@"metrics"]) {
-    NSMutableDictionary *metric = mutableMetrics[@"metrics"][metricName];
+  for (NSString* metricName in mutableMetrics[@"metrics"]) {
+    NSMutableDictionary* metric = mutableMetrics[@"metrics"][metricName];
 
-    for (NSString *field in metric[@"fields"]) {
-      NSMutableArray<NSMutableDictionary *> *values = metric[@"fields"][field];
+    for (NSString* field in metric[@"fields"]) {
+      NSMutableArray<NSMutableDictionary*>* values = metric[@"fields"][field];
 
-      [values enumerateObjectsUsingBlock:^(id object, NSUInteger index, BOOL *stop) {
+      [values enumerateObjectsUsingBlock:^(id object, NSUInteger index, BOOL* stop) {
         values[index][@"created"] = [formatter stringFromDate:values[index][@"created"]];
         values[index][@"last_updated"] = [formatter stringFromDate:values[index][@"last_updated"]];
       }];

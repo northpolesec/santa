@@ -86,13 +86,13 @@ PowerMonitor::~PowerMonitor() {
   }
 }
 
-void PowerMonitor::PowerCallback(void *refcon, io_service_t service, natural_t message_type,
-                                 void *message_argument) {
-  auto *monitor = static_cast<PowerMonitor *>(refcon);
+void PowerMonitor::PowerCallback(void* refcon, io_service_t service, natural_t message_type,
+                                 void* message_argument) {
+  auto* monitor = static_cast<PowerMonitor*>(refcon);
   monitor->HandlePowerEvent(message_type, message_argument);
 }
 
-void PowerMonitor::HandlePowerEvent(natural_t message_type, void *message_argument) {
+void PowerMonitor::HandlePowerEvent(natural_t message_type, void* message_argument) {
   switch (message_type) {
     case kIOMessageCanSystemSleep:
       callback_(PowerEvent::kCanSleep);

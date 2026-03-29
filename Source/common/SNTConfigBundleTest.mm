@@ -23,35 +23,35 @@
 #import "Source/common/ne/SNTSyncNetworkExtensionSettings.h"
 
 @interface SNTConfigBundle (Testing)
-@property NSNumber *clientMode;
-@property NSNumber *syncType;
-@property NSString *allowlistRegex;
-@property NSString *blocklistRegex;
-@property NSNumber *blockUSBMount;
-@property NSNumber *blockUnencryptedRemovableMediaMount;
-@property NSArray *remountUSBMode;
-@property NSNumber *blockNetworkMount;
-@property NSString *bannedNetworkMountBlockMessage;
-@property NSArray<NSString *> *allowedNetworkMountHosts;
-@property NSNumber *enableBundles;
-@property NSNumber *enableTransitiveRules;
-@property NSNumber *enableAllEventUpload;
-@property NSNumber *disableUnknownEventUpload;
-@property NSString *overrideFileAccessAction;
-@property SNTExportConfiguration *exportConfiguration;
-@property NSDate *fullSyncLastSuccess;
-@property NSDate *ruleSyncLastSuccess;
-@property SNTModeTransition *modeTransition;
-@property NSString *eventDetailURL;
-@property NSString *eventDetailText;
-@property NSString *fileAccessEventDetailURL;
-@property NSString *fileAccessEventDetailText;
-@property NSNumber *enableNotificationSilences;
-@property SNTSyncNetworkExtensionSettings *networkExtensionSettings;
-@property NSArray<NSString *> *pushTokenChain;
-@property NSArray<SNTCELFallbackRule *> *celFallbackRules;
-@property NSNumber *fullSyncInterval;
-@property NSNumber *pushNotificationsFullSyncInterval;
+@property NSNumber* clientMode;
+@property NSNumber* syncType;
+@property NSString* allowlistRegex;
+@property NSString* blocklistRegex;
+@property NSNumber* blockUSBMount;
+@property NSNumber* blockUnencryptedRemovableMediaMount;
+@property NSArray* remountUSBMode;
+@property NSNumber* blockNetworkMount;
+@property NSString* bannedNetworkMountBlockMessage;
+@property NSArray<NSString*>* allowedNetworkMountHosts;
+@property NSNumber* enableBundles;
+@property NSNumber* enableTransitiveRules;
+@property NSNumber* enableAllEventUpload;
+@property NSNumber* disableUnknownEventUpload;
+@property NSString* overrideFileAccessAction;
+@property SNTExportConfiguration* exportConfiguration;
+@property NSDate* fullSyncLastSuccess;
+@property NSDate* ruleSyncLastSuccess;
+@property SNTModeTransition* modeTransition;
+@property NSString* eventDetailURL;
+@property NSString* eventDetailText;
+@property NSString* fileAccessEventDetailURL;
+@property NSString* fileAccessEventDetailText;
+@property NSNumber* enableNotificationSilences;
+@property SNTSyncNetworkExtensionSettings* networkExtensionSettings;
+@property NSArray<NSString*>* pushTokenChain;
+@property NSArray<SNTCELFallbackRule*>* celFallbackRules;
+@property NSNumber* fullSyncInterval;
+@property NSNumber* pushNotificationsFullSyncInterval;
 @end
 
 @interface SNTConfigBundleTest : XCTestCase
@@ -60,11 +60,11 @@
 @implementation SNTConfigBundleTest
 
 - (void)testGettersWithValues {
-  __block XCTestExpectation *exp = [self expectationWithDescription:@"Result Blocks"];
+  __block XCTestExpectation* exp = [self expectationWithDescription:@"Result Blocks"];
   exp.expectedFulfillmentCount = 28;
-  NSDate *nowDate = [NSDate now];
+  NSDate* nowDate = [NSDate now];
 
-  SNTConfigBundle *bundle = [[SNTConfigBundle alloc] init];
+  SNTConfigBundle* bundle = [[SNTConfigBundle alloc] init];
   bundle.clientMode = @(SNTClientModeLockdown);
   bundle.syncType = @(SNTSyncTypeNormal);
   bundle.allowlistRegex = @"allow";
@@ -106,12 +106,12 @@
     [exp fulfill];
   }];
 
-  [bundle allowlistRegex:^(NSString *val) {
+  [bundle allowlistRegex:^(NSString* val) {
     XCTAssertEqualObjects(val, @"allow");
     [exp fulfill];
   }];
 
-  [bundle blocklistRegex:^(NSString *val) {
+  [bundle blocklistRegex:^(NSString* val) {
     XCTAssertEqualObjects(val, @"block");
     [exp fulfill];
   }];
@@ -126,7 +126,7 @@
     [exp fulfill];
   }];
 
-  [bundle remountUSBMode:^(NSArray *val) {
+  [bundle remountUSBMode:^(NSArray* val) {
     XCTAssertEqualObjects(val, @[ @"foo" ]);
     [exp fulfill];
   }];
@@ -136,12 +136,12 @@
     [exp fulfill];
   }];
 
-  [bundle bannedNetworkMountBlockMessage:^(NSString *val) {
+  [bundle bannedNetworkMountBlockMessage:^(NSString* val) {
     XCTAssertEqualObjects(val, @"Network mount blocked");
     [exp fulfill];
   }];
 
-  [bundle allowedNetworkMountHosts:^(NSArray<NSString *> *val) {
+  [bundle allowedNetworkMountHosts:^(NSArray<NSString*>* val) {
     XCTAssertEqualObjects(val, (@[ @"example.com", @"localhost" ]));
     [exp fulfill];
   }];
@@ -166,51 +166,51 @@
     [exp fulfill];
   }];
 
-  [bundle overrideFileAccessAction:^(NSString *val) {
+  [bundle overrideFileAccessAction:^(NSString* val) {
     XCTAssertEqualObjects(val, @"disable");
     [exp fulfill];
   }];
 
-  [bundle exportConfiguration:^(SNTExportConfiguration *val) {
+  [bundle exportConfiguration:^(SNTExportConfiguration* val) {
     XCTAssertEqualObjects(val.url, [NSURL URLWithString:@"https://example.com/upload"]);
     XCTAssertEqualObjects(val.formValues[@"key1"], @"value1");
     XCTAssertEqualObjects(val.formValues[@"key2"], @"value2");
     [exp fulfill];
   }];
 
-  [bundle fullSyncLastSuccess:^(NSDate *val) {
+  [bundle fullSyncLastSuccess:^(NSDate* val) {
     XCTAssertEqualObjects(val, nowDate);
     [exp fulfill];
   }];
 
-  [bundle ruleSyncLastSuccess:^(NSDate *val) {
+  [bundle ruleSyncLastSuccess:^(NSDate* val) {
     XCTAssertEqualObjects(val, nowDate);
     [exp fulfill];
   }];
 
-  [bundle modeTransition:^(SNTModeTransition *val) {
+  [bundle modeTransition:^(SNTModeTransition* val) {
     XCTAssertEqual(val.type, SNTModeTransitionTypeOnDemand);
     XCTAssertEqualObjects(val.maxMinutes, @(4));
     XCTAssertEqualObjects(val.defaultDurationMinutes, @(2));
     [exp fulfill];
   }];
 
-  [bundle eventDetailURL:^(NSString *val) {
+  [bundle eventDetailURL:^(NSString* val) {
     XCTAssertEqualObjects(val, @"https://example.com/details");
     [exp fulfill];
   }];
 
-  [bundle eventDetailText:^(NSString *val) {
+  [bundle eventDetailText:^(NSString* val) {
     XCTAssertEqualObjects(val, @"View Details");
     [exp fulfill];
   }];
 
-  [bundle fileAccessEventDetailURL:^(NSString *val) {
+  [bundle fileAccessEventDetailURL:^(NSString* val) {
     XCTAssertEqualObjects(val, @"https://example.com/faa-details");
     [exp fulfill];
   }];
 
-  [bundle fileAccessEventDetailText:^(NSString *val) {
+  [bundle fileAccessEventDetailText:^(NSString* val) {
     XCTAssertEqualObjects(val, @"View FAA Details");
     [exp fulfill];
   }];
@@ -220,13 +220,13 @@
     [exp fulfill];
   }];
 
-  [bundle networkExtensionSettings:^(SNTSyncNetworkExtensionSettings *val) {
+  [bundle networkExtensionSettings:^(SNTSyncNetworkExtensionSettings* val) {
     XCTAssertNotNil(val);
     XCTAssertTrue(val.enable);
     [exp fulfill];
   }];
 
-  [bundle pushTokenChain:^(NSArray<NSString *> *val) {
+  [bundle pushTokenChain:^(NSArray<NSString*>* val) {
     XCTAssertEqualObjects(val, (@[ @"issuerJWT", @"userJWT" ]));
     [exp fulfill];
   }];
@@ -246,7 +246,7 @@
 }
 
 - (void)testGettersWithoutValues {
-  SNTConfigBundle *bundle = [[SNTConfigBundle alloc] init];
+  SNTConfigBundle* bundle = [[SNTConfigBundle alloc] init];
 
   [bundle clientMode:^(SNTClientMode val) {
     XCTFail(@"This shouldn't be called");
@@ -256,11 +256,11 @@
     XCTFail(@"This shouldn't be called");
   }];
 
-  [bundle allowlistRegex:^(NSString *val) {
+  [bundle allowlistRegex:^(NSString* val) {
     XCTFail(@"This shouldn't be called");
   }];
 
-  [bundle blocklistRegex:^(NSString *val) {
+  [bundle blocklistRegex:^(NSString* val) {
     XCTFail(@"This shouldn't be called");
   }];
 
@@ -272,7 +272,7 @@
     XCTFail(@"This shouldn't be called");
   }];
 
-  [bundle remountUSBMode:^(NSArray *val) {
+  [bundle remountUSBMode:^(NSArray* val) {
     XCTFail(@"This shouldn't be called");
   }];
 
@@ -280,11 +280,11 @@
     XCTFail(@"This shouldn't be called");
   }];
 
-  [bundle bannedNetworkMountBlockMessage:^(NSString *val) {
+  [bundle bannedNetworkMountBlockMessage:^(NSString* val) {
     XCTFail(@"This shouldn't be called");
   }];
 
-  [bundle allowedNetworkMountHosts:^(NSArray<NSString *> *val) {
+  [bundle allowedNetworkMountHosts:^(NSArray<NSString*>* val) {
     XCTFail(@"This shouldn't be called");
   }];
 
@@ -304,39 +304,39 @@
     XCTFail(@"This shouldn't be called");
   }];
 
-  [bundle overrideFileAccessAction:^(NSString *val) {
+  [bundle overrideFileAccessAction:^(NSString* val) {
     XCTFail(@"This shouldn't be called");
   }];
 
-  [bundle exportConfiguration:^(SNTExportConfiguration *val) {
+  [bundle exportConfiguration:^(SNTExportConfiguration* val) {
     XCTFail(@"This shouldn't be called");
   }];
 
-  [bundle fullSyncLastSuccess:^(NSDate *val) {
+  [bundle fullSyncLastSuccess:^(NSDate* val) {
     XCTAssertEqualObjects(val, [NSDate now]);
   }];
 
-  [bundle ruleSyncLastSuccess:^(NSDate *val) {
+  [bundle ruleSyncLastSuccess:^(NSDate* val) {
     XCTFail(@"This shouldn't be called");
   }];
 
-  [bundle modeTransition:^(SNTModeTransition *val) {
+  [bundle modeTransition:^(SNTModeTransition* val) {
     XCTFail(@"This shouldn't be called");
   }];
 
-  [bundle eventDetailURL:^(NSString *val) {
+  [bundle eventDetailURL:^(NSString* val) {
     XCTFail(@"This shouldn't be called");
   }];
 
-  [bundle eventDetailText:^(NSString *val) {
+  [bundle eventDetailText:^(NSString* val) {
     XCTFail(@"This shouldn't be called");
   }];
 
-  [bundle fileAccessEventDetailURL:^(NSString *val) {
+  [bundle fileAccessEventDetailURL:^(NSString* val) {
     XCTFail(@"This shouldn't be called");
   }];
 
-  [bundle fileAccessEventDetailText:^(NSString *val) {
+  [bundle fileAccessEventDetailText:^(NSString* val) {
     XCTFail(@"This shouldn't be called");
   }];
 
@@ -344,11 +344,11 @@
     XCTFail(@"This shouldn't be called");
   }];
 
-  [bundle networkExtensionSettings:^(SNTSyncNetworkExtensionSettings *val) {
+  [bundle networkExtensionSettings:^(SNTSyncNetworkExtensionSettings* val) {
     XCTFail(@"This shouldn't be called");
   }];
 
-  [bundle pushTokenChain:^(NSArray<NSString *> *val) {
+  [bundle pushTokenChain:^(NSArray<NSString*>* val) {
     XCTFail(@"This shouldn't be called");
   }];
 

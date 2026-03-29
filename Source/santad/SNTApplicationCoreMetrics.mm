@@ -28,14 +28,14 @@
 /**
  * Register the mode metric checking the config before reporting the status.
  */
-static void RegisterModeMetric(SNTMetricSet *metricSet) {
-  SNTMetricStringGauge *mode = [metricSet stringGaugeWithName:@"/santa/mode"
+static void RegisterModeMetric(SNTMetricSet* metricSet) {
+  SNTMetricStringGauge* mode = [metricSet stringGaugeWithName:@"/santa/mode"
                                                    fieldNames:@[]
                                                      helpText:@"Santa's operating mode"];
 
   // create a callback that gets the current mode
   [metricSet registerCallback:^{
-    SNTConfigurator *config = [SNTConfigurator configurator];
+    SNTConfigurator* config = [SNTConfigurator configurator];
 
     switch (config.clientMode) {
       case SNTClientModeLockdown: [mode set:@"lockdown" forFieldValues:@[]]; break;
@@ -52,8 +52,8 @@ static void RegisterModeMetric(SNTMetricSet *metricSet) {
 /**
  * Register the event log type metric checking the config before reporting the status.
  */
-static void RegisterEventLogType(SNTMetricSet *metricSet) {
-  SNTMetricStringGauge *logType = [metricSet stringGaugeWithName:@"/santa/log_type"
+static void RegisterEventLogType(SNTMetricSet* metricSet) {
+  SNTMetricStringGauge* logType = [metricSet stringGaugeWithName:@"/santa/log_type"
                                                       fieldNames:@[]
                                                         helpText:@"Santa's log type"];
 
@@ -82,17 +82,17 @@ static void RegisterEventLogType(SNTMetricSet *metricSet) {
 /**
  * Register metrics for measuring memory usage.
  */
-static void RegisterMemoryAndCPUMetrics(SNTMetricSet *metricSet) {
-  SNTMetricInt64Gauge *vsize =
+static void RegisterMemoryAndCPUMetrics(SNTMetricSet* metricSet) {
+  SNTMetricInt64Gauge* vsize =
       [metricSet int64GaugeWithName:@"/proc/memory/virtual_size"
                          fieldNames:@[]
                            helpText:@"The virtual memory size of this process"];
-  SNTMetricInt64Gauge *rsize =
+  SNTMetricInt64Gauge* rsize =
       [metricSet int64GaugeWithName:@"/proc/memory/resident_size"
                          fieldNames:@[]
                            helpText:@"The resident set size of this process"];
 
-  SNTMetricDoubleGauge *cpuUsage =
+  SNTMetricDoubleGauge* cpuUsage =
       [metricSet doubleGaugeWithName:@"/proc/cpu_usage"
                           fieldNames:@[ @"mode" ]  // "user" or "system"
                             helpText:@"CPU time consumed by this process, in seconds"];
@@ -115,8 +115,8 @@ static void RegisterMemoryAndCPUMetrics(SNTMetricSet *metricSet) {
   }];
 }
 
-static void RegisterHostnameAndUsernameLabels(SNTMetricSet *metricSet) {
-  NSString *hostname = [NSProcessInfo processInfo].hostName;
+static void RegisterHostnameAndUsernameLabels(SNTMetricSet* metricSet) {
+  NSString* hostname = [NSProcessInfo processInfo].hostName;
 
   [metricSet addRootLabel:@"host_name" value:hostname];
   [metricSet addRootLabel:@"username" value:NSUserName()];
@@ -124,25 +124,25 @@ static void RegisterHostnameAndUsernameLabels(SNTMetricSet *metricSet) {
   [metricSet addRootLabel:@"service_name" value:@"santa"];
 
   // get extra root labels from configuration
-  SNTConfigurator *config = [SNTConfigurator configurator];
+  SNTConfigurator* config = [SNTConfigurator configurator];
 
-  NSDictionary *extraLabels = [config extraMetricLabels];
+  NSDictionary* extraLabels = [config extraMetricLabels];
 
   if (extraLabels.count == 0) return;
 
-  for (NSString *key in extraLabels) {
+  for (NSString* key in extraLabels) {
     // remove the root label if the value is empty.
-    if ([@"" isEqualToString:(NSString *)extraLabels[key]]) {
+    if ([@"" isEqualToString:(NSString*)extraLabels[key]]) {
       [metricSet removeRootLabel:key];
       continue;
     }
 
     // Set or override the value.
-    [metricSet addRootLabel:key value:(NSString *)extraLabels[key]];
+    [metricSet addRootLabel:key value:(NSString*)extraLabels[key]];
   }
 }
-static void RegisterCommonSantaMetrics(SNTMetricSet *metricSet) {
-  NSString *version = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleVersion"];
+static void RegisterCommonSantaMetrics(SNTMetricSet* metricSet) {
+  NSString* version = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleVersion"];
 
   // register the version
   [metricSet addConstantStringWithName:@"/build/label"
@@ -167,7 +167,7 @@ static void RegisterCommonSantaMetrics(SNTMetricSet *metricSet) {
 }
 
 void SNTRegisterCoreMetrics() {
-  SNTMetricSet *metricSet = [SNTMetricSet sharedInstance];
+  SNTMetricSet* metricSet = [SNTMetricSet sharedInstance];
   RegisterHostnameAndUsernameLabels(metricSet);
   RegisterMemoryAndCPUMetrics(metricSet);
   RegisterCommonSantaMetrics(metricSet);

@@ -41,7 +41,7 @@ using santa::PrefixTree;
 using santa::Unit;
 using santa::santad::process_tree::ProcessTree;
 
-es_file_t *GetTargetFileForPrefixTree(const es_message_t *msg) {
+es_file_t* GetTargetFileForPrefixTree(const es_message_t* msg) {
   switch (msg->event_type) {
     case ES_EVENT_TYPE_NOTIFY_CLONE: return msg->event.clone.source;
     case ES_EVENT_TYPE_NOTIFY_CLOSE: return msg->event.close.target;
@@ -55,8 +55,8 @@ es_file_t *GetTargetFileForPrefixTree(const es_message_t *msg) {
 }
 
 @interface SNTEndpointSecurityRecorder ()
-@property SNTCompilerController *compilerController;
-@property SNTConfigurator *configurator;
+@property SNTCompilerController* compilerController;
+@property SNTConfigurator* configurator;
 @end
 
 @implementation SNTEndpointSecurityRecorder {
@@ -70,7 +70,7 @@ es_file_t *GetTargetFileForPrefixTree(const es_message_t *msg) {
                       metrics:(std::shared_ptr<santa::ESMetricsObserver>)metrics
                        logger:(std::shared_ptr<Logger>)logger
                      enricher:(std::shared_ptr<Enricher>)enricher
-           compilerController:(SNTCompilerController *)compilerController
+           compilerController:(SNTCompilerController*)compilerController
               authResultCache:(std::shared_ptr<AuthResultCache>)authResultCache
                    prefixTree:(std::shared_ptr<PrefixTree<Unit>>)prefixTree
                   processTree:(std::shared_ptr<ProcessTree>)processTree {
@@ -91,11 +91,11 @@ es_file_t *GetTargetFileForPrefixTree(const es_message_t *msg) {
   return self;
 }
 
-- (NSString *)description {
+- (NSString*)description {
   return @"Recorder";
 }
 
-- (void)handleMessage:(Message &&)esMsg
+- (void)handleMessage:(Message&&)esMsg
     recordEventMetrics:(void (^)(EventDisposition))recordEventMetrics {
   // Pre-enrichment processing
   switch (esMsg->event_type) {
@@ -132,7 +132,7 @@ es_file_t *GetTargetFileForPrefixTree(const es_message_t *msg) {
   // For NOTIFY_EXEC with holdAndAsk pending, skip logging here.
   // The event will be logged after TouchID authentication completes.
   if (esMsg->event_type == ES_EVENT_TYPE_NOTIFY_EXEC) {
-    SNTCachedDecision *cd = [[SNTDecisionCache sharedCache]
+    SNTCachedDecision* cd = [[SNTDecisionCache sharedCache]
         cachedDecisionForFile:esMsg->event.exec.target->executable->stat];
     if (cd && cd.holdAndAsk) {
       return;
@@ -147,14 +147,14 @@ es_file_t *GetTargetFileForPrefixTree(const es_message_t *msg) {
     case ES_EVENT_TYPE_NOTIFY_LINK: OS_FALLTHROUGH;
     case ES_EVENT_TYPE_NOTIFY_RENAME: OS_FALLTHROUGH;
     case ES_EVENT_TYPE_NOTIFY_UNLINK: {
-      es_file_t *targetFile = GetTargetFileForPrefixTree(&(*esMsg));
+      es_file_t* targetFile = GetTargetFileForPrefixTree(&(*esMsg));
 
       if (!targetFile) {
         break;
       }
 
       // Only log file changes that match the given regex
-      NSString *targetPath = santa::StringToNSString(targetFile->path.data);
+      NSString* targetPath = santa::StringToNSString(targetFile->path.data);
       if (![[self.configurator fileChangesRegex]
               numberOfMatchesInString:targetPath
                               options:0

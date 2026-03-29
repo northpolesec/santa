@@ -18,6 +18,7 @@
 
 #include <sys/types.h>
 
+#include <atomic>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -34,16 +35,16 @@ struct Pid {
   pid_t pid;
   uint64_t pidversion;
 
-  friend bool operator==(const struct Pid &lhs, const struct Pid &rhs) {
+  friend bool operator==(const struct Pid& lhs, const struct Pid& rhs) {
     return lhs.pid == rhs.pid && lhs.pidversion == rhs.pidversion;
   }
-  friend bool operator!=(const struct Pid &lhs, const struct Pid &rhs) {
+  friend bool operator!=(const struct Pid& lhs, const struct Pid& rhs) {
     return !(lhs == rhs);
   }
 };
 
 template <typename H>
-H AbslHashValue(H h, const struct Pid &p) {
+H AbslHashValue(H h, const struct Pid& p) {
   return H::combine(std::move(h), p.pid, p.pidversion);
 }
 
@@ -51,10 +52,10 @@ struct Cred {
   uid_t uid;
   gid_t gid;
 
-  friend bool operator==(const struct Cred &lhs, const struct Cred &rhs) {
+  friend bool operator==(const struct Cred& lhs, const struct Cred& rhs) {
     return lhs.uid == rhs.uid && lhs.gid == rhs.gid;
   }
-  friend bool operator!=(const struct Cred &lhs, const struct Cred &rhs) {
+  friend bool operator!=(const struct Cred& lhs, const struct Cred& rhs) {
     return !(lhs == rhs);
   }
 };
@@ -65,8 +66,8 @@ struct CodeSigningInfo {
   std::string cdhash;  // hex string
   bool is_platform_binary;
 
-  friend bool operator==(const struct CodeSigningInfo &lhs,
-                         const struct CodeSigningInfo &rhs) {
+  friend bool operator==(const struct CodeSigningInfo& lhs,
+                         const struct CodeSigningInfo& rhs) {
     return lhs.signing_id == rhs.signing_id && lhs.team_id == rhs.team_id &&
            lhs.cdhash == rhs.cdhash &&
            lhs.is_platform_binary == rhs.is_platform_binary;
@@ -78,10 +79,18 @@ struct Program {
   std::vector<std::string> arguments;
   std::optional<CodeSigningInfo> code_signing;
 
-  friend bool operator==(const struct Program &lhs, const struct Program &rhs) {
+  friend bool operator==(const struct Program& lhs, const struct Program& rhs) {
     return lhs.executable == rhs.executable && lhs.arguments == rhs.arguments &&
            lhs.code_signing == rhs.code_signing;
   }
+};
+
+// Lightweight container for process data loaded during backfill, before
+// a Process is constructed and inserted into the tree.
+struct BackfilledProcess {
+  struct Pid pid;
+  struct Cred cred;
+  std::shared_ptr<const Program> program;
 };
 
 // Fwd decls
@@ -99,10 +108,10 @@ class Process {
         parent_(parent),
         refcnt_(0),
         tombstoned_(false) {}
-  Process(const Process &) = default;
-  Process &operator=(const Process &) = delete;
-  Process(Process &&) = default;
-  Process &operator=(Process &&) = delete;
+  Process(const Process&) = delete;
+  Process& operator=(const Process&) = delete;
+  Process(Process&&) = delete;
+  Process& operator=(Process&&) = delete;
 
   // Const "attributes" are public
   const struct Pid pid_;
@@ -118,8 +127,7 @@ class Process {
   absl::flat_hash_map<std::type_index, std::shared_ptr<const Annotator>>
       annotations_;
   std::shared_ptr<const Process> parent_;
-  // TODO(nickmg): atomic here breaks the build.
-  int refcnt_;
+  std::atomic<int> refcnt_;
   // If the process is tombstoned, the event removing it from the tree has been
   // processed, but refcnt>0 keeps it alive.
   bool tombstoned_;

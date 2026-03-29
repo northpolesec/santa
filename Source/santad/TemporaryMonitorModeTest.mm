@@ -27,7 +27,7 @@
 namespace santa {
 class TemporaryMonitorModePeer : public TemporaryMonitorMode {
  public:
-  TemporaryMonitorModePeer(SNTConfigurator *configurator, SNTNotificationQueue *notQueue,
+  TemporaryMonitorModePeer(SNTConfigurator* configurator, SNTNotificationQueue* notQueue,
                            HandleAuditEventBlock block)
       : santa::TemporaryMonitorMode(MakeKey(), configurator, notQueue, block) {}
 
@@ -63,11 +63,11 @@ uint64_t MakeDeadline(uint64_t want) {
 }
 
 - (void)testGetSecondsRemainingFromInitialState {
-  NSURL *unpinnedURL = [NSURL URLWithString:@"https://my.sync.server"];
-  NSURL *pinnedURL = [NSURL URLWithString:@"https://foo.workshop.cloud"];
-  NSURL *pinnedURL2 = [NSURL URLWithString:@"https://bar.workshop.cloud"];
-  NSString *testBootUUID = @"my.boot.uuid";
-  NSString *testSessionUUID = [[NSUUID UUID] UUIDString];
+  NSURL* unpinnedURL = [NSURL URLWithString:@"https://my.sync.server"];
+  NSURL* pinnedURL = [NSURL URLWithString:@"https://foo.workshop.cloud"];
+  NSURL* pinnedURL2 = [NSURL URLWithString:@"https://bar.workshop.cloud"];
+  NSString* testBootUUID = @"my.boot.uuid";
+  NSString* testSessionUUID = [[NSUUID UUID] UUIDString];
   uint64_t wantAtLeastSeconds = 100;
 
   TemporaryMonitorModePeer tmm([SNTConfigurator configurator], self.mockNotQueue,
@@ -75,7 +75,7 @@ uint64_t MakeDeadline(uint64_t want) {
                                    // This space intentionally left blank.
                                });
 
-  NSDictionary *goodTestState = @{
+  NSDictionary* goodTestState = @{
     kStateTempMonitorModeBootUUIDKey : testBootUUID,
     kStateTempMonitorModeDeadlineKey : @(MakeDeadline(wantAtLeastSeconds)),
     kStateTempMonitorModeSavedSyncURLKey : pinnedURL.host,
@@ -83,11 +83,11 @@ uint64_t MakeDeadline(uint64_t want) {
   };
 
   __block BOOL syncV2Enabled = YES;
-  OCMStub([self.mockConfigurator isSyncV2Enabled]).andDo(^(NSInvocation *inv) {
+  OCMStub([self.mockConfigurator isSyncV2Enabled]).andDo(^(NSInvocation* inv) {
     [inv setReturnValue:&syncV2Enabled];
   });
 
-  NSMutableDictionary *testState = [goodTestState copy];
+  NSMutableDictionary* testState = [goodTestState copy];
   XCTAssertGreaterThan(
       tmm.GetSecondsRemainingFromInitialStateLocked(testState, testBootUUID, pinnedURL),
       wantAtLeastSeconds);
@@ -131,7 +131,7 @@ uint64_t MakeDeadline(uint64_t want) {
   testState = [goodTestState mutableCopy];
   testState[kStateTempMonitorModeSavedSyncURLKey] = unpinnedURL.host;
   OCMExpect([self.mockConfigurator
-      setSyncServerModeTransition:[OCMArg checkWithBlock:^BOOL(SNTModeTransition *mt) {
+      setSyncServerModeTransition:[OCMArg checkWithBlock:^BOOL(SNTModeTransition* mt) {
         return mt.type == SNTModeTransitionTypeRevoke;
       }]]);
   XCTAssertEqual(
@@ -141,7 +141,7 @@ uint64_t MakeDeadline(uint64_t want) {
   testState = [goodTestState mutableCopy];
   testState[kStateTempMonitorModeSavedSyncURLKey] = pinnedURL2.host;
   OCMExpect([self.mockConfigurator
-      setSyncServerModeTransition:[OCMArg checkWithBlock:^BOOL(SNTModeTransition *mt) {
+      setSyncServerModeTransition:[OCMArg checkWithBlock:^BOOL(SNTModeTransition* mt) {
         return mt.type == SNTModeTransitionTypeRevoke;
       }]]);
   XCTAssertEqual(tmm.GetSecondsRemainingFromInitialStateLocked(testState, testBootUUID, pinnedURL),

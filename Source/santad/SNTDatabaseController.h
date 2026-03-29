@@ -32,9 +32,9 @@
 ///  Returns an instance of the respective table class initialized with an appropriate
 ///  database queue. Will initialize only once, regardless of calling thread.
 ///
-+ (SNTEventTable *)eventTable;
-+ (SNTRuleTable *)ruleTable;
++ (SNTEventTable*)eventTable;
++ (SNTRuleTable*)ruleTable;
 
-+ (NSString *const)databasePath;
++ (NSString* const)databasePath;
 
 @end

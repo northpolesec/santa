@@ -35,43 +35,43 @@ NS_ASSUME_NONNULL_BEGIN
 ///  In SantaGUI this will return an NSAttributedString with links and formatting included
 ///  while for santad all HTML will be properly stripped.
 ///
-+ (NSAttributedString *)formatMessage:(NSString *)message withFallback:(NSString *)fallback;
++ (NSAttributedString*)formatMessage:(NSString*)message withFallback:(NSString*)fallback;
 
 ///
 ///  Uses either the configured message depending on the event type or a custom message
 ///  if the rule that blocked this file included one, formatted using
 ///  +[SNTBlockMessage formatMessage].
 ///
-+ (NSAttributedString *)attributedBlockMessageForEvent:(nullable SNTStoredExecutionEvent *)event
-                                         customMessage:(nullable NSString *)customMessage;
++ (NSAttributedString*)attributedBlockMessageForEvent:(nullable SNTStoredExecutionEvent*)event
+                                        customMessage:(nullable NSString*)customMessage;
 
-+ (NSAttributedString *)attributedBlockMessageForFileAccessEvent:
-                            (nullable SNTStoredFileAccessEvent *)event
-                                                   customMessage:(nullable NSString *)customMessage;
++ (NSAttributedString*)attributedBlockMessageForFileAccessEvent:
+                           (nullable SNTStoredFileAccessEvent*)event
+                                                  customMessage:(nullable NSString*)customMessage;
 
-+ (NSAttributedString *)attributedBlockMessageForDeviceEvent:(nullable SNTDeviceEvent *)event;
++ (NSAttributedString*)attributedBlockMessageForDeviceEvent:(nullable SNTDeviceEvent*)event;
 
-+ (NSAttributedString *)attributedBlockMessageForNetworkMountEventWithCustomMessage:
-    (nullable NSString *)customMsg;
++ (NSAttributedString*)attributedBlockMessageForNetworkMountEventWithCustomMessage:
+    (nullable NSString*)customMsg;
 
 ///
 ///  Return a URL generated from the EventDetailURL configuration key
 ///  after replacing templates in the URL with values from the event.
 ///
-+ (nullable NSURL *)eventDetailURLForEvent:(nullable SNTStoredExecutionEvent *)event
-                                 customURL:(nullable NSString *)url;
-+ (nullable NSURL *)eventDetailURLForFileAccessEvent:(nullable SNTStoredFileAccessEvent *)event
-                                           customURL:(nullable NSString *)url;
++ (nullable NSURL*)eventDetailURLForEvent:(nullable SNTStoredExecutionEvent*)event
+                                customURL:(nullable NSString*)url;
++ (nullable NSURL*)eventDetailURLForFileAccessEvent:(nullable SNTStoredFileAccessEvent*)event
+                                          customURL:(nullable NSString*)url;
 
 ///
 ///  Returns a human-readable string describing the block reason for the given event state.
 ///
-+ (NSString *)blockReasonForEventState:(SNTEventState)decision;
++ (NSString*)blockReasonForEventState:(SNTEventState)decision;
 
 ///
 ///  Strip HTML from a string, replacing <br /> with newline.
 ///
-+ (NSString *)stringFromHTML:(NSString *)html;
++ (NSString*)stringFromHTML:(NSString*)html;
 
 NS_ASSUME_NONNULL_END
 

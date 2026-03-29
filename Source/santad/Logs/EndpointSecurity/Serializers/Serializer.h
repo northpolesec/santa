@@ -38,11 +38,11 @@ namespace santa {
 
 class Serializer {
  public:
-  Serializer(SNTDecisionCache *decision_cache);
+  Serializer(SNTDecisionCache* decision_cache);
   virtual ~Serializer() = default;
 
   std::vector<uint8_t> SerializeMessage(std::unique_ptr<santa::EnrichedMessage> msg) {
-    return std::visit([this](const auto &arg) { return this->SerializeMessageTemplate(arg); },
+    return std::visit([this](const auto& arg) { return this->SerializeMessageTemplate(arg); },
                       msg->GetEnrichedMessage());
   }
 
@@ -50,86 +50,83 @@ class Serializer {
   std::shared_ptr<std::string> MachineID() const;
   void UpdateMachineID();
 
-  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedClose &) = 0;
-  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedExchange &) = 0;
-  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedExec &,
-                                                SNTCachedDecision *cd) = 0;
-  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedExit &) = 0;
-  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedFork &) = 0;
-  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedLink &) = 0;
-  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedRename &) = 0;
-  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedUnlink &) = 0;
-  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedCSInvalidated &) = 0;
-  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedClone &) = 0;
-  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedCopyfile &) = 0;
-  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedProcSuspendResume &) = 0;
-  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedLoginWindowSessionLogin &) = 0;
-  virtual std::vector<uint8_t> SerializeMessage(
-      const santa::EnrichedLoginWindowSessionLogout &) = 0;
-  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedLoginWindowSessionLock &) = 0;
-  virtual std::vector<uint8_t> SerializeMessage(
-      const santa::EnrichedLoginWindowSessionUnlock &) = 0;
-  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedScreenSharingAttach &) = 0;
-  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedScreenSharingDetach &) = 0;
-  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedOpenSSHLogin &) = 0;
-  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedOpenSSHLogout &) = 0;
-  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedLoginLogin &) = 0;
-  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedLoginLogout &) = 0;
-  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedAuthenticationOD &) = 0;
-  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedAuthenticationTouchID &) = 0;
-  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedAuthenticationToken &) = 0;
-  virtual std::vector<uint8_t> SerializeMessage(
-      const santa::EnrichedAuthenticationAutoUnlock &) = 0;
-  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedLaunchItem &) = 0;
-  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedXProtectDetected &) = 0;
-  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedXProtectRemediated &) = 0;
+  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedClose&) = 0;
+  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedExchange&) = 0;
+  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedExec&,
+                                                SNTCachedDecision* cd) = 0;
+  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedExit&) = 0;
+  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedFork&) = 0;
+  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedLink&) = 0;
+  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedRename&) = 0;
+  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedUnlink&) = 0;
+  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedCSInvalidated&) = 0;
+  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedClone&) = 0;
+  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedCopyfile&) = 0;
+  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedProcSuspendResume&) = 0;
+  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedLoginWindowSessionLogin&) = 0;
+  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedLoginWindowSessionLogout&) = 0;
+  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedLoginWindowSessionLock&) = 0;
+  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedLoginWindowSessionUnlock&) = 0;
+  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedScreenSharingAttach&) = 0;
+  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedScreenSharingDetach&) = 0;
+  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedOpenSSHLogin&) = 0;
+  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedOpenSSHLogout&) = 0;
+  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedLoginLogin&) = 0;
+  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedLoginLogout&) = 0;
+  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedAuthenticationOD&) = 0;
+  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedAuthenticationTouchID&) = 0;
+  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedAuthenticationToken&) = 0;
+  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedAuthenticationAutoUnlock&) = 0;
+  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedLaunchItem&) = 0;
+  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedXProtectDetected&) = 0;
+  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedXProtectRemediated&) = 0;
 #if HAVE_MACOS_15
-  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedGatekeeperOverride &) = 0;
+  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedGatekeeperOverride&) = 0;
 #endif  // HAVE_MACOS_15
 #if HAVE_MACOS_15_4
-  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedTCCModification &) = 0;
+  virtual std::vector<uint8_t> SerializeMessage(const santa::EnrichedTCCModification&) = 0;
 #endif  // HAVE_MACOS_15_4
 
   virtual std::vector<uint8_t> SerializeFileAccess(
-      const std::string &policy_version, const std::string &policy_name, const santa::Message &msg,
-      const santa::EnrichedProcess &enriched_process, size_t target_index,
+      const std::string& policy_version, const std::string& policy_name, const santa::Message& msg,
+      const santa::EnrichedProcess& enriched_process, size_t target_index,
       std::optional<santa::EnrichedFile> enriched_event_target, FileAccessPolicyDecision decision,
       std::string_view operation_id) = 0;
 
   virtual std::vector<uint8_t> SerializeFileAccess(
-      const std::string &policy_version, const std::string &policy_name, const santa::Message &msg,
-      const santa::EnrichedProcess &enriched_process, size_t target_index,
+      const std::string& policy_version, const std::string& policy_name, const santa::Message& msg,
+      const santa::EnrichedProcess& enriched_process, size_t target_index,
       std::optional<santa::EnrichedFile> enriched_event_target, FileAccessPolicyDecision decision);
 
-  virtual std::vector<uint8_t> SerializeAllowlist(const santa::Message &, const std::string_view,
+  virtual std::vector<uint8_t> SerializeAllowlist(const santa::Message&, const std::string_view,
                                                   const std::string_view) = 0;
 
-  virtual std::vector<uint8_t> SerializeBundleHashingEvent(SNTStoredExecutionEvent *) = 0;
+  virtual std::vector<uint8_t> SerializeBundleHashingEvent(SNTStoredExecutionEvent*) = 0;
 
-  virtual std::vector<uint8_t> SerializeNetworkFlows(SNDProcessFlows *processFlows,
+  virtual std::vector<uint8_t> SerializeNetworkFlows(SNDProcessFlows* processFlows,
                                                      struct timespec window_start,
                                                      struct timespec window_end,
-                                                     SNTCachedDecision *cd) = 0;
-  std::vector<uint8_t> SerializeNetworkFlows(SNDProcessFlows *processFlows,
+                                                     SNTCachedDecision* cd) = 0;
+  std::vector<uint8_t> SerializeNetworkFlows(SNDProcessFlows* processFlows,
                                              struct timespec window_start,
                                              struct timespec window_end);
 
-  virtual std::vector<uint8_t> SerializeDiskAppeared(NSDictionary *, bool) = 0;
-  virtual std::vector<uint8_t> SerializeDiskDisappeared(NSDictionary *) = 0;
+  virtual std::vector<uint8_t> SerializeDiskAppeared(NSDictionary*, bool) = 0;
+  virtual std::vector<uint8_t> SerializeDiskDisappeared(NSDictionary*) = 0;
 
  private:
   // Template pattern methods used to ensure a place to implement any desired
   // functionality that shouldn't be overridden by derived classes.
   // The default implementation acts as a pass-through.
   // Define type-specific specializations when requried.
-  std::vector<uint8_t> SerializeMessageTemplate(const santa::EnrichedExec &);
+  std::vector<uint8_t> SerializeMessageTemplate(const santa::EnrichedExec&);
 
   template <typename T>
-  std::vector<uint8_t> SerializeMessageTemplate(const T &msg) {
+  std::vector<uint8_t> SerializeMessageTemplate(const T& msg) {
     return SerializeMessage(msg);
   }
 
-  SNTDecisionCache *decision_cache_;
+  SNTDecisionCache* decision_cache_;
   std::atomic<bool> enabled_machine_id_{false};
   std::shared_ptr<std::string> machine_id_;
   // Used to ensure a reference sticks around while no vended copies exists

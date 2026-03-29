@@ -32,7 +32,7 @@ __BEGIN_DECLS
   @return A string that tries to be more helpful to users by extracting
   appropriate information from the certificate chain.
 */
-NSString *Publisher(NSArray<MOLCertificate *> *certs, NSString *teamID);
+NSString* Publisher(NSArray<MOLCertificate*>* certs, NSString* teamID);
 
 /**
   Return an array of the underlying SecCertificateRef's for the given array
@@ -43,7 +43,7 @@ NSString *Publisher(NSArray<MOLCertificate *> *certs, NSString *teamID);
   @return An array of SecCertificateRefs. WARNING: If the refs need to be used
   for a long time be careful to properly CFRetain/CFRelease the returned items.
 */
-NSArray<id> *CertificateChain(NSArray<MOLCertificate *> *certs);
+NSArray<id>* CertificateChain(NSArray<MOLCertificate*>* certs);
 
 /**
   Test if the given certificate contains production OID values.
@@ -52,7 +52,7 @@ NSArray<id> *CertificateChain(NSArray<MOLCertificate *> *certs);
 
   @return True if any production OIDs exist, otherwise false.
 */
-BOOL IsProductionSigningCert(MOLCertificate *cert);
+BOOL IsProductionSigningCert(MOLCertificate* cert);
 
 /**
   Determine the signing status of a binary based on the signature flags and error.
@@ -62,6 +62,6 @@ BOOL IsProductionSigningCert(MOLCertificate *cert);
 
   @return The signing status of the binary
 */
-SNTSigningStatus SigningStatus(MOLCodesignChecker *csc, NSError *error);
+SNTSigningStatus SigningStatus(MOLCodesignChecker* csc, NSError* error);
 
 __END_DECLS

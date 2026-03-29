@@ -19,7 +19,7 @@
 #import "Source/common/MOLDERDecoder.h"
 
 @interface MOLDERDecoder (Testing)
-+ (NSString *)decodeOIDWithBytes:(unsigned char *)bytes length:(NSUInteger)length;
++ (NSString*)decodeOIDWithBytes:(unsigned char*)bytes length:(NSUInteger)length;
 @end
 
 @interface MOLDERDecoderTest : XCTestCase
@@ -28,10 +28,10 @@
 @implementation MOLDERDecoderTest
 
 - (void)testAllFields {
-  NSString *file = [[NSBundle bundleForClass:[self class]] pathForResource:@"dn" ofType:@"plist"];
-  NSArray *distinguishedNames = [NSArray arrayWithContentsOfFile:file];
+  NSString* file = [[NSBundle bundleForClass:[self class]] pathForResource:@"dn" ofType:@"plist"];
+  NSArray* distinguishedNames = [NSArray arrayWithContentsOfFile:file];
 
-  MOLDERDecoder *sut = [[MOLDERDecoder alloc] initWithData:[distinguishedNames firstObject]];
+  MOLDERDecoder* sut = [[MOLDERDecoder alloc] initWithData:[distinguishedNames firstObject]];
   XCTAssertEqualObjects(sut.commonName, @"auth.server.com");
   XCTAssertEqualObjects(sut.organizationName, @"Internet Widgits Pty Ltd");
   XCTAssertEqualObjects(sut.organizationalUnit, @"Awesome Authentication Authority");
@@ -40,7 +40,7 @@
 
 - (void)testOIDDecoding {
   unsigned char oidBytes1[] = {0x2b, 0x06, 0x01, 0x04, 0x01, 0x82, 0x37, 0x15, 0x14};
-  NSString *oidStr = [MOLDERDecoder decodeOIDWithBytes:oidBytes1 length:sizeof(oidBytes1)];
+  NSString* oidStr = [MOLDERDecoder decodeOIDWithBytes:oidBytes1 length:sizeof(oidBytes1)];
   XCTAssertEqualObjects(oidStr, @"1.3.6.1.4.1.311.21.20");
 
   unsigned char oidBytes2[] = {0x2b, 0x06, 0x01, 0x04, 0x01, 0xAB, 0x0E, 0x01, 0x05, 0x2F};

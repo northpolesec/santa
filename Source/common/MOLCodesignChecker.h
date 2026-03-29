@@ -40,14 +40,14 @@
 /**
   A dictionary of raw signing information provided by the Security framework.
 */
-@property(readonly) NSDictionary *signingInformation;
+@property(readonly) NSDictionary* signingInformation;
 
 /**
   An array of dictionaries. Each dictionary contains a single architecture string as a key and
   a dictionary of raw signing information as the value.
   Available for universal/FAT binaries only.
 */
-@property(readonly) NSArray *universalSigningInformation;
+@property(readonly) NSArray* universalSigningInformation;
 
 /**
   Validates the code signature for a specific architecture in a universal binary.
@@ -56,49 +56,49 @@
   @return A human-readable status string describing the verification result, or nil if the
           architecture is not found in the binary or this is not a universal binary.
 */
-- (NSString *)validationStatusForArchitecture:(NSString *)architecture;
+- (NSString*)validationStatusForArchitecture:(NSString*)architecture;
 
 /**
   An array of `MOLCertificate` objects representing the chain that signed this binary.
 
   @see [MOLCertificate](http://cocoadocs.org/docsets/MOLCertificate)
 */
-@property(readonly) NSArray *certificates;
+@property(readonly) NSArray* certificates;
 
 /**
   The leaf certificate that this binary was signed with.
 
   @see [MOLCertificate](http://cocoadocs.org/docsets/MOLCertificate)
 */
-@property(readonly, nonatomic) MOLCertificate *leafCertificate;
+@property(readonly, nonatomic) MOLCertificate* leafCertificate;
 
 /** The on-disk path of this binary. */
-@property(readonly, nonatomic) NSString *binaryPath;
+@property(readonly, nonatomic) NSString* binaryPath;
 
 /** Code signature flags. */
 @property(readonly, nonatomic) uint32_t signatureFlags;
 
 /** The CDHash for this binary, if properly signed. */
-@property(readonly) NSString *cdhash;
+@property(readonly) NSString* cdhash;
 
 /** The Team ID from the certificate that signed this binary. */
-@property(readonly) NSString *teamID;
+@property(readonly) NSString* teamID;
 
 /** The developer provided signing ID for this binary. */
-@property(readonly) NSString *signingID;
+@property(readonly) NSString* signingID;
 
 /** Whether or not this binary is considered a platform binary (i.e. part of the OS) */
 @property(readonly) BOOL platformBinary;
 
 /** The entitlements encoded in this binary. */
-@property(readonly) NSDictionary *entitlements;
+@property(readonly) NSDictionary* entitlements;
 
 /** The timestamp of when the binary was signed.
 
   This timestamp is the secure timestamp that was certified by Apple's timestamp
   authority service and can be trusted.
 */
-@property(readonly) NSDate *secureSigningTime;
+@property(readonly) NSDate* secureSigningTime;
 
 /**
   The timestamp of when the binary was signed.
@@ -108,7 +108,7 @@
   unlike the secureSigningTime. Callers should only trust this as much as they
   trust the developer.
 */
-@property(readonly) NSDate *signingTime;
+@property(readonly) NSDate* signingTime;
 
 /**
   Designated initializer
@@ -119,7 +119,7 @@
   @param error NSError to be filled in if validation fails for any reason.
   @return An initialized `MOLCodesignChecker`
 */
-- (instancetype)initWithSecStaticCodeRef:(SecStaticCodeRef)codeRef error:(NSError **)error;
+- (instancetype)initWithSecStaticCodeRef:(SecStaticCodeRef)codeRef error:(NSError**)error;
 
 /**
   Initialize with a SecStaticCodeRef (or SecCodeRef);
@@ -141,7 +141,7 @@
   @param error NSError to be filled in if validation fails for any reason.
   @return An initialized `MOLCodesignChecker`.
 */
-- (instancetype)initWithBinaryPath:(NSString *)binaryPath error:(NSError **)error;
+- (instancetype)initWithBinaryPath:(NSString*)binaryPath error:(NSError**)error;
 
 /**
   Initialize with a binary on disk.
@@ -152,7 +152,7 @@
   @param binaryPath Path to a binary file on disk.
   @return An initialized `MOLCodesignChecker` or nil if validation failed.
 */
-- (instancetype)initWithBinaryPath:(NSString *)binaryPath;
+- (instancetype)initWithBinaryPath:(NSString*)binaryPath;
 
 /**
   Wrapper around initWithBinaryPath:error: that takes a file descriptor for reading.
@@ -161,13 +161,13 @@
 
   @note The file offset will be set to the amount of bytes read while parsing the header.
 */
-- (instancetype)initWithBinaryPath:(NSString *)binaryPath
+- (instancetype)initWithBinaryPath:(NSString*)binaryPath
                     fileDescriptor:(int)fileDescriptor
-                             error:(NSError **)error;
+                             error:(NSError**)error;
 /**
   Wrapper around initWithBinaryPath:fileDescriptor:error:.
 */
-- (instancetype)initWithBinaryPath:(NSString *)binaryPath fileDescriptor:(int)fileDescriptor;
+- (instancetype)initWithBinaryPath:(NSString*)binaryPath fileDescriptor:(int)fileDescriptor;
 
 /**
   Initialize with a running binary using its process ID.
@@ -176,7 +176,7 @@
   @param error NSError to be filled in if validation fails for any reason.
   @return An initialized `MOLCodesignChecker`.
 */
-- (instancetype)initWithPID:(pid_t)pid error:(NSError **)error;
+- (instancetype)initWithPID:(pid_t)pid error:(NSError**)error;
 
 /**
   Initialize with a running binary using its process ID.
@@ -192,7 +192,7 @@
   @param error Optional NSError to be filled in if validation fails for any reason.
   @return An initialized `MOLCodesignChecker`.
 */
-- (instancetype)initWithSelfError:(NSError **)error;
+- (instancetype)initWithSelfError:(NSError**)error;
 
 /**
   Initialize with the currently running process.
@@ -207,13 +207,13 @@
 
   @return YES if both binaries are signed with the same leaf certificate.
 */
-- (BOOL)signingInformationMatches:(MOLCodesignChecker *)otherChecker;
+- (BOOL)signingInformationMatches:(MOLCodesignChecker*)otherChecker;
 
 /**
   Validates this binary against the given requirement.
 */
 - (BOOL)validateWithRequirement:(SecRequirementRef)requirement;
 
-extern NSString *const kMOLCodesignCheckerErrorDomain;
+extern NSString* const kMOLCodesignCheckerErrorDomain;
 
 @end

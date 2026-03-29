@@ -29,17 +29,17 @@ namespace ptpb = ::santa::pb::v1::process_tree;
 
 namespace santa::santad::process_tree {
 
-void OriginatorAnnotator::AnnotateFork(ProcessTree &tree, const Process &parent,
-                                       const Process &child) {
+void OriginatorAnnotator::AnnotateFork(ProcessTree& tree, const Process& parent,
+                                       const Process& child) {
   // "Base case". Propagate existing annotations down to descendants.
   if (auto annotation = tree.GetAnnotation<OriginatorAnnotator>(parent)) {
     tree.AnnotateProcess(child, std::move(*annotation));
   }
 }
 
-void OriginatorAnnotator::AnnotateExec(ProcessTree &tree,
-                                       const Process &orig_process,
-                                       const Process &new_process) {
+void OriginatorAnnotator::AnnotateExec(ProcessTree& tree,
+                                       const Process& orig_process,
+                                       const Process& new_process) {
   static const absl::flat_hash_map<std::string, ptpb::Annotations::Originator>
       originator_programs = {
           {"/usr/bin/login",

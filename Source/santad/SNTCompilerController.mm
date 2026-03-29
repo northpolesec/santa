@@ -45,12 +45,12 @@ static constexpr std::string_view kIgnoredCompilerProcessPathPrefix = "/dev/";
 
 @implementation SNTCompilerController
 
-- (BOOL)isCompiler:(const audit_token_t &)tok {
+- (BOOL)isCompiler:(const audit_token_t&)tok {
   pid_t pid = audit_token_to_pid(tok);
   return pid >= 0 && pid < PID_MAX && self->_compilerPIDs[pid].load();
 }
 
-- (void)setProcess:(const audit_token_t &)tok isCompiler:(bool)isCompiler {
+- (void)setProcess:(const audit_token_t&)tok isCompiler:(bool)isCompiler {
   pid_t pid = audit_token_to_pid(tok);
   if (pid < 1) {
     LOGE(@"Unable to watch compiler pid=%d", pid);
@@ -67,21 +67,21 @@ static constexpr std::string_view kIgnoredCompilerProcessPathPrefix = "/dev/";
 // Adds a fake cached decision to SNTDecisionCache for pending files. If the file
 // is executed before we can create a transitive rule for it, then we can at
 // least log the pending decision info.
-- (void)saveFakeDecision:(SNTFileInfo *)fileInfo {
-  SNTCachedDecision *cd = [[SNTCachedDecision alloc] initWithVnode:fileInfo.vnode];
+- (void)saveFakeDecision:(SNTFileInfo*)fileInfo {
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] initWithVnode:fileInfo.vnode];
   cd.decision = SNTEventStateAllowPendingTransitive;
   cd.sha256 = @"pending";
   [[SNTDecisionCache sharedCache] cacheDecision:cd];
 }
 
-- (void)removeFakeDecision:(SNTFileInfo *)fileInfo {
+- (void)removeFakeDecision:(SNTFileInfo*)fileInfo {
   [[SNTDecisionCache sharedCache] forgetCachedDecisionForVnode:fileInfo.vnode];
 }
 
-- (BOOL)handleEvent:(const Message &)esMsg withLogger:(std::shared_ptr<Logger>)logger {
-  SNTFileInfo *targetFile;
-  NSString *targetPath;
-  NSError *error;
+- (BOOL)handleEvent:(const Message&)esMsg withLogger:(std::shared_ptr<Logger>)logger {
+  SNTFileInfo* targetFile;
+  NSString* targetPath;
+  NSError* error;
 
   switch (esMsg->event_type) {
     case ES_EVENT_TYPE_NOTIFY_CLOSE:
@@ -176,8 +176,8 @@ static constexpr std::string_view kIgnoredCompilerProcessPathPrefix = "/dev/";
 // Assume that this method is called only when we already know that the writing process is a
 // compiler.  It checks if the closed file is executable, and if so, transitively allowlists it.
 // The passed in message contains the pid of the writing process and path of closed file.
-- (void)createTransitiveRule:(const Message &)esMsg
-                      target:(SNTFileInfo *)targetFile
+- (void)createTransitiveRule:(const Message&)esMsg
+                      target:(SNTFileInfo*)targetFile
                       logger:(std::shared_ptr<Logger>)logger {
   [self saveFakeDecision:targetFile];
 
@@ -185,8 +185,8 @@ static constexpr std::string_view kIgnoredCompilerProcessPathPrefix = "/dev/";
   if (targetFile.isExecutable) {
     // Check if there is an existing (non-transitive) rule for this file.  We leave existing rules
     // alone, so that a allowlist or blocklist rule can't be overwritten by a transitive one.
-    SNTRuleTable *ruleTable = [SNTDatabaseController ruleTable];
-    SNTRule *prevRule =
+    SNTRuleTable* ruleTable = [SNTDatabaseController ruleTable];
+    SNTRule* prevRule =
         [ruleTable executionRuleForIdentifiers:(struct RuleIdentifiers){
                                                    .binarySHA256 = targetFile.SHA256,
                                                }];
@@ -194,7 +194,7 @@ static constexpr std::string_view kIgnoredCompilerProcessPathPrefix = "/dev/";
     // in order to have timestamps updated.
     if (!prevRule || prevRule.state == SNTRuleStateAllowTransitive) {
       // Construct a new transitive allowlist rule for the executable.
-      SNTRule *rule = [[SNTRule alloc] initWithIdentifier:targetFile.SHA256
+      SNTRule* rule = [[SNTRule alloc] initWithIdentifier:targetFile.SHA256
                                                     state:SNTRuleStateAllowTransitive
                                                      type:SNTRuleTypeBinary];
 
@@ -203,11 +203,11 @@ static constexpr std::string_view kIgnoredCompilerProcessPathPrefix = "/dev/";
              targetFile.SHA256);
       } else {
         // Add the new rule to the rules database.
-        NSArray<NSError *> *errors;
+        NSArray<NSError*>* errors;
         if (![ruleTable addExecutionRules:@[ rule ]
                               ruleCleanup:SNTRuleCleanupNone
                                    errors:&errors]) {
-          for (NSError *error in errors) {
+          for (NSError* error in errors) {
             LOGE(@"Unable to add new transitive rule to database: %@", error.localizedDescription);
           }
         } else {

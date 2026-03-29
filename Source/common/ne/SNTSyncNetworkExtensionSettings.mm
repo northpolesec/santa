@@ -44,7 +44,7 @@
     return NO;
   }
 
-  SNTSyncNetworkExtensionSettings *otherSettings = (SNTSyncNetworkExtensionSettings *)other;
+  SNTSyncNetworkExtensionSettings* otherSettings = (SNTSyncNetworkExtensionSettings*)other;
   return self.enable == otherSettings.enable;
 }
 
@@ -59,11 +59,11 @@
   return YES;
 }
 
-- (void)encodeWithCoder:(NSCoder *)coder {
+- (void)encodeWithCoder:(NSCoder*)coder {
   ENCODE_BOXABLE(coder, enable);
 }
 
-- (instancetype)initWithCoder:(NSCoder *)decoder {
+- (instancetype)initWithCoder:(NSCoder*)decoder {
   self = [self init];
   if (self) {
     DECODE_SELECTOR(decoder, enable, NSNumber, boolValue);
@@ -71,9 +71,9 @@
   return self;
 }
 
-- (NSData *)serialize {
-  NSError *error;
-  NSData *data = [NSKeyedArchiver archivedDataWithRootObject:self
+- (NSData*)serialize {
+  NSError* error;
+  NSData* data = [NSKeyedArchiver archivedDataWithRootObject:self
                                        requiringSecureCoding:YES
                                                        error:&error];
   if (error) {
@@ -84,12 +84,12 @@
   return data;
 }
 
-+ (instancetype)deserialize:(NSData *)data {
++ (instancetype)deserialize:(NSData*)data {
   if (!data) {
     return nil;
   }
 
-  NSError *error;
+  NSError* error;
   id object = [NSKeyedUnarchiver unarchivedObjectOfClass:[SNTSyncNetworkExtensionSettings class]
                                                 fromData:data
                                                    error:&error];

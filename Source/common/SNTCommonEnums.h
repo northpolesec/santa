@@ -172,6 +172,7 @@ typedef NS_ENUM(NSInteger, SNTMetricFormatType) {
   SNTMetricFormatTypeUnknown,
   SNTMetricFormatTypeRawJSON,
   SNTMetricFormatTypeMonarchJSON,
+  SNTMetricFormatTypeProto,
 };
 
 typedef NS_ENUM(NSInteger, SNTOverrideFileAccessAction) {
@@ -228,11 +229,11 @@ enum class FileAccessPolicyDecision {
   kAllowedAuditOnly,
 };
 
-static const char *kSantaDPath =
+static const char* kSantaDPath =
     "/Applications/Santa.app/Contents/Library/SystemExtensions/"
     "com.northpolesec.santa.daemon.systemextension/Contents/MacOS/com.northpolesec.santa.daemon";
-static const char *kSantaNetdPath =
+static const char* kSantaNetdPath =
     "/Applications/Santa.app/Contents/Library/SystemExtensions/"
     "com.northpolesec.santa.netd.systemextension/Contents/MacOS/com.northpolesec.santa.netd";
-static const char *kSantaAppPath = "/Applications/Santa.app";
-static const char *kSleighPath = "/Applications/Santa.app/Contents/MacOS/sleigh";
+static const char* kSantaAppPath = "/Applications/Santa.app";
+static const char* kSleighPath = "/Applications/Santa.app/Contents/MacOS/sleigh";

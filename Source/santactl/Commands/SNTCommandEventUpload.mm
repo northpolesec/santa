@@ -46,11 +46,11 @@ REGISTER_COMMAND_NAME(@"eventupload")
   return YES;
 }
 
-+ (NSString *)shortHelpText {
++ (NSString*)shortHelpText {
   return @"Generate and upload non-execution events to the sync server.";
 }
 
-+ (NSString *)longHelpText {
++ (NSString*)longHelpText {
   return @"Generates a non-execution event containing the metadata of the provided bundle or file."
          @"\n"
          @"Usage: santactl eventupload [options] [file-or-bundle-paths]\n"
@@ -70,18 +70,18 @@ REGISTER_COMMAND_NAME(@"eventupload")
   return NO;
 }
 
-- (NSArray *)pathsFromArguments:(NSArray *)arguments skipBundles:(BOOL *)skipBundles {
+- (NSArray*)pathsFromArguments:(NSArray*)arguments skipBundles:(BOOL*)skipBundles {
   NSUInteger noBundleIndex = [arguments indexOfObject:@"--binary-only"];
   if (noBundleIndex != NSNotFound) {
     if (skipBundles) *skipBundles = YES;
-    NSMutableArray *newArguments = arguments.mutableCopy;
+    NSMutableArray* newArguments = arguments.mutableCopy;
     [newArguments removeObjectAtIndex:noBundleIndex];
     arguments = [newArguments copy];
   }
   return arguments;
 }
 
-- (void)runWithArguments:(NSArray *)arguments {
+- (void)runWithArguments:(NSArray*)arguments {
   if (![SNTConfigurator configurator].syncBaseURL) {
     TEE_LOGE(@"Missing SyncBaseURL. Exiting.");
     exit(1);
@@ -90,8 +90,8 @@ REGISTER_COMMAND_NAME(@"eventupload")
   // Parse arguments
   if (!arguments.count) [self printErrorUsageAndExit:@"No arguments"];
   BOOL skipBundles = NO;
-  NSArray *paths = [self pathsFromArguments:arguments skipBundles:&skipBundles];
-  NSMutableArray *events = [NSMutableArray arrayWithCapacity:paths.count];
+  NSArray* paths = [self pathsFromArguments:arguments skipBundles:&skipBundles];
+  NSMutableArray* events = [NSMutableArray arrayWithCapacity:paths.count];
 
   // Hash the bundle if the server declares support and if the caller has not explicitly disabled
   // bundle hashing.
@@ -102,22 +102,22 @@ REGISTER_COMMAND_NAME(@"eventupload")
     }];
   }
 
-  MOLXPCConnection *bs = [SNTXPCBundleServiceInterface configuredConnection];
+  MOLXPCConnection* bs = [SNTXPCBundleServiceInterface configuredConnection];
   bs.invalidationHandler = ^(void) {
     TEE_LOGE(@"Failed to connect to the bundle service.");
     exit(1);
   };
   [bs resume];
 
-  for (NSString *path in paths) {
-    NSError *error;
-    SNTFileInfo *fi = [[SNTFileInfo alloc] initWithPath:path error:&error];
+  for (NSString* path in paths) {
+    NSError* error;
+    SNTFileInfo* fi = [[SNTFileInfo alloc] initWithPath:path error:&error];
     if (!fi) {
       TEE_LOGE(@"Skipping %@: %@", path, error.description);
       continue;
     }
 
-    SNTStoredExecutionEvent *se = [[SNTStoredExecutionEvent alloc] initWithFileInfo:fi];
+    SNTStoredExecutionEvent* se = [[SNTStoredExecutionEvent alloc] initWithFileInfo:fi];
     se.decision = SNTEventStateBundleBinary;
     if (fi.bundle && enableBundles) {
       se.fileBundlePath = fi.bundlePath;
@@ -131,8 +131,8 @@ REGISTER_COMMAND_NAME(@"eventupload")
 
       // There are two streams of progress the bundle service reports.
       // The first is over SNTBundleServiceProgressXPC. This reports stages and counts of files.
-      NSXPCListener *al = [NSXPCListener anonymousListener];
-      MOLXPCConnection *pl = [[MOLXPCConnection alloc] initServerWithListener:al];
+      NSXPCListener* al = [NSXPCListener anonymousListener];
+      MOLXPCConnection* pl = [[MOLXPCConnection alloc] initServerWithListener:al];
       pl.exportedObject = self;
       pl.privilegedInterface =
           [NSXPCInterface interfaceWithProtocol:@protocol(SNTBundleServiceProgressXPC)];
@@ -140,7 +140,7 @@ REGISTER_COMMAND_NAME(@"eventupload")
 
       // The second stream is "overall progress", via an XPC proxied NSProgress object. This starts
       // reporting progress once all of the bundle's files have been discovered.
-      NSProgress *progress = [NSProgress discreteProgressWithTotalUnitCount:1];
+      NSProgress* progress = [NSProgress discreteProgressWithTotalUnitCount:1];
       [progress addObserver:self
                  forKeyPath:@"fractionCompleted"
                     options:NSKeyValueObservingOptionNew
@@ -150,13 +150,13 @@ REGISTER_COMMAND_NAME(@"eventupload")
       [[bs synchronousRemoteObjectProxy]
           hashBundleBinariesForEvent:se
                             listener:al.endpoint
-                               reply:^(NSString *hash,
-                                       NSArray<SNTStoredExecutionEvent *> *bundleEvents,
-                                       NSNumber *time) {
+                               reply:^(NSString* hash,
+                                       NSArray<SNTStoredExecutionEvent*>* bundleEvents,
+                                       NSNumber* time) {
                                  printf("\tHashing time: %llu ms\n", time.unsignedLongLongValue);
                                  printf("\tEvents found: %lu\n", bundleEvents.count);
                                  printf("\tBundleHash: %s\n", hash.UTF8String);
-                                 for (SNTStoredExecutionEvent *e in bundleEvents) {
+                                 for (SNTStoredExecutionEvent* e in bundleEvents) {
                                    e.fileBundleHash = hash;
                                    e.fileBundleHashMilliseconds = time;
                                    e.fileBundleBinaryCount = @(bundleEvents.count);
@@ -170,7 +170,7 @@ REGISTER_COMMAND_NAME(@"eventupload")
     if (se) [events addObject:se];
   }
 
-  MOLXPCConnection *ss = [SNTXPCSyncServiceInterface configuredConnection];
+  MOLXPCConnection* ss = [SNTXPCSyncServiceInterface configuredConnection];
   ss.invalidationHandler = ^(void) {
     TEE_LOGE(@"Failed to connect to the sync service.");
     exit(1);
@@ -184,21 +184,21 @@ REGISTER_COMMAND_NAME(@"eventupload")
   exit(0);
 }
 
-- (void)observeValueForKeyPath:(NSString *)keyPath
+- (void)observeValueForKeyPath:(NSString*)keyPath
                       ofObject:(id)object
-                        change:(NSDictionary *)change
-                       context:(void *)context {
+                        change:(NSDictionary*)change
+                       context:(void*)context {
   if ([keyPath isEqualToString:@"fractionCompleted"]) {
-    NSProgress *progress = object;
-    NSString *fileLabel =
+    NSProgress* progress = object;
+    NSString* fileLabel =
         [NSString stringWithFormat:@"Complete: %d%% | %llu binaries / %llu files",
                                    (int)(progress.fractionCompleted * 100), self.currentBinaryCount,
                                    self.currentFileCount];
-    NSString *hashedLabel =
+    NSString* hashedLabel =
         [NSString stringWithFormat:@"Complete: %d%% | %llu hashed / %llu binaries",
                                    (int)(progress.fractionCompleted * 100), self.currentHashedCount,
                                    self.currentBinaryCount];
-    NSString *status = self.currentHashedCount ? hashedLabel : fileLabel;
+    NSString* status = self.currentHashedCount ? hashedLabel : fileLabel;
     printf("\33[2K\r\t%s", status.UTF8String);
     if (progress.fractionCompleted == 100.0) {
       // Clear and return to the start of the line.
@@ -207,7 +207,7 @@ REGISTER_COMMAND_NAME(@"eventupload")
   }
 }
 
-- (void)updateCountsForEvent:(SNTStoredExecutionEvent *)event
+- (void)updateCountsForEvent:(SNTStoredExecutionEvent*)event
                  binaryCount:(uint64_t)binaryCount
                    fileCount:(uint64_t)fileCount
                  hashedCount:(uint64_t)hashedCount {

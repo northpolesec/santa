@@ -21,7 +21,7 @@
 
 @interface MOLCertificate ()
 ///  A container for cached property values.
-@property NSMutableDictionary *memoizedData;
+@property NSMutableDictionary* memoizedData;
 
 ///  Re-declare the certRef property as readwrite.
 @property(readwrite) SecCertificateRef certRef;
@@ -29,7 +29,7 @@
 
 @implementation MOLCertificate
 
-static NSString *const kCertDataKey = @"certData";
+static NSString* const kCertDataKey = @"certData";
 
 #pragma mark Init/Dealloc
 
@@ -43,7 +43,7 @@ static NSString *const kCertDataKey = @"certData";
   return self;
 }
 
-- (instancetype)initWithCertificateDataDER:(NSData *)certData {
+- (instancetype)initWithCertificateDataDER:(NSData*)certData {
   SecCertificateRef cert = SecCertificateCreateWithData(NULL, (__bridge CFDataRef)certData);
 
   if (cert) {
@@ -52,7 +52,7 @@ static NSString *const kCertDataKey = @"certData";
     // radar://problem/16124651
     // To workaround, check that the certificate serial number can be retrieved. According to
     // RFC5280, the serial number field is required.
-    NSData *ser = CFBridgingRelease(SecCertificateCopySerialNumberData(cert, NULL));
+    NSData* ser = CFBridgingRelease(SecCertificateCopySerialNumberData(cert, NULL));
 
     if (ser) {
       self = [self initWithSecCertificateRef:cert];
@@ -67,10 +67,10 @@ static NSString *const kCertDataKey = @"certData";
   return self;
 }
 
-- (instancetype)initWithCertificateDataPEM:(NSString *)certData {
+- (instancetype)initWithCertificateDataPEM:(NSString*)certData {
   // Find the PEM and extract the Base64-encoded DER data from within
-  NSScanner *scanner = [NSScanner scannerWithString:certData];
-  NSString *base64der;
+  NSScanner* scanner = [NSScanner scannerWithString:certData];
+  NSString* base64der;
 
   // Locate and parse DER data into base64der
   [scanner scanUpToString:@"-----BEGIN CERTIFICATE-----" intoString:NULL];
@@ -82,18 +82,18 @@ static NSString *const kCertDataKey = @"certData";
 
   // Base64-decode the DER. We have to use NSDataBase64DecodingIgnoreUnknownCharacters
   // to ignore newline characters.
-  NSData *output =
+  NSData* output =
       [[NSData alloc] initWithBase64EncodedString:base64der
                                           options:NSDataBase64DecodingIgnoreUnknownCharacters];
   return [self initWithCertificateDataDER:output];
 }
 
-+ (NSArray *)certificatesFromPEM:(NSString *)pemData {
-  NSScanner *scanner = [NSScanner scannerWithString:pemData];
-  NSMutableArray *certs = [[NSMutableArray alloc] init];
++ (NSArray*)certificatesFromPEM:(NSString*)pemData {
+  NSScanner* scanner = [NSScanner scannerWithString:pemData];
+  NSMutableArray* certs = [[NSMutableArray alloc] init];
 
   while (YES) {
-    NSString *curCert;
+    NSString* curCert;
 
     [scanner scanUpToString:@"-----BEGIN CERTIFICATE-----" intoString:NULL];
     [scanner scanUpToString:@"-----END CERTIFICATE-----" intoString:&curCert];
@@ -101,7 +101,7 @@ static NSString *const kCertDataKey = @"certData";
     if (!curCert) break;
 
     curCert = [curCert stringByAppendingString:@"-----END CERTIFICATE-----"];
-    MOLCertificate *cert = [[MOLCertificate alloc] initWithCertificateDataPEM:curCert];
+    MOLCertificate* cert = [[MOLCertificate alloc] initWithCertificateDataPEM:curCert];
 
     if (!cert) continue;
 
@@ -111,12 +111,12 @@ static NSString *const kCertDataKey = @"certData";
   return certs;
 }
 
-+ (NSArray *)certificatesFromArray:(NSArray *)array {
-  NSMutableArray *newArray = [NSMutableArray arrayWithCapacity:array.count];
++ (NSArray*)certificatesFromArray:(NSArray*)array {
+  NSMutableArray* newArray = [NSMutableArray arrayWithCapacity:array.count];
   for (id object in array) {
     if (CFGetTypeID((__bridge CFTypeRef)object) == SecCertificateGetTypeID()) {
       SecCertificateRef cert = (__bridge SecCertificateRef)object;
-      MOLCertificate *molCert = [[MOLCertificate alloc] initWithSecCertificateRef:cert];
+      MOLCertificate* molCert = [[MOLCertificate alloc] initWithSecCertificateRef:cert];
       if (molCert) [newArray addObject:molCert];
     }
   }
@@ -138,7 +138,7 @@ static NSString *const kCertDataKey = @"certData";
   if (self == other) return YES;
   if (![other isKindOfClass:[MOLCertificate class]]) return NO;
 
-  MOLCertificate *o = other;
+  MOLCertificate* o = other;
   return [self.certData isEqual:o.certData];
 }
 
@@ -146,7 +146,7 @@ static NSString *const kCertDataKey = @"certData";
   return [self.certData hash];
 }
 
-- (NSString *)description {
+- (NSString*)description {
   return [NSString stringWithFormat:@"/O=%@/OU=%@/CN=%@/SHA-1=%@", self.orgName, self.orgUnit,
                                     self.commonName, self.SHA1];
 }
@@ -157,12 +157,12 @@ static NSString *const kCertDataKey = @"certData";
   return YES;
 }
 
-- (void)encodeWithCoder:(NSCoder *)coder {
+- (void)encodeWithCoder:(NSCoder*)coder {
   [coder encodeObject:self.certData forKey:kCertDataKey];
 }
 
-- (instancetype)initWithCoder:(NSCoder *)decoder {
-  NSData *certData = [decoder decodeObjectOfClass:[NSData class] forKey:kCertDataKey];
+- (instancetype)initWithCoder:(NSCoder*)decoder {
+  NSData* certData = [decoder decodeObjectOfClass:[NSData class] forKey:kCertDataKey];
   if ([certData length] == 0) return nil;
   SecCertificateRef cert = SecCertificateCreateWithData(NULL, (__bridge CFDataRef)certData);
   self = [self initWithSecCertificateRef:cert];
@@ -179,7 +179,7 @@ static NSString *const kCertDataKey = @"certData";
   Assumes the selector's value will never change.
 */
 - (id)memoizedSelector:(SEL)selector forBlock:(id (^)(void))block {
-  NSString *selName = NSStringFromSelector(selector);
+  NSString* selName = NSStringFromSelector(selector);
 
   if (!self.memoizedData) {
     self.memoizedData = [NSMutableDictionary dictionary];
@@ -198,7 +198,7 @@ static NSString *const kCertDataKey = @"certData";
   return self.memoizedData[selName] != [NSNull null] ? self.memoizedData[selName] : nil;
 }
 
-- (NSDictionary *)allCertificateValues {
+- (NSDictionary*)allCertificateValues {
   return
       [self memoizedSelector:_cmd
                     forBlock:^id {
@@ -206,28 +206,28 @@ static NSString *const kCertDataKey = @"certData";
                     }];
 }
 
-- (NSDictionary *)x509SubjectName {
+- (NSDictionary*)x509SubjectName {
   return [self
       memoizedSelector:_cmd
               forBlock:^id {
-                return [self allCertificateValues][(__bridge NSString *)kSecOIDX509V1SubjectName];
+                return [self allCertificateValues][(__bridge NSString*)kSecOIDX509V1SubjectName];
               }];
 }
 
-- (NSDictionary *)x509IssuerName {
+- (NSDictionary*)x509IssuerName {
   return [self
       memoizedSelector:_cmd
               forBlock:^id {
-                return [self allCertificateValues][(__bridge NSString *)kSecOIDX509V1IssuerName];
+                return [self allCertificateValues][(__bridge NSString*)kSecOIDX509V1IssuerName];
               }];
 }
 
-- (NSDictionary *)x509SubjectAltName {
-  return [self
-      memoizedSelector:_cmd
-              forBlock:^id {
-                return [self allCertificateValues][(__bridge NSString *)kSecOIDSubjectAltName];
-              }];
+- (NSDictionary*)x509SubjectAltName {
+  return [self memoizedSelector:_cmd
+                       forBlock:^id {
+                         return
+                             [self allCertificateValues][(__bridge NSString*)kSecOIDSubjectAltName];
+                       }];
 }
 
 /**
@@ -237,18 +237,18 @@ static NSString *const kCertDataKey = @"certData";
   @param dict The dictionary to look in (Subject, Issuer or SAN)
   @return An `NSString`, the value for the specified label.
 */
-- (NSString *)x509ValueForLabel:(NSString *)desiredLabel fromDictionary:(NSDictionary *)dict {
+- (NSString*)x509ValueForLabel:(NSString*)desiredLabel fromDictionary:(NSDictionary*)dict {
   @try {
-    NSArray *valArray = dict[(__bridge NSString *)kSecPropertyKeyValue];
+    NSArray* valArray = dict[(__bridge NSString*)kSecPropertyKeyValue];
 
-    for (NSDictionary *curCertVal in valArray) {
-      NSString *valueLabel = curCertVal[(__bridge NSString *)kSecPropertyKeyLabel];
+    for (NSDictionary* curCertVal in valArray) {
+      NSString* valueLabel = curCertVal[(__bridge NSString*)kSecPropertyKeyLabel];
       if ([valueLabel isEqual:desiredLabel]) {
-        return curCertVal[(__bridge NSString *)kSecPropertyKeyValue];
+        return curCertVal[(__bridge NSString*)kSecPropertyKeyValue];
       }
     }
     return nil;
-  } @catch (NSException *e) {
+  } @catch (NSException* e) {
     return nil;
   }
 }
@@ -260,19 +260,19 @@ static NSString *const kCertDataKey = @"certData";
   @param dict The dictionary to look in (SAN)
   @return An `NSString`, the value for the specified label.
 */
-- (NSArray *)x509ListForLabel:(NSString *)desiredLabel fromDictionary:(NSDictionary *)dict {
+- (NSArray*)x509ListForLabel:(NSString*)desiredLabel fromDictionary:(NSDictionary*)dict {
   @try {
-    NSArray *valArray = dict[(__bridge NSString *)kSecPropertyKeyValue];
-    NSMutableArray *retArray = [[NSMutableArray alloc] init];
+    NSArray* valArray = dict[(__bridge NSString*)kSecPropertyKeyValue];
+    NSMutableArray* retArray = [[NSMutableArray alloc] init];
 
-    for (NSDictionary *curCertVal in valArray) {
-      NSString *valueLabel = curCertVal[(__bridge NSString *)kSecPropertyKeyLabel];
+    for (NSDictionary* curCertVal in valArray) {
+      NSString* valueLabel = curCertVal[(__bridge NSString*)kSecPropertyKeyLabel];
       if ([valueLabel isEqual:desiredLabel]) {
-        [retArray addObject:curCertVal[(__bridge NSString *)kSecPropertyKeyValue]];
+        [retArray addObject:curCertVal[(__bridge NSString*)kSecPropertyKeyValue]];
       }
     }
-    return (retArray.count == 0) ? nil : (NSArray *)retArray;
-  } @catch (NSException *e) {
+    return (retArray.count == 0) ? nil : (NSArray*)retArray;
+  } @catch (NSException* e) {
     return nil;
   }
 }
@@ -284,9 +284,9 @@ static NSString *const kCertDataKey = @"certData";
   @param key The identifier for the date: e.g. `kSecOIDX509V1ValiditityNotBefore`
   @return An `NSDate` representing the date and time the certificate is valid from or expires.
 */
-- (NSDate *)dateForX509Key:(NSString *)key {
-  NSDictionary *curCertVal = [self allCertificateValues][key];
-  NSNumber *value = curCertVal[(__bridge NSString *)kSecPropertyKeyValue];
+- (NSDate*)dateForX509Key:(NSString*)key {
+  NSDictionary* curCertVal = [self allCertificateValues][key];
+  NSNumber* value = curCertVal[(__bridge NSString*)kSecPropertyKeyValue];
 
   NSTimeInterval interval = [value doubleValue];
   if (interval) {
@@ -298,17 +298,17 @@ static NSString *const kCertDataKey = @"certData";
 
 #pragma mark Public Accessors
 
-- (NSString *)SHA1 {
+- (NSString*)SHA1 {
   return [self memoizedSelector:_cmd
                        forBlock:^id {
-                         NSMutableData *SHA1Buffer =
+                         NSMutableData* SHA1Buffer =
                              [[NSMutableData alloc] initWithCapacity:CC_SHA1_DIGEST_LENGTH];
 
                          CC_SHA1([self.certData bytes], (CC_LONG)[self.certData length],
-                                 static_cast<unsigned char *>([SHA1Buffer mutableBytes]));
+                                 static_cast<unsigned char*>([SHA1Buffer mutableBytes]));
 
-                         const unsigned char *bytes = (const unsigned char *)[SHA1Buffer bytes];
-                         NSMutableString *hexDigest =
+                         const unsigned char* bytes = (const unsigned char*)[SHA1Buffer bytes];
+                         NSMutableString* hexDigest =
                              [NSMutableString stringWithCapacity:CC_SHA1_DIGEST_LENGTH * 2];
                          for (int i = 0; i < CC_SHA1_DIGEST_LENGTH; i++) {
                            [hexDigest appendFormat:@"%02x", bytes[i]];
@@ -318,13 +318,13 @@ static NSString *const kCertDataKey = @"certData";
                        }];
 }
 
-- (NSString *)SHA256 {
+- (NSString*)SHA256 {
   return [self
       memoizedSelector:_cmd
               forBlock:^id {
                 unsigned char SHA256Digest[CC_SHA256_DIGEST_LENGTH];
                 CC_SHA256([self.certData bytes], (CC_LONG)[self.certData length], SHA256Digest);
-                NSString *const SHA256FormatString =
+                NSString* const SHA256FormatString =
                     @"%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x"
                      "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x";
 
@@ -343,11 +343,11 @@ static NSString *const kCertDataKey = @"certData";
               }];
 }
 
-- (NSData *)certData {
+- (NSData*)certData {
   return CFBridgingRelease(SecCertificateCopyData(self.certRef));
 }
 
-- (NSString *)commonName {
+- (NSString*)commonName {
   return [self memoizedSelector:_cmd
                        forBlock:^id {
                          CFStringRef commonName = NULL;
@@ -356,131 +356,131 @@ static NSString *const kCertDataKey = @"certData";
                        }];
 }
 
-- (NSString *)countryName {
+- (NSString*)countryName {
   return [self memoizedSelector:_cmd
                        forBlock:^id {
-                         return [self x509ValueForLabel:(__bridge NSString *)kSecOIDCountryName
+                         return [self x509ValueForLabel:(__bridge NSString*)kSecOIDCountryName
                                          fromDictionary:[self x509SubjectName]];
                        }];
 }
 
-- (NSString *)orgName {
+- (NSString*)orgName {
   return [self memoizedSelector:_cmd
                        forBlock:^id {
-                         return [self x509ValueForLabel:(__bridge NSString *)kSecOIDOrganizationName
+                         return [self x509ValueForLabel:(__bridge NSString*)kSecOIDOrganizationName
                                          fromDictionary:[self x509SubjectName]];
                        }];
 }
 
-- (NSString *)orgUnit {
+- (NSString*)orgUnit {
   return [self memoizedSelector:_cmd
                        forBlock:^id {
                          return [[self orgUnits] firstObject];
                        }];
 }
 
-- (NSString *)orgUnits {
+- (NSArray*)orgUnits {
   return [self memoizedSelector:_cmd
                        forBlock:^id {
                          return [self
-                             x509ListForLabel:(__bridge NSString *)kSecOIDOrganizationalUnitName
+                             x509ListForLabel:(__bridge NSString*)kSecOIDOrganizationalUnitName
                                fromDictionary:[self x509SubjectName]];
                        }];
 }
 
-- (NSDate *)validFrom {
+- (NSDate*)validFrom {
   return [self
       memoizedSelector:_cmd
               forBlock:^id {
-                return [self dateForX509Key:(__bridge NSString *)kSecOIDX509V1ValidityNotBefore];
+                return [self dateForX509Key:(__bridge NSString*)kSecOIDX509V1ValidityNotBefore];
               }];
 }
 
-- (NSDate *)validUntil {
+- (NSDate*)validUntil {
   return [self
       memoizedSelector:_cmd
               forBlock:^id {
-                return [self dateForX509Key:(__bridge NSString *)kSecOIDX509V1ValidityNotAfter];
+                return [self dateForX509Key:(__bridge NSString*)kSecOIDX509V1ValidityNotAfter];
               }];
 }
 
-- (NSString *)issuerCommonName {
+- (NSString*)issuerCommonName {
   return [self memoizedSelector:_cmd
                        forBlock:^id {
-                         return [self x509ValueForLabel:(__bridge NSString *)kSecOIDCommonName
+                         return [self x509ValueForLabel:(__bridge NSString*)kSecOIDCommonName
                                          fromDictionary:[self x509IssuerName]];
                        }];
 }
 
-- (NSString *)issuerCountryName {
+- (NSString*)issuerCountryName {
   return [self memoizedSelector:_cmd
                        forBlock:^id {
-                         return [self x509ValueForLabel:(__bridge NSString *)kSecOIDCountryName
+                         return [self x509ValueForLabel:(__bridge NSString*)kSecOIDCountryName
                                          fromDictionary:[self x509IssuerName]];
                        }];
 }
 
-- (NSString *)issuerOrgName {
+- (NSString*)issuerOrgName {
   return [self memoizedSelector:_cmd
                        forBlock:^id {
-                         return [self x509ValueForLabel:(__bridge NSString *)kSecOIDOrganizationName
+                         return [self x509ValueForLabel:(__bridge NSString*)kSecOIDOrganizationName
                                          fromDictionary:[self x509IssuerName]];
                        }];
 }
 
-- (NSString *)issuerOrgUnit {
+- (NSString*)issuerOrgUnit {
   return [self memoizedSelector:_cmd
                        forBlock:^id {
                          return [[self issuerOrgUnits] firstObject];
                        }];
 }
 
-- (NSArray *)issuerOrgUnits {
+- (NSArray*)issuerOrgUnits {
   return [self memoizedSelector:_cmd
                        forBlock:^id {
                          return [self
-                             x509ListForLabel:(__bridge NSString *)kSecOIDOrganizationalUnitName
+                             x509ListForLabel:(__bridge NSString*)kSecOIDOrganizationalUnitName
                                fromDictionary:[self x509IssuerName]];
                        }];
 }
 
 - (BOOL)isCA {
-  return [[self
-      memoizedSelector:_cmd
-              forBlock:^id {
-                NSDictionary *dict =
-                    [self allCertificateValues][(__bridge NSString *)kSecOIDBasicConstraints];
-                return [self x509ValueForLabel:@"Certificate Authority" fromDictionary:dict];
-              }] isEqual:@"Yes"];
+  return
+      [[self memoizedSelector:_cmd
+                     forBlock:^id {
+                       NSDictionary* dict =
+                           [self allCertificateValues][(__bridge NSString*)kSecOIDBasicConstraints];
+                       return [self x509ValueForLabel:@"Certificate Authority" fromDictionary:dict];
+                     }] isEqual:@"Yes"];
 }
 
-- (NSString *)serialNumber {
+- (NSString*)serialNumber {
   return [self
       memoizedSelector:_cmd
               forBlock:^id {
-                NSDictionary *dict =
-                    [self allCertificateValues][(__bridge NSString *)kSecOIDX509V1SerialNumber];
-                return dict[(__bridge NSString *)kSecPropertyKeyValue];
+                NSDictionary* dict =
+                    [self allCertificateValues][(__bridge NSString*)kSecOIDX509V1SerialNumber];
+                return dict[(__bridge NSString*)kSecPropertyKeyValue];
               }];
 }
 
-- (NSString *)ntPrincipalName {
+- (NSString*)ntPrincipalName {
   return [self memoizedSelector:_cmd
                        forBlock:^id {
                          return
-                             [self x509ValueForLabel:(__bridge NSString *)kSecOIDMS_NTPrincipalName
+                             [self x509ValueForLabel:(__bridge NSString*)kSecOIDMS_NTPrincipalName
                                       fromDictionary:[self x509SubjectAltName]];
                        }];
 }
 
-- (NSString *)dnsName {
+- (NSString*)dnsName {
   return [self memoizedSelector:_cmd
                        forBlock:^id {
                          return [[self dnsNames] firstObject];
                        }];
 }
 
-- (NSArray *)dnsNames {
+- (NSArray*)dnsNames {
   return [self memoizedSelector:_cmd
                        forBlock:^id {
                          return [self x509ListForLabel:@"DNS Name"

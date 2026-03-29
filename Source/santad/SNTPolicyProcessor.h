@@ -47,7 +47,7 @@ using ActivationCallbackBlock =
 ///  @param ruleTable The rule table to be used for every decision
 ///  @param entitlementsFilter The entitlements filter to be used for filtering entitlements
 ///
-- (nullable instancetype)initWithRuleTable:(nonnull SNTRuleTable *)ruleTable
+- (nullable instancetype)initWithRuleTable:(nonnull SNTRuleTable*)ruleTable
                         entitlementsFilter:
                             (std::shared_ptr<santa::EntitlementsFilter>)entitlementsFilter;
 
@@ -59,19 +59,19 @@ using ActivationCallbackBlock =
 ///  only guaranteed for the duration of the call to the block. Do not perform
 ///  any async processing without extending their lifetimes.
 ///
-- (nonnull SNTCachedDecision *)decisionForFileInfo:(nonnull SNTFileInfo *)fileInfo
-                                     targetProcess:(nonnull const es_process_t *)targetProc
-                                       configState:(nonnull SNTConfigState *)configState
-                                activationCallback:
-                                    (nullable ActivationCallbackBlock)activationCallback
-                                    cachedDecision:(nullable SNTCachedDecision *)existingDecision;
+- (nonnull SNTCachedDecision*)decisionForFileInfo:(nonnull SNTFileInfo*)fileInfo
+                                    targetProcess:(nonnull const es_process_t*)targetProc
+                                      configState:(nonnull SNTConfigState*)configState
+                               activationCallback:
+                                   (nullable ActivationCallbackBlock)activationCallback
+                                   cachedDecision:(nullable SNTCachedDecision*)existingDecision;
 
 ///
 /// Updates a decision for a given file and agent configuration.
 ///
 /// Returns YES if the decision requires no futher processing NO otherwise.
-- (BOOL)decision:(nonnull SNTCachedDecision *)cd
-                     forRule:(nonnull SNTRule *)rule
+- (BOOL)decision:(nonnull SNTCachedDecision*)cd
+                     forRule:(nonnull SNTRule*)rule
          withTransitiveRules:(BOOL)transitive
     andCELActivationCallback:(nullable ActivationCallbackBlock)activationCallback;
 

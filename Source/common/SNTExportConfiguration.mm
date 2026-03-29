@@ -18,8 +18,8 @@
 #import "Source/common/SNTLogging.h"
 
 @interface SNTExportConfiguration ()
-@property NSURL *url;
-@property NSDictionary *formValues;
+@property NSURL* url;
+@property NSDictionary* formValues;
 @end
 
 @implementation SNTExportConfiguration
@@ -28,12 +28,12 @@
   return YES;
 }
 
-- (void)encodeWithCoder:(NSCoder *)coder {
+- (void)encodeWithCoder:(NSCoder*)coder {
   ENCODE(coder, url);
   ENCODE(coder, formValues);
 }
 
-- (instancetype)initWithCoder:(NSCoder *)decoder {
+- (instancetype)initWithCoder:(NSCoder*)decoder {
   self = [super init];
   if (self) {
     DECODE(decoder, url, NSURL);
@@ -42,7 +42,7 @@
   return self;
 }
 
-- (instancetype)initWithURL:(NSURL *)url formValues:(NSDictionary *)formValues {
+- (instancetype)initWithURL:(NSURL*)url formValues:(NSDictionary*)formValues {
   self = [super init];
   if (self) {
     _url = url;
@@ -51,13 +51,13 @@
   return self;
 }
 
-- (NSString *)description {
+- (NSString*)description {
   return self.url.absoluteString;
 }
 
-- (NSData *)serialize {
-  NSError *error;
-  NSData *data = [NSKeyedArchiver archivedDataWithRootObject:self
+- (NSData*)serialize {
+  NSError* error;
+  NSData* data = [NSKeyedArchiver archivedDataWithRootObject:self
                                        requiringSecureCoding:YES
                                                        error:&error];
   if (error) {
@@ -68,12 +68,12 @@
   return data;
 }
 
-+ (instancetype)deserialize:(NSData *)data {
++ (instancetype)deserialize:(NSData*)data {
   if (!data) {
     return nil;
   }
 
-  NSError *error;
+  NSError* error;
   id object = [NSKeyedUnarchiver unarchivedObjectOfClass:[SNTExportConfiguration class]
                                                 fromData:data
                                                    error:&error];

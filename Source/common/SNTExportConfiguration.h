@@ -16,12 +16,12 @@
 
 @interface SNTExportConfiguration : NSObject <NSSecureCoding>
 
-@property(readonly) NSURL *url;
-@property(readonly) NSDictionary *formValues;
+@property(readonly) NSURL* url;
+@property(readonly) NSDictionary* formValues;
 
-- (instancetype)initWithURL:(NSURL *)url formValues:(NSDictionary *)formValues;
+- (instancetype)initWithURL:(NSURL*)url formValues:(NSDictionary*)formValues;
 
-- (NSData *)serialize;
-+ (instancetype)deserialize:(NSData *)data;
+- (NSData*)serialize;
++ (instancetype)deserialize:(NSData*)data;
 
 @end

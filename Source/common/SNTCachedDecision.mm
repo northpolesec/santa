@@ -22,7 +22,7 @@
   return [self initWithVnode:(SantaVnode){}];
 }
 
-- (instancetype)initWithEndpointSecurityFile:(const es_file_t *)esFile {
+- (instancetype)initWithEndpointSecurityFile:(const es_file_t*)esFile {
   return [self initWithVnode:SantaVnode::VnodeForFile(esFile)];
 }
 
@@ -35,7 +35,7 @@
   return self;
 }
 
-- (instancetype)initWithCachedIdentity:(SNTCachedDecision *)previous {
+- (instancetype)initWithCachedIdentity:(SNTCachedDecision*)previous {
   self = [self init];
   if (self) {
     _sha256 = previous.sha256;
@@ -55,8 +55,8 @@
   return self;
 }
 
-- (id)copyWithZone:(NSZone *)zone {
-  SNTCachedDecision *copy = [[SNTCachedDecision alloc] initWithVnode:_vnodeId];
+- (id)copyWithZone:(NSZone*)zone {
+  SNTCachedDecision* copy = [[SNTCachedDecision alloc] initWithVnode:_vnodeId];
   copy.decision = _decision;
   copy.decisionClientMode = _decisionClientMode;
   copy.decisionExtra = _decisionExtra;

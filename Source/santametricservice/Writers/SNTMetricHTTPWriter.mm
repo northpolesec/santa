@@ -21,7 +21,7 @@
 #import "Source/santametricservice/Writers/SNTMetricHTTPWriter.h"
 
 @interface SNTMetricHTTPWriter ()
-@property SNTConfigurator *configurator;
+@property SNTConfigurator* configurator;
 @end
 
 @implementation SNTMetricHTTPWriter
@@ -34,14 +34,14 @@
   return self;
 }
 
-- (MOLAuthenticatingURLSession *)createSessionWithHostname:(NSURL *)url
-                                                   Timeout:(NSTimeInterval)timeout {
-  NSURLSessionConfiguration *config = [NSURLSessionConfiguration ephemeralSessionConfiguration];
+- (MOLAuthenticatingURLSession*)createSessionWithHostname:(NSURL*)url
+                                                  Timeout:(NSTimeInterval)timeout {
+  NSURLSessionConfiguration* config = [NSURLSessionConfiguration ephemeralSessionConfiguration];
   config.TLSMinimumSupportedProtocolVersion = tls_protocol_version_TLSv12;
   config.HTTPShouldUsePipelining = YES;
   config.timeoutIntervalForResource = timeout;
 
-  MOLAuthenticatingURLSession *session =
+  MOLAuthenticatingURLSession* session =
       [[MOLAuthenticatingURLSession alloc] initWithSessionConfiguration:config];
   session.serverHostname = url.host;
 
@@ -51,31 +51,31 @@
 /**
  * Post serialzied metrics to the specified URL one object at a time.
  **/
-- (BOOL)write:(NSArray<NSData *> *)metrics toURL:(NSURL *)url error:(NSError **)error {
-  NSError *localError;
+- (BOOL)write:(NSArray<NSData*>*)metrics toURL:(NSURL*)url error:(NSError**)error {
+  NSError* localError;
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
 
-  MOLAuthenticatingURLSession *authSession =
+  MOLAuthenticatingURLSession* authSession =
       [self createSessionWithHostname:url Timeout:self.configurator.metricExportTimeout];
 
-  NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
+  NSMutableURLRequest* request = [NSMutableURLRequest requestWithURL:url];
   request.HTTPMethod = @"POST";
   [request setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
 
-  for (NSData *metric in metrics) {
-    NSError *taskError;
-    NSURLResponse *taskResponse;
-    request.HTTPBody = (NSData *)metric;
+  for (NSData* metric in metrics) {
+    NSError* taskError;
+    NSURLResponse* taskResponse;
+    request.HTTPBody = (NSData*)metric;
 
     // Note: In order to help ease mock writing in tests, the `task` variable is
     // sequestered into this anonymous scope to help ensure future edits outside
     // of this scope don'taccess the `task` variable which could mess up how the
     // tests are written.
     {
-      NSURLSessionDataTask *task = [authSession.session
+      NSURLSessionDataTask* task = [authSession.session
           dataTaskWithRequest:request
-            completionHandler:^(NSData *_Nullable data, NSURLResponse *_Nullable response,
-                                NSError *_Nullable err) {
+            completionHandler:^(NSData* _Nullable data, NSURLResponse* _Nullable response,
+                                NSError* _Nullable err) {
               dispatch_semaphore_signal(sema);
             }];
 
@@ -93,7 +93,7 @@
     if (taskError) {
       localError = taskError;
     } else if ([taskResponse isKindOfClass:[NSHTTPURLResponse class]]) {
-      NSInteger statusCode = ((NSHTTPURLResponse *)taskResponse).statusCode;
+      NSInteger statusCode = ((NSHTTPURLResponse*)taskResponse).statusCode;
       if (statusCode != 200) {
         localError = [[NSError alloc]
             initWithDomain:@"com.northpolesec.santa.metricservice.writers.http"

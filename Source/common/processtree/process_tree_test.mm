@@ -35,21 +35,21 @@ static constexpr std::string_view kAnnotatedExecutable = "/usr/bin/login";
 class TestAnnotator : public Annotator {
  public:
   TestAnnotator() {}
-  void AnnotateFork(ProcessTree &tree, const Process &parent, const Process &child) override;
-  void AnnotateExec(ProcessTree &tree, const Process &orig_process,
-                    const Process &new_process) override;
+  void AnnotateFork(ProcessTree& tree, const Process& parent, const Process& child) override;
+  void AnnotateExec(ProcessTree& tree, const Process& orig_process,
+                    const Process& new_process) override;
   std::optional<::ptpb::Annotations> Proto() const override;
 };
 
-void TestAnnotator::AnnotateFork(ProcessTree &tree, const Process &parent, const Process &child) {
+void TestAnnotator::AnnotateFork(ProcessTree& tree, const Process& parent, const Process& child) {
   // "Base case". Propagate existing annotations down to descendants.
   if (auto annotation = tree.GetAnnotation<TestAnnotator>(parent)) {
     tree.AnnotateProcess(child, std::move(*annotation));
   }
 }
 
-void TestAnnotator::AnnotateExec(ProcessTree &tree, const Process &orig_process,
-                                 const Process &new_process) {
+void TestAnnotator::AnnotateExec(ProcessTree& tree, const Process& orig_process,
+                                 const Process& new_process) {
   if (auto annotation = tree.GetAnnotation<TestAnnotator>(orig_process)) {
     tree.AnnotateProcess(new_process, std::move(*annotation));
     return;
@@ -120,17 +120,18 @@ using namespace santa::santad::process_tree;
   XCTAssertEqual(task_info(mach_task_self(), TASK_AUDIT_TOKEN, (task_info_t)&self_tok, &count),
                  KERN_SUCCESS);
 
-  XCTAssertEqual(proc.pid_.pid, audit_token_to_pid(self_tok));
-  XCTAssertEqual(proc.pid_.pidversion, audit_token_to_pidversion(self_tok));
+  XCTAssertEqual(proc.pid.pid, audit_token_to_pid(self_tok));
+  XCTAssertEqual(proc.pid.pidversion, audit_token_to_pidversion(self_tok));
 
-  XCTAssertEqual(proc.effective_cred_.uid, geteuid());
-  XCTAssertEqual(proc.effective_cred_.gid, getegid());
+  XCTAssertEqual(proc.cred.uid, geteuid());
+  XCTAssertEqual(proc.cred.gid, getegid());
 
+  auto program = proc.program;
   [[[NSProcessInfo processInfo] arguments]
-      enumerateObjectsUsingBlock:^(NSString *_Nonnull obj, NSUInteger idx, BOOL *_Nonnull stop) {
-        XCTAssertEqualObjects(@(proc.program_->arguments[idx].c_str()), obj);
+      enumerateObjectsUsingBlock:^(NSString* _Nonnull obj, NSUInteger idx, BOOL* _Nonnull stop) {
+        XCTAssertEqualObjects(@(program->arguments[idx].c_str()), obj);
         if (idx == 0) {
-          XCTAssertEqualObjects(@(proc.program_->executable.c_str()), obj);
+          XCTAssertEqualObjects(@(program->executable.c_str()), obj);
         }
       }];
 }
@@ -217,7 +218,7 @@ using namespace santa::santad::process_tree;
   {
     auto child = self.tree->Get(child_pid);
     XCTAssertTrue(child.has_value());
-    std::vector<struct Pid> pids = {(*child)->pid_};
+    PidList pids = {(*child)->pid_};
     self.tree->RetainProcess(pids);
   }
 
@@ -234,7 +235,7 @@ using namespace santa::santad::process_tree;
   {
     auto child = self.tree->Get(child_pid);
     XCTAssertTrue(child.has_value());
-    std::vector<struct Pid> pids = {(*child)->pid_};
+    PidList pids = {(*child)->pid_};
     self.tree->ReleaseProcess(pids);
   }
 

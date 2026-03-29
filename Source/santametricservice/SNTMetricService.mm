@@ -18,6 +18,8 @@
 
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTLogging.h"
+#import "Source/common/SNTStrengthify.h"
+#import "Source/common/SNTXPCSyncServiceInterface.h"
 
 #import "SNTMetricService.h"
 #import "Source/santametricservice/Formats/SNTMetricMonarchJSONFormat.h"
@@ -26,16 +28,17 @@
 #import "Source/santametricservice/Writers/SNTMetricHTTPWriter.h"
 
 @interface SNTMetricService ()
-@property MOLXPCConnection *notifierConnection;
-@property MOLXPCConnection *listener;
+@property MOLXPCConnection* notifierConnection;
+@property MOLXPCConnection* listener;
 @property(nonatomic) dispatch_queue_t queue;
 @end
 
 @implementation SNTMetricService {
  @private
-  SNTMetricRawJSONFormat *rawJSONFormatter;
-  SNTMetricMonarchJSONFormat *monarchJSONFormatter;
-  NSDictionary *metricWriters;
+  SNTMetricRawJSONFormat* rawJSONFormatter;
+  SNTMetricMonarchJSONFormat* monarchJSONFormatter;
+  NSDictionary* metricWriters;
+  MOLXPCConnection* syncServiceConnection;
 }
 
 - (instancetype)init {
@@ -58,9 +61,9 @@
 /**
  * Helper function to format NSError's for logging error messages.
  */
-- (NSString *)messageFromError:(NSError *)error {
-  NSString *message = [error localizedDescription];
-  NSString *details = [error localizedFailureReason] ?: @"";
+- (NSString*)messageFromError:(NSError*)error {
+  NSString* message = [error localizedDescription];
+  NSString* details = [error localizedFailureReason] ?: @"";
 
   return [NSString stringWithFormat:@"%@ %@", message, details];
 }
@@ -74,9 +77,9 @@
  *  @return An array of metrics formatted according to the specified format or
  *          nil on error;
  */
-- (NSArray<NSData *> *)convertMetrics:(NSDictionary *)metrics
-                             toFormat:(SNTMetricFormatType)format
-                                error:(NSError **)err {
+- (NSArray<NSData*>*)convertMetrics:(NSDictionary*)metrics
+                           toFormat:(SNTMetricFormatType)format
+                              error:(NSError**)err {
   switch (format) {
     case SNTMetricFormatTypeRawJSON:
       return [self->rawJSONFormatter convert:metrics endTimestamp:[NSDate date] error:err];
@@ -92,26 +95,38 @@
  *
  * @param metrics The NSDictionary from a MetricSet export call.
  */
-- (void)exportForMonitoring:(NSDictionary *)metrics {
-  SNTConfigurator *config = [SNTConfigurator configurator];
+- (void)exportForMonitoring:(NSDictionary*)metrics {
+  [self exportForMonitoring:metrics reply:nil];
+}
+
+- (void)exportForMonitoring:(NSDictionary*)metrics reply:(void (^)(BOOL))reply {
+  SNTConfigurator* config = [SNTConfigurator configurator];
 
   if (![config exportMetrics]) {
     LOGD(@"received metrics message while not configured to export metrics.");
+    if (reply) reply(NO);
     return;
   }
 
   if (metrics == nil) {
     LOGE(@"nil metrics dictionary sent for export");
+    if (reply) reply(NO);
     return;
   }
 
-  NSError *err;
-  NSArray<NSData *> *formattedMetrics = [self convertMetrics:metrics
-                                                    toFormat:config.metricFormat
-                                                       error:&err];
+  if (config.metricFormat == SNTMetricFormatTypeProto) {
+    [self publishMetricsViaSyncService:metrics reply:reply];
+    return;
+  }
+
+  NSError* err;
+  NSArray<NSData*>* formattedMetrics = [self convertMetrics:metrics
+                                                   toFormat:config.metricFormat
+                                                      error:&err];
 
   if (err != nil) {
     LOGE(@"unable to format metrics as  %@", [self messageFromError:err]);
+    if (reply) reply(NO);
     return;
   }
 
@@ -121,10 +136,38 @@
     BOOL ok = [writer write:formattedMetrics toURL:config.metricURL error:&err];
 
     if (!ok) {
-      if (err != nil) {
-        LOGE(@"unable to write metrics: %@", [self messageFromError:err]);
-      }
+      LOGE(@"unable to write metrics: %@",
+           err ? [self messageFromError:err] : @"no error provided");
+    }
+    if (reply) reply(ok);
+  } else {
+    if (reply) reply(NO);
+  }
+}
+
+- (void)publishMetricsViaSyncService:(NSDictionary*)metrics reply:(void (^)(BOOL))reply {
+  @synchronized(self) {
+    if (!syncServiceConnection) {
+      syncServiceConnection = [SNTXPCSyncServiceInterface configuredConnection];
+      WEAKIFY(self);
+      syncServiceConnection.invalidationHandler = ^{
+        STRONGIFY(self);
+        LOGW(@"Sync service connection invalidated for metric publishing");
+        @synchronized(self) {
+          self->syncServiceConnection = nil;
+        }
+      };
+      [syncServiceConnection resume];
     }
   }
+
+  [[syncServiceConnection remoteObjectProxy]
+      publishMetrics:metrics
+               reply:^(BOOL success) {
+                 if (!success) {
+                   LOGE(@"Failed to publish metrics via sync service");
+                 }
+                 if (reply) reply(success);
+               }];
 }
 @end

@@ -26,15 +26,15 @@
 
 @interface SNTNotificationQueue ()
 @property dispatch_queue_t pendingQueue;
-@property NSMutableArray *sentToUser;
+@property NSMutableArray* sentToUser;
 @end
 
 @implementation SNTNotificationQueue {
-  std::unique_ptr<santa::RingBuffer<NSMutableDictionary *>> _pendingNotifications;
+  std::unique_ptr<santa::RingBuffer<NSMutableDictionary*>> _pendingNotifications;
 }
 
 - (instancetype)initWithRingBuffer:
-    (std::unique_ptr<santa::RingBuffer<NSMutableDictionary *>>)pendingNotifications {
+    (std::unique_ptr<santa::RingBuffer<NSMutableDictionary*>>)pendingNotifications {
   self = [super init];
   if (self) {
     _pendingNotifications = std::move(pendingNotifications);
@@ -47,10 +47,10 @@
   return self;
 }
 
-- (void)addEvent:(SNTStoredExecutionEvent *)event
-    withCustomMessage:(NSString *)message
-            customURL:(NSString *)url
-          configState:(SNTConfigState *)configState
+- (void)addEvent:(SNTStoredExecutionEvent*)event
+    withCustomMessage:(NSString*)message
+            customURL:(NSString*)url
+          configState:(SNTConfigState*)configState
              andReply:(NotificationReplyBlock)replyBlock {
   if (!event) {
     if (replyBlock) {
@@ -59,7 +59,7 @@
     return;
   }
 
-  NSMutableDictionary *d = [NSMutableDictionary dictionary];
+  NSMutableDictionary* d = [NSMutableDictionary dictionary];
   [d setValue:event forKey:@"event"];
   [d setValue:message forKey:@"message"];
   [d setValue:url forKey:@"url"];
@@ -70,7 +70,7 @@
   [d setValue:[replyBlock copy] forKey:@"reply"];
 
   dispatch_sync(self.pendingQueue, ^{
-    NSDictionary *msg = _pendingNotifications->Enqueue(d).value_or(nil);
+    NSDictionary* msg = _pendingNotifications->Enqueue(d).value_or(nil);
 
     if (msg != nil) {
       LOGI(@"Pending GUI notification count is over %zu, dropping oldest notification.",
@@ -91,7 +91,7 @@
 /// reply so it won't be called again when the notification is eventually sent.
 - (void)clearAllPendingWithRepliesSerialized {
   // Auto-respond to blocks that have been sent to the UI but have not yet received a response.
-  for (NSDictionary *d in self.sentToUser) {
+  for (NSDictionary* d in self.sentToUser) {
     NotificationReplyBlock replyBlock = d[@"reply"];
     if (replyBlock) {
       replyBlock(NO);
@@ -101,7 +101,7 @@
 
   _pendingNotifications->Erase(
       std::remove_if(_pendingNotifications->begin(), _pendingNotifications->end(),
-                     [](NSMutableDictionary *d) {
+                     [](NSMutableDictionary* d) {
                        NotificationReplyBlock replyBlock = d[@"reply"];
                        if (replyBlock) {
                          replyBlock(NO);
@@ -122,7 +122,7 @@
   }
 
   while (!_pendingNotifications->Empty()) {
-    NSDictionary *d = _pendingNotifications->Dequeue().value_or(nil);
+    NSDictionary* d = _pendingNotifications->Dequeue().value_or(nil);
     if (!d) {
       // This shouldn't ever be possible, but bail just in case.
       return;
@@ -160,7 +160,7 @@
   }
 }
 
-- (void)setNotifierConnection:(MOLXPCConnection *)notifierConnection {
+- (void)setNotifierConnection:(MOLXPCConnection*)notifierConnection {
   _notifierConnection = notifierConnection;
 
   WEAKIFY(self);

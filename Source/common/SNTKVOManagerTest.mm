@@ -18,8 +18,8 @@
 #import "Source/common/SNTKVOManager.h"
 
 @interface Foo : NSObject
-@property NSNumber *propNumber;
-@property NSArray *propArray;
+@property NSNumber* propNumber;
+@property NSArray* propArray;
 @property id propId;
 @end
 
@@ -32,9 +32,9 @@
 @implementation SNTKVOManagerTest
 
 - (void)testInvalidSelector {
-  Foo *foo = [[Foo alloc] init];
+  Foo* foo = [[Foo alloc] init];
 
-  SNTKVOManager *kvo = [[SNTKVOManager alloc] initWithObject:foo
+  SNTKVOManager* kvo = [[SNTKVOManager alloc] initWithObject:foo
                                                     selector:NSSelectorFromString(@"doesNotExist")
                                                         type:[NSNumber class]
                                                     callback:^(id, id){
@@ -44,7 +44,7 @@
 }
 
 - (void)testNormalOperation {
-  Foo *foo = [[Foo alloc] init];
+  Foo* foo = [[Foo alloc] init];
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
 
   int origVal = 123;
@@ -57,11 +57,11 @@
   __block int oldVal;
   __block int newVal;
 
-  SNTKVOManager *kvo =
+  SNTKVOManager* kvo =
       [[SNTKVOManager alloc] initWithObject:foo
                                    selector:@selector(propNumber)
                                        type:[NSNumber class]
-                                   callback:^(NSNumber *oldValue, NSNumber *newValue) {
+                                   callback:^(NSNumber* oldValue, NSNumber* newValue) {
                                      oldVal = [oldValue intValue];
                                      newVal = [newValue intValue];
                                      dispatch_semaphore_signal(sema);
@@ -88,17 +88,17 @@
 }
 
 - (void)testUnexpectedTypes {
-  Foo *foo = [[Foo alloc] init];
+  Foo* foo = [[Foo alloc] init];
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
 
-  NSString *origVal = @"any_val";
-  NSString *update = @"new_val";
+  NSString* origVal = @"any_val";
+  NSString* update = @"new_val";
   foo.propId = origVal;
 
   __block id oldVal;
   __block id newVal;
 
-  SNTKVOManager *kvo = [[SNTKVOManager alloc] initWithObject:foo
+  SNTKVOManager* kvo = [[SNTKVOManager alloc] initWithObject:foo
                                                     selector:@selector(propId)
                                                         type:[NSString class]
                                                     callback:^(id oldValue, id newValue) {

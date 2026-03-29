@@ -23,7 +23,7 @@
 #import "Source/santactl/SNTCommand.h"
 #import "Source/santactl/SNTCommandController.h"
 
-NSString *StartupOptionToString(SNTDeviceManagerStartupPreferences pref) {
+NSString* StartupOptionToString(SNTDeviceManagerStartupPreferences pref) {
   switch (pref) {
     case SNTDeviceManagerStartupPreferencesUnmount: return @"Unmount";
     case SNTDeviceManagerStartupPreferencesForceUnmount: return @"ForceUnmount";
@@ -33,8 +33,8 @@ NSString *StartupOptionToString(SNTDeviceManagerStartupPreferences pref) {
   }
 }
 
-NSString *FormatTimeRemaining(NSTimeInterval seconds) {
-  NSDateComponentsFormatter *formatter = [[NSDateComponentsFormatter alloc] init];
+NSString* FormatTimeRemaining(NSTimeInterval seconds) {
+  NSDateComponentsFormatter* formatter = [[NSDateComponentsFormatter alloc] init];
   formatter.unitsStyle = NSDateComponentsFormatterUnitsStyleFull;
   formatter.allowedUnits =
       NSCalendarUnitDay | NSCalendarUnitHour | NSCalendarUnitMinute | NSCalendarUnitSecond;
@@ -46,8 +46,8 @@ NSString *FormatTimeRemaining(NSTimeInterval seconds) {
   return [formatter stringFromTimeInterval:seconds];
 }
 
-NSString *FormatInterval(NSUInteger seconds) {
-  NSDateComponentsFormatter *formatter = [[NSDateComponentsFormatter alloc] init];
+NSString* FormatInterval(NSUInteger seconds) {
+  NSDateComponentsFormatter* formatter = [[NSDateComponentsFormatter alloc] init];
   formatter.unitsStyle = NSDateComponentsFormatterUnitsStyleFull;
   formatter.allowedUnits = NSCalendarUnitHour | NSCalendarUnitMinute | NSCalendarUnitSecond;
   formatter.collapsesLargestUnit = NO;
@@ -73,24 +73,24 @@ REGISTER_COMMAND_NAME(@"status")
   return YES;
 }
 
-+ (NSString *)shortHelpText {
++ (NSString*)shortHelpText {
   return @"Show Santa status information.";
 }
 
-+ (NSString *)longHelpText {
++ (NSString*)longHelpText {
   return (@"Provides details about Santa while it's running.\n"
           @"  Use --json to output in JSON format");
 }
 
-- (void)runWithArguments:(NSArray *)arguments {
+- (void)runWithArguments:(NSArray*)arguments {
   id<SNTDaemonControlXPC> rop = [self.daemonConn synchronousRemoteObjectProxy];
 
   // Daemon status
-  __block NSString *clientMode;
+  __block NSString* clientMode;
   __block uint64_t cpuEvents, ramEvents;
   __block double cpuPeak, ramPeak;
 
-  [rop temporaryMonitorModeSecondsRemaining:^(NSNumber *val) {
+  [rop temporaryMonitorModeSecondsRemaining:^(NSNumber* val) {
     if (val) {
       clientMode = [@"Temporary Monitor Mode "
           stringByAppendingFormat:@"(%@)", FormatTimeRemaining([val unsignedLongLongValue])];
@@ -115,9 +115,9 @@ REGISTER_COMMAND_NAME(@"status")
   }];
 
   BOOL fileLogging = ([[SNTConfigurator configurator] fileChangesRegex] != nil);
-  NSString *eventLogType = [[[SNTConfigurator configurator] eventLogTypeRaw] lowercaseString];
+  NSString* eventLogType = [[[SNTConfigurator configurator] eventLogTypeRaw] lowercaseString];
 
-  SNTConfigurator *configurator = [SNTConfigurator configurator];
+  SNTConfigurator* configurator = [SNTConfigurator configurator];
 
   // Cache status
   __block uint64_t rootCacheCount = -1, nonRootCacheCount = -1;
@@ -153,21 +153,21 @@ REGISTER_COMMAND_NAME(@"status")
   }];
 
   // Rules hash
-  __block NSString *executionRulesHash;
-  __block NSString *fileAccessRulesHash;
-  [rop databaseRulesHash:^(NSString *execRulesHash, NSString *faaRulesHash) {
+  __block NSString* executionRulesHash;
+  __block NSString* fileAccessRulesHash;
+  [rop databaseRulesHash:^(NSString* execRulesHash, NSString* faaRulesHash) {
     executionRulesHash = execRulesHash;
     fileAccessRulesHash = faaRulesHash;
   }];
 
   // Sync status
-  __block NSDate *fullSyncLastSuccess;
-  [rop fullSyncLastSuccess:^(NSDate *date) {
+  __block NSDate* fullSyncLastSuccess;
+  [rop fullSyncLastSuccess:^(NSDate* date) {
     fullSyncLastSuccess = date;
   }];
 
-  __block NSDate *ruleSyncLastSuccess;
-  [rop ruleSyncLastSuccess:^(NSDate *date) {
+  __block NSDate* ruleSyncLastSuccess;
+  [rop ruleSyncLastSuccess:^(NSDate* date) {
     ruleSyncLastSuccess = date;
   }];
 
@@ -176,8 +176,8 @@ REGISTER_COMMAND_NAME(@"status")
     syncCleanReqd = (syncType == SNTSyncTypeClean || syncType == SNTSyncTypeCleanAll);
   }];
 
-  __block NSString *pushNotifications = @"Unknown";
-  __block NSString *pushServerAddress = nil;
+  __block NSString* pushNotifications = @"Unknown";
+  __block NSString* pushServerAddress = nil;
   if ([configurator syncBaseURL]) {
     // The request to santad to discover whether push notifications are enabled
     // makes a call to santasyncservice. If it's unavailable the call can hang
@@ -196,7 +196,7 @@ REGISTER_COMMAND_NAME(@"status")
             pushNotifications = @"NPS Push Service";
             // Fetch the push server address for NATS
             dispatch_semaphore_t serverSema = dispatch_semaphore_create(0);
-            [rop pushNotificationServerAddress:^(NSString *serverAddress) {
+            [rop pushNotificationServerAddress:^(NSString* serverAddress) {
               if (serverAddress) {
                 pushServerAddress = [[NSURL URLWithString:serverAddress] host];
               }
@@ -228,12 +228,12 @@ REGISTER_COMMAND_NAME(@"status")
 
   __block BOOL watchItemsEnabled = NO;
   __block uint64_t watchItemsRuleCount = 0;
-  __block NSString *watchItemsPolicyVersion = nil;
-  __block NSString *watchItemsConfigPath = nil;
+  __block NSString* watchItemsPolicyVersion = nil;
+  __block NSString* watchItemsConfigPath = nil;
   __block NSTimeInterval watchItemsLastUpdateEpoch = 0;
   __block santa::WatchItems::DataSource watchItemsDataSource;
-  [rop watchItemsState:^(BOOL enabled, uint64_t ruleCount, NSString *policyVersion,
-                         santa::WatchItems::DataSource dataSource, NSString *configPath,
+  [rop watchItemsState:^(BOOL enabled, uint64_t ruleCount, NSString* policyVersion,
+                         santa::WatchItems::DataSource dataSource, NSString* configPath,
                          NSTimeInterval lastUpdateEpoch) {
     watchItemsEnabled = enabled;
     if (enabled) {
@@ -255,8 +255,8 @@ REGISTER_COMMAND_NAME(@"status")
     blockUnencryptedRemovableMediaMount = response;
   }];
 
-  __block NSArray<NSString *> *remountUSBMode;
-  [rop remountUSBMode:^(NSArray<NSString *> *response) {
+  __block NSArray<NSString*>* remountUSBMode;
+  [rop remountUSBMode:^(NSArray<NSString*>* response) {
     remountUSBMode = response;
   }];
 
@@ -265,11 +265,11 @@ REGISTER_COMMAND_NAME(@"status")
     isSyncV2Enabled = val;
   }];
 
-  __block NSNumber *networkMountExceptions;
+  __block NSNumber* networkMountExceptions;
   __block BOOL networkExtensionEnabled = NO;
   __block BOOL networkExtensionLoaded = NO;
   if (isSyncV2Enabled) {
-    [rop blockNetworkMount:^(NSNumber *numExceptions) {
+    [rop blockNetworkMount:^(NSNumber* numExceptions) {
       networkMountExceptions = numExceptions;
     }];
     [rop networkExtensionEnabled:^(BOOL enabled) {
@@ -281,18 +281,18 @@ REGISTER_COMMAND_NAME(@"status")
   }
 
   // Format dates
-  NSDateFormatter *dateFormatter = [[NSDateFormatter alloc] init];
+  NSDateFormatter* dateFormatter = [[NSDateFormatter alloc] init];
   dateFormatter.dateFormat = @"yyyy/MM/dd HH:mm:ss Z";
-  NSString *fullSyncLastSuccessStr = [dateFormatter stringFromDate:fullSyncLastSuccess] ?: @"Never";
-  NSString *ruleSyncLastSuccessStr =
+  NSString* fullSyncLastSuccessStr = [dateFormatter stringFromDate:fullSyncLastSuccess] ?: @"Never";
+  NSString* ruleSyncLastSuccessStr =
       [dateFormatter stringFromDate:ruleSyncLastSuccess] ?: fullSyncLastSuccessStr;
 
-  NSString *watchItemsLastUpdateStr =
+  NSString* watchItemsLastUpdateStr =
       [dateFormatter
           stringFromDate:[NSDate dateWithTimeIntervalSince1970:watchItemsLastUpdateEpoch]]
           ?: @"Never";
 
-  NSString *syncURLStr = configurator.syncBaseURL.absoluteString;
+  NSString* syncURLStr = configurator.syncBaseURL.absoluteString;
 
   __block NSUInteger fullSyncInterval = 0;
   [rop fullSyncInterval:^(NSUInteger interval) {
@@ -305,18 +305,18 @@ REGISTER_COMMAND_NAME(@"status")
   }];
 
   BOOL exportMetrics = configurator.exportMetrics;
-  NSURL *metricsURLStr = configurator.metricURL;
+  NSURL* metricsURLStr = configurator.metricURL;
   NSUInteger metricExportInterval = configurator.metricExportInterval;
 
-  NSArray<NSString *> *allowedCommands = configurator.allowedSantaCommands;
-  NSString *allowedStr = !allowedCommands ? @"All"
+  NSArray<NSString*>* allowedCommands = configurator.allowedSantaCommands;
+  NSString* allowedStr = !allowedCommands ? @"All"
                          : allowedCommands.count > 0
                              ? [[allowedCommands sortedArrayUsingSelector:@selector(compare:)]
                                    componentsJoinedByString:@", "]
                              : @"None (all blocked)";
 
   if ([arguments containsObject:@"--json"]) {
-    NSMutableDictionary *stats = [@{
+    NSMutableDictionary* stats = [@{
       @"daemon" : @{
         @"mode" : clientMode ?: @"null",
         @"log_type" : eventLogType,
@@ -353,7 +353,7 @@ REGISTER_COMMAND_NAME(@"status")
     } mutableCopy];
 
     if (isSyncV2Enabled) {
-      NSMutableDictionary *daemon = [stats[@"daemon"] mutableCopy];
+      NSMutableDictionary* daemon = [stats[@"daemon"] mutableCopy];
       daemon[@"block_network_mounts"] = @(networkMountExceptions != nil);
       daemon[@"network_mount_host_exceptions"] = @([networkMountExceptions intValue]);
       stats[@"daemon"] = daemon;
@@ -364,7 +364,7 @@ REGISTER_COMMAND_NAME(@"status")
       };
 
       if (allowedCommands) {
-        NSMutableDictionary *daemon = [stats[@"daemon"] mutableCopy];
+        NSMutableDictionary* daemon = [stats[@"daemon"] mutableCopy];
         daemon[@"allowed_commands"] =
             [allowedCommands sortedArrayUsingSelector:@selector(compare:)];
         stats[@"daemon"] = daemon;
@@ -433,10 +433,10 @@ REGISTER_COMMAND_NAME(@"status")
       };
     }
 
-    NSData *statsData = [NSJSONSerialization dataWithJSONObject:stats
+    NSData* statsData = [NSJSONSerialization dataWithJSONObject:stats
                                                         options:NSJSONWritingPrettyPrinted
                                                           error:nil];
-    NSString *statsStr = [[NSString alloc] initWithData:statsData encoding:NSUTF8StringEncoding];
+    NSString* statsStr = [[NSString alloc] initWithData:statsData encoding:NSUTF8StringEncoding];
     printf("%s\n", [statsStr UTF8String]);
   } else {
     printf(">>> Daemon Info\n");
@@ -513,7 +513,7 @@ REGISTER_COMMAND_NAME(@"status")
 
       // If push notifications are enabled, show the push notifications full
       // sync interval since it's the active configuration.
-      NSString *fullSyncIntervalStr = FormatInterval(fullSyncInterval);
+      NSString* fullSyncIntervalStr = FormatInterval(fullSyncInterval);
       if (configurator.fcmEnabled || configurator.enablePushNotifications) {
         fullSyncIntervalStr =
             [NSString stringWithFormat:@"%@ (with Push Notifications)",
@@ -522,7 +522,7 @@ REGISTER_COMMAND_NAME(@"status")
       printf("  %-40s | %s\n", "Full Sync Interval", [fullSyncIntervalStr UTF8String]);
 
       // Format push notifications output
-      NSString *pushNotificationsOutput = pushNotifications;
+      NSString* pushNotificationsOutput = pushNotifications;
       if (pushServerAddress && [pushNotifications containsString:@"NPS Push Service"]) {
         pushNotificationsOutput =
             [NSString stringWithFormat:@"NPS Push Service (%@)", pushServerAddress];

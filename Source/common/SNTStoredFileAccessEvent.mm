@@ -30,7 +30,7 @@
   return YES;
 }
 
-- (void)encodeWithCoder:(NSCoder *)coder {
+- (void)encodeWithCoder:(NSCoder*)coder {
   [super encodeWithCoder:coder];
   ENCODE(coder, accessedPath);
   ENCODE(coder, ruleVersion);
@@ -39,7 +39,7 @@
   ENCODE_BOXABLE(coder, decision);
 }
 
-- (instancetype)initWithCoder:(NSCoder *)decoder {
+- (instancetype)initWithCoder:(NSCoder*)decoder {
   self = [super initWithCoder:decoder];
   if (self) {
     DECODE(decoder, ruleVersion, NSString);
@@ -51,12 +51,12 @@
   return self;
 }
 
-- (NSString *)description {
+- (NSString*)description {
   return [NSString stringWithFormat:@"SNTStoredFileAccessEvent[%@]: Accessed: %@, By: %@", self.idx,
                                     self.accessedPath, self.process];
 }
 
-- (NSString *)uniqueID {
+- (NSString*)uniqueID {
   // NB: Not using `accessedPath` as part of the uniqe ID to prevent a noisy
   // rule from generating a large number of events to upload.
   return [NSString stringWithFormat:@"%@|%@|%@", _ruleName, _ruleVersion, _process.fileSHA256];
@@ -74,7 +74,7 @@
   return YES;
 }
 
-- (void)encodeWithCoder:(NSCoder *)coder {
+- (void)encodeWithCoder:(NSCoder*)coder {
   ENCODE(coder, filePath);
   ENCODE(coder, cdhash);
   ENCODE(coder, fileSHA256);
@@ -86,7 +86,7 @@
   ENCODE(coder, parent);
 }
 
-- (instancetype)initWithCoder:(NSCoder *)decoder {
+- (instancetype)initWithCoder:(NSCoder*)decoder {
   self = [super init];
   if (self) {
     DECODE(decoder, filePath, NSString);
@@ -102,7 +102,7 @@
   return self;
 }
 
-- (NSString *)description {
+- (NSString*)description {
   return [NSString
       stringWithFormat:@"SNTStoredFileAccessProcess (pid: %@): %@", self.pid, self.filePath];
 }

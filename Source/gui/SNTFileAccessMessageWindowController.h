@@ -27,13 +27,13 @@ NS_ASSUME_NONNULL_BEGIN
 ///
 @interface SNTFileAccessMessageWindowController : SNTMessageWindowController <NSWindowDelegate>
 
-- (instancetype)initWithEvent:(SNTStoredFileAccessEvent *)event
-                customMessage:(nullable NSString *)message
-                    customURL:(nullable NSString *)url
-                   customText:(nullable NSString *)text
-                  configState:(nullable SNTConfigState *)configState;
+- (instancetype)initWithEvent:(SNTStoredFileAccessEvent*)event
+                customMessage:(nullable NSString*)message
+                    customURL:(nullable NSString*)url
+                   customText:(nullable NSString*)text
+                  configState:(nullable SNTConfigState*)configState;
 
-@property(readonly) SNTStoredFileAccessEvent *event;
+@property(readonly) SNTStoredFileAccessEvent* event;
 
 @end
 

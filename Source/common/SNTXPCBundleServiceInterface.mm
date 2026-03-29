@@ -20,8 +20,8 @@
 
 @implementation SNTXPCBundleServiceInterface
 
-+ (NSXPCInterface *)bundleServiceInterface {
-  NSXPCInterface *r = [NSXPCInterface interfaceWithProtocol:@protocol(SNTBundleServiceXPC)];
++ (NSXPCInterface*)bundleServiceInterface {
+  NSXPCInterface* r = [NSXPCInterface interfaceWithProtocol:@protocol(SNTBundleServiceXPC)];
 
   [r setClasses:[NSSet setWithObjects:[NSArray class], [SNTStoredEvent class],
                                       [SNTStoredExecutionEvent class], nil]
@@ -38,12 +38,12 @@
   return r;
 }
 
-+ (NSString *)serviceID {
++ (NSString*)serviceID {
   return @"com.northpolesec.santa.bundleservice";
 }
 
-+ (MOLXPCConnection *)configuredConnection {
-  MOLXPCConnection *c = [[MOLXPCConnection alloc] initClientWithName:[self serviceID]
++ (MOLXPCConnection*)configuredConnection {
+  MOLXPCConnection* c = [[MOLXPCConnection alloc] initClientWithName:[self serviceID]
                                                           privileged:YES];
   c.remoteInterface = [self bundleServiceInterface];
   return c;

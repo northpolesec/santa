@@ -46,7 +46,7 @@ using santa::FindPoliciesForTargetsBlock;
 using santa::Message;
 
 @interface SNTEndpointSecurityDataFileAccessAuthorizer ()
-@property SNTConfigurator *configurator;
+@property SNTConfigurator* configurator;
 @property bool isSubscribed;
 @property(copy) FindPoliciesForTargetsBlock findPoliciesForTargetsBlock;
 @end
@@ -72,7 +72,7 @@ using santa::Message;
 
     _configurator = [SNTConfigurator configurator];
 
-    SNTMetricBooleanGauge *famEnabled = [[SNTMetricSet sharedInstance]
+    SNTMetricBooleanGauge* famEnabled = [[SNTMetricSet sharedInstance]
         booleanGaugeWithName:@"/santa/fam_enabled"
                   fieldNames:@[]
                     helpText:@"Whether or not the FAM client is enabled"];
@@ -90,7 +90,7 @@ using santa::Message;
   return self;
 }
 
-- (NSString *)description {
+- (NSString*)description {
   return @"DataFileAccessAuthorizer";
 }
 
@@ -104,7 +104,7 @@ using santa::Message;
 
   self.findPoliciesForTargetsBlock(^(santa::LookupPolicyBlock lookupPolicyBlock) {
     size_t idx = 0;
-    for (const auto &target : pathTargets) {
+    for (const auto& target : pathTargets) {
       targetPolicyPairs.emplace_back(idx, lookupPolicyBlock(target.path.c_str()));
       idx++;
     }
@@ -112,9 +112,9 @@ using santa::Message;
 
   FAAPolicyProcessor::ESResult result = _faaPolicyProcessorProxy->ProcessMessage(
       msg, targetPolicyPairs,
-      ^bool(const santa::WatchItemPolicyBase &base_policy, const Message::PathTarget &target,
-            const Message &msg) {
-        for (const santa::WatchItemProcess &process : base_policy.processes) {
+      ^bool(const santa::WatchItemPolicyBase& base_policy, const Message::PathTarget& target,
+            const Message& msg) {
+        for (const santa::WatchItemProcess& process : base_policy.processes) {
           if ((*_faaPolicyProcessorProxy)->PolicyMatchesProcess(process, msg->process)) {
             return true;
           }
@@ -127,7 +127,7 @@ using santa::Message;
   [self respondToMessage:msg withAuthResult:result.auth_result cacheable:result.cacheable];
 }
 
-- (void)handleMessage:(santa::Message &&)esMsg
+- (void)handleMessage:(santa::Message&&)esMsg
     recordEventMetrics:(void (^)(santa::EventDisposition))recordEventMetrics {
   SNTOverrideFileAccessAction overrideAction = [self.configurator overrideFileAccessAction];
 
@@ -158,7 +158,7 @@ using santa::Message;
                }];
 }
 
-- (santa::ProbeInterest)probeInterest:(const santa::Message &)esMsg {
+- (santa::ProbeInterest)probeInterest:(const santa::Message&)esMsg {
   if (!self.isSubscribed) {
     return santa::ProbeInterest::kUninterested;
   }
@@ -166,7 +166,7 @@ using santa::Message;
   // Mute Santa's Bundle Service so that it doesn't run afoul of file access protections and
   // can function as expected. Note: Other processes, especially santactl, are explicitly *NOT*
   // allowlisted to prevent it from becoming an oracle.
-  const es_process_t *targetProc = esMsg->event.exec.target;
+  const es_process_t* targetProc = esMsg->event.exec.target;
   if ((targetProc->codesigning_flags & (CS_SIGNED | CS_VALID)) == (CS_SIGNED | CS_VALID) &&
       targetProc->team_id.data && strcmp(targetProc->team_id.data, "ZMCG7MLDV9") == 0 &&
       targetProc->signing_id.data &&
@@ -206,8 +206,8 @@ using santa::Message;
 }
 
 - (void)watchItemsCount:(size_t)count
-               newPaths:(const santa::SetPairPathAndType &)newPaths
-           removedPaths:(const santa::SetPairPathAndType &)removedPaths {
+               newPaths:(const santa::SetPairPathAndType&)newPaths
+           removedPaths:(const santa::SetPairPathAndType&)removedPaths {
   if (count == 0) {
     [self disable];
   } else {

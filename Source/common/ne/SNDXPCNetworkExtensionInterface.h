@@ -22,9 +22,9 @@
 ///
 @protocol SNDNetworkExtensionXPC
 
-- (void)updateNetworkExtensionSettings:(SNTNetworkExtensionSettings *)settings
+- (void)updateNetworkExtensionSettings:(SNTNetworkExtensionSettings*)settings
                                  reply:(void (^)(BOOL))reply;
 
-- (void)bundleVersionInfo:(void (^)(NSDictionary *bundleInfo))reply;
+- (void)bundleVersionInfo:(void (^)(NSDictionary* bundleInfo))reply;
 
 @end

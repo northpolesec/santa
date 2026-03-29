@@ -20,8 +20,8 @@
 
 @implementation SNTMessageWindowController
 
-+ (NSWindow *)defaultWindow {
-  NSWindow *window =
++ (NSWindow*)defaultWindow {
+  NSWindow* window =
       [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 0, 0)
                                   styleMask:NSWindowStyleMaskClosable | NSWindowStyleMaskResizable |
                                             NSWindowStyleMaskTitled
@@ -57,7 +57,7 @@
   [self.window close];
 }
 
-- (void)windowWillClose:(NSNotification *)notification {
+- (void)windowWillClose:(NSNotification*)notification {
   if (!self.delegate) return;
 
   if (self.silenceFutureNotificationsPeriod) {
@@ -68,14 +68,14 @@
   }
 }
 
-- (void)windowDidResize:(NSNotification *)notification {
+- (void)windowDidResize:(NSNotification*)notification {
   if (!self.hasBeenCentered) {
     [self.window center];
     self.hasBeenCentered = YES;
   }
 }
 
-- (NSString *)messageHash {
+- (NSString*)messageHash {
   [self doesNotRecognizeSelector:_cmd];
   return nil;
 }

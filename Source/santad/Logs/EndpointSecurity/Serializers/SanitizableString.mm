@@ -20,14 +20,14 @@ using santa::NSStringToUTF8StringView;
 
 namespace santa {
 
-SanitizableString::SanitizableString(const es_file_t *file)
+SanitizableString::SanitizableString(const es_file_t* file)
     : data_(file->path.data, file->path.length) {}
 
-SanitizableString::SanitizableString(const es_string_token_t &tok) : data_(tok.data, tok.length) {}
+SanitizableString::SanitizableString(const es_string_token_t& tok) : data_(tok.data, tok.length) {}
 
-SanitizableString::SanitizableString(NSString *str) : data_(NSStringToUTF8StringView(str)) {}
+SanitizableString::SanitizableString(NSString* str) : data_(NSStringToUTF8StringView(str)) {}
 
-SanitizableString::SanitizableString(const char *str, size_t len) : data_(str, len) {}
+SanitizableString::SanitizableString(const char* str, size_t len) : data_(str, len) {}
 
 std::string_view SanitizableString::String() const {
   return data_;
@@ -46,16 +46,16 @@ std::string_view SanitizableString::Sanitized() const {
   }
 }
 
-std::ostream &operator<<(std::ostream &ss, const SanitizableString &sani_string) {
+std::ostream& operator<<(std::ostream& ss, const SanitizableString& sani_string) {
   ss << sani_string.Sanitized();
   return ss;
 }
 
-std::optional<std::string> SanitizableString::SanitizeString(const char *str) {
+std::optional<std::string> SanitizableString::SanitizeString(const char* str) {
   return SanitizeString(str, str ? strlen(str) : 0);
 }
 
-std::optional<std::string> SanitizableString::SanitizeString(const char *str, size_t length) {
+std::optional<std::string> SanitizableString::SanitizeString(const char* str, size_t length) {
   size_t strOffset = 0;
   char c = 0;
   std::string buf;
@@ -71,7 +71,7 @@ std::optional<std::string> SanitizableString::SanitizeString(const char *str, si
 
   // Loop through the string one character at a time, looking for the characters
   // we want to remove.
-  for (const char *p = str; (c = *p) != 0; ++p) {
+  for (const char* p = str; (c = *p) != 0; ++p) {
     if (c == '|' || c == '\n' || c == '\r') {
       if (!reservedStringSpace) {
         // Assume the common case won't grow the string length by more than a

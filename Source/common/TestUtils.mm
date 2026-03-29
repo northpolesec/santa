@@ -24,7 +24,7 @@
 #include "Source/common/Platform.h"
 #include "Source/common/SystemResources.h"
 
-NSString *RepeatedString(NSString *str, NSUInteger len) {
+NSString* RepeatedString(NSString* str, NSUInteger len) {
   return [@"" stringByPaddingToLength:len withString:str startingAtIndex:0];
 }
 
@@ -65,14 +65,14 @@ struct stat MakeStat(int offset) {
   };
 }
 
-es_string_token_t MakeESStringToken(const char *s) {
+es_string_token_t MakeESStringToken(const char* s) {
   return es_string_token_t{
       .length = s ? strlen(s) : 0,
       .data = s,
   };
 }
 
-es_file_t MakeESFile(const char *path, struct stat sb) {
+es_file_t MakeESFile(const char* path, struct stat sb) {
   return es_file_t{
       .path = MakeESStringToken(path),
       .path_truncated = false,
@@ -80,7 +80,7 @@ es_file_t MakeESFile(const char *path, struct stat sb) {
   };
 }
 
-es_process_t MakeESProcess(es_file_t *file, audit_token_t tok, audit_token_t parent_tok) {
+es_process_t MakeESProcess(es_file_t* file, audit_token_t tok, audit_token_t parent_tok) {
   return es_process_t{
       .audit_token = tok,
       .ppid = audit_token_to_pid(parent_tok),
@@ -94,7 +94,7 @@ es_process_t MakeESProcess(es_file_t *file, audit_token_t tok, audit_token_t par
   };
 }
 
-es_message_t MakeESMessage(es_event_type_t et, es_process_t *proc, ActionType action_type,
+es_message_t MakeESMessage(es_event_type_t et, es_process_t* proc, ActionType action_type,
                            uint64_t future_deadline_ms) {
   es_message_t es_msg = {
       .deadline =

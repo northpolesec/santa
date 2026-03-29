@@ -19,12 +19,12 @@
 
 @implementation SNTCommand
 
-+ (void)runWithArguments:(NSArray *)arguments daemonConnection:(MOLXPCConnection *)daemonConn {
++ (void)runWithArguments:(NSArray*)arguments daemonConnection:(MOLXPCConnection*)daemonConn {
   id cmd = [[self alloc] initWithDaemonConnection:daemonConn];
   [cmd runWithArguments:arguments];
 }
 
-- (instancetype)initWithDaemonConnection:(MOLXPCConnection *)daemonConn {
+- (instancetype)initWithDaemonConnection:(MOLXPCConnection*)daemonConn {
   self = [super init];
   if (self) {
     _daemonConn = daemonConn;
@@ -32,12 +32,12 @@
   return self;
 }
 
-- (void)runWithArguments:(NSArray *)arguments {
+- (void)runWithArguments:(NSArray*)arguments {
   // This method must be overridden.
   [self doesNotRecognizeSelector:_cmd];
 }
 
-- (void)printErrorUsageAndExit:(NSString *)error {
+- (void)printErrorUsageAndExit:(NSString*)error {
   // Only send the error string to both the system logger and stderr, not the usage string
   TEE_LOGE(@"%@\n\n", error);
   fprintf(stderr, "%s\n", [[[self class] longHelpText] UTF8String]);

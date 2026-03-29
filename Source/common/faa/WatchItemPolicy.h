@@ -79,9 +79,9 @@ static constexpr bool kWatchItemPolicyDefaultEnableSilentMode = false;
 static constexpr bool kWatchItemPolicyDefaultEnableSilentTTYMode = false;
 
 struct WatchItemProcess {
-  static std::optional<WatchItemProcess> Create(NSString *bp, NSString *sid, NSString *tid,
-                                                NSString *cdh, NSString *ch, bool pb,
-                                                NSError **error) {
+  static std::optional<WatchItemProcess> Create(NSString* bp, NSString* sid, NSString* tid,
+                                                NSString* cdh, NSString* ch, bool pb,
+                                                NSError** error) {
     // Ensure at least one attribute set
     if (!bp && !sid && !tid && !cdh && !ch && !pb) {
       [SNTError populateError:error withFormat:@"No valid attributes set in process dictionary"];
@@ -145,26 +145,26 @@ struct WatchItemProcess {
   }
 #endif
 
-  bool operator==(const WatchItemProcess &other) const {
+  bool operator==(const WatchItemProcess& other) const {
     return binary_path == other.binary_path && signing_id == other.signing_id &&
            team_id == other.team_id && cdhash == other.cdhash &&
            certificate_sha256 == other.certificate_sha256 &&
            platform_binary == other.platform_binary;
   }
 
-  bool operator!=(const WatchItemProcess &other) const { return !(*this == other); }
+  bool operator!=(const WatchItemProcess& other) const { return !(*this == other); }
 
 #ifdef DEBUG
   /// This interface should only be used for testing
   void UnsafeUpdateSigningId(std::string new_signing_id) {
-    const std::string &ref_sid = signing_id;
-    const_cast<std::string &>(ref_sid) = new_signing_id;
+    const std::string& ref_sid = signing_id;
+    const_cast<std::string&>(ref_sid) = new_signing_id;
     signing_id_wildcard_pos = signing_id.find('*');
   }
 #endif
 
   template <typename H>
-  friend H AbslHashValue(H h, const WatchItemProcess &p) {
+  friend H AbslHashValue(H h, const WatchItemProcess& p) {
     return H::combine(std::move(h), p.binary_path, p.signing_id, p.team_id, p.cdhash,
                       p.certificate_sha256, p.platform_binary);
   }
@@ -197,7 +197,7 @@ struct WatchItemPolicyBase {
                       WatchItemRuleType rt = kWatchItemPolicyDefaultRuleType,
                       bool esm = kWatchItemPolicyDefaultEnableSilentMode,
                       bool estm = kWatchItemPolicyDefaultEnableSilentTTYMode,
-                      std::string_view cm = "", NSString *edu = nil, NSString *edt = nil,
+                      std::string_view cm = "", NSString* edu = nil, NSString* edt = nil,
                       SetWatchItemProcess procs = {})
       : name(n),
         version(v),
@@ -209,13 +209,13 @@ struct WatchItemPolicyBase {
         custom_message(cm.length() == 0 ? std::nullopt : std::make_optional<std::string>(cm)),
         // Note: Empty string considered valid for event_detail_url to allow rules
         // overriding global setting in order to hide the button.
-        event_detail_url(edu == nil ? std::nullopt : std::make_optional<NSString *>(edu)),
-        event_detail_text(edt.length == 0 ? std::nullopt : std::make_optional<NSString *>(edt)),
+        event_detail_url(edu == nil ? std::nullopt : std::make_optional<NSString*>(edu)),
+        event_detail_text(edt.length == 0 ? std::nullopt : std::make_optional<NSString*>(edt)),
         processes(std::move(procs)) {}
 
   virtual ~WatchItemPolicyBase() = default;
 
-  virtual bool operator==(const WatchItemPolicyBase &other) const {
+  virtual bool operator==(const WatchItemPolicyBase& other) const {
     // Note: custom_message, event_detail_url, and event_detail_text are not currently considered
     // for equality purposes
     return name == other.name && version == other.version &&
@@ -224,10 +224,10 @@ struct WatchItemPolicyBase {
            silent_tty == other.silent_tty && processes == other.processes;
   }
 
-  virtual bool operator!=(const WatchItemPolicyBase &other) const { return !(*this == other); }
+  virtual bool operator!=(const WatchItemPolicyBase& other) const { return !(*this == other); }
 
   template <typename H>
-  friend H AbslHashValue(H h, const WatchItemPolicyBase &p) {
+  friend H AbslHashValue(H h, const WatchItemPolicyBase& p) {
     return H::combine(std::move(h), p.name);
   }
 
@@ -239,8 +239,8 @@ struct WatchItemPolicyBase {
   bool silent;
   bool silent_tty;
   std::optional<std::string> custom_message;
-  std::optional<NSString *> event_detail_url;
-  std::optional<NSString *> event_detail_text;
+  std::optional<NSString*> event_detail_url;
+  std::optional<NSString*> event_detail_text;
   SetWatchItemProcess processes;
 };
 
@@ -252,14 +252,14 @@ struct DataWatchItemPolicy : public WatchItemPolicyBase {
                       WatchItemRuleType rt = kWatchItemPolicyDefaultRuleType,
                       bool esm = kWatchItemPolicyDefaultEnableSilentMode,
                       bool estm = kWatchItemPolicyDefaultEnableSilentTTYMode,
-                      std::string_view cm = "", NSString *edu = nil, NSString *edt = nil,
+                      std::string_view cm = "", NSString* edu = nil, NSString* edt = nil,
                       SetWatchItemProcess procs = {})
       : WatchItemPolicyBase(n, v, ara, ao, rt, esm, estm, cm, edu, edt, std::move(procs)),
         path(p),
         path_type(pt) {}
 
-  bool operator==(const WatchItemPolicyBase &other) const override {
-    const DataWatchItemPolicy *otherPolicy = dynamic_cast<const DataWatchItemPolicy *>(&other);
+  bool operator==(const WatchItemPolicyBase& other) const override {
+    const DataWatchItemPolicy* otherPolicy = dynamic_cast<const DataWatchItemPolicy*>(&other);
     if (!otherPolicy) {
       return false;
     }
@@ -269,7 +269,7 @@ struct DataWatchItemPolicy : public WatchItemPolicyBase {
            path == otherPolicy->path;
   }
 
-  bool operator!=(const WatchItemPolicyBase &other) const override { return !(*this == other); }
+  bool operator!=(const WatchItemPolicyBase& other) const override { return !(*this == other); }
 
   std::string path;
   WatchItemPathType path_type;
@@ -282,16 +282,16 @@ struct ProcessWatchItemPolicy : public WatchItemPolicyBase {
                          WatchItemRuleType rt = kWatchItemPolicyDefaultRuleType,
                          bool esm = kWatchItemPolicyDefaultEnableSilentMode,
                          bool estm = kWatchItemPolicyDefaultEnableSilentTTYMode,
-                         std::string_view cm = "", NSString *edu = nil, NSString *edt = nil,
+                         std::string_view cm = "", NSString* edu = nil, NSString* edt = nil,
                          SetWatchItemProcess procs = {})
       : WatchItemPolicyBase(n, v, ara, ao, rt, esm, estm, cm, edu, edt, std::move(procs)),
         path_type_pairs(std::move(pt)),
         tree(std::make_unique<santa::PrefixTree<santa::Unit>>()) {
     // Build tree
-    for (const auto &pt_pair : path_type_pairs) {
+    for (const auto& pt_pair : path_type_pairs) {
       std::vector<std::string> matches = FindMatches(@(pt_pair.first.c_str()));
 
-      for (const auto &match : matches) {
+      for (const auto& match : matches) {
         if (pt_pair.second == WatchItemPathType::kPrefix) {
           tree->InsertPrefix(match.c_str(), santa::Unit{});
         } else {
@@ -301,9 +301,8 @@ struct ProcessWatchItemPolicy : public WatchItemPolicyBase {
     }
   }
 
-  bool operator==(const WatchItemPolicyBase &other) const override {
-    const ProcessWatchItemPolicy *otherPolicy =
-        dynamic_cast<const ProcessWatchItemPolicy *>(&other);
+  bool operator==(const WatchItemPolicyBase& other) const override {
+    const ProcessWatchItemPolicy* otherPolicy = dynamic_cast<const ProcessWatchItemPolicy*>(&other);
     if (!otherPolicy) {
       return false;
     }
@@ -313,7 +312,7 @@ struct ProcessWatchItemPolicy : public WatchItemPolicyBase {
            path_type_pairs == otherPolicy->path_type_pairs;
   }
 
-  bool operator!=(const WatchItemPolicyBase &other) const override { return !(*this == other); }
+  bool operator!=(const WatchItemPolicyBase& other) const override { return !(*this == other); }
 
   SetPairPathAndType path_type_pairs;
   std::unique_ptr<santa::PrefixTree<Unit>> tree;
@@ -322,12 +321,12 @@ struct ProcessWatchItemPolicy : public WatchItemPolicyBase {
 // Hash and equality call operators for values of shared_ptr types
 template <typename T>
 struct SharedPtrValueHash {
-  std::size_t operator()(const std::shared_ptr<T> &ptr) const { return absl::Hash<T>()(*ptr); }
+  std::size_t operator()(const std::shared_ptr<T>& ptr) const { return absl::Hash<T>()(*ptr); }
 };
 
 template <typename T>
 struct SharedPtrValueEqual {
-  bool operator()(const std::shared_ptr<T> &a, const std::shared_ptr<T> &b) const {
+  bool operator()(const std::shared_ptr<T>& a, const std::shared_ptr<T>& b) const {
     // Handle null pointer cases
     if (!a && !b) return true;
     if (!a || !b) return false;

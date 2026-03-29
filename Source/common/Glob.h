@@ -22,7 +22,7 @@
 
 namespace santa {
 
-std::vector<std::string> FindMatches(NSString *path);
+std::vector<std::string> FindMatches(NSString* path);
 
 }  // namespace santa
 

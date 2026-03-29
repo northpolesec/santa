@@ -17,8 +17,8 @@
 
 @implementation SNTXPCSyncServiceInterface
 
-+ (NSXPCInterface *)syncServiceInterface {
-  NSXPCInterface *r = [NSXPCInterface interfaceWithProtocol:@protocol(SNTSyncServiceXPC)];
++ (NSXPCInterface*)syncServiceInterface {
+  NSXPCInterface* r = [NSXPCInterface interfaceWithProtocol:@protocol(SNTSyncServiceXPC)];
 
   [r setClasses:[NSSet setWithObjects:[NSArray class], [SNTStoredEvent class],
                                       [SNTStoredExecutionEvent class],
@@ -27,15 +27,21 @@
       argumentIndex:0
             ofReply:NO];
 
+  [r setClasses:[NSSet setWithObjects:[NSDictionary class], [NSArray class], [NSString class],
+                                      [NSNumber class], [NSDate class], nil]
+        forSelector:@selector(publishMetrics:reply:)
+      argumentIndex:0
+            ofReply:NO];
+
   return r;
 }
 
-+ (NSString *)serviceID {
++ (NSString*)serviceID {
   return @"com.northpolesec.santa.syncservice";
 }
 
-+ (MOLXPCConnection *)configuredConnection {
-  MOLXPCConnection *c = [[MOLXPCConnection alloc] initClientWithName:[self serviceID]
++ (MOLXPCConnection*)configuredConnection {
+  MOLXPCConnection* c = [[MOLXPCConnection alloc] initClientWithName:[self serviceID]
                                                           privileged:YES];
   c.remoteInterface = [self syncServiceInterface];
   return c;

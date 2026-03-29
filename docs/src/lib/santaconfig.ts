@@ -438,7 +438,7 @@ changes in the release notes of any future release that changes them.`,
         limit for files stored in the spool directory. Events are buffered in memory until this threshold would be
         exceeded (or \`SpoolDirectoryEventMaxFlushTimeSec\` is exceeded)`,
       type: "integer",
-      defaultValue: 100,
+      defaultValue: 250,
       enableIf: (data) => data.EventLogType == "protobuf",
     },
     {
@@ -455,7 +455,7 @@ changes in the release notes of any future release that changes them.`,
         of time events will stay buffered in memory before being flushed to disk, regardless of whether or not
         \`SpoolDirectoryFileSizeThresholdKB\` would be exceeded`,
       type: "integer",
-      defaultValue: 10,
+      defaultValue: 15,
       enableIf: (data) => data.EventLogType == "protobuf",
     },
     {

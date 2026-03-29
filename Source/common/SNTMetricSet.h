@@ -49,43 +49,43 @@ typedef NS_ENUM(NSInteger, SNTMetricType) {
   SNTMetricTypeCounter = 9,
 };
 
-NSString *SNTMetricMakeStringFromMetricType(SNTMetricType metricType);
+NSString* SNTMetricMakeStringFromMetricType(SNTMetricType metricType);
 
 @interface SNTMetric : NSObject
-- (NSDictionary *)export;
+- (NSDictionary*)export;
 @end
 
 @interface SNTMetricCounter : SNTMetric
-- (void)incrementBy:(long long)step forFieldValues:(NSArray<NSString *> *)fieldValues;
-- (void)incrementForFieldValues:(NSArray<NSString *> *)fieldValues;
-- (long long)getCountForFieldValues:(NSArray<NSString *> *)fieldValues;
+- (void)incrementBy:(long long)step forFieldValues:(NSArray<NSString*>*)fieldValues;
+- (void)incrementForFieldValues:(NSArray<NSString*>*)fieldValues;
+- (long long)getCountForFieldValues:(NSArray<NSString*>*)fieldValues;
 @end
 
 @interface SNTMetricInt64Gauge : SNTMetric
-- (void)set:(long long)value forFieldValues:(NSArray<NSString *> *)fieldValues;
-- (long long)getGaugeValueForFieldValues:(NSArray<NSString *> *)fieldValues;
+- (void)set:(long long)value forFieldValues:(NSArray<NSString*>*)fieldValues;
+- (long long)getGaugeValueForFieldValues:(NSArray<NSString*>*)fieldValues;
 @end
 
 @interface SNTMetricDoubleGauge : SNTMetric
-- (void)set:(double)value forFieldValues:(NSArray<NSString *> *)fieldValues;
-- (double)getGaugeValueForFieldValues:(NSArray<NSString *> *)fieldValues;
+- (void)set:(double)value forFieldValues:(NSArray<NSString*>*)fieldValues;
+- (double)getGaugeValueForFieldValues:(NSArray<NSString*>*)fieldValues;
 @end
 
 @interface SNTMetricStringGauge : SNTMetric
-- (void)set:(NSString *)value forFieldValues:(NSArray<NSString *> *)fieldValues;
-- (NSString *)getStringValueForFieldValues:(NSArray<NSString *> *)fieldValues;
+- (void)set:(NSString*)value forFieldValues:(NSArray<NSString*>*)fieldValues;
+- (NSString*)getStringValueForFieldValues:(NSArray<NSString*>*)fieldValues;
 @end
 
 @interface SNTMetricBooleanGauge : SNTMetric
-- (void)set:(BOOL)value forFieldValues:(NSArray<NSString *> *)fieldValues;
-- (BOOL)getBoolValueForFieldValues:(NSArray<NSString *> *)fieldValues;
+- (void)set:(BOOL)value forFieldValues:(NSArray<NSString*>*)fieldValues;
+- (BOOL)getBoolValueForFieldValues:(NSArray<NSString*>*)fieldValues;
 @end
 
 /**
  * A registry of metrics with associated fields.
  */
 @interface SNTMetricSet : NSObject
-- (instancetype)initWithHostname:(NSString *)hostname username:(NSString *)username;
+- (instancetype)initWithHostname:(NSString*)hostname username:(NSString*)username;
 
 /* Returns a counter with the given name, field names and help
  *  text, registered with the MetricSet.
@@ -99,9 +99,9 @@ NSString *SNTMetricMakeStringFromMetricType(SNTMetricType metricType);
  * @throw NSInternalInconsistencyException When trying to register a second
  *   counter with the same name but a different schema as an existing one
  */
-- (SNTMetricCounter *)counterWithName:(NSString *)name
-                           fieldNames:(NSArray<NSString *> *)fieldNames
-                             helpText:(NSString *)text;
+- (SNTMetricCounter*)counterWithName:(NSString*)name
+                          fieldNames:(NSArray<NSString*>*)fieldNames
+                            helpText:(NSString*)text;
 
 /**
  * Returns a shared global instance with default root labels and metrics registered.
@@ -116,12 +116,12 @@ NSString *SNTMetricMakeStringFromMetricType(SNTMetricType metricType);
 /**
  *  Add a root label to the MetricSet.
  */
-- (void)addRootLabel:(NSString *)label value:(NSString *)value;
+- (void)addRootLabel:(NSString*)label value:(NSString*)value;
 
 /**
  * Remove a root label from the MetricSet.
  */
-- (void)removeRootLabel:(NSString *)labelName;
+- (void)removeRootLabel:(NSString*)labelName;
 
 /**
  * Returns a int64 gauge metric with the given Streamz name and help text,
@@ -131,9 +131,9 @@ NSString *SNTMetricMakeStringFromMetricType(SNTMetricType metricType);
  * @param fieldNames The metric's field names, for example @[@"type"].
  * @param helpText The metric's help description.
  */
-- (SNTMetricInt64Gauge *)int64GaugeWithName:(NSString *)name
-                                 fieldNames:(NSArray<NSString *> *)fieldNames
-                                   helpText:(NSString *)helpText;
+- (SNTMetricInt64Gauge*)int64GaugeWithName:(NSString*)name
+                                fieldNames:(NSArray<NSString*>*)fieldNames
+                                  helpText:(NSString*)helpText;
 
 /**
  * Returns a double gauge metric with the given name and help text,
@@ -143,9 +143,9 @@ NSString *SNTMetricMakeStringFromMetricType(SNTMetricType metricType);
  * @param fieldNames The metric's field names, for example @[@"type"].
  * @param helpText The metric's help description.
  */
-- (SNTMetricDoubleGauge *)doubleGaugeWithName:(NSString *)name
-                                   fieldNames:(NSArray<NSString *> *)fieldNames
-                                     helpText:(NSString *)helpText;
+- (SNTMetricDoubleGauge*)doubleGaugeWithName:(NSString*)name
+                                  fieldNames:(NSArray<NSString*>*)fieldNames
+                                    helpText:(NSString*)helpText;
 
 /**
  * Returns a string gauge metric with the given name and help text,
@@ -155,9 +155,9 @@ NSString *SNTMetricMakeStringFromMetricType(SNTMetricType metricType);
  * @param fieldNames The metric's field names, for example @[@"type"].
  * @param helpText The metric's help description.
  */
-- (SNTMetricStringGauge *)stringGaugeWithName:(NSString *)name
-                                   fieldNames:(NSArray<NSString *> *)fieldNames
-                                     helpText:(NSString *)helpText;
+- (SNTMetricStringGauge*)stringGaugeWithName:(NSString*)name
+                                  fieldNames:(NSArray<NSString*>*)fieldNames
+                                    helpText:(NSString*)helpText;
 
 /**
  * Returns a boolean gauge metric with the given name and help text,
@@ -167,36 +167,36 @@ NSString *SNTMetricMakeStringFromMetricType(SNTMetricType metricType);
  * @param fieldNames The metric's field names, for example @[@"type"].
  * @param helpText The metric's help description.
  */
-- (SNTMetricBooleanGauge *)booleanGaugeWithName:(NSString *)name
-                                     fieldNames:(NSArray<NSString *> *)fieldNames
-                                       helpText:(NSString *)helpText;
+- (SNTMetricBooleanGauge*)booleanGaugeWithName:(NSString*)name
+                                    fieldNames:(NSArray<NSString*>*)fieldNames
+                                      helpText:(NSString*)helpText;
 
 /** Creates a constant metric with a string value and no fields. */
-- (void)addConstantStringWithName:(NSString *)name
-                         helpText:(NSString *)helpText
-                            value:(NSString *)value;
+- (void)addConstantStringWithName:(NSString*)name
+                         helpText:(NSString*)helpText
+                            value:(NSString*)value;
 
 /** Creates a constant metric with an integer value and no fields. */
-- (void)addConstantIntegerWithName:(NSString *)name
-                          helpText:(NSString *)helpText
+- (void)addConstantIntegerWithName:(NSString*)name
+                          helpText:(NSString*)helpText
                              value:(long long)value;
 
 /** Creates a constant metric with an integer value and no fields. */
-- (void)addConstantBooleanWithName:(NSString *)name helpText:(NSString *)helpText value:(BOOL)value;
+- (void)addConstantBooleanWithName:(NSString*)name helpText:(NSString*)helpText value:(BOOL)value;
 
 /** Register a callback to get executed just before each export. */
 - (void)registerCallback:(void (^)(void))callback;
 
 /** Export creates an NSDictionary of the state of the metrics */
-- (NSDictionary *)export;
+- (NSDictionary*)export;
 @end
 
 // Returns a human readble string from an SNTMetricFormat type
-NSString *SNTMetricStringFromMetricFormatType(SNTMetricFormatType format);
+NSString* SNTMetricStringFromMetricFormatType(SNTMetricFormatType format);
 
 /** Normalizes dates in an exported dictionary to be ISO8601 timestamp strings in
  *  UTC time.
  */
-NSDictionary *SNTMetricConvertDatesToISO8601Strings(NSDictionary *metrics);
+NSDictionary* SNTMetricConvertDatesToISO8601Strings(NSDictionary* metrics);
 
 NS_ASSUME_NONNULL_END

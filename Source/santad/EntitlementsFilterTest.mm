@@ -31,7 +31,7 @@ using santa::EntitlementsFilter;
 - (void)testFilterNilAndEmptyEntitlements {
   std::unique_ptr<EntitlementsFilter> filter = EntitlementsFilter::Create(@[], @[]);
 
-  NSDictionary *result = filter->Filter("TEAMID123", nil);
+  NSDictionary* result = filter->Filter("TEAMID123", nil);
   XCTAssertNil(result, @"Filtering nil entitlements should return nil");
 
   result = filter->Filter("TEAMID123", @{});
@@ -42,20 +42,20 @@ using santa::EntitlementsFilter;
 - (void)testFilterNoFiltersReturnsDeepCopy {
   std::unique_ptr<EntitlementsFilter> filter = EntitlementsFilter::Create(@[], @[]);
 
-  NSDictionary *entitlements = @{
+  NSDictionary* entitlements = @{
     @"com.apple.security.app-sandbox" : @YES,
     @"com.apple.security.network.client" : @YES,
     @"keychain-access-groups" : @[ @"group1", @"group2" ],
   };
 
-  NSDictionary *result = filter->Filter("TEAMID123", entitlements);
+  NSDictionary* result = filter->Filter("TEAMID123", entitlements);
 
   XCTAssertEqual(result.count, 3);
   XCTAssertEqualObjects(result[@"com.apple.security.app-sandbox"], @YES);
   XCTAssertEqualObjects(result[@"com.apple.security.network.client"], @YES);
 
   // Verify it's a deep copy - modifying result shouldn't affect original
-  NSMutableDictionary *mutableResult = [result mutableCopy];
+  NSMutableDictionary* mutableResult = [result mutableCopy];
   mutableResult[@"com.apple.security.app-sandbox"] = @NO;
   XCTAssertEqualObjects(entitlements[@"com.apple.security.app-sandbox"], @YES,
                         @"Original should be unchanged");
@@ -67,11 +67,11 @@ using santa::EntitlementsFilter;
   std::unique_ptr<EntitlementsFilter> filter =
       EntitlementsFilter::Create(@[ @"TEAMID123", @"TEAMID456" ], @[]);
 
-  NSDictionary *entitlements = @{
+  NSDictionary* entitlements = @{
     @"com.apple.security.app-sandbox" : @YES,
   };
 
-  NSDictionary *result = filter->Filter("TEAMID123", entitlements);
+  NSDictionary* result = filter->Filter("TEAMID123", entitlements);
 
   XCTAssertNil(result, @"Entitlements for filtered TeamID should be dropped");
 }
@@ -80,11 +80,11 @@ using santa::EntitlementsFilter;
   std::unique_ptr<EntitlementsFilter> filter =
       EntitlementsFilter::Create(@[ @"TEAMID123", @"TEAMID456" ], @[]);
 
-  NSDictionary *entitlements = @{
+  NSDictionary* entitlements = @{
     @"com.apple.security.app-sandbox" : @YES,
   };
 
-  NSDictionary *result = filter->Filter("OTHERTEAM", entitlements);
+  NSDictionary* result = filter->Filter("OTHERTEAM", entitlements);
 
   XCTAssertEqualObjects(result[@"com.apple.security.app-sandbox"], @YES);
 }
@@ -92,11 +92,11 @@ using santa::EntitlementsFilter;
 - (void)testFilterNullTeamIDNotFiltered {
   std::unique_ptr<EntitlementsFilter> filter = EntitlementsFilter::Create(@[ @"TEAMID123" ], @[]);
 
-  NSDictionary *entitlements = @{
+  NSDictionary* entitlements = @{
     @"com.apple.security.app-sandbox" : @YES,
   };
 
-  NSDictionary *result = filter->Filter(NULL, entitlements);
+  NSDictionary* result = filter->Filter(NULL, entitlements);
 
   XCTAssertEqual(result.count, 1);
 }
@@ -106,13 +106,13 @@ using santa::EntitlementsFilter;
 - (void)testFilterPrefixMatchesAreExcluded {
   std::unique_ptr<EntitlementsFilter> filter = EntitlementsFilter::Create(@[], @[ @"com.apple." ]);
 
-  NSDictionary *entitlements = @{
+  NSDictionary* entitlements = @{
     @"com.apple.security.app-sandbox" : @YES,
     @"com.apple.security.network.client" : @YES,
     @"com.myapp.custom" : @YES,
   };
 
-  NSDictionary *result = filter->Filter("TEAMID123", entitlements);
+  NSDictionary* result = filter->Filter("TEAMID123", entitlements);
 
   XCTAssertEqual(result.count, 1, @"Only non-matching prefixes should remain");
   XCTAssertEqualObjects(result[@"com.myapp.custom"], @YES);
@@ -124,14 +124,14 @@ using santa::EntitlementsFilter;
   std::unique_ptr<EntitlementsFilter> filter =
       EntitlementsFilter::Create(@[], @[ @"com.apple.", @"com.example." ]);
 
-  NSDictionary *entitlements = @{
+  NSDictionary* entitlements = @{
     @"com.apple.security.app-sandbox" : @YES,
     @"com.example.testing" : @YES,
     @"com.myapp.custom" : @YES,
     @"keychain-access-groups" : @[ @"group1" ],
   };
 
-  NSDictionary *result = filter->Filter("TEAMID123", entitlements);
+  NSDictionary* result = filter->Filter("TEAMID123", entitlements);
 
   XCTAssertNotNil(result);
   XCTAssertEqual(result.count, 2);
@@ -142,12 +142,12 @@ using santa::EntitlementsFilter;
 - (void)testFilterAllEntitlementsExcludedReturnsNil {
   std::unique_ptr<EntitlementsFilter> filter = EntitlementsFilter::Create(@[], @[ @"com.apple." ]);
 
-  NSDictionary *entitlements = @{
+  NSDictionary* entitlements = @{
     @"com.apple.security.app-sandbox" : @YES,
     @"com.apple.security.network.client" : @YES,
   };
 
-  NSDictionary *result = filter->Filter("TEAMID123", entitlements);
+  NSDictionary* result = filter->Filter("TEAMID123", entitlements);
 
   XCTAssertNil(result, @"When all entitlements are filtered, should return nil");
 }
@@ -157,7 +157,7 @@ using santa::EntitlementsFilter;
 - (void)testUpdateTeamIDFilter {
   std::unique_ptr<EntitlementsFilter> filter = EntitlementsFilter::Create(@[ @"TEAMID123" ], @[]);
 
-  NSDictionary *entitlements = @{@"com.apple.security.app-sandbox" : @YES};
+  NSDictionary* entitlements = @{@"com.apple.security.app-sandbox" : @YES};
 
   // Initially, TEAMID123 is filtered but TEAMID456 is not
   XCTAssertNil(filter->Filter("TEAMID123", entitlements));
@@ -174,7 +174,7 @@ using santa::EntitlementsFilter;
 - (void)testUpdateTeamIDFilterToEmpty {
   std::unique_ptr<EntitlementsFilter> filter = EntitlementsFilter::Create(@[ @"TEAMID123" ], @[]);
 
-  NSDictionary *entitlements = @{@"com.apple.security.app-sandbox" : @YES};
+  NSDictionary* entitlements = @{@"com.apple.security.app-sandbox" : @YES};
 
   // Initially TEAMID123 is filtered
   XCTAssertNil(filter->Filter("TEAMID123", entitlements));
@@ -189,13 +189,13 @@ using santa::EntitlementsFilter;
 - (void)testUpdatePrefixFilter {
   std::unique_ptr<EntitlementsFilter> filter = EntitlementsFilter::Create(@[], @[ @"com.apple." ]);
 
-  NSDictionary *entitlements = @{
+  NSDictionary* entitlements = @{
     @"com.apple.security.app-sandbox" : @YES,
     @"com.example.custom" : @YES,
   };
 
   // Initially com.apple. is filtered
-  NSDictionary *result = filter->Filter("TEAMID123", entitlements);
+  NSDictionary* result = filter->Filter("TEAMID123", entitlements);
   XCTAssertEqual(result.count, 1);
   XCTAssertNil(result[@"com.apple.security.app-sandbox"]);
 
@@ -211,13 +211,13 @@ using santa::EntitlementsFilter;
 - (void)testUpdatePrefixFilterToEmpty {
   std::unique_ptr<EntitlementsFilter> filter = EntitlementsFilter::Create(@[], @[ @"com.apple." ]);
 
-  NSDictionary *entitlements = @{
+  NSDictionary* entitlements = @{
     @"com.apple.security.app-sandbox" : @YES,
     @"com.example.custom" : @YES,
   };
 
   // Initially com.apple. is filtered
-  NSDictionary *result = filter->Filter("TEAMID123", entitlements);
+  NSDictionary* result = filter->Filter("TEAMID123", entitlements);
   XCTAssertEqual(result.count, 1);
 
   // Update to empty filter (no prefix filtering)
@@ -235,7 +235,7 @@ using santa::EntitlementsFilter;
 - (void)testConcurrentUpdateAndFilter {
   std::unique_ptr<EntitlementsFilter> filter = EntitlementsFilter::Create(@[], @[ @"com.apple." ]);
 
-  NSDictionary *entitlements = @{
+  NSDictionary* entitlements = @{
     @"com.apple.security.app-sandbox" : @YES,
     @"com.example.custom" : @YES,
     @"com.myapp.custom" : @YES,
@@ -245,12 +245,12 @@ using santa::EntitlementsFilter;
   dispatch_group_t group = dispatch_group_create();
 
   // Get raw pointer for use in blocks
-  EntitlementsFilter *filterPtr = filter.get();
+  EntitlementsFilter* filterPtr = filter.get();
 
   // Launch concurrent readers
   for (int i = 0; i < 50; i++) {
     dispatch_group_async(group, queue, ^{
-      NSDictionary *result = filterPtr->Filter("TEAMID123", entitlements);
+      NSDictionary* result = filterPtr->Filter("TEAMID123", entitlements);
       XCTAssertNotNil(result);
       // Result count will vary depending on which filter is active
       XCTAssertGreaterThan(result.count, 0);

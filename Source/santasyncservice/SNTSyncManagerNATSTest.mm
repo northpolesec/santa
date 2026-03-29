@@ -29,7 +29,7 @@
 @interface SNTSyncManagerNATSTest : XCTestCase
 @property id mockConfigurator;
 @property id mockDaemonConn;
-@property SNTSyncManager *syncManager;
+@property SNTSyncManager* syncManager;
 @end
 
 @implementation SNTSyncManagerNATSTest

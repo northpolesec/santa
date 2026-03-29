@@ -87,7 +87,7 @@
 }
 
 // Helper to test bucket distributions for uint64_t/uint64_t combinations.
-- (void)distributionTestHelper:(SantaCache<uint64_t, uint64_t> *)sut bucketRatio:(int)br {
+- (void)distributionTestHelper:(SantaCache<uint64_t, uint64_t>*)sut bucketRatio:(int)br {
   uint16_t count[512];
   uint16_t array_size = 512;
   uint64_t start_bucket = 0;
@@ -243,12 +243,12 @@ struct S {
   uint64_t first_val;
   uint64_t second_val;
 
-  bool operator==(const S &rhs) const {
+  bool operator==(const S& rhs) const {
     return first_val == rhs.first_val && second_val == rhs.second_val;
   }
 
   template <typename H>
-  friend H AbslHashValue(H h, const S &v) {
+  friend H AbslHashValue(H h, const S& v) {
     return H::combine(std::move(h), v.first_val, v.second_val);
   }
 };
@@ -292,7 +292,7 @@ struct S {
   XCTAssertTrue(sut.set(12, 34));
   XCTAssertEqual(sut.get(12), 34);
 
-  sut.update(12, ^(uint64_t &val) {
+  sut.update(12, ^(uint64_t& val) {
     XCTAssertEqual(val, 34);
     val = 56;
   });
@@ -303,7 +303,7 @@ struct S {
 - (void)testUpdateScalarNew {
   SantaCache<uint64_t, uint64_t> sut;
 
-  sut.update(12, ^(uint64_t &val) {
+  sut.update(12, ^(uint64_t& val) {
     XCTAssertEqual(val, 0);
     val = 56;
   });
@@ -324,7 +324,7 @@ struct S {
   XCTAssertEqual(res.count(33), 1);
   XCTAssertEqual(res.count(44), 0);
 
-  sut.update(12, ^(std::set<int> &val) {
+  sut.update(12, ^(std::set<int>& val) {
     XCTAssertEqual(val.size(), 3);
     val.insert(44);
   });
@@ -340,7 +340,7 @@ struct S {
 - (void)testUpdateObjectNew {
   SantaCache<uint64_t, std::set<int>> sut;
 
-  sut.update(12, ^(std::set<int> &val) {
+  sut.update(12, ^(std::set<int>& val) {
     XCTAssertEqual(val.size(), 0);
     val = {11, 22, 33, 44};
   });
@@ -368,7 +368,7 @@ struct S {
   XCTAssertEqual(res->count(33), 1);
   XCTAssertEqual(res->count(44), 0);
 
-  sut.update(12, ^(std::shared_ptr<IntSet> &val) {
+  sut.update(12, ^(std::shared_ptr<IntSet>& val) {
     XCTAssertNotEqual(val, nullptr);
     XCTAssertEqual(val->size(), 3);
     val->insert(44);
@@ -386,7 +386,7 @@ struct S {
   using IntSet = std::set<int>;
   SantaCache<uint64_t, std::shared_ptr<IntSet>> sut;
 
-  sut.update(12, ^(std::shared_ptr<IntSet> &val) {
+  sut.update(12, ^(std::shared_ptr<IntSet>& val) {
     // shared_ptr is initially null
     XCTAssertEqual(val, nullptr);
     val = std::make_shared<IntSet>(IntSet{11, 22, 33});
@@ -404,24 +404,24 @@ struct S {
   using IntSet = std::set<int>;
   SantaCache<uint64_t, std::shared_ptr<IntSet>> sut(3);
 
-  sut.update(12, ^(std::shared_ptr<IntSet> &val) {
+  sut.update(12, ^(std::shared_ptr<IntSet>& val) {
     XCTAssertEqual(val, nullptr);
     val = std::make_shared<IntSet>(IntSet{11, 22});
   });
 
-  sut.update(34, ^(std::shared_ptr<IntSet> &val) {
+  sut.update(34, ^(std::shared_ptr<IntSet>& val) {
     XCTAssertEqual(val, nullptr);
     val = std::make_shared<IntSet>(IntSet{33, 44});
   });
 
-  sut.update(56, ^(std::shared_ptr<IntSet> &val) {
+  sut.update(56, ^(std::shared_ptr<IntSet>& val) {
     XCTAssertEqual(val, nullptr);
     val = std::make_shared<IntSet>(IntSet{55, 66});
   });
 
   XCTAssertEqual(sut.count(), 3);
 
-  sut.update(78, ^(std::shared_ptr<IntSet> &val) {
+  sut.update(78, ^(std::shared_ptr<IntSet>& val) {
     XCTAssertEqual(val, nullptr);
     val = std::make_shared<IntSet>(IntSet{77, 88});
   });
@@ -439,20 +439,20 @@ struct S {
   XCTAssertEqual(sut.count(), 0);
 
   XCTAssertFalse(sut.contains(1));
-  XCTAssertFalse(sut.contains(1, ^(const uint64_t &) {
+  XCTAssertFalse(sut.contains(1, ^(const uint64_t&) {
     return true;
   }));
 
   XCTAssertTrue(sut.set(1, 2));
   XCTAssertEqual(sut.count(), 1);
   XCTAssertTrue(sut.contains(1));
-  XCTAssertFalse(sut.contains(1, ^(const uint64_t &) {
+  XCTAssertFalse(sut.contains(1, ^(const uint64_t&) {
     return false;
   }));
-  XCTAssertTrue(sut.contains(1, ^(const uint64_t &x) {
+  XCTAssertTrue(sut.contains(1, ^(const uint64_t& x) {
     return x == 2;
   }));
-  XCTAssertFalse(sut.contains(1, ^(const uint64_t &x) {
+  XCTAssertFalse(sut.contains(1, ^(const uint64_t& x) {
     return x == 3;
   }));
 }
@@ -468,8 +468,8 @@ struct S {
   sut.set(6, 66);
   sut.remove(6);
 
-  NSDictionary *want = @{@(1) : @(11), @(2) : @(22), @(3) : @(33), @(4) : @(44), @(5) : @(55)};
-  __block NSMutableDictionary *got = [[NSMutableDictionary alloc] init];
+  NSDictionary* want = @{@(1) : @(11), @(2) : @(22), @(3) : @(33), @(4) : @(44), @(5) : @(55)};
+  __block NSMutableDictionary* got = [[NSMutableDictionary alloc] init];
 
   sut.foreach(^(uint64_t k, uint64_t v) {
     [got setObject:@(v) forKey:@(k)];
@@ -487,8 +487,8 @@ struct S {
   sut.set(4, std::make_shared<uint64_t>(44));
   sut.remove(4);
 
-  NSDictionary *want = @{@(1) : @(11), @(2) : @(22), @(3) : @(33)};
-  __block NSMutableDictionary *got = [[NSMutableDictionary alloc] init];
+  NSDictionary* want = @{@(1) : @(11), @(2) : @(22), @(3) : @(33)};
+  __block NSMutableDictionary* got = [[NSMutableDictionary alloc] init];
 
   sut.foreach(^(uint64_t k, std::shared_ptr<uint64_t> v) {
     [got setObject:@(*v) forKey:@(k)];
@@ -521,8 +521,8 @@ struct S {
   XCTAssertEqual(sut.count(), 3);
   XCTAssertEqual(*sut.get(2), 22);
 
-  NSDictionary *want = @{@(1) : @(11), @(2) : @(22), @(3) : @(33)};
-  __block NSMutableDictionary *got = [[NSMutableDictionary alloc] init];
+  NSDictionary* want = @{@(1) : @(11), @(2) : @(22), @(3) : @(33)};
+  __block NSMutableDictionary* got = [[NSMutableDictionary alloc] init];
 
   sut.clear(^(uint64_t k, std::shared_ptr<uint64_t> v) {
     [got setObject:@(*v) forKey:@(k)];
@@ -731,7 +731,7 @@ struct S {
     dispatch_group_enter(group);
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
       for (int i = 0; i < kIncrementsPerThread; ++i) {
-        sut->update(1, ^(uint64_t &val) {
+        sut->update(1, ^(uint64_t& val) {
           val++;
         });
       }
@@ -805,6 +805,246 @@ struct S {
 
   XCTAssertFalse(dispatch_group_wait(group, dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_SEC)),
                  @"Timed out");
+
+  delete stop;
+  delete sut;
+}
+
+- (void)testRemoveIfSelectiveRemoval {
+  SantaCache<uint64_t, uint64_t> sut;
+  sut.set(1, 10);
+  sut.set(2, 20);
+  sut.set(3, 30);
+  sut.set(4, 40);
+  sut.set(5, 50);
+
+  uint64_t removed = sut.remove_if(^bool(const uint64_t& key, uint64_t& value) {
+    return value > 30;
+  });
+
+  XCTAssertEqual(removed, 2);
+  XCTAssertEqual(sut.count(), 3);
+  XCTAssertEqual(sut.get(1), 10);
+  XCTAssertEqual(sut.get(2), 20);
+  XCTAssertEqual(sut.get(3), 30);
+  XCTAssertEqual(sut.get(4), 0);
+  XCTAssertEqual(sut.get(5), 0);
+}
+
+- (void)testRemoveIfMutatesThenDecides {
+  SantaCache<uint64_t, uint64_t> sut;
+  sut.set(1, 1);
+  sut.set(2, 1);
+  sut.set(3, 2);
+
+  uint64_t removed = sut.remove_if(^bool(const uint64_t& key, uint64_t& value) {
+    value += 1;
+    return value >= 3;
+  });
+
+  XCTAssertEqual(removed, 1);
+  XCTAssertEqual(sut.count(), 2);
+  XCTAssertEqual(sut.get(1), 2);
+  XCTAssertEqual(sut.get(2), 2);
+  XCTAssertEqual(sut.get(3), 0);
+}
+
+- (void)testRemoveIfNoMatches {
+  SantaCache<uint64_t, uint64_t> sut;
+  sut.set(1, 10);
+  sut.set(2, 20);
+
+  uint64_t removed = sut.remove_if(^bool(const uint64_t& key, uint64_t& value) {
+    return false;
+  });
+
+  XCTAssertEqual(removed, 0);
+  XCTAssertEqual(sut.count(), 2);
+  XCTAssertEqual(sut.get(1), 10);
+  XCTAssertEqual(sut.get(2), 20);
+}
+
+- (void)testRemoveIfAllMatch {
+  SantaCache<uint64_t, uint64_t> sut;
+  sut.set(1, 10);
+  sut.set(2, 20);
+  sut.set(3, 30);
+
+  uint64_t removed = sut.remove_if(^bool(const uint64_t& key, uint64_t& value) {
+    return true;
+  });
+
+  XCTAssertEqual(removed, 3);
+  XCTAssertEqual(sut.count(), 0);
+}
+
+- (void)testRemoveIfSharedPtr {
+  SantaCache<uint64_t, std::shared_ptr<uint64_t>> sut;
+  sut.set(1, std::make_shared<uint64_t>(11));
+  sut.set(2, std::make_shared<uint64_t>(22));
+  sut.set(3, std::make_shared<uint64_t>(33));
+
+  std::weak_ptr<uint64_t> weak = sut.get(2);
+  XCTAssertFalse(weak.expired());
+
+  uint64_t removed = sut.remove_if(^bool(const uint64_t& key, std::shared_ptr<uint64_t>& value) {
+    return *value == 22;
+  });
+
+  XCTAssertEqual(removed, 1);
+  XCTAssertEqual(sut.count(), 2);
+  XCTAssertTrue(weak.expired());
+  XCTAssertEqual(*sut.get(1), 11);
+  XCTAssertEqual(sut.get(2), nullptr);
+  XCTAssertEqual(*sut.get(3), 33);
+}
+
+- (void)testRemoveIfEmptyCache {
+  SantaCache<uint64_t, uint64_t> sut;
+
+  uint64_t removed = sut.remove_if(^bool(const uint64_t& key, uint64_t& value) {
+    return true;
+  });
+
+  XCTAssertEqual(removed, 0);
+  XCTAssertEqual(sut.count(), 0);
+}
+
+- (void)testRemoveIfMultipleEntriesPerBucket {
+  SantaCache<uint64_t, uint64_t> sut(10, 10);
+  sut.set(1, 10);
+  sut.set(2, 20);
+  sut.set(3, 30);
+  sut.set(4, 40);
+  sut.set(5, 50);
+
+  uint64_t removed = sut.remove_if(^bool(const uint64_t& key, uint64_t& value) {
+    return value % 20 == 0;
+  });
+
+  XCTAssertEqual(removed, 2);
+  XCTAssertEqual(sut.count(), 3);
+  XCTAssertEqual(sut.get(1), 10);
+  XCTAssertEqual(sut.get(2), 0);
+  XCTAssertEqual(sut.get(3), 30);
+  XCTAssertEqual(sut.get(4), 0);
+  XCTAssertEqual(sut.get(5), 50);
+}
+
+// Tests that remove_if works correctly while concurrent set/get operations
+// are modifying the cache. Writers continuously set entries, readers verify
+// they never see corrupted data, and a remove_if thread periodically sweeps.
+- (void)testConcurrentRemoveIfWithSetAndGet {
+  auto sut = new SantaCache<uint64_t, uint64_t>(20000);
+  const int kKeyRange = 1000;
+  auto stop = new std::atomic<bool>{false};
+
+  // Pre-populate so readers have entries to find
+  for (int i = 0; i < kKeyRange; ++i) {
+    sut->set(i, i + 1);
+  }
+
+  dispatch_group_t group = dispatch_group_create();
+
+  // 2 writer threads: continuously set entries
+  for (int t = 0; t < 2; ++t) {
+    dispatch_group_enter(group);
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
+      while (!stop->load(std::memory_order_relaxed)) {
+        for (int i = 0; i < kKeyRange; ++i) {
+          sut->set(i, i + 1);
+        }
+      }
+      dispatch_group_leave(group);
+    });
+  }
+
+  // 2 reader threads: continuously get, expect either 0 (removed) or i+1
+  for (int t = 0; t < 2; ++t) {
+    dispatch_group_enter(group);
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0), ^{
+      while (!stop->load(std::memory_order_relaxed)) {
+        for (int i = 0; i < kKeyRange; ++i) {
+          uint64_t val = sut->get(i);
+          XCTAssertTrue(val == 0 || val == (uint64_t)(i + 1), @"Corrupted value %llu for key %d",
+                        val, i);
+        }
+      }
+      dispatch_group_leave(group);
+    });
+  }
+
+  // 1 remove_if thread: periodically sweep even-keyed entries
+  dispatch_group_enter(group);
+  dispatch_async(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
+    while (!stop->load(std::memory_order_relaxed)) {
+      sut->remove_if(^bool(const uint64_t& key, uint64_t& value) {
+        return key % 2 == 0;
+      });
+    }
+    dispatch_group_leave(group);
+  });
+
+  usleep(500000);  // 500ms
+  stop->store(true, std::memory_order_relaxed);
+
+  XCTAssertFalse(dispatch_group_wait(group, dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_SEC)),
+                 @"Timed out");
+
+  // Cache must still be usable
+  sut->set(42, 99);
+  XCTAssertEqual(sut->get(42), 99);
+
+  delete stop;
+  delete sut;
+}
+
+// Tests remove_if racing against set-triggered auto-clear. The cache is kept
+// near max capacity so that set() frequently triggers clear() while remove_if
+// is iterating. Validates the interaction between remove_if's per-bucket
+// locking and clear()'s lock-all-buckets strategy.
+- (void)testConcurrentRemoveIfWithAutoOverflowClear {
+  const uint64_t kMaxSize = 100;
+  auto sut = new SantaCache<uint64_t, uint64_t>(kMaxSize);
+  auto stop = new std::atomic<bool>{false};
+
+  dispatch_group_t group = dispatch_group_create();
+
+  // 2 writer threads: race to fill and overflow the cache, triggering auto-clear
+  for (int t = 0; t < 2; ++t) {
+    dispatch_group_enter(group);
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
+      uint64_t i = t * 10000;
+      while (!stop->load(std::memory_order_relaxed)) {
+        sut->set(i++, 42);
+      }
+      dispatch_group_leave(group);
+    });
+  }
+
+  // 1 remove_if thread: continuously sweep
+  dispatch_group_enter(group);
+  dispatch_async(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
+    while (!stop->load(std::memory_order_relaxed)) {
+      sut->remove_if(^bool(const uint64_t& key, uint64_t& value) {
+        return key % 3 == 0;
+      });
+    }
+    dispatch_group_leave(group);
+  });
+
+  usleep(500000);  // 500ms
+  stop->store(true, std::memory_order_relaxed);
+
+  XCTAssertFalse(dispatch_group_wait(group, dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_SEC)),
+                 @"Timed out");
+
+  // Count must never exceed max
+  XCTAssertLessThanOrEqual(sut->count(), kMaxSize);
+
+  // Cache must still be functional
+  sut->set(999999, 77);
+  XCTAssertEqual(sut->get(999999), 77);
 
   delete stop;
   delete sut;

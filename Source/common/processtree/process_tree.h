@@ -22,32 +22,37 @@
 
 #include "Source/common/processtree/process.h"
 #include "absl/container/flat_hash_map.h"
+#include "absl/container/inlined_vector.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/synchronization/mutex.h"
 
 namespace santa::santad::process_tree {
 
-absl::StatusOr<Process> LoadPID(pid_t pid);
+absl::StatusOr<BackfilledProcess> LoadPID(pid_t pid);
+
+// Events reference 1-2 pids (the process + optional child/target for
+// fork/exec). InlinedVector avoids a heap allocation for these.
+using PidList = absl::InlinedVector<struct Pid, 2>;
 
 // Fwd decl for test peer.
 class ProcessTreeTestPeer;
 
 class ProcessTree {
  public:
-  explicit ProcessTree(std::vector<std::unique_ptr<Annotator>> &&annotators)
+  explicit ProcessTree(std::vector<std::unique_ptr<Annotator>>&& annotators)
       : annotators_(std::move(annotators)), seen_timestamps_({}) {}
-  ProcessTree(const ProcessTree &) = delete;
-  ProcessTree &operator=(const ProcessTree &) = delete;
-  ProcessTree(ProcessTree &&) = delete;
-  ProcessTree &operator=(ProcessTree &&) = delete;
+  ProcessTree(const ProcessTree&) = delete;
+  ProcessTree& operator=(const ProcessTree&) = delete;
+  ProcessTree(ProcessTree&&) = delete;
+  ProcessTree& operator=(ProcessTree&&) = delete;
 
   // Initialize the tree with the processes currently running on the system.
   absl::Status Backfill();
 
   // Inform the tree of a fork event, in which the parent process spawns a child
   // with the only difference between the two being the pid.
-  void HandleFork(uint64_t timestamp, const Process &parent,
+  void HandleFork(uint64_t timestamp, const Process& parent,
                   struct Pid new_pid);
 
   // Inform the tree of an exec event, in which the program and potentially cred
@@ -58,30 +63,30 @@ class ProcessTree {
   // N.B. new_pid is required as the "pid version" will have changed.
   // It is a programming error to pass a new_pid such that
   // p.pid_.pid != new_pid.pid.
-  void HandleExec(uint64_t timestamp, const Process &p, struct Pid new_pid,
+  void HandleExec(uint64_t timestamp, const Process& p, struct Pid new_pid,
                   struct Program prog, struct Cred c);
 
   // Inform the tree of a process exit.
-  void HandleExit(uint64_t timestamp, const Process &p);
+  void HandleExit(uint64_t timestamp, const Process& p);
 
   // Mark the given pids as needing to be retained in the tree's map for future
   // access. Normally, Processes are removed once all clients process past the
   // event which would remove the Process (e.g. exit), however in cases where
   // async processing occurs, the Process may need to be accessed after the
   // exit.
-  void RetainProcess(std::vector<struct Pid> &pids);
+  void RetainProcess(const PidList& pids);
 
   // Release previously retained processes, signaling that the client is done
   // processing the event that retained them.
-  void ReleaseProcess(std::vector<struct Pid> &pids);
+  void ReleaseProcess(const PidList& pids);
 
   // Annotate the given process with an Annotator (state).
-  void AnnotateProcess(const Process &p, std::shared_ptr<const Annotator> a);
+  void AnnotateProcess(const Process& p, std::shared_ptr<const Annotator> a);
 
   // Get the given annotation on the given process if it exists, or nullopt if
   // the annotation is not set.
   template <typename T>
-  std::optional<std::shared_ptr<const T>> GetAnnotation(const Process &p) const;
+  std::optional<std::shared_ptr<const T>> GetAnnotation(const Process& p) const;
 
   // Get the fully merged proto form of all annotations on the given process.
   std::optional<::santa::pb::v1::process_tree::Annotations> ExportAnnotations(
@@ -102,18 +107,19 @@ class ProcessTree {
   std::optional<std::shared_ptr<const Process>> Get(struct Pid target) const;
 
   // Traverse the tree from the given Process to its parent.
-  std::shared_ptr<const Process> GetParent(const Process &p) const;
+  std::shared_ptr<const Process> GetParent(const Process& p) const;
 
 #if SANTA_PROCESS_TREE_DEBUG
   // Dump the tree in a human readable form to the given ostream.
-  void DebugDump(std::ostream &stream) const;
+  void DebugDump(std::ostream& stream) const;
 #endif
 
  private:
   friend class ProcessTreeTestPeer;
   void BackfillInsertChildren(
-      absl::flat_hash_map<pid_t, std::vector<Process>> &parent_map,
-      std::shared_ptr<Process> parent, const Process &unlinked_proc);
+      absl::flat_hash_map<pid_t, std::vector<BackfilledProcess>>& parent_map,
+      std::shared_ptr<Process> parent,
+      const BackfilledProcess& backfilled_proc);
 
   // Mark that an event with the given timestamp is being processed.
   // Returns whether the given timestamp is "novel", and the tree should be
@@ -123,7 +129,7 @@ class ProcessTree {
   std::optional<std::shared_ptr<Process>> GetLocked(struct Pid target) const
       ABSL_SHARED_LOCKS_REQUIRED(mtx_);
 
-  void DebugDumpLocked(std::ostream &stream, int depth, pid_t ppid) const;
+  void DebugDumpLocked(std::ostream& stream, int depth, pid_t ppid) const;
 
   std::vector<std::unique_ptr<Annotator>> annotators_;
 
@@ -143,7 +149,7 @@ class ProcessTree {
 
 template <typename T>
 std::optional<std::shared_ptr<const T>> ProcessTree::GetAnnotation(
-    const Process &p) const {
+    const Process& p) const {
   auto it = p.annotations_.find(std::type_index(typeid(T)));
   if (it == p.annotations_.end()) {
     return std::nullopt;
@@ -165,21 +171,20 @@ absl::StatusOr<std::shared_ptr<ProcessTree>> CreateTree(
 // fallen out otherwise due to a destruction event (e.g. exit).
 class ProcessToken {
  public:
-  explicit ProcessToken(std::shared_ptr<ProcessTree> tree,
-                        std::vector<struct Pid> pids);
+  explicit ProcessToken(std::shared_ptr<ProcessTree> tree, PidList pids);
 
   // Default copy/move/destructor — shared_ptr<State> handles lifetime.
-  ProcessToken(const ProcessToken &) = default;
-  ProcessToken(ProcessToken &&) noexcept = default;
-  ProcessToken &operator=(const ProcessToken &) = default;
-  ProcessToken &operator=(ProcessToken &&) noexcept = default;
+  ProcessToken(const ProcessToken&) = default;
+  ProcessToken(ProcessToken&&) noexcept = default;
+  ProcessToken& operator=(const ProcessToken&) = default;
+  ProcessToken& operator=(ProcessToken&&) noexcept = default;
   ~ProcessToken() = default;
 
  private:
   struct State {
     std::shared_ptr<ProcessTree> tree;
-    std::vector<struct Pid> pids;
-    State(std::shared_ptr<ProcessTree> tree, std::vector<struct Pid> pids)
+    PidList pids;
+    State(std::shared_ptr<ProcessTree> tree, PidList pids)
         : tree(std::move(tree)), pids(std::move(pids)) {}
     ~State();
   };

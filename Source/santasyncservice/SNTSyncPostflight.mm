@@ -28,7 +28,7 @@
 namespace {
 
 template <bool IsV2>
-BOOL Postflight(SNTSyncPostflight *self) {
+BOOL Postflight(SNTSyncPostflight* self) {
   using Traits = santa::ProtoTraits<IsV2>;
   google::protobuf::Arena arena;
   auto req = google::protobuf::Arena::Create<typename Traits::PostflightRequestT>(&arena);
@@ -49,7 +49,7 @@ BOOL Postflight(SNTSyncPostflight *self) {
   }
 
   id<SNTDaemonControlXPC> rop = [self.daemonConn synchronousRemoteObjectProxy];
-  [rop databaseRulesHash:^(NSString *execRulesHash, NSString *faaRulesHash) {
+  [rop databaseRulesHash:^(NSString* execRulesHash, NSString* faaRulesHash) {
     req->set_rules_hash(santa::NSStringToUTF8String(execRulesHash));
     if constexpr (IsV2) {
       req->set_file_access_rules_hash(santa::NSStringToUTF8String(faaRulesHash));
@@ -69,8 +69,8 @@ BOOL Postflight(SNTSyncPostflight *self) {
 
 @implementation SNTSyncPostflight
 
-- (NSURL *)stageURL {
-  NSString *stageName = [@"postflight" stringByAppendingFormat:@"/%@", self.syncState.machineID];
+- (NSURL*)stageURL {
+  NSString* stageName = [@"postflight" stringByAppendingFormat:@"/%@", self.syncState.machineID];
   return [NSURL URLWithString:stageName relativeToURL:self.syncState.syncBaseURL];
 }
 

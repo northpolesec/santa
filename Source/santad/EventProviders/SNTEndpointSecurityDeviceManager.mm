@@ -53,35 +53,35 @@ using santa::Message;
 
 // Defined operations for startup metrics:
 // Device shouldn't be operated on (e.g. not a mass storage device)
-static NSString *const kMetricStartupDiskOperationSkip = @"Skipped";
+static NSString* const kMetricStartupDiskOperationSkip = @"Skipped";
 // Device already had appropriate flags set
-static NSString *const kMetricStartupDiskOperationAllowed = @"Allowed";
+static NSString* const kMetricStartupDiskOperationAllowed = @"Allowed";
 // Device failed to be unmounted
-static NSString *const kMetricStartupDiskOperationUnmountFailed = @"UnmountFailed";
+static NSString* const kMetricStartupDiskOperationUnmountFailed = @"UnmountFailed";
 // Device failed to be remounted
-static NSString *const kMetricStartupDiskOperationRemountFailed = @"RemountFailed";
+static NSString* const kMetricStartupDiskOperationRemountFailed = @"RemountFailed";
 // Remounts were requested, but remount args weren't set
-static NSString *const kMetricStartupDiskOperationRemountSkipped = @"RemountSkipped";
+static NSString* const kMetricStartupDiskOperationRemountSkipped = @"RemountSkipped";
 // Operations on device matching the configured startup pref wwere successful
-static NSString *const kMetricStartupDiskOperationSuccess = @"Success";
+static NSString* const kMetricStartupDiskOperationSuccess = @"Success";
 
 @interface SNTEndpointSecurityDeviceManager ()
 
-- (void)logDiskAppeared:(NSDictionary *)props allowed:(bool)allowed;
-- (void)logDiskDisappeared:(NSDictionary *)props;
+- (void)logDiskAppeared:(NSDictionary*)props allowed:(bool)allowed;
+- (void)logDiskDisappeared:(NSDictionary*)props;
 - (DADissenterRef __nullable)handleMountApproval:(DADiskRef)disk;
 - (void)handleRemountCompletion:(DADiskRef)disk dissenter:(DADissenterRef __nullable)dissenter;
 
-@property SNTMetricCounter *startupDiskMetrics;
+@property SNTMetricCounter* startupDiskMetrics;
 @property DASessionRef diskArbSession;
 @property(nonatomic, readonly) dispatch_queue_t diskQueue;
 @property dispatch_semaphore_t diskSema;
-@property SNTConfigurator *configurator;
-@property NSMutableSet<NSString *> *remountingDisks;
+@property SNTConfigurator* configurator;
+@property NSMutableSet<NSString*>* remountingDisks;
 
 @end
 
-void DiskMountedCallback(DADiskRef disk, DADissenterRef dissenter, void *context) {
+void DiskMountedCallback(DADiskRef disk, DADissenterRef dissenter, void* context) {
   if (dissenter) {
     DAReturn status = DADissenterGetStatus(dissenter);
 
@@ -101,32 +101,32 @@ void DiskMountedCallback(DADiskRef disk, DADissenterRef dissenter, void *context
   }
 }
 
-void DiskAppearedCallback(DADiskRef disk, void *context) {
-  NSDictionary *props = CFBridgingRelease(DADiskCopyDescription(disk));
+void DiskAppearedCallback(DADiskRef disk, void* context) {
+  NSDictionary* props = CFBridgingRelease(DADiskCopyDescription(disk));
   if (![props[@"DAVolumeMountable"] boolValue]) return;
-  SNTEndpointSecurityDeviceManager *dm = (__bridge SNTEndpointSecurityDeviceManager *)context;
+  SNTEndpointSecurityDeviceManager* dm = (__bridge SNTEndpointSecurityDeviceManager*)context;
 
   [dm logDiskAppeared:props allowed:true];
 }
 
-void DiskDescriptionChangedCallback(DADiskRef disk, CFArrayRef keys, void *context) {
-  NSDictionary *props = CFBridgingRelease(DADiskCopyDescription(disk));
+void DiskDescriptionChangedCallback(DADiskRef disk, CFArrayRef keys, void* context) {
+  NSDictionary* props = CFBridgingRelease(DADiskCopyDescription(disk));
   if (![props[@"DAVolumeMountable"] boolValue]) return;
 
   if (props[@"DAVolumePath"]) {
-    SNTEndpointSecurityDeviceManager *dm = (__bridge SNTEndpointSecurityDeviceManager *)context;
+    SNTEndpointSecurityDeviceManager* dm = (__bridge SNTEndpointSecurityDeviceManager*)context;
 
     [dm logDiskAppeared:props allowed:true];
   }
 }
 
-void DiskDisappearedCallback(DADiskRef disk, void *context) {
-  NSDictionary *props = CFBridgingRelease(DADiskCopyDescription(disk));
+void DiskDisappearedCallback(DADiskRef disk, void* context) {
+  NSDictionary* props = CFBridgingRelease(DADiskCopyDescription(disk));
   if (![props[@"DAVolumeMountable"] boolValue]) return;
 
-  SNTEndpointSecurityDeviceManager *dm = (__bridge SNTEndpointSecurityDeviceManager *)context;
+  SNTEndpointSecurityDeviceManager* dm = (__bridge SNTEndpointSecurityDeviceManager*)context;
 
-  const char *bsdNameStr = DADiskGetBSDName(disk);
+  const char* bsdNameStr = DADiskGetBSDName(disk);
   if (bsdNameStr) {
     [dm.remountingDisks removeObject:@(bsdNameStr)];
   }
@@ -134,33 +134,33 @@ void DiskDisappearedCallback(DADiskRef disk, void *context) {
   [dm logDiskDisappeared:props];
 }
 
-void DiskUnmountCallback(DADiskRef disk, DADissenterRef dissenter, void *context) {
+void DiskUnmountCallback(DADiskRef disk, DADissenterRef dissenter, void* context) {
   if (dissenter) {
     LOGW(@"Unable to unmount device: %@", CFBridgingRelease(DADissenterGetStatusString(dissenter)));
   } else if (disk) {
-    NSDictionary *diskInfo = CFBridgingRelease(DADiskCopyDescription(disk));
+    NSDictionary* diskInfo = CFBridgingRelease(DADiskCopyDescription(disk));
     LOGI(@"Unmounted device: Model: %@, Vendor: %@, Path: %@",
-         diskInfo[(__bridge NSString *)kDADiskDescriptionDeviceModelKey],
-         diskInfo[(__bridge NSString *)kDADiskDescriptionDeviceVendorKey],
-         diskInfo[(__bridge NSString *)kDADiskDescriptionVolumePathKey]);
+         diskInfo[(__bridge NSString*)kDADiskDescriptionDeviceModelKey],
+         diskInfo[(__bridge NSString*)kDADiskDescriptionDeviceVendorKey],
+         diskInfo[(__bridge NSString*)kDADiskDescriptionVolumePathKey]);
   }
 
   dispatch_semaphore_t sema = (__bridge dispatch_semaphore_t)context;
   dispatch_semaphore_signal(sema);
 }
 
-DADissenterRef DiskMountApprovalCallback(DADiskRef disk, void *context) {
-  SNTEndpointSecurityDeviceManager *dm = (__bridge SNTEndpointSecurityDeviceManager *)context;
+DADissenterRef DiskMountApprovalCallback(DADiskRef disk, void* context) {
+  SNTEndpointSecurityDeviceManager* dm = (__bridge SNTEndpointSecurityDeviceManager*)context;
   return [dm handleMountApproval:disk];
 }
 
-void DiskRemountCompletionCallback(DADiskRef disk, DADissenterRef dissenter, void *context) {
-  SNTEndpointSecurityDeviceManager *dm = (__bridge SNTEndpointSecurityDeviceManager *)context;
+void DiskRemountCompletionCallback(DADiskRef disk, DADissenterRef dissenter, void* context) {
+  SNTEndpointSecurityDeviceManager* dm = (__bridge SNTEndpointSecurityDeviceManager*)context;
   [dm handleRemountCompletion:disk dissenter:dissenter];
 }
 
-NSArray<NSString *> *maskToMountArgs(uint32_t remountOpts) {
-  NSMutableArray<NSString *> *args = [NSMutableArray array];
+NSArray<NSString*>* maskToMountArgs(uint32_t remountOpts) {
+  NSMutableArray<NSString*>* args = [NSMutableArray array];
   if (remountOpts & MNT_RDONLY) [args addObject:@"rdonly"];
   if (remountOpts & MNT_NOEXEC) [args addObject:@"noexec"];
   if (remountOpts & MNT_NOSUID) [args addObject:@"nosuid"];
@@ -172,10 +172,10 @@ NSArray<NSString *> *maskToMountArgs(uint32_t remountOpts) {
   return args;
 }
 
-uint32_t mountArgsToMask(NSArray<NSString *> *args) {
+uint32_t mountArgsToMask(NSArray<NSString*>* args) {
   uint32_t flags = 0;
-  for (NSString *i in args) {
-    NSString *arg = [i lowercaseString];
+  for (NSString* i in args) {
+    NSString* arg = [i lowercaseString];
     if ([arg isEqualToString:@"rdonly"]) {
       flags |= MNT_RDONLY;
     } else if ([arg isEqualToString:@"noexec"]) {
@@ -214,7 +214,7 @@ NS_ASSUME_NONNULL_BEGIN
                         authResultCache:(std::shared_ptr<AuthResultCache>)authResultCache
                           blockUSBMount:(BOOL)blockUSBMount
     blockUnencryptedRemovableMediaMount:(BOOL)blockUnencryptedRemovableMediaMount
-                         remountUSBMode:(nullable NSArray<NSString *> *)remountUSBMode
+                         remountUSBMode:(nullable NSArray<NSString*>*)remountUSBMode
                      startupPreferences:(SNTDeviceManagerStartupPreferences)startupPrefs {
   self = [super initWithESAPI:std::move(esApi)
                       metrics:std::move(metrics)
@@ -235,7 +235,7 @@ NS_ASSUME_NONNULL_BEGIN
     _diskArbSession = DASessionCreate(NULL);
     DASessionSetDispatchQueue(_diskArbSession, _diskQueue);
 
-    SNTMetricInt64Gauge *startupPrefsMetric = [[SNTMetricSet sharedInstance]
+    SNTMetricInt64Gauge* startupPrefsMetric = [[SNTMetricSet sharedInstance]
         int64GaugeWithName:@"/santa/device_manager/startup_preference"
                 fieldNames:@[]
                   helpText:@"The current startup preference value"];
@@ -256,7 +256,7 @@ NS_ASSUME_NONNULL_BEGIN
   return self;
 }
 
-- (uint32_t)updatedMountFlags:(const struct statfs *)sfs {
+- (uint32_t)updatedMountFlags:(const struct statfs*)sfs {
   uint32_t mask = sfs->f_flags | mountArgsToMask(self.remountArgs);
 
   // NB: APFS mounts get MNT_JOURNALED implicitly set. However, mount_apfs
@@ -268,31 +268,31 @@ NS_ASSUME_NONNULL_BEGIN
   return mask;
 }
 
-- (BOOL)shouldOperateOnDiskWithProperties:(NSDictionary *)diskInfo {
+- (BOOL)shouldOperateOnDiskWithProperties:(NSDictionary*)diskInfo {
   // Handle cases like time machine mounts where a disk info is not present.
   if (!diskInfo) {
     return false;
   }
 
-  BOOL isInternal = [diskInfo[(__bridge NSString *)kDADiskDescriptionDeviceInternalKey] boolValue];
-  BOOL isRemovable = [diskInfo[(__bridge NSString *)kDADiskDescriptionMediaRemovableKey] boolValue];
-  BOOL isEjectable = [diskInfo[(__bridge NSString *)kDADiskDescriptionMediaEjectableKey] boolValue];
-  NSString *protocol = diskInfo[(__bridge NSString *)kDADiskDescriptionDeviceProtocolKey];
+  BOOL isInternal = [diskInfo[(__bridge NSString*)kDADiskDescriptionDeviceInternalKey] boolValue];
+  BOOL isRemovable = [diskInfo[(__bridge NSString*)kDADiskDescriptionMediaRemovableKey] boolValue];
+  BOOL isEjectable = [diskInfo[(__bridge NSString*)kDADiskDescriptionMediaEjectableKey] boolValue];
+  NSString* protocol = diskInfo[(__bridge NSString*)kDADiskDescriptionDeviceProtocolKey];
   BOOL isUSB = [protocol isEqualToString:@"USB"];
   BOOL isSecureDigital = [protocol isEqualToString:@"Secure Digital"];
   BOOL isVirtual = [protocol isEqualToString:@"Virtual Interface"];
 
-  NSString *kind = diskInfo[(__bridge NSString *)kDADiskDescriptionMediaKindKey];
+  NSString* kind = diskInfo[(__bridge NSString*)kDADiskDescriptionMediaKindKey];
 
   // TODO: check kind and protocol for banned things (e.g. MTP).
   LOGD(@"SNTEndpointSecurityDeviceManager: DiskInfo Protocol: %@ Kind: %@ isInternal: %d "
        @"isRemovable: %d isEjectable: %d",
        protocol, kind, isInternal, isRemovable, isEjectable);
 
-  NSString *model = diskInfo[(__bridge NSString *)kDADiskDescriptionDeviceModelKey];
-  NSString *vendor = diskInfo[(__bridge NSString *)kDADiskDescriptionDeviceVendorKey];
-  NSString *devicePath = diskInfo[(__bridge NSString *)kDADiskDescriptionDevicePathKey];
-  NSString *mediaPath = diskInfo[(__bridge NSString *)kDADiskDescriptionMediaPathKey];
+  NSString* model = diskInfo[(__bridge NSString*)kDADiskDescriptionDeviceModelKey];
+  NSString* vendor = diskInfo[(__bridge NSString*)kDADiskDescriptionDeviceVendorKey];
+  NSString* devicePath = diskInfo[(__bridge NSString*)kDADiskDescriptionDevicePathKey];
+  NSString* mediaPath = diskInfo[(__bridge NSString*)kDADiskDescriptionMediaPathKey];
 
   LOGD(@"SNTEndpointSecurityDeviceManager: DiskInfo --- model: %@ vendor: %@ devicePath: %@ "
        @"mediaPath: %@",
@@ -339,7 +339,7 @@ NS_ASSUME_NONNULL_BEGIN
   return (flags & requiredFlags) == requiredFlags;
 }
 
-- (void)incrementStartupMetricsOperation:(NSString *)op {
+- (void)incrementStartupMetricsOperation:(NSString*)op {
   [self.startupDiskMetrics incrementForFieldValues:@[ op ]];
 }
 
@@ -355,7 +355,7 @@ NS_ASSUME_NONNULL_BEGIN
     return;
   }
 
-  struct statfs *mnts;
+  struct statfs* mnts;
   int numMounts = getmntinfo_r_np(&mnts, MNT_WAIT);
 
   if (numMounts == 0) {
@@ -366,7 +366,7 @@ NS_ASSUME_NONNULL_BEGIN
   self.diskSema = dispatch_semaphore_create(0);
 
   for (int i = 0; i < numMounts; i++) {
-    struct statfs *sfs = &mnts[i];
+    struct statfs* sfs = &mnts[i];
 
     DADiskRef disk = DADiskCreateFromBSDName(NULL, self.diskArbSession, sfs->f_mntfromname);
     if (!disk) {
@@ -376,7 +376,7 @@ NS_ASSUME_NONNULL_BEGIN
     }
 
     CFAutorelease(disk);
-    NSDictionary *diskInfo = CFBridgingRelease(DADiskCopyDescription(disk));
+    NSDictionary* diskInfo = CFBridgingRelease(DADiskCopyDescription(disk));
 
     if (![self shouldOperateOnDiskWithProperties:diskInfo]) {
       [self incrementStartupMetricsOperation:kMetricStartupDiskOperationSkip];
@@ -399,7 +399,7 @@ NS_ASSUME_NONNULL_BEGIN
     LOGI(@"Attempting to unmount device: '%s' mounted on '%s'", sfs->f_mntfromname,
          sfs->f_mntonname);
 
-    DADiskUnmount(disk, unmountOptions, DiskUnmountCallback, (__bridge void *)self.diskSema);
+    DADiskUnmount(disk, unmountOptions, DiskUnmountCallback, (__bridge void*)self.diskSema);
 
     if (dispatch_semaphore_wait(self.diskSema,
                                 dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC))) {
@@ -425,7 +425,7 @@ NS_ASSUME_NONNULL_BEGIN
       [self remount:disk
           mountMode:newMode
            callback:DiskMountedCallback
-            context:(__bridge void *)self.diskSema];
+            context:(__bridge void*)self.diskSema];
 
       if (dispatch_semaphore_wait(self.diskSema,
                                   dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC))) {
@@ -439,19 +439,19 @@ NS_ASSUME_NONNULL_BEGIN
   }
 }
 
-- (void)logDiskAppeared:(NSDictionary *)props allowed:(bool)allowed {
+- (void)logDiskAppeared:(NSDictionary*)props allowed:(bool)allowed {
   self->_logger->LogDiskAppeared(props, allowed);
 }
 
-- (void)logDiskDisappeared:(NSDictionary *)props {
+- (void)logDiskDisappeared:(NSDictionary*)props {
   self->_logger->LogDiskDisappeared(props);
 }
 
-- (NSString *)description {
+- (NSString*)description {
   return @"Device Manager";
 }
 
-- (void)handleMessage:(Message &&)esMsg
+- (void)handleMessage:(Message&&)esMsg
     recordEventMetrics:(void (^)(EventDisposition))recordEventMetrics {
   // Process the unmount event first so that caches are flushed before any
   // other potential early returns.
@@ -501,14 +501,13 @@ NS_ASSUME_NONNULL_BEGIN
 }
 
 - (void)enable {
-  DARegisterDiskAppearedCallback(_diskArbSession, NULL, DiskAppearedCallback,
-                                 (__bridge void *)self);
+  DARegisterDiskAppearedCallback(_diskArbSession, NULL, DiskAppearedCallback, (__bridge void*)self);
   DARegisterDiskDescriptionChangedCallback(_diskArbSession, NULL, NULL,
-                                           DiskDescriptionChangedCallback, (__bridge void *)self);
+                                           DiskDescriptionChangedCallback, (__bridge void*)self);
   DARegisterDiskDisappearedCallback(_diskArbSession, NULL, DiskDisappearedCallback,
-                                    (__bridge void *)self);
+                                    (__bridge void*)self);
   DARegisterDiskMountApprovalCallback(_diskArbSession, NULL, DiskMountApprovalCallback,
-                                      (__bridge void *)self);
+                                      (__bridge void*)self);
 
   [super subscribeAndClearCache:{
                                     ES_EVENT_TYPE_AUTH_MOUNT,
@@ -517,8 +516,8 @@ NS_ASSUME_NONNULL_BEGIN
   }];
 }
 
-- (es_auth_result_t)handleAuthMount:(const Message &)m isNetworkMount:(BOOL)isNetworkMount {
-  const struct statfs *eventStatFS;
+- (es_auth_result_t)handleAuthMount:(const Message&)m isNetworkMount:(BOOL)isNetworkMount {
+  const struct statfs* eventStatFS;
 
   switch (m->event_type) {
     case ES_EVENT_TYPE_AUTH_MOUNT: eventStatFS = m->event.mount.statfs; break;
@@ -541,12 +540,12 @@ NS_ASSUME_NONNULL_BEGIN
   }
 }
 
-- (es_auth_result_t)handleAuthDeviceMount:(const Message &)m
-                              eventStatFS:(const struct statfs *)eventStatFS {
+- (es_auth_result_t)handleAuthDeviceMount:(const Message&)m
+                              eventStatFS:(const struct statfs*)eventStatFS {
   DADiskRef disk = DADiskCreateFromBSDName(NULL, self.diskArbSession, eventStatFS->f_mntfromname);
   CFAutorelease(disk);
 
-  NSDictionary *diskInfo = CFBridgingRelease(DADiskCopyDescription(disk));
+  NSDictionary* diskInfo = CFBridgingRelease(DADiskCopyDescription(disk));
   if (![self shouldOperateOnDiskWithProperties:diskInfo]) {
     return ES_AUTH_RESULT_ALLOW;
   }
@@ -555,7 +554,7 @@ NS_ASSUME_NONNULL_BEGIN
   // asynchronously by diskarbitrationd via _FSGetMediaEncryptionStatusAtPath().
   // A nil value means the key has not yet been populated — we treat this as
   // "not encrypted" (deny-by-default) since this is a security-critical decision.
-  NSNumber *encryptedValue = diskInfo[(__bridge NSString *)kDADiskDescriptionMediaEncryptedKey];
+  NSNumber* encryptedValue = diskInfo[(__bridge NSString*)kDADiskDescriptionMediaEncryptedKey];
   BOOL isEncrypted = (encryptedValue != nil && [encryptedValue boolValue]);
 
   // When only encryption enforcement is active (blockUSBMount is OFF),
@@ -572,18 +571,18 @@ NS_ASSUME_NONNULL_BEGIN
   // (never remount — remounting still exposes unencrypted data).
   BOOL shouldBlockUnencrypted = self.blockUnencryptedRemovableMediaMount && !isEncrypted;
 
-  SNTDeviceEvent *event = [[SNTDeviceEvent alloc]
+  SNTDeviceEvent* event = [[SNTDeviceEvent alloc]
       initWithOnName:[NSString stringWithUTF8String:eventStatFS->f_mntonname]
             fromName:[NSString stringWithUTF8String:eventStatFS->f_mntfromname]];
   event.isEncrypted = isEncrypted;
 
-  NSString *model = [diskInfo[(__bridge NSString *)kDADiskDescriptionDeviceModelKey]
+  NSString* model = [diskInfo[(__bridge NSString*)kDADiskDescriptionDeviceModelKey]
       stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
-  NSString *vendor = [diskInfo[(__bridge NSString *)kDADiskDescriptionDeviceVendorKey]
+  NSString* vendor = [diskInfo[(__bridge NSString*)kDADiskDescriptionDeviceVendorKey]
       stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
-  NSString *protocol = [diskInfo[(__bridge NSString *)kDADiskDescriptionDeviceProtocolKey]
+  NSString* protocol = [diskInfo[(__bridge NSString*)kDADiskDescriptionDeviceProtocolKey]
       stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
-  SNTStoredUSBMountEvent *storedUSBMountEvent;
+  SNTStoredUSBMountEvent* storedUSBMountEvent;
 
   if ([self haveRemountArgs] && !shouldBlockUnencrypted) {
     event.remountArgs = self.remountArgs;
@@ -608,7 +607,7 @@ NS_ASSUME_NONNULL_BEGIN
                 isEncrypted:isEncrypted];
   } else {
     // The mount is going to be blocked, log it
-    NSMutableDictionary *props = [CFBridgingRelease(DADiskCopyDescription(disk)) mutableCopy];
+    NSMutableDictionary* props = [CFBridgingRelease(DADiskCopyDescription(disk)) mutableCopy];
     props[santa::kMountFromNameKey] = event.mntfromname;
     [self logDiskAppeared:[props copy] allowed:false];
     storedUSBMountEvent =
@@ -631,21 +630,21 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)remount:(DADiskRef)disk
       mountMode:(uint32_t)remountMask
        callback:(DADiskMountCallback)callback
-        context:(nullable void *)context {
-  NSArray<NSString *> *args = maskToMountArgs(remountMask);
-  CFStringRef *argv = (CFStringRef *)calloc(args.count + 1, sizeof(CFStringRef));
+        context:(nullable void*)context {
+  NSArray<NSString*>* args = maskToMountArgs(remountMask);
+  CFStringRef* argv = (CFStringRef*)calloc(args.count + 1, sizeof(CFStringRef));
   CFArrayGetValues((__bridge CFArrayRef)args, CFRangeMake(0, (CFIndex)args.count),
-                   (const void **)argv);
+                   (const void**)argv);
 
   DADiskMountWithArguments(disk, NULL, kDADiskMountOptionDefault, callback, context,
-                           (CFStringRef *)argv);
+                           (CFStringRef*)argv);
 
   free(argv);
 }
 
 - (DADissenterRef __nullable)handleMountApproval:(DADiskRef)disk {
-  const char *bsdNameStr = DADiskGetBSDName(disk);
-  NSString *bsdName = bsdNameStr ? @(bsdNameStr) : @"";
+  const char* bsdNameStr = DADiskGetBSDName(disk);
+  NSString* bsdName = bsdNameStr ? @(bsdNameStr) : @"";
 
   // Approve our own remount to prevent infinite dissent loops.
   if ([self.remountingDisks containsObject:bsdName]) {
@@ -653,7 +652,7 @@ NS_ASSUME_NONNULL_BEGIN
     return NULL;
   }
 
-  NSDictionary *diskInfo = CFBridgingRelease(DADiskCopyDescription(disk));
+  NSDictionary* diskInfo = CFBridgingRelease(DADiskCopyDescription(disk));
   if (![self shouldOperateOnDiskWithProperties:diskInfo]) {
     return NULL;
   }
@@ -664,7 +663,7 @@ NS_ASSUME_NONNULL_BEGIN
     return NULL;
   }
 
-  NSNumber *encryptedValue = diskInfo[(__bridge NSString *)kDADiskDescriptionMediaEncryptedKey];
+  NSNumber* encryptedValue = diskInfo[(__bridge NSString*)kDADiskDescriptionMediaEncryptedKey];
   BOOL isEncrypted = (encryptedValue != nil && [encryptedValue boolValue]);
 
   if (!isEncrypted || ![self haveRemountArgs]) {
@@ -678,15 +677,15 @@ NS_ASSUME_NONNULL_BEGIN
   [self remount:disk
       mountMode:mountArgsToMask(self.remountArgs)
        callback:DiskRemountCompletionCallback
-        context:(__bridge void *)self];
+        context:(__bridge void*)self];
 
   return DADissenterCreate(kCFAllocatorDefault, kDAReturnBusy,
                            CFSTR("Remounting with restricted flags"));
 }
 
 - (void)handleRemountCompletion:(DADiskRef)disk dissenter:(DADissenterRef __nullable)dissenter {
-  const char *bsdNameStr = DADiskGetBSDName(disk);
-  NSString *bsdName = bsdNameStr ? @(bsdNameStr) : @"";
+  const char* bsdNameStr = DADiskGetBSDName(disk);
+  NSString* bsdName = bsdNameStr ? @(bsdNameStr) : @"";
 
   [self.remountingDisks removeObject:bsdName];
 
@@ -699,30 +698,30 @@ NS_ASSUME_NONNULL_BEGIN
 
   LOGI(@"Successfully remounted encrypted device %@ with restricted flags", bsdName);
 
-  NSDictionary *diskInfo = CFBridgingRelease(DADiskCopyDescription(disk));
+  NSDictionary* diskInfo = CFBridgingRelease(DADiskCopyDescription(disk));
 
-  NSString *model = [diskInfo[(__bridge NSString *)kDADiskDescriptionDeviceModelKey]
+  NSString* model = [diskInfo[(__bridge NSString*)kDADiskDescriptionDeviceModelKey]
       stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
-  NSString *vendor = [diskInfo[(__bridge NSString *)kDADiskDescriptionDeviceVendorKey]
+  NSString* vendor = [diskInfo[(__bridge NSString*)kDADiskDescriptionDeviceVendorKey]
       stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
-  NSString *protocol = [diskInfo[(__bridge NSString *)kDADiskDescriptionDeviceProtocolKey]
+  NSString* protocol = [diskInfo[(__bridge NSString*)kDADiskDescriptionDeviceProtocolKey]
       stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
 
-  id volumePath = diskInfo[(__bridge NSString *)kDADiskDescriptionVolumePathKey];
-  NSString *mountOnName;
+  id volumePath = diskInfo[(__bridge NSString*)kDADiskDescriptionVolumePathKey];
+  NSString* mountOnName;
   if ([volumePath isKindOfClass:[NSURL class]]) {
-    mountOnName = [(NSURL *)volumePath path];
+    mountOnName = [(NSURL*)volumePath path];
   } else {
-    mountOnName = (NSString *)volumePath;
+    mountOnName = (NSString*)volumePath;
   }
   if (!mountOnName) mountOnName = @"";
 
   if (self.deviceBlockCallback) {
-    SNTDeviceEvent *event = [[SNTDeviceEvent alloc] initWithOnName:mountOnName fromName:bsdName];
+    SNTDeviceEvent* event = [[SNTDeviceEvent alloc] initWithOnName:mountOnName fromName:bsdName];
     event.remountArgs = self.remountArgs;
     event.isEncrypted = YES;
 
-    SNTStoredUSBMountEvent *storedEvent = [[SNTStoredUSBMountEvent alloc]
+    SNTStoredUSBMountEvent* storedEvent = [[SNTStoredUSBMountEvent alloc]
         initWithDeviceModel:model
                deviceVendor:vendor
                 mountOnName:mountOnName
@@ -735,16 +734,15 @@ NS_ASSUME_NONNULL_BEGIN
   }
 }
 
-- (void)handleBlockedNetworkMount:(const Message &)m
-                      eventStatFS:(const struct statfs *)eventStatFS {
-  SNTStoredNetworkMountEvent *storedEvent = [self makeNetworkMountEventForMessage:m
+- (void)handleBlockedNetworkMount:(const Message&)m eventStatFS:(const struct statfs*)eventStatFS {
+  SNTStoredNetworkMountEvent* storedEvent = [self makeNetworkMountEventForMessage:m
                                                                       eventStatFS:eventStatFS];
 
   if (self.networkMountCallback) {
     self.networkMountCallback(storedEvent);
   }
 
-  NSMutableDictionary *props = [NSMutableDictionary dictionary];
+  NSMutableDictionary* props = [NSMutableDictionary dictionary];
   props[santa::kMountFromNameKey] = storedEvent.mountFromName;
   props[@"DAVolumePath"] = [NSURL URLWithString:storedEvent.mountOnName];
   props[@"DAVolumeKind"] = storedEvent.fsType;
@@ -752,15 +750,23 @@ NS_ASSUME_NONNULL_BEGIN
   [self logDiskAppeared:[props copy] allowed:false];
 }
 
-- (es_auth_result_t)handleAuthNetworkMount:(const Message &)m
-                               eventStatFS:(const struct statfs *)eventStatFS {
+- (es_auth_result_t)handleAuthNetworkMount:(const Message&)m
+                               eventStatFS:(const struct statfs*)eventStatFS {
   if (!self.configurator.blockNetworkMount) {
     return ES_AUTH_RESULT_ALLOW;
   }
 
-  NSString *mountFromName = @(eventStatFS->f_mntfromname);
+  NSString* mountFromName = @(eventStatFS->f_mntfromname);
 
-  NSURL *fromURL = [NSURL URLWithString:mountFromName];
+  // f_mntfromname uses protocol-specific formats that aren't always valid URLs.
+  // NFS uses "host:/path" which NSURL misinterprets as scheme=host with no host component.
+  // SMB/CIFS uses "//[user@]host/share" which NSURL handles correctly.
+  // Prepend the filesystem type as a URL scheme when needed to make it parseable.
+  NSString* urlString = mountFromName;
+  if (![mountFromName containsString:@"://"] && ![mountFromName hasPrefix:@"//"]) {
+    urlString = [NSString stringWithFormat:@"%s://%@", eventStatFS->f_fstypename, mountFromName];
+  }
+  NSURL* fromURL = [NSURL URLWithString:urlString];
   if (!fromURL.host) {
     if (self.configurator.failClosed) {
       LOGW(@"Network share prevented from mounting: %s (by: %s). Unable to extract host "
@@ -789,9 +795,9 @@ NS_ASSUME_NONNULL_BEGIN
   return ES_AUTH_RESULT_DENY;
 }
 
-- (SNTStoredNetworkMountEvent *)makeNetworkMountEventForMessage:(const Message &)m
-                                                    eventStatFS:(const struct statfs *)eventStatFS {
-  SNTStoredNetworkMountEvent *event = [[SNTStoredNetworkMountEvent alloc] init];
+- (SNTStoredNetworkMountEvent*)makeNetworkMountEventForMessage:(const Message&)m
+                                                   eventStatFS:(const struct statfs*)eventStatFS {
+  SNTStoredNetworkMountEvent* event = [[SNTStoredNetworkMountEvent alloc] init];
 
   event.mountFromName = @(eventStatFS->f_mntfromname);
   // Sanitize password from mount URL to prevent it from being logged or stored
@@ -799,7 +805,7 @@ NS_ASSUME_NONNULL_BEGIN
   event.mountOnName = @(eventStatFS->f_mntonname);
   event.fsType = @(eventStatFS->f_fstypename);
 
-  SNTCachedDecision *cd =
+  SNTCachedDecision* cd =
       [[SNTDecisionCache sharedCache] cachedDecisionForFile:m->process->executable->stat];
 
   event.process.filePath = @(m->process->executable->path.data);

@@ -22,21 +22,21 @@
 namespace santa {
 
 extern const NSUInteger kTeamIDLength;
-extern NSString *const kPlatformTeamID;
-extern NSString *const kPlatformTeamIDPrefix;
+extern NSString* const kPlatformTeamID;
+extern NSString* const kPlatformTeamIDPrefix;
 
 // Validates that a Team ID is exactly 10 alphanumeric characters.
-bool IsValidTeamID(NSString *tid);
+bool IsValidTeamID(NSString* tid);
 
 // Validates a signing ID in the format "TeamID:SigningID" or "platform:SigningID".
-bool IsValidSigningID(NSString *sid);
+bool IsValidSigningID(NSString* sid);
 
 // Validates a CDHash is a hex string with the correct length.
-bool IsValidCDHash(NSString *cdhash);
+bool IsValidCDHash(NSString* cdhash);
 
 // Splits a signing ID into its TeamID and SigningID components.
 // Returns (nil, nil) if invalid.
-std::pair<NSString *, NSString *> SplitSigningID(NSString *sid);
+std::pair<NSString*, NSString*> SplitSigningID(NSString* sid);
 
 }  // namespace santa
 

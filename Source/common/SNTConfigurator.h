@@ -77,7 +77,7 @@
 ///  </array>
 ///
 ///
-@property(nullable, readonly, nonatomic) NSArray<NSDictionary *> *staticRules;
+@property(nullable, readonly, nonatomic) NSArray<NSDictionary*>* staticRules;
 
 ///
 ///  The regex of allowed paths. Regexes are specified in ICU format.
@@ -86,12 +86,12 @@
 ///  pointless as a path only ever has a single line.
 ///  If the regex doesn't begin with ^ to match from the beginning of the line, it will be added.
 ///
-@property(nullable, readonly, nonatomic) NSRegularExpression *allowedPathRegex;
+@property(nullable, readonly, nonatomic) NSRegularExpression* allowedPathRegex;
 
 ///
 ///  Set the regex of allowed paths as received from a sync server.
 ///
-- (void)setSyncServerAllowedPathRegex:(nonnull NSRegularExpression *)re;
+- (void)setSyncServerAllowedPathRegex:(nonnull NSRegularExpression*)re;
 
 ///
 ///  The regex of blocked paths. Regexes are specified in ICU format.
@@ -100,12 +100,12 @@
 ///  pointless as a path only ever has a single line.
 ///  If the regex doesn't begin with ^ to match from the beginning of the line, it will be added.
 ///
-@property(nullable, readonly, nonatomic) NSRegularExpression *blockedPathRegex;
+@property(nullable, readonly, nonatomic) NSRegularExpression* blockedPathRegex;
 
 ///
 ///  Set the regex of blocked paths as received from a sync server.
 ///
-- (void)setSyncServerBlockedPathRegex:(nonnull NSRegularExpression *)re;
+- (void)setSyncServerBlockedPathRegex:(nonnull NSRegularExpression*)re;
 
 ///
 ///  The regex of paths to log file changes for. Regexes are specified in ICU format.
@@ -114,7 +114,7 @@
 ///  pointless as a path only ever has a single line.
 ///  If the regex doesn't begin with ^ to match from the beginning of the line, it will be added.
 ///
-@property(nullable, readonly, nonatomic) NSRegularExpression *fileChangesRegex;
+@property(nullable, readonly, nonatomic) NSRegularExpression* fileChangesRegex;
 
 ///
 ///  A list of ignore prefixes which are checked in-kernel.
@@ -165,7 +165,7 @@
 ///  Filters are only applied on santad startup.
 ///  TODO(bur): Support add / remove of filters while santad is running.
 ///
-@property(nullable, readonly, nonatomic) NSArray *fileChangesPrefixFilters;
+@property(nullable, readonly, nonatomic) NSArray* fileChangesPrefixFilters;
 
 ///
 ///  Enable __PAGEZERO protection, defaults to YES
@@ -217,7 +217,7 @@
 /// converted to the SNTEventLogType enum. If the key is not set, the default log
 /// type is returned.
 ///
-@property(nonnull, readonly, nonatomic) NSString *eventLogTypeRaw;
+@property(nonnull, readonly, nonatomic) NSString* eventLogTypeRaw;
 
 ///
 ///  If eventLogType is set to Filelog, eventLogPath will provide the path to save logs.
@@ -225,14 +225,14 @@
 ///
 ///  @note: This property is KVO compliant, but should only be read once at santad startup.
 ///
-@property(nonnull, readonly, nonatomic) NSString *eventLogPath;
+@property(nonnull, readonly, nonatomic) NSString* eventLogPath;
 
 ///
 ///  Array of strings of telemetry events that should be logged.
 ///
 ///  @note: This property is KVO compliant.
 ///
-@property(nullable, readonly, nonatomic) NSArray<NSString *> *telemetry;
+@property(nullable, readonly, nonatomic) NSArray<NSString*>* telemetry;
 
 ///
 ///  If eventLogType is set to protobuf, spoolDirectory will provide the base path used for
@@ -241,7 +241,7 @@
 ///
 ///  @note: This property is KVO compliant, but should only be read once at santad startup.
 ///
-@property(nonnull, readonly, nonatomic) NSString *spoolDirectory;
+@property(nonnull, readonly, nonatomic) NSString* spoolDirectory;
 
 ///
 ///  If eventLogType is set to protobuf, spoolDirectoryFileSizeThresholdKB sets the per-file size
@@ -322,14 +322,14 @@
 ///
 ///  @note: This property is KVO compliant.
 ///
-@property(nullable, readonly, nonatomic) NSArray<NSString *> *telemetryFilterExpressions;
+@property(nullable, readonly, nonatomic) NSArray<NSString*>* telemetryFilterExpressions;
 
 ///
 ///  CEL rules evaluated as fallback when no rules match, before scope checks.
 ///
 ///  @note: This property is KVO compliant.
 ///
-@property(nullable, readonly, nonatomic) NSArray<SNTCELFallbackRule *> *celFallbackRules;
+@property(nullable, readonly, nonatomic) NSArray<SNTCELFallbackRule*>* celFallbackRules;
 
 ///
 ///  If set, contains the filesystem access policy configuration.
@@ -338,7 +338,7 @@
 ///         fileAccessPolicy is set.
 ///  @note: This property is KVO compliant.
 ///
-@property(nullable, readonly, nonatomic) NSDictionary *fileAccessPolicy;
+@property(nullable, readonly, nonatomic) NSDictionary* fileAccessPolicy;
 
 ///
 ///  If set, contains the path to the filesystem access policy config plist.
@@ -346,7 +346,7 @@
 ///  @note: This property will be ignored if fileAccessPolicy is set.
 ///  @note: This property is KVO compliant.
 ///
-@property(nullable, readonly, nonatomic) NSString *fileAccessPolicyPlist;
+@property(nullable, readonly, nonatomic) NSString* fileAccessPolicyPlist;
 
 ///
 ///  This is the message shown to the user when access to a file is blocked
@@ -356,7 +356,7 @@
 ///
 ///  @note: This property is KVO compliant.
 ///
-@property(nullable, readonly, nonatomic) NSString *fileAccessBlockMessage;
+@property(nullable, readonly, nonatomic) NSString* fileAccessBlockMessage;
 
 ///
 ///  If fileAccessPolicyPlist is set, fileAccessPolicyUpdateIntervalSec
@@ -402,35 +402,35 @@
 ///
 ///  Currently defined settings for Santa's network extension. Its value is set by a sync server.
 ///
-@property(nullable, readonly) SNTSyncNetworkExtensionSettings *syncNetworkExtensionSettings;
+@property(nullable, readonly) SNTSyncNetworkExtensionSettings* syncNetworkExtensionSettings;
 
 ///
 ///  Set the mode network extension settings as received from a sync server.
 ///
 - (void)setSyncServerSyncNetworkExtensionSettings:
-    (nullable SNTSyncNetworkExtensionSettings *)syncNetworkExtensionSettings;
+    (nullable SNTSyncNetworkExtensionSettings*)syncNetworkExtensionSettings;
 
 ///
 ///  The push token chain as received from a sync server. This is used to
 ///  validate sync v2 feature access. This will always be an array of two
 ///  strings. The first is the account JWT and the second is the user JWT.
 ///
-@property(nullable, readonly) NSArray<NSString *> *pushTokenChain;
+@property(nullable, readonly) NSArray<NSString*>* pushTokenChain;
 
 ///
 ///  Set the push token chain as received from a sync server.
 ///
-- (void)setSyncServerPushTokenChain:(nonnull NSArray<NSString *> *)pushTokenChain;
+- (void)setSyncServerPushTokenChain:(nonnull NSArray<NSString*>*)pushTokenChain;
 
 ///
 ///  Set the telemetry filter expressions as received from a sync server.
 ///
-- (void)setSyncServerTelemetryFilterExpressions:(nullable NSArray<NSString *> *)expressions;
+- (void)setSyncServerTelemetryFilterExpressions:(nullable NSArray<NSString*>*)expressions;
 
 ///
 ///  Set the CEL fallback expressions as received from a sync server.
 ///
-- (void)setSyncServerCELFallbackRules:(nullable NSArray<SNTCELFallbackRule *> *)rules;
+- (void)setSyncServerCELFallbackRules:(nullable NSArray<SNTCELFallbackRule*>*)rules;
 
 #pragma mark - GUI Settings
 
@@ -469,13 +469,13 @@
 /// The text to display when opening Santa.app.
 /// If unset, the default text will be displayed.
 ///
-@property(nullable, readonly, nonatomic) NSString *aboutText;
+@property(nullable, readonly, nonatomic) NSString* aboutText;
 
 ///
 ///  The URL to open when the user clicks "More Info..." when opening Santa.app.
 ///  If unset, the button will not be displayed.
 ///
-@property(nullable, readonly, nonatomic) NSURL *moreInfoURL;
+@property(nullable, readonly, nonatomic) NSURL* moreInfoURL;
 
 ///
 ///  When the user gets a block notification, a button can be displayed which will
@@ -501,22 +501,22 @@
 ///
 ///  If this item isn't set, the Open Event button will not be displayed.
 ///
-@property(nullable, readonly, nonatomic) NSString *eventDetailURL;
+@property(nullable, readonly, nonatomic) NSString* eventDetailURL;
 
 ///
 ///  Set the EventDetailURL as received from a sync server.
 ///
-- (void)setSyncServerEventDetailURL:(nullable NSString *)eventDetailURL;
+- (void)setSyncServerEventDetailURL:(nullable NSString*)eventDetailURL;
 
 ///
 ///  Related to the above property, this string represents the text to show on the button.
 ///
-@property(nullable, readonly, nonatomic) NSString *eventDetailText;
+@property(nullable, readonly, nonatomic) NSString* eventDetailText;
 
 ///
 ///  Set the EventDetailText as received from a sync server.
 ///
-- (void)setSyncServerEventDetailText:(nullable NSString *)eventDetailText;
+- (void)setSyncServerEventDetailText:(nullable NSString*)eventDetailText;
 
 ///
 ///  When the user gets a file access block notification, a button can be displayed which will
@@ -542,86 +542,86 @@
 ///
 ///  If this item isn't set, the Open Event button will not be displayed for file access events.
 ///
-@property(nullable, readonly, nonatomic) NSString *fileAccessEventDetailURL;
+@property(nullable, readonly, nonatomic) NSString* fileAccessEventDetailURL;
 
 ///
 ///  Set the FileAccessEventDetailURL as received from a sync server.
 ///
-- (void)setSyncServerFileAccessEventDetailURL:(nullable NSString *)fileAccessEventDetailURL;
+- (void)setSyncServerFileAccessEventDetailURL:(nullable NSString*)fileAccessEventDetailURL;
 
 ///
 ///  Related to FileAccessEventDetailURL, this string represents the text to show on the
 ///  button for file access events.
 ///
-@property(nullable, readonly, nonatomic) NSString *fileAccessEventDetailText;
+@property(nullable, readonly, nonatomic) NSString* fileAccessEventDetailText;
 
 ///
 ///  Set the FileAccessEventDetailText as received from a sync server.
 ///
-- (void)setSyncServerFileAccessEventDetailText:(nullable NSString *)fileAccessEventDetailText;
+- (void)setSyncServerFileAccessEventDetailText:(nullable NSString*)fileAccessEventDetailText;
 
 ///
 ///  This string represents the text to show on the "Dismiss" button in the UI instead of "Dismiss".
 ///
-@property(nullable, readonly, nonatomic) NSString *dismissText;
+@property(nullable, readonly, nonatomic) NSString* dismissText;
 
 ///
 ///  In lockdown mode this is the message shown to the user when an unknown binary
 ///  is blocked. If this message is not configured, a reasonable default is provided.
 ///
-@property(nullable, readonly, nonatomic) NSString *unknownBlockMessage;
+@property(nullable, readonly, nonatomic) NSString* unknownBlockMessage;
 
 ///
 ///  This is the message shown to the user when a binary is blocked because of a rule,
 ///  if that rule doesn't provide a custom message. If this is not configured, a reasonable
 ///  default is provided.
 ///
-@property(nullable, readonly, nonatomic) NSString *bannedBlockMessage;
+@property(nullable, readonly, nonatomic) NSString* bannedBlockMessage;
 
 ///
 /// This is the message shown to the user when a USB storage device's mount is denied
 /// from the BlockUSBMount configuration setting. If not configured, a reasonable
 /// default is provided.
 ///
-@property(nullable, readonly, nonatomic) NSString *bannedUSBBlockMessage;
+@property(nullable, readonly, nonatomic) NSString* bannedUSBBlockMessage;
 
 ///
 /// This is the message shown to the user when a USB storage device's mount is forcibly
 /// remounted to a different set of permissions from the BlockUSB and RemountUSBMode
 /// configuration settings. If not configured, a reasonable default is provided.
 ///
-@property(nullable, readonly, nonatomic) NSString *remountUSBBlockMessage;
+@property(nullable, readonly, nonatomic) NSString* remountUSBBlockMessage;
 
 ///
 /// This is the message shown to the user when a network share mount is denied
 /// due to the BlockNetworkMount configuration setting. If not configured, a
 /// reasonable default is provided.
 ///
-@property(nullable, readonly, nonatomic) NSString *bannedNetworkMountBlockMessage;
+@property(nullable, readonly, nonatomic) NSString* bannedNetworkMountBlockMessage;
 
 ///
 ///  Set the message to be shown when a network mount is blocked as
 ///  received from a sync server.
 ///
-- (void)setSyncServerBannedNetworkMountBlockMessage:(nullable NSString *)msg;
+- (void)setSyncServerBannedNetworkMountBlockMessage:(nullable NSString*)msg;
 
 ///
 ///  The notification text to display when the client goes into MONITOR mode.
 ///  Defaults to "Switching into Monitor mode"
 ///
-@property(nullable, readonly, nonatomic) NSString *modeNotificationMonitor;
+@property(nullable, readonly, nonatomic) NSString* modeNotificationMonitor;
 
 ///
 ///  The notification text to display when the client goes into LOCKDOWN mode.
 ///  Defaults to "Switching into Lockdown mode"
 ///
-@property(nullable, readonly, nonatomic) NSString *modeNotificationLockdown;
+@property(nullable, readonly, nonatomic) NSString* modeNotificationLockdown;
 
 ///
 ///  The notification text to display when the client goes into STANDALONE mode.
 ///  Defaults to "Switching into Standalone mode"
 ///
-@property(nullable, readonly, nonatomic) NSString *modeNotificationStandalone;
+@property(nullable, readonly, nonatomic) NSString* modeNotificationStandalone;
 
 ///
 ///  If set to true, when a user is presented with a GUI notification there will be
@@ -644,7 +644,7 @@
 ///
 ///  If set, this value will override `BrandingCompanyName`.
 ///
-@property(nullable, readonly, nonatomic) NSURL *brandingCompanyLogo;
+@property(nullable, readonly, nonatomic) NSURL* brandingCompanyLogo;
 
 ///
 ///  If set, the logo that will be displayed on Santa UI when the UI will be
@@ -660,14 +660,14 @@
 ///  If set, and the UI will be shown in dark mode, this value will
 ///  override both `BrandingCompanyLogo` and `BrandingCompanyName`.
 ///
-@property(nullable, readonly, nonatomic) NSURL *brandingCompanyLogoDark;
+@property(nullable, readonly, nonatomic) NSURL* brandingCompanyLogoDark;
 
 ///
 ///  If this value is set, the text will be be shown on Santa UI.
 ///
 ///  This setting is ignored if brandingCompanyLogo/brandingCompanyLogoDark are set.
 ///
-@property(nullable, readonly, nonatomic) NSString *brandingCompanyName;
+@property(nullable, readonly, nonatomic) NSString* brandingCompanyName;
 
 ///
 ///  If this is set to true, the UI will use different fonts on April 1st, May 4th and October 31st.
@@ -682,7 +682,7 @@
 @property(readonly, nonatomic) BOOL enableMenuItem;
 
 /// User defaults key for user override of the menu item enabled setting.
-extern NSString *_Nonnull const kEnableMenuItemUserOverride;
+extern NSString* _Nonnull const kEnableMenuItemUserOverride;
 
 #pragma mark - Sync Settings
 
@@ -696,7 +696,7 @@ extern NSString *_Nonnull const kEnableMenuItemUserOverride;
 ///
 ///  The base URL of the sync server.
 ///
-@property(nullable, readonly, nonatomic) NSURL *syncBaseURL;
+@property(nullable, readonly, nonatomic) NSURL* syncBaseURL;
 
 ///
 ///  If enabled, syncing will use binary protobufs for transfer instead
@@ -710,7 +710,7 @@ extern NSString *_Nonnull const kEnableMenuItemUserOverride;
 ///  are loosely documented at
 ///  https://developer.apple.com/documentation/cfnetwork/global-proxy-settings-constants.
 ///
-@property(nullable, readonly, nonatomic) NSDictionary *syncProxyConfig;
+@property(nullable, readonly, nonatomic) NSDictionary* syncProxyConfig;
 
 ///
 ///  Extra headers to include in all requests made during syncing.
@@ -731,27 +731,27 @@ extern NSString *_Nonnull const kEnableMenuItemUserOverride;
 ///  are able to use a different header for this that would be safest but if not
 ///  using Authorization /should/ be fine.
 ///
-@property(nullable, readonly, nonatomic) NSDictionary *syncExtraHeaders;
+@property(nullable, readonly, nonatomic) NSDictionary* syncExtraHeaders;
 
 ///
 ///  The machine owner.
 ///
-@property(nullable, readonly, nonatomic) NSString *machineOwner;
+@property(nullable, readonly, nonatomic) NSString* machineOwner;
 
 ///
 ///  The machine owner's groups.
 ///
-@property(nullable, readonly, nonatomic) NSArray<NSString *> *machineOwnerGroups;
+@property(nullable, readonly, nonatomic) NSArray<NSString*>* machineOwnerGroups;
 
 ///
 ///  The last date of a successful full sync.
 ///
-@property(nullable, nonatomic) NSDate *fullSyncLastSuccess;
+@property(nullable, nonatomic) NSDate* fullSyncLastSuccess;
 
 ///
 ///  The last date of a successful rule sync.
 ///
-@property(nullable, nonatomic) NSDate *ruleSyncLastSuccess;
+@property(nullable, nonatomic) NSDate* ruleSyncLastSuccess;
 
 ///
 ///  Type of sync required (e.g. normal, clean, etc.).
@@ -795,7 +795,7 @@ extern NSString *_Nonnull const kEnableMenuItemUserOverride;
 ///  Only populate this field with a value provided to you by
 ///  North Pole Security, Inc.
 ///
-@property(nullable, readonly, nonatomic) NSString *statsOrganizationID;
+@property(nullable, readonly, nonatomic) NSString* statsOrganizationID;
 
 ///
 ///  If YES, enables bundle detection for blocked events.
@@ -806,22 +806,22 @@ extern NSString *_Nonnull const kEnableMenuItemUserOverride;
 ///
 ///  Currently defined export configuration. Its value is set by a sync server.
 ///
-@property(nullable, readonly) SNTExportConfiguration *exportConfig;
+@property(nullable, readonly) SNTExportConfiguration* exportConfig;
 
 ///
 ///  Set the export configuration as received from a sync server.
 ///
-- (void)setSyncServerExportConfig:(nonnull SNTExportConfiguration *)exportConfig;
+- (void)setSyncServerExportConfig:(nonnull SNTExportConfiguration*)exportConfig;
 
 ///
 ///  Currently defined mode transition configuration. Its value is set by a sync server.
 ///
-@property(nullable, readonly) SNTModeTransition *modeTransition;
+@property(nullable, readonly) SNTModeTransition* modeTransition;
 
 ///
 ///  Set the mode transition configuration as received from a sync server.
 ///
-- (void)setSyncServerModeTransition:(nonnull SNTModeTransition *)modeTransition;
+- (void)setSyncServerModeTransition:(nonnull SNTModeTransition*)modeTransition;
 
 ///
 ///  Return if Santa is temporarily in Monitor Mode and will revert back
@@ -832,7 +832,7 @@ extern NSString *_Nonnull const kEnableMenuItemUserOverride;
 ///
 ///  Set Santa to be in Monitor Mode temporarily
 ///
-- (void)enterTemporaryMonitorMode:(nullable NSDictionary *)temporaryMonitorModeState;
+- (void)enterTemporaryMonitorMode:(nullable NSDictionary*)temporaryMonitorModeState;
 
 ///
 ///  Set Santa as having left temporary Monitor Mode
@@ -842,7 +842,7 @@ extern NSString *_Nonnull const kEnableMenuItemUserOverride;
 ///
 /// Returns the Temporary Monitor Mode state if it exists
 ///
-- (nullable NSDictionary *)savedTemporaryMonitorModeState;
+- (nullable NSDictionary*)savedTemporaryMonitorModeState;
 
 #pragma mark - USB Settings
 
@@ -872,7 +872,7 @@ extern NSString *_Nonnull const kEnableMenuItemUserOverride;
 /// Comma-separated `$ mount -o` arguments used for forced remounting of USB devices. Default
 /// to fully allow/deny without remounting if unset.
 ///
-@property(nullable, nonatomic) NSArray<NSString *> *remountUSBMode;
+@property(nullable, nonatomic) NSArray<NSString*>* remountUSBMode;
 
 ///
 /// Network Mount Blocking. Defaults to false.
@@ -888,12 +888,12 @@ extern NSString *_Nonnull const kEnableMenuItemUserOverride;
 //
 /// Set of hosts that are allowed to be mounted when blockNetworkMount is true.
 ///
-@property(readonly, nullable) NSArray<NSString *> *allowedNetworkMountHosts;
+@property(readonly, nullable) NSArray<NSString*>* allowedNetworkMountHosts;
 
 ///
 ///  Set the explicitly allowed hosts when network mounts are blocked.
 ///
-- (void)setSyncServerAllowedNetworkMountHosts:(nullable NSArray<NSString *> *)hosts;
+- (void)setSyncServerAllowedNetworkMountHosts:(nullable NSArray<NSString*>*)hosts;
 
 ///
 /// If set, defines the action that should be taken on existing USB mounts when
@@ -926,12 +926,12 @@ extern NSString *_Nonnull const kEnableMenuItemUserOverride;
 ///
 ///  Set the action that will override file access policy config action
 ///
-- (void)setSyncServerOverrideFileAccessAction:(nonnull NSString *)action;
+- (void)setSyncServerOverrideFileAccessAction:(nonnull NSString*)action;
 
 ///
 ///  If set, this over-rides the default machine ID used for syncing.
 ///
-@property(nullable, readonly, nonatomic) NSString *machineID;
+@property(nullable, readonly, nonatomic) NSString* machineID;
 
 #pragma mark Transitive Allowlist Settings
 
@@ -948,36 +948,36 @@ extern NSString *_Nonnull const kEnableMenuItemUserOverride;
 ///  If set, this is valid PEM containing one or more certificates to be used to evaluate the
 ///  server's SSL chain, overriding the list of trusted CAs distributed with the OS.
 ///
-@property(nullable, readonly, nonatomic) NSData *syncServerAuthRootsData;
+@property(nullable, readonly, nonatomic) NSData* syncServerAuthRootsData;
 
 ///
 ///  This property is the same as the above but is a file on disk containing the PEM data.
 ///
-@property(nullable, readonly, nonatomic) NSString *syncServerAuthRootsFile;
+@property(nullable, readonly, nonatomic) NSString* syncServerAuthRootsFile;
 
 #pragma mark Client Auth Settings
 
 ///
 ///  If set, this contains the location of a PKCS#12 certificate to be used for sync authentication.
 ///
-@property(nullable, readonly, nonatomic) NSString *syncClientAuthCertificateFile;
+@property(nullable, readonly, nonatomic) NSString* syncClientAuthCertificateFile;
 
 ///
 ///  Contains the password for the pkcs#12 certificate.
 ///
-@property(nullable, readonly, nonatomic) NSString *syncClientAuthCertificatePassword;
+@property(nullable, readonly, nonatomic) NSString* syncClientAuthCertificatePassword;
 
 ///
 ///  If set, this is the Common Name of a certificate in the System keychain to be used for
 ///  sync authentication. The corresponding private key must also be in the keychain.
 ///
-@property(nullable, readonly, nonatomic) NSString *syncClientAuthCertificateCn;
+@property(nullable, readonly, nonatomic) NSString* syncClientAuthCertificateCn;
 
 ///
 ///  If set, this is the Issuer Name of a certificate in the System keychain to be used for
 ///  sync authentication. The corresponding private key must also be in the keychain.
 ///
-@property(nullable, readonly, nonatomic) NSString *syncClientAuthCertificateIssuer;
+@property(nullable, readonly, nonatomic) NSString* syncClientAuthCertificateIssuer;
 
 ///
 ///  If true, syncs will upload events when a clean sync is requested. Defaults to false.
@@ -1018,17 +1018,17 @@ extern NSString *_Nonnull const kEnableMenuItemUserOverride;
 ///
 ///  Contains the FCM project name.
 ///
-@property(nullable, readonly, nonatomic) NSString *fcmProject;
+@property(nullable, readonly, nonatomic) NSString* fcmProject;
 
 ///
 ///  Contains the FCM project entity.
 ///
-@property(nullable, readonly, nonatomic) NSString *fcmEntity;
+@property(nullable, readonly, nonatomic) NSString* fcmEntity;
 
 ///
 ///  Contains the FCM project API key.
 ///
-@property(nullable, readonly, nonatomic) NSString *fcmAPIKey;
+@property(nullable, readonly, nonatomic) NSString* fcmAPIKey;
 
 ///
 ///  True if fcmProject, fcmEntity and fcmAPIKey are all set. Defaults to false.
@@ -1055,12 +1055,12 @@ extern NSString *_Nonnull const kEnableMenuItemUserOverride;
 ///
 /// URL describing where metrics are exported, defaults to nil.
 ///
-@property(nullable, readonly, nonatomic) NSURL *metricURL;
+@property(nullable, readonly, nonatomic) NSURL* metricURL;
 
 ///
 /// Extra Metric Labels to add to the metrics payloads.
 ///
-@property(nullable, readonly, nonatomic) NSDictionary *extraMetricLabels;
+@property(nullable, readonly, nonatomic) NSDictionary* extraMetricLabels;
 
 ///
 /// Duration in seconds of how often the metrics should be exported.
@@ -1076,19 +1076,19 @@ extern NSString *_Nonnull const kEnableMenuItemUserOverride;
 /// List of prefix strings for which individual entitlement keys with a matching
 /// prefix should not be logged.
 ///
-@property(nullable, readonly, nonatomic) NSArray<NSString *> *entitlementsPrefixFilter;
+@property(nullable, readonly, nonatomic) NSArray<NSString*>* entitlementsPrefixFilter;
 
 ///
 /// List of TeamIDs for which entitlements should not be logged. Use the string
 /// "platform" to refer to platform binaries.
 ///
-@property(nullable, readonly, nonatomic) NSArray<NSString *> *entitlementsTeamIDFilter;
+@property(nullable, readonly, nonatomic) NSArray<NSString*>* entitlementsTeamIDFilter;
 
 ///
 /// List of enabled process annotations.
 /// This property is not KVO compliant.
 ///
-@property(nullable, readonly, nonatomic) NSArray<NSString *> *enabledProcessAnnotations;
+@property(nullable, readonly, nonatomic) NSArray<NSString*>* enabledProcessAnnotations;
 
 ///
 ///  If set, only the listed command types will be accepted from the sync server.
@@ -1097,7 +1097,7 @@ extern NSString *_Nonnull const kEnableMenuItemUserOverride;
 ///
 ///  This is a forced config key (MDM only) — not settable via sync server.
 ///
-@property(nullable, readonly, nonatomic) NSArray<NSString *> *allowedSantaCommands;
+@property(nullable, readonly, nonatomic) NSArray<NSString*>* allowedSantaCommands;
 
 ///
 ///  Retrieve an initialized singleton configurator object using the default file path.
@@ -1108,7 +1108,7 @@ extern NSString *_Nonnull const kEnableMenuItemUserOverride;
 ///  Replace the shared configurator with a custom one using a static config.
 ///
 #ifdef DEBUG
-+ (void)overrideConfig:(nonnull NSDictionary *)config;
++ (void)overrideConfig:(nonnull NSDictionary*)config;
 #endif
 
 ///
@@ -1119,25 +1119,25 @@ extern NSString *_Nonnull const kEnableMenuItemUserOverride;
 ///
 ///  Validate the configuration profile.
 ///
-- (nullable NSArray *)validateConfiguration;
+- (nullable NSArray*)validateConfiguration;
 
 #pragma mark Stats Submission State
 
 ///
 /// Timestamp of the last time a stats submission was attempted
 ///
-@property(nullable, readonly, nonatomic) NSDate *lastStatsSubmissionTimestamp;
+@property(nullable, readonly, nonatomic) NSDate* lastStatsSubmissionTimestamp;
 
 ///
 /// Santa version information from the last time a stats submission was attempted
 ///
-@property(nullable, readonly, nonatomic) NSString *lastStatsSubmissionVersion;
+@property(nullable, readonly, nonatomic) NSString* lastStatsSubmissionVersion;
 
 ///
 /// Update the stats state file
 ///
-- (void)saveStatsSubmissionAttemptTime:(nullable NSDate *)timestamp
-                               version:(nullable NSString *)version;
+- (void)saveStatsSubmissionAttemptTime:(nullable NSDate*)timestamp
+                               version:(nullable NSString*)version;
 
 ///
 /// Returns true if the system has rebooted since the last time santad was run.

@@ -39,7 +39,7 @@ __END_DECLS
 namespace pbv1 = ::santa::commands::v1;
 
 // Helper function to convert response code to readable string using protobuf generated code
-NSString *ResponseCodeToString(::pbv1::SantaCommandResponse::Error code) {
+NSString* ResponseCodeToString(::pbv1::SantaCommandResponse::Error code) {
   // Try the generated _Name() function first
   std::string name = ::pbv1::SantaCommandResponse::Error_Name(code);
   if (!name.empty()) {
@@ -47,10 +47,10 @@ NSString *ResponseCodeToString(::pbv1::SantaCommandResponse::Error code) {
   }
 
   // Fallback to descriptor API if _Name() doesn't recognize the value
-  const google::protobuf::EnumDescriptor *descriptor =
+  const google::protobuf::EnumDescriptor* descriptor =
       ::pbv1::SantaCommandResponse::Error_descriptor();
   if (descriptor) {
-    const google::protobuf::EnumValueDescriptor *value_desc =
+    const google::protobuf::EnumValueDescriptor* value_desc =
         descriptor->FindValueByNumber(static_cast<int>(code));
     if (value_desc) {
       std::string_view name_view = value_desc->name();
@@ -65,11 +65,11 @@ NSString *ResponseCodeToString(::pbv1::SantaCommandResponse::Error code) {
 
 @interface SNTPushClientNATS ()
 @property(weak) id<SNTPushNotificationsSyncDelegate> syncDelegate;
-@property(nonatomic) natsConnection *conn;
+@property(nonatomic) natsConnection* conn;
 // Array of natsSubscription pointers wrapped in NSValue
-@property(nonatomic) NSMutableArray<NSValue *> *tagSubscriptions;
+@property(nonatomic) NSMutableArray<NSValue*>* tagSubscriptions;
 // Commands subscription
-@property(nonatomic) natsSubscription *commandsSubscription;
+@property(nonatomic) natsSubscription* commandsSubscription;
 // Single queue for connection management
 @property(nonatomic) dispatch_queue_t connectionQueue;
 // Queue for processing messages
@@ -78,24 +78,24 @@ NSString *ResponseCodeToString(::pbv1::SantaCommandResponse::Error code) {
 @property(nonatomic, readwrite) NSUInteger fullSyncInterval;
 @property(atomic) BOOL isShuttingDown;
 // Push notification configuration from preflight
-@property(nonatomic, copy) NSString *pushServer;
+@property(nonatomic, copy) NSString* pushServer;
 // nkey
-@property(nonatomic, copy) NSString *pushToken;
-@property(nonatomic, copy) NSString *jwt;
-@property(nonatomic, copy) NSString *pushDeviceID;
-@property(nonatomic, copy) NSArray<NSString *> *tags;
-@property(nonatomic, copy) NSData *hmacKey;
+@property(nonatomic, copy) NSString* pushToken;
+@property(nonatomic, copy) NSString* jwt;
+@property(nonatomic, copy) NSString* pushDeviceID;
+@property(nonatomic, copy) NSArray<NSString*>* tags;
+@property(nonatomic, copy) NSData* hmacKey;
 // Nonce cache for replay protection
 // Two-generation cache with lazy rotation
-@property(nonatomic) NSMutableSet<NSString *> *currentNonces;
-@property(nonatomic) NSMutableSet<NSString *> *previousNonces;
+@property(nonatomic) NSMutableSet<NSString*>* currentNonces;
+@property(nonatomic) NSMutableSet<NSString*>* previousNonces;
 @property(nonatomic) int64_t lastRotationTime;
 // Connection retry state
 @property(nonatomic) dispatch_source_t connectionRetryTimer;
 @property(atomic) NSInteger retryAttempt;
 @property(atomic) BOOL isRetrying;
 // Track the last error for better retry diagnostics
-@property(nonatomic, copy) NSString *lastConnectionError;
+@property(nonatomic, copy) NSString* lastConnectionError;
 @end
 
 @implementation SNTPushClientNATS
@@ -129,11 +129,11 @@ NSString *ResponseCodeToString(::pbv1::SantaCommandResponse::Error code) {
   }
 }
 
-- (void)configureWithPushServer:(NSString *)server
-                      pushToken:(NSString *)token
-                            jwt:(NSString *)jwt
-                   pushDeviceID:(NSString *)deviceID
-                           tags:(NSArray<NSString *> *)tags {
+- (void)configureWithPushServer:(NSString*)server
+                      pushToken:(NSString*)token
+                            jwt:(NSString*)jwt
+                   pushDeviceID:(NSString*)deviceID
+                           tags:(NSArray<NSString*>*)tags {
   dispatch_async(self.connectionQueue, ^{
     if (self.isShuttingDown) return;
 
@@ -142,7 +142,7 @@ NSString *ResponseCodeToString(::pbv1::SantaCommandResponse::Error code) {
       return;
     }
 
-    NSString *fullServer;
+    NSString* fullServer;
 #ifdef DEBUG
     // In debug builds, allow overriding the domain suffix and avoid TLS checks.
     LOGW(@"NATS: Domain check disabled - using server as-is: %@", server);
@@ -182,8 +182,8 @@ NSString *ResponseCodeToString(::pbv1::SantaCommandResponse::Error code) {
     } else if (self.tags != nil && tags == nil) {
       tagsChanged = YES;
     } else if (self.tags != nil && tags != nil) {
-      NSSet *oldTagSet = [NSSet setWithArray:self.tags];
-      NSSet *newTagSet = [NSSet setWithArray:tags];
+      NSSet* oldTagSet = [NSSet setWithArray:self.tags];
+      NSSet* newTagSet = [NSSet setWithArray:tags];
       tagsChanged = ![oldTagSet isEqualToSet:newTagSet];
     }
 
@@ -305,7 +305,7 @@ NSString *ResponseCodeToString(::pbv1::SantaCommandResponse::Error code) {
     natsStatus status;
 
     // Create connection options
-    natsOptions *opts = NULL;
+    natsOptions* opts = NULL;
     status = natsOptions_Create(&opts);
     if (status != NATS_OK) {
       LOGE(@"NATS: Failed to create options: %s", natsStatus_GetText(status));
@@ -313,7 +313,7 @@ NSString *ResponseCodeToString(::pbv1::SantaCommandResponse::Error code) {
     }
 
     // Set server URL with TLS unless debug mode is enabled
-    NSString *serverURL;
+    NSString* serverURL;
 
 #ifndef DEBUG
     // Make sure it's running on push.northpole.security and on port 443
@@ -345,7 +345,7 @@ NSString *ResponseCodeToString(::pbv1::SantaCommandResponse::Error code) {
 
     // Set nkey and JWT for authentication
     // Create a combined string with JWT and seed (nkey) separated by newlines
-    NSString *jwtAndSeed = [NSString
+    NSString* jwtAndSeed = [NSString
         stringWithFormat:
             @"-----BEGIN NATS USER JWT-----\n%@\n------END NATS USER JWT------\n\n-----BEGIN USER "
             @"NKEY SEED-----\n%@\n------END USER NKEY SEED------",
@@ -363,26 +363,26 @@ NSString *ResponseCodeToString(::pbv1::SantaCommandResponse::Error code) {
     natsOptions_SetMaxReconnect(opts, -1);  // Infinite reconnects
 
     // Set error callback to catch subscription violations and other errors
-    natsOptions_SetErrorHandler(opts, &errorHandler, (__bridge void *)self);
+    natsOptions_SetErrorHandler(opts, &errorHandler, (__bridge void*)self);
 
     // Set connection callbacks for better monitoring
-    natsOptions_SetDisconnectedCB(opts, &disconnectedCallback, (__bridge void *)self);
-    natsOptions_SetReconnectedCB(opts, &reconnectedCallback, (__bridge void *)self);
-    natsOptions_SetClosedCB(opts, &closedCallback, (__bridge void *)self);
+    natsOptions_SetDisconnectedCB(opts, &disconnectedCallback, (__bridge void*)self);
+    natsOptions_SetReconnectedCB(opts, &reconnectedCallback, (__bridge void*)self);
+    natsOptions_SetClosedCB(opts, &closedCallback, (__bridge void*)self);
 
     // Create connection
-    natsConnection *conn = NULL;
+    natsConnection* conn = NULL;
     status = natsConnection_Connect(&conn, opts);
     natsOptions_Destroy(opts);
 
     if (status != NATS_OK) {
       // Capture detailed error information for diagnostics
-      const char *statusText = natsStatus_GetText(status);
-      NSString *errorDetail =
+      const char* statusText = natsStatus_GetText(status);
+      NSString* errorDetail =
           [NSString stringWithFormat:@"%s (code: %d)", statusText ?: "unknown", status];
 
       // Categorize the error for better diagnostics
-      NSString *errorCategory;
+      NSString* errorCategory;
       switch (status) {
         case NATS_TIMEOUT: errorCategory = @"TIMEOUT"; break;
         case NATS_NO_SERVER: errorCategory = @"NO_SERVER"; break;
@@ -465,7 +465,7 @@ NSString *ResponseCodeToString(::pbv1::SantaCommandResponse::Error code) {
   });
 }
 
-- (void)cleanupSubscription:(natsSubscription **)subscription {
+- (void)cleanupSubscription:(natsSubscription**)subscription {
   if (subscription && *subscription) {
     natsSubscription_Unsubscribe(*subscription);
     natsSubscription_Destroy(*subscription);
@@ -479,8 +479,8 @@ NSString *ResponseCodeToString(::pbv1::SantaCommandResponse::Error code) {
   LOGD(@"NATS: Unsubscribing from all topics");
 
   // Unsubscribe all tag subscriptions
-  for (NSValue *subValue in self.tagSubscriptions) {
-    natsSubscription *sub = (natsSubscription *)[subValue pointerValue];
+  for (NSValue* subValue in self.tagSubscriptions) {
+    natsSubscription* sub = (natsSubscription*)[subValue pointerValue];
     if (sub) {
       natsSubscription_Unsubscribe(sub);
       natsSubscription_Destroy(sub);
@@ -500,12 +500,12 @@ NSString *ResponseCodeToString(::pbv1::SantaCommandResponse::Error code) {
   LOGD(@"NATS: All topics unsubscribed");
 }
 
-- (BOOL)isValidNATSTopic:(NSString *)topic {
+- (BOOL)isValidNATSTopic:(NSString*)topic {
   if (!topic || topic.length == 0) {
     return NO;
   }
 
-  NSString *suffix = nil;
+  NSString* suffix = nil;
 
   // Check if topic starts with santa.host. or santa.tag.
   if ([topic hasPrefix:@"santa.host."]) {
@@ -538,9 +538,9 @@ NSString *ResponseCodeToString(::pbv1::SantaCommandResponse::Error code) {
     LOGD(@"NATS: Processing %lu tags from preflight", (unsigned long)self.tags.count);
 
     // Keep track of already subscribed topics to avoid duplicates
-    NSMutableSet *subscribedTopics = [NSMutableSet set];
+    NSMutableSet* subscribedTopics = [NSMutableSet set];
 
-    for (NSString *tag in self.tags) {
+    for (NSString* tag in self.tags) {
       LOGD(@"NATS: Processing tag: '%@'", tag);
 
       // Skip if we've already subscribed to this topic
@@ -554,9 +554,9 @@ NSString *ResponseCodeToString(::pbv1::SantaCommandResponse::Error code) {
         continue;
       }
 
-      natsSubscription *tagSub = NULL;
+      natsSubscription* tagSub = NULL;
       status = natsConnection_Subscribe(&tagSub, self.conn, [tag UTF8String], &messageHandler,
-                                        (__bridge void *)self);
+                                        (__bridge void*)self);
 
       if (status != NATS_OK) {
         LOGE(@"NATS: Failed to subscribe to tag topic %@: %s", tag, natsStatus_GetText(status));
@@ -572,13 +572,13 @@ NSString *ResponseCodeToString(::pbv1::SantaCommandResponse::Error code) {
   // Subscribe to commands topic: santa.host.<device-id>.commands
   // Note: Failure to subscribe to commands topic is non-fatal - client continues operating
   if (self.pushDeviceID.length > 0) {
-    NSString *commandsTopic =
+    NSString* commandsTopic =
         [NSString stringWithFormat:@"santa.host.%@.commands", self.pushDeviceID];
     LOGD(@"NATS: Subscribing to commands topic: %@", commandsTopic);
 
-    natsSubscription *commandsSub = NULL;
+    natsSubscription* commandsSub = NULL;
     status = natsConnection_Subscribe(&commandsSub, self.conn, [commandsTopic UTF8String],
-                                      &commandMessageHandler, (__bridge void *)self);
+                                      &commandMessageHandler, (__bridge void*)self);
 
     if (status != NATS_OK) {
       LOGE(@"NATS: Failed to subscribe to commands topic %@: %s (non-fatal, continuing)",
@@ -598,7 +598,7 @@ NSString *ResponseCodeToString(::pbv1::SantaCommandResponse::Error code) {
 // Tag subjects (santa.tag.*) get a random jitter delay of 0-180 seconds to
 // avoid thundering herd when many hosts share the same tag. Host subjects
 // (santa.host.*) trigger an immediate sync.
-- (void)handlePushNotificationForSubject:(NSString *)subject {
+- (void)handlePushNotificationForSubject:(NSString*)subject {
   dispatch_async(self.messageQueue, ^{
     if (!self.isShuttingDown) {
       uint32_t jitterSeconds = 0;
@@ -620,24 +620,24 @@ NSString *ResponseCodeToString(::pbv1::SantaCommandResponse::Error code) {
 }
 
 // NATS message handler
-static void messageHandler(natsConnection *nc, natsSubscription *sub, natsMsg *msg, void *closure) {
+static void messageHandler(natsConnection* nc, natsSubscription* sub, natsMsg* msg, void* closure) {
   if (!closure || !msg) {
     natsMsg_Destroy(msg);
     return;
   }
 
-  SNTPushClientNATS *self = (__bridge SNTPushClientNATS *)closure;
+  SNTPushClientNATS* self = (__bridge SNTPushClientNATS*)closure;
   if (!self || self.isShuttingDown) {
     natsMsg_Destroy(msg);
     return;
   }
 
-  const char *subject = natsMsg_GetSubject(msg);
-  const char *data = natsMsg_GetData(msg);
+  const char* subject = natsMsg_GetSubject(msg);
+  const char* data = natsMsg_GetData(msg);
   int dataLen = natsMsg_GetDataLength(msg);
 
-  NSString *msgSubject = subject ? @(subject) : @"<unknown>";
-  NSString *msgData;
+  NSString* msgSubject = subject ? @(subject) : @"<unknown>";
+  NSString* msgData;
   if (data && dataLen > 0) {
     // Decode the payload as a UTF-8 string.
     // TODO in the future handle binary data e.g. protobuf if / when needed.
@@ -661,8 +661,8 @@ static void messageHandler(natsConnection *nc, natsSubscription *sub, natsMsg *m
 }
 
 // Publish a command response to the reply topic
-- (void)publishResponse:(const ::pbv1::SantaCommandResponse &)response
-           toReplyTopic:(NSString *)replyTopic {
+- (void)publishResponse:(const ::pbv1::SantaCommandResponse&)response
+           toReplyTopic:(NSString*)replyTopic {
   // Failures are logged but don't crash the client
   if (!replyTopic || replyTopic.length == 0) {
     LOGW(@"NATS: Cannot publish command response - no reply topic provided (non-fatal)");
@@ -702,12 +702,12 @@ static void messageHandler(natsConnection *nc, natsSubscription *sub, natsMsg *m
 // Helper function to safely get the last error from a NATS connection as an NSString.
 // This copies the error text to avoid lifetime issues with the internal NATS buffer,
 // which may be overwritten by subsequent NATS operations.
-static NSString *GetNATSLastError(natsConnection *nc) {
+static NSString* GetNATSLastError(natsConnection* nc) {
   if (!nc) {
     return nil;
   }
 
-  const char *lastError = NULL;
+  const char* lastError = NULL;
   natsConnection_GetLastError(nc, &lastError);
 
   // Copy to NSString to avoid lifetime issues.
@@ -718,18 +718,18 @@ static NSString *GetNATSLastError(natsConnection *nc) {
 }
 
 // NATS error handler callback
-static void errorHandler(natsConnection *nc, natsSubscription *sub, natsStatus err, void *closure) {
+static void errorHandler(natsConnection* nc, natsSubscription* sub, natsStatus err, void* closure) {
   if (!closure) return;
 
-  SNTPushClientNATS *self = (__bridge SNTPushClientNATS *)closure;
-  const char *statusText = natsStatus_GetText(err);
-  const char *subSubject = sub ? natsSubscription_GetSubject(sub) : "unknown";
+  SNTPushClientNATS* self = (__bridge SNTPushClientNATS*)closure;
+  const char* statusText = natsStatus_GetText(err);
+  const char* subSubject = sub ? natsSubscription_GetSubject(sub) : "unknown";
 
   // Get the detailed last error from the connection (safely copied to NSString)
-  NSString *connLastError = GetNATSLastError(nc);
+  NSString* connLastError = GetNATSLastError(nc);
 
   // Log with server context and both error sources
-  NSString *errorDetail =
+  NSString* errorDetail =
       connLastError.length > 0 && (!statusText || ![connLastError isEqualToString:@(statusText)])
           ? [NSString stringWithFormat:@"%s - %@", statusText ?: "unknown", connLastError]
           : [NSString stringWithFormat:@"%s", statusText ?: "unknown"];
@@ -779,14 +779,14 @@ static void errorHandler(natsConnection *nc, natsSubscription *sub, natsStatus e
 }
 
 // NATS disconnected callback
-static void disconnectedCallback(natsConnection *nc, void *closure) {
+static void disconnectedCallback(natsConnection* nc, void* closure) {
   if (!closure) return;
-  SNTPushClientNATS *self = (__bridge SNTPushClientNATS *)closure;
+  SNTPushClientNATS* self = (__bridge SNTPushClientNATS*)closure;
 
   // Get last error from NATS (safely copied to NSString for use in async block)
-  NSString *lastError = GetNATSLastError(nc);
+  NSString* lastError = GetNATSLastError(nc);
 
-  NSString *errorInfo =
+  NSString* errorInfo =
       lastError.length > 0 ? [NSString stringWithFormat:@" - %@", lastError] : @"";
   LOGW(@"NATS: Disconnected from %@%@", self.pushServer ?: @"server", errorInfo);
 
@@ -799,9 +799,9 @@ static void disconnectedCallback(natsConnection *nc, void *closure) {
 }
 
 // NATS reconnected callback
-static void reconnectedCallback(natsConnection *nc, void *closure) {
+static void reconnectedCallback(natsConnection* nc, void* closure) {
   if (!closure) return;
-  SNTPushClientNATS *self = (__bridge SNTPushClientNATS *)closure;
+  SNTPushClientNATS* self = (__bridge SNTPushClientNATS*)closure;
   LOGI(@"NATS: Reconnected to %@", self.pushServer ?: @"server");
   dispatch_async(self.connectionQueue, ^{
     self.isConnected = YES;
@@ -827,14 +827,14 @@ static void reconnectedCallback(natsConnection *nc, void *closure) {
 }
 
 // NATS closed callback
-static void closedCallback(natsConnection *nc, void *closure) {
+static void closedCallback(natsConnection* nc, void* closure) {
   if (!closure) return;
-  SNTPushClientNATS *self = (__bridge SNTPushClientNATS *)closure;
+  SNTPushClientNATS* self = (__bridge SNTPushClientNATS*)closure;
 
   // Get last error from NATS (safely copied to NSString for use in async block)
-  NSString *lastError = GetNATSLastError(nc);
+  NSString* lastError = GetNATSLastError(nc);
 
-  NSString *errorInfo =
+  NSString* errorInfo =
       lastError.length > 0 ? [NSString stringWithFormat:@" - %@", lastError] : @"";
   LOGI(@"NATS: Connection to %@ closed%@", self.pushServer ?: @"server", errorInfo);
 
@@ -962,12 +962,12 @@ static void closedCallback(natsConnection *nc, void *closure) {
   });
 }
 
-- (NSString *)token {
+- (NSString*)token {
   // NATS doesn't use tokens like FCM
   return [[SNTConfigurator configurator] machineID];
 }
 
-- (void)handlePreflightSyncState:(SNTSyncState *)syncState {
+- (void)handlePreflightSyncState:(SNTSyncState*)syncState {
   LOGD(@"NATS: handlePreflightSyncState - server: %@, deviceID: %@", syncState.pushServer,
        syncState.pushDeviceID);
 
@@ -983,7 +983,7 @@ static void closedCallback(natsConnection *nc, void *closure) {
     // Now attempt to connect
     [self connect];
   } else {
-    NSMutableArray *missing = [NSMutableArray array];
+    NSMutableArray* missing = [NSMutableArray array];
     if (!syncState.pushServer) [missing addObject:@"server"];
     if (!syncState.pushNKey) [missing addObject:@"nkey"];
     if (!syncState.pushJWT) [missing addObject:@"JWT"];

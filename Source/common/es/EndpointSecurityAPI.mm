@@ -23,11 +23,11 @@
 
 namespace santa {
 
-Client EndpointSecurityAPI::NewClient(void (^message_handler)(es_client_t *, Message)) {
-  es_client_t *client = NULL;
+Client EndpointSecurityAPI::NewClient(void (^message_handler)(es_client_t*, Message)) {
+  es_client_t* client = NULL;
 
   auto shared_esapi = shared_from_this();
-  es_new_client_result_t res = es_new_client(&client, ^(es_client_t *c, const es_message_t *msg) {
+  es_new_client_result_t res = es_new_client(&client, ^(es_client_t* c, const es_message_t* msg) {
     @autoreleasepool {
       message_handler(c, Message(shared_esapi, msg));
     }
@@ -36,37 +36,37 @@ Client EndpointSecurityAPI::NewClient(void (^message_handler)(es_client_t *, Mes
   return Client(client, res);
 }
 
-void EndpointSecurityAPI::RetainMessage(const es_message_t *msg) {
+void EndpointSecurityAPI::RetainMessage(const es_message_t* msg) {
   es_retain_message(msg);
 }
 
-void EndpointSecurityAPI::ReleaseMessage(const es_message_t *msg) {
+void EndpointSecurityAPI::ReleaseMessage(const es_message_t* msg) {
   es_release_message(msg);
 }
 
-bool EndpointSecurityAPI::Subscribe(const Client &client,
-                                    const std::set<es_event_type_t> &event_types) {
+bool EndpointSecurityAPI::Subscribe(const Client& client,
+                                    const std::set<es_event_type_t>& event_types) {
   std::vector<es_event_type_t> subs(event_types.begin(), event_types.end());
   return es_subscribe(client.Get(), subs.data(), (uint32_t)subs.size()) == ES_RETURN_SUCCESS;
 }
 
-bool EndpointSecurityAPI::UnsubscribeAll(const Client &client) {
+bool EndpointSecurityAPI::UnsubscribeAll(const Client& client) {
   return es_unsubscribe_all(client.Get()) == ES_RETURN_SUCCESS;
 }
 
-bool EndpointSecurityAPI::UnmuteAllPaths(const Client &client) {
+bool EndpointSecurityAPI::UnmuteAllPaths(const Client& client) {
   return es_unmute_all_paths(client.Get()) == ES_RETURN_SUCCESS;
 }
 
-bool EndpointSecurityAPI::UnmuteAllTargetPaths(const Client &client) {
+bool EndpointSecurityAPI::UnmuteAllTargetPaths(const Client& client) {
   return es_unmute_all_target_paths(client.Get()) == ES_RETURN_SUCCESS;
 }
 
-bool EndpointSecurityAPI::IsTargetPathMutingInverted(const Client &client) {
+bool EndpointSecurityAPI::IsTargetPathMutingInverted(const Client& client) {
   return es_muting_inverted(client.Get(), ES_MUTE_INVERSION_TYPE_TARGET_PATH) == ES_MUTE_INVERTED;
 }
 
-bool EndpointSecurityAPI::InvertTargetPathMuting(const Client &client) {
+bool EndpointSecurityAPI::InvertTargetPathMuting(const Client& client) {
   if (!IsTargetPathMutingInverted(client)) {
     return es_invert_muting(client.Get(), ES_MUTE_INVERSION_TYPE_TARGET_PATH) == ES_RETURN_SUCCESS;
   } else {
@@ -74,11 +74,11 @@ bool EndpointSecurityAPI::InvertTargetPathMuting(const Client &client) {
   }
 }
 
-bool EndpointSecurityAPI::IsProcessMutingInverted(const Client &client) {
+bool EndpointSecurityAPI::IsProcessMutingInverted(const Client& client) {
   return es_muting_inverted(client.Get(), ES_MUTE_INVERSION_TYPE_PROCESS) == ES_MUTE_INVERTED;
 }
 
-bool EndpointSecurityAPI::InvertProcessMuting(const Client &client) {
+bool EndpointSecurityAPI::InvertProcessMuting(const Client& client) {
   if (!IsProcessMutingInverted(client)) {
     return es_invert_muting(client.Get(), ES_MUTE_INVERSION_TYPE_PROCESS) == ES_RETURN_SUCCESS;
   } else {
@@ -86,15 +86,15 @@ bool EndpointSecurityAPI::InvertProcessMuting(const Client &client) {
   }
 }
 
-bool EndpointSecurityAPI::MuteProcess(const Client &client, const audit_token_t *tok) {
+bool EndpointSecurityAPI::MuteProcess(const Client& client, const audit_token_t* tok) {
   return es_mute_process(client.Get(), tok) == ES_RETURN_SUCCESS;
 }
 
-bool EndpointSecurityAPI::UnmuteProcess(const Client &client, const audit_token_t *tok) {
+bool EndpointSecurityAPI::UnmuteProcess(const Client& client, const audit_token_t* tok) {
   return es_unmute_process(client.Get(), tok) == ES_RETURN_SUCCESS;
 }
 
-bool EndpointSecurityAPI::MuteTargetPath(const Client &client, std::string_view path,
+bool EndpointSecurityAPI::MuteTargetPath(const Client& client, std::string_view path,
                                          WatchItemPathType path_type) {
   return es_mute_path(client.Get(), path.data(),
                       path_type == WatchItemPathType::kPrefix
@@ -102,7 +102,7 @@ bool EndpointSecurityAPI::MuteTargetPath(const Client &client, std::string_view 
                           : ES_MUTE_PATH_TYPE_TARGET_LITERAL) == ES_RETURN_SUCCESS;
 }
 
-bool EndpointSecurityAPI::UnmuteTargetPath(const Client &client, std::string_view path,
+bool EndpointSecurityAPI::UnmuteTargetPath(const Client& client, std::string_view path,
                                            WatchItemPathType path_type) {
   return es_unmute_path(client.Get(), path.data(),
                         path_type == WatchItemPathType::kPrefix
@@ -110,29 +110,29 @@ bool EndpointSecurityAPI::UnmuteTargetPath(const Client &client, std::string_vie
                             : ES_MUTE_PATH_TYPE_TARGET_LITERAL) == ES_RETURN_SUCCESS;
 }
 
-bool EndpointSecurityAPI::RespondAuthResult(const Client &client, const Message &msg,
+bool EndpointSecurityAPI::RespondAuthResult(const Client& client, const Message& msg,
                                             es_auth_result_t result, bool cache) {
   return es_respond_auth_result(client.Get(), &(*msg), result, cache) == ES_RESPOND_RESULT_SUCCESS;
 }
 
-bool EndpointSecurityAPI::RespondFlagsResult(const Client &client, const Message &msg,
+bool EndpointSecurityAPI::RespondFlagsResult(const Client& client, const Message& msg,
                                              uint32_t allowed_flags, bool cache) {
   return es_respond_flags_result(client.Get(), &(*msg), allowed_flags, cache);
 }
 
-bool EndpointSecurityAPI::ClearCache(const Client &client) {
+bool EndpointSecurityAPI::ClearCache(const Client& client) {
   return es_clear_cache(client.Get()) == ES_CLEAR_CACHE_RESULT_SUCCESS;
 }
 
-uint32_t EndpointSecurityAPI::ExecArgCount(const es_event_exec_t *event) {
+uint32_t EndpointSecurityAPI::ExecArgCount(const es_event_exec_t* event) {
   return es_exec_arg_count(event);
 }
 
-es_string_token_t EndpointSecurityAPI::ExecArg(const es_event_exec_t *event, uint32_t index) {
+es_string_token_t EndpointSecurityAPI::ExecArg(const es_event_exec_t* event, uint32_t index) {
   return es_exec_arg(event, index);
 }
 
-std::vector<std::string> EndpointSecurityAPI::ExecArgs(const es_event_exec_t *event) {
+std::vector<std::string> EndpointSecurityAPI::ExecArgs(const es_event_exec_t* event) {
   std::vector<std::string> args;
   for (uint32_t i = 0; i < es_exec_arg_count(event); i++) {
     args.push_back(StringTokenToString(es_exec_arg(event, i)));
@@ -140,15 +140,15 @@ std::vector<std::string> EndpointSecurityAPI::ExecArgs(const es_event_exec_t *ev
   return args;
 }
 
-uint32_t EndpointSecurityAPI::ExecEnvCount(const es_event_exec_t *event) {
+uint32_t EndpointSecurityAPI::ExecEnvCount(const es_event_exec_t* event) {
   return es_exec_env_count(event);
 }
 
-es_string_token_t EndpointSecurityAPI::ExecEnv(const es_event_exec_t *event, uint32_t index) {
+es_string_token_t EndpointSecurityAPI::ExecEnv(const es_event_exec_t* event, uint32_t index) {
   return es_exec_env(event, index);
 }
 
-std::map<std::string, std::string> EndpointSecurityAPI::ExecEnvs(const es_event_exec_t *event) {
+std::map<std::string, std::string> EndpointSecurityAPI::ExecEnvs(const es_event_exec_t* event) {
   std::map<std::string, std::string> envs;
   for (uint32_t i = 0; i < es_exec_env_count(event); i++) {
     auto s = santa::StringTokenToString(es_exec_env(event, i));
@@ -162,11 +162,11 @@ std::map<std::string, std::string> EndpointSecurityAPI::ExecEnvs(const es_event_
   return envs;
 }
 
-uint32_t EndpointSecurityAPI::ExecFDCount(const es_event_exec_t *event) {
+uint32_t EndpointSecurityAPI::ExecFDCount(const es_event_exec_t* event) {
   return es_exec_fd_count(event);
 }
 
-const es_fd_t *EndpointSecurityAPI::ExecFD(const es_event_exec_t *event, uint32_t index) {
+const es_fd_t* EndpointSecurityAPI::ExecFD(const es_event_exec_t* event, uint32_t index) {
   return es_exec_fd(event, index);
 }
 

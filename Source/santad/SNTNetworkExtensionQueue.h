@@ -23,32 +23,32 @@
 @class SNTNotificationQueue;
 @class SNTSyncdQueue;
 
-extern NSString *const kSantaNetworkExtensionProtocolVersion;
+extern NSString* const kSantaNetworkExtensionProtocolVersion;
 
 @interface SNTNetworkExtensionQueue : NSObject
 
-@property(readonly) NSString *connectedProtocolVersion;
+@property(readonly) NSString* connectedProtocolVersion;
 
-- (instancetype)initWithNotifierQueue:(SNTNotificationQueue *)notifierQueue
-                           syncdQueue:(SNTSyncdQueue *)syncdQueue
+- (instancetype)initWithNotifierQueue:(SNTNotificationQueue*)notifierQueue
+                           syncdQueue:(SNTSyncdQueue*)syncdQueue
                                logger:(std::shared_ptr<santa::Logger>)logger
     NS_DESIGNATED_INITIALIZER;
 
 - (instancetype)init NS_UNAVAILABLE;
 
-- (SNTNetworkExtensionSettings *)handleRegistrationWithProtocolVersion:(NSString *)protocolVersion
-                                                                 error:(NSError **)error;
+- (SNTNetworkExtensionSettings*)handleRegistrationWithProtocolVersion:(NSString*)protocolVersion
+                                                                error:(NSError**)error;
 
-- (void)handleNetworkFlows:(NSArray<SNDProcessFlows *> *)processFlows
-               windowStart:(NSDate *)windowStart
-                 windowEnd:(NSDate *)windowEnd;
+- (void)handleNetworkFlows:(NSArray<SNDProcessFlows*>*)processFlows
+               windowStart:(NSDate*)windowStart
+                 windowEnd:(NSDate*)windowEnd;
 
 /// Returns YES if the network extension should be installed.
 /// Checks that sync v2 is enabled and network extension settings have enable set to YES.
 - (BOOL)shouldInstallNetworkExtension;
 
 /// Queries the connected network extension for its bundle version info.
-- (void)networkExtensionBundleVersionInfo:(void (^)(NSDictionary *bundleInfo))reply;
+- (void)networkExtensionBundleVersionInfo:(void (^)(NSDictionary* bundleInfo))reply;
 
 /// Returns YES if the network extension is currently connected.
 - (BOOL)isLoaded;

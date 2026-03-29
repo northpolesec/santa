@@ -47,11 +47,11 @@ REGISTER_COMMAND_NAME(@"rule")
   return YES;
 }
 
-+ (NSString *)shortHelpText {
++ (NSString*)shortHelpText {
   return @"Manually add/remove/check rules.";
 }
 
-+ (NSString *)longHelpText {
++ (NSString*)longHelpText {
   return (@"Usage: santactl rule [options]\n"
           @"  One of:\n"
           @"    --allow: add to allow\n"
@@ -122,8 +122,8 @@ REGISTER_COMMAND_NAME(@"rule")
           @"\n");
 }
 
-- (void)runWithArguments:(NSArray *)arguments {
-  SNTConfigurator *config = [SNTConfigurator configurator];
+- (void)runWithArguments:(NSArray*)arguments {
+  SNTConfigurator* config = [SNTConfigurator configurator];
   if ((config.syncBaseURL || config.staticRules.count) &&
       ![arguments containsObject:@"--check"]
 #ifdef DEBUG
@@ -136,13 +136,13 @@ REGISTER_COMMAND_NAME(@"rule")
     exit(1);
   }
 
-  NSString *identifier;
+  NSString* identifier;
   SNTRuleState state = SNTRuleStateUnknown;
   SNTRuleType type = SNTRuleTypeBinary;
   NSString *celExpr, *customMsg, *customURL, *comment;
 
-  NSString *path;
-  NSString *importExportFilePath;
+  NSString* path;
+  NSString* importExportFilePath;
   BOOL check = NO;
   SNTRuleCleanup cleanupType = SNTRuleCleanupNone;
   BOOL importRules = NO;
@@ -152,7 +152,7 @@ REGISTER_COMMAND_NAME(@"rule")
 
   // Parse arguments
   for (NSUInteger i = 0; i < arguments.count; ++i) {
-    NSString *arg = arguments[i];
+    NSString* arg = arguments[i];
 
     if ([arg caseInsensitiveCompare:@"--allow"] == NSOrderedSame ||
         [arg caseInsensitiveCompare:@"--whitelist"] == NSOrderedSame) {
@@ -270,10 +270,10 @@ REGISTER_COMMAND_NAME(@"rule")
     if (!check) [self printErrorUsageAndExit:@"--file-access can only be used with --check"];
     if (!path) [self printErrorUsageAndExit:@"--file-access requires --path"];
 
-    __block NSString *output = @"No Data File Access Rules exist";
+    __block NSString* output = @"No Data File Access Rules exist";
     [[self.daemonConn synchronousRemoteObjectProxy]
         dataFileAccessRuleForTarget:path
-                              reply:^(NSString *name, NSString *version) {
+                              reply:^(NSString* name, NSString* version) {
                                 if (name && version) {
                                   output = [NSString stringWithFormat:@"Data File Access Rule\n"
                                                                       @"     Name: %@\n"
@@ -291,18 +291,18 @@ REGISTER_COMMAND_NAME(@"rule")
                       fileAccessRules:nil
                           ruleCleanup:cleanupType
                                source:SNTRuleAddSourceSantactl
-                                reply:^(BOOL success, NSArray<NSError *> *errors) {
+                                reply:^(BOOL success, NSArray<NSError*>* errors) {
                                   if (success) {
                                     TEE_LOGI(@"Rules were successfully deleted.");
                                     if (errors.count > 0) {
                                       TEE_LOGE(@"The following warnings were emitted:");
-                                      for (NSError *e in errors) {
+                                      for (NSError* e in errors) {
                                         TEE_LOGW(@"\t%@", e.localizedDescription);
                                       }
                                     }
                                   } else {
                                     TEE_LOGE(@"Failed to delete rules:");
-                                    for (NSError *e in errors) {
+                                    for (NSError* e in errors) {
                                       TEE_LOGE(@"\t%@", e.localizedDescription);
                                     }
                                   }
@@ -335,7 +335,7 @@ REGISTER_COMMAND_NAME(@"rule")
   }
 
   if (path) {
-    SNTFileInfo *fi = [[SNTFileInfo alloc] initWithPath:path];
+    SNTFileInfo* fi = [[SNTFileInfo alloc] initWithPath:path];
     if (!fi.path) {
       [self printErrorUsageAndExit:@"Provided path was not a plain file"];
     }
@@ -343,16 +343,16 @@ REGISTER_COMMAND_NAME(@"rule")
     if (type == SNTRuleTypeBinary) {
       identifier = fi.SHA256;
     } else if (type == SNTRuleTypeCertificate) {
-      MOLCodesignChecker *cs = [fi codesignCheckerWithError:NULL];
+      MOLCodesignChecker* cs = [fi codesignCheckerWithError:NULL];
       identifier = cs.leafCertificate.SHA256;
     } else if (type == SNTRuleTypeCDHash) {
-      MOLCodesignChecker *cs = [fi codesignCheckerWithError:NULL];
+      MOLCodesignChecker* cs = [fi codesignCheckerWithError:NULL];
       identifier = cs.cdhash;
     } else if (type == SNTRuleTypeTeamID) {
-      MOLCodesignChecker *cs = [fi codesignCheckerWithError:NULL];
+      MOLCodesignChecker* cs = [fi codesignCheckerWithError:NULL];
       identifier = cs.teamID;
     } else if (type == SNTRuleTypeSigningID) {
-      MOLCodesignChecker *cs = [fi codesignCheckerWithError:NULL];
+      MOLCodesignChecker* cs = [fi codesignCheckerWithError:NULL];
       if (cs.teamID.length) {
         identifier = [NSString stringWithFormat:@"%@:%@", cs.teamID, cs.signingID];
       } else if (cs.platformBinary) {
@@ -366,7 +366,7 @@ REGISTER_COMMAND_NAME(@"rule")
   }
 
   if (type == SNTRuleTypeBinary || type == SNTRuleTypeCertificate || type == SNTRuleTypeCDHash) {
-    NSCharacterSet *nonHex =
+    NSCharacterSet* nonHex =
         [[NSCharacterSet characterSetWithCharactersInString:@"0123456789ABCDEF"] invertedSet];
     NSUInteger length =
         [[identifier uppercaseString] stringByTrimmingCharactersInSet:nonHex].length;
@@ -381,7 +381,7 @@ REGISTER_COMMAND_NAME(@"rule")
     }
   }
 
-  SNTRule *newRule = [[SNTRule alloc] initWithIdentifier:identifier
+  SNTRule* newRule = [[SNTRule alloc] initWithIdentifier:identifier
                                                    state:state
                                                     type:type
                                                customMsg:customMsg
@@ -408,10 +408,10 @@ REGISTER_COMMAND_NAME(@"rule")
                     fileAccessRules:nil
                         ruleCleanup:SNTRuleCleanupNone
                              source:SNTRuleAddSourceSantactl
-                              reply:^(BOOL success, NSArray<NSError *> *errors) {
+                              reply:^(BOOL success, NSArray<NSError*>* errors) {
                                 if (!success) {
                                   TEE_LOGE(@"Failed to modify rules:");
-                                  for (NSError *e in errors) {
+                                  for (NSError* e in errors) {
                                     TEE_LOGE(@"\t%@", e.localizedFailureReason);
                                   }
                                   exit(EXIT_FAILURE);
@@ -419,12 +419,12 @@ REGISTER_COMMAND_NAME(@"rule")
 
                                 if (errors.count > 0) {
                                   TEE_LOGW(@"Rules were modified but with the following issues:");
-                                  for (NSError *e in errors) {
+                                  for (NSError* e in errors) {
                                     TEE_LOGW(@"\t%@", e.localizedFailureReason);
                                   }
                                 }
 
-                                NSString *ruleType;
+                                NSString* ruleType;
                                 switch (newRule.type) {
                                   case SNTRuleTypeCertificate:
                                     ruleType = @"Certificate SHA-256";
@@ -446,9 +446,9 @@ REGISTER_COMMAND_NAME(@"rule")
                               }];
 }
 
-- (void)printStateOfRule:(SNTRule *)rule daemonConnection:(MOLXPCConnection *)daemonConn {
+- (void)printStateOfRule:(SNTRule*)rule daemonConnection:(MOLXPCConnection*)daemonConn {
   id<SNTDaemonControlXPC> rop = [daemonConn synchronousRemoteObjectProxy];
-  __block NSString *output = @"No matching rule exists";
+  __block NSString* output = @"No matching rule exists";
 
   struct RuleIdentifiers identifiers = {
       .cdhash = (rule.type == SNTRuleTypeCDHash) ? rule.identifier : nil,
@@ -459,7 +459,7 @@ REGISTER_COMMAND_NAME(@"rule")
   };
 
   [rop databaseRuleForIdentifiers:[[SNTRuleIdentifiers alloc] initWithRuleIdentifiers:identifiers]
-                            reply:^(SNTRule *r) {
+                            reply:^(SNTRule* r) {
                               if (r) output = [r stringifyWithColor:(isatty(STDOUT_FILENO) == 1)];
                             }];
 
@@ -467,10 +467,10 @@ REGISTER_COMMAND_NAME(@"rule")
   exit(0);
 }
 
-- (void)importJSONFile:(NSString *)jsonFilePath with:(SNTRuleCleanup)cleanupType {
+- (void)importJSONFile:(NSString*)jsonFilePath with:(SNTRuleCleanup)cleanupType {
   // If the file exists parse it and then add the rules one at a time.
-  NSError *error;
-  NSData *data = [NSData dataWithContentsOfFile:jsonFilePath options:0 error:&error];
+  NSError* error;
+  NSData* data = [NSData dataWithContentsOfFile:jsonFilePath options:0 error:&error];
   if (error) {
     [self printErrorUsageAndExit:[NSString stringWithFormat:@"Failed to read %@: %@", jsonFilePath,
                                                             error.localizedDescription]];
@@ -486,17 +486,17 @@ REGISTER_COMMAND_NAME(@"rule")
   //    "custom_url" : "",
   //    "custom_msg" : "/bin/ls block for demo"
   //  }]}
-  NSDictionary *rules = [NSJSONSerialization JSONObjectWithData:data options:0 error:&error];
+  NSDictionary* rules = [NSJSONSerialization JSONObjectWithData:data options:0 error:&error];
   if (error) {
     [self printErrorUsageAndExit:[NSString stringWithFormat:@"Failed to parse %@: %@", jsonFilePath,
                                                             error.localizedDescription]];
   }
 
-  NSMutableArray<SNTRule *> *parsedRules = [[NSMutableArray alloc] init];
+  NSMutableArray<SNTRule*>* parsedRules = [[NSMutableArray alloc] init];
 
-  for (NSDictionary *jsonRule in rules[@"rules"]) {
-    NSError *error;
-    SNTRule *rule = [[SNTRule alloc] initWithDictionary:jsonRule error:&error];
+  for (NSDictionary* jsonRule in rules[@"rules"]) {
+    NSError* error;
+    SNTRule* rule = [[SNTRule alloc] initWithDictionary:jsonRule error:&error];
     if (!rule) {
       [self printErrorUsageAndExit:[NSString
                                        stringWithFormat:@"Invalid rule: %@ = %@", jsonRule, error]];
@@ -509,13 +509,13 @@ REGISTER_COMMAND_NAME(@"rule")
                     fileAccessRules:nil
                         ruleCleanup:cleanupType
                              source:SNTRuleAddSourceSantactl
-                              reply:^(BOOL success, NSArray<NSError *> *errors) {
+                              reply:^(BOOL success, NSArray<NSError*>* errors) {
                                 if (success) {
                                   TEE_LOGE(@"Rules were modified but with the following issues:");
                                 } else {
                                   TEE_LOGE(@"Failed to modify rules:");
                                 }
-                                for (NSError *e in errors) {
+                                for (NSError* e in errors) {
                                   TEE_LOGE(@"\t%@", e.localizedFailureReason);
                                 }
 
@@ -523,10 +523,10 @@ REGISTER_COMMAND_NAME(@"rule")
                               }];
 }
 
-- (void)exportExecutionRulesToJSONFile:(NSString *)jsonFilePath {
+- (void)exportExecutionRulesToJSONFile:(NSString*)jsonFilePath {
   // Get the rules from the daemon and then write them to the file.
   id<SNTDaemonControlXPC> rop = [self.daemonConn synchronousRemoteObjectProxy];
-  [rop retrieveAllExecutionRules:^(NSArray<SNTRule *> *rules, NSError *error) {
+  [rop retrieveAllExecutionRules:^(NSArray<SNTRule*>* rules, NSError* error) {
     if (error) {
       TEE_LOGE(@"Failed to get rules: %@\n", error.localizedDescription);
       exit(1);
@@ -537,9 +537,9 @@ REGISTER_COMMAND_NAME(@"rule")
       exit(1);
     }
     // Convert Rules to an NSDictionary.
-    NSMutableArray *rulesAsDicts = [[NSMutableArray alloc] init];
+    NSMutableArray* rulesAsDicts = [[NSMutableArray alloc] init];
 
-    for (SNTRule *rule in rules) {
+    for (SNTRule* rule in rules) {
       // Omit transitive and remove rules as they're not relevant.
       if (rule.state == SNTRuleStateAllowTransitive || rule.state == SNTRuleStateRemove) {
         continue;
@@ -548,13 +548,13 @@ REGISTER_COMMAND_NAME(@"rule")
       [rulesAsDicts addObject:[rule dictionaryRepresentation]];
     }
 
-    NSOutputStream *outputStream = [[NSOutputStream alloc] initToFileAtPath:jsonFilePath append:NO];
+    NSOutputStream* outputStream = [[NSOutputStream alloc] initToFileAtPath:jsonFilePath append:NO];
     [outputStream open];
 
     // Write the rules to the file.
     // File should look like the following JSON:
     // {"rules": [{"policy": "ALLOWLIST", "identifier": hash, "rule_type: "BINARY"},}]}
-    NSData *jsonData = [NSJSONSerialization dataWithJSONObject:@{@"rules" : rulesAsDicts}
+    NSData* jsonData = [NSJSONSerialization dataWithJSONObject:@{@"rules" : rulesAsDicts}
                                                        options:NSJSONWritingPrettyPrinted
                                                          error:&error];
     // Print error
@@ -563,18 +563,18 @@ REGISTER_COMMAND_NAME(@"rule")
       exit(1);
     }
     // Write jsonData to the file
-    [outputStream write:static_cast<const uint8_t *>(jsonData.bytes) maxLength:jsonData.length];
+    [outputStream write:static_cast<const uint8_t*>(jsonData.bytes) maxLength:jsonData.length];
     [outputStream close];
     exit(0);
   }];
 }
 
 #ifdef DEBUG
-- (void)exportFileAccessRulesToPlistFile:(NSString *)plistFilePath {
+- (void)exportFileAccessRulesToPlistFile:(NSString*)plistFilePath {
   // Get the rules from the daemon and then write them to the file.
   id<SNTDaemonControlXPC> rop = [self.daemonConn synchronousRemoteObjectProxy];
-  [rop retrieveAllFileAccessRules:^(NSDictionary<NSString *, NSDictionary *> *fileAccessRules,
-                                    NSError *error) {
+  [rop retrieveAllFileAccessRules:^(NSDictionary<NSString*, NSDictionary*>* fileAccessRules,
+                                    NSError* error) {
     if (error) {
       TEE_LOGE(@"Failed to get file access rules: %@\n", error.localizedDescription);
       exit(1);

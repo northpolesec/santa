@@ -48,11 +48,10 @@ using ::cel::StructValue;
 
 // Implementation of require_touchid_with_cooldown_minutes(int)
 // Returns a Result message with REQUIRE_TOUCHID and the specified cooldown.
-StructValue RequireTouchIDWithCooldownImpl(int64_t minutes,
-                                           const google::protobuf::DescriptorPool *,
-                                           google::protobuf::MessageFactory *,
-                                           google::protobuf::Arena *arena) {
-  auto *result = google::protobuf::Arena::Create<::santa::cel::Result>(arena);
+StructValue RequireTouchIDWithCooldownImpl(int64_t minutes, const google::protobuf::DescriptorPool*,
+                                           google::protobuf::MessageFactory*,
+                                           google::protobuf::Arena* arena) {
+  auto* result = google::protobuf::Arena::Create<::santa::cel::Result>(arena);
   result->set_value(::santa::cel::v2::REQUIRE_TOUCHID);
   result->set_cooldown_minutes(minutes >= 0 ? static_cast<uint64_t>(minutes) : 0);
   return StructValue(ParsedMessageValue(result, arena));
@@ -61,16 +60,16 @@ StructValue RequireTouchIDWithCooldownImpl(int64_t minutes,
 // Implementation of require_touchid_only_with_cooldown_minutes(int)
 // Returns a Result message with REQUIRE_TOUCHID_ONLY and the specified cooldown.
 StructValue RequireTouchIDOnlyWithCooldownImpl(int64_t minutes,
-                                               const google::protobuf::DescriptorPool *,
-                                               google::protobuf::MessageFactory *,
-                                               google::protobuf::Arena *arena) {
-  auto *result = google::protobuf::Arena::Create<::santa::cel::Result>(arena);
+                                               const google::protobuf::DescriptorPool*,
+                                               google::protobuf::MessageFactory*,
+                                               google::protobuf::Arena* arena) {
+  auto* result = google::protobuf::Arena::Create<::santa::cel::Result>(arena);
   result->set_value(::santa::cel::v2::REQUIRE_TOUCHID_ONLY);
   result->set_cooldown_minutes(minutes >= 0 ? static_cast<uint64_t>(minutes) : 0);
   return StructValue(ParsedMessageValue(result, arena));
 }
 
-absl::Status RegisterTouchIDCooldownDecls(::cel::TypeCheckerBuilder &builder) {
+absl::Status RegisterTouchIDCooldownDecls(::cel::TypeCheckerBuilder& builder) {
   // Get the Result message type from the descriptor
   auto result_type = MessageType(::santa::cel::Result::descriptor());
 
@@ -96,15 +95,15 @@ absl::Status RegisterTouchIDCooldownDecls(::cel::TypeCheckerBuilder &builder) {
 
 }  // namespace
 
-absl::Status AddTouchIDCooldownCompilerLibrary(::cel::CompilerBuilder &builder) {
+absl::Status AddTouchIDCooldownCompilerLibrary(::cel::CompilerBuilder& builder) {
   return builder.AddLibrary(::cel::CompilerLibrary::FromCheckerLibrary(
       {"touchid_cooldown", &RegisterTouchIDCooldownDecls}));
 }
 
 absl::Status RegisterTouchIDCooldownFunctions(
-    ::google::api::expr::runtime::CelFunctionRegistry *registry,
-    const ::google::api::expr::runtime::InterpreterOptions &options) {
-  auto &func_registry = registry->InternalGetRegistry();
+    ::google::api::expr::runtime::CelFunctionRegistry* registry,
+    const ::google::api::expr::runtime::InterpreterOptions& options) {
+  auto& func_registry = registry->InternalGetRegistry();
 
   // Register require_touchid_with_cooldown_minutes(int) -> StructValue
   CEL_RETURN_IF_ERROR((::cel::UnaryFunctionAdapter<StructValue, int64_t>::RegisterGlobalOverload(

@@ -27,6 +27,6 @@
 @interface SNTNotificationManager
     : NSObject <SNTMessageWindowControllerDelegate, SNTNotifierXPC, SNTBundleServiceProgressXPC>
 
-@property NSXPCListenerEndpoint *notificationListener;
-@property(weak, nonatomic) SNTStatusItemManager *statusItemManager;
+@property NSXPCListenerEndpoint* notificationListener;
+@property(weak, nonatomic) SNTStatusItemManager* statusItemManager;
 @end

@@ -137,12 +137,12 @@ absl::StatusOr<std::vector<std::string>> ProcessArgumentsForPID(pid_t pid) {
 }
 }  // namespace
 
-struct Pid PidFromAuditToken(const audit_token_t &tok) {
+struct Pid PidFromAuditToken(const audit_token_t& tok) {
   return (struct Pid){.pid = audit_token_to_pid(tok),
                       .pidversion = (uint64_t)audit_token_to_pidversion(tok)};
 }
 
-absl::StatusOr<Process> LoadPID(pid_t pid) {
+absl::StatusOr<BackfilledProcess> LoadPID(pid_t pid) {
   task_name_t task;
   mach_msg_type_number_t size = TASK_AUDIT_TOKEN_COUNT;
   audit_token_t token;
@@ -165,18 +165,16 @@ absl::StatusOr<Process> LoadPID(pid_t pid) {
   std::vector<std::string> args =
       ProcessArgumentsForPID(audit_token_to_pid(token)).value_or(std::vector<std::string>());
 
-  return Process((struct Pid){.pid = audit_token_to_pid(token),
-                              .pidversion = (uint64_t)audit_token_to_pidversion(token)},
-                 (struct Cred){
-                     .uid = audit_token_to_euid(token),
-                     .gid = audit_token_to_egid(token),
-                 },
-                 std::make_shared<struct Program>((struct Program){
-                     .executable = path,
-                     .arguments = args,
-                     .code_signing = LoadCodeSigningInfoForPID(pid),
-                 }),
-                 nullptr);
+  return BackfilledProcess{
+      .pid = {.pid = audit_token_to_pid(token),
+              .pidversion = (uint64_t)audit_token_to_pidversion(token)},
+      .cred = {.uid = audit_token_to_euid(token), .gid = audit_token_to_egid(token)},
+      .program = std::make_shared<struct Program>((struct Program){
+          .executable = path,
+          .arguments = args,
+          .code_signing = LoadCodeSigningInfoForPID(pid),
+      }),
+  };
 }
 
 absl::Status ProcessTree::Backfill() {
@@ -185,11 +183,11 @@ absl::Status ProcessTree::Backfill() {
     return absl::InternalError("GetPidList() failed");
   }
 
-  absl::flat_hash_map<pid_t, std::vector<Process>> parent_map;
+  absl::flat_hash_map<pid_t, std::vector<BackfilledProcess>> parent_map;
   for (pid_t pid : pid_list.value()) {
     auto proc_status = LoadPID(pid);
     if (proc_status.ok()) {
-      auto unlinked_proc = proc_status.value();
+      auto backfilled_proc = std::move(proc_status).value();
 
       // Determine ppid
       // Alternatively, there's a sysctl interface:
@@ -200,12 +198,12 @@ absl::Status ProcessTree::Backfill() {
         continue;
       };
 
-      parent_map[bsdinfo.pbi_ppid].push_back(unlinked_proc);
+      parent_map[bsdinfo.pbi_ppid].push_back(std::move(backfilled_proc));
     }
   }
 
-  auto &roots = parent_map[0];
-  for (const Process &p : roots) {
+  auto& roots = parent_map[0];
+  for (const BackfilledProcess& p : roots) {
     BackfillInsertChildren(parent_map, std::shared_ptr<Process>(), p);
   }
 

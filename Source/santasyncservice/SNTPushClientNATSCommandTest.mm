@@ -38,42 +38,42 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
 
 // Expose private methods for testing
 @interface SNTPushClientNATS (Testing)
-@property(nonatomic) natsConnection *conn;
+@property(nonatomic) natsConnection* conn;
 @property(nonatomic, readwrite) BOOL isConnected;
 @property(nonatomic) dispatch_queue_t connectionQueue;
 @property(nonatomic) dispatch_queue_t messageQueue;
-@property(nonatomic, copy) NSString *pushDeviceID;
-@property(nonatomic, copy) NSData *hmacKey;
-@property(nonatomic) NSMutableSet<NSString *> *currentNonces;
-@property(nonatomic) NSMutableSet<NSString *> *previousNonces;
+@property(nonatomic, copy) NSString* pushDeviceID;
+@property(nonatomic, copy) NSData* hmacKey;
+@property(nonatomic) NSMutableSet<NSString*>* currentNonces;
+@property(nonatomic) NSMutableSet<NSString*>* previousNonces;
 @property(nonatomic) int64_t lastRotationTime;
 - (void)disconnectWithCompletion:(void (^)(void))completion;
-- (::pbv1::PingResponse *)handlePingRequest:(const ::pbv1::PingRequest &)pingRequest
-                            withCommandUUID:(NSString *)uuid
-                                    onArena:(google::protobuf::Arena *)arena;
-- (::pbv1::KillResponse *)handleKillRequest:(const ::pbv1::KillRequest &)killRequest
-                            withCommandUUID:(NSString *)uuid
-                                    onArena:(google::protobuf::Arena *)arena;
-- (::pbv1::EventUploadResponse *)handleEventUploadRequest:
-                                     (const ::pbv1::EventUploadRequest &)eventUploadRequest
-                                          withCommandUUID:(NSString *)uuid
-                                                  onArena:(google::protobuf::Arena *)arena;
-- (::pbv1::SantaCommandResponse *)dispatchSantaCommandToHandler:
-                                      (const ::pbv1::SantaCommandRequest &)command
-                                                        onArena:(google::protobuf::Arena *)arena;
-- (void)publishResponse:(const ::pbv1::SantaCommandResponse &)response
-           toReplyTopic:(NSString *)replyTopic;
+- (::pbv1::PingResponse*)handlePingRequest:(const ::pbv1::PingRequest&)pingRequest
+                           withCommandUUID:(NSString*)uuid
+                                   onArena:(google::protobuf::Arena*)arena;
+- (::pbv1::KillResponse*)handleKillRequest:(const ::pbv1::KillRequest&)killRequest
+                           withCommandUUID:(NSString*)uuid
+                                   onArena:(google::protobuf::Arena*)arena;
+- (::pbv1::EventUploadResponse*)handleEventUploadRequest:
+                                    (const ::pbv1::EventUploadRequest&)eventUploadRequest
+                                         withCommandUUID:(NSString*)uuid
+                                                 onArena:(google::protobuf::Arena*)arena;
+- (::pbv1::SantaCommandResponse*)dispatchSantaCommandToHandler:
+                                     (const ::pbv1::SantaCommandRequest&)command
+                                                       onArena:(google::protobuf::Arena*)arena;
+- (void)publishResponse:(const ::pbv1::SantaCommandResponse&)response
+           toReplyTopic:(NSString*)replyTopic;
 @end
 
 @interface SNTPushClientNATSCommandTest : XCTestCase
 @property id mockConfigurator;
 @property id mockSyncDelegate;
-@property SNTPushClientNATS *client;
-@property google::protobuf::Arena *arena;
-@property NSData *testHMACKey;
+@property SNTPushClientNATS* client;
+@property google::protobuf::Arena* arena;
+@property NSData* testHMACKey;
 
 // Helper method to sign a command request with HMAC
-- (void)signCommandRequest:(::pbv1::SantaCommandRequest *)command;
+- (void)signCommandRequest:(::pbv1::SantaCommandRequest*)command;
 @end
 
 @implementation SNTPushClientNATSCommandTest
@@ -94,7 +94,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
 
   // Set up test HMAC key (32 bytes for SHA256)
-  const char *keyString = "test_hmac_key_for_unit_tests_32";
+  const char* keyString = "test_hmac_key_for_unit_tests_32";
   self.testHMACKey = [NSData dataWithBytes:keyString length:32];
   self.client.hmacKey = self.testHMACKey;
 
@@ -115,7 +115,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
 
 #pragma mark - Helper Methods
 
-- (void)signCommandRequest:(::pbv1::SantaCommandRequest *)command {
+- (void)signCommandRequest:(::pbv1::SantaCommandRequest*)command {
   // Prep the command to be signed - set the current time and clear any existing hmac.
   command->set_issued_at(time(nullptr));
   command->clear_hmac();
@@ -173,7 +173,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   ::pbv1::PingRequest pingRequest;
 
   // When: Handling the ping command
-  ::pbv1::PingResponse *response = [self.client handlePingRequest:pingRequest
+  ::pbv1::PingResponse* response = [self.client handlePingRequest:pingRequest
                                                   withCommandUUID:@"uuid"
                                                           onArena:self.arena];
 
@@ -201,7 +201,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   XCTAssertTrue(deserialized.has_ping(), @"Command should have ping field set");
 
   // Verify the ping handler works with the deserialized command
-  ::pbv1::PingResponse *response = [self.client handlePingRequest:deserialized.ping()
+  ::pbv1::PingResponse* response = [self.client handlePingRequest:deserialized.ping()
                                                   withCommandUUID:@"uuid"
                                                           onArena:self.arena];
   XCTAssertNotEqual(response, nullptr, @"Ping handler should return ping response");
@@ -212,7 +212,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   ::pbv1::KillRequest killRequest;
 
   // When: Handling the kill command
-  ::pbv1::KillResponse *response = [self.client handleKillRequest:killRequest
+  ::pbv1::KillResponse* response = [self.client handleKillRequest:killRequest
                                                   withCommandUUID:@"uuid"
                                                           onArena:self.arena];
 
@@ -240,7 +240,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   XCTAssertTrue(deserialized.has_kill(), @"Command should have kill field set");
 
   // Verify the kill handler works with the deserialized command
-  ::pbv1::KillResponse *response = [self.client handleKillRequest:deserialized.kill()
+  ::pbv1::KillResponse* response = [self.client handleKillRequest:deserialized.kill()
                                                   withCommandUUID:@"uuid"
                                                           onArena:self.arena];
   XCTAssertNotEqual(response, nullptr, @"Kill handler should return kill response");
@@ -271,7 +271,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   XCTAssertFalse(deserialized.has_kill(), @"Command should not have kill field set");
 
   // Test dispatch with bad UUID
-  ::pbv1::SantaCommandResponse *response = [self.client dispatchSantaCommandToHandler:deserialized
+  ::pbv1::SantaCommandResponse* response = [self.client dispatchSantaCommandToHandler:deserialized
                                                                               onArena:self.arena];
   XCTAssertTrue(response->has_error());
   XCTAssertEqual(response->error(), ::pbv1::SantaCommandResponse::ERROR_INVALID_UUID);
@@ -301,7 +301,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   XCTAssertFalse(deserialized.has_kill(), @"Command should not have kill field set");
 
   // Test dispatch with unknown command
-  ::pbv1::SantaCommandResponse *response = [self.client dispatchSantaCommandToHandler:deserialized
+  ::pbv1::SantaCommandResponse* response = [self.client dispatchSantaCommandToHandler:deserialized
                                                                               onArena:self.arena];
   XCTAssertTrue(response->has_error());
   XCTAssertEqual(response->error(), ::pbv1::SantaCommandResponse::ERROR_UNKNOWN_REQUEST_TYPE);
@@ -406,7 +406,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   [self signCommandRequest:&command];
 
   // When: Dispatching the command
-  ::pbv1::SantaCommandResponse *response = [self.client dispatchSantaCommandToHandler:command
+  ::pbv1::SantaCommandResponse* response = [self.client dispatchSantaCommandToHandler:command
                                                                               onArena:self.arena];
 
   // Then: Should return a successful ping response
@@ -424,7 +424,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   [self signCommandRequest:&command];
 
   // When: Dispatching the command
-  ::pbv1::SantaCommandResponse *response = [self.client dispatchSantaCommandToHandler:command
+  ::pbv1::SantaCommandResponse* response = [self.client dispatchSantaCommandToHandler:command
                                                                               onArena:self.arena];
 
   // Then: Should return an error response
@@ -449,7 +449,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   XCTAssertTrue(parsed, @"Failed to parse serialized PingRequest");
 
   // When: Dispatching the deserialized command
-  ::pbv1::SantaCommandResponse *response = [self.client dispatchSantaCommandToHandler:deserialized
+  ::pbv1::SantaCommandResponse* response = [self.client dispatchSantaCommandToHandler:deserialized
                                                                               onArena:self.arena];
 
   // Then: Should return a successful ping response
@@ -473,7 +473,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   command.set_hmac(hmac);
 
   // When: Dispatching the command with corrupted HMAC
-  ::pbv1::SantaCommandResponse *response = [self.client dispatchSantaCommandToHandler:command
+  ::pbv1::SantaCommandResponse* response = [self.client dispatchSantaCommandToHandler:command
                                                                               onArena:self.arena];
 
   // Then: Should be rejected with INVALID_DATA error
@@ -490,7 +490,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   command.set_issued_at(time(nullptr));
 
   // When: Dispatching the command without HMAC
-  ::pbv1::SantaCommandResponse *response = [self.client dispatchSantaCommandToHandler:command
+  ::pbv1::SantaCommandResponse* response = [self.client dispatchSantaCommandToHandler:command
                                                                               onArena:self.arena];
 
   // Then: Should be rejected with INVALID_DATA error
@@ -511,7 +511,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   command.set_hmac(shortHmac, 16);
 
   // When: Dispatching the command with wrong HMAC length
-  ::pbv1::SantaCommandResponse *response = [self.client dispatchSantaCommandToHandler:command
+  ::pbv1::SantaCommandResponse* response = [self.client dispatchSantaCommandToHandler:command
                                                                               onArena:self.arena];
 
   // Then: Should be rejected with INVALID_DATA error
@@ -542,7 +542,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   command.set_hmac(hmac, CC_SHA256_DIGEST_LENGTH);
 
   // When: Dispatching the command with old timestamp
-  ::pbv1::SantaCommandResponse *response = [self.client dispatchSantaCommandToHandler:command
+  ::pbv1::SantaCommandResponse* response = [self.client dispatchSantaCommandToHandler:command
                                                                               onArena:self.arena];
 
   // Then: Should be rejected with INVALID_DATA error
@@ -571,7 +571,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   command.set_hmac(hmac, CC_SHA256_DIGEST_LENGTH);
 
   // When: Dispatching the command with future timestamp
-  ::pbv1::SantaCommandResponse *response = [self.client dispatchSantaCommandToHandler:command
+  ::pbv1::SantaCommandResponse* response = [self.client dispatchSantaCommandToHandler:command
                                                                               onArena:self.arena];
 
   // Then: Should be rejected with INVALID_DATA error
@@ -598,7 +598,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   command.set_hmac(hmac, CC_SHA256_DIGEST_LENGTH);
 
   // When: Dispatching the command without timestamp
-  ::pbv1::SantaCommandResponse *response = [self.client dispatchSantaCommandToHandler:command
+  ::pbv1::SantaCommandResponse* response = [self.client dispatchSantaCommandToHandler:command
                                                                               onArena:self.arena];
 
   // Then: Should be rejected with INVALID_DATA error
@@ -624,7 +624,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
          serialized1.size(), hmac1);
   command1.set_hmac(hmac1, CC_SHA256_DIGEST_LENGTH);
 
-  ::pbv1::SantaCommandResponse *response1 = [self.client dispatchSantaCommandToHandler:command1
+  ::pbv1::SantaCommandResponse* response1 = [self.client dispatchSantaCommandToHandler:command1
                                                                                onArena:self.arena];
   XCTAssertFalse(response1->has_error(), @"Command just within the limit should be accepted");
 
@@ -642,7 +642,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
          serialized2.size(), hmac2);
   command2.set_hmac(hmac2, CC_SHA256_DIGEST_LENGTH);
 
-  ::pbv1::SantaCommandResponse *response2 = [self.client dispatchSantaCommandToHandler:command2
+  ::pbv1::SantaCommandResponse* response2 = [self.client dispatchSantaCommandToHandler:command2
                                                                                onArena:self.arena];
   XCTAssertFalse(response2->has_error(),
                  @"Command just within the future limit should be accepted");
@@ -652,14 +652,14 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
 
 - (void)testNonceReplayProtection {
   // Given: A PingRequest command with a specific UUID
-  NSString *testUUID = [[NSUUID UUID] UUIDString];
+  NSString* testUUID = [[NSUUID UUID] UUIDString];
   ::pbv1::SantaCommandRequest command;
   command.set_uuid(testUUID.UTF8String);
   command.mutable_ping();
   [self signCommandRequest:&command];
 
   // When: Dispatching the command the first time
-  ::pbv1::SantaCommandResponse *response1 = [self.client dispatchSantaCommandToHandler:command
+  ::pbv1::SantaCommandResponse* response1 = [self.client dispatchSantaCommandToHandler:command
                                                                                onArena:self.arena];
 
   // Then: Should succeed
@@ -667,7 +667,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   XCTAssertEqual(response1->result_case(), ::pbv1::SantaCommandResponse::kPing);
 
   // When: Dispatching the same command again (replay attack)
-  ::pbv1::SantaCommandResponse *response2 = [self.client dispatchSantaCommandToHandler:command
+  ::pbv1::SantaCommandResponse* response2 = [self.client dispatchSantaCommandToHandler:command
                                                                                onArena:self.arena];
 
   // Then: Should be rejected with INVALID_DATA error
@@ -678,13 +678,13 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
 
 - (void)testNonceCacheRotation {
   // Given: A command that succeeds
-  NSString *testUUID = [[NSUUID UUID] UUIDString];
+  NSString* testUUID = [[NSUUID UUID] UUIDString];
   ::pbv1::SantaCommandRequest command;
   command.set_uuid(testUUID.UTF8String);
   command.mutable_ping();
   [self signCommandRequest:&command];
 
-  ::pbv1::SantaCommandResponse *response1 = [self.client dispatchSantaCommandToHandler:command
+  ::pbv1::SantaCommandResponse* response1 = [self.client dispatchSantaCommandToHandler:command
                                                                                onArena:self.arena];
   XCTAssertFalse(response1->has_error(), @"First command should succeed");
 
@@ -693,13 +693,13 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   self.client.lastRotationTime = time(nullptr) - (kMaxCommandAgeSeconds + 1);
 
   // Send a new command to trigger rotation
-  NSString *newUUID = [[NSUUID UUID] UUIDString];
+  NSString* newUUID = [[NSUUID UUID] UUIDString];
   ::pbv1::SantaCommandRequest newCommand;
   newCommand.set_uuid(newUUID.UTF8String);
   newCommand.mutable_ping();
   [self signCommandRequest:&newCommand];
 
-  ::pbv1::SantaCommandResponse *response2 = [self.client dispatchSantaCommandToHandler:newCommand
+  ::pbv1::SantaCommandResponse* response2 = [self.client dispatchSantaCommandToHandler:newCommand
                                                                                onArena:self.arena];
   XCTAssertFalse(response2->has_error(), @"New command should succeed and trigger rotation");
 
@@ -709,7 +709,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   replayCommand.mutable_ping();
   [self signCommandRequest:&replayCommand];
 
-  ::pbv1::SantaCommandResponse *response3 = [self.client dispatchSantaCommandToHandler:replayCommand
+  ::pbv1::SantaCommandResponse* response3 = [self.client dispatchSantaCommandToHandler:replayCommand
                                                                                onArena:self.arena];
   XCTAssertTrue(response3->has_error(), @"UUID in previousNonces should still be rejected");
   XCTAssertEqual(response3->error(), ::pbv1::SantaCommandResponse::ERROR_INVALID_DATA);
@@ -717,13 +717,13 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
 
 - (void)testNonceCacheDoubleRotation {
   // Given: A command that succeeds
-  NSString *oldUUID = [[NSUUID UUID] UUIDString];
+  NSString* oldUUID = [[NSUUID UUID] UUIDString];
   ::pbv1::SantaCommandRequest command;
   command.set_uuid(oldUUID.UTF8String);
   command.mutable_ping();
   [self signCommandRequest:&command];
 
-  ::pbv1::SantaCommandResponse *response1 = [self.client dispatchSantaCommandToHandler:command
+  ::pbv1::SantaCommandResponse* response1 = [self.client dispatchSantaCommandToHandler:command
                                                                                onArena:self.arena];
   XCTAssertFalse(response1->has_error(), @"First command should succeed");
 
@@ -750,7 +750,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   replayCommand.mutable_ping();
   [self signCommandRequest:&replayCommand];
 
-  ::pbv1::SantaCommandResponse *response4 = [self.client dispatchSantaCommandToHandler:replayCommand
+  ::pbv1::SantaCommandResponse* response4 = [self.client dispatchSantaCommandToHandler:replayCommand
                                                                                onArena:self.arena];
   XCTAssertFalse(response4->has_error(),
                  @"UUID should be accepted after aging out of two-generation cache");
@@ -761,11 +761,11 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   // Given: A client with an empty nonce cache
   // When: Sending more commands than the max cache size
   NSUInteger maxCommands = kMaxCommandNonceCacheCount;
-  NSMutableArray<NSString *> *uuids = [NSMutableArray array];
+  NSMutableArray<NSString*>* uuids = [NSMutableArray array];
 
   // Send maxCommands commands - all should succeed
   for (NSUInteger i = 0; i < maxCommands; i++) {
-    NSString *uuid = [[NSUUID UUID] UUIDString];
+    NSString* uuid = [[NSUUID UUID] UUIDString];
     [uuids addObject:uuid];
 
     ::pbv1::SantaCommandRequest command;
@@ -773,7 +773,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
     command.mutable_ping();
     [self signCommandRequest:&command];
 
-    ::pbv1::SantaCommandResponse *response = [self.client dispatchSantaCommandToHandler:command
+    ::pbv1::SantaCommandResponse* response = [self.client dispatchSantaCommandToHandler:command
                                                                                 onArena:self.arena];
     XCTAssertFalse(response->has_error(), @"Command %lu should succeed (within limit)", i + 1);
   }
@@ -784,7 +784,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   throttledCommand.mutable_ping();
   [self signCommandRequest:&throttledCommand];
 
-  ::pbv1::SantaCommandResponse *throttledResponse =
+  ::pbv1::SantaCommandResponse* throttledResponse =
       [self.client dispatchSantaCommandToHandler:throttledCommand onArena:self.arena];
 
   XCTAssertTrue(throttledResponse->has_error(), @"Command over limit should be throttled");
@@ -804,7 +804,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   [self signCommandRequest:&command];
 
   // When: Dispatching a kill command
-  ::pbv1::SantaCommandResponse *response = [self.client dispatchSantaCommandToHandler:command
+  ::pbv1::SantaCommandResponse* response = [self.client dispatchSantaCommandToHandler:command
                                                                               onArena:self.arena];
 
   // Then: Should be rejected
@@ -822,7 +822,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   [self signCommandRequest:&command];
 
   // When: Dispatching a kill command
-  ::pbv1::SantaCommandResponse *response = [self.client dispatchSantaCommandToHandler:command
+  ::pbv1::SantaCommandResponse* response = [self.client dispatchSantaCommandToHandler:command
                                                                               onArena:self.arena];
 
   // Then: Should succeed
@@ -840,7 +840,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   [self signCommandRequest:&command];
 
   // When: Dispatching a ping command
-  ::pbv1::SantaCommandResponse *response = [self.client dispatchSantaCommandToHandler:command
+  ::pbv1::SantaCommandResponse* response = [self.client dispatchSantaCommandToHandler:command
                                                                               onArena:self.arena];
 
   // Then: Should succeed (backward compatible)
@@ -858,7 +858,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   [self signCommandRequest:&command];
 
   // When: Dispatching a kill command
-  ::pbv1::SantaCommandResponse *response = [self.client dispatchSantaCommandToHandler:command
+  ::pbv1::SantaCommandResponse* response = [self.client dispatchSantaCommandToHandler:command
                                                                               onArena:self.arena];
 
   // Then: Should succeed (backward compatible)
@@ -876,7 +876,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   [self signCommandRequest:&pingCommand];
 
   // When: Dispatching a ping command
-  ::pbv1::SantaCommandResponse *pingResponse =
+  ::pbv1::SantaCommandResponse* pingResponse =
       [self.client dispatchSantaCommandToHandler:pingCommand onArena:self.arena];
 
   // Then: Should be rejected
@@ -889,7 +889,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   [self signCommandRequest:&killCommand];
 
   // When: Dispatching a kill command
-  ::pbv1::SantaCommandResponse *killResponse =
+  ::pbv1::SantaCommandResponse* killResponse =
       [self.client dispatchSantaCommandToHandler:killCommand onArena:self.arena];
 
   // Then: Should also be rejected
@@ -907,7 +907,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   [self signCommandRequest:&command];
 
   // When: Dispatching a ping command
-  ::pbv1::SantaCommandResponse *response = [self.client dispatchSantaCommandToHandler:command
+  ::pbv1::SantaCommandResponse* response = [self.client dispatchSantaCommandToHandler:command
                                                                               onArena:self.arena];
 
   // Then: Should be rejected
@@ -917,7 +917,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
 
 - (void)testNonceCachePreviousGenerationReplay {
   // Given: Add a UUID directly to the previousNonces cache
-  NSString *previousUUID = [[NSUUID UUID] UUIDString];
+  NSString* previousUUID = [[NSUUID UUID] UUIDString];
   [self.client.previousNonces addObject:previousUUID];
 
   // When: Attempting to use that UUID
@@ -926,7 +926,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   command.mutable_ping();
   [self signCommandRequest:&command];
 
-  ::pbv1::SantaCommandResponse *response = [self.client dispatchSantaCommandToHandler:command
+  ::pbv1::SantaCommandResponse* response = [self.client dispatchSantaCommandToHandler:command
                                                                               onArena:self.arena];
 
   // Then: Should be rejected
@@ -941,7 +941,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   ::pbv1::EventUploadRequest eventUploadRequest;
 
   // When: Handling the event upload request
-  ::pbv1::EventUploadResponse *response = [self.client handleEventUploadRequest:eventUploadRequest
+  ::pbv1::EventUploadResponse* response = [self.client handleEventUploadRequest:eventUploadRequest
                                                                 withCommandUUID:@"uuid"
                                                                         onArena:self.arena];
 
@@ -954,13 +954,13 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
 
 - (void)testHandleEventUploadRequestNilSyncDelegate {
   // Given: An EventUploadRequest with a valid path but no sync delegate
-  SNTPushClientNATS *clientWithoutDelegate = [[SNTPushClientNATS alloc] initWithSyncDelegate:nil];
+  SNTPushClientNATS* clientWithoutDelegate = [[SNTPushClientNATS alloc] initWithSyncDelegate:nil];
 
   ::pbv1::EventUploadRequest eventUploadRequest;
   eventUploadRequest.set_path("/Applications/Safari.app");
 
   // When: Handling the event upload request without a sync delegate
-  ::pbv1::EventUploadResponse *response =
+  ::pbv1::EventUploadResponse* response =
       [clientWithoutDelegate handleEventUploadRequest:eventUploadRequest
                                       withCommandUUID:@"uuid"
                                               onArena:self.arena];
@@ -982,7 +982,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
                                               reply:[OCMArg any]]);
 
   // When: Handling the event upload request
-  ::pbv1::EventUploadResponse *response = [self.client handleEventUploadRequest:eventUploadRequest
+  ::pbv1::EventUploadResponse* response = [self.client handleEventUploadRequest:eventUploadRequest
                                                                 withCommandUUID:@"uuid"
                                                                         onArena:self.arena];
 
@@ -1001,7 +1001,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
                                                 reply:[OCMArg any]]);
 
   // When: Handling the event upload request
-  ::pbv1::EventUploadResponse *response = [self.client handleEventUploadRequest:eventUploadRequest
+  ::pbv1::EventUploadResponse* response = [self.client handleEventUploadRequest:eventUploadRequest
                                                                 withCommandUUID:@"uuid"
                                                                         onArena:self.arena];
 
@@ -1024,7 +1024,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
                                               reply:[OCMArg any]]);
 
   // When: Dispatching the command
-  ::pbv1::SantaCommandResponse *response = [self.client dispatchSantaCommandToHandler:command
+  ::pbv1::SantaCommandResponse* response = [self.client dispatchSantaCommandToHandler:command
                                                                               onArena:self.arena];
 
   // Then: Should return a successful event upload response
@@ -1039,7 +1039,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   eventUploadRequest.set_path("/Applications/Safari.app");
 
   // Mock delegate to invoke the reply block with an error
-  NSError *uploadError =
+  NSError* uploadError =
       [NSError errorWithDomain:@"com.northpolesec.santa.syncservice"
                           code:4
                       userInfo:@{NSLocalizedDescriptionKey : @"Failed to upload"}];
@@ -1049,7 +1049,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   OCMReject([self.mockSyncDelegate sync]);
 
   // When: Handling the event upload request
-  ::pbv1::EventUploadResponse *response = [self.client handleEventUploadRequest:eventUploadRequest
+  ::pbv1::EventUploadResponse* response = [self.client handleEventUploadRequest:eventUploadRequest
                                                                 withCommandUUID:@"uuid"
                                                                         onArena:self.arena];
 
@@ -1068,7 +1068,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   [self signCommandRequest:&command];
 
   // When: Dispatching the command
-  ::pbv1::SantaCommandResponse *response = [self.client dispatchSantaCommandToHandler:command
+  ::pbv1::SantaCommandResponse* response = [self.client dispatchSantaCommandToHandler:command
                                                                               onArena:self.arena];
 
   // Then: Should return EventUploadResponse with ERROR_INVALID_PATH (not top-level error)

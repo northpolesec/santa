@@ -18,12 +18,12 @@
 #import "Source/common/MOLCertificate.h"
 
 @interface MOLCertificateTest : XCTestCase
-@property NSString *testDataPEM1;
-@property NSString *testDataPEM2;
-@property NSData *testDataDER1;
-@property NSData *testDataDER2;
-@property NSString *testDataPrivateKey;
-@property NSString *testNTPrincipalName;
+@property NSString* testDataPEM1;
+@property NSString* testDataPEM2;
+@property NSData* testDataDER1;
+@property NSData* testDataDER2;
+@property NSString* testDataPrivateKey;
+@property NSString* testNTPrincipalName;
 @end
 
 @implementation MOLCertificateTest
@@ -31,7 +31,7 @@
 - (void)setUp {
   [super setUp];
 
-  NSString *file = [[NSBundle bundleForClass:[self class]] pathForResource:@"GIAG2" ofType:@"pem"];
+  NSString* file = [[NSBundle bundleForClass:[self class]] pathForResource:@"GIAG2" ofType:@"pem"];
   self.testDataPEM1 = [NSString stringWithContentsOfFile:file
                                                 encoding:NSUTF8StringEncoding
                                                    error:nil];
@@ -74,7 +74,7 @@
 }
 
 - (void)testInitWithDER {
-  MOLCertificate *sut = [[MOLCertificate alloc] initWithCertificateDataDER:self.testDataDER1];
+  MOLCertificate* sut = [[MOLCertificate alloc] initWithCertificateDataDER:self.testDataDER1];
 
   XCTAssertNotNil(sut);
   XCTAssertEqualObjects(sut.commonName, @"Google Internet Authority G2");
@@ -103,7 +103,7 @@
 }
 
 - (void)testInitWithValidPEM {
-  MOLCertificate *sut = [[MOLCertificate alloc] initWithCertificateDataPEM:self.testDataPEM1];
+  MOLCertificate* sut = [[MOLCertificate alloc] initWithCertificateDataPEM:self.testDataPEM1];
   XCTAssertNotNil(sut);
   XCTAssertEqualObjects(sut.commonName, @"Google Internet Authority G2");
   XCTAssertEqualObjects(sut.orgUnit, nil);
@@ -112,7 +112,7 @@
   XCTAssertEqualObjects(sut.SHA1, @"d83c1a7f4d0446bb2081b81a1670f8183451ca24");
   XCTAssertEqualObjects(sut.SHA256,
                         @"a047a37fa2d2e118a4f5095fe074d6cfe0e352425a7632bf8659c03919a6c81d");
-  NSDateFormatter *dateFormat = [[NSDateFormatter alloc] init];
+  NSDateFormatter* dateFormat = [[NSDateFormatter alloc] init];
   dateFormat.dateFormat = @"yyyy-MM-dd HH:mm:ss Z";
   XCTAssertEqualObjects(sut.validFrom, [dateFormat dateFromString:@"2013-04-05 15:15:55 +0000"]);
   XCTAssertEqualObjects(sut.validUntil, [dateFormat dateFromString:@"2015-04-04 15:15:55 +0000"]);
@@ -145,29 +145,29 @@
 }
 
 - (void)testInitWithValidPEMAfterKey {
-  NSString *pemWithKey = [self.testDataPrivateKey stringByAppendingString:self.testDataPEM1];
-  MOLCertificate *sut = [[MOLCertificate alloc] initWithCertificateDataPEM:pemWithKey];
+  NSString* pemWithKey = [self.testDataPrivateKey stringByAppendingString:self.testDataPEM1];
+  MOLCertificate* sut = [[MOLCertificate alloc] initWithCertificateDataPEM:pemWithKey];
 
   XCTAssertNotNil(sut);
   XCTAssertEqualObjects(sut.commonName, @"Google Internet Authority G2");
 }
 
 - (void)testInitWithEmptyPEM {
-  NSString *badPEM = @"-----BEGIN CERTIFICATE----------END CERTIFICATE-----";
-  MOLCertificate *sut = [[MOLCertificate alloc] initWithCertificateDataPEM:badPEM];
+  NSString* badPEM = @"-----BEGIN CERTIFICATE----------END CERTIFICATE-----";
+  MOLCertificate* sut = [[MOLCertificate alloc] initWithCertificateDataPEM:badPEM];
   XCTAssertNil(sut);
 }
 
 - (void)testInitWithTruncatedPEM {
-  NSString *badPEM = @"-----BEGIN CERTIFICATE-----"
+  NSString* badPEM = @"-----BEGIN CERTIFICATE-----"
                      @"MIICXQIBAAKBgQDk2F9JsQQjKSveMwazXzFLbiiOD0RkDiRX1LTmQtVdi514F6l/";
-  MOLCertificate *sut = [[MOLCertificate alloc] initWithCertificateDataPEM:badPEM];
+  MOLCertificate* sut = [[MOLCertificate alloc] initWithCertificateDataPEM:badPEM];
   XCTAssertNil(sut);
 }
 
 - (void)testInitWithInvalidPEM {
-  NSString *badPEM = @"This is not a valid PEM";
-  MOLCertificate *sut = [[MOLCertificate alloc] initWithCertificateDataPEM:badPEM];
+  NSString* badPEM = @"This is not a valid PEM";
+  MOLCertificate* sut = [[MOLCertificate alloc] initWithCertificateDataPEM:badPEM];
   XCTAssertNil(sut);
 
   badPEM = @"-----BEGIN CERTIFICATE-----Hello Thar-----END CERTIFICATE-----";
@@ -176,17 +176,17 @@
 }
 
 - (void)testInitWithMultipleCertsInPEM {
-  NSString *multiPEM = [self.testDataPEM1 stringByAppendingString:self.testDataPEM2];
+  NSString* multiPEM = [self.testDataPEM1 stringByAppendingString:self.testDataPEM2];
 
-  MOLCertificate *sut = [[MOLCertificate alloc] initWithCertificateDataPEM:multiPEM];
+  MOLCertificate* sut = [[MOLCertificate alloc] initWithCertificateDataPEM:multiPEM];
   XCTAssertNotNil(sut);
   XCTAssertEqualObjects(sut.commonName, @"Google Internet Authority G2");
 }
 
 - (void)testArrayOfCerts {
-  NSString *multiPEM = [self.testDataPEM1 stringByAppendingString:self.testDataPEM2];
+  NSString* multiPEM = [self.testDataPEM1 stringByAppendingString:self.testDataPEM2];
 
-  NSArray *certs = [MOLCertificate certificatesFromPEM:multiPEM];
+  NSArray* certs = [MOLCertificate certificatesFromPEM:multiPEM];
 
   XCTAssertNotNil(certs);
   XCTAssertEqual(certs.count, 2);
@@ -199,14 +199,14 @@
 }
 
 - (void)testEquals {
-  MOLCertificate *sut1 = [[MOLCertificate alloc] initWithCertificateDataPEM:self.testDataPEM1];
-  MOLCertificate *sut2 = [[MOLCertificate alloc] initWithCertificateDataPEM:self.testDataPEM1];
+  MOLCertificate* sut1 = [[MOLCertificate alloc] initWithCertificateDataPEM:self.testDataPEM1];
+  MOLCertificate* sut2 = [[MOLCertificate alloc] initWithCertificateDataPEM:self.testDataPEM1];
 
   XCTAssertEqualObjects(sut1, sut2);
 }
 
 - (void)testDescription {
-  MOLCertificate *sut = [[MOLCertificate alloc] initWithCertificateDataPEM:self.testDataPEM1];
+  MOLCertificate* sut = [[MOLCertificate alloc] initWithCertificateDataPEM:self.testDataPEM1];
 
   XCTAssertEqualObjects([sut description],
                         @"/O=Google Inc/OU=(null)/CN=Google Internet Authority G2/"
@@ -216,14 +216,14 @@
 - (void)testSecureCoding {
   XCTAssertTrue([MOLCertificate supportsSecureCoding]);
 
-  MOLCertificate *sut = [[MOLCertificate alloc] initWithCertificateDataPEM:self.testDataPEM1];
+  MOLCertificate* sut = [[MOLCertificate alloc] initWithCertificateDataPEM:self.testDataPEM1];
 
-  NSMutableData *encodedObject = [[NSMutableData alloc] init];
-  NSKeyedArchiver *archive = [[NSKeyedArchiver alloc] initForWritingWithMutableData:encodedObject];
+  NSMutableData* encodedObject = [[NSMutableData alloc] init];
+  NSKeyedArchiver* archive = [[NSKeyedArchiver alloc] initForWritingWithMutableData:encodedObject];
   [archive encodeObject:sut forKey:@"exampleCert"];
   [archive finishEncoding];
-  NSKeyedUnarchiver *unarchive = [[NSKeyedUnarchiver alloc] initForReadingWithData:encodedObject];
-  MOLCertificate *newCert = [unarchive decodeObjectForKey:@"exampleCert"];
+  NSKeyedUnarchiver* unarchive = [[NSKeyedUnarchiver alloc] initForReadingWithData:encodedObject];
+  MOLCertificate* newCert = [unarchive decodeObjectForKey:@"exampleCert"];
 
   XCTAssertNotNil(newCert);
   XCTAssertEqualObjects(newCert, sut);

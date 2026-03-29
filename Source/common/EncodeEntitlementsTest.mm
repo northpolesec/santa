@@ -50,7 +50,7 @@ using santa::StandardizedNestedObjects;
 }
 
 - (void)testStandardizedNestedObjectsLevels {
-  NSArray *nestedObj = @[
+  NSArray* nestedObj = @[
     @[
       @[
         @[ @"111", @"112" ],
@@ -75,7 +75,7 @@ using santa::StandardizedNestedObjects;
 
   id val = StandardizedNestedObjects(nestedObj, 1);
 
-  XCTAssertEqual(((NSArray *)val).count, 2);
+  XCTAssertEqual(((NSArray*)val).count, 2);
   XCTAssertEqualObjects(
       val[0], @"(\n        (\n                (\n            111,\n            112\n        ),\n   "
               @"             (\n            113,\n            114\n        )\n    ),\n        (\n  "
@@ -89,11 +89,11 @@ using santa::StandardizedNestedObjects;
 
   val = StandardizedNestedObjects(nestedObj, 3);
 
-  XCTAssertEqual(((NSArray *)val).count, 2);
-  XCTAssertEqual(((NSArray *)val[0]).count, 2);
-  XCTAssertEqual(((NSArray *)val[1]).count, 2);
-  XCTAssertEqual(((NSArray *)val[0][0]).count, 2);
-  XCTAssertEqual(((NSArray *)val[0][1]).count, 2);
+  XCTAssertEqual(((NSArray*)val).count, 2);
+  XCTAssertEqual(((NSArray*)val[0]).count, 2);
+  XCTAssertEqual(((NSArray*)val[1]).count, 2);
+  XCTAssertEqual(((NSArray*)val[0][0]).count, 2);
+  XCTAssertEqual(((NSArray*)val[0][1]).count, 2);
   XCTAssertEqualObjects(val[0][0][0], @"(\n    111,\n    112\n)");
   XCTAssertEqualObjects(val[0][0][1], @"(\n    113,\n    114\n)");
   XCTAssertEqualObjects(val[0][1][0], @"(\n    121,\n    122\n)");
@@ -105,7 +105,7 @@ using santa::StandardizedNestedObjects;
 }
 
 - (void)testEncodeEntitlementsCommonBasic {
-  NSDictionary *entitlements = @{
+  NSDictionary* entitlements = @{
     @"ent1" : @"val1",
     @"ent2" : @"val2",
   };
@@ -116,7 +116,7 @@ using santa::StandardizedNestedObjects;
         XCTAssertEqual(count, entitlements.count);
         XCTAssertFalse(is_filtered);
       },
-      ^(NSString *entitlement, NSString *value) {
+      ^(NSString* entitlement, NSString* value) {
         if ([entitlement isEqualToString:@"ent1"]) {
           XCTAssertEqualObjects(value, @"\"val1\"");
         } else if ([entitlement isEqualToString:@"ent2"]) {
@@ -128,14 +128,14 @@ using santa::StandardizedNestedObjects;
 }
 
 - (void)testEncodeEntitlementsCommonFiltered {
-  NSMutableDictionary *entitlements = [NSMutableDictionary dictionary];
+  NSMutableDictionary* entitlements = [NSMutableDictionary dictionary];
 
   EncodeEntitlementsCommon(entitlements, true,
                            ^(NSUInteger count, bool is_filtered) {
                              XCTAssertEqual(count, entitlements.count);
                              XCTAssertTrue(is_filtered);
                            },
-                           ^(NSString *entitlement, NSString *value){
+                           ^(NSString* entitlement, NSString* value){
                                // noop
                            });
 
@@ -149,7 +149,7 @@ using santa::StandardizedNestedObjects;
                              XCTAssertLessThan(count, entitlements.count);
                              XCTAssertTrue(is_filtered);
                            },
-                           ^(NSString *entitlement, NSString *value){
+                           ^(NSString* entitlement, NSString* value){
                                // noop
                            });
 }

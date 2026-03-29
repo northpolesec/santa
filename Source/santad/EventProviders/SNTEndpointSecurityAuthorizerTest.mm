@@ -45,15 +45,15 @@ class MockAuthResultCache : public AuthResultCache {
   using AuthResultCache::AuthResultCache;
 
   MOCK_METHOD(bool, AddToCache,
-              (const es_file_t *es_file, SNTAction decision, SNTCachedDecision *cd));
-  MOCK_METHOD(santa::CachedAuthResult, CheckCache, (const es_file_t *es_file));
+              (const es_file_t* es_file, SNTAction decision, SNTCachedDecision* cd));
+  MOCK_METHOD(santa::CachedAuthResult, CheckCache, (const es_file_t* es_file));
 };
 
 @interface SNTEndpointSecurityAuthorizer (Testing)
 - (void)processMessage:(Message)msg;
 - (bool)postAction:(SNTAction)action
-        forMessage:(const Message &)esMsg
-      withDecision:(SNTCachedDecision *)cd;
+        forMessage:(const Message&)esMsg
+      withDecision:(SNTCachedDecision*)cd;
 @end
 
 // This test fake exists due to limitations with OCMPartialMock. The partial mock object
@@ -66,9 +66,9 @@ class MockAuthResultCache : public AuthResultCache {
 @property dispatch_semaphore_t sema;
 
 - (instancetype)initWithSema:(dispatch_semaphore_t)sema;
-- (void)validateExecEvent:(const santa::Message &)esMsg
-           cachedDecision:(SNTCachedDecision *)existingDecision
-               postAction:(bool (^)(SNTAction, SNTCachedDecision *))postAction;
+- (void)validateExecEvent:(const santa::Message&)esMsg
+           cachedDecision:(SNTCachedDecision*)existingDecision
+               postAction:(bool (^)(SNTAction, SNTCachedDecision*))postAction;
 @end
 
 @implementation FakeExecutionController
@@ -79,9 +79,9 @@ class MockAuthResultCache : public AuthResultCache {
   }
   return self;
 }
-- (void)validateExecEvent:(const santa::Message &)esMsg
-           cachedDecision:(SNTCachedDecision *)existingDecision
-               postAction:(bool (^)(SNTAction, SNTCachedDecision *))postAction {
+- (void)validateExecEvent:(const santa::Message&)esMsg
+           cachedDecision:(SNTCachedDecision*)existingDecision
+               postAction:(bool (^)(SNTAction, SNTCachedDecision*))postAction {
   dispatch_semaphore_signal(self.sema);
 }
 @end
@@ -118,7 +118,7 @@ class MockAuthResultCache : public AuthResultCache {
 
   [authClient enable];
 
-  for (const auto &event : expectedEventSubs) {
+  for (const auto& event : expectedEventSubs) {
     XCTAssertNoThrow(santa::EventTypeToString(event));
   }
 
@@ -154,7 +154,7 @@ class MockAuthResultCache : public AuthResultCache {
     // mock object will think that it has been leaked.
     ::testing::Mock::AllowLeak(mockESApi.get());
 
-    SNTEndpointSecurityAuthorizer *authClient =
+    SNTEndpointSecurityAuthorizer* authClient =
         [[SNTEndpointSecurityAuthorizer alloc] initWithESAPI:mockESApi
                                                      metrics:nullptr
                                               execController:self.mockExecController
@@ -179,7 +179,7 @@ class MockAuthResultCache : public AuthResultCache {
     mockESApi->SetExpectationsRetainReleaseMessage();
     ::testing::Mock::AllowLeak(mockESApi.get());
 
-    SNTEndpointSecurityAuthorizer *authClient =
+    SNTEndpointSecurityAuthorizer* authClient =
         [[SNTEndpointSecurityAuthorizer alloc] initWithESAPI:mockESApi
                                                      metrics:nullptr
                                               execController:self.mockExecController
@@ -229,7 +229,7 @@ class MockAuthResultCache : public AuthResultCache {
     mockESApi->SetExpectationsRetainReleaseMessage();
     ::testing::Mock::AllowLeak(mockESApi.get());
 
-    SNTEndpointSecurityAuthorizer *authClient =
+    SNTEndpointSecurityAuthorizer* authClient =
         [[SNTEndpointSecurityAuthorizer alloc] initWithESAPI:mockESApi
                                                      metrics:nullptr
                                               execController:self.mockExecController
@@ -247,7 +247,7 @@ class MockAuthResultCache : public AuthResultCache {
 
       OCMExpect([mockAuthClient processMessage:Message(mockESApi, &esMsg) handler:OCMOCK_ANY])
           .ignoringNonObjectArgs()
-          .andDo(^(NSInvocation *invocation) {
+          .andDo(^(NSInvocation* invocation) {
             dispatch_semaphore_signal(semaMetrics);
           });
 
@@ -280,7 +280,7 @@ class MockAuthResultCache : public AuthResultCache {
   mockESApi->SetExpectationsRetainReleaseMessage();
 
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-  FakeExecutionController *fakeExecController = [[FakeExecutionController alloc] initWithSema:sema];
+  FakeExecutionController* fakeExecController = [[FakeExecutionController alloc] initWithSema:sema];
 
   auto mockAuthCache = std::make_shared<MockAuthResultCache>(nullptr, nil);
   EXPECT_CALL(*mockAuthCache, CheckCache)
@@ -295,10 +295,10 @@ class MockAuthResultCache : public AuthResultCache {
   id mockCompilerController = OCMStrictClassMock([SNTCompilerController class]);
   OCMExpect([mockCompilerController setProcess:execProc.audit_token isCompiler:true]);
 
-  SNTEndpointSecurityAuthorizer *authClient = [[SNTEndpointSecurityAuthorizer alloc]
+  SNTEndpointSecurityAuthorizer* authClient = [[SNTEndpointSecurityAuthorizer alloc]
            initWithESAPI:mockESApi
                  metrics:nullptr
-          execController:(SNTExecutionController *)fakeExecController
+          execController:(SNTExecutionController*)fakeExecController
       compilerController:mockCompilerController
          authResultCache:mockAuthCache
                ttyWriter:santa::TTYWriter::Create(true)];
@@ -379,7 +379,7 @@ class MockAuthResultCache : public AuthResultCache {
   id mockCompilerController = OCMStrictClassMock([SNTCompilerController class]);
   OCMExpect([mockCompilerController setProcess:execProc.audit_token isCompiler:true]);
 
-  SNTEndpointSecurityAuthorizer *authClient =
+  SNTEndpointSecurityAuthorizer* authClient =
       [[SNTEndpointSecurityAuthorizer alloc] initWithESAPI:mockESApi
                                                    metrics:nullptr
                                             execController:nil
@@ -407,12 +407,12 @@ class MockAuthResultCache : public AuthResultCache {
                               withAuthResult:(es_auth_result_t)0
                                    cacheable:false])
         .ignoringNonObjectArgs()
-        .andDo(^(NSInvocation *inv) {
+        .andDo(^(NSInvocation* inv) {
           [inv getArgument:&gotAuthResult atIndex:3];
           [inv getArgument:&gotCachable atIndex:4];
         });
 
-    for (const auto &kv : actions) {
+    for (const auto& kv : actions) {
       [mockAuthClient postAction:kv.first forMessage:msg withDecision:nil];
 
       XCTAssertEqual(gotAuthResult, kv.second);

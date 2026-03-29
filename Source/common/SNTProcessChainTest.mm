@@ -29,7 +29,7 @@
 }
 
 - (void)testEncodeDecodeBasicProperties {
-  SNTProcessChain *chain = [[SNTProcessChain alloc] init];
+  SNTProcessChain* chain = [[SNTProcessChain alloc] init];
   chain.filePath = @"/usr/bin/mount_smbfs";
   chain.fileSHA256 = @"abc123def456";
   chain.cdhash = @"deadbeef";
@@ -41,15 +41,15 @@
   chain.executingUserID = @(501);
 
   // Archive the chain
-  NSData *archivedChain = [NSKeyedArchiver archivedDataWithRootObject:chain
+  NSData* archivedChain = [NSKeyedArchiver archivedDataWithRootObject:chain
                                                 requiringSecureCoding:YES
                                                                 error:nil];
 
   XCTAssertNotNil(archivedChain);
 
   // Unarchive the chain
-  NSSet *allowedClasses = [NSSet setWithObjects:[SNTProcessChain class], nil];
-  SNTProcessChain *decodedChain = [NSKeyedUnarchiver unarchivedObjectOfClasses:allowedClasses
+  NSSet* allowedClasses = [NSSet setWithObjects:[SNTProcessChain class], nil];
+  SNTProcessChain* decodedChain = [NSKeyedUnarchiver unarchivedObjectOfClasses:allowedClasses
                                                                       fromData:archivedChain
                                                                          error:nil];
 
@@ -68,7 +68,7 @@
 
 - (void)testEncodeDecodeWithParent {
   // Create child process
-  SNTProcessChain *child = [[SNTProcessChain alloc] init];
+  SNTProcessChain* child = [[SNTProcessChain alloc] init];
   child.filePath = @"/usr/bin/mount";
   child.pid = @(100);
   child.executingUser = @"user1";
@@ -81,15 +81,15 @@
   child.parent.fileSHA256 = @"parent_sha256";
 
   // Archive
-  NSData *archivedChain = [NSKeyedArchiver archivedDataWithRootObject:child
+  NSData* archivedChain = [NSKeyedArchiver archivedDataWithRootObject:child
                                                 requiringSecureCoding:YES
                                                                 error:nil];
 
   XCTAssertNotNil(archivedChain);
 
   // Unarchive
-  NSSet *allowedClasses = [NSSet setWithObjects:[SNTProcessChain class], nil];
-  SNTProcessChain *decodedChain = [NSKeyedUnarchiver unarchivedObjectOfClasses:allowedClasses
+  NSSet* allowedClasses = [NSSet setWithObjects:[SNTProcessChain class], nil];
+  SNTProcessChain* decodedChain = [NSKeyedUnarchiver unarchivedObjectOfClasses:allowedClasses
                                                                       fromData:archivedChain
                                                                          error:nil];
 
@@ -108,7 +108,7 @@
 
 - (void)testEncodeDecodeWithMultipleGenerations {
   // Create grandchild process
-  SNTProcessChain *grandchild = [[SNTProcessChain alloc] init];
+  SNTProcessChain* grandchild = [[SNTProcessChain alloc] init];
   grandchild.filePath = @"/usr/bin/curl";
   grandchild.pid = @(300);
 
@@ -123,15 +123,15 @@
   grandchild.parent.parent.pid = @(100);
 
   // Archive
-  NSData *archivedChain = [NSKeyedArchiver archivedDataWithRootObject:grandchild
+  NSData* archivedChain = [NSKeyedArchiver archivedDataWithRootObject:grandchild
                                                 requiringSecureCoding:YES
                                                                 error:nil];
 
   XCTAssertNotNil(archivedChain);
 
   // Unarchive
-  NSSet *allowedClasses = [NSSet setWithObjects:[SNTProcessChain class], nil];
-  SNTProcessChain *decodedChain = [NSKeyedUnarchiver unarchivedObjectOfClasses:allowedClasses
+  NSSet* allowedClasses = [NSSet setWithObjects:[SNTProcessChain class], nil];
+  SNTProcessChain* decodedChain = [NSKeyedUnarchiver unarchivedObjectOfClasses:allowedClasses
                                                                       fromData:archivedChain
                                                                          error:nil];
 
@@ -153,19 +153,19 @@
 }
 
 - (void)testEncodeDecodeWithNilValues {
-  SNTProcessChain *chain = [[SNTProcessChain alloc] init];
+  SNTProcessChain* chain = [[SNTProcessChain alloc] init];
   chain.filePath = @"/usr/bin/test";
   chain.pid = @(999);
   // Leave all other properties as nil
 
-  NSData *archivedChain = [NSKeyedArchiver archivedDataWithRootObject:chain
+  NSData* archivedChain = [NSKeyedArchiver archivedDataWithRootObject:chain
                                                 requiringSecureCoding:YES
                                                                 error:nil];
 
   XCTAssertNotNil(archivedChain);
 
-  NSSet *allowedClasses = [NSSet setWithObjects:[SNTProcessChain class], nil];
-  SNTProcessChain *decodedChain = [NSKeyedUnarchiver unarchivedObjectOfClasses:allowedClasses
+  NSSet* allowedClasses = [NSSet setWithObjects:[SNTProcessChain class], nil];
+  SNTProcessChain* decodedChain = [NSKeyedUnarchiver unarchivedObjectOfClasses:allowedClasses
                                                                       fromData:archivedChain
                                                                          error:nil];
 

@@ -29,23 +29,23 @@ void print_usage() {
   printf("Usage: santactl:\n%s\n", [[SNTCommandController usage] UTF8String]);
 }
 
-void print_unknown_command(NSString *commandName) {
+void print_unknown_command(NSString* commandName) {
   printf("Unknown command: %s\n", [commandName UTF8String]);
 }
 
-void print_string(NSString *string) {
+void print_string(NSString* string) {
   printf("%s\n", [string UTF8String]);
 }
 
-int main(int argc, const char *argv[]) {
+int main(int argc, const char* argv[]) {
   // Do not buffer stdout
   setbuf(stdout, NULL);
 
   @autoreleasepool {
-    NSMutableArray *arguments = [[[NSProcessInfo processInfo] arguments] mutableCopy];
+    NSMutableArray* arguments = [[[NSProcessInfo processInfo] arguments] mutableCopy];
     [arguments removeObjectAtIndex:0];
 
-    NSString *commandName = [SNTCommandController resolveCommandName:[arguments firstObject]];
+    NSString* commandName = [SNTCommandController resolveCommandName:[arguments firstObject]];
     if (!commandName || [commandName isEqualToString:@"usage"] ||
         [commandName isEqualToString:@"commands"]) {
       print_usage();

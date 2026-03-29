@@ -62,16 +62,16 @@ class Activation : public ::google::api::expr::runtime::BaseActivation {
   ~Activation() = default;
 
   std::optional<::google::api::expr::runtime::CelValue> FindValue(
-      absl::string_view name, google::protobuf::Arena *arena) const override;
+      absl::string_view name, google::protobuf::Arena* arena) const override;
 
   // Activation does not support lazy-loaded functions.
-  std::vector<const ::google::api::expr::runtime::CelFunction *> FindFunctionOverloads(
+  std::vector<const ::google::api::expr::runtime::CelFunction*> FindFunctionOverloads(
       absl::string_view) const override {
     return {};
   }
 
   static std::vector<std::pair<absl::string_view, ::cel::Type>> GetVariables(
-      google::protobuf::Arena *arena);
+      google::protobuf::Arena* arena);
 
   template <bool V2>
   friend class Evaluator;
@@ -89,17 +89,17 @@ class Activation : public ::google::api::expr::runtime::BaseActivation {
   bool IsResultCacheable() const;
 
   static ::cel::Type CELType(google::protobuf::FieldDescriptor::CppType type,
-                             const google::protobuf::Descriptor *messageType);
+                             const google::protobuf::Descriptor* messageType);
 
   template <typename T>
-  static ::google::api::expr::runtime::CelValue CELValue(const T &v,
-                                                         google::protobuf::Arena *arena);
+  static ::google::api::expr::runtime::CelValue CELValue(const T& v,
+                                                         google::protobuf::Arena* arena);
   template <typename T>
-  static ::google::api::expr::runtime::CelValue CELValue(const std::vector<T> &v,
-                                                         google::protobuf::Arena *arena);
+  static ::google::api::expr::runtime::CelValue CELValue(const std::vector<T>& v,
+                                                         google::protobuf::Arena* arena);
   template <typename K, typename V>
-  static ::google::api::expr::runtime::CelValue CELValue(const std::map<K, V> &v,
-                                                         google::protobuf::Arena *arena);
+  static ::google::api::expr::runtime::CelValue CELValue(const std::map<K, V>& v,
+                                                         google::protobuf::Arena* arena);
 };
 
 }  // namespace cel

@@ -17,8 +17,8 @@
 
 @implementation SNTXPCMetricServiceInterface
 
-+ (NSXPCInterface *)metricServiceInterface {
-  NSXPCInterface *r = [NSXPCInterface interfaceWithProtocol:@protocol(SNTMetricServiceXPC)];
++ (NSXPCInterface*)metricServiceInterface {
+  NSXPCInterface* r = [NSXPCInterface interfaceWithProtocol:@protocol(SNTMetricServiceXPC)];
 
   [r setClasses:[NSSet setWithObjects:[NSDictionary class], [NSArray class], [NSNumber class],
                                       [NSString class], [NSDate class], nil]
@@ -29,12 +29,12 @@
   return r;
 }
 
-+ (NSString *)serviceID {
++ (NSString*)serviceID {
   return @"com.northpolesec.santa.metricservice";
 }
 
-+ (MOLXPCConnection *)configuredConnection {
-  MOLXPCConnection *c = [[MOLXPCConnection alloc] initClientWithName:[self serviceID]
++ (MOLXPCConnection*)configuredConnection {
+  MOLXPCConnection* c = [[MOLXPCConnection alloc] initClientWithName:[self serviceID]
                                                           privileged:NO];
   c.remoteInterface = [self metricServiceInterface];
   return c;

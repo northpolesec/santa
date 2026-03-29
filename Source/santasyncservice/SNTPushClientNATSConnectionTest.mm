@@ -28,19 +28,19 @@ __END_DECLS
 
 // Expose private methods and properties for testing
 @interface SNTPushClientNATS (ConnectionTesting)
-@property(nonatomic) natsConnection *conn;
-@property(nonatomic, copy) NSString *pushServer;
-@property(nonatomic, copy) NSString *pushToken;
-@property(nonatomic, copy) NSString *jwt;
-@property(nonatomic, copy) NSArray<NSString *> *tags;
+@property(nonatomic) natsConnection* conn;
+@property(nonatomic, copy) NSString* pushServer;
+@property(nonatomic, copy) NSString* pushToken;
+@property(nonatomic, copy) NSString* jwt;
+@property(nonatomic, copy) NSArray<NSString*>* tags;
 @property(nonatomic, readwrite) BOOL isConnected;
 - (void)connect;
 - (void)disconnectWithCompletion:(void (^)(void))completion;
-- (void)configureWithPushServer:(NSString *)server
-                      pushToken:(NSString *)token
-                            jwt:(NSString *)jwt
-                   pushDeviceID:(NSString *)deviceID
-                           tags:(NSArray<NSString *> *)tags;
+- (void)configureWithPushServer:(NSString*)server
+                      pushToken:(NSString*)token
+                            jwt:(NSString*)jwt
+                   pushDeviceID:(NSString*)deviceID
+                           tags:(NSArray<NSString*>*)tags;
 @end
 
 /// This test focuses on the NATS connection logic independent of preflight
@@ -48,7 +48,7 @@ __END_DECLS
 @interface SNTPushClientNATSConnectionTest : XCTestCase
 @property id mockConfigurator;
 @property id mockSyncDelegate;
-@property SNTPushClientNATS *client;
+@property SNTPushClientNATS* client;
 @end
 
 @implementation SNTPushClientNATSConnectionTest
@@ -66,7 +66,7 @@ __END_DECLS
   OCMStub([self.mockConfigurator configurator]).andReturn(self.mockConfigurator);
 
   // Set up machine ID to match our test user credentials (hexadecimal only)
-  NSString *machineID = @"ABCDEF123456789";
+  NSString* machineID = @"ABCDEF123456789";
   OCMStub([self.mockConfigurator machineID]).andReturn(machineID);
 
   self.mockSyncDelegate = OCMProtocolMock(@protocol(SNTPushNotificationsSyncDelegate));
@@ -75,7 +75,7 @@ __END_DECLS
 - (void)tearDown {
   if (self.client) {
     // Use expectation to wait for disconnect completion
-    XCTestExpectation *disconnectExpectation =
+    XCTestExpectation* disconnectExpectation =
         [self expectationWithDescription:@"Client disconnect"];
     [self.client disconnectWithCompletion:^{
       [disconnectExpectation fulfill];

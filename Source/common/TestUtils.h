@@ -74,7 +74,7 @@
 void SleepMS(long ms);
 
 // Helper to construct strings of a given length
-NSString *RepeatedString(NSString *str, NSUInteger len);
+NSString* RepeatedString(NSString* str, NSUInteger len);
 
 //
 // Helpers to construct various ES structs
@@ -93,10 +93,10 @@ audit_token_t MakeAuditToken(pid_t pid, pid_t pidver);
 ///   values across the members.
 struct stat MakeStat(int offset = 0);
 
-es_string_token_t MakeESStringToken(const char *s);
-es_file_t MakeESFile(const char *path, struct stat sb = MakeStat());
-es_process_t MakeESProcess(es_file_t *file, audit_token_t tok = {}, audit_token_t parent_tok = {});
-es_message_t MakeESMessage(es_event_type_t et, es_process_t *proc,
+es_string_token_t MakeESStringToken(const char* s);
+es_file_t MakeESFile(const char* path, struct stat sb = MakeStat());
+es_process_t MakeESProcess(es_file_t* file, audit_token_t tok = {}, audit_token_t parent_tok = {});
+es_message_t MakeESMessage(es_event_type_t et, es_process_t* proc,
                            ActionType action_type = ActionType::Notify,
                            uint64_t future_deadline_ms = 100000);
 

@@ -45,11 +45,11 @@
   [self.window center];
 }
 
-- (void)windowWillClose:(NSNotification *)notification {
+- (void)windowWillClose:(NSNotification*)notification {
   self.hasBeenCentered = NO;
 }
 
-- (void)windowDidResize:(NSNotification *)notification {
+- (void)windowDidResize:(NSNotification*)notification {
   if (!self.hasBeenCentered) {
     [self.window center];
     self.hasBeenCentered = YES;

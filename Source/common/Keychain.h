@@ -27,9 +27,9 @@ namespace santa {
 namespace keychain {
 
 // Validation helpers with semi-arbitrary length checks.
-bool IsValidServiceName(NSString *service);
-bool IsValidAccountName(NSString *account);
-bool IsValidDescription(NSString *description);
+bool IsValidServiceName(NSString* service);
+bool IsValidAccountName(NSString* account);
+bool IsValidDescription(NSString* description);
 
 absl::Status SecurityOSStatusToAbslStatus(OSStatus status);
 
@@ -37,38 +37,38 @@ class Item;
 
 class Manager {
  public:
-  static std::unique_ptr<Manager> Create(NSString *service, SecPreferencesDomain domain);
-  Manager(NSString *service, SecKeychainRef keychain_ref);
+  static std::unique_ptr<Manager> Create(NSString* service, SecPreferencesDomain domain);
+  Manager(NSString* service, SecKeychainRef keychain_ref);
   ~Manager();
 
-  Manager(Manager &&other);
-  Manager &operator=(Manager &&other);
+  Manager(Manager&& other);
+  Manager& operator=(Manager&& other);
 
   // Could be safe to implement, but not currently needed
-  Manager(Manager &other) = delete;
-  Manager &operator=(Manager &other) = delete;
+  Manager(Manager& other) = delete;
+  Manager& operator=(Manager& other) = delete;
 
-  std::unique_ptr<Item> CreateItem(NSString *account, NSString *description);
+  std::unique_ptr<Item> CreateItem(NSString* account, NSString* description);
 
  private:
-  NSString *service_;
+  NSString* service_;
   SecKeychainRef keychain_;
 };
 
 class Item {
  public:
   // Note: The given keychain is retained
-  Item(NSString *service, NSString *account, NSString *description, SecKeychainRef keychain);
+  Item(NSString* service, NSString* account, NSString* description, SecKeychainRef keychain);
   ~Item();
 
-  absl::Status Store(NSData *data);
+  absl::Status Store(NSData* data);
   absl::Status Delete();
-  absl::StatusOr<NSData *> Get();
+  absl::StatusOr<NSData*> Get();
 
  private:
-  NSString *service_;
-  NSString *account_;
-  NSString *description_;
+  NSString* service_;
+  NSString* account_;
+  NSString* description_;
   SecKeychainRef keychain_;
 };
 

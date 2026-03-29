@@ -28,20 +28,20 @@
 
 @interface SNTSyncdQueue ()
 @property dispatch_queue_t syncdQueue;
-@property MOLXPCConnection *syncConnection;
+@property MOLXPCConnection* syncConnection;
 @property dispatch_source_t timer;
-@property NSURL *previousSyncBaseURL;
+@property NSURL* previousSyncBaseURL;
 @end
 
 @implementation SNTSyncdQueue {
   // TODO(https://github.com/northpolesec/santa/issues/344): Eventually replace with an LRU.
-  std::unique_ptr<SantaCache<std::string, NSDate *>> _uploadBackoff;
+  std::unique_ptr<SantaCache<std::string, NSDate*>> _uploadBackoff;
 }
 
 - (instancetype)initWithCacheSize:(uint64_t)cacheSize {
   self = [super init];
   if (self) {
-    _uploadBackoff = std::make_unique<SantaCache<std::string, NSDate *>>(cacheSize);
+    _uploadBackoff = std::make_unique<SantaCache<std::string, NSDate*>>(cacheSize);
     _syncdQueue = dispatch_queue_create("com.northpolesec.syncd_queue",
                                         DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL);
   }
@@ -78,9 +78,9 @@
     // WEAKIFY(self);
     dispatch_source_set_event_handler(self.timer, ^{
       STRONGIFY(self);
-      SNTConfigurator *configurator = [SNTConfigurator configurator];
+      SNTConfigurator* configurator = [SNTConfigurator configurator];
 
-      NSURL *newSyncBaseURL = [configurator syncBaseURL];
+      NSURL* newSyncBaseURL = [configurator syncBaseURL];
       BOOL statsCollectionEnabled = [configurator enableStatsCollection];
       BOOL telemetryExportEnabled = [configurator enableTelemetryExport];
 
@@ -135,7 +135,7 @@
 }
 
 - (void)establishSyncServiceConnectionSerialized {
-  MOLXPCConnection *ss = [SNTXPCSyncServiceInterface configuredConnection];
+  MOLXPCConnection* ss = [SNTXPCSyncServiceInterface configuredConnection];
 
   WEAKIFY(self);
   ss.invalidationHandler = ^(void) {
@@ -153,23 +153,22 @@
   [[self.syncConnection remoteObjectProxy] spindown];
 }
 
-- (void)addStoredEvent:(SNTStoredEvent *)event {
+- (void)addStoredEvent:(SNTStoredEvent*)event {
   if (!event) {
     return;
   }
   [self addEvents:@[ event ] withBackoffHashKey:[event uniqueID]];
 }
 
-- (void)addBundleEvents:(NSArray<SNTStoredExecutionEvent *> *)events
-         withBundleHash:(NSString *)bundleHash {
+- (void)addBundleEvents:(NSArray<SNTStoredExecutionEvent*>*)events
+         withBundleHash:(NSString*)bundleHash {
   if (!events.count) {
     return;
   }
   [self addEvents:events withBackoffHashKey:bundleHash];
 }
 
-- (void)addEvents:(NSArray<SNTStoredEvent *> *)events
-    withBackoffHashKey:(NSString *)backoffHashKey {
+- (void)addEvents:(NSArray<SNTStoredEvent*>*)events withBackoffHashKey:(NSString*)backoffHashKey {
   if (!events.count || [self backoffForPrimaryHash:backoffHashKey]) {
     return;
   }
@@ -185,8 +184,7 @@
   }];
 }
 
-- (void)addBundleEvent:(SNTStoredExecutionEvent *)event
-                 reply:(void (^)(SNTBundleEventAction))reply {
+- (void)addBundleEvent:(SNTStoredExecutionEvent*)event reply:(void (^)(SNTBundleEventAction))reply {
   if ([self backoffForPrimaryHash:event.fileBundleHash]) return;
   [self dispatchBlockOnSyncdQueue:^{
     [self.syncConnection.remoteObjectProxy
@@ -214,9 +212,9 @@
 // The event upload is skipped if an event has been initiated for it in the last 10 minutes.
 // The passed-in hash is fileBundleHash for a bundle event, or fileSHA256 for a normal event.
 // Returns YES if backoff is needed, NO otherwise.
-- (BOOL)backoffForPrimaryHash:(NSString *)hash {
-  NSDate *backoff = _uploadBackoff->get(santa::NSStringToUTF8String(hash));
-  NSDate *now = [NSDate date];
+- (BOOL)backoffForPrimaryHash:(NSString*)hash {
+  NSDate* backoff = _uploadBackoff->get(santa::NSStringToUTF8String(hash));
+  NSDate* now = [NSDate date];
   if (([now timeIntervalSince1970] - [backoff timeIntervalSince1970]) < 600) return YES;
   _uploadBackoff->set(santa::NSStringToUTF8String(hash), now);
   return NO;

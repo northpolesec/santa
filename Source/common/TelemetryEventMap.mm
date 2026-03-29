@@ -67,11 +67,11 @@ static inline TelemetryEvent EventNameToMask(std::string_view event) {
   }
 }
 
-TelemetryEvent TelemetryConfigToBitmask(NSArray<NSString *> *telemetry) {
+TelemetryEvent TelemetryConfigToBitmask(NSArray<NSString*>* telemetry) {
   TelemetryEvent mask = TelemetryEvent::kNone;
 
   if (telemetry) {
-    for (NSString *event_name in telemetry) {
+    for (NSString* event_name in telemetry) {
       mask |= EventNameToMask(santa::NSStringToUTF8StringView([event_name lowercaseString]));
     }
   } else {

@@ -29,8 +29,8 @@ NS_ASSUME_NONNULL_BEGIN
 // different struct managed by the CFRuntime.
 // https://opensource.apple.com/source/DiskArbitration/DiskArbitration-297.70.1/DiskArbitration/DADisk.c.auto.html
 @interface MockDADisk : NSObject
-@property(nonatomic) NSDictionary *diskDescription;
-@property(nonatomic, readwrite) NSString *name;
+@property(nonatomic) NSDictionary* diskDescription;
+@property(nonatomic, readwrite) NSString* name;
 @property(nonatomic) BOOL wasMounted;
 @property(nonatomic) BOOL wasUnmounted;
 @end
@@ -39,35 +39,35 @@ typedef void (^MockDADiskAppearedCallback)(DADiskRef ref);
 // Singleton mock fixture around all of the DiskArbitration framework functions
 @interface MockDiskArbitration : NSObject
 @property(nonatomic, readwrite, nonnull)
-    NSMutableDictionary<NSString *, MockDADisk *> *insertedDevices;
+    NSMutableDictionary<NSString*, MockDADisk*>* insertedDevices;
 @property(nonatomic, readwrite, nonnull)
-    NSMutableArray<MockDADiskAppearedCallback> *diskAppearedCallbacks;
+    NSMutableArray<MockDADiskAppearedCallback>* diskAppearedCallbacks;
 @property(nonatomic, nullable) dispatch_queue_t sessionQueue;
 
 - (instancetype _Nonnull)init;
 - (void)reset;
 
 // Also triggers DADiskRegisterDiskAppearedCallback
-- (void)insert:(MockDADisk *)ref;
+- (void)insert:(MockDADisk*)ref;
 
 // Retrieve an initialized singleton MockDiskArbitration object
 + (instancetype _Nonnull)mockDiskArbitration;
 @end
 
 @interface MockStatfs : NSObject
-@property NSString *fromName;
-@property NSString *onName;
-@property NSNumber *flags;
+@property NSString* fromName;
+@property NSString* onName;
+@property NSNumber* flags;
 
-- (instancetype _Nonnull)initFrom:(NSString *)from on:(NSString *)on flags:(NSNumber *)flags;
+- (instancetype _Nonnull)initFrom:(NSString*)from on:(NSString*)on flags:(NSNumber*)flags;
 @end
 
 @interface MockMounts : NSObject
-@property(nonatomic) NSMutableDictionary<NSString *, MockStatfs *> *mounts;
+@property(nonatomic) NSMutableDictionary<NSString*, MockStatfs*>* mounts;
 
 - (instancetype _Nonnull)init;
 - (void)reset;
-- (void)insert:(MockStatfs *)sfs;
+- (void)insert:(MockStatfs*)sfs;
 + (instancetype _Nonnull)mockMounts;
 @end
 
@@ -79,46 +79,48 @@ CF_EXTERN_C_BEGIN
 
 void DADiskMountWithArguments(DADiskRef _Nonnull disk, CFURLRef __nullable path,
                               DADiskMountOptions options, DADiskMountCallback __nullable callback,
-                              void *__nullable context,
+                              void* __nullable context,
                               CFStringRef __nullable arguments[_Nullable]);
 
 DADiskRef __nullable DADiskCreateFromBSDName(CFAllocatorRef __nullable allocator,
-                                             DASessionRef session, const char *name);
+                                             DASessionRef session, const char* name);
 
 CFDictionaryRef __nullable DADiskCopyDescription(DADiskRef disk);
 
 void DARegisterDiskAppearedCallback(DASessionRef session, CFDictionaryRef __nullable match,
-                                    DADiskAppearedCallback callback, void *__nullable context);
+                                    DADiskAppearedCallback callback, void* __nullable context);
 
 void DARegisterDiskDisappearedCallback(DASessionRef session, CFDictionaryRef __nullable match,
                                        DADiskDisappearedCallback callback,
-                                       void *__nullable context);
+                                       void* __nullable context);
 
 void DARegisterDiskDescriptionChangedCallback(DASessionRef session,
                                               CFDictionaryRef __nullable match,
                                               CFArrayRef __nullable watch,
                                               DADiskDescriptionChangedCallback callback,
-                                              void *__nullable context);
+                                              void* __nullable context);
 
 void DASessionSetDispatchQueue(DASessionRef session, dispatch_queue_t __nullable queue);
 DASessionRef __nullable DASessionCreate(CFAllocatorRef __nullable allocator);
 
 void DADiskUnmount(DADiskRef disk, DADiskUnmountOptions options,
-                   DADiskUnmountCallback __nullable callback, void *__nullable context);
+                   DADiskUnmountCallback __nullable callback, void* __nullable context);
 
-const char *__nullable DADiskGetBSDName(DADiskRef disk);
+const char* __nullable DADiskGetBSDName(DADiskRef disk);
 
 DADissenterRef __nullable DADissenterCreate(CFAllocatorRef __nullable allocator, DAReturn status,
                                             CFStringRef __nullable statusString);
 
 void DARegisterDiskMountApprovalCallback(DASessionRef session, CFDictionaryRef __nullable match,
                                          DADiskMountApprovalCallback callback,
-                                         void *__nullable context);
+                                         void* __nullable context);
 
 DAReturn DADissenterGetStatus(DADissenterRef dissenter);
 CFStringRef __nullable DADissenterGetStatusString(DADissenterRef dissenter);
 
-int getmntinfo_r_np(struct statfs *__nullable *__nullable mntbufp, int flags);
+// clang-format off
+int getmntinfo_r_np(struct statfs * __nullable * __nullable mntbufp, int flags);
+// clang-format on
 
 CF_EXTERN_C_END
 NS_ASSUME_NONNULL_END

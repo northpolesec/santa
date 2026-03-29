@@ -18,7 +18,7 @@
 
 @implementation SNTDeviceEvent
 
-- (instancetype)initWithOnName:(NSString *)mntonname fromName:(NSString *)mntfromname {
+- (instancetype)initWithOnName:(NSString*)mntonname fromName:(NSString*)mntfromname {
   self = [super init];
   if (self) {
     _mntonname = mntonname;
@@ -31,14 +31,14 @@
   return YES;
 }
 
-- (void)encodeWithCoder:(NSCoder *)coder {
+- (void)encodeWithCoder:(NSCoder*)coder {
   ENCODE(coder, mntonname);
   ENCODE(coder, mntfromname);
   ENCODE(coder, remountArgs);
   ENCODE_BOXABLE(coder, isEncrypted);
 }
 
-- (instancetype)initWithCoder:(NSCoder *)decoder {
+- (instancetype)initWithCoder:(NSCoder*)decoder {
   self = [super init];
   if (self) {
     DECODE(decoder, mntonname, NSString);
@@ -48,15 +48,15 @@
   }
   return self;
 }
-- (NSString *)description {
+- (NSString*)description {
   return [NSString stringWithFormat:@"SNTDeviceEvent '%@' -> '%@' (with permissions: [%@]",
                                     self.mntfromname, self.mntonname,
                                     [self.remountArgs componentsJoinedByString:@", "]];
 }
 
-- (NSString *)readableRemountArgs {
-  NSMutableArray<NSString *> *readable = [NSMutableArray array];
-  for (NSString *arg in self.remountArgs) {
+- (NSString*)readableRemountArgs {
+  NSMutableArray<NSString*>* readable = [NSMutableArray array];
+  for (NSString* arg in self.remountArgs) {
     if ([arg isEqualToString:@"rdonly"]) {
       [readable addObject:@"read-only"];
     } else if ([arg isEqualToString:@"noexec"]) {

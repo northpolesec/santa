@@ -85,7 +85,7 @@ void SetExpectationsForDataFileAccessAuthorizerInit(
 
   [fileAccessClient enable];
 
-  for (const auto &event : expectedEventSubs) {
+  for (const auto& event : expectedEventSubs) {
     XCTAssertNoThrow(santa::EventTypeToString(event));
   }
 
@@ -97,7 +97,7 @@ void SetExpectationsForDataFileAccessAuthorizerInit(
   mockESApi->SetExpectationsESNewClient();
   SetExpectationsForDataFileAccessAuthorizerInit(mockESApi);
 
-  SNTEndpointSecurityDataFileAccessAuthorizer *accessClient =
+  SNTEndpointSecurityDataFileAccessAuthorizer* accessClient =
       [[SNTEndpointSecurityDataFileAccessAuthorizer alloc] initWithESAPI:mockESApi
                                                                  metrics:nullptr
                                                                   logger:nullptr

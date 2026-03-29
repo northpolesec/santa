@@ -32,47 +32,47 @@ class EndpointSecurityAPI : public std::enable_shared_from_this<EndpointSecurity
  public:
   virtual ~EndpointSecurityAPI() = default;
 
-  virtual Client NewClient(void (^message_handler)(es_client_t *, Message));
+  virtual Client NewClient(void (^message_handler)(es_client_t*, Message));
 
-  virtual bool Subscribe(const Client &client, const std::set<es_event_type_t> &);
-  virtual bool UnsubscribeAll(const Client &client);
+  virtual bool Subscribe(const Client& client, const std::set<es_event_type_t>&);
+  virtual bool UnsubscribeAll(const Client& client);
 
-  virtual bool UnmuteAllPaths(const Client &client);
-  virtual bool UnmuteAllTargetPaths(const Client &client);
+  virtual bool UnmuteAllPaths(const Client& client);
+  virtual bool UnmuteAllTargetPaths(const Client& client);
 
-  virtual bool IsTargetPathMutingInverted(const Client &client);
-  virtual bool InvertTargetPathMuting(const Client &client);
+  virtual bool IsTargetPathMutingInverted(const Client& client);
+  virtual bool InvertTargetPathMuting(const Client& client);
 
-  virtual bool MuteTargetPath(const Client &client, std::string_view path,
+  virtual bool MuteTargetPath(const Client& client, std::string_view path,
                               santa::WatchItemPathType path_type);
-  virtual bool UnmuteTargetPath(const Client &client, std::string_view path,
+  virtual bool UnmuteTargetPath(const Client& client, std::string_view path,
                                 santa::WatchItemPathType path_type);
 
-  virtual bool IsProcessMutingInverted(const Client &client);
-  virtual bool InvertProcessMuting(const Client &client);
-  virtual bool MuteProcess(const Client &client, const audit_token_t *tok);
-  virtual bool UnmuteProcess(const Client &client, const audit_token_t *tok);
+  virtual bool IsProcessMutingInverted(const Client& client);
+  virtual bool InvertProcessMuting(const Client& client);
+  virtual bool MuteProcess(const Client& client, const audit_token_t* tok);
+  virtual bool UnmuteProcess(const Client& client, const audit_token_t* tok);
 
-  virtual void RetainMessage(const es_message_t *msg);
-  virtual void ReleaseMessage(const es_message_t *msg);
+  virtual void RetainMessage(const es_message_t* msg);
+  virtual void ReleaseMessage(const es_message_t* msg);
 
-  virtual bool RespondAuthResult(const Client &client, const Message &msg, es_auth_result_t result,
+  virtual bool RespondAuthResult(const Client& client, const Message& msg, es_auth_result_t result,
                                  bool cache);
-  virtual bool RespondFlagsResult(const Client &client, const Message &msg, uint32_t allowed_flags,
+  virtual bool RespondFlagsResult(const Client& client, const Message& msg, uint32_t allowed_flags,
                                   bool cache);
 
-  virtual bool ClearCache(const Client &client);
+  virtual bool ClearCache(const Client& client);
 
-  virtual uint32_t ExecArgCount(const es_event_exec_t *event);
-  virtual es_string_token_t ExecArg(const es_event_exec_t *event, uint32_t index);
-  virtual std::vector<std::string> ExecArgs(const es_event_exec_t *event);
+  virtual uint32_t ExecArgCount(const es_event_exec_t* event);
+  virtual es_string_token_t ExecArg(const es_event_exec_t* event, uint32_t index);
+  virtual std::vector<std::string> ExecArgs(const es_event_exec_t* event);
 
-  virtual uint32_t ExecEnvCount(const es_event_exec_t *event);
-  virtual es_string_token_t ExecEnv(const es_event_exec_t *event, uint32_t index);
-  virtual std::map<std::string, std::string> ExecEnvs(const es_event_exec_t *event);
+  virtual uint32_t ExecEnvCount(const es_event_exec_t* event);
+  virtual es_string_token_t ExecEnv(const es_event_exec_t* event, uint32_t index);
+  virtual std::map<std::string, std::string> ExecEnvs(const es_event_exec_t* event);
 
-  virtual uint32_t ExecFDCount(const es_event_exec_t *event);
-  virtual const es_fd_t *ExecFD(const es_event_exec_t *event, uint32_t index);
+  virtual uint32_t ExecFDCount(const es_event_exec_t* event);
+  virtual const es_fd_t* ExecFD(const es_event_exec_t* event, uint32_t index);
 };
 
 }  // namespace santa

@@ -41,54 +41,54 @@ typedef NS_ENUM(NSInteger, SNTRuleAddSource) {
   SNTRuleAddSourceSyncService,
   SNTRuleAddSourceSantactl,
 };
-- (void)databaseRuleAddExecutionRules:(NSArray<SNTRule *> *)executionRules
-                      fileAccessRules:(NSArray<SNTFileAccessRule *> *)fileAccessRules
+- (void)databaseRuleAddExecutionRules:(NSArray<SNTRule*>*)executionRules
+                      fileAccessRules:(NSArray<SNTFileAccessRule*>*)fileAccessRules
                           ruleCleanup:(SNTRuleCleanup)cleanupType
                                source:(SNTRuleAddSource)source
-                                reply:(void (^)(BOOL, NSArray<NSError *> *error))reply;
-- (void)databaseEventsPending:(void (^)(NSArray<SNTStoredEvent *> *events))reply;
-- (void)databaseRemoveEventsWithIDs:(NSArray *)ids;
-- (void)retrieveAllExecutionRules:(void (^)(NSArray<SNTRule *> *rules, NSError *error))reply;
+                                reply:(void (^)(BOOL, NSArray<NSError*>* error))reply;
+- (void)databaseEventsPending:(void (^)(NSArray<SNTStoredEvent*>* events))reply;
+- (void)databaseRemoveEventsWithIDs:(NSArray*)ids;
+- (void)retrieveAllExecutionRules:(void (^)(NSArray<SNTRule*>* rules, NSError* error))reply;
 - (void)retrieveAllFileAccessRules:
-    (void (^)(NSDictionary<NSString *, NSDictionary *> *fileAccessRules, NSError *error))reply;
+    (void (^)(NSDictionary<NSString*, NSDictionary*>* fileAccessRules, NSError* error))reply;
 
 ///
 ///  Config ops
 ///
-- (void)updateSyncSettings:(SNTConfigBundle *)result reply:(void (^)(void))reply;
+- (void)updateSyncSettings:(SNTConfigBundle*)result reply:(void (^)(void))reply;
 
 ///
 ///  Syncd Ops
 ///
-- (void)postRuleSyncNotificationForApplication:(NSString *)app reply:(void (^)(void))reply;
+- (void)postRuleSyncNotificationForApplication:(NSString*)app reply:(void (^)(void))reply;
 // Retrieve saved stats state info from santad
-- (void)retrieveStatsState:(void (^)(NSDate *, NSString *))reply;
+- (void)retrieveStatsState:(void (^)(NSDate*, NSString*))reply;
 // Have santad save the latest stats state information
-- (void)saveStatsSubmissionAttemptTime:(NSDate *)timestamp version:(NSString *)version;
+- (void)saveStatsSubmissionAttemptTime:(NSDate*)timestamp version:(NSString*)version;
 
 ///
 /// Command ops
 ///
-- (void)killProcesses:(SNTKillRequest *)killRequest reply:(void (^)(SNTKillResponse *))reply;
+- (void)killProcesses:(SNTKillRequest*)killRequest reply:(void (^)(SNTKillResponse*))reply;
 
 ///
 /// Control Ops
 ///
-- (void)installSantaApp:(NSString *)appPath reply:(void (^)(BOOL))reply;
+- (void)installSantaApp:(NSString*)appPath reply:(void (^)(BOOL))reply;
 
 ///
 /// Network Extension Ops
 ///
 - (void)installNetworkExtension:(void (^)(BOOL))reply;
 
-- (void)registerNetworkExtensionWithProtocolVersion:(NSString *)protocolVersion
-                                              reply:(void (^)(SNTNetworkExtensionSettings *settings,
-                                                              NSString *santaProtocolVersion,
-                                                              NSError *error))reply;
+- (void)registerNetworkExtensionWithProtocolVersion:(NSString*)protocolVersion
+                                              reply:(void (^)(SNTNetworkExtensionSettings* settings,
+                                                              NSString* santaProtocolVersion,
+                                                              NSError* error))reply;
 
-- (void)reportNetworkFlows:(NSArray<SNDProcessFlows *> *)processFlows
-               windowStart:(NSDate *)windowStart
-                 windowEnd:(NSDate *)windowEnd
+- (void)reportNetworkFlows:(NSArray<SNDProcessFlows*>*)processFlows
+               windowStart:(NSDate*)windowStart
+                 windowEnd:(NSDate*)windowEnd
                      reply:(void (^)(void))reply;
 
 @end
@@ -98,28 +98,28 @@ typedef NS_ENUM(NSInteger, SNTRuleAddSource) {
 ///
 ///  Returns the MachService ID for this service.
 ///
-+ (NSString *)serviceID;
++ (NSString*)serviceID;
 
 ///
 ///  Returns the Santa Endpoint Security SystemExtension bundle ID.
 ///
-+ (NSString *)santaExtensionBundleID;
++ (NSString*)santaExtensionBundleID;
 
 ///
 ///  Returns the Santa Network Extension (santanetd) bundle ID.
 ///
-+ (NSString *)santanetdExtensionBundleID;
++ (NSString*)santanetdExtensionBundleID;
 
 ///
 ///  Returns an initialized NSXPCInterface for the SNTUnprivilegedDaemonControlXPC protocol.
 ///  Ensures any methods that accept custom classes as arguments are set-up before returning
 ///
-+ (NSXPCInterface *)controlInterface;
++ (NSXPCInterface*)controlInterface;
 
 ///
 ///  Retrieve a pre-configured MOLXPCConnection for communicating with santad.
 ///  Connections just needs any handlers set and then can be resumed and used.
 ///
-+ (MOLXPCConnection *)configuredConnection;
++ (MOLXPCConnection*)configuredConnection;
 
 @end

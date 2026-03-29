@@ -45,13 +45,13 @@
 
 namespace santa {
 
-static inline SanitizableString FilePath(const es_file_t *file) {
+static inline SanitizableString FilePath(const es_file_t* file) {
   return SanitizableString(file);
 }
 
-static NSDateFormatter *GetDateFormatter() {
+static NSDateFormatter* GetDateFormatter() {
   static dispatch_once_t onceToken;
-  static NSDateFormatter *dateFormatter;
+  static NSDateFormatter* dateFormatter;
 
   dispatch_once(&onceToken, ^{
     dateFormatter = [[NSDateFormatter alloc] init];
@@ -152,7 +152,7 @@ std::string GetFileAccessPolicyDecisionString(FileAccessPolicyDecision decision)
   }
 }
 
-static inline void AppendProcess(std::string &str, const es_process_t *es_proc,
+static inline void AppendProcess(std::string& str, const es_process_t* es_proc,
                                  const std::string prefix = "") {
   char bname[MAXPATHLEN];
   str.append("|" + prefix + "pid=");
@@ -165,9 +165,9 @@ static inline void AppendProcess(std::string &str, const es_process_t *es_proc,
   str.append(FilePath(es_proc->executable).Sanitized());
 }
 
-static inline void AppendUserGroup(std::string &str, const audit_token_t &tok,
-                                   const std::optional<std::shared_ptr<std::string>> &user,
-                                   const std::optional<std::shared_ptr<std::string>> &group,
+static inline void AppendUserGroup(std::string& str, const audit_token_t& tok,
+                                   const std::optional<std::shared_ptr<std::string>>& user,
+                                   const std::optional<std::shared_ptr<std::string>>& group,
                                    const std::string prefix = "") {
   str.append("|" + prefix + "uid=");
   str.append(std::to_string((int)RealUser(tok)));
@@ -179,7 +179,7 @@ static inline void AppendUserGroup(std::string &str, const audit_token_t &tok,
   str.append(group.has_value() ? group->get()->c_str() : "(null)");
 }
 
-static inline void AppendEventUser(std::string &str, const es_string_token_t &user,
+static inline void AppendEventUser(std::string& str, const es_string_token_t& user,
                                    std::optional<uid_t> uid, const std::string prefix = "event_") {
   if (user.length > 0) {
     str.append("|" + prefix + "user=");
@@ -192,21 +192,21 @@ static inline void AppendEventUser(std::string &str, const es_string_token_t &us
   }
 }
 
-static inline void AppendInstigator(std::string &str, const es_process_t *es_proc,
-                                    const EnrichedProcess &enriched_proc,
+static inline void AppendInstigator(std::string& str, const es_process_t* es_proc,
+                                    const EnrichedProcess& enriched_proc,
                                     const std::string prefix = "") {
   AppendProcess(str, es_proc, prefix);
   AppendUserGroup(str, es_proc->audit_token, enriched_proc.real_user(), enriched_proc.real_group(),
                   prefix);
 }
 
-static inline void AppendInstigator(std::string &str, const EnrichedEventType &event,
+static inline void AppendInstigator(std::string& str, const EnrichedEventType& event,
                                     const std::string prefix = "") {
   AppendInstigator(str, event->process, event.instigator(), prefix);
 }
 
-static inline void AppendEventUser(std::string &str,
-                                   const std::optional<std::shared_ptr<std::string>> &user,
+static inline void AppendEventUser(std::string& str,
+                                   const std::optional<std::shared_ptr<std::string>>& user,
                                    uid_t uid, const std::string prefix = "event_") {
   es_string_token_t user_token = {.length = user.has_value() ? user.value()->length() : 0,
                                   .data = user.has_value() ? user.value()->c_str() : NULL};
@@ -214,12 +214,12 @@ static inline void AppendEventUser(std::string &str,
   AppendEventUser(str, user_token, std::make_optional<uid_t>(uid), prefix);
 }
 
-static inline void AppendGraphicalSession(std::string &str, es_graphical_session_id_t session_id) {
+static inline void AppendGraphicalSession(std::string& str, es_graphical_session_id_t session_id) {
   str.append("|graphical_session_id=");
   str.append(std::to_string(session_id));
 }
 
-static inline void AppendSocketAddress(std::string &str, es_address_type_t type,
+static inline void AppendSocketAddress(std::string& str, es_address_type_t type,
                                        es_string_token_t addr) {
   str.append("|address_type=");
   switch (type) {
@@ -236,7 +236,7 @@ static inline void AppendSocketAddress(std::string &str, es_address_type_t type,
   }
 }
 
-static inline std::string GetOpenSSHLoginResult(std::string &str,
+static inline std::string GetOpenSSHLoginResult(std::string& str,
                                                 es_openssh_login_result_type_t result) {
   switch (result) {
     case ES_OPENSSH_LOGIN_EXCEED_MAXTRIES: return "LOGIN_EXCEED_MAXTRIES";
@@ -253,7 +253,7 @@ static inline std::string GetOpenSSHLoginResult(std::string &str,
   }
 }
 
-static char *FormattedDateString(char *buf, size_t len) {
+static char* FormattedDateString(char* buf, size_t len) {
   struct timeval tv;
   struct tm tm;
 
@@ -267,13 +267,13 @@ static char *FormattedDateString(char *buf, size_t len) {
 }
 
 std::shared_ptr<BasicString> BasicString::Create(std::shared_ptr<EndpointSecurityAPI> esapi,
-                                                 SNTDecisionCache *decision_cache,
+                                                 SNTDecisionCache* decision_cache,
                                                  bool prefix_time_name) {
   return std::make_shared<BasicString>(esapi, decision_cache, prefix_time_name);
 }
 
 BasicString::BasicString(std::shared_ptr<EndpointSecurityAPI> esapi,
-                         SNTDecisionCache *decision_cache, bool prefix_time_name)
+                         SNTDecisionCache* decision_cache, bool prefix_time_name)
     : Serializer(std::move(decision_cache)), esapi_(esapi), prefix_time_name_(prefix_time_name) {}
 
 std::string BasicString::CreateDefaultString(size_t reserved_size) {
@@ -291,7 +291,7 @@ std::string BasicString::CreateDefaultString(size_t reserved_size) {
   return str;
 }
 
-std::vector<uint8_t> BasicString::FinalizeString(std::string &str) {
+std::vector<uint8_t> BasicString::FinalizeString(std::string& str) {
   if (EnableMachineIDDecoration()) {
     str.append("|machineid=");
     str.append(*MachineID());
@@ -303,7 +303,7 @@ std::vector<uint8_t> BasicString::FinalizeString(std::string &str) {
   return vec;
 }
 
-std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedClose &msg) {
+std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedClose& msg) {
   std::string str = CreateDefaultString();
 
   str.append("action=WRITE|path=");
@@ -314,7 +314,7 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedClose &msg) {
   return FinalizeString(str);
 }
 
-std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedExchange &msg) {
+std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedExchange& msg) {
   std::string str = CreateDefaultString();
 
   str.append("action=EXCHANGE|path=");
@@ -327,7 +327,7 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedExchange &msg) 
   return FinalizeString(str);
 }
 
-std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedExec &msg, SNTCachedDecision *cd) {
+std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedExec& msg, SNTCachedDecision* cd) {
   std::string str = CreateDefaultString(1024);  // EXECs tend to be bigger, reserve more space.
 
   str.append("action=EXEC|decision=");
@@ -377,7 +377,7 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedExec &msg, SNTC
   str.append("|path=");
   str.append(FilePath(msg->event.exec.target->executable).Sanitized());
 
-  NSString *origPath = santa::OriginalPathForTranslocation(msg->event.exec.target);
+  NSString* origPath = santa::OriginalPathForTranslocation(msg->event.exec.target);
   if (origPath) {
     str.append("|origpath=");
     str.append(SanitizableString(origPath).Sanitized());
@@ -398,7 +398,7 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedExec &msg, SNTC
   return FinalizeString(str);
 }
 
-std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedExit &msg) {
+std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedExit& msg) {
   std::string str = CreateDefaultString();
 
   str.append("action=EXIT|pid=");
@@ -415,7 +415,7 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedExit &msg) {
   return FinalizeString(str);
 }
 
-std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedFork &msg) {
+std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedFork& msg) {
   std::string str = CreateDefaultString();
 
   str.append("action=FORK|pid=");
@@ -432,7 +432,7 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedFork &msg) {
   return FinalizeString(str);
 }
 
-std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedLink &msg) {
+std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedLink& msg) {
   std::string str = CreateDefaultString();
 
   str.append("action=LINK|path=");
@@ -447,7 +447,7 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedLink &msg) {
   return FinalizeString(str);
 }
 
-std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedRename &msg) {
+std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedRename& msg) {
   std::string str = CreateDefaultString();
 
   str.append("action=RENAME|path=");
@@ -471,7 +471,7 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedRename &msg) {
   return FinalizeString(str);
 }
 
-std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedUnlink &msg) {
+std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedUnlink& msg) {
   std::string str = CreateDefaultString();
 
   str.append("action=DELETE|path=");
@@ -482,7 +482,7 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedUnlink &msg) {
   return FinalizeString(str);
 }
 
-std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedCSInvalidated &msg) {
+std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedCSInvalidated& msg) {
   std::string str = CreateDefaultString();
 
   str.append("action=CODESIGNING_INVALIDATED");
@@ -492,7 +492,7 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedCSInvalidated &
   return FinalizeString(str);
 }
 
-std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedClone &msg) {
+std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedClone& msg) {
   std::string str = CreateDefaultString();
 
   str.append("action=CLONE|source=");
@@ -506,7 +506,7 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedClone &msg) {
   return FinalizeString(str);
 }
 
-std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedCopyfile &msg) {
+std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedCopyfile& msg) {
   std::string str = CreateDefaultString();
 
   str.append("action=COPYFILE|source=");
@@ -520,7 +520,7 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedCopyfile &msg) 
   return FinalizeString(str);
 }
 
-std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedProcSuspendResume &msg) {
+std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedProcSuspendResume& msg) {
   std::string str = CreateDefaultString();
 
   str.append("action=PROC_SUSPEND_RESUME");
@@ -543,7 +543,7 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedProcSuspendResu
   return FinalizeString(str);
 }
 
-std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedLoginWindowSessionLogin &msg) {
+std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedLoginWindowSessionLogin& msg) {
   std::string str = CreateDefaultString();
 
   str.append("action=LOGIN_WINDOW_SESSION_LOGIN");
@@ -554,7 +554,7 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedLoginWindowSess
   return FinalizeString(str);
 };
 
-std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedLoginWindowSessionLogout &msg) {
+std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedLoginWindowSessionLogout& msg) {
   std::string str = CreateDefaultString();
 
   str.append("action=LOGIN_WINDOW_SESSION_LOGOUT");
@@ -565,7 +565,7 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedLoginWindowSess
   return FinalizeString(str);
 };
 
-std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedLoginWindowSessionLock &msg) {
+std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedLoginWindowSessionLock& msg) {
   std::string str = CreateDefaultString();
 
   str.append("action=LOGIN_WINDOW_SESSION_LOCK");
@@ -576,7 +576,7 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedLoginWindowSess
   return FinalizeString(str);
 }
 
-std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedLoginWindowSessionUnlock &msg) {
+std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedLoginWindowSessionUnlock& msg) {
   std::string str = CreateDefaultString();
 
   str.append("action=LOGIN_WINDOW_SESSION_UNLOCK");
@@ -587,7 +587,7 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedLoginWindowSess
   return FinalizeString(str);
 }
 
-std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedScreenSharingAttach &msg) {
+std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedScreenSharingAttach& msg) {
   std::string str = CreateDefaultString();
 
   str.append("action=SCREEN_SHARING_ATTACH|success=");
@@ -626,7 +626,7 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedScreenSharingAt
   return FinalizeString(str);
 }
 
-std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedScreenSharingDetach &msg) {
+std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedScreenSharingDetach& msg) {
   std::string str = CreateDefaultString();
 
   str.append("action=SCREEN_SHARING_DETACH");
@@ -645,7 +645,7 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedScreenSharingDe
   return FinalizeString(str);
 }
 
-std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedOpenSSHLogin &msg) {
+std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedOpenSSHLogin& msg) {
   std::string str = CreateDefaultString();
 
   str.append("action=OPENSSH_LOGIN|success=");
@@ -664,7 +664,7 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedOpenSSHLogin &m
   return FinalizeString(str);
 }
 
-std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedOpenSSHLogout &msg) {
+std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedOpenSSHLogout& msg) {
   std::string str = CreateDefaultString();
 
   str.append("action=OPENSSH_LOGOUT");
@@ -678,7 +678,7 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedOpenSSHLogout &
   return FinalizeString(str);
 }
 
-std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedLoginLogin &msg) {
+std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedLoginLogin& msg) {
   std::string str = CreateDefaultString();
 
   str.append("action=LOGIN|success=");
@@ -697,7 +697,7 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedLoginLogin &msg
   return FinalizeString(str);
 }
 
-std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedLoginLogout &msg) {
+std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedLoginLogout& msg) {
   std::string str = CreateDefaultString();
 
   str.append("action=LOGOUT");
@@ -709,8 +709,8 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedLoginLogout &ms
   return FinalizeString(str);
 }
 
-static void AppendEventInstigatorOrFallback(std::string &str,
-                                            const EnrichedEventWithInstigator &event,
+static void AppendEventInstigatorOrFallback(std::string& str,
+                                            const EnrichedEventWithInstigator& event,
                                             std::string prefix = "auth_") {
   if (event.EventInstigator() && event.EnrichedEventInstigator().has_value()) {
     AppendInstigator(str, event.EventInstigator(), event.EnrichedEventInstigator().value(), prefix);
@@ -726,7 +726,7 @@ static void AppendEventInstigatorOrFallback(std::string &str,
   }
 }
 
-std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedAuthenticationOD &msg) {
+std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedAuthenticationOD& msg) {
   std::string str = CreateDefaultString();
 
   str.append("action=AUTHENTICATION_OD");
@@ -760,7 +760,7 @@ std::string GetAuthenticationTouchIDModeString(es_touchid_mode_t mode) {
   }
 }
 
-std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedAuthenticationTouchID &msg) {
+std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedAuthenticationTouchID& msg) {
   std::string str = CreateDefaultString();
 
   str.append("action=AUTHENTICATION_TOUCHID");
@@ -781,7 +781,7 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedAuthenticationT
   return FinalizeString(str);
 }
 
-std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedAuthenticationToken &msg) {
+std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedAuthenticationToken& msg) {
   std::string str = CreateDefaultString();
 
   str.append("action=AUTHENTICATION_TOKEN");
@@ -813,7 +813,7 @@ std::string GetAuthenticationAutoUnlockTypeString(es_auto_unlock_type_t type) {
   }
 }
 
-std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedAuthenticationAutoUnlock &msg) {
+std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedAuthenticationAutoUnlock& msg) {
   std::string str = CreateDefaultString();
 
   str.append("action=AUTHENTICATION_AUTO_UNLOCK");
@@ -841,9 +841,9 @@ std::string GetBTMLaunchItemTypeString(es_btm_item_type_t item_type) {
   }
 }
 
-std::vector<uint8_t> BasicString::SerializeMessageLaunchItemAdd(const EnrichedLaunchItem &msg) {
+std::vector<uint8_t> BasicString::SerializeMessageLaunchItemAdd(const EnrichedLaunchItem& msg) {
   assert(msg->event_type == ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_ADD);
-  const es_event_btm_launch_item_add_t *btm = msg->event.btm_launch_item_add;
+  const es_event_btm_launch_item_add_t* btm = msg->event.btm_launch_item_add;
 
   std::string str = CreateDefaultString();
 
@@ -855,7 +855,7 @@ std::vector<uint8_t> BasicString::SerializeMessageLaunchItemAdd(const EnrichedLa
   str.append(GetBoolString(btm->item->managed));
   AppendEventUser(str, msg.Username(), btm->item->uid, "item_");
 
-  NSString *path = ConcatPrefixIfRelativePath(btm->executable_path, btm->item->app_url);
+  NSString* path = ConcatPrefixIfRelativePath(btm->executable_path, btm->item->app_url);
   if (path) {
     str.append("|exec_path=");
     str.append(NSStringToUTF8StringView(path));
@@ -880,9 +880,9 @@ std::vector<uint8_t> BasicString::SerializeMessageLaunchItemAdd(const EnrichedLa
   return FinalizeString(str);
 }
 
-std::vector<uint8_t> BasicString::SerializeMessageLaunchItemRemove(const EnrichedLaunchItem &msg) {
+std::vector<uint8_t> BasicString::SerializeMessageLaunchItemRemove(const EnrichedLaunchItem& msg) {
   assert(msg->event_type == ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_REMOVE);
-  const es_event_btm_launch_item_remove_t *btm = msg->event.btm_launch_item_remove;
+  const es_event_btm_launch_item_remove_t* btm = msg->event.btm_launch_item_remove;
 
   std::string str = CreateDefaultString();
 
@@ -894,7 +894,7 @@ std::vector<uint8_t> BasicString::SerializeMessageLaunchItemRemove(const Enriche
   str.append(GetBoolString(btm->item->managed));
   AppendEventUser(str, msg.Username(), btm->item->uid, "item_");
 
-  NSString *path = ConcatPrefixIfRelativePath(btm->item->item_url, btm->item->app_url);
+  NSString* path = ConcatPrefixIfRelativePath(btm->item->item_url, btm->item->app_url);
   if (path) {
     str.append("|item_path=");
     str.append(NSStringToUTF8StringView(path));
@@ -913,7 +913,7 @@ std::vector<uint8_t> BasicString::SerializeMessageLaunchItemRemove(const Enriche
   return FinalizeString(str);
 }
 
-std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedLaunchItem &msg) {
+std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedLaunchItem& msg) {
   if (msg->event_type == ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_ADD) {
     return SerializeMessageLaunchItemAdd(msg);
   } else if (msg->event_type == ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_REMOVE) {
@@ -924,15 +924,15 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedLaunchItem &msg
   }
 }
 
-static inline void AppendStringToken(std::string &str, std::string key, es_string_token_t val) {
+static inline void AppendStringToken(std::string& str, std::string key, es_string_token_t val) {
   if (val.length > 0) {
     str.append(key);
     str.append(val.data);
   }
 }
 
-std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedXProtectDetected &msg) {
-  const es_event_xp_malware_detected_t *xp = msg->event.xp_malware_detected;
+std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedXProtectDetected& msg) {
+  const es_event_xp_malware_detected_t* xp = msg->event.xp_malware_detected;
   std::string str = CreateDefaultString();
 
   str.append("action=XPROTECT_DETECTED");
@@ -947,8 +947,8 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedXProtectDetecte
   return FinalizeString(str);
 }
 
-std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedXProtectRemediated &msg) {
-  const es_event_xp_malware_remediated_t *xp = msg->event.xp_malware_remediated;
+std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedXProtectRemediated& msg) {
+  const es_event_xp_malware_remediated_t* xp = msg->event.xp_malware_remediated;
   std::string str = CreateDefaultString();
 
   str.append("action=XPROTECT_REMEDIATED");
@@ -971,9 +971,9 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedXProtectRemedia
 
 #if HAVE_MACOS_15
 
-std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedGatekeeperOverride &msg) {
+std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedGatekeeperOverride& msg) {
   std::string str = CreateDefaultString();
-  es_event_gatekeeper_user_override_t *gk = msg->event.gatekeeper_user_override;
+  es_event_gatekeeper_user_override_t* gk = msg->event.gatekeeper_user_override;
 
   str.append("action=GATEKEEPER_OVERRIDE|target=");
   switch (gk->file_type) {
@@ -1065,7 +1065,7 @@ std::string GetTCCAuthorizationReasonString(es_tcc_authorization_reason_t auth_r
   }
 }
 
-std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedTCCModification &msg) {
+std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedTCCModification& msg) {
   std::string str = CreateDefaultString();
 
   str.append("action=TCC_MODIFICATION");
@@ -1095,18 +1095,18 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedTCCModification
 
 #endif  // HAVE_MACOS_15_4
 
-std::vector<uint8_t> BasicString::SerializeNetworkFlows(SNDProcessFlows *processFlows,
+std::vector<uint8_t> BasicString::SerializeNetworkFlows(SNDProcessFlows* processFlows,
                                                         struct timespec window_start,
                                                         struct timespec window_end,
-                                                        SNTCachedDecision *cd) {
+                                                        SNTCachedDecision* cd) {
   std::string line = CreateDefaultString();
   line += santanetd::FormatNetworkFlowsBasicString(processFlows, cd);
   return FinalizeString(line);
 }
 
 std::vector<uint8_t> BasicString::SerializeFileAccess(
-    const std::string &policy_version, const std::string &policy_name, const Message &msg,
-    const EnrichedProcess &enriched_process, size_t target_index,
+    const std::string& policy_version, const std::string& policy_name, const Message& msg,
+    const EnrichedProcess& enriched_process, size_t target_index,
     std::optional<santa::EnrichedFile> enriched_event_target, FileAccessPolicyDecision decision,
     std::string_view operation_id) {
   std::string str = CreateDefaultString();
@@ -1136,7 +1136,7 @@ std::vector<uint8_t> BasicString::SerializeFileAccess(
   return FinalizeString(str);
 }
 
-std::vector<uint8_t> BasicString::SerializeAllowlist(const Message &msg,
+std::vector<uint8_t> BasicString::SerializeAllowlist(const Message& msg,
                                                      const std::string_view hash,
                                                      const std::string_view target_path) {
   std::string str = CreateDefaultString();
@@ -1153,7 +1153,7 @@ std::vector<uint8_t> BasicString::SerializeAllowlist(const Message &msg,
   return FinalizeString(str);
 }
 
-std::vector<uint8_t> BasicString::SerializeBundleHashingEvent(SNTStoredExecutionEvent *event) {
+std::vector<uint8_t> BasicString::SerializeBundleHashingEvent(SNTStoredExecutionEvent* event) {
   std::string str = CreateDefaultString();
 
   str.append("action=BUNDLE|sha256=");
@@ -1172,20 +1172,20 @@ std::vector<uint8_t> BasicString::SerializeBundleHashingEvent(SNTStoredExecution
   return FinalizeString(str);
 }
 
-std::vector<uint8_t> BasicString::SerializeDiskAppeared(NSDictionary *props, bool allowed) {
-  NSString *dmg_path = nil;
-  NSString *serial = nil;
+std::vector<uint8_t> BasicString::SerializeDiskAppeared(NSDictionary* props, bool allowed) {
+  NSString* dmg_path = nil;
+  NSString* serial = nil;
   if ([props[@"DADeviceModel"] isEqual:@"Disk Image"]) {
     dmg_path = santa::DiskImageForDevice(props[@"DADevicePath"]);
   } else {
     serial = santa::SerialForDevice(props[@"DADevicePath"]);
   }
 
-  NSString *model = [NSString stringWithFormat:@"%@ %@", NonNull(props[@"DADeviceVendor"]),
+  NSString* model = [NSString stringWithFormat:@"%@ %@", NonNull(props[@"DADeviceVendor"]),
                                                NonNull(props[@"DADeviceModel"])];
   model = [model stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
 
-  NSString *appearanceDateString = [GetDateFormatter()
+  NSString* appearanceDateString = [GetDateFormatter()
       stringFromDate:[NSDate dateWithTimeIntervalSinceReferenceDate:[props[@"DAAppearanceTime"]
                                                                         doubleValue]]];
 
@@ -1220,7 +1220,7 @@ std::vector<uint8_t> BasicString::SerializeDiskAppeared(NSDictionary *props, boo
     str.append([NonNull(props[santa::kMountFromNameKey]) UTF8String]);
   }
 
-  NSNumber *encrypted = props[(__bridge NSString *)kDADiskDescriptionMediaEncryptedKey];
+  NSNumber* encrypted = props[(__bridge NSString*)kDADiskDescriptionMediaEncryptedKey];
   if (encrypted != nil) {
     str.append("|encrypted=");
     str.append([encrypted boolValue] ? "true" : "false");
@@ -1229,7 +1229,7 @@ std::vector<uint8_t> BasicString::SerializeDiskAppeared(NSDictionary *props, boo
   return FinalizeString(str);
 }
 
-std::vector<uint8_t> BasicString::SerializeDiskDisappeared(NSDictionary *props) {
+std::vector<uint8_t> BasicString::SerializeDiskDisappeared(NSDictionary* props) {
   std::string str = CreateDefaultString();
 
   str.append("action=DISKDISAPPEAR");

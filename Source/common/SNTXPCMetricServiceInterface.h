@@ -24,7 +24,8 @@
 ///
 ///  @param metrics The current metric/counter values serialized to an NSDictionary.
 ///
-- (void)exportForMonitoring:(NSDictionary *)metrics;
+- (void)exportForMonitoring:(NSDictionary*)metrics;
+- (void)exportForMonitoring:(NSDictionary*)metrics reply:(void (^)(BOOL))reply;
 
 @end
 
@@ -35,17 +36,17 @@
 ///  Ensures any methods that accept custom classes as arguments are set-up
 ///  before returning.
 ///
-+ (NSXPCInterface *)metricServiceInterface;
++ (NSXPCInterface*)metricServiceInterface;
 
 ///
 ///  Returns the MachService ID for this service.
 ///
-+ (NSString *)serviceID;
++ (NSString*)serviceID;
 
 ///
 ///  Retrieve a pre-configured MOLXPCConnection for communicating with santametricservice.
 ///  Connections just needs any handlers set and then can be resumed and used.
 ///
-+ (MOLXPCConnection *)configuredConnection;
++ (MOLXPCConnection*)configuredConnection;
 
 @end

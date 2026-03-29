@@ -103,7 +103,7 @@ using santa::RingBuffer;
 
   // Add an object within a new scope to ensure the ring properly holds onto the object
   @autoreleasepool {
-    NSString *pidStr = [NSString stringWithFormat:@"pid: %d", getpid()];
+    NSString* pidStr = [NSString stringWithFormat:@"pid: %d", getpid()];
     XCTAssertEqual(rb.Enqueue([pidStr copy]), std::nullopt);
     pidStr = nil;
   }
@@ -111,8 +111,8 @@ using santa::RingBuffer;
   XCTAssertTrue(rb.Full());
   XCTAssertFalse(rb.Empty());
 
-  NSString *str = @"bar";
-  NSString *res = rb.Enqueue(str).value_or(nil);
+  NSString* str = @"bar";
+  NSString* res = rb.Enqueue(str).value_or(nil);
   XCTAssertEqualObjects(res, @"throwaway");
 
   // Drain the ring and check values
@@ -138,7 +138,7 @@ using santa::RingBuffer;
   rb.Enqueue(4);
   rb.Enqueue(5);
   int expected = 2;
-  for (const auto &val : rb) {
+  for (const auto& val : rb) {
     XCTAssertEqual(val, expected);
     expected++;
   }
@@ -186,7 +186,7 @@ using santa::RingBuffer;
   rb.Enqueue({700, 7});
   rb.Enqueue({8, 800});
 
-  rb.Erase(std::remove_if(rb.begin(), rb.end(), [](const Foo &f) { return f.x < f.y; }), rb.end());
+  rb.Erase(std::remove_if(rb.begin(), rb.end(), [](const Foo& f) { return f.x < f.y; }), rb.end());
 
   res = rb.Dequeue().value_or(Foo{0, 0});
   XCTAssertEqual(res.x, 500);

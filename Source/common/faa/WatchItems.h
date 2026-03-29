@@ -34,34 +34,34 @@
 #include "Source/common/faa/WatchItemPolicy.h"
 #include "absl/container/flat_hash_set.h"
 
-extern NSString *const kWatchItemConfigKeyVersion;
-extern NSString *const kWatchItemConfigKeyWatchItems;
-extern NSString *const kWatchItemConfigKeyPaths;
-extern NSString *const kWatchItemConfigKeyPathsPath;
-extern NSString *const kWatchItemConfigKeyPathsIsPrefix;
-extern NSString *const kWatchItemConfigKeyOptions;
-extern NSString *const kWatchItemConfigKeyOptionsAllowReadAccess;
-extern NSString *const kWatchItemConfigKeyOptionsAuditOnly;
-extern NSString *const kWatchItemConfigKeyOptionsInvertProcessExceptions;
-extern NSString *const kWatchItemConfigKeyOptionsRuleType;
-extern NSString *const kWatchItemConfigKeyOptionsEnableSilentMode;
-extern NSString *const kWatchItemConfigKeyOptionsEnableSilentTTYMode;
-extern NSString *const kWatchItemConfigKeyOptionsCustomMessage;
-extern NSString *const kWatchItemConfigKeyOptionsEventDetailText;
-extern NSString *const kWatchItemConfigKeyOptionsEventDetailURL;
-extern NSString *const kWatchItemConfigKeyOptionsVersion;
-extern NSString *const kWatchItemConfigKeyProcesses;
-extern NSString *const kWatchItemConfigKeyProcessesBinaryPath;
-extern NSString *const kWatchItemConfigKeyProcessesCertificateSha256;
-extern NSString *const kWatchItemConfigKeyProcessesSigningID;
-extern NSString *const kWatchItemConfigKeyProcessesTeamID;
-extern NSString *const kWatchItemConfigKeyProcessesCDHash;
-extern NSString *const kWatchItemConfigKeyProcessesPlatformBinary;
+extern NSString* const kWatchItemConfigKeyVersion;
+extern NSString* const kWatchItemConfigKeyWatchItems;
+extern NSString* const kWatchItemConfigKeyPaths;
+extern NSString* const kWatchItemConfigKeyPathsPath;
+extern NSString* const kWatchItemConfigKeyPathsIsPrefix;
+extern NSString* const kWatchItemConfigKeyOptions;
+extern NSString* const kWatchItemConfigKeyOptionsAllowReadAccess;
+extern NSString* const kWatchItemConfigKeyOptionsAuditOnly;
+extern NSString* const kWatchItemConfigKeyOptionsInvertProcessExceptions;
+extern NSString* const kWatchItemConfigKeyOptionsRuleType;
+extern NSString* const kWatchItemConfigKeyOptionsEnableSilentMode;
+extern NSString* const kWatchItemConfigKeyOptionsEnableSilentTTYMode;
+extern NSString* const kWatchItemConfigKeyOptionsCustomMessage;
+extern NSString* const kWatchItemConfigKeyOptionsEventDetailText;
+extern NSString* const kWatchItemConfigKeyOptionsEventDetailURL;
+extern NSString* const kWatchItemConfigKeyOptionsVersion;
+extern NSString* const kWatchItemConfigKeyProcesses;
+extern NSString* const kWatchItemConfigKeyProcessesBinaryPath;
+extern NSString* const kWatchItemConfigKeyProcessesCertificateSha256;
+extern NSString* const kWatchItemConfigKeyProcessesSigningID;
+extern NSString* const kWatchItemConfigKeyProcessesTeamID;
+extern NSString* const kWatchItemConfigKeyProcessesCDHash;
+extern NSString* const kWatchItemConfigKeyProcessesPlatformBinary;
 
-extern NSString *const kRuleTypePathsWithAllowedProcesses;
-extern NSString *const kRuleTypePathsWithDeniedProcesses;
-extern NSString *const kRuleTypeProcessesWithAllowedPaths;
-extern NSString *const kRuleTypeProcessesWithDeniedPaths;
+extern NSString* const kRuleTypePathsWithAllowedProcesses;
+extern NSString* const kRuleTypePathsWithDeniedProcesses;
+extern NSString* const kRuleTypeProcessesWithAllowedPaths;
+extern NSString* const kRuleTypeProcessesWithDeniedPaths;
 
 namespace santa {
 
@@ -85,7 +85,7 @@ using IterateProcessPoliciesBlock = void (^)(CheckPolicyBlock);
 // Allowing callers to define their own structures simplifies this code at the
 // cost of making it a little harder to read.
 using LookupPolicyBlock =
-    std::optional<std::shared_ptr<WatchItemPolicyBase>> (^)(const std::string &);
+    std::optional<std::shared_ptr<WatchItemPolicyBase>> (^)(const std::string&);
 using IterateTargetsBlock = void (^)(LookupPolicyBlock);
 using FindPoliciesForTargetsBlock = void (^)(IterateTargetsBlock);
 
@@ -94,18 +94,18 @@ class DataWatchItems {
   DataWatchItems()
       : tree_(std::make_unique<santa::PrefixTree<std::shared_ptr<DataWatchItemPolicy>>>()) {}
 
-  DataWatchItems(DataWatchItems &&other) = default;
-  DataWatchItems &operator=(DataWatchItems &&rhs) = default;
+  DataWatchItems(DataWatchItems&& other) = default;
+  DataWatchItems& operator=(DataWatchItems&& rhs) = default;
 
   // Copying not supported
-  DataWatchItems(const DataWatchItems &other) = delete;
-  DataWatchItems &operator=(const DataWatchItems &other) = delete;
+  DataWatchItems(const DataWatchItems& other) = delete;
+  DataWatchItems& operator=(const DataWatchItems& other) = delete;
 
-  bool operator==(const DataWatchItems &other) const { return paths_ == other.paths_; }
-  bool operator!=(const DataWatchItems &other) const { return !(*this == other); }
-  SetPairPathAndType operator-(const DataWatchItems &other) const;
+  bool operator==(const DataWatchItems& other) const { return paths_ == other.paths_; }
+  bool operator!=(const DataWatchItems& other) const { return !(*this == other); }
+  SetPairPathAndType operator-(const DataWatchItems& other) const;
 
-  friend void swap(DataWatchItems &first, DataWatchItems &second) {
+  friend void swap(DataWatchItems& first, DataWatchItems& second) {
     std::swap(first.tree_, second.tree_);
     std::swap(first.paths_, second.paths_);
   }
@@ -124,15 +124,15 @@ class ProcessWatchItems {
  public:
   ProcessWatchItems() = default;
 
-  ProcessWatchItems(ProcessWatchItems &&other) = default;
-  ProcessWatchItems &operator=(ProcessWatchItems &&rhs) = default;
+  ProcessWatchItems(ProcessWatchItems&& other) = default;
+  ProcessWatchItems& operator=(ProcessWatchItems&& rhs) = default;
 
   // Copying not supported
-  ProcessWatchItems(const ProcessWatchItems &other) = delete;
-  ProcessWatchItems &operator=(const ProcessWatchItems &other) = delete;
+  ProcessWatchItems(const ProcessWatchItems& other) = delete;
+  ProcessWatchItems& operator=(const ProcessWatchItems& other) = delete;
 
-  bool operator==(const ProcessWatchItems &other) const { return policies_ == other.policies_; }
-  bool operator!=(const ProcessWatchItems &other) const { return !(*this == other); }
+  bool operator==(const ProcessWatchItems& other) const { return policies_ == other.policies_; }
+  bool operator!=(const ProcessWatchItems& other) const { return !(*this == other); }
 
   bool Build(SetSharedProcessWatchItemPolicy proc_policies);
 
@@ -154,18 +154,18 @@ class WatchItems : public Timer<WatchItems>, public PassKey<WatchItems> {
 
   // Type aliases
   using DataWatchItemsUpdatedBlock = std::function<void(
-      size_t count, const SetPairPathAndType &new_paths, const SetPairPathAndType &removed_paths)>;
+      size_t count, const SetPairPathAndType& new_paths, const SetPairPathAndType& removed_paths)>;
   using ProcWatchItemsUpdatedBlock = std::function<void(size_t count)>;
 
   // Factory methods
-  static std::shared_ptr<WatchItems> CreateFromPath(NSString *config_path,
+  static std::shared_ptr<WatchItems> CreateFromPath(NSString* config_path,
                                                     uint32_t reapply_config_frequency_secs);
   static std::shared_ptr<WatchItems> CreateFromEmbeddedConfig(
-      NSDictionary *config, uint32_t reapply_config_frequency_secs);
-  static std::shared_ptr<WatchItems> CreateFromRules(NSDictionary *config,
+      NSDictionary* config, uint32_t reapply_config_frequency_secs);
+  static std::shared_ptr<WatchItems> CreateFromRules(NSDictionary* config,
                                                      uint32_t reapply_config_frequency_secs);
 
-  WatchItems(PassKey, DataSource data_source, NSString *config_path, NSDictionary *config,
+  WatchItems(PassKey, DataSource data_source, NSString* config_path, NSDictionary* config,
              dispatch_queue_t q, void (^periodic_task_complete_f)(void) = nullptr);
 
   ~WatchItems() = default;
@@ -175,9 +175,9 @@ class WatchItems : public Timer<WatchItems>, public PassKey<WatchItems> {
   void RegisterDataWatchItemsUpdatedCallback(DataWatchItemsUpdatedBlock callback);
   void RegisterProcWatchItemsUpdatedCallback(ProcWatchItemsUpdatedBlock callback);
 
-  void SetDBRules(NSDictionary *rules);
-  void SetConfigPath(NSString *config_path);
-  void SetConfig(NSDictionary *config);
+  void SetDBRules(NSDictionary* rules);
+  void SetConfigPath(NSString* config_path);
+  void SetConfig(NSDictionary* config);
 
   void FindPoliciesForTargets(IterateTargetsBlock iterateTargetsBlock);
 
@@ -185,30 +185,31 @@ class WatchItems : public Timer<WatchItems>, public PassKey<WatchItems> {
 
   std::optional<WatchItemsState> State();
 
-  std::pair<NSString *, NSString *> EventDetailLinkInfo(
-      const std::shared_ptr<WatchItemPolicyBase> &watch_item);
+  std::pair<NSString*, NSString*> EventDetailLinkInfo(
+      const std::shared_ptr<WatchItemPolicyBase>& watch_item);
 
-  static bool IsValidRule(NSString *name, NSDictionary *rule, NSError **error);
+  static bool IsValidRule(NSString* name, NSDictionary* rule, NSError** error);
+  static bool IsValidConfig(NSDictionary* config, NSError** error);
 
-  static NSString *DataSourceName(DataSource data_source);
+  static NSString* DataSourceName(DataSource data_source);
 
   friend class santa::WatchItemsPeer;
 
  private:
-  static std::shared_ptr<WatchItems> CreateInternal(DataSource data_source, NSString *config_path,
-                                                    NSDictionary *config,
+  static std::shared_ptr<WatchItems> CreateInternal(DataSource data_source, NSString* config_path,
+                                                    NSDictionary* config,
                                                     uint32_t reapply_config_frequency_secs);
 
-  NSDictionary *ReadConfig();
-  NSDictionary *ReadConfigLocked() ABSL_SHARED_LOCKS_REQUIRED(lock_);
-  void ReloadConfig(NSDictionary *new_config);
+  NSDictionary* ReadConfig();
+  NSDictionary* ReadConfigLocked() ABSL_SHARED_LOCKS_REQUIRED(lock_);
+  void ReloadConfig(NSDictionary* new_config);
   void UpdateCurrentState(DataWatchItems new_data_watch_items,
-                          ProcessWatchItems new_proc_watch_items, NSDictionary *new_config,
+                          ProcessWatchItems new_proc_watch_items, NSDictionary* new_config,
                           uint64_t rules_loaded);
 
   DataSource data_source_;
-  NSString *config_path_;
-  NSDictionary *embedded_config_;
+  NSString* config_path_;
+  NSDictionary* embedded_config_;
   dispatch_queue_t q_;
   void (^periodic_task_complete_f_)(void);
 
@@ -216,22 +217,22 @@ class WatchItems : public Timer<WatchItems>, public PassKey<WatchItems> {
 
   DataWatchItems data_watch_items_ ABSL_GUARDED_BY(lock_);
   ProcessWatchItems proc_watch_items_ ABSL_GUARDED_BY(lock_);
-  NSDictionary *current_config_ ABSL_GUARDED_BY(lock_);
+  NSDictionary* current_config_ ABSL_GUARDED_BY(lock_);
   NSTimeInterval last_update_time_ ABSL_GUARDED_BY(lock_);
   std::string policy_version_ ABSL_GUARDED_BY(lock_);
   DataWatchItemsUpdatedBlock data_watch_items_updated_callback_ ABSL_GUARDED_BY(lock_);
   ProcWatchItemsUpdatedBlock proc_watch_items_updated_callback_ ABSL_GUARDED_BY(lock_);
   bool periodic_task_started_ = false;
-  NSString *policy_event_detail_url_ ABSL_GUARDED_BY(lock_);
-  NSString *policy_event_detail_text_ ABSL_GUARDED_BY(lock_);
+  NSString* policy_event_detail_url_ ABSL_GUARDED_BY(lock_);
+  NSString* policy_event_detail_text_ ABSL_GUARDED_BY(lock_);
   uint64_t rules_loaded_ ABSL_GUARDED_BY(lock_);
 };
 
 struct WatchItemsState {
   uint64_t rule_count;
-  NSString *policy_version;
+  NSString* policy_version;
   WatchItems::DataSource data_source;
-  NSString *config_path;
+  NSString* config_path;
   NSTimeInterval last_config_load_epoch;
 };
 
