@@ -534,8 +534,8 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedProcSuspendResu
 
   if (msg->event.proc_suspend_resume.target) {
     str.append("|targetpid=");
-    str.append(std::to_string(
-        audit_token_to_pid(msg->event.proc_suspend_resume.target->audit_token)));
+    str.append(
+        std::to_string(audit_token_to_pid(msg->event.proc_suspend_resume.target->audit_token)));
   }
 
   AppendInstigator(str, msg);

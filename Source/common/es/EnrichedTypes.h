@@ -346,16 +346,16 @@ class EnrichedCSInvalidated : public EnrichedEventType {
 
 class EnrichedProcSuspendResume : public EnrichedEventType {
  public:
-  EnrichedProcSuspendResume(Message &&es_msg, EnrichedProcess &&instigator,
-                            std::optional<EnrichedProcess> &&target)
+  EnrichedProcSuspendResume(Message&& es_msg, EnrichedProcess&& instigator,
+                            std::optional<EnrichedProcess>&& target)
       : EnrichedEventType(std::move(es_msg), std::move(instigator)),
         target_(std::move(target)) {}
 
-  EnrichedProcSuspendResume(EnrichedProcSuspendResume &&) = default;
+  EnrichedProcSuspendResume(EnrichedProcSuspendResume&&) = default;
 
-  EnrichedProcSuspendResume(const EnrichedProcSuspendResume &other) = delete;
+  EnrichedProcSuspendResume(const EnrichedProcSuspendResume& other) = delete;
 
-  const std::optional<EnrichedProcess> &target() const { return target_; }
+  const std::optional<EnrichedProcess>& target() const { return target_; }
 
  private:
   std::optional<EnrichedProcess> target_;
@@ -797,8 +797,8 @@ using EnrichedType = std::variant<
     EnrichedLoginLogout, EnrichedAuthenticationOD,
     EnrichedAuthenticationTouchID, EnrichedAuthenticationToken,
     EnrichedAuthenticationAutoUnlock, EnrichedClone, EnrichedCopyfile,
-    EnrichedProcSuspendResume,
-    EnrichedLaunchItem, EnrichedXProtectDetected, EnrichedXProtectRemediated
+    EnrichedProcSuspendResume, EnrichedLaunchItem, EnrichedXProtectDetected,
+    EnrichedXProtectRemediated
 #if HAVE_MACOS_15
     ,
     EnrichedGatekeeperOverride
