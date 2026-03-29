@@ -758,7 +758,15 @@ NS_ASSUME_NONNULL_BEGIN
 
   NSString* mountFromName = @(eventStatFS->f_mntfromname);
 
-  NSURL* fromURL = [NSURL URLWithString:mountFromName];
+  // f_mntfromname uses protocol-specific formats that aren't always valid URLs.
+  // NFS uses "host:/path" which NSURL misinterprets as scheme=host with no host component.
+  // SMB/CIFS uses "//[user@]host/share" which NSURL handles correctly.
+  // Prepend the filesystem type as a URL scheme when needed to make it parseable.
+  NSString* urlString = mountFromName;
+  if (![mountFromName containsString:@"://"] && ![mountFromName hasPrefix:@"//"]) {
+    urlString = [NSString stringWithFormat:@"%s://%@", eventStatFS->f_fstypename, mountFromName];
+  }
+  NSURL* fromURL = [NSURL URLWithString:urlString];
   if (!fromURL.host) {
     if (self.configurator.failClosed) {
       LOGW(@"Network share prevented from mounting: %s (by: %s). Unable to extract host "
