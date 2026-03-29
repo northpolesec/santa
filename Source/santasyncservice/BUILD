@@ -424,7 +424,6 @@ objc_library(
         "//Source/common:MOLXPCConnection",
         "//Source/common:SNTDropRootPrivs",
         "//Source/common:SNTExportConfiguration",
-        "//Source/common:SNTKVOManager",
         "//Source/common:SNTLogging",
         "//Source/common:SNTStrengthify",
         "//Source/common:SNTXPCControlInterface",

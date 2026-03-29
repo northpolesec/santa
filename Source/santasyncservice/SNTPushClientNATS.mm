@@ -982,6 +982,19 @@ static void closedCallback(natsConnection* nc, void* closure) {
 
     // Now attempt to connect
     [self connect];
+
+    if (syncState.pushHMACKey) {
+      self.hmacKey = syncState.pushHMACKey;
+    } else {
+      LOGW(@"NATS: No push HMAC key received from preflight");
+    }
+
+    // Only update the sync interval when we have valid push configuration.
+    // Without this guard, sync v1 clients (with no push infrastructure) would
+    // have their interval overwritten to the minimum (60s).
+    if (syncState.pushNotificationsFullSyncInterval) {
+      self.fullSyncInterval = syncState.pushNotificationsFullSyncInterval.unsignedIntegerValue;
+    }
   } else {
     NSMutableArray* missing = [NSMutableArray array];
     if (!syncState.pushServer) [missing addObject:@"server"];
@@ -990,17 +1003,6 @@ static void closedCallback(natsConnection* nc, void* closure) {
     if (!syncState.pushDeviceID) [missing addObject:@"device ID"];
     LOGW(@"NATS: Missing required push configuration from preflight: %@",
          [missing componentsJoinedByString:@", "]);
-  }
-
-  if (syncState.pushHMACKey) {
-    self.hmacKey = syncState.pushHMACKey;
-  } else {
-    LOGW(@"NATS: No push HMAC key received from preflight");
-  }
-
-  // Update sync interval to avoid polling Workshop.
-  if (syncState.pushNotificationsFullSyncInterval) {
-    self.fullSyncInterval = syncState.pushNotificationsFullSyncInterval.unsignedIntegerValue;
   }
 }
 

@@ -591,11 +591,11 @@ double watchdogRAMPeak = 0;
   }];
 
   [result fullSyncInterval:^(NSUInteger val) {
-    [configurator setFullSyncInterval:val];
+    [configurator setSyncServerFullSyncInterval:val];
   }];
 
   [result pushNotificationsFullSyncInterval:^(NSUInteger val) {
-    [configurator setPushNotificationsFullSyncInterval:val];
+    [configurator setSyncServerPushNotificationsFullSyncInterval:val];
   }];
 
   reply();

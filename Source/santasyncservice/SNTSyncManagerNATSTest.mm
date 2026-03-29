@@ -49,47 +49,40 @@
   [super tearDown];
 }
 
-- (void)testSyncManagerInitializesNATSClientWhenEnabled {
-  // Given: FCM is disabled, NATS is enabled (default), and syncBaseURL is pinned
+- (void)testSyncManagerDoesNotCreateNATSClientAtStartup {
+  // NATS client should NOT be created at startup, even when enablePushNotifications is YES.
+  // It is created dynamically after preflight token chain validation.
   OCMStub([self.mockConfigurator fcmEnabled]).andReturn(NO);
   OCMStub([self.mockConfigurator enablePushNotifications]).andReturn(YES);
   OCMStub([self.mockConfigurator syncBaseURL])
       .andReturn([NSURL URLWithString:@"https://example.workshop.cloud"]);
 
-  // When: Sync manager is initialized
   self.syncManager = [[SNTSyncManager alloc] initWithDaemonConnection:self.mockDaemonConn];
 
-  // Then: Push notifications should be NATS client
-  XCTAssertNotNil(self.syncManager.pushNotifications);
-  XCTAssertTrue([self.syncManager.pushNotifications isKindOfClass:[SNTPushClientNATS class]]);
+  XCTAssertNil(self.syncManager.pushNotifications, @"NATS client should not be created at startup");
 }
 
-- (void)testSyncManagerFCMTakesPrecedenceOverNATS {
-  // Given: Both FCM and NATS are enabled
+- (void)testSyncManagerFCMStillCreatedAtStartup {
+  // FCM is a legacy client and should still be created at startup.
   OCMStub([self.mockConfigurator fcmEnabled]).andReturn(YES);
-  OCMStub([self.mockConfigurator enablePushNotifications]).andReturn(YES);
   OCMStub([self.mockConfigurator syncBaseURL])
       .andReturn([NSURL URLWithString:@"https://example.workshop.cloud"]);
 
-  // When: Sync manager is initialized
   self.syncManager = [[SNTSyncManager alloc] initWithDaemonConnection:self.mockDaemonConn];
 
-  // Then: Push notifications should be FCM client (FCM takes precedence)
   XCTAssertNotNil(self.syncManager.pushNotifications);
   XCTAssertTrue([self.syncManager.pushNotifications isKindOfClass:[SNTPushClientFCM class]]);
 }
 
-- (void)testSyncManagerNoPushClientWhenAllDisabled {
-  // Given: All push notification systems are disabled
+- (void)testSyncManagerNoPushClientWhenFCMDisabled {
+  // No push client at startup when FCM is disabled (NATS is dynamic now).
   OCMStub([self.mockConfigurator fcmEnabled]).andReturn(NO);
   OCMStub([self.mockConfigurator enablePushNotifications]).andReturn(NO);
   OCMStub([self.mockConfigurator syncBaseURL])
       .andReturn([NSURL URLWithString:@"https://example.workshop.cloud"]);
 
-  // When: Sync manager is initialized
   self.syncManager = [[SNTSyncManager alloc] initWithDaemonConnection:self.mockDaemonConn];
 
-  // Then: Push notifications should be nil
   XCTAssertNil(self.syncManager.pushNotifications);
 }
 

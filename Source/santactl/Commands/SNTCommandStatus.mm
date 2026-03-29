@@ -386,7 +386,7 @@ REGISTER_COMMAND_NAME(@"status")
         @"full_sync_interval_seconds" : @(fullSyncInterval),
       } mutableCopy];
 
-      if (configurator.fcmEnabled || configurator.enablePushNotifications) {
+      if (configurator.fcmEnabled || (isSyncV2Enabled && configurator.enablePushNotifications)) {
         stats[@"sync"][@"push_notifications_full_sync_interval_seconds"] =
             @(pushNotificationsFullSyncInterval);
       }
@@ -511,10 +511,10 @@ REGISTER_COMMAND_NAME(@"status")
       printf("  %-40s | %s\n", "Last Successful Full Sync", [fullSyncLastSuccessStr UTF8String]);
       printf("  %-40s | %s\n", "Last Successful Rule Sync", [ruleSyncLastSuccessStr UTF8String]);
 
-      // If push notifications are enabled, show the push notifications full
-      // sync interval since it's the active configuration.
+      // Show the push notifications full sync interval for FCM clients or
+      // sync v2 clients where push has not been explicitly disabled.
       NSString* fullSyncIntervalStr = FormatInterval(fullSyncInterval);
-      if (configurator.fcmEnabled || configurator.enablePushNotifications) {
+      if (configurator.fcmEnabled || (isSyncV2Enabled && configurator.enablePushNotifications)) {
         fullSyncIntervalStr =
             [NSString stringWithFormat:@"%@ (with Push Notifications)",
                                        FormatInterval(pushNotificationsFullSyncInterval)];
