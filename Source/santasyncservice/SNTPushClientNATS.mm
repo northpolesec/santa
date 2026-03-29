@@ -983,12 +983,6 @@ static void closedCallback(natsConnection* nc, void* closure) {
     // Now attempt to connect
     [self connect];
 
-    if (syncState.pushHMACKey) {
-      self.hmacKey = syncState.pushHMACKey;
-    } else {
-      LOGW(@"NATS: No push HMAC key received from preflight");
-    }
-
     // Only update the sync interval when we have valid push configuration.
     // Without this guard, sync v1 clients (with no push infrastructure) would
     // have their interval overwritten to the minimum (60s).
@@ -1003,6 +997,15 @@ static void closedCallback(natsConnection* nc, void* closure) {
     if (!syncState.pushDeviceID) [missing addObject:@"device ID"];
     LOGW(@"NATS: Missing required push configuration from preflight: %@",
          [missing componentsJoinedByString:@", "]);
+  }
+
+  // HMAC key is independent of connection credentials — update or clear
+  // regardless of whether the full push config was present.
+  if (syncState.pushHMACKey) {
+    self.hmacKey = syncState.pushHMACKey;
+  } else {
+    LOGW(@"NATS: No push HMAC key received from preflight");
+    self.hmacKey = nil;
   }
 }
 
