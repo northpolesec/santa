@@ -1201,4 +1201,154 @@
   OCMVerify([self.daemonConnRop updateSyncSettings:OCMOCK_ANY reply:OCMOCK_ANY]);
 }
 
+#pragma mark - Dynamic NATS Push Client Lifecycle Tests
+
+- (void)testPreflightCreatesNATSWhenSyncV2 {
+  id mockPreflight = OCMClassMock([SNTSyncPreflight class]);
+  OCMStub([mockPreflight alloc]).andReturn(mockPreflight);
+  OCMStub([mockPreflight initWithState:OCMOCK_ANY]).andReturn(mockPreflight);
+  OCMStub([(SNTSyncPreflight*)mockPreflight sync]).andReturn(YES);
+
+  SNTSyncState* ss = [[SNTSyncState alloc] init];
+  ss.isSyncV2 = YES;
+  ss.fullSyncInterval = @(600);
+  ss.preflightOnly = YES;
+
+  SNTSyncManager* sm = [[SNTSyncManager alloc] initWithDaemonConnection:nil];
+
+  // pushNotifications should be nil before preflight
+  XCTAssertNil(sm.pushNotifications);
+
+  OCMStub([self.configMock enablePushNotifications]).andReturn(YES);
+
+  [sm preflightWithSyncState:ss];
+
+  // After a successful v2 preflight, NATS client should be created
+  XCTAssertNotNil(sm.pushNotifications);
+  XCTAssertTrue([sm.pushNotifications isKindOfClass:[SNTPushClientNATS class]]);
+
+  [mockPreflight stopMocking];
+}
+
+- (void)testPreflightDoesNotCreateNATSWhenSyncV1 {
+  id mockPreflight = OCMClassMock([SNTSyncPreflight class]);
+  OCMStub([mockPreflight alloc]).andReturn(mockPreflight);
+  OCMStub([mockPreflight initWithState:OCMOCK_ANY]).andReturn(mockPreflight);
+  OCMStub([(SNTSyncPreflight*)mockPreflight sync]).andReturn(YES);
+
+  SNTSyncState* ss = [[SNTSyncState alloc] init];
+  ss.isSyncV2 = NO;
+  ss.fullSyncInterval = @(600);
+  ss.preflightOnly = YES;
+
+  SNTSyncManager* sm = [[SNTSyncManager alloc] initWithDaemonConnection:nil];
+
+  [sm preflightWithSyncState:ss];
+
+  // sync v1: no NATS client should be created
+  XCTAssertNil(sm.pushNotifications);
+
+  [mockPreflight stopMocking];
+}
+
+- (void)testPreflightDoesNotCreateNATSWhenKillSwitchDisabled {
+  id mockPreflight = OCMClassMock([SNTSyncPreflight class]);
+  OCMStub([mockPreflight alloc]).andReturn(mockPreflight);
+  OCMStub([mockPreflight initWithState:OCMOCK_ANY]).andReturn(mockPreflight);
+  OCMStub([(SNTSyncPreflight*)mockPreflight sync]).andReturn(YES);
+
+  SNTSyncState* ss = [[SNTSyncState alloc] init];
+  ss.isSyncV2 = YES;
+  ss.fullSyncInterval = @(600);
+  ss.preflightOnly = YES;
+
+  SNTSyncManager* sm = [[SNTSyncManager alloc] initWithDaemonConnection:nil];
+
+  OCMStub([self.configMock enablePushNotifications]).andReturn(NO);
+
+  [sm preflightWithSyncState:ss];
+
+  // Kill switch disabled: no NATS client even though sync v2
+  XCTAssertNil(sm.pushNotifications);
+
+  [mockPreflight stopMocking];
+}
+
+- (void)testPreflightTearsDownNATSWhenSyncV2Lost {
+  id mockPreflight = OCMClassMock([SNTSyncPreflight class]);
+  OCMStub([mockPreflight alloc]).andReturn(mockPreflight);
+  OCMStub([mockPreflight initWithState:OCMOCK_ANY]).andReturn(mockPreflight);
+  OCMStub([(SNTSyncPreflight*)mockPreflight sync]).andReturn(YES);
+
+  SNTSyncState* ss = [[SNTSyncState alloc] init];
+  ss.isSyncV2 = NO;
+  ss.fullSyncInterval = @(600);
+  ss.preflightOnly = YES;
+
+  SNTSyncManager* sm = [[SNTSyncManager alloc] initWithDaemonConnection:nil];
+
+  // Simulate a previously created NATS client
+  sm.pushNotifications = [[SNTPushClientNATS alloc] initWithSyncDelegate:nil];
+  XCTAssertNotNil(sm.pushNotifications);
+
+  [sm preflightWithSyncState:ss];
+
+  // sync v2 no longer active: NATS client should be torn down
+  XCTAssertNil(sm.pushNotifications);
+
+  [mockPreflight stopMocking];
+}
+
+- (void)testPreflightDoesNotTearDownFCMWhenSyncV2Lost {
+  id mockPreflight = OCMClassMock([SNTSyncPreflight class]);
+  OCMStub([mockPreflight alloc]).andReturn(mockPreflight);
+  OCMStub([mockPreflight initWithState:OCMOCK_ANY]).andReturn(mockPreflight);
+  OCMStub([(SNTSyncPreflight*)mockPreflight sync]).andReturn(YES);
+
+  SNTSyncState* ss = [[SNTSyncState alloc] init];
+  ss.isSyncV2 = NO;
+  ss.fullSyncInterval = @(600);
+  ss.preflightOnly = YES;
+
+  SNTSyncManager* sm = [[SNTSyncManager alloc] initWithDaemonConnection:nil];
+
+  // Simulate an FCM client (legacy, created at startup)
+  id mockFCM = OCMProtocolMock(@protocol(SNTPushNotificationsClientDelegate));
+  sm.pushNotifications = mockFCM;
+
+  [sm preflightWithSyncState:ss];
+
+  // FCM should NOT be torn down — isKindOfClass:SNTPushClientNATS check protects it
+  XCTAssertNotNil(sm.pushNotifications);
+
+  [mockPreflight stopMocking];
+}
+
+- (void)testPreflightDoesNotReplaceExistingPushClient {
+  id mockPreflight = OCMClassMock([SNTSyncPreflight class]);
+  OCMStub([mockPreflight alloc]).andReturn(mockPreflight);
+  OCMStub([mockPreflight initWithState:OCMOCK_ANY]).andReturn(mockPreflight);
+  OCMStub([(SNTSyncPreflight*)mockPreflight sync]).andReturn(YES);
+
+  SNTSyncState* ss = [[SNTSyncState alloc] init];
+  ss.isSyncV2 = YES;
+  ss.fullSyncInterval = @(600);
+  ss.preflightOnly = YES;
+
+  SNTSyncManager* sm = [[SNTSyncManager alloc] initWithDaemonConnection:nil];
+
+  // Simulate existing FCM client
+  id mockFCM = OCMProtocolMock(@protocol(SNTPushNotificationsClientDelegate));
+  sm.pushNotifications = mockFCM;
+
+  OCMStub([self.configMock enablePushNotifications]).andReturn(YES);
+
+  [sm preflightWithSyncState:ss];
+
+  // Existing push client should not be replaced by NATS
+  XCTAssertEqual(sm.pushNotifications, mockFCM);
+
+  [mockPreflight stopMocking];
+}
+
 @end

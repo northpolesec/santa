@@ -1348,7 +1348,7 @@ static SNTConfigurator* sharedConfigurator = nil;
   return kDefaultFullSyncInterval;
 }
 
-- (void)setFullSyncInterval:(NSUInteger)interval {
+- (void)setSyncServerFullSyncInterval:(NSUInteger)interval {
   [self updateSyncStateForKey:kFullSyncInterval value:@(interval)];
 }
 
@@ -1360,8 +1360,10 @@ static SNTConfigurator* sharedConfigurator = nil;
   return kDefaultPushNotificationsFullSyncInterval;
 }
 
-- (void)setPushNotificationsFullSyncInterval:(NSUInteger)interval {
-  [self updateSyncStateForKey:kFCMFullSyncInterval value:@(interval)];
+- (void)setSyncServerPushNotificationsFullSyncInterval:(NSUInteger)interval {
+  // A value of 0 means "not applicable" (e.g. sync v1). Clear the key so
+  // the getter falls back to the default rather than storing a sentinel.
+  [self updateSyncStateForKey:kFCMFullSyncInterval value:interval ? @(interval) : nil];
 }
 
 - (NSString*)machineOwner {

@@ -219,8 +219,12 @@ extern "C" {
   self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
   NSUInteger originalInterval = self.client.fullSyncInterval;
 
-  // When: Preflight sync state with new interval is handled
+  // When: Preflight sync state with new interval and valid push config is handled
   SNTSyncState* syncState = [[SNTSyncState alloc] init];
+  syncState.pushServer = @"workshop";
+  syncState.pushNKey = @"test-nkey";
+  syncState.pushJWT = @"test-jwt";
+  syncState.pushDeviceID = @"test-device-id";
   syncState.pushNotificationsFullSyncInterval = @(7200);  // 2 hours
 
   [self.client handlePreflightSyncState:syncState];
@@ -228,6 +232,21 @@ extern "C" {
   // Then: Interval should be updated
   XCTAssertEqual(self.client.fullSyncInterval, 7200);
   XCTAssertNotEqual(self.client.fullSyncInterval, originalInterval);
+}
+
+- (void)testHandlePreflightSyncStateDoesNotUpdateIntervalWithoutPushConfig {
+  // Given: Client is initialized
+  self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
+  NSUInteger originalInterval = self.client.fullSyncInterval;
+
+  // When: Preflight sync state has interval but no push config fields
+  SNTSyncState* syncState = [[SNTSyncState alloc] init];
+  syncState.pushNotificationsFullSyncInterval = @(7200);
+
+  [self.client handlePreflightSyncState:syncState];
+
+  // Then: Interval should NOT be updated (no push config)
+  XCTAssertEqual(self.client.fullSyncInterval, originalInterval);
 }
 
 #pragma mark - Full Sync Interval Tests

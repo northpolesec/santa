@@ -138,6 +138,33 @@
   dispatch_source_cancel(timer);
 }
 
+- (void)testCreateSyncTimerDoesNotFireImmediately {
+  // Verify that a newly created timer does not fire until explicitly scheduled.
+  // This prevents a race with the initial syncSecondsFromNow:15 call.
+  id mockConnection = OCMClassMock([MOLXPCConnection class]);
+  SNTSyncManager* syncManager = [[SNTSyncManager alloc] initWithDaemonConnection:mockConnection];
+
+  __block BOOL blockFired = NO;
+  dispatch_source_t timer = [syncManager createSyncTimerWithBlock:^{
+    blockFired = YES;
+  }];
+
+  XCTAssertNotNil(timer, @"Timer should be created");
+
+  // Wait 100ms — more than enough for an unguarded timer to fire
+  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+  dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 100 * NSEC_PER_MSEC),
+                 dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+                   dispatch_semaphore_signal(sema);
+                 });
+  dispatch_semaphore_wait(sema, DISPATCH_TIME_FOREVER);
+
+  XCTAssertFalse(blockFired, @"Timer block should not fire until explicitly scheduled");
+
+  // Clean up
+  dispatch_source_cancel(timer);
+}
+
 - (void)testTimerReschedulingAfterIntervalChange {
   // Test that timers are properly rescheduled when intervals change
   // This verifies the integration between interval updates and timer rescheduling
