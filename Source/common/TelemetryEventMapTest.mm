@@ -60,6 +60,7 @@ using santa::TelemetryEvent;
       {"LaunchItem", TelemetryEvent::kLaunchItem},
       {"TCCModification", TelemetryEvent::kTCCModification},
       {"XProtect", TelemetryEvent::kXProtect},
+      {"ProcSuspendResume", TelemetryEvent::kProcSuspendResume},
 
       // special cases
       {"none", TelemetryEvent::kNone},
