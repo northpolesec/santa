@@ -1349,7 +1349,9 @@ static SNTConfigurator* sharedConfigurator = nil;
 }
 
 - (void)setSyncServerFullSyncInterval:(NSUInteger)interval {
-  [self updateSyncStateForKey:kFullSyncInterval value:@(interval)];
+  // A value of 0 means "not provided" (e.g. server didn't set the field).
+  // Clear the key so the getter falls back to the default rather than storing a sentinel.
+  [self updateSyncStateForKey:kFullSyncInterval value:interval ? @(interval) : nil];
 }
 
 - (NSUInteger)pushNotificationsFullSyncInterval {

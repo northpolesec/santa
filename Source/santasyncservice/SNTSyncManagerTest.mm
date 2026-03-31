@@ -18,14 +18,16 @@
 
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTSyncConstants.h"
+#import "Source/common/SNTXPCControlInterface.h"
 #import "Source/santasyncservice/SNTPushNotifications.h"
 #import "Source/santasyncservice/SNTSyncManager.h"
 #import "Source/santasyncservice/SNTSyncState.h"
 
-// Test category to access private timer properties for testing
+// Test category to access private properties for testing
 @interface SNTSyncManager (TestAccess)
 @property(nonatomic) dispatch_source_t fullSyncTimer;
 @property(nonatomic) dispatch_source_t ruleSyncTimer;
+@property NSUInteger persistedFullSyncInterval;
 - (void)rescheduleTimerQueue:(dispatch_source_t)timerQueue secondsFromNow:(uint64_t)seconds;
 - (dispatch_source_t)createSyncTimerWithBlock:(void (^)(void))block;
 @end
@@ -181,6 +183,32 @@
 
   // Verify timer is still valid
   XCTAssertNotNil(initialFullTimer, @"Timer should remain valid after rescheduling");
+}
+
+- (void)testInitReadsPersistedFullSyncIntervalFromDaemon {
+  // Verify that initWithDaemonConnection: reads the persisted full sync interval
+  // from the daemon via XPC and stores it as a fallback.
+  id mockConnection = OCMClassMock([MOLXPCConnection class]);
+  id mockRop = OCMProtocolMock(@protocol(SNTDaemonControlXPC));
+  OCMStub([mockConnection synchronousRemoteObjectProxy]).andReturn(mockRop);
+
+  OCMStub([mockRop fullSyncInterval:OCMOCK_ANY]).andDo(^(NSInvocation* inv) {
+    void (^block)(NSUInteger);
+    [inv getArgument:&block atIndex:2];
+    block(3600);
+  });
+
+  SNTSyncManager* sm = [[SNTSyncManager alloc] initWithDaemonConnection:mockConnection];
+
+  XCTAssertEqual(sm.persistedFullSyncInterval, 3600);
+}
+
+- (void)testInitUsesDefaultWhenDaemonConnectionIsNil {
+  // When the daemon connection is nil (e.g. during testing), XPC calls are
+  // no-ops (messages to nil). The persisted value should stay at the default.
+  SNTSyncManager* sm = [[SNTSyncManager alloc] initWithDaemonConnection:nil];
+
+  XCTAssertEqual(sm.persistedFullSyncInterval, kDefaultFullSyncInterval);
 }
 
 @end

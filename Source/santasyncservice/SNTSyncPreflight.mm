@@ -202,9 +202,13 @@ BOOL Preflight(SNTSyncPreflight* self, google::protobuf::Arena* arena,
           ? kDefaultPushNotificationsGlobalRuleSyncDeadline
           : value;
 
-  // Check if our sync interval has changed
+  // Only set fullSyncInterval when the server actually provides a value.
+  // If the field is unset (protobuf default 0), leave the property nil so the
+  // sync manager falls back to the daemon's persisted interval or the default.
   value = resp.full_sync_interval_seconds();
-  self.syncState.fullSyncInterval = @(MAX(value, kMinimumFullSyncInterval));
+  if (value > 0) {
+    self.syncState.fullSyncInterval = @(MAX(value, kMinimumFullSyncInterval));
+  }
 
   switch (resp.client_mode()) {
     case Traits::MONITOR: self.syncState.clientMode = SNTClientModeMonitor; break;

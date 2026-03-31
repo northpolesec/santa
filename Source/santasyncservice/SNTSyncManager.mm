@@ -66,6 +66,11 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
 @property NSString* xsrfToken;
 @property NSString* xsrfTokenHeader;
 
+// Persisted full sync interval read from the daemon on startup.
+// Used as fallback when the server doesn't provide full_sync_interval_seconds in preflight.
+// Updated when the server provides a new value so the fallback stays current.
+@property NSUInteger persistedFullSyncInterval;
+
 @property(nonatomic, readonly) dispatch_queue_t metricsQueue;
 
 @end
@@ -78,6 +83,17 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   self = [super init];
   if (self) {
     _daemonConn = daemonConn;
+
+    // Read the daemon's persisted full sync interval. This reflects the last value
+    // the server provided and serves as a fallback when the server doesn't include
+    // full_sync_interval_seconds in a preflight response. The XPC call is synchronous
+    // (reply block executes before the method returns).
+    __block NSUInteger persistedFull = kDefaultFullSyncInterval;
+    [[_daemonConn synchronousRemoteObjectProxy] fullSyncInterval:^(NSUInteger interval) {
+      persistedFull = interval;
+    }];
+    _persistedFullSyncInterval = persistedFull;
+    LOGD(@"Read persisted full sync interval from daemon: %lu", _persistedFullSyncInterval);
 
     SNTConfigurator* config = [SNTConfigurator configurator];
 
@@ -95,7 +111,7 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
       // a safety net for the case where the sync fails before reaching any
       // rescheduling logic.
       NSUInteger interval = self.pushNotifications ? self.pushNotifications.fullSyncInterval
-                                                   : kDefaultFullSyncInterval;
+                                                   : self.persistedFullSyncInterval;
       [self rescheduleTimerQueue:self.fullSyncTimer secondsFromNow:interval];
       [self syncType:SNTSyncTypeNormal withReply:NULL];
     }];
@@ -525,6 +541,11 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
 
     self.eventBatchSize = syncState.eventBatchSize;
 
+    // Keep the persisted fallback current when the server provides a value.
+    if (syncState.fullSyncInterval) {
+      self.persistedFullSyncInterval = syncState.fullSyncInterval.unsignedIntegerValue;
+    }
+
     // Dynamic NATS lifecycle: create when server validates sync v2,
     // tear down when sync v2 is no longer valid.
     if (syncState.isSyncV2 && !self.pushNotifications) {
@@ -546,13 +567,6 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
       self.pushNotifications = nil;
     }
 
-    // pushNotificationsFullSyncInterval is only meaningful when push notifications
-    // are in use. Clear it otherwise so the postflight persists 0 to the daemon,
-    // overriding any stale default (14400).
-    if (!self.pushNotifications) {
-      syncState.pushNotificationsFullSyncInterval = @(0);
-    }
-
     // Hand off push credentials to the push client (if present).
     if (self.pushNotifications) {
       NSUInteger oldInterval = self.pushNotifications.fullSyncInterval;
@@ -570,6 +584,11 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
             @"Push notification sync interval changed from %lu to %lu seconds. Rescheduling timer.",
             oldInterval, self.pushNotifications.fullSyncInterval);
       }
+    } else {
+      // pushNotificationsFullSyncInterval is only meaningful when push notifications
+      // are in use. Clear it so the postflight persists 0 to the daemon,
+      // overriding any stale default (14400).
+      syncState.pushNotificationsFullSyncInterval = @(0);
     }
 
     // Use the push notification interval when the server provided one and we
@@ -582,7 +601,7 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
     } else {
       NSUInteger interval = syncState.fullSyncInterval
                                 ? syncState.fullSyncInterval.unsignedIntegerValue
-                                : kDefaultFullSyncInterval;
+                                : self.persistedFullSyncInterval;
       LOGD(@"Push notifications not configured by server. Sync every %lu min.", interval / 60);
       [self rescheduleTimerQueue:self.fullSyncTimer secondsFromNow:interval];
     }
