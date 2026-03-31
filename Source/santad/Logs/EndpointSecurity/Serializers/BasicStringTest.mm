@@ -1070,6 +1070,16 @@ std::string BasicStringSerializeMessage(es_message_t* esMsg) {
                      "|uid=-2|user=nobody|gid=-1|group=nogroup|machineid=my_id\n";
 
   XCTAssertCppStringEqual(got, want);
+
+  esMsg.event.proc_suspend_resume.type = ES_PROC_SUSPEND_RESUME_TYPE_RESUME;
+  esMsg.event.proc_suspend_resume.target = NULL;
+
+  got = BasicStringSerializeMessage(&esMsg);
+  want = "action=PROC_SUSPEND_RESUME|type=RESUME"
+         "|pid=12|ppid=56|process=foo|processpath=foo"
+         "|uid=-2|user=nobody|gid=-1|group=nogroup|machineid=my_id\n";
+
+  XCTAssertCppStringEqual(got, want);
 }
 
 #if HAVE_MACOS_15

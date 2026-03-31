@@ -1576,6 +1576,14 @@ void SerializeAndCheckNonESEvents(
                     esMsg->event.proc_suspend_resume.type = ES_PROC_SUSPEND_RESUME_TYPE_SUSPEND;
                     esMsg->event.proc_suspend_resume.target = &targetProc;
                   }];
+
+  [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_PROC_SUSPEND_RESUME
+                  messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
+                                 es_message_t* esMsg) {
+                    esMsg->event.proc_suspend_resume.type = ES_PROC_SUSPEND_RESUME_TYPE_RESUME;
+                    esMsg->event.proc_suspend_resume.target = NULL;
+                  }
+                       variant:@"null_target"];
 }
 
 #if HAVE_MACOS_15
