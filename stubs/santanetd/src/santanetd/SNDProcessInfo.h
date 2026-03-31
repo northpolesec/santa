@@ -19,10 +19,11 @@ struct SantaVnode;
 
 // Stub implementation to allow Santa to build independently without
 // access to the Network Extension repo.
+//
+// Santa only accesses SNDProcessInfo via [processFlows.processInfo vnode]
+// in Serializer.mm. All other property access happens inside
+// PopulateNetworkActivityProcess which is stubbed as a no-op.
 @interface SNDProcessInfo : NSObject <NSSecureCoding>
-
-@property(nonatomic, readonly) pid_t pid;
-@property(nonatomic, readonly) int pidversion;
 
 - (SantaVnode)vnode;
 

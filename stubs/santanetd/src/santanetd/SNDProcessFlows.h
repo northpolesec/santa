@@ -19,13 +19,12 @@
 
 // Stub implementation to allow Santa to build independently without
 // access to the Network Extension repo.
+//
+// Santa only accesses SNDProcessFlows via processFlows.processInfo in
+// Serializer.mm. All other methods are used inside
+// PopulateNetworkActivityProcess which is stubbed as a no-op.
 @interface SNDProcessFlows : NSObject <NSSecureCoding>
 
 @property(nonatomic, readonly) SNDProcessInfo* processInfo;
-@property(nonatomic, readonly) NSUInteger flowCount;
-
-- (instancetype)initWithProcessInfo:(SNDProcessInfo*)processInfo;
-- (void)addFlow:(SNDFlowInfo*)flow;
-- (void)enumerateFlowsUsingBlock:(void(NS_NOESCAPE ^)(SNDFlowInfo* flow))block;
 
 @end
