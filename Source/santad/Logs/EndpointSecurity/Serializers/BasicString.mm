@@ -29,6 +29,8 @@
 #include <time.h>
 #include <unistd.h>
 
+#include <format>
+#include <iterator>
 #include <optional>
 #include <string>
 
@@ -276,7 +278,7 @@ BasicString::BasicString(std::shared_ptr<EndpointSecurityAPI> esapi,
                          SNTDecisionCache* decision_cache, bool prefix_time_name)
     : Serializer(std::move(decision_cache)), esapi_(esapi), prefix_time_name_(prefix_time_name) {}
 
-std::string BasicString::CreateDefaultString(size_t reserved_size) {
+std::string BasicString::CreateDefaultString() {
   std::string str;
   str.reserve(1024);
 
@@ -328,7 +330,7 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedExchange& msg) 
 }
 
 std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedExec& msg, SNTCachedDecision* cd) {
-  std::string str = CreateDefaultString(1024);  // EXECs tend to be bigger, reserve more space.
+  std::string str = CreateDefaultString();
 
   str.append("action=EXEC|decision=");
   str.append(GetDecisionString(cd.decision));
@@ -487,8 +489,8 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedCSInvalidated& 
 
   str.append("action=CODESIGNING_INVALIDATED");
   AppendInstigator(str, msg);
-  str.append("|codesigning_flags=");
-  str.append([NSString stringWithFormat:@"0x%08x", msg->process->codesigning_flags].UTF8String);
+  std::format_to(std::back_inserter(str), "|codesigning_flags=0x{:08x}",
+                 msg->process->codesigning_flags);
   return FinalizeString(str);
 }
 
