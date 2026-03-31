@@ -84,17 +84,19 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
     if (config.fcmEnabled) {
       LOGD(@"Using FCM push notifications");
       _pushNotifications = [[SNTPushClientFCM alloc] initWithSyncDelegate:self];
-    } else if (config.enablePushNotifications) {
-      // Unless explicitly disabled, initialize the NATS push client. The client
-      // will wait for configuration during a valid V2 preflight.
-      LOGD(@"Using NATS push notifications");
-      _pushNotifications = [[SNTPushClientNATS alloc] initWithSyncDelegate:self];
     }
+    // NATS push client is created dynamically in preflightWithSyncState: after
+    // the server provides a validated token chain (isSyncV2) and push config.
 
     _fullSyncTimer = [self createSyncTimerWithBlock:^{
-      [self rescheduleTimerQueue:self.fullSyncTimer
-                  secondsFromNow:_pushNotifications ? _pushNotifications.fullSyncInterval
-                                                    : kDefaultFullSyncInterval];
+      // Reschedule as a fallback before starting the sync. On success,
+      // preflightWithSyncState: will override with the server-informed interval.
+      // On failure, the failed-preflight path corrects it as well. This is just
+      // a safety net for the case where the sync fails before reaching any
+      // rescheduling logic.
+      NSUInteger interval = self.pushNotifications ? self.pushNotifications.fullSyncInterval
+                                                   : kDefaultFullSyncInterval;
+      [self rescheduleTimerQueue:self.fullSyncTimer secondsFromNow:interval];
       [self syncType:SNTSyncTypeNormal withReply:NULL];
     }];
     _ruleSyncTimer = [self createSyncTimerWithBlock:^{
@@ -523,47 +525,76 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
 
     self.eventBatchSize = syncState.eventBatchSize;
 
-    // Start listening for push notifications with a full sync every
-    // pushNotificationsFullSyncInterval.
+    // Dynamic NATS lifecycle: create when server validates sync v2,
+    // tear down when sync v2 is no longer valid.
+    if (syncState.isSyncV2 && !self.pushNotifications) {
+      // Check kill switch — respect explicit admin disable
+      if ([[SNTConfigurator configurator] enablePushNotifications]) {
+        LOGI(@"Creating NATS push client after successful sync v2 preflight");
+        self.pushNotifications = [[SNTPushClientNATS alloc] initWithSyncDelegate:self];
+      }
+    } else if (!syncState.isSyncV2 && self.pushNotifications &&
+               [self.pushNotifications isKindOfClass:[SNTPushClientNATS class]]) {
+      // Token chain no longer valid — tear down NATS client.
+      // The NATS C library holds unretained pointers to the client via __bridge
+      // callbacks, so we must disconnect (which destroys the C-level connection)
+      // before the object is deallocated. disconnectWithCompletion: dispatches
+      // async onto connectionQueue and the block's implicit capture of self (the
+      // NATS client) keeps it alive until cleanup completes.
+      LOGI(@"Sync v2 no longer active, tearing down NATS push client");
+      [(SNTPushClientNATS*)self.pushNotifications disconnectWithCompletion:nil];
+      self.pushNotifications = nil;
+    }
+
+    // pushNotificationsFullSyncInterval is only meaningful when push notifications
+    // are in use. Clear it otherwise so the postflight persists 0 to the daemon,
+    // overriding any stale default (14400).
+    if (!self.pushNotifications) {
+      syncState.pushNotificationsFullSyncInterval = @(0);
+    }
+
+    // Hand off push credentials to the push client (if present).
     if (self.pushNotifications) {
       NSUInteger oldInterval = self.pushNotifications.fullSyncInterval;
       [self.pushNotifications handlePreflightSyncState:syncState];
 
-      // Clear all push credentials from syncState after handoff to push client
-      // These are no longer needed and should not be accessible to other sync stages
+      // Clear all push credentials from syncState after handoff to push client.
+      // These are no longer needed and should not be accessible to other sync stages.
       syncState.pushNKey = nil;
       syncState.pushJWT = nil;
       syncState.pushIssuerJWT = nil;
       syncState.pushHMACKey = nil;
 
-      // If push interval changed, mark log the difference.
       if (oldInterval != self.pushNotifications.fullSyncInterval) {
         LOGD(
             @"Push notification sync interval changed from %lu to %lu seconds. Rescheduling timer.",
             oldInterval, self.pushNotifications.fullSyncInterval);
       }
+    }
 
-      // Always reschedule
+    // Use the push notification interval when the server provided one and we
+    // have an active push client. syncState.pushNotificationsFullSyncInterval
+    // is nil when the server does not set push_notification_full_sync_interval_seconds
+    // (e.g. sync v1). In that case, fall back to the server's regular full_sync_interval.
+    if (self.pushNotifications && syncState.pushNotificationsFullSyncInterval) {
       [self rescheduleTimerQueue:self.fullSyncTimer
                   secondsFromNow:self.pushNotifications.fullSyncInterval];
     } else {
       NSUInteger interval = syncState.fullSyncInterval
                                 ? syncState.fullSyncInterval.unsignedIntegerValue
                                 : kDefaultFullSyncInterval;
-      LOGD(@"Push notifications are not enabled. Sync every %lu min.", interval / 60);
-
-      // Always reschedule
+      LOGD(@"Push notifications not configured by server. Sync every %lu min.", interval / 60);
       [self rescheduleTimerQueue:self.fullSyncTimer secondsFromNow:interval];
     }
 
     if (syncState.preflightOnly) return SNTSyncStatusTypeSuccess;
     return [self eventUploadWithSyncState:syncState];
-  } else if (_pushNotifications) {
+  } else if (self.pushNotifications) {
     // If preflight failed and push notifications are enabled, force a reschedule for
     // the smaller of the default sync interval (default 10 minutes) and whatever the
     // last push full sync interval was set to (default 4 hours).
     // If push notifications are not enabled, the default sync interval was already set (10m).
-    auto interval = std::min(_pushNotifications.fullSyncInterval, kDefaultFullSyncInterval);
+    auto interval = std::min(self.pushNotifications.fullSyncInterval, kDefaultFullSyncInterval);
     [self rescheduleTimerQueue:self.fullSyncTimer secondsFromNow:interval];
   }
 
@@ -621,6 +652,10 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
       block();
     }
   });
+  // Arm with DISPATCH_TIME_FOREVER so the timer does not fire until explicitly
+  // scheduled via rescheduleTimerQueue:secondsFromNow: (e.g. syncSecondsFromNow:15).
+  // Without this, the default fire time races with the initial schedule call.
+  dispatch_source_set_timer(timerQueue, DISPATCH_TIME_FOREVER, DISPATCH_TIME_FOREVER, 0);
   dispatch_resume(timerQueue);
   return timerQueue;
 }
