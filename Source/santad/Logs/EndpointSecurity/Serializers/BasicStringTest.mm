@@ -1052,6 +1052,36 @@ std::string BasicStringSerializeMessage(es_message_t* esMsg) {
   XCTAssertCppStringEqual(got, want);
 }
 
+- (void)testSerializeMessageProcSuspendResume {
+  es_file_t procFile = MakeESFile("foo");
+  es_process_t proc = MakeESProcess(&procFile, MakeAuditToken(12, 34), MakeAuditToken(56, 78));
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_PROC_SUSPEND_RESUME, &proc);
+
+  es_file_t targetFile = MakeESFile("targetpath");
+  es_process_t targetProc =
+      MakeESProcess(&targetFile, MakeAuditToken(99, 100), MakeAuditToken(56, 78));
+
+  esMsg.event.proc_suspend_resume.type = ES_PROC_SUSPEND_RESUME_TYPE_SUSPEND;
+  esMsg.event.proc_suspend_resume.target = &targetProc;
+
+  std::string got = BasicStringSerializeMessage(&esMsg);
+  std::string want = "action=PROC_SUSPEND_RESUME|type=SUSPEND|targetpid=99|targetpath=targetpath"
+                     "|pid=12|ppid=56|process=foo|processpath=foo"
+                     "|uid=-2|user=nobody|gid=-1|group=nogroup|machineid=my_id\n";
+
+  XCTAssertCppStringEqual(got, want);
+
+  esMsg.event.proc_suspend_resume.type = ES_PROC_SUSPEND_RESUME_TYPE_RESUME;
+  esMsg.event.proc_suspend_resume.target = NULL;
+
+  got = BasicStringSerializeMessage(&esMsg);
+  want = "action=PROC_SUSPEND_RESUME|type=RESUME"
+         "|pid=12|ppid=56|process=foo|processpath=foo"
+         "|uid=-2|user=nobody|gid=-1|group=nogroup|machineid=my_id\n";
+
+  XCTAssertCppStringEqual(got, want);
+}
+
 #if HAVE_MACOS_15
 
 - (void)testSerializeMessageGatekeeperOverride {

@@ -344,6 +344,23 @@ class EnrichedCSInvalidated : public EnrichedEventType {
   EnrichedCSInvalidated(const EnrichedCSInvalidated& other) = delete;
 };
 
+class EnrichedProcSuspendResume : public EnrichedEventType {
+ public:
+  EnrichedProcSuspendResume(Message&& es_msg, EnrichedProcess&& instigator,
+                            std::optional<EnrichedProcess>&& target)
+      : EnrichedEventType(std::move(es_msg), std::move(instigator)),
+        target_(std::move(target)) {}
+
+  EnrichedProcSuspendResume(EnrichedProcSuspendResume&&) = default;
+
+  EnrichedProcSuspendResume(const EnrichedProcSuspendResume& other) = delete;
+
+  const std::optional<EnrichedProcess>& target() const { return target_; }
+
+ private:
+  std::optional<EnrichedProcess> target_;
+};
+
 // Note: All EnrichedLoginWindowSession* classes currently have the same
 // data and implementation. To improve maintainability but still provide
 // individual types, an internal EnrichedLoginWindowSession base class is
@@ -780,7 +797,8 @@ using EnrichedType = std::variant<
     EnrichedLoginLogout, EnrichedAuthenticationOD,
     EnrichedAuthenticationTouchID, EnrichedAuthenticationToken,
     EnrichedAuthenticationAutoUnlock, EnrichedClone, EnrichedCopyfile,
-    EnrichedLaunchItem, EnrichedXProtectDetected, EnrichedXProtectRemediated
+    EnrichedProcSuspendResume, EnrichedLaunchItem, EnrichedXProtectDetected,
+    EnrichedXProtectRemediated
 #if HAVE_MACOS_15
     ,
     EnrichedGatekeeperOverride

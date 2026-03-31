@@ -136,6 +136,7 @@ NSString* ConstructFilename(es_event_type_t eventType, NSString* variant = nil) 
     case ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_REMOVE: name = @"launch_item_remove"; break;
     case ES_EVENT_TYPE_NOTIFY_XP_MALWARE_DETECTED: name = @"xp_detected"; break;
     case ES_EVENT_TYPE_NOTIFY_XP_MALWARE_REMEDIATED: name = @"xp_remediated"; break;
+    case ES_EVENT_TYPE_NOTIFY_PROC_SUSPEND_RESUME: name = @"proc_suspend_resume"; break;
 #if HAVE_MACOS_15
     case ES_EVENT_TYPE_NOTIFY_GATEKEEPER_USER_OVERRIDE: name = @"gatekeeper"; break;
 #endif  // HAVE_MACOS_15
@@ -214,6 +215,7 @@ const google::protobuf::Message& SantaMessageEvent(const ::pbv1::SantaMessage& s
     case ::pbv1::SantaMessage::kLaunchItem: return santaMsg.launch_item();
     case ::pbv1::SantaMessage::kTccModification: return santaMsg.tcc_modification();
     case ::pbv1::SantaMessage::kXprotect: return santaMsg.xprotect();
+    case ::pbv1::SantaMessage::kProcSuspendResume: return santaMsg.proc_suspend_resume();
     case ::pbv1::SantaMessage::EVENT_NOT_SET:
       XCTFail(@"Protobuf message SantaMessage did not set an 'event' field");
       OS_FALLTHROUGH;
@@ -1561,6 +1563,27 @@ void SerializeAndCheckNonESEvents(
                     esMsg->event.xp_malware_remediated = &xp;
                   }
                        variant:@"null_token"];
+}
+
+- (void)testSerializeMessageProcSuspendResume {
+  es_file_t targetFile = MakeESFile("targetpath");
+  __block es_process_t targetProc =
+      MakeESProcess(&targetFile, MakeAuditToken(99, 100), MakeAuditToken(56, 78));
+
+  [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_PROC_SUSPEND_RESUME
+                  messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
+                                 es_message_t* esMsg) {
+                    esMsg->event.proc_suspend_resume.type = ES_PROC_SUSPEND_RESUME_TYPE_SUSPEND;
+                    esMsg->event.proc_suspend_resume.target = &targetProc;
+                  }];
+
+  [self serializeAndCheckEvent:ES_EVENT_TYPE_NOTIFY_PROC_SUSPEND_RESUME
+                  messageSetup:^(std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
+                                 es_message_t* esMsg) {
+                    esMsg->event.proc_suspend_resume.type = ES_PROC_SUSPEND_RESUME_TYPE_RESUME;
+                    esMsg->event.proc_suspend_resume.target = NULL;
+                  }
+                       variant:@"null_target"];
 }
 
 #if HAVE_MACOS_15
