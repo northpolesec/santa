@@ -94,7 +94,7 @@ class BasicString : public Serializer {
   std::vector<uint8_t> SerializeDiskDisappeared(NSDictionary*) override;
 
  private:
-  std::string CreateDefaultString(size_t reserved_size = 512);
+  std::string CreateDefaultString();
   std::vector<uint8_t> FinalizeString(std::string& str);
 
   std::vector<uint8_t> SerializeMessageLaunchItemAdd(const santa::EnrichedLaunchItem&);
