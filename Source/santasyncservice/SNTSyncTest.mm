@@ -61,6 +61,7 @@
 - (void)startReachability;
 @property(nonatomic) dispatch_source_t fullSyncTimer;
 @property id<SNTPushNotificationsClientDelegate> pushNotifications;
+@property NSUInteger persistedFullSyncInterval;
 @end
 
 @interface SNTPushClientNATS (Testing)
@@ -1347,6 +1348,55 @@
 
   // Existing push client should not be replaced by NATS
   XCTAssertEqual(sm.pushNotifications, mockFCM);
+
+  [mockPreflight stopMocking];
+}
+
+- (void)testPreflightUsesPersistedIntervalWhenServerOmitsIt {
+  // When the server doesn't provide full_sync_interval_seconds,
+  // syncState.fullSyncInterval is nil. The sync manager should fall back
+  // to the persisted interval from the daemon, not kDefaultFullSyncInterval.
+  id mockPreflight = OCMClassMock([SNTSyncPreflight class]);
+  OCMStub([mockPreflight alloc]).andReturn(mockPreflight);
+  OCMStub([mockPreflight initWithState:OCMOCK_ANY]).andReturn(mockPreflight);
+  OCMStub([(SNTSyncPreflight*)mockPreflight sync]).andReturn(YES);
+
+  SNTSyncState* ss = [[SNTSyncState alloc] init];
+  ss.isSyncV2 = NO;
+  ss.fullSyncInterval = nil;  // Server didn't set it
+  ss.preflightOnly = YES;
+
+  SNTSyncManager* sm = [[SNTSyncManager alloc] initWithDaemonConnection:nil];
+  sm.persistedFullSyncInterval = 3600;  // Daemon had this persisted
+
+  [sm preflightWithSyncState:ss];
+
+  XCTAssertEqual(sm.persistedFullSyncInterval, 3600,
+                 @"Persisted interval should not be changed when server omits the value");
+
+  [mockPreflight stopMocking];
+}
+
+- (void)testPreflightUpdatesPersistedIntervalWhenServerProvidesIt {
+  // When the server provides full_sync_interval_seconds, the persisted
+  // fallback should be updated so it stays current for future fallbacks.
+  id mockPreflight = OCMClassMock([SNTSyncPreflight class]);
+  OCMStub([mockPreflight alloc]).andReturn(mockPreflight);
+  OCMStub([mockPreflight initWithState:OCMOCK_ANY]).andReturn(mockPreflight);
+  OCMStub([(SNTSyncPreflight*)mockPreflight sync]).andReturn(YES);
+
+  SNTSyncState* ss = [[SNTSyncState alloc] init];
+  ss.isSyncV2 = NO;
+  ss.fullSyncInterval = @(1800);  // Server provided 30 minutes
+  ss.preflightOnly = YES;
+
+  SNTSyncManager* sm = [[SNTSyncManager alloc] initWithDaemonConnection:nil];
+  sm.persistedFullSyncInterval = 3600;  // Old persisted value
+
+  [sm preflightWithSyncState:ss];
+
+  XCTAssertEqual(sm.persistedFullSyncInterval, 1800,
+                 @"Persisted interval should be updated when server provides a new value");
 
   [mockPreflight stopMocking];
 }
