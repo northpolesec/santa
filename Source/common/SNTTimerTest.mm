@@ -358,4 +358,33 @@
   XCTAssertTrue([timer isStarted]);
 }
 
+- (void)testDestroyWhileTimerRunning {
+  // Verify that destroying an SNTTimer while its timer is running does not
+  // deadlock or crash. This exercises the reentrance guard in ~Timer() when
+  // the destructor is triggered from the timer queue.
+  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+
+  @autoreleasepool {
+    SNTTimer* timer = [[SNTTimer alloc] initWithMinInterval:1
+                                                maxInterval:60
+                                                       name:@"DestroyTest"
+                                                fireOnStart:YES
+                                             rescheduleMode:SNTTimerRescheduleModeLeadingEdge
+                                                   qosClass:QOS_CLASS_USER_INTERACTIVE
+                                                   callback:^BOOL(void) {
+                                                     dispatch_semaphore_signal(sema);
+                                                     return YES;
+                                                   }];
+
+    [timer startWithInterval:1];
+
+    // Wait for at least one fire to confirm the timer is actively running
+    XCTAssertSemaTrue(sema, 5, "Timer did not fire");
+  }
+  // timer is deallocated here — must not deadlock or crash
+
+  // Brief sleep to let any async cleanup settle
+  SleepMS(100);
+}
+
 @end

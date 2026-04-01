@@ -30,8 +30,9 @@ namespace santa {
 //   bool OnTimer(void);
 // Derived classes can prevent future timer scheduling by returning `false` from `OnTimer`.
 //
-// NB: This class is thread safe. However, OnTimer implementations currently cannot call
-// back into public methods as this will create a deadlock.
+// NB: This class is thread safe. Public methods use dispatch_queue_set_specific to detect
+// reentrant calls from the timer queue (e.g. destructor triggered from callback, or
+// OnTimer calling back into public methods) and avoid deadlocking on dispatch_sync.
 template <typename T>
 class Timer : public std::enable_shared_from_this<Timer<T>> {
  public:
@@ -66,12 +67,16 @@ class Timer : public std::enable_shared_from_this<Timer<T>> {
 
     timer_queue_ = dispatch_queue_create("com.northpolesec.santa.timer", DISPATCH_QUEUE_SERIAL);
     dispatch_set_target_queue(timer_queue_, dispatch_get_global_queue(qos_class, 0));
+    dispatch_queue_set_specific(timer_queue_, &queue_key_, &queue_key_, NULL);
   }
 
   virtual ~Timer() { StopTimer(); }
 
   /// Start a new timer if not already running.
   bool StartTimer() {
+    if (OnTimerQueue()) {
+      return StartTimerSerialized();
+    }
     __block bool did_start_new_timer;
     dispatch_sync(timer_queue_, ^{
       did_start_new_timer = StartTimerSerialized();
@@ -81,6 +86,9 @@ class Timer : public std::enable_shared_from_this<Timer<T>> {
 
   /// Stop the timer if running.
   bool StopTimer() {
+    if (OnTimerQueue()) {
+      return StopTimerSerialized();
+    }
     __block bool did_stop;
     dispatch_sync(timer_queue_, ^{
       did_stop = StopTimerSerialized();
@@ -107,6 +115,10 @@ class Timer : public std::enable_shared_from_this<Timer<T>> {
   }
 
   bool StartTimerWithInterval(uint32_t interval_seconds) {
+    if (OnTimerQueue()) {
+      SetTimerIntervalSerialized(interval_seconds);
+      return StartTimerSerialized();
+    }
     __block bool did_start_new_timer;
     dispatch_sync(timer_queue_, ^{
       SetTimerIntervalSerialized(interval_seconds);
@@ -118,12 +130,19 @@ class Timer : public std::enable_shared_from_this<Timer<T>> {
   /// Set new timer parameters. If the timer is running, the new parameters will take effect
   /// immediately, and may fire immediately based on the OnStart mode used during construction.
   void SetTimerInterval(uint32_t interval_seconds) {
+    if (OnTimerQueue()) {
+      SetTimerIntervalSerialized(interval_seconds);
+      return;
+    }
     dispatch_sync(timer_queue_, ^{
       SetTimerIntervalSerialized(interval_seconds);
     });
   }
 
   bool IsStarted() const {
+    if (OnTimerQueue()) {
+      return timer_source_ != nullptr;
+    }
     __block bool is_started;
     dispatch_sync(timer_queue_, ^{
       is_started = (timer_source_ != nullptr);
@@ -211,6 +230,8 @@ class Timer : public std::enable_shared_from_this<Timer<T>> {
     UpdateTimingParametersSerialized(startup_option_);
   }
 
+  inline bool OnTimerQueue() const { return dispatch_get_specific(&queue_key_) == &queue_key_; }
+
   /// Cancels the dispatch timer source.
   inline bool StopTimerSerialized() {
     if (timer_source_) {
@@ -230,6 +251,7 @@ class Timer : public std::enable_shared_from_this<Timer<T>> {
   OnStart startup_option_;
   std::string backing_config_var_;
   RescheduleMode reschedule_mode_;
+  char queue_key_;
 };
 
 }  // namespace santa
