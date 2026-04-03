@@ -105,7 +105,7 @@ using santa::Message;
   self.findPoliciesForTargetsBlock(^(santa::LookupPolicyBlock lookupPolicyBlock) {
     size_t idx = 0;
     for (const auto& target : pathTargets) {
-      targetPolicyPairs.emplace_back(idx, lookupPolicyBlock(target.path.c_str()));
+      targetPolicyPairs.emplace_back(idx, lookupPolicyBlock(target.Path().data()));
       idx++;
     }
   });

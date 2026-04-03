@@ -1120,7 +1120,7 @@ std::vector<uint8_t> BasicString::SerializeFileAccess(
   str.append(policy_name);
   str.append("|path=");
   if (msg.HasPathTarget(target_index)) {
-    str.append(msg.PathTargetAtIndex(target_index).path);
+    str.append(msg.PathTargetAtIndex(target_index).Path());
   } else {
     // This shouldn't be possible with real data
     str.append("(error)");

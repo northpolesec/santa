@@ -24,26 +24,24 @@
 
 namespace santa {
 
-static inline std::string Path(const es_file_t* esFile) {
-  return std::string(esFile->path.data, esFile->path.length);
-}
-
-static inline std::string Path(const es_string_token_t& tok) {
-  return std::string(tok.data, tok.length);
-}
-
+// Simple path: string_view directly into the retained es_message_t data.
 static inline void PushBackIfNotTruncated(std::vector<Message::PathTarget>& vec,
                                           const es_file_t* esFile, bool isReadable = false) {
   if (!esFile->path_truncated) {
-    vec.push_back({Path(esFile), isReadable, esFile});
+    vec.push_back({std::string_view(esFile->path.data, esFile->path.length), isReadable, esFile});
   }
 }
 
-// Note: This variant of PushBackIfNotTruncated can never be marked "is_readable"
+// Compound path (dir + "/" + filename): must materialize a std::string.
 static inline void PushBackIfNotTruncated(std::vector<Message::PathTarget>& vec,
                                           const es_file_t* dir, const es_string_token_t& name) {
   if (!dir->path_truncated) {
-    vec.push_back({Path(dir) + "/" + Path(name), false, nullptr});
+    std::string full_path;
+    full_path.reserve(dir->path.length + 1 + name.length);
+    full_path.append(dir->path.data, dir->path.length);
+    full_path += '/';
+    full_path.append(name.data, name.length);
+    vec.push_back({std::move(full_path), false, nullptr});
   }
 }
 

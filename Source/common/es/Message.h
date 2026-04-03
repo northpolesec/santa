@@ -20,6 +20,8 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
+#include <variant>
 
 #include "Source/common/processtree/process_tree.h"
 
@@ -31,13 +33,22 @@ class Message {
  public:
   // Small structure to hold event target information.
   struct PathTarget {
-    std::string path;
+    // Simple paths hold a string_view into the retained es_message_t (zero
+    // copy). Compound paths (dir + "/" + filename) hold a materialized string.
+    // Both variants are null-terminated.
+    std::variant<std::string_view, std::string> path;
     bool is_readable;
     // This is a pointer into an es_message_t. The message must be valid for
     // this pointer to be valid. The interfaces in the Message class will vend
     // pointers that are valid, and callers must not store or otherwise
     // reference the pointer to ensure no valid access is made.
     const es_file_t* unsafe_file;
+
+    // Returns a view of the path, regardless of which variant is held.
+    std::string_view Path() const {
+      return std::visit([](const auto& p) -> std::string_view { return p; },
+                        path);
+    }
   };
 
   Message(std::shared_ptr<EndpointSecurityAPI> esapi,

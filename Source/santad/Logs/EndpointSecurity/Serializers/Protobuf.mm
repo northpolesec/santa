@@ -1425,9 +1425,9 @@ std::vector<uint8_t> Protobuf::SerializeFileAccess(
     if (target.unsafe_file) {
       EncodeFileInfo(file_access->mutable_target(), target.unsafe_file, enriched_event_target);
     } else {
+      std::string_view path = target.Path();
       EncodeFileInfo(file_access->mutable_target(),
-                     es_string_token_t{.length = target.path.length(), .data = target.path.c_str()},
-                     false);
+                     es_string_token_t{.length = path.length(), .data = path.data()}, false);
     }
   }
   EncodeString([file_access] { return file_access->mutable_policy_version(); }, policy_version);
