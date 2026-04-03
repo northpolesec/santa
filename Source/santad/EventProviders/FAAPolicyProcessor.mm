@@ -453,7 +453,7 @@ FileAccessPolicyDecision FAAPolicyProcessor::ProcessTargetAndPolicy(
     SNTCachedDecision* cd = GetCachedDecision(msg->process->executable->stat);
     SNTStoredFileAccessEvent* event = [[SNTStoredFileAccessEvent alloc] init];
 
-    event.accessedPath = StringToNSString(target.path);
+    event.accessedPath = StringToNSString(target.Path());
     event.ruleVersion = StringToNSString(policy->version);
     event.ruleName = StringToNSString(policy->name);
     event.decision = decision;

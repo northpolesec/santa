@@ -206,7 +206,7 @@ std::string GetProcessPath(pid_t pid) {
     std::vector<Message::PathTarget> targets = msg.PathTargets();
 
     XCTAssertEqual(targets.size(), 1);
-    XCTAssertCStringEqual(targets[0].path.c_str(), testFile1.path.data);
+    XCTAssertCStringEqual(targets[0].Path().data(), testFile1.path.data);
     XCTAssertTrue(targets[0].is_readable);
     XCTAssertEqual(targets[0].unsafe_file, &testFile1);
     XCTAssertTrue(msg.HasPathTarget(0));
@@ -223,10 +223,10 @@ std::string GetProcessPath(pid_t pid) {
     std::vector<Message::PathTarget> targets = msg.PathTargets();
 
     XCTAssertEqual(targets.size(), 2);
-    XCTAssertCStringEqual(targets[0].path.c_str(), testFile1.path.data);
+    XCTAssertCStringEqual(targets[0].Path().data(), testFile1.path.data);
     XCTAssertFalse(targets[0].is_readable);
     XCTAssertEqual(targets[0].unsafe_file, &testFile1);
-    XCTAssertCppStringEqual(targets[1].path, dirTok);
+    XCTAssertCppStringEqual(targets[1].Path(), dirTok);
     XCTAssertFalse(targets[1].is_readable);
     XCTAssertEqual(targets[1].unsafe_file, nullptr);
     XCTAssertTrue(msg.HasPathTarget(0));
@@ -246,10 +246,10 @@ std::string GetProcessPath(pid_t pid) {
       std::vector<Message::PathTarget> targets = msg.PathTargets();
 
       XCTAssertEqual(targets.size(), 2);
-      XCTAssertCStringEqual(targets[0].path.c_str(), testFile1.path.data);
+      XCTAssertCStringEqual(targets[0].Path().data(), testFile1.path.data);
       XCTAssertFalse(targets[0].is_readable);
       XCTAssertEqual(targets[0].unsafe_file, &testFile1);
-      XCTAssertCStringEqual(targets[1].path.c_str(), testFile2.path.data);
+      XCTAssertCStringEqual(targets[1].Path().data(), testFile2.path.data);
       XCTAssertFalse(targets[1].is_readable);
       XCTAssertEqual(targets[1].unsafe_file, &testFile2);
     }
@@ -263,10 +263,10 @@ std::string GetProcessPath(pid_t pid) {
       std::vector<Message::PathTarget> targets = msg.PathTargets();
 
       XCTAssertEqual(targets.size(), 2);
-      XCTAssertCStringEqual(targets[0].path.c_str(), testFile1.path.data);
+      XCTAssertCStringEqual(targets[0].Path().data(), testFile1.path.data);
       XCTAssertFalse(targets[0].is_readable);
       XCTAssertEqual(targets[0].unsafe_file, &testFile1);
-      XCTAssertCppStringEqual(targets[1].path, dirTok);
+      XCTAssertCppStringEqual(targets[1].Path(), dirTok);
       XCTAssertFalse(targets[1].is_readable);
       XCTAssertEqual(targets[1].unsafe_file, nullptr);
     }
@@ -280,7 +280,7 @@ std::string GetProcessPath(pid_t pid) {
     std::vector<Message::PathTarget> targets = msg.PathTargets();
 
     XCTAssertEqual(targets.size(), 1);
-    XCTAssertCStringEqual(targets[0].path.c_str(), testFile1.path.data);
+    XCTAssertCStringEqual(targets[0].Path().data(), testFile1.path.data);
     XCTAssertFalse(targets[0].is_readable);
     XCTAssertEqual(targets[0].unsafe_file, &testFile1);
   }
@@ -295,10 +295,10 @@ std::string GetProcessPath(pid_t pid) {
     std::vector<Message::PathTarget> targets = msg.PathTargets();
 
     XCTAssertEqual(targets.size(), 2);
-    XCTAssertCStringEqual(targets[0].path.c_str(), testFile1.path.data);
+    XCTAssertCStringEqual(targets[0].Path().data(), testFile1.path.data);
     XCTAssertTrue(targets[0].is_readable);
     XCTAssertEqual(targets[0].unsafe_file, &testFile1);
-    XCTAssertCppStringEqual(targets[1].path, dirTok);
+    XCTAssertCppStringEqual(targets[1].Path(), dirTok);
     XCTAssertFalse(targets[1].is_readable);
     XCTAssertEqual(targets[1].unsafe_file, nullptr);
   }
@@ -312,10 +312,10 @@ std::string GetProcessPath(pid_t pid) {
     std::vector<Message::PathTarget> targets = msg.PathTargets();
 
     XCTAssertEqual(targets.size(), 2);
-    XCTAssertCStringEqual(targets[0].path.c_str(), testFile1.path.data);
+    XCTAssertCStringEqual(targets[0].Path().data(), testFile1.path.data);
     XCTAssertFalse(targets[0].is_readable);
     XCTAssertEqual(targets[0].unsafe_file, &testFile1);
-    XCTAssertCStringEqual(targets[1].path.c_str(), testFile2.path.data);
+    XCTAssertCStringEqual(targets[1].Path().data(), testFile2.path.data);
     XCTAssertFalse(targets[1].is_readable);
     XCTAssertEqual(targets[1].unsafe_file, &testFile2);
   }
@@ -330,7 +330,7 @@ std::string GetProcessPath(pid_t pid) {
     std::vector<Message::PathTarget> targets = msg.PathTargets();
 
     XCTAssertEqual(targets.size(), 1);
-    XCTAssertCppStringEqual(targets[0].path, dirTok);
+    XCTAssertCppStringEqual(targets[0].Path(), dirTok);
     XCTAssertFalse(targets[0].is_readable);
     XCTAssertEqual(targets[0].unsafe_file, nullptr);
   }
@@ -343,7 +343,7 @@ std::string GetProcessPath(pid_t pid) {
     std::vector<Message::PathTarget> targets = msg.PathTargets();
 
     XCTAssertEqual(targets.size(), 1);
-    XCTAssertCStringEqual(targets[0].path.c_str(), testFile1.path.data);
+    XCTAssertCStringEqual(targets[0].Path().data(), testFile1.path.data);
     XCTAssertFalse(targets[0].is_readable);
     XCTAssertEqual(targets[0].unsafe_file, &testFile1);
   }
@@ -361,10 +361,10 @@ std::string GetProcessPath(pid_t pid) {
       std::vector<Message::PathTarget> targets = msg.PathTargets();
 
       XCTAssertEqual(targets.size(), 2);
-      XCTAssertCStringEqual(targets[0].path.c_str(), testFile1.path.data);
+      XCTAssertCStringEqual(targets[0].Path().data(), testFile1.path.data);
       XCTAssertTrue(targets[0].is_readable);
       XCTAssertEqual(targets[0].unsafe_file, &testFile1);
-      XCTAssertCppStringEqual(targets[1].path, dirTok);
+      XCTAssertCppStringEqual(targets[1].Path(), dirTok);
       XCTAssertFalse(targets[1].is_readable);
       XCTAssertEqual(targets[1].unsafe_file, nullptr);
     }
@@ -376,10 +376,10 @@ std::string GetProcessPath(pid_t pid) {
       std::vector<Message::PathTarget> targets = msg.PathTargets();
 
       XCTAssertEqual(targets.size(), 2);
-      XCTAssertCStringEqual(targets[0].path.c_str(), testFile1.path.data);
+      XCTAssertCStringEqual(targets[0].Path().data(), testFile1.path.data);
       XCTAssertTrue(targets[0].is_readable);
       XCTAssertEqual(targets[0].unsafe_file, &testFile1);
-      XCTAssertCStringEqual(targets[1].path.c_str(), testFile2.path.data);
+      XCTAssertCStringEqual(targets[1].Path().data(), testFile2.path.data);
       XCTAssertFalse(targets[1].is_readable);
       XCTAssertEqual(targets[1].unsafe_file, &testFile2);
     }

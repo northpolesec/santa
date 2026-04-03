@@ -201,7 +201,7 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess& proc) {
   mockESApi->SetExpectationsRetainReleaseMessage();
 
   auto policy = std::make_shared<santa::WatchItemPolicyBase>("foo_policy", "ver", "/foo");
-  Message::PathTarget target = {.path = "/some/random/path", .is_readable = true};
+  Message::PathTarget target = {.path = std::string_view("/some/random/path"), .is_readable = true};
 
   MockFAAPolicyProcessor faaPolicyProcessor(self.dcMock, nullptr, nullptr, nullptr, nullptr, 0, 0,
                                             nil, nil);
@@ -308,7 +308,7 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess& proc) {
   EXPECT_CALL(faaPolicyProcessor, PolicyAllowsReadsForTarget)
       .WillRepeatedly(testing::Return(false));
 
-  Message::PathTarget target = {.path = "/some/random/path", .is_readable = true};
+  Message::PathTarget target = {.path = std::string_view("/some/random/path"), .is_readable = true};
 
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
 

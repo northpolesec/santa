@@ -96,7 +96,7 @@ using ProcessRuleCache = SantaCache<PidPidverPair, std::shared_ptr<ProcessWatchI
           return false;
         }
 
-        if (policy->tree->Contains(target.path.c_str())) {
+        if (policy->tree->Contains(target.Path().data())) {
           return true;
         } else {
           return false;
