@@ -25,7 +25,10 @@
 
 __BEGIN_DECLS
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-function"
 #include "src/util.h"
+#pragma clang diagnostic pop
 
 __END_DECLS
 

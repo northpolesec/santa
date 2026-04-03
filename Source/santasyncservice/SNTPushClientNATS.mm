@@ -700,19 +700,16 @@ static void messageHandler(natsConnection* nc, natsSubscription* sub, natsMsg* m
 }
 
 // Helper function to safely get the last error from a NATS connection as an NSString.
-// This copies the error text to avoid lifetime issues with the internal NATS buffer,
-// which may be overwritten by subsequent NATS operations.
 static NSString* GetNATSLastError(natsConnection* nc) {
   if (!nc) {
     return nil;
   }
 
-  const char* lastError = NULL;
-  natsConnection_GetLastError(nc, &lastError);
+  char errBuf[256] = {};
+  natsConnection_ReadLastError(nc, errBuf, sizeof(errBuf));
 
-  // Copy to NSString to avoid lifetime issues.
-  if (lastError && *lastError != '\0') {
-    return @(lastError);
+  if (errBuf[0] != '\0') {
+    return @(errBuf);
   }
   return nil;
 }
