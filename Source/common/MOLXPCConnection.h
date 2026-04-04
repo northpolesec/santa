@@ -60,11 +60,29 @@
 - (nullable instancetype)initServerWithListener:(nonnull NSXPCListener*)listener;
 
 /**
+ Initialize a new server with a given listener and code signing requirement.
+
+ @param listener An NSXPCListener, typically from `[NSXPCListener anonymousListener]`.
+ @param requirement A code signing requirement string that connecting clients must satisfy.
+ */
+- (nullable instancetype)initServerWithListener:(nonnull NSXPCListener*)listener
+                         codeSigningRequirement:(nullable NSString*)requirement;
+
+/**
  Initializer for the 'server' side of the connection, started by launchd.
 
  @param name MachService name, must match the MachServices key in the launchd.plist
  */
 - (nullable instancetype)initServerWithName:(nonnull NSString*)name;
+
+/**
+ Initializer for the 'server' side of the connection with a code signing requirement.
+
+ @param name MachService name, must match the MachServices key in the launchd.plist
+ @param requirement A code signing requirement string that connecting clients must satisfy.
+ */
+- (nullable instancetype)initServerWithName:(nonnull NSString*)name
+                     codeSigningRequirement:(nullable NSString*)requirement;
 
 /**
  Initialize a new client to a service exported by a LaunchDaemon.
@@ -75,6 +93,17 @@
 - (nullable instancetype)initClientWithName:(nonnull NSString*)name privileged:(BOOL)privileged;
 
 /**
+ Initialize a new client to a service exported by a LaunchDaemon with a code signing requirement.
+
+ @param name MachService name
+ @param privileged Use YES if the server is running as root.
+ @param requirement A code signing requirement string that the server must satisfy.
+ */
+- (nullable instancetype)initClientWithName:(nonnull NSString*)name
+                                 privileged:(BOOL)privileged
+                     codeSigningRequirement:(nullable NSString*)requirement;
+
+/**
  Initialize a new client to a service within a bundle.
 
  @param name service name
@@ -82,11 +111,29 @@
 - (nullable instancetype)initClientWithServiceName:(nonnull NSString*)name;
 
 /**
+ Initialize a new client to a service within a bundle with a code signing requirement.
+
+ @param name service name
+ @param requirement A code signing requirement string that the server must satisfy.
+ */
+- (nullable instancetype)initClientWithServiceName:(nonnull NSString*)name
+                            codeSigningRequirement:(nullable NSString*)requirement;
+
+/**
  Initialize a new client with a listener endpoint sent from another process.
 
  @param listener An NSXPCListenerEndpoint to connect to.
  */
 - (nullable instancetype)initClientWithListener:(nonnull NSXPCListenerEndpoint*)listener;
+
+/**
+ Initialize a new client with a listener endpoint and code signing requirement.
+
+ @param listener An NSXPCListenerEndpoint to connect to.
+ @param requirement A code signing requirement string that the server must satisfy.
+ */
+- (nullable instancetype)initClientWithListener:(nonnull NSXPCListenerEndpoint*)listener
+                         codeSigningRequirement:(nullable NSString*)requirement;
 
 /**
  Call when the properties of the object have been set-up and you're ready for connections.
@@ -146,6 +193,15 @@
  A block to run when a/the connection is invalidated/interrupted/rejected.
  */
 @property(copy, nullable) void (^invalidationHandler)(void);
+
+/**
+ The code signing requirement string that the peer must satisfy.
+
+ For servers, connecting clients must satisfy this requirement.
+ For clients, the server must satisfy this requirement.
+ Set via the codeSigningRequirement: initializers or directly before calling resume.
+ */
+@property(copy, nullable) NSString* codeSignatureRequirement;
 
 /**
  Whether or not the XPC connection is currently established.
