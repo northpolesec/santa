@@ -19,6 +19,11 @@
 
 #import "Source/common/ScopedCFTypeRef.h"
 
+static NSString* const kDefaultCodeSigningRequirement =
+    @"anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] /* exists */ and "
+    @"certificate leaf[field.1.2.840.113635.100.6.1.13] /* exists */ and certificate "
+    @"leaf[subject.OU] = \"ZMCG7MLDV9\"";
+
 /**
  Protocol used during connection establishment, @see MOLXPCConnectionInterface
  */
@@ -75,17 +80,17 @@ using santa::ScopedCFTypeRef;
 static NSString* CopyDefaultCodeSigningRequirement(void) {
   ScopedCFTypeRef<SecCodeRef> code;
   OSStatus status = SecCodeCopySelf(kSecCSDefaultFlags, code.InitializeInto());
-  if (status != errSecSuccess) return nil;
+  if (status != errSecSuccess) return kDefaultCodeSigningRequirement;
 
   ScopedCFTypeRef<SecRequirementRef> requirement;
   status = SecCodeCopyDesignatedRequirement((SecStaticCodeRef)code.Unsafe(), kSecCSDefaultFlags,
                                             requirement.InitializeInto());
-  if (status != errSecSuccess) return nil;
+  if (status != errSecSuccess) return kDefaultCodeSigningRequirement;
 
   ScopedCFTypeRef<CFStringRef> requirementString;
   status = SecRequirementCopyString(requirement.Unsafe(), kSecCSDefaultFlags,
                                     requirementString.InitializeInto());
-  if (status != errSecSuccess) return nil;
+  if (status != errSecSuccess) return kDefaultCodeSigningRequirement;
 
   NSString* reqStr = requirementString.BridgeRelease<NSString*>();
 
@@ -99,7 +104,7 @@ static NSString* CopyDefaultCodeSigningRequirement(void) {
                                                      options:0
                                                        range:NSMakeRange(0, reqStr.length)
                                                 withTemplate:@""];
-  if ([result isEqualToString:reqStr] || result.length == 0) return nil;
+  if ([result isEqualToString:reqStr] || result.length == 0) return kDefaultCodeSigningRequirement;
   return result;
 }
 
