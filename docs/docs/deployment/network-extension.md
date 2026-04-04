@@ -73,6 +73,14 @@ output includes a Network Extension section:
 - **Loaded** means the network extension has been installed and activated via the
   network extension provider configuration.
 
-You can also run `santactl version` to view version information. If a newer
-version of the network extension is available, it will be noted in the output and
-installed on the next reboot or sleep/wake cycle.
+You can also run `santactl version` to view version information:
+
+```text title="santactl version"
+santad               | 2026.3 (build 187, commit 47a21b0d)
+santactl             | 2026.3 (build 187, commit 47a21b0d)
+SantaGUI             | 2026.3 (build 187, commit 47a21b0d)
+santanetd (BETA)     | 2026.3 (build 187, commit 2149a1ce)
+```
+
+If a newer version of the network extension is available, it will be noted in the
+output and installed on the next reboot or sleep/wake cycle.
