@@ -15,7 +15,14 @@
 
 #import "MOLXPCConnection.h"
 
-#import "Source/common/MOLCodesignChecker.h"
+#import <Security/Security.h>
+
+#import "Source/common/ScopedCFTypeRef.h"
+
+static NSString* const kDefaultCodeSigningRequirement =
+    @"anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] /* exists */ and "
+    @"certificate leaf[field.1.2.840.113635.100.6.1.13] /* exists */ and certificate "
+    @"leaf[subject.OU] = \"ZMCG7MLDV9\"";
 
 /**
  Protocol used during connection establishment, @see MOLXPCConnectionInterface
@@ -65,32 +72,96 @@ static inline void SafeCallBlock(void (^_Nullable block)(void)) {
 
 #pragma mark Initializers
 
+// Returns the designated requirement of the current process with the identifier
+// clause removed. The identifier includes the signing ID which differs between
+// binaries, so leaving it in would prevent cross-process XPC communication.
+using santa::ScopedCFTypeRef;
+
+static NSString* CopyDefaultCodeSigningRequirement(void) {
+  ScopedCFTypeRef<SecCodeRef> code;
+  OSStatus status = SecCodeCopySelf(kSecCSDefaultFlags, code.InitializeInto());
+  if (status != errSecSuccess) return kDefaultCodeSigningRequirement;
+
+  ScopedCFTypeRef<SecRequirementRef> requirement;
+  status = SecCodeCopyDesignatedRequirement((SecStaticCodeRef)code.Unsafe(), kSecCSDefaultFlags,
+                                            requirement.InitializeInto());
+  if (status != errSecSuccess) return kDefaultCodeSigningRequirement;
+
+  ScopedCFTypeRef<CFStringRef> requirementString;
+  status = SecRequirementCopyString(requirement.Unsafe(), kSecCSDefaultFlags,
+                                    requirementString.InitializeInto());
+  if (status != errSecSuccess) return kDefaultCodeSigningRequirement;
+
+  NSString* reqStr = requirementString.BridgeRelease<NSString*>();
+
+  // The identifier clause is always at the start: identifier "com.example.app" and ...
+  // Remove it so that different binaries signed by the same certificate can communicate.
+  NSRegularExpression* regex =
+      [NSRegularExpression regularExpressionWithPattern:@"^identifier\\s+\"[^\"]*\"\\s+and\\s+"
+                                                options:0
+                                                  error:nil];
+  NSString* result = [regex stringByReplacingMatchesInString:reqStr
+                                                     options:0
+                                                       range:NSMakeRange(0, reqStr.length)
+                                                withTemplate:@""];
+  if ([result isEqualToString:reqStr] || result.length == 0) return kDefaultCodeSigningRequirement;
+  return result;
+}
+
 - (instancetype)initServerWithListener:(NSXPCListener*)listener {
+  return [self initServerWithListener:listener
+               codeSigningRequirement:CopyDefaultCodeSigningRequirement()];
+}
+
+- (instancetype)initServerWithListener:(NSXPCListener*)listener
+                codeSigningRequirement:(NSString*)requirement {
   self = [super init];
   if (self) {
     _listenerObject = listener;
     _validationInterface =
         [NSXPCInterface interfaceWithProtocol:@protocol(MOLXPCConnectionProtocol)];
+    _codeSigningRequirement = [requirement copy];
   }
   return self;
 }
 
 - (instancetype)initServerWithName:(NSString*)name {
-  return [self initServerWithListener:[[NSXPCListener alloc] initWithMachServiceName:name]];
+  return [self initServerWithListener:[[NSXPCListener alloc] initWithMachServiceName:name]
+               codeSigningRequirement:CopyDefaultCodeSigningRequirement()];
+}
+
+- (instancetype)initServerWithName:(NSString*)name codeSigningRequirement:(NSString*)requirement {
+  return [self initServerWithListener:[[NSXPCListener alloc] initWithMachServiceName:name]
+               codeSigningRequirement:requirement];
 }
 
 - (instancetype)initClientWithListener:(NSXPCListenerEndpoint*)listener {
+  return [self initClientWithListener:listener
+               codeSigningRequirement:CopyDefaultCodeSigningRequirement()];
+}
+
+- (instancetype)initClientWithListener:(NSXPCListenerEndpoint*)listener
+                codeSigningRequirement:(NSString*)requirement {
   self = [super init];
   if (self) {
     _currentConnection = [[NSXPCConnection alloc] initWithListenerEndpoint:listener];
     if (!_currentConnection) return nil;
     _validationInterface =
         [NSXPCInterface interfaceWithProtocol:@protocol(MOLXPCConnectionProtocol)];
+    _codeSigningRequirement = [requirement copy];
   }
   return self;
 }
 
 - (instancetype)initClientWithName:(NSString*)name privileged:(BOOL)privileged {
+  return [self initClientWithName:name
+                       privileged:privileged
+           codeSigningRequirement:CopyDefaultCodeSigningRequirement()];
+}
+
+- (instancetype)initClientWithName:(NSString*)name
+                        privileged:(BOOL)privileged
+            codeSigningRequirement:(NSString*)requirement {
   self = [super init];
   if (self) {
     NSXPCConnectionOptions options = (privileged ? NSXPCConnectionPrivileged : 0);
@@ -98,17 +169,25 @@ static inline void SafeCallBlock(void (^_Nullable block)(void)) {
     if (!_currentConnection) return nil;
     _validationInterface =
         [NSXPCInterface interfaceWithProtocol:@protocol(MOLXPCConnectionProtocol)];
+    _codeSigningRequirement = [requirement copy];
   }
   return self;
 }
 
 - (instancetype)initClientWithServiceName:(NSString*)name {
+  return [self initClientWithServiceName:name
+                  codeSigningRequirement:CopyDefaultCodeSigningRequirement()];
+}
+
+- (instancetype)initClientWithServiceName:(NSString*)name
+                   codeSigningRequirement:(NSString*)requirement {
   self = [super init];
   if (self) {
     _currentConnection = [[NSXPCConnection alloc] initWithServiceName:name];
     if (!_currentConnection) return nil;
     _validationInterface =
         [NSXPCInterface interfaceWithProtocol:@protocol(MOLXPCConnectionProtocol)];
+    _codeSigningRequirement = [requirement copy];
   }
   return self;
 }
@@ -141,6 +220,9 @@ static inline void SafeCallBlock(void (^_Nullable block)(void)) {
       }
       SafeCallBlock(self.invalidationHandler);
     };
+    if (self.codeSigningRequirement) {
+      [self.currentConnection setCodeSigningRequirement:self.codeSigningRequirement];
+    }
     [self.currentConnection resume];
     [[self.currentConnection remoteObjectProxy] connectWithReply:^{
       STRONGIFY(self);
@@ -177,13 +259,11 @@ static inline void SafeCallBlock(void (^_Nullable block)(void)) {
 
   if (!interface) return NO;
 
-  pid_t pid = connection.processIdentifier;
-  MOLCodesignChecker* otherCS = [[MOLCodesignChecker alloc] initWithPID:pid];
-  if (![otherCS signingInformationMatches:[[MOLCodesignChecker alloc] initWithSelf]]) {
-    return NO;
+  if (self.codeSigningRequirement) {
+    [connection setCodeSigningRequirement:self.codeSigningRequirement];
   }
 
-  // The client passed the code signature check, now we need to resume the listener and
+  // The code signature requirement is set, now we need to resume the listener and
   // return YES so that the client can send the connectWithReply message. Once the client does
   // we reset the connection's exportedInterface and exportedObject.
   MOLXPCConnectionInterface* ci = [[MOLXPCConnectionInterface alloc] init];
