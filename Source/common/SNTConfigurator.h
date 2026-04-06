@@ -857,16 +857,25 @@ extern NSString* _Nonnull const kEnableMenuItemUserOverride;
 - (void)setSyncServerBlockUSBMount:(BOOL)enabled;
 
 ///
-/// If YES, unencrypted external USB storage devices will be blocked from mounting.
-/// Encrypted devices will be allowed (or remounted per RemountUSBMode).
-/// This setting is independent of BlockUSBMount. Defaults to NO.
+/// The action to apply to encrypted removable media. Values: "Allow", "Block", "Remount".
+/// If unset, encrypted volumes use the baseline policy.
 ///
-@property(nonatomic, readonly) BOOL blockUnencryptedRemovableMediaMount;
+@property(nullable, nonatomic, readonly) NSString* encryptedRemovableMediaAction;
 
 ///
-///  Set the block unencrypted USB mount state as received from a sync server.
+///  Set the encrypted removable media action as received from a sync server.
 ///
-- (void)setSyncServerBlockUnencryptedRemovableMediaMount:(BOOL)enabled;
+- (void)setSyncServerEncryptedRemovableMediaAction:(nullable NSString*)action;
+
+///
+/// Mount flags for encrypted removable media when action is "Remount".
+///
+@property(nullable, nonatomic, readonly) NSArray<NSString*>* encryptedRemovableMediaRemountFlags;
+
+///
+///  Set the encrypted removable media remount flags as received from a sync server.
+///
+- (void)setSyncServerEncryptedRemovableMediaRemountFlags:(nullable NSArray<NSString*>*)flags;
 
 ///
 /// Comma-separated `$ mount -o` arguments used for forced remounting of USB devices. Default

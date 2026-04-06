@@ -220,9 +220,10 @@ static NSString* const kAllowedSantaCommandsKey = @"AllowedSantaCommands";
 // The keys managed by a sync server or mobileconfig.
 static NSString* const kClientModeKey = @"ClientMode";
 static NSString* const kBlockUSBMountKey = @"BlockUSBMount";
-static NSString* const kBlockUnencryptedRemovableMediaMountKey =
-    @"BlockUnencryptedRemovableMediaMount";
 static NSString* const kRemountUSBModeKey = @"RemountUSBMode";
+static NSString* const kEncryptedRemovableMediaActionKey = @"EncryptedRemovableMediaAction";
+static NSString* const kEncryptedRemovableMediaRemountFlagsKey =
+    @"EncryptedRemovableMediaRemountFlags";
 static NSString* const kBlockNetworkMountKey = @"BlockNetworkMount";
 static NSString* const kAllowedNetworkMountHosts = @"AllowedNetworkMountHosts";
 static NSString* const kEnableTransitiveRulesKey = @"EnableTransitiveRules";
@@ -788,7 +789,11 @@ static SNTConfigurator* sharedConfigurator = nil;
   return [self syncAndConfigStateSet];
 }
 
-+ (NSSet*)keyPathsForValuesAffectingBlockUnencryptedRemovableMediaMount {
++ (NSSet*)keyPathsForValuesAffectingEncryptedRemovableMediaAction {
+  return [self syncAndConfigStateSet];
+}
+
++ (NSSet*)keyPathsForValuesAffectingEncryptedRemovableMediaRemountFlags {
   return [self syncAndConfigStateSet];
 }
 
@@ -1669,15 +1674,31 @@ static SNTConfigurator* sharedConfigurator = nil;
   return [self.configState[kBlockUSBMountKey] boolValue];
 }
 
-- (void)setSyncServerBlockUnencryptedRemovableMediaMount:(BOOL)enabled {
-  [self updateSyncStateForKey:kBlockUnencryptedRemovableMediaMountKey value:@(enabled)];
+- (void)setSyncServerEncryptedRemovableMediaAction:(nullable NSString*)action {
+  [self updateSyncStateForKey:kEncryptedRemovableMediaActionKey value:action];
 }
 
-- (BOOL)blockUnencryptedRemovableMediaMount {
-  NSNumber* n = self.syncState[kBlockUnencryptedRemovableMediaMountKey];
-  if (n) return [n boolValue];
+- (nullable NSString*)encryptedRemovableMediaAction {
+  NSString* s = self.syncState[kEncryptedRemovableMediaActionKey];
+  if (s) return s;
+  return self.configState[kEncryptedRemovableMediaActionKey];
+}
 
-  return [self.configState[kBlockUnencryptedRemovableMediaMountKey] boolValue];
+- (void)setSyncServerEncryptedRemovableMediaRemountFlags:(nullable NSArray<NSString*>*)flags {
+  [self updateSyncStateForKey:kEncryptedRemovableMediaRemountFlagsKey value:flags];
+}
+
+- (nullable NSArray<NSString*>*)encryptedRemovableMediaRemountFlags {
+  NSArray<NSString*>* args = self.syncState[kEncryptedRemovableMediaRemountFlagsKey];
+  if (!args) {
+    args = (NSArray<NSString*>*)self.configState[kEncryptedRemovableMediaRemountFlagsKey];
+  }
+  for (id arg in args) {
+    if (![arg isKindOfClass:[NSString class]]) {
+      return nil;
+    }
+  }
+  return args;
 }
 
 - (void)setSyncServerBannedNetworkMountBlockMessage:(NSString*)msg {
