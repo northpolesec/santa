@@ -36,6 +36,8 @@ else
   /bin/mkdir -p /var/db/santa/migration
   /bin/cp -r ${BINARIES}/Santa.app /var/db/santa/migration/
 
+  /bin/chmod +x /Applications/Santa.app/Contents/MacOS/santactl
+
   SANTA_VERSION=$(/Applications/Santa.app/Contents/MacOS/santactl version | /usr/bin/awk '/^santad/ { print $3 }')
   SANTA_MODE=$(/Applications/Santa.app/Contents/MacOS/santactl status | /usr/bin/awk '/ *Mode/ { print $3 }')
 
