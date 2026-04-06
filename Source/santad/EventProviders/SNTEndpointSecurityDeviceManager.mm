@@ -69,8 +69,9 @@ static NSString* const kMetricStartupDiskOperationSuccess = @"Success";
 
 - (void)logDiskAppeared:(NSDictionary*)props allowed:(bool)allowed;
 - (void)logDiskDisappeared:(NSDictionary*)props;
-- (DADissenterRef __nullable)handleMountApproval:(DADiskRef)disk;
-- (void)handleRemountCompletion:(DADiskRef)disk dissenter:(DADissenterRef __nullable)dissenter;
+- (DADissenterRef __nullable)handleEncryptedMountApproval:(DADiskRef)disk;
+- (void)handleEncryptedRemountCompletion:(DADiskRef)disk
+                               dissenter:(DADissenterRef __nullable)dissenter;
 
 @property SNTMetricCounter* startupDiskMetrics;
 @property DASessionRef diskArbSession;
@@ -151,12 +152,12 @@ void DiskUnmountCallback(DADiskRef disk, DADissenterRef dissenter, void* context
 
 DADissenterRef DiskMountApprovalCallback(DADiskRef disk, void* context) {
   SNTEndpointSecurityDeviceManager* dm = (__bridge SNTEndpointSecurityDeviceManager*)context;
-  return [dm handleMountApproval:disk];
+  return [dm handleEncryptedMountApproval:disk];
 }
 
 void DiskRemountCompletionCallback(DADiskRef disk, DADissenterRef dissenter, void* context) {
   SNTEndpointSecurityDeviceManager* dm = (__bridge SNTEndpointSecurityDeviceManager*)context;
-  [dm handleRemountCompletion:disk dissenter:dissenter];
+  [dm handleEncryptedRemountCompletion:disk dissenter:dissenter];
 }
 
 NSArray<NSString*>* maskToMountArgs(uint32_t remountOpts) {
@@ -213,8 +214,9 @@ NS_ASSUME_NONNULL_BEGIN
                                enricher:(std::shared_ptr<santa::Enricher>)enricher
                         authResultCache:(std::shared_ptr<AuthResultCache>)authResultCache
                           blockUSBMount:(BOOL)blockUSBMount
-    blockUnencryptedRemovableMediaMount:(BOOL)blockUnencryptedRemovableMediaMount
                          remountUSBMode:(nullable NSArray<NSString*>*)remountUSBMode
+          encryptedRemovableMediaAction:(nullable NSString*)encryptedRemovableMediaAction
+    encryptedRemovableMediaRemountFlags:(nullable NSArray<NSString*>*)encryptedRemovableMediaRemountFlags
                      startupPreferences:(SNTDeviceManagerStartupPreferences)startupPrefs {
   self = [super initWithESAPI:std::move(esApi)
                       metrics:std::move(metrics)
@@ -224,8 +226,9 @@ NS_ASSUME_NONNULL_BEGIN
     _enricher = std::move(enricher);
     _authResultCache = std::move(authResultCache);
     _blockUSBMount = blockUSBMount;
-    _blockUnencryptedRemovableMediaMount = blockUnencryptedRemovableMediaMount;
     _remountArgs = remountUSBMode;
+    _encryptedRemovableMediaAction = encryptedRemovableMediaAction;
+    _encryptedRemovableMediaRemountFlags = encryptedRemovableMediaRemountFlags;
     _configurator = [SNTConfigurator configurator];
     _remountingDisks = [NSMutableSet set];
 
@@ -256,8 +259,9 @@ NS_ASSUME_NONNULL_BEGIN
   return self;
 }
 
-- (uint32_t)updatedMountFlags:(const struct statfs*)sfs {
-  uint32_t mask = sfs->f_flags | mountArgsToMask(self.remountArgs);
+- (uint32_t)updatedMountFlags:(const struct statfs*)sfs
+                   remountArgs:(NSArray<NSString*>*)args {
+  uint32_t mask = sfs->f_flags | mountArgsToMask(args);
 
   // NB: APFS mounts get MNT_JOURNALED implicitly set. However, mount_apfs
   // does not support the `-j` option so this flag needs to be cleared.
@@ -322,21 +326,55 @@ NS_ASSUME_NONNULL_BEGIN
   return true;
 }
 
-- (BOOL)haveRemountArgs {
-  return [self.remountArgs count] > 0;
-}
-
-- (BOOL)remountUSBModeContainsFlags:(uint32_t)flags {
-  if (![self haveRemountArgs]) {
+- (BOOL)mountFlags:(uint32_t)flags containArgs:(NSArray<NSString*>*)args {
+  if ([args count] == 0) {
     return false;
   }
 
-  uint32_t requiredFlags = mountArgsToMask(self.remountArgs);
+  uint32_t requiredFlags = mountArgsToMask(args);
 
   LOGD(@" Got mount flags: 0x%08x | %@", flags, maskToMountArgs(flags));
-  LOGD(@"Want mount flags: 0x%08x | %@", mountArgsToMask(self.remountArgs), self.remountArgs);
+  LOGD(@"Want mount flags: 0x%08x | %@", requiredFlags, args);
 
   return (flags & requiredFlags) == requiredFlags;
+}
+
+- (SNTRemovableMediaAction)baselineAction {
+  if (!self.blockUSBMount) {
+    return SNTRemovableMediaActionAllow;
+  }
+  if ([self.remountArgs count] > 0) {
+    return SNTRemovableMediaActionRemount;
+  }
+  return SNTRemovableMediaActionBlock;
+}
+
+- (SNTRemovableMediaAction)encryptedAction {
+  NSString* action = self.encryptedRemovableMediaAction;
+  if (!action) {
+    return [self baselineAction];
+  }
+  if ([action caseInsensitiveCompare:@"Allow"] == NSOrderedSame) {
+    return SNTRemovableMediaActionAllow;
+  }
+  if ([action caseInsensitiveCompare:@"Block"] == NSOrderedSame) {
+    return SNTRemovableMediaActionBlock;
+  }
+  if ([action caseInsensitiveCompare:@"Remount"] == NSOrderedSame) {
+    return SNTRemovableMediaActionRemount;
+  }
+  return [self baselineAction];
+}
+
+- (SNTRemovableMediaAction)actionForEncrypted:(BOOL)isEncrypted {
+  return isEncrypted ? [self encryptedAction] : [self baselineAction];
+}
+
+- (NSArray<NSString*>*)remountArgsForEncrypted:(BOOL)isEncrypted {
+  if (isEncrypted && self.encryptedRemovableMediaAction != nil) {
+    return self.encryptedRemovableMediaRemountFlags;
+  }
+  return self.remountArgs;
 }
 
 - (void)incrementStartupMetricsOperation:(NSString*)op {
@@ -348,10 +386,10 @@ NS_ASSUME_NONNULL_BEGIN
 // filesystems often don't support many transitions (e.g. RW to RO). Performing
 // the two step process has a higher chance of succeeding.
 - (void)performStartupTasks:(SNTDeviceManagerStartupPreferences)startupPrefs {
-  if (!self.blockUSBMount || (startupPrefs != SNTDeviceManagerStartupPreferencesUnmount &&
-                              startupPrefs != SNTDeviceManagerStartupPreferencesForceUnmount &&
-                              startupPrefs != SNTDeviceManagerStartupPreferencesRemount &&
-                              startupPrefs != SNTDeviceManagerStartupPreferencesForceRemount)) {
+  if (startupPrefs != SNTDeviceManagerStartupPreferencesUnmount &&
+      startupPrefs != SNTDeviceManagerStartupPreferencesForceUnmount &&
+      startupPrefs != SNTDeviceManagerStartupPreferencesRemount &&
+      startupPrefs != SNTDeviceManagerStartupPreferencesForceRemount) {
     return;
   }
 
@@ -383,8 +421,18 @@ NS_ASSUME_NONNULL_BEGIN
       continue;
     }
 
-    if ([self remountUSBModeContainsFlags:sfs->f_flags]) {
-      LOGI(@"Allowing existing mount as flags contain RemountUSBMode. '%s' -> '%s'",
+    NSNumber* encryptedValue = diskInfo[(__bridge NSString*)kDADiskDescriptionMediaEncryptedKey];
+    BOOL isEncrypted = (encryptedValue != nil && [encryptedValue boolValue]);
+    SNTRemovableMediaAction action = [self actionForEncrypted:isEncrypted];
+    NSArray<NSString*>* args = [self remountArgsForEncrypted:isEncrypted];
+
+    if (action == SNTRemovableMediaActionAllow) {
+      [self incrementStartupMetricsOperation:kMetricStartupDiskOperationSkip];
+      continue;
+    }
+
+    if ([self mountFlags:sfs->f_flags containArgs:args]) {
+      LOGI(@"Allowing existing mount as flags already satisfy policy. '%s' -> '%s'",
            sfs->f_mntfromname, sfs->f_mntonname);
       [self incrementStartupMetricsOperation:kMetricStartupDiskOperationAllowed];
       continue;
@@ -412,13 +460,13 @@ NS_ASSUME_NONNULL_BEGIN
 
     if (startupPrefs == SNTDeviceManagerStartupPreferencesRemount ||
         startupPrefs == SNTDeviceManagerStartupPreferencesForceRemount) {
-      if (![self haveRemountArgs]) {
+      if ([args count] == 0) {
         [self incrementStartupMetricsOperation:kMetricStartupDiskOperationRemountSkipped];
         LOGW(@"Remount requested during startup, but no remount args set. Leaving unmounted.");
         continue;
       }
 
-      uint32_t newMode = [self updatedMountFlags:sfs];
+      uint32_t newMode = [self updatedMountFlags:sfs remountArgs:args];
       LOGI(@"Attempting to mount device again changing flags: 0x%08x --> 0x%08x", sfs->f_flags,
            newMode);
 
@@ -483,7 +531,7 @@ NS_ASSUME_NONNULL_BEGIN
 #endif  // HAVE_MACOS_15
 
   if ((isNetworkMount && !self.configurator.blockNetworkMount) ||
-      (!isNetworkMount && !self.blockUSBMount && !self.blockUnencryptedRemovableMediaMount)) {
+      (!isNetworkMount && !self.blockUSBMount && self.encryptedRemovableMediaAction == nil)) {
     // TODO: We should also unsubscribe from events when these aren't set, but
     // this is generally a low-volume event type and handling dynamic subscriptions adds
     // a lot of code complexity.
@@ -557,19 +605,12 @@ NS_ASSUME_NONNULL_BEGIN
   NSNumber* encryptedValue = diskInfo[(__bridge NSString*)kDADiskDescriptionMediaEncryptedKey];
   BOOL isEncrypted = (encryptedValue != nil && [encryptedValue boolValue]);
 
-  // When only encryption enforcement is active (blockUSBMount is OFF),
-  // encrypted devices are allowed through (subject to remountArgs if configured).
-  // Unencrypted devices fall through to the block/remount logic below.
-  if (self.blockUnencryptedRemovableMediaMount && !self.blockUSBMount && isEncrypted) {
-    if (![self haveRemountArgs]) {
-      return ES_AUTH_RESULT_ALLOW;
-    }
-    // Encrypted device with remountArgs: fall through to remount logic.
-  }
+  SNTRemovableMediaAction action = [self actionForEncrypted:isEncrypted];
+  NSArray<NSString*>* actionRemountArgs = [self remountArgsForEncrypted:isEncrypted];
 
-  // When blockUnencryptedRemovableMediaMount is ON and device is unencrypted, always block
-  // (never remount — remounting still exposes unencrypted data).
-  BOOL shouldBlockUnencrypted = self.blockUnencryptedRemovableMediaMount && !isEncrypted;
+  if (action == SNTRemovableMediaActionAllow) {
+    return ES_AUTH_RESULT_ALLOW;
+  }
 
   SNTDeviceEvent* event = [[SNTDeviceEvent alloc]
       initWithOnName:[NSString stringWithUTF8String:eventStatFS->f_mntonname]
@@ -584,16 +625,17 @@ NS_ASSUME_NONNULL_BEGIN
       stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
   SNTStoredUSBMountEvent* storedUSBMountEvent;
 
-  if ([self haveRemountArgs] && !shouldBlockUnencrypted) {
-    event.remountArgs = self.remountArgs;
+  if (action == SNTRemovableMediaActionRemount && [actionRemountArgs count] > 0) {
+    event.remountArgs = actionRemountArgs;
 
-    if ([self remountUSBModeContainsFlags:eventStatFS->f_flags] &&
+    if ([self mountFlags:eventStatFS->f_flags containArgs:actionRemountArgs] &&
         m->event_type != ES_EVENT_TYPE_AUTH_REMOUNT) {
-      LOGD(@"Allowing mount as flags contain RemountUSBMode. '%s' -> '%s'",
+      LOGD(@"Allowing mount as flags already satisfy policy. '%s' -> '%s'",
            eventStatFS->f_mntfromname, eventStatFS->f_mntonname);
       return ES_AUTH_RESULT_ALLOW;
     }
-    uint32_t newMode = [self updatedMountFlags:eventStatFS];
+
+    uint32_t newMode = [self updatedMountFlags:eventStatFS remountArgs:actionRemountArgs];
     LOGI(@"SNTEndpointSecurityDeviceManager: remounting device '%s'->'%s', flags (%u) -> (%u)",
          eventStatFS->f_mntfromname, eventStatFS->f_mntonname, eventStatFS->f_flags, newMode);
     [self remount:disk mountMode:newMode callback:DiskMountedCallback context:nil];
@@ -606,7 +648,7 @@ NS_ASSUME_NONNULL_BEGIN
                 remountArgs:event.remountArgs
                 isEncrypted:isEncrypted];
   } else {
-    // The mount is going to be blocked, log it
+    // Block — log the mount denial.
     NSMutableDictionary* props = [CFBridgingRelease(DADiskCopyDescription(disk)) mutableCopy];
     props[santa::kMountFromNameKey] = event.mntfromname;
     [self logDiskAppeared:[props copy] allowed:false];
@@ -642,7 +684,7 @@ NS_ASSUME_NONNULL_BEGIN
   free(argv);
 }
 
-- (DADissenterRef __nullable)handleMountApproval:(DADiskRef)disk {
+- (DADissenterRef __nullable)handleEncryptedMountApproval:(DADiskRef)disk {
   const char* bsdNameStr = DADiskGetBSDName(disk);
   NSString* bsdName = bsdNameStr ? @(bsdNameStr) : @"";
 
@@ -657,16 +699,20 @@ NS_ASSUME_NONNULL_BEGIN
     return NULL;
   }
 
-  // Only intercept when encryption enforcement is active and blockUSBMount is off.
-  // When blockUSBMount is on, ES handles everything (block all).
-  if (!self.blockUnencryptedRemovableMediaMount || self.blockUSBMount) {
+  // Only intercept when encrypted policy is Remount.
+  if ([self encryptedAction] != SNTRemovableMediaActionRemount) {
     return NULL;
   }
 
   NSNumber* encryptedValue = diskInfo[(__bridge NSString*)kDADiskDescriptionMediaEncryptedKey];
   BOOL isEncrypted = (encryptedValue != nil && [encryptedValue boolValue]);
 
-  if (!isEncrypted || ![self haveRemountArgs]) {
+  if (!isEncrypted) {
+    return NULL;
+  }
+
+  NSArray<NSString*>* args = self.encryptedRemovableMediaRemountFlags;
+  if ([args count] == 0) {
     return NULL;
   }
 
@@ -675,7 +721,7 @@ NS_ASSUME_NONNULL_BEGIN
   [self.remountingDisks addObject:bsdName];
 
   [self remount:disk
-      mountMode:mountArgsToMask(self.remountArgs)
+      mountMode:mountArgsToMask(args)
        callback:DiskRemountCompletionCallback
         context:(__bridge void*)self];
 
@@ -683,7 +729,8 @@ NS_ASSUME_NONNULL_BEGIN
                            CFSTR("Remounting with restricted flags"));
 }
 
-- (void)handleRemountCompletion:(DADiskRef)disk dissenter:(DADissenterRef __nullable)dissenter {
+- (void)handleEncryptedRemountCompletion:(DADiskRef)disk
+                               dissenter:(DADissenterRef __nullable)dissenter {
   const char* bsdNameStr = DADiskGetBSDName(disk);
   NSString* bsdName = bsdNameStr ? @(bsdNameStr) : @"";
 
@@ -718,7 +765,7 @@ NS_ASSUME_NONNULL_BEGIN
 
   if (self.deviceBlockCallback) {
     SNTDeviceEvent* event = [[SNTDeviceEvent alloc] initWithOnName:mountOnName fromName:bsdName];
-    event.remountArgs = self.remountArgs;
+    event.remountArgs = self.encryptedRemovableMediaRemountFlags;
     event.isEncrypted = YES;
 
     SNTStoredUSBMountEvent* storedEvent = [[SNTStoredUSBMountEvent alloc]
@@ -727,7 +774,7 @@ NS_ASSUME_NONNULL_BEGIN
                 mountOnName:mountOnName
                    protocol:protocol
                    decision:SNTStoredUSBMountEventDecisionAllowedWithRemount
-                remountArgs:self.remountArgs
+                remountArgs:self.encryptedRemovableMediaRemountFlags
                 isEncrypted:YES];
 
     self.deviceBlockCallback(event, storedEvent);

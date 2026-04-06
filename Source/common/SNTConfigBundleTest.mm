@@ -28,7 +28,8 @@
 @property NSString* allowlistRegex;
 @property NSString* blocklistRegex;
 @property NSNumber* blockUSBMount;
-@property NSNumber* blockUnencryptedRemovableMediaMount;
+@property NSString* encryptedRemovableMediaAction;
+@property NSArray<NSString*>* encryptedRemovableMediaRemountFlags;
 @property NSArray* remountUSBMode;
 @property NSNumber* blockNetworkMount;
 @property NSString* bannedNetworkMountBlockMessage;
@@ -61,7 +62,7 @@
 
 - (void)testGettersWithValues {
   __block XCTestExpectation* exp = [self expectationWithDescription:@"Result Blocks"];
-  exp.expectedFulfillmentCount = 28;
+  exp.expectedFulfillmentCount = 29;
   NSDate* nowDate = [NSDate now];
 
   SNTConfigBundle* bundle = [[SNTConfigBundle alloc] init];
@@ -70,7 +71,8 @@
   bundle.allowlistRegex = @"allow";
   bundle.blocklistRegex = @"block";
   bundle.blockUSBMount = @(YES);
-  bundle.blockUnencryptedRemovableMediaMount = @(YES);
+  bundle.encryptedRemovableMediaAction = @"Remount";
+  bundle.encryptedRemovableMediaRemountFlags = @[ @"rdonly" ];
   bundle.remountUSBMode = @[ @"foo" ];
   bundle.blockNetworkMount = @(YES);
   bundle.bannedNetworkMountBlockMessage = @"Network mount blocked";
@@ -121,8 +123,13 @@
     [exp fulfill];
   }];
 
-  [bundle blockUnencryptedRemovableMediaMount:^(BOOL val) {
-    XCTAssertNotEqual(val, NO);
+  [bundle encryptedRemovableMediaAction:^(NSString* val) {
+    XCTAssertEqualObjects(val, @"Remount");
+    [exp fulfill];
+  }];
+
+  [bundle encryptedRemovableMediaRemountFlags:^(NSArray<NSString*>* val) {
+    XCTAssertEqualObjects(val, @[ @"rdonly" ]);
     [exp fulfill];
   }];
 
@@ -268,7 +275,11 @@
     XCTFail(@"This shouldn't be called");
   }];
 
-  [bundle blockUnencryptedRemovableMediaMount:^(BOOL val) {
+  [bundle encryptedRemovableMediaAction:^(NSString* val) {
+    XCTFail(@"This shouldn't be called");
+  }];
+
+  [bundle encryptedRemovableMediaRemountFlags:^(NSArray<NSString*>* val) {
     XCTFail(@"This shouldn't be called");
   }];
 

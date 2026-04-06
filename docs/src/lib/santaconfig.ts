@@ -775,6 +775,37 @@ changes in the release notes of any future release that changes them.`,
       enableIf: (data) => data.BlockUSBMount,
     },
     {
+      key: "EncryptedRemovableMediaAction",
+      description:
+        "Action for encrypted removable media. If unset, encrypted volumes use the baseline policy.",
+      type: "string",
+      syncConfigurable: true,
+      possibleValues: [
+        { value: "Allow" },
+        { value: "Block" },
+        { value: "Remount" },
+      ],
+    },
+    {
+      key: "EncryptedRemovableMediaRemountFlags",
+      description:
+        "Array of mount flag arguments for encrypted removable media when EncryptedRemovableMediaAction is Remount.",
+      type: "string",
+      syncConfigurable: true,
+      repeated: true,
+      possibleValues: [
+        { value: "rdonly" },
+        { value: "noexec" },
+        { value: "nosuid" },
+        { value: "nobrowse" },
+        { value: "noowners" },
+        { value: "nodev" },
+        { value: "async" },
+        { value: "-j" },
+      ],
+      enableIf: (data) => data.EncryptedRemovableMediaAction === "Remount",
+    },
+    {
       key: "OnStartUSBOptions",
       description: `If set, defines the action that should be taken on existing Removable Media (e.g. USB device) mounts when Santa starts up.
 

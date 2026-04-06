@@ -250,9 +250,14 @@ REGISTER_COMMAND_NAME(@"status")
     blockUSBMount = response;
   }];
 
-  __block BOOL blockUnencryptedRemovableMediaMount = NO;
-  [rop blockUnencryptedRemovableMediaMount:^(BOOL response) {
-    blockUnencryptedRemovableMediaMount = response;
+  __block NSString* encryptedRemovableMediaAction = nil;
+  [rop encryptedRemovableMediaAction:^(NSString* response) {
+    encryptedRemovableMediaAction = response;
+  }];
+
+  __block NSArray<NSString*>* encryptedRemovableMediaRemountFlags = nil;
+  [rop encryptedRemovableMediaRemountFlags:^(NSArray<NSString*>* response) {
+    encryptedRemovableMediaRemountFlags = response;
   }];
 
   __block NSArray<NSString*>* remountUSBMode;
@@ -326,11 +331,11 @@ REGISTER_COMMAND_NAME(@"status")
         @"watchdog_cpu_peak" : @(cpuPeak),
         @"watchdog_ram_peak" : @(ramPeak),
         @"block_usb" : @(blockUSBMount),
-        @"block_unencrypted_removable_media" : @(blockUnencryptedRemovableMediaMount),
+        @"encrypted_removable_media_action" : (encryptedRemovableMediaAction ?: @""),
+        @"encrypted_removable_media_remount_flags" :
+            (encryptedRemovableMediaRemountFlags ?: @[]),
         @"remount_usb_mode" :
-            ((blockUSBMount || blockUnencryptedRemovableMediaMount) && remountUSBMode.count
-                 ? remountUSBMode
-                 : @""),
+            ((blockUSBMount && remountUSBMode.count) ? remountUSBMode : @""),
         @"on_start_usb_options" : StartupOptionToString(configurator.onStartUSBOptions),
         @"static_rules" : @(staticRuleCount),
       },
@@ -444,11 +449,15 @@ REGISTER_COMMAND_NAME(@"status")
     printf("  %-40s | %s\n", "Log Type", [eventLogType UTF8String]);
     printf("  %-40s | %s\n", "File Logging", (fileLogging ? "Yes" : "No"));
     printf("  %-40s | %s\n", "Removable Media Blocking", (blockUSBMount ? "Yes" : "No"));
-    printf("  %-40s | %s\n", "Unencrypted Removable Media Blocking",
-           (blockUnencryptedRemovableMediaMount ? "Yes" : "No"));
-    if ((blockUSBMount || blockUnencryptedRemovableMediaMount) && remountUSBMode.count > 0) {
+    if (blockUSBMount && remountUSBMode.count > 0) {
       printf("  %-40s | %s\n", "Removable Media Remounting Mode",
              [[remountUSBMode componentsJoinedByString:@", "] UTF8String]);
+    }
+    printf("  %-40s | %s\n", "Encrypted Removable Media Action",
+           (encryptedRemovableMediaAction ? [encryptedRemovableMediaAction UTF8String] : "None"));
+    if (encryptedRemovableMediaRemountFlags.count > 0) {
+      printf("  %-40s | %s\n", "Encrypted Removable Media Remount Flags",
+             [[encryptedRemovableMediaRemountFlags componentsJoinedByString:@", "] UTF8String]);
     }
     printf("  %-40s | %s\n", "On Start Removable Media Options",
            StartupOptionToString(configurator.onStartUSBOptions).UTF8String);

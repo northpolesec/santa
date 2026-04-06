@@ -75,7 +75,8 @@ struct RuleCounts {
 - (void)enableBundles:(void (^)(BOOL))reply;
 - (void)enableTransitiveRules:(void (^)(BOOL))reply;
 - (void)blockUSBMount:(void (^)(BOOL))reply;
-- (void)blockUnencryptedRemovableMediaMount:(void (^)(BOOL))reply;
+- (void)encryptedRemovableMediaAction:(void (^)(NSString*))reply;
+- (void)encryptedRemovableMediaRemountFlags:(void (^)(NSArray<NSString*>*))reply;
 - (void)remountUSBMode:(void (^)(NSArray<NSString*>*))reply;
 - (void)blockNetworkMount:(void (^)(NSNumber*))reply;
 - (void)fullSyncInterval:(void (^)(NSUInteger))reply;

@@ -124,8 +124,9 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                  enricher:enricher
                           authResultCache:auth_result_cache
                             blockUSBMount:[configurator blockUSBMount]
-      blockUnencryptedRemovableMediaMount:[configurator blockUnencryptedRemovableMediaMount]
                            remountUSBMode:[configurator remountUSBMode]
+            encryptedRemovableMediaAction:[configurator encryptedRemovableMediaAction]
+      encryptedRemovableMediaRemountFlags:[configurator encryptedRemovableMediaRemountFlags]
                        startupPreferences:[configurator onStartUSBOptions]];
 
   device_client.deviceBlockCallback = ^(SNTDeviceEvent* event, SNTStoredUSBMountEvent* usbEvent) {
@@ -399,21 +400,6 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                    device_client.blockUSBMount = newBool;
                                  }],
     [[SNTKVOManager alloc] initWithObject:configurator
-                                 selector:@selector(blockUnencryptedRemovableMediaMount)
-                                     type:[NSNumber class]
-                                 callback:^(NSNumber* oldValue, NSNumber* newValue) {
-                                   BOOL oldBool = [oldValue boolValue];
-                                   BOOL newBool = [newValue boolValue];
-
-                                   if (oldBool == newBool) {
-                                     return;
-                                   }
-
-                                   LOGI(@"BlockUnencryptedRemovableMediaMount changed: %d -> %d",
-                                        oldBool, newBool);
-                                   device_client.blockUnencryptedRemovableMediaMount = newBool;
-                                 }],
-    [[SNTKVOManager alloc] initWithObject:configurator
                                  selector:@selector(remountUSBMode)
                                      type:[NSArray class]
                                  callback:^(NSArray* oldValue, NSArray* newValue) {
@@ -442,6 +428,41 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                         [oldValue componentsJoinedByString:@","],
                                         [newValue componentsJoinedByString:@","]);
                                    device_client.remountArgs = newValue;
+                                 }],
+    [[SNTKVOManager alloc] initWithObject:configurator
+                                 selector:@selector(encryptedRemovableMediaAction)
+                                     type:[NSString class]
+                                 callback:^(NSString* oldValue, NSString* newValue) {
+                                   if ([oldValue isEqualToString:newValue]) {
+                                     return;
+                                   }
+
+                                   LOGI(@"EncryptedRemovableMediaAction changed: %@ -> %@",
+                                        oldValue, newValue);
+                                   device_client.encryptedRemovableMediaAction = newValue;
+                                 }],
+    [[SNTKVOManager alloc] initWithObject:configurator
+                                 selector:@selector(encryptedRemovableMediaRemountFlags)
+                                     type:[NSArray class]
+                                 callback:^(NSArray* oldValue, NSArray* newValue) {
+                                   if (!oldValue && !newValue) {
+                                     return;
+                                   }
+
+                                   for (id element in newValue) {
+                                     if (![element isKindOfClass:[NSString class]]) {
+                                       return;
+                                     }
+                                   }
+
+                                   if ([oldValue isEqualToArray:newValue]) {
+                                     return;
+                                   }
+
+                                   LOGI(@"EncryptedRemovableMediaRemountFlags changed: %@ -> %@",
+                                        [oldValue componentsJoinedByString:@","],
+                                        [newValue componentsJoinedByString:@","]);
+                                   device_client.encryptedRemovableMediaRemountFlags = newValue;
                                  }],
     [[SNTKVOManager alloc] initWithObject:configurator
                                  selector:@selector(staticRules)
