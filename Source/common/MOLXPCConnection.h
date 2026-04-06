@@ -201,7 +201,7 @@
  For clients, the server must satisfy this requirement.
  Set via the codeSigningRequirement: initializers or directly before calling resume.
  */
-@property(copy, nullable) NSString* codeSignatureRequirement;
+@property(copy, nullable) NSString* codeSigningRequirement;
 
 /**
  Whether or not the XPC connection is currently established.

@@ -120,7 +120,7 @@ static NSString* CopyDefaultCodeSigningRequirement(void) {
     _listenerObject = listener;
     _validationInterface =
         [NSXPCInterface interfaceWithProtocol:@protocol(MOLXPCConnectionProtocol)];
-    _codeSignatureRequirement = [requirement copy];
+    _codeSigningRequirement = [requirement copy];
   }
   return self;
 }
@@ -148,7 +148,7 @@ static NSString* CopyDefaultCodeSigningRequirement(void) {
     if (!_currentConnection) return nil;
     _validationInterface =
         [NSXPCInterface interfaceWithProtocol:@protocol(MOLXPCConnectionProtocol)];
-    _codeSignatureRequirement = [requirement copy];
+    _codeSigningRequirement = [requirement copy];
   }
   return self;
 }
@@ -169,7 +169,7 @@ static NSString* CopyDefaultCodeSigningRequirement(void) {
     if (!_currentConnection) return nil;
     _validationInterface =
         [NSXPCInterface interfaceWithProtocol:@protocol(MOLXPCConnectionProtocol)];
-    _codeSignatureRequirement = [requirement copy];
+    _codeSigningRequirement = [requirement copy];
   }
   return self;
 }
@@ -187,7 +187,7 @@ static NSString* CopyDefaultCodeSigningRequirement(void) {
     if (!_currentConnection) return nil;
     _validationInterface =
         [NSXPCInterface interfaceWithProtocol:@protocol(MOLXPCConnectionProtocol)];
-    _codeSignatureRequirement = [requirement copy];
+    _codeSigningRequirement = [requirement copy];
   }
   return self;
 }
@@ -220,8 +220,8 @@ static NSString* CopyDefaultCodeSigningRequirement(void) {
       }
       SafeCallBlock(self.invalidationHandler);
     };
-    if (self.codeSignatureRequirement) {
-      [self.currentConnection setCodeSigningRequirement:self.codeSignatureRequirement];
+    if (self.codeSigningRequirement) {
+      [self.currentConnection setCodeSigningRequirement:self.codeSigningRequirement];
     }
     [self.currentConnection resume];
     [[self.currentConnection remoteObjectProxy] connectWithReply:^{
@@ -259,8 +259,8 @@ static NSString* CopyDefaultCodeSigningRequirement(void) {
 
   if (!interface) return NO;
 
-  if (self.codeSignatureRequirement) {
-    [connection setCodeSigningRequirement:self.codeSignatureRequirement];
+  if (self.codeSigningRequirement) {
+    [connection setCodeSigningRequirement:self.codeSigningRequirement];
   }
 
   // The code signature requirement is set, now we need to resume the listener and

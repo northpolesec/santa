@@ -87,7 +87,7 @@
   sutServer.unprivilegedInterface =
       [NSXPCInterface interfaceWithProtocol:@protocol(DummyXPCProtocol)];
   // Set a requirement that the test binary cannot satisfy to force rejection.
-  sutServer.codeSignatureRequirement = @"identifier \"com.impossible.nonexistent.app\"";
+  sutServer.codeSigningRequirement = @"identifier \"com.impossible.nonexistent.app\"";
   [sutServer resume];
 
   __block XCTestExpectation* exp1 = [self expectationWithDescription:@"Client Invalidated"];
