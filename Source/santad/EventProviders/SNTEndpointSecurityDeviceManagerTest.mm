@@ -425,8 +425,8 @@ class MockAuthResultCache : public AuthResultCache {
                           authResultCache:mockAuthCache
                             blockUSBMount:YES
                            remountUSBMode:nil
-              encryptedRemovableMediaAction:nil
-        encryptedRemovableMediaRemountFlags:nil
+            encryptedRemovableMediaAction:nil
+      encryptedRemovableMediaRemountFlags:nil
                        startupPreferences:SNTDeviceManagerStartupPreferencesNone];
 
   deviceManager.blockUSBMount = YES;
@@ -622,8 +622,8 @@ class MockAuthResultCache : public AuthResultCache {
                           authResultCache:nullptr
                             blockUSBMount:false
                            remountUSBMode:nil
-              encryptedRemovableMediaAction:nil
-        encryptedRemovableMediaRemountFlags:nil
+            encryptedRemovableMediaAction:nil
+      encryptedRemovableMediaRemountFlags:nil
                        startupPreferences:SNTDeviceManagerStartupPreferencesNone];
 
   setupDMCallback(deviceManager);
@@ -1009,8 +1009,7 @@ class MockAuthResultCache : public AuthResultCache {
              dm.remountArgs = @[ @"rdonly" ];
              dm.encryptedRemovableMediaAction = @"Allow";
              dm.deviceBlockCallback = ^(SNTDeviceEvent* event, SNTStoredUSBMountEvent* usbEvent) {
-               XCTAssertEqual(usbEvent.decision,
-                              SNTStoredUSBMountEventDecisionAllowedWithRemount);
+               XCTAssertEqual(usbEvent.decision, SNTStoredUSBMountEventDecisionAllowedWithRemount);
                XCTAssertEqualObjects(usbEvent.remountArgs, (@[ @"rdonly" ]));
                [exp fulfill];
              };
@@ -1080,8 +1079,7 @@ class MockAuthResultCache : public AuthResultCache {
              dm.encryptedRemovableMediaAction = @"Remount";
              dm.encryptedRemovableMediaRemountFlags = @[ @"rdonly", @"noexec" ];
              dm.deviceBlockCallback = ^(SNTDeviceEvent* event, SNTStoredUSBMountEvent* usbEvent) {
-               XCTAssertEqual(usbEvent.decision,
-                              SNTStoredUSBMountEventDecisionAllowedWithRemount);
+               XCTAssertEqual(usbEvent.decision, SNTStoredUSBMountEventDecisionAllowedWithRemount);
                XCTAssertEqualObjects(usbEvent.remountArgs, (@[ @"rdonly" ]));
                [exp fulfill];
              };

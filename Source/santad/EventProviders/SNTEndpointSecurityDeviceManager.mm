@@ -216,7 +216,8 @@ NS_ASSUME_NONNULL_BEGIN
                           blockUSBMount:(BOOL)blockUSBMount
                          remountUSBMode:(nullable NSArray<NSString*>*)remountUSBMode
           encryptedRemovableMediaAction:(nullable NSString*)encryptedRemovableMediaAction
-    encryptedRemovableMediaRemountFlags:(nullable NSArray<NSString*>*)encryptedRemovableMediaRemountFlags
+    encryptedRemovableMediaRemountFlags:
+        (nullable NSArray<NSString*>*)encryptedRemovableMediaRemountFlags
                      startupPreferences:(SNTDeviceManagerStartupPreferences)startupPrefs {
   self = [super initWithESAPI:std::move(esApi)
                       metrics:std::move(metrics)
@@ -259,8 +260,7 @@ NS_ASSUME_NONNULL_BEGIN
   return self;
 }
 
-- (uint32_t)updatedMountFlags:(const struct statfs*)sfs
-                   remountArgs:(NSArray<NSString*>*)args {
+- (uint32_t)updatedMountFlags:(const struct statfs*)sfs remountArgs:(NSArray<NSString*>*)args {
   uint32_t mask = sfs->f_flags | mountArgsToMask(args);
 
   // NB: APFS mounts get MNT_JOURNALED implicitly set. However, mount_apfs

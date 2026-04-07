@@ -250,8 +250,7 @@ BOOL Preflight(SNTSyncPreflight* self, google::protobuf::Arena* arena,
         self.syncState.remountUSBMode = flags;
         break;
       }
-      default:
-        break;
+      default: break;
     }
   } else if (resp.has_block_usb_mount()) {
     // Deprecated fallback.
@@ -282,8 +281,7 @@ BOOL Preflight(SNTSyncPreflight* self, google::protobuf::Arena* arena,
         self.syncState.encryptedRemovableMediaRemountFlags = flags;
         break;
       }
-      default:
-        break;
+      default: break;
     }
   }
 

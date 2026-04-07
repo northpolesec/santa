@@ -55,7 +55,8 @@ typedef void (^SNTNetworkMountCallback)(SNTStoredNetworkMountEvent* event);
                           blockUSBMount:(BOOL)blockUSBMount
                          remountUSBMode:(nullable NSArray<NSString*>*)remountUSBMode
           encryptedRemovableMediaAction:(nullable NSString*)encryptedRemovableMediaAction
-    encryptedRemovableMediaRemountFlags:(nullable NSArray<NSString*>*)encryptedRemovableMediaRemountFlags
+    encryptedRemovableMediaRemountFlags:
+        (nullable NSArray<NSString*>*)encryptedRemovableMediaRemountFlags
                      startupPreferences:(SNTDeviceManagerStartupPreferences)startupPrefs;
 
 @end
