@@ -608,7 +608,8 @@ NS_ASSUME_NONNULL_BEGIN
   SNTRemovableMediaAction action = [self actionForEncrypted:isEncrypted];
   NSArray<NSString*>* actionRemountArgs = [self remountArgsForEncrypted:isEncrypted];
 
-  if (action == SNTRemovableMediaActionAllow) {
+  if (action == SNTRemovableMediaActionAllow ||
+   (action == SNTRemovableMediaActionRemount && [actionRemountArgs count] == 0)) {
     return ES_AUTH_RESULT_ALLOW;
   }
 
