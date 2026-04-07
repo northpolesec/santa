@@ -432,15 +432,15 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
 
 - (SNTRule*)executionRuleFromResultSet:(FMResultSet*)rs {
   return [[SNTRule alloc] initWithIdentifier:[rs stringForColumn:@"identifier"]
-                                    state:static_cast<SNTRuleState>([rs intForColumn:@"state"])
-                                     type:static_cast<SNTRuleType>([rs intForColumn:@"type"])
-                                customMsg:[rs stringForColumn:@"custommsg"]
-                                customURL:[rs stringForColumn:@"customurl"]
-                                timestamp:[rs intForColumn:@"timestamp"]
-                                  comment:[rs stringForColumn:@"comment"]
-                                  celExpr:[rs stringForColumn:@"cel_expr"]
-                                   ruleId:[rs longLongIntForColumn:@"rule_id"]
-                                    error:nil];
+                                       state:static_cast<SNTRuleState>([rs intForColumn:@"state"])
+                                        type:static_cast<SNTRuleType>([rs intForColumn:@"type"])
+                                   customMsg:[rs stringForColumn:@"custommsg"]
+                                   customURL:[rs stringForColumn:@"customurl"]
+                                   timestamp:[rs intForColumn:@"timestamp"]
+                                     comment:[rs stringForColumn:@"comment"]
+                                     celExpr:[rs stringForColumn:@"cel_expr"]
+                                      ruleId:[rs longLongIntForColumn:@"rule_id"]
+                                       error:nil];
 }
 
 - (SNTRule*)executionRuleForIdentifiers:(struct RuleIdentifiers)identifiers {
