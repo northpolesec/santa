@@ -1691,14 +1691,10 @@ static SNTConfigurator* sharedConfigurator = nil;
 }
 
 - (nullable NSArray<NSString*>*)encryptedRemovableMediaRemountFlags {
-  NSArray<NSString*>* args = self.syncState[kEncryptedRemovableMediaRemountFlagsKey];
+  NSArray<NSString*>* args = EnsureArrayOfStrings(
+      self.syncState[kEncryptedRemovableMediaRemountFlagsKey]);
   if (!args) {
-    args = (NSArray<NSString*>*)self.configState[kEncryptedRemovableMediaRemountFlagsKey];
-  }
-  for (id arg in args) {
-    if (![arg isKindOfClass:[NSString class]]) {
-      return nil;
-    }
+    args = EnsureArrayOfStrings(self.configState[kEncryptedRemovableMediaRemountFlagsKey]);
   }
   return args;
 }
