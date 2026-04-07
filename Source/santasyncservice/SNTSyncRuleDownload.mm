@@ -214,6 +214,10 @@ NSDictionary* OptionsFromProtoFAARuleAdd(const ::pbv2::FileAccessRule::Add& pbAd
       pbAddRule.event_detail_url().length() > 0 ? StringToNSString(pbAddRule.event_detail_url())
                                                 : nil;
 
+  if (pbAddRule.rule_id() > 0) {
+    optionsDict[kWatchItemConfigKeyOptionsRuleId] = @(pbAddRule.rule_id());
+  }
+
   return optionsDict;
 }
 
@@ -338,12 +342,17 @@ SNTRule* RuleFromProtoRule(const typename santa::ProtoTraits<IsV2>::RuleT& rule)
   const std::string& cel_expr = rule.cel_expr();
   NSString* celExpr = (!cel_expr.empty()) ? StringToNSString(cel_expr) : nil;
 
+  int64_t ruleId = 0;
+  if constexpr (IsV2) {
+    ruleId = rule.rule_id();
+  }
   return [[SNTRule alloc] initWithIdentifier:identifier
                                        state:state
                                         type:type
                                    customMsg:customMsg
                                    customURL:customURL
-                                     celExpr:celExpr];
+                                     celExpr:celExpr
+                                      ruleId:ruleId];
 }
 
 template <bool IsV2>

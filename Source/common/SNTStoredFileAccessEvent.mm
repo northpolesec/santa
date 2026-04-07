@@ -37,6 +37,7 @@
   ENCODE(coder, ruleName);
   ENCODE(coder, process);
   ENCODE_BOXABLE(coder, decision);
+  ENCODE_BOXABLE(coder, ruleId);
 }
 
 - (instancetype)initWithCoder:(NSCoder*)decoder {
@@ -47,6 +48,7 @@
     DECODE(decoder, accessedPath, NSString);
     DECODE(decoder, process, SNTStoredFileAccessProcess);
     DECODE_SELECTOR(decoder, decision, NSNumber, intValue);
+    DECODE_SELECTOR(decoder, ruleId, NSNumber, longLongValue);
   }
   return self;
 }

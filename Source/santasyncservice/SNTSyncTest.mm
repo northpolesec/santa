@@ -1119,13 +1119,15 @@
                       type:SNTRuleTypeCertificate
                  customMsg:@"Hi There"
                  customURL:@"http://northpole.security"
-                   celExpr:nil],
+                   celExpr:nil
+                    ruleId:0],
     [[SNTRule alloc] initWithIdentifier:@"AAAAAAAAAA"
                                   state:SNTRuleStateBlock
                                    type:SNTRuleTypeTeamID
                               customMsg:@"Banned team ID"
                               customURL:@"http://northpole.security"
-                                celExpr:nil],
+                                celExpr:nil
+                                 ruleId:0],
   ];
 
   OCMVerify([self.daemonConnRop databaseRuleAddExecutionRules:rules
@@ -1158,19 +1160,20 @@
 
   // Both rules should get sent to the daemon. It will reject the second one.
   NSArray* rules = @[
-    [[SNTRule alloc]
-        initWithIdentifier:@"AAAAAAAAAA"
-                     state:state
-                      type:SNTRuleTypeTeamID
-                 customMsg:nil
-                 customURL:nil
-                   celExpr:@"target.signing_time >= timestamp('2025-05-31T00:00:00Z')"],
+    [[SNTRule alloc] initWithIdentifier:@"AAAAAAAAAA"
+                                  state:state
+                                   type:SNTRuleTypeTeamID
+                              customMsg:nil
+                              customURL:nil
+                                celExpr:@"target.signing_time >= timestamp('2025-05-31T00:00:00Z')"
+                                 ruleId:0],
     [[SNTRule alloc] initWithIdentifier:@"BBBBBBBBBB"
                                   state:state
                                    type:SNTRuleTypeTeamID
                               customMsg:nil
                               customURL:nil
-                                celExpr:@"this is an invalid expression"],
+                                celExpr:@"this is an invalid expression"
+                                 ruleId:0],
   ];
 
   OCMVerify([self.daemonConnRop databaseRuleAddExecutionRules:rules
@@ -1399,6 +1402,65 @@
                  @"Persisted interval should be updated when server provides a new value");
 
   [mockPreflight stopMocking];
+}
+
+- (void)testEventUploadRuleId {
+  SNTSyncEventUpload* sut = [[SNTSyncEventUpload alloc] initWithState:self.syncState];
+  self.syncState.eventBatchSize = 50;
+
+  SNTStoredExecutionEvent* execEvent = [[SNTStoredExecutionEvent alloc] init];
+  execEvent.fileSHA256 = @"aabbccdd";
+  execEvent.filePath = @"/usr/bin/test";
+  execEvent.decision = SNTEventStateBlockBinary;
+  execEvent.occurrenceDate = [NSDate dateWithTimeIntervalSince1970:1700000000];
+  execEvent.pid = @(1234);
+  execEvent.ppid = @(1);
+  execEvent.ruleId = 42;
+
+  SNTStoredFileAccessEvent* faaEvent = [[SNTStoredFileAccessEvent alloc] init];
+  faaEvent.ruleName = @"TestRule";
+  faaEvent.ruleVersion = @"v1";
+  faaEvent.accessedPath = @"/watched/path";
+  faaEvent.decision = FileAccessPolicyDecision::kDenied;
+  faaEvent.occurrenceDate = [NSDate dateWithTimeIntervalSince1970:1700000001];
+  faaEvent.ruleId = 99;
+  SNTStoredFileAccessProcess* proc = [[SNTStoredFileAccessProcess alloc] init];
+  proc.filePath = @"/bin/cat";
+  proc.pid = @(555);
+  faaEvent.process = proc;
+
+  NSArray* events = @[ execEvent, faaEvent ];
+  OCMStub([self.daemonConnRop databaseEventsPending:([OCMArg invokeBlockWithArgs:events, nil])]);
+
+  [self stubRequestBody:nil
+               response:nil
+                  error:nil
+          validateBlock:^BOOL(NSURLRequest* req) {
+            NSDictionary* requestDict = [self dictFromRequest:req];
+            NSArray* execEvents = requestDict[kEvents];
+            XCTAssertEqual(execEvents.count, 1);
+            NSDictionary* event = execEvents[0];
+
+            if (self.syncState.isSyncV2) {
+              XCTAssertEqualObjects(event[@"ruleId"], @"42");
+            } else {
+              XCTAssertNil(event[@"ruleId"]);
+            }
+
+            NSArray* faaEvents = requestDict[@"file_access_events"];
+            XCTAssertEqual(faaEvents.count, 1);
+            NSDictionary* faaEvt = faaEvents[0];
+
+            if (self.syncState.isSyncV2) {
+              XCTAssertEqualObjects(faaEvt[@"ruleId"], @"99");
+            } else {
+              XCTAssertNil(faaEvt[@"ruleId"]);
+            }
+
+            return YES;
+          }];
+
+  XCTAssertTrue([sut sync]);
 }
 
 @end
