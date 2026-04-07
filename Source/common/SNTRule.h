@@ -84,7 +84,7 @@
                          timestamp:(NSUInteger)timestamp
                            comment:(NSString*)comment
                            celExpr:(NSString*)celExpr
-                            ruleId:(uint64_t)ruleId
+                            ruleId:(int64_t)ruleId
                              error:(NSError**)error;
 
 ///
@@ -96,7 +96,7 @@
                          customMsg:(NSString*)customMsg
                          customURL:(NSString*)customURL
                            celExpr:(NSString*)celExpr
-                            ruleId:(uint64_t)ruleId;
+                            ruleId:(int64_t)ruleId;
 
 ///
 ///  Initialize with a default timestamp: current time if rule state is transitive, 0 otherwise.

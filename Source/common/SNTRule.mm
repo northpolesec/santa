@@ -48,7 +48,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
                          timestamp:(NSUInteger)timestamp
                            comment:(NSString*)comment
                            celExpr:(NSString*)celExpr
-                            ruleId:(uint64_t)ruleId
+                            ruleId:(int64_t)ruleId
                              error:(NSError**)error {
   self = [super init];
   if (self) {
@@ -194,7 +194,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
                          customMsg:(NSString*)customMsg
                          customURL:(NSString*)customURL
                            celExpr:(NSString*)celExpr
-                            ruleId:(uint64_t)ruleId {
+                            ruleId:(int64_t)ruleId {
   self = [self initWithIdentifier:identifier
                             state:state
                              type:type
@@ -410,7 +410,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     DECODE(decoder, comment, NSString);
     DECODE(decoder, celExpr, NSString);
     DECODE_SELECTOR(decoder, staticRule, NSNumber, boolValue);
-    DECODE_SELECTOR(decoder, ruleId, NSNumber, unsignedLongLongValue);
+    DECODE_SELECTOR(decoder, ruleId, NSNumber, longLongValue);
   }
   return self;
 }

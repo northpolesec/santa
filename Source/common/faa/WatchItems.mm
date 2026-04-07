@@ -176,6 +176,17 @@ ValidatorBlock HexValidator(NSUInteger expected_length) {
   };
 }
 
+// Returns a ValidatorBlock that confirms the NSNumber value is non-negative.
+ValidatorBlock NonNegativeValidator() {
+  return ^bool(NSNumber* val, NSError** err) {
+    if ([val longLongValue] < 0) {
+      [SNTError populateError:err withFormat:@"Value must be non-negative. Got: %@", val];
+      return false;
+    }
+    return true;
+  };
+}
+
 // Given a min and max length, returns a ValidatorBlock that confirms the
 // string is within the given bounds.
 ValidatorBlock LenRangeValidator(NSUInteger min_length, NSUInteger max_length) {
@@ -490,6 +501,11 @@ bool ParseConfigSingleWatchItem(NSString* name, std::string_view fallback_policy
                          false, LenRangeValidator(0, kWatchItemConfigEventDetailTextMaxLength))) {
       return false;
     }
+
+    if (!VerifyConfigKey(options, kWatchItemConfigKeyOptionsRuleId, [NSNumber class], err, false,
+                         NonNegativeValidator())) {
+      return false;
+    }
   }
 
   std::string policy_version;
@@ -540,10 +556,7 @@ bool ParseConfigSingleWatchItem(NSString* name, std::string_view fallback_policy
     return true;
   }
 
-  int64_t rule_id = 0;
-  if ([options[kWatchItemConfigKeyOptionsRuleId] isKindOfClass:[NSNumber class]]) {
-    rule_id = [options[kWatchItemConfigKeyOptionsRuleId] longLongValue];
-  }
+  int64_t rule_id = [options[kWatchItemConfigKeyOptionsRuleId] longLongValue];
 
   switch (rule_type) {
     case WatchItemRuleType::kPathsWithAllowedProcesses: [[fallthrough]];
