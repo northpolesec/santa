@@ -1442,7 +1442,6 @@
             NSDictionary* event = execEvents[0];
 
             if (self.syncState.isSyncV2) {
-              // v2 proto JSON uses camelCase field names
               XCTAssertEqualObjects(event[@"ruleId"], @"42");
             } else {
               XCTAssertNil(event[@"ruleId"]);
