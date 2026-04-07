@@ -1832,7 +1832,7 @@ void SerializeAndCheckNonESEvents(
       ^std::vector<uint8_t>(std::shared_ptr<Serializer> serializer, const Message& msg) {
         return serializer->SerializeFileAccess(
             "policy_version", "policy_name", msg, Enricher().Enrich(*msg->process), 0,
-            Enricher().Enrich(openFile), FileAccessPolicyDecision::kDenied, "abc123");
+            Enricher().Enrich(openFile), FileAccessPolicyDecision::kDenied, "abc123", 0);
       });
 
   SerializeAndCheckNonESEvents(
@@ -1846,7 +1846,7 @@ void SerializeAndCheckNonESEvents(
         return serializer->SerializeFileAccess(
             "policy_version", "policy_name", msg, Enricher().Enrich(*msg->process), 0,
             santa::EnrichedFile(std::nullopt, std::nullopt, std::nullopt),
-            FileAccessPolicyDecision::kDenied, "abc123");
+            FileAccessPolicyDecision::kDenied, "abc123", 0);
       });
 
   SerializeAndCheckNonESEvents(
@@ -1862,7 +1862,7 @@ void SerializeAndCheckNonESEvents(
         return serializer->SerializeFileAccess(
             "policy_version", "policy_name", msg, Enricher().Enrich(*msg->process), 1,
             santa::EnrichedFile(std::nullopt, std::nullopt, std::nullopt),
-            FileAccessPolicyDecision::kDenied, "abc123");
+            FileAccessPolicyDecision::kDenied, "abc123", 0);
       });
 
   // This state shouldn't be possible. But ensure the code handles it.
@@ -1877,7 +1877,7 @@ void SerializeAndCheckNonESEvents(
         return serializer->SerializeFileAccess(
             "policy_version", "policy_name", msg, Enricher().Enrich(*msg->process), 0,
             santa::EnrichedFile(std::nullopt, std::nullopt, std::nullopt),
-            FileAccessPolicyDecision::kDenied, "abc123");
+            FileAccessPolicyDecision::kDenied, "abc123", 0);
       });
 
   // This state shouldn't be possible. But ensure the code handles it.
@@ -1892,7 +1892,7 @@ void SerializeAndCheckNonESEvents(
         return serializer->SerializeFileAccess(
             "policy_version", "policy_name", msg, Enricher().Enrich(*msg->process), 111,
             santa::EnrichedFile(std::nullopt, std::nullopt, std::nullopt),
-            FileAccessPolicyDecision::kDenied, "abc123");
+            FileAccessPolicyDecision::kDenied, "abc123", 0);
       });
 }
 
@@ -2045,6 +2045,95 @@ void SerializeAndCheckNonESEvents(
   // Note: `DAAppearanceTime` is treated as a reference time since 2001 and is converted to a
   // reference time of 1970. Skip the calculation in the test here, just ensure the value is set.
   XCTAssertGreaterThan(pbDisk.appearance().seconds(), 1);
+}
+
+- (void)testSerializeExecRuleId {
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+
+  es_file_t procFile = MakeESFile("foo", MakeStat(100));
+  es_file_t procFileTarget = MakeESFile("fooexec", MakeStat(300));
+  es_process_t proc = MakeESProcess(&procFile, MakeAuditToken(12, 34), MakeAuditToken(56, 78));
+  es_process_t procTarget =
+      MakeESProcess(&procFileTarget, MakeAuditToken(23, 45), MakeAuditToken(67, 89));
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_EXEC, &proc);
+  esMsg.event.exec.target = &procTarget;
+  esMsg.event.exec.last_fd = 0;
+
+  mockESApi->SetExpectationsRetainReleaseMessage();
+  EXPECT_CALL(*mockESApi, ExecArgCount).WillOnce(testing::Return(0));
+  EXPECT_CALL(*mockESApi, ExecEnvCount).WillOnce(testing::Return(0));
+  if (esMsg.version >= 4) {
+    EXPECT_CALL(*mockESApi, ExecFDCount).WillOnce(testing::Return(0));
+  }
+
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+  cd.decision = SNTEventStateAllowBinary;
+  cd.decisionClientMode = SNTClientModeLockdown;
+  cd.ruleId = 12345;
+
+  std::shared_ptr<Serializer> serializer = Protobuf::Create(mockESApi, nil);
+  auto enrichedMsg = Enricher().Enrich(Message(mockESApi, &esMsg));
+
+  const auto& execMsg = std::get<santa::EnrichedExec>(enrichedMsg->GetEnrichedMessage());
+  std::vector<uint8_t> vec = serializer->SerializeMessage(execMsg, cd);
+
+  ::pbv1::SantaMessage santaMsg;
+  XCTAssertTrue(santaMsg.ParseFromString(std::string(vec.begin(), vec.end())));
+  XCTAssertTrue(santaMsg.has_execution());
+  XCTAssertEqual(santaMsg.execution().rule_id(), 12345LL);
+
+  // Verify rule_id is absent when 0
+  cd.ruleId = 0;
+  mockESApi->SetExpectationsRetainReleaseMessage();
+  EXPECT_CALL(*mockESApi, ExecArgCount).WillOnce(testing::Return(0));
+  EXPECT_CALL(*mockESApi, ExecEnvCount).WillOnce(testing::Return(0));
+  if (esMsg.version >= 4) {
+    EXPECT_CALL(*mockESApi, ExecFDCount).WillOnce(testing::Return(0));
+  }
+
+  auto enrichedMsg2 = Enricher().Enrich(Message(mockESApi, &esMsg));
+  const auto& execMsg2 = std::get<santa::EnrichedExec>(enrichedMsg2->GetEnrichedMessage());
+  vec = serializer->SerializeMessage(execMsg2, cd);
+
+  ::pbv1::SantaMessage santaMsg2;
+  XCTAssertTrue(santaMsg2.ParseFromString(std::string(vec.begin(), vec.end())));
+  XCTAssertTrue(santaMsg2.has_execution());
+  XCTAssertFalse(santaMsg2.execution().has_rule_id());
+}
+
+- (void)testSerializeFileAccessRuleId {
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+
+  es_file_t procFile = MakeESFile("foo", MakeStat(100));
+  es_file_t openFile = MakeESFile("open_file", MakeStat(300));
+  es_process_t proc = MakeESProcess(&procFile, MakeAuditToken(12, 34), MakeAuditToken(56, 78));
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_OPEN, &proc);
+  esMsg.event.open.file = &openFile;
+
+  std::shared_ptr<Serializer> serializer = Protobuf::Create(mockESApi, nil);
+  Message msg(mockESApi, &esMsg);
+  (void)msg.PathTargets();
+
+  // Non-zero rule_id
+  std::vector<uint8_t> vec = serializer->SerializeFileAccess(
+      "v1", "policy", msg, Enricher().Enrich(*msg->process), 0, Enricher().Enrich(openFile),
+      FileAccessPolicyDecision::kDenied, "op123", 99999);
+
+  ::pbv1::SantaMessage santaMsg;
+  XCTAssertTrue(santaMsg.ParseFromString(std::string(vec.begin(), vec.end())));
+  XCTAssertTrue(santaMsg.has_file_access());
+  XCTAssertEqual(santaMsg.file_access().rule_id(), 99999LL);
+
+  // Zero rule_id should not be set
+  vec = serializer->SerializeFileAccess("v1", "policy", msg, Enricher().Enrich(*msg->process), 0,
+                                        Enricher().Enrich(openFile),
+                                        FileAccessPolicyDecision::kDenied, "op123", 0);
+
+  ::pbv1::SantaMessage santaMsg2;
+  XCTAssertTrue(santaMsg2.ParseFromString(std::string(vec.begin(), vec.end())));
+  XCTAssertTrue(santaMsg2.has_file_access());
+  XCTAssertFalse(santaMsg2.file_access().has_rule_id());
 }
 
 @end

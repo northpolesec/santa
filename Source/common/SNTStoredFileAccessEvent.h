@@ -38,6 +38,9 @@
 /// The decision made by Santa about the access operation.
 @property FileAccessPolicyDecision decision;
 
+/// The server-assigned rule ID that matched this event.
+@property int64_t ruleId;
+
 @end
 
 @interface SNTStoredFileAccessProcess : NSObject <NSSecureCoding>

@@ -58,6 +58,7 @@ NSString* const kWatchItemConfigKeyOptionsCustomMessage = @"BlockMessage";
 NSString* const kWatchItemConfigKeyOptionsEventDetailURL = kWatchItemConfigKeyEventDetailURL;
 NSString* const kWatchItemConfigKeyOptionsEventDetailText = kWatchItemConfigKeyEventDetailText;
 NSString* const kWatchItemConfigKeyOptionsVersion = kWatchItemConfigKeyVersion;
+NSString* const kWatchItemConfigKeyOptionsRuleId = @"RuleId";
 NSString* const kWatchItemConfigKeyProcesses = @"Processes";
 NSString* const kWatchItemConfigKeyProcessesBinaryPath = @"BinaryPath";
 NSString* const kWatchItemConfigKeyProcessesCertificateSha256 = @"CertificateSha256";
@@ -539,6 +540,11 @@ bool ParseConfigSingleWatchItem(NSString* name, std::string_view fallback_policy
     return true;
   }
 
+  int64_t rule_id = 0;
+  if ([options[kWatchItemConfigKeyOptionsRuleId] isKindOfClass:[NSNumber class]]) {
+    rule_id = [options[kWatchItemConfigKeyOptionsRuleId] longLongValue];
+  }
+
   switch (rule_type) {
     case WatchItemRuleType::kPathsWithAllowedProcesses: [[fallthrough]];
     case WatchItemRuleType::kPathsWithDeniedProcesses:
@@ -550,7 +556,7 @@ bool ParseConfigSingleWatchItem(NSString* name, std::string_view fallback_policy
             NSStringToUTF8StringView(options[kWatchItemConfigKeyOptionsCustomMessage]),
             options[kWatchItemConfigKeyOptionsEventDetailURL],
             options[kWatchItemConfigKeyOptionsEventDetailText],
-            std::get<SetWatchItemProcess>(proc_list)));
+            std::get<SetWatchItemProcess>(proc_list), rule_id));
       }
 
       break;
@@ -563,7 +569,7 @@ bool ParseConfigSingleWatchItem(NSString* name, std::string_view fallback_policy
           NSStringToUTF8StringView(options[kWatchItemConfigKeyOptionsCustomMessage]),
           options[kWatchItemConfigKeyOptionsEventDetailURL],
           options[kWatchItemConfigKeyOptionsEventDetailText],
-          std::get<SetWatchItemProcess>(proc_list)));
+          std::get<SetWatchItemProcess>(proc_list), rule_id));
 
       break;
   }

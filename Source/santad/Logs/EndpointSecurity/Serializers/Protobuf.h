@@ -87,7 +87,7 @@ class Protobuf : public Serializer {
       const std::string& policy_version, const std::string& policy_name, const santa::Message& msg,
       const santa::EnrichedProcess& enriched_process, size_t target_index,
       std::optional<santa::EnrichedFile> enriched_event_target, FileAccessPolicyDecision decision,
-      std::string_view operation_id) override;
+      std::string_view operation_id, int64_t rule_id) override;
 
   std::vector<uint8_t> SerializeAllowlist(const santa::Message&, const std::string_view,
                                           const std::string_view) override;

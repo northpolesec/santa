@@ -358,6 +358,7 @@ static NSString* const kPrinterProxy =
     se.holdAndAsk = cd.holdAndAsk;
     se.silentTouchID = cd.silentTouchID;
     se.staticRule = cd.staticRule;
+    se.ruleId = cd.ruleId;
 
     se.signingChain = cd.certChain;
     se.teamID = cd.teamID;
@@ -642,6 +643,7 @@ static NSString* const kPrinterProxy =
                                                timestamp:[[NSDate now] timeIntervalSince1970]
                                                  comment:commentStr
                                                  celExpr:nil
+                                                  ruleId:0
                                                    error:&err];
   if (err) {
     LOGE(@"Failed to add rule in standalone mode for %@: %@", se.filePath,

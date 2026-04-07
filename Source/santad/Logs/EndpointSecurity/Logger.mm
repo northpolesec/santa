@@ -349,11 +349,11 @@ void Logger::LogFileAccess(const std::string& policy_version, const std::string&
                            const santa::Message& msg,
                            const santa::EnrichedProcess& enriched_process, size_t target_index,
                            std::optional<santa::EnrichedFile> enriched_event_target,
-                           FileAccessPolicyDecision decision) {
+                           FileAccessPolicyDecision decision, int64_t rule_id) {
   if (ShouldLog(TelemetryEvent::kFileAccess)) {
-    writer_->Write(serializer_->SerializeFileAccess(policy_version, policy_name, msg,
-                                                    enriched_process, target_index,
-                                                    std::move(enriched_event_target), decision));
+    writer_->Write(serializer_->SerializeFileAccess(
+        policy_version, policy_name, msg, enriched_process, target_index,
+        std::move(enriched_event_target), decision, rule_id));
   }
 }
 

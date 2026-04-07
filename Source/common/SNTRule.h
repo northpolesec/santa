@@ -69,6 +69,11 @@
 @property(readonly) BOOL staticRule;
 
 ///
+///  The server-assigned rule ID, used to correlate events back to rules.
+///
+@property(readonly) int64_t ruleId;
+
+///
 ///  Designated initializer.
 ///
 - (instancetype)initWithIdentifier:(NSString*)identifier
@@ -79,6 +84,7 @@
                          timestamp:(NSUInteger)timestamp
                            comment:(NSString*)comment
                            celExpr:(NSString*)celExpr
+                            ruleId:(uint64_t)ruleId
                              error:(NSError**)error;
 
 ///
@@ -89,7 +95,8 @@
                               type:(SNTRuleType)type
                          customMsg:(NSString*)customMsg
                          customURL:(NSString*)customURL
-                           celExpr:(NSString*)celExpr;
+                           celExpr:(NSString*)celExpr
+                            ruleId:(uint64_t)ruleId;
 
 ///
 ///  Initialize with a default timestamp: current time if rule state is transitive, 0 otherwise.

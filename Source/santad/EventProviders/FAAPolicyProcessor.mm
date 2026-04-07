@@ -379,6 +379,7 @@ void FAAPolicyProcessor::LogTelemetry(const WatchItemPolicyBase& policy, const M
   // they have proper lifetimes.
   std::string policy_name_copy = policy.name;
   std::string policy_version_copy = policy.version;
+  int64_t rule_id = policy.rule_id;
   __block Message msg_copy(msg);
 
   dispatch_async(queue_, ^{
@@ -389,7 +390,8 @@ void FAAPolicyProcessor::LogTelemetry(const WatchItemPolicyBase& policy, const M
     std::optional<santa::EnrichedFile> enriched_event_target =
         enricher_->Enrich(target.unsafe_file, EnrichOptions::kLocalOnly);
     logger_->LogFileAccess(policy_version_copy, policy_name_copy, std::move(moved_in_msg),
-                           enriched_proc, target_index, std::move(enriched_event_target), decision);
+                           enriched_proc, target_index, std::move(enriched_event_target), decision,
+                           rule_id);
   });
 }
 
@@ -456,6 +458,7 @@ FileAccessPolicyDecision FAAPolicyProcessor::ProcessTargetAndPolicy(
     event.accessedPath = StringToNSString(target.Path());
     event.ruleVersion = StringToNSString(policy->version);
     event.ruleName = StringToNSString(policy->name);
+    event.ruleId = policy->rule_id;
     event.decision = decision;
     event.process.fileSHA256 = cd.sha256 ?: @"<unknown sha>";
     event.process.filePath = StringToNSString(msg->process->executable->path.data);
