@@ -72,6 +72,10 @@ const config: Config = {
             to: "/features/binary-authorization#client-mode",
             from: "/concepts/mode.html",
           },
+          {
+            to: "/features/removable-media-blocking",
+            from: "/features/usb-sd-blocking",
+          },
         ],
       },
     ],
