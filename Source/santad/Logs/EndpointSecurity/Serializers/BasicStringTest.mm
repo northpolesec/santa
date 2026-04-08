@@ -1307,7 +1307,7 @@ std::string BasicStringSerializeMessage(es_message_t* esMsg) {
       BasicString::Create(nullptr, nil, false)
           ->SerializeFileAccess("v1.0", "pol_name", std::move(msg),
                                 Enricher().Enrich(*esMsg.process), 0, Enricher().Enrich(targetFile),
-                                FileAccessPolicyDecision::kAllowedAuditOnly, "abc123");
+                                FileAccessPolicyDecision::kAllowedAuditOnly, "abc123", 0);
   std::string got(ret.begin(), ret.end());
   std::string want =
       "action=FILE_ACCESS|policy_version=v1.0|policy_name=pol_name|path=file_target"

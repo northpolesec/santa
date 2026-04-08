@@ -313,6 +313,12 @@ typename santa::ProtoTraits<IsV2>::EventT* MessageForExecutionEvent(
     e->set_static_rule(true);
   }
 
+  if constexpr (IsV2) {
+    if (event.ruleId > 0) {
+      e->set_rule_id(event.ruleId);
+    }
+  }
+
   return e;
 }
 
@@ -341,6 +347,12 @@ typename santa::ProtoTraits<IsV2>::FileAccessEventT* MessageForFileAccessEvent(
     case FileAccessPolicyDecision::kAllowed: return nullptr;
     case FileAccessPolicyDecision::kAllowedReadAccess: return nullptr;
     default: return nullptr;
+  }
+
+  if constexpr (IsV2) {
+    if (event.ruleId > 0) {
+      e->set_rule_id(event.ruleId);
+    }
   }
 
   SNTStoredFileAccessProcess* p = event.process;

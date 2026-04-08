@@ -94,7 +94,7 @@ class Logger : public Timer<Logger> {
                              const santa::Message& msg,
                              const santa::EnrichedProcess& enriched_process, size_t target_index,
                              std::optional<santa::EnrichedFile> enriched_event_target,
-                             FileAccessPolicyDecision decision);
+                             FileAccessPolicyDecision decision, int64_t rule_id);
 
   void Flush();
 

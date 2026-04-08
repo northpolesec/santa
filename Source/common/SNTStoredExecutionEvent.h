@@ -98,6 +98,9 @@
 /// Indicates whether the decision was made by a static rule.
 @property BOOL staticRule;
 
+/// The server-assigned rule ID that matched this event.
+@property int64_t ruleId;
+
 /// NSArray of logged in users when the decision was made.
 @property(nullable) NSArray* loggedInUsers;
 

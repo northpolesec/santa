@@ -40,7 +40,7 @@ class MockLogger : public santa::Logger {
                const santa::EnrichedProcess& enriched_process,
                size_t target_index,
                std::optional<santa::EnrichedFile> enriched_event_target,
-               FileAccessPolicyDecision decision));
+               FileAccessPolicyDecision decision, int64_t rule_id));
 };
 
 #endif  // SANTA_SANTAD_LOGS_ENDPOINTSECURITY_MOCKLOGGER_H

@@ -67,6 +67,8 @@
 
 @property BOOL staticRule;
 
+@property int64_t ruleId;
+
 @property BOOL cacheable;
 @property BOOL holdAndAsk;
 @property BOOL silentTouchID;
