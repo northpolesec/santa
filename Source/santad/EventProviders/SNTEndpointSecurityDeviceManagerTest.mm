@@ -487,6 +487,9 @@ class MockAuthResultCache : public AuthResultCache {
           [self.mockDA insert:d];
         }
 
+        deviceManager.removableMediaAction =
+            remountArgs.count > 0 ? SNTRemovableMediaActionRemount : SNTRemovableMediaActionBlock;
+        deviceManager.encryptedRemovableMediaAction = deviceManager.removableMediaAction;
         deviceManager.removableMediaRemountFlags = remountArgs;
 
         [deviceManager performStartupTasks:startupPref];
