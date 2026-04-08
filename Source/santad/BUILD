@@ -925,7 +925,6 @@ objc_library(
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTError",
         "//Source/common:SNTFileAccessRule",
-        "//Source/common:SNTLiteDetector",
         "//Source/common:SNTLogging",
         "//Source/common:SNTMetricSet",
         "//Source/common:SNTModeTransition",

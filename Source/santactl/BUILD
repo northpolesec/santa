@@ -45,8 +45,10 @@ objc_library(
     deps = [
         ":santactl_cmd",
         "//Source/common:MOLXPCConnection",
+        "//Source/common:SNTLiteDetector",
         "//Source/common:SNTLogging",
         "//Source/common:SNTXPCControlInterface",
+        "//Source/common:SNTXPCUnprivilegedControlInterface",
     ],
 )
 

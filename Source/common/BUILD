@@ -515,7 +515,6 @@ objc_library(
         ":SNTCELFallbackRule",
         ":SNTCommonEnums",
         ":SNTExportConfiguration",
-        ":SNTLiteDetector",
         ":SNTLogging",
         ":SNTModeTransition",
         ":SNTRule",

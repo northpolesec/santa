@@ -24,7 +24,6 @@
 #import "Source/common/NKeyTokenValidator.h"
 #import "Source/common/SNTCELFallbackRule.h"
 #import "Source/common/SNTExportConfiguration.h"
-#import "Source/common/SNTLiteDetector.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTModeTransition.h"
 #import "Source/common/SNTRule.h"
@@ -1646,10 +1645,6 @@ static SNTConfigurator* sharedConfigurator = nil;
     [NSException
          raise:@"Attempt to call isSyncV2Enabled from a non-daemon process"
         format:@"isSyncV2Enabled called from: %@", [[NSProcessInfo processInfo] processName]];
-  }
-
-  if (santa::SNTIsLiteInstall()) {
-    return NO;
   }
 
   return santa::IsDomainPinned([self syncBaseURL]) || [self hasValidPushTokenChain];

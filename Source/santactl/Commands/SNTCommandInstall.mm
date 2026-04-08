@@ -15,8 +15,10 @@
 #import <Foundation/Foundation.h>
 
 #import "Source/common/MOLXPCConnection.h"
+#import "Source/common/SNTLiteDetector.h"
 #include "Source/common/SNTLogging.h"
 #import "Source/common/SNTXPCControlInterface.h"
+#import "Source/common/SNTXPCUnprivilegedControlInterface.h"
 #import "Source/santactl/SNTCommand.h"
 #import "Source/santactl/SNTCommandController.h"
 
@@ -43,7 +45,8 @@ REGISTER_COMMAND_NAME(@"install")
   return @"Instruct the daemon to install Santa.app.\n"
          @"Options:\n"
          @"  --network-extension:  Install and activate the santanetd content filter instead.\n"
-         @"                        WARNING: All network connections will reset.\n";
+         @"                        WARNING: All network connections will reset.\n"
+         @"  --allow-downgrade:    Allow installing a Lite variant when SyncV2 is enabled.\n";
 }
 
 + (BOOL)isHidden {
@@ -52,18 +55,20 @@ REGISTER_COMMAND_NAME(@"install")
 
 - (void)runWithArguments:(NSArray*)arguments {
   BOOL installNetworkExtension = NO;
+  BOOL allowDowngrade = NO;
 
   for (NSString* arg in arguments) {
     if ([arg caseInsensitiveCompare:@"--network-extension"] == NSOrderedSame) {
       installNetworkExtension = YES;
-      break;
+    } else if ([arg caseInsensitiveCompare:@"--allow-downgrade"] == NSOrderedSame) {
+      allowDowngrade = YES;
     }
   }
 
   if (installNetworkExtension) {
     [self installNetworkExtension];
   } else {
-    [self installSantaApp];
+    [self installSantaApp:allowDowngrade];
   }
 
   // Each install action is responsible for exiting appropriately
@@ -100,8 +105,24 @@ REGISTER_COMMAND_NAME(@"install")
   exit(success ? EXIT_SUCCESS : EXIT_FAILURE);
 }
 
-- (void)installSantaApp {
+- (void)installSantaApp:(BOOL)allowDowngrade {
   NSString* installFromPath = @"/var/db/santa/migration/Santa.app";
+
+  if (santa::SNTIsLiteAppBundle(installFromPath)) {
+    __block BOOL isSyncV2 = NO;
+    [[self.daemonConn synchronousRemoteObjectProxy] isSyncV2Enabled:^(BOOL val) {
+      isSyncV2 = val;
+    }];
+
+    if (isSyncV2 && !allowDowngrade) {
+      TEE_LOGE(@"Refusing to install Lite variant while SyncV2 is enabled. "
+               @"Use --allow-downgrade to override.");
+      exit(EXIT_FAILURE);
+    } else if (isSyncV2 && allowDowngrade) {
+      TEE_LOGW(@"Installing Lite variant with --allow-downgrade while SyncV2 is enabled.");
+    }
+  }
+
   int64_t secondsToWait = 15;
 
   TEE_LOGI(@"Asking daemon to install: %@", installFromPath);
