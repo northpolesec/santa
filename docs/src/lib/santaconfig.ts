@@ -755,6 +755,7 @@ changes in the release notes of any future release that changes them.`,
       type: "bool",
       syncConfigurable: true,
       defaultValue: false,
+      versionDeprecated: "2026.3",
     },
     {
       key: "RemountUSBMode",
@@ -762,6 +763,7 @@ changes in the release notes of any future release that changes them.`,
       type: "string",
       syncConfigurable: true,
       repeated: true,
+      versionDeprecated: "2026.3",
       possibleValues: [
         { value: "rdonly" },
         { value: "noexec" },
@@ -841,7 +843,7 @@ changes in the release notes of any future release that changes them.`,
       description: `If set, defines the action that should be taken on existing Removable Media (e.g. USB device) mounts when Santa starts up.
 
 **Note**: “remounts” are implemented by first unmounting and then mounting the device again). Existing mounts with
-mount flags that are a superset of \`RemountUSBMode\` are unaffected and left as-is.`,
+mount flags that are a superset of \`RemovableMediaRemountFlags\` or \`EncryptedRemovableMediaRemountFlags\` are unaffected and left as-is.`,
       type: "string",
       syncConfigurable: true,
       possibleValues: [

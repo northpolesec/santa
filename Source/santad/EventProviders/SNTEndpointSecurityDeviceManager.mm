@@ -396,7 +396,8 @@ NS_ASSUME_NONNULL_BEGIN
     SNTRemovableMediaAction action = [self actionForEncrypted:isEncrypted];
     NSArray<NSString*>* args = [self remountArgsForEncrypted:isEncrypted];
 
-    if (action == SNTRemovableMediaActionAllow) {
+    if (action == SNTRemovableMediaActionAllow ||
+        (action == SNTRemovableMediaActionRemount && [args count] == 0)) {
       [self incrementStartupMetricsOperation:kMetricStartupDiskOperationSkip];
       continue;
     }

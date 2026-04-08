@@ -56,6 +56,7 @@ static NSArray<NSString*>* EnsureArrayOfStrings(id obj) {
 }
 
 static SNTRemovableMediaAction ActionFromString(NSString* action) {
+  if (!action) return SNTRemovableMediaActionAllow;
   if ([action caseInsensitiveCompare:@"Allow"] == NSOrderedSame) {
     return SNTRemovableMediaActionAllow;
   }
@@ -1974,15 +1975,17 @@ static SNTConfigurator* sharedConfigurator = nil;
   }
 
   // Migrate BlockUSBMount + RemountUSBMode → RemovableMediaAction + RemovableMediaRemountFlags
-  if (syncState[kBlockUSBMountKey] && !syncState[kRemovableMediaActionKey]) {
-    if ([syncState[kBlockUSBMountKey] boolValue]) {
-      NSArray* flags = EnsureArrayOfStrings(syncState[kRemountUSBModeKey]);
-      syncState[kRemovableMediaActionKey] = [flags count] > 0 ? @"Remount" : @"Block";
-      if ([flags count] > 0) {
-        syncState[kRemovableMediaRemountFlagsKey] = flags;
+  if (syncState[kBlockUSBMountKey]) {
+    if (!syncState[kRemovableMediaActionKey]) {
+      if ([syncState[kBlockUSBMountKey] boolValue]) {
+        NSArray* flags = EnsureArrayOfStrings(syncState[kRemountUSBModeKey]);
+        syncState[kRemovableMediaActionKey] = [flags count] > 0 ? @"Remount" : @"Block";
+        if ([flags count] > 0) {
+          syncState[kRemovableMediaRemountFlagsKey] = flags;
+        }
+      } else {
+        syncState[kRemovableMediaActionKey] = @"Allow";
       }
-    } else {
-      syncState[kRemovableMediaActionKey] = @"Allow";
     }
     syncState[kBlockUSBMountKey] = nil;
     syncState[kRemountUSBModeKey] = nil;
