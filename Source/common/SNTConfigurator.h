@@ -847,20 +847,32 @@ extern NSString* _Nonnull const kEnableMenuItemUserOverride;
 #pragma mark - USB Settings
 
 ///
-/// USB Mount Blocking. Defaults to false.
+/// The action to apply to all removable media. Defaults to Allow.
+/// If unset, falls back to deprecated BlockUSBMount + RemountUSBMode.
 ///
-@property(nonatomic, readonly) BOOL blockUSBMount;
+@property(nonatomic, readonly) SNTRemovableMediaAction removableMediaAction;
 
 ///
-///  Set the block USB mount state as received from a sync server.
+///  Set the removable media action as received from a sync server.
 ///
-- (void)setSyncServerBlockUSBMount:(BOOL)enabled;
+- (void)setSyncServerRemovableMediaAction:(nullable NSString*)action;
 
 ///
-/// The action to apply to encrypted removable media. Values: "Allow", "Block", "Remount".
-/// If unset, encrypted volumes use the baseline policy.
+/// Mount flags for removable media when action is "Remount".
+/// If unset, falls back to deprecated RemountUSBMode.
 ///
-@property(nullable, nonatomic, readonly) NSString* encryptedRemovableMediaAction;
+@property(nullable, nonatomic, readonly) NSArray<NSString*>* removableMediaRemountFlags;
+
+///
+///  Set the removable media remount flags as received from a sync server.
+///
+- (void)setSyncServerRemovableMediaRemountFlags:(nullable NSArray<NSString*>*)flags;
+
+///
+/// The action to apply to encrypted removable media.
+/// If unset, encrypted volumes use removableMediaAction.
+///
+@property(nonatomic, readonly) SNTRemovableMediaAction encryptedRemovableMediaAction;
 
 ///
 ///  Set the encrypted removable media action as received from a sync server.
@@ -876,12 +888,6 @@ extern NSString* _Nonnull const kEnableMenuItemUserOverride;
 ///  Set the encrypted removable media remount flags as received from a sync server.
 ///
 - (void)setSyncServerEncryptedRemovableMediaRemountFlags:(nullable NSArray<NSString*>*)flags;
-
-///
-/// Comma-separated `$ mount -o` arguments used for forced remounting of USB devices. Default
-/// to fully allow/deny without remounting if unset.
-///
-@property(nullable, nonatomic) NSArray<NSString*>* remountUSBMode;
 
 ///
 /// Network Mount Blocking. Defaults to false.

@@ -213,9 +213,9 @@ NS_ASSUME_NONNULL_BEGIN
                                  logger:(std::shared_ptr<Logger>)logger
                                enricher:(std::shared_ptr<santa::Enricher>)enricher
                         authResultCache:(std::shared_ptr<AuthResultCache>)authResultCache
-                          blockUSBMount:(BOOL)blockUSBMount
-                         remountUSBMode:(nullable NSArray<NSString*>*)remountUSBMode
-          encryptedRemovableMediaAction:(nullable NSString*)encryptedRemovableMediaAction
+                   removableMediaAction:(SNTRemovableMediaAction)removableMediaAction
+             removableMediaRemountFlags:(nullable NSArray<NSString*>*)removableMediaRemountFlags
+          encryptedRemovableMediaAction:(SNTRemovableMediaAction)encryptedRemovableMediaAction
     encryptedRemovableMediaRemountFlags:
         (nullable NSArray<NSString*>*)encryptedRemovableMediaRemountFlags
                      startupPreferences:(SNTDeviceManagerStartupPreferences)startupPrefs {
@@ -226,8 +226,8 @@ NS_ASSUME_NONNULL_BEGIN
     _logger = std::move(logger);
     _enricher = std::move(enricher);
     _authResultCache = std::move(authResultCache);
-    _blockUSBMount = blockUSBMount;
-    _remountArgs = remountUSBMode;
+    _removableMediaAction = removableMediaAction;
+    _removableMediaRemountFlags = removableMediaRemountFlags;
     _encryptedRemovableMediaAction = encryptedRemovableMediaAction;
     _encryptedRemovableMediaRemountFlags = encryptedRemovableMediaRemountFlags;
     _configurator = [SNTConfigurator configurator];
@@ -339,42 +339,12 @@ NS_ASSUME_NONNULL_BEGIN
   return (flags & requiredFlags) == requiredFlags;
 }
 
-- (SNTRemovableMediaAction)baselineAction {
-  if (!self.blockUSBMount) {
-    return SNTRemovableMediaActionAllow;
-  }
-  if ([self.remountArgs count] > 0) {
-    return SNTRemovableMediaActionRemount;
-  }
-  return SNTRemovableMediaActionBlock;
-}
-
-- (SNTRemovableMediaAction)encryptedAction {
-  NSString* action = self.encryptedRemovableMediaAction;
-  if (!action) {
-    return [self baselineAction];
-  }
-  if ([action caseInsensitiveCompare:@"Allow"] == NSOrderedSame) {
-    return SNTRemovableMediaActionAllow;
-  }
-  if ([action caseInsensitiveCompare:@"Block"] == NSOrderedSame) {
-    return SNTRemovableMediaActionBlock;
-  }
-  if ([action caseInsensitiveCompare:@"Remount"] == NSOrderedSame) {
-    return SNTRemovableMediaActionRemount;
-  }
-  return [self baselineAction];
-}
-
 - (SNTRemovableMediaAction)actionForEncrypted:(BOOL)isEncrypted {
-  return isEncrypted ? [self encryptedAction] : [self baselineAction];
+  return isEncrypted ? self.encryptedRemovableMediaAction : self.removableMediaAction;
 }
 
 - (NSArray<NSString*>*)remountArgsForEncrypted:(BOOL)isEncrypted {
-  if (isEncrypted && self.encryptedRemovableMediaAction != nil) {
-    return self.encryptedRemovableMediaRemountFlags;
-  }
-  return self.remountArgs;
+  return isEncrypted ? self.encryptedRemovableMediaRemountFlags : self.removableMediaRemountFlags;
 }
 
 - (void)incrementStartupMetricsOperation:(NSString*)op {
@@ -531,7 +501,8 @@ NS_ASSUME_NONNULL_BEGIN
 #endif  // HAVE_MACOS_15
 
   if ((isNetworkMount && !self.configurator.blockNetworkMount) ||
-      (!isNetworkMount && !self.blockUSBMount && self.encryptedRemovableMediaAction == nil)) {
+      (!isNetworkMount && self.removableMediaAction == SNTRemovableMediaActionAllow &&
+       self.encryptedRemovableMediaAction == SNTRemovableMediaActionAllow)) {
     // TODO: We should also unsubscribe from events when these aren't set, but
     // this is generally a low-volume event type and handling dynamic subscriptions adds
     // a lot of code complexity.
@@ -609,7 +580,7 @@ NS_ASSUME_NONNULL_BEGIN
   NSArray<NSString*>* actionRemountArgs = [self remountArgsForEncrypted:isEncrypted];
 
   if (action == SNTRemovableMediaActionAllow ||
-   (action == SNTRemovableMediaActionRemount && [actionRemountArgs count] == 0)) {
+      (action == SNTRemovableMediaActionRemount && [actionRemountArgs count] == 0)) {
     return ES_AUTH_RESULT_ALLOW;
   }
 
@@ -626,7 +597,7 @@ NS_ASSUME_NONNULL_BEGIN
       stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
   SNTStoredUSBMountEvent* storedUSBMountEvent;
 
-  if (action == SNTRemovableMediaActionRemount && [actionRemountArgs count] > 0) {
+  if (action == SNTRemovableMediaActionRemount) {
     event.remountArgs = actionRemountArgs;
 
     if ([self mountFlags:eventStatFS->f_flags containArgs:actionRemountArgs] &&
@@ -701,7 +672,7 @@ NS_ASSUME_NONNULL_BEGIN
   }
 
   // Only intercept when encrypted policy is Remount.
-  if ([self encryptedAction] != SNTRemovableMediaActionRemount) {
+  if (self.encryptedRemovableMediaAction != SNTRemovableMediaActionRemount) {
     return NULL;
   }
 

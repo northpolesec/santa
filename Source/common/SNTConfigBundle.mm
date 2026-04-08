@@ -25,8 +25,8 @@
 @property NSNumber* syncType;
 @property NSString* allowlistRegex;
 @property NSString* blocklistRegex;
-@property NSNumber* blockUSBMount;
-@property NSArray* remountUSBMode;
+@property NSString* removableMediaAction;
+@property NSArray<NSString*>* removableMediaRemountFlags;
 @property NSString* encryptedRemovableMediaAction;
 @property NSArray<NSString*>* encryptedRemovableMediaRemountFlags;
 @property NSNumber* blockNetworkMount;
@@ -65,8 +65,8 @@
   ENCODE(coder, syncType);
   ENCODE(coder, allowlistRegex);
   ENCODE(coder, blocklistRegex);
-  ENCODE(coder, blockUSBMount);
-  ENCODE(coder, remountUSBMode);
+  ENCODE(coder, removableMediaAction);
+  ENCODE(coder, removableMediaRemountFlags);
   ENCODE(coder, encryptedRemovableMediaAction);
   ENCODE(coder, encryptedRemovableMediaRemountFlags);
   ENCODE(coder, blockNetworkMount);
@@ -101,8 +101,8 @@
     DECODE(decoder, syncType, NSNumber);
     DECODE(decoder, allowlistRegex, NSString);
     DECODE(decoder, blocklistRegex, NSString);
-    DECODE(decoder, blockUSBMount, NSNumber);
-    DECODE_ARRAY(decoder, remountUSBMode, NSString);
+    DECODE(decoder, removableMediaAction, NSString);
+    DECODE_ARRAY(decoder, removableMediaRemountFlags, NSString);
     DECODE(decoder, encryptedRemovableMediaAction, NSString);
     DECODE_ARRAY(decoder, encryptedRemovableMediaRemountFlags, NSString);
     DECODE(decoder, blockNetworkMount, NSNumber);
@@ -156,9 +156,9 @@
   }
 }
 
-- (void)blockUSBMount:(void (^)(BOOL))block {
-  if (self.blockUSBMount) {
-    block([self.blockUSBMount boolValue]);
+- (void)removableMediaAction:(void (^)(NSString*))block {
+  if (self.removableMediaAction) {
+    block(self.removableMediaAction);
   }
 }
 
@@ -174,9 +174,9 @@
   }
 }
 
-- (void)remountUSBMode:(void (^)(NSArray*))block {
-  if (self.remountUSBMode) {
-    block(self.remountUSBMode);
+- (void)removableMediaRemountFlags:(void (^)(NSArray<NSString*>*))block {
+  if (self.removableMediaRemountFlags) {
+    block(self.removableMediaRemountFlags);
   }
 }
 

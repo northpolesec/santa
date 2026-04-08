@@ -245,24 +245,24 @@ REGISTER_COMMAND_NAME(@"status")
     }
   }];
 
-  __block BOOL blockUSBMount = NO;
-  [rop blockUSBMount:^(BOOL response) {
-    blockUSBMount = response;
+  __block SNTRemovableMediaAction removableMediaAction = SNTRemovableMediaActionAllow;
+  [rop removableMediaAction:^(SNTRemovableMediaAction response) {
+    removableMediaAction = response;
   }];
 
-  __block NSString* encryptedRemovableMediaAction = nil;
-  [rop encryptedRemovableMediaAction:^(NSString* response) {
-    encryptedRemovableMediaAction = response;
+  __block NSArray<NSString*>* removableMediaRemountFlags = nil;
+  [rop removableMediaRemountFlags:^(NSArray<NSString*>* response) {
+    removableMediaRemountFlags = response;
+  }];
+
+  __block SNTRemovableMediaAction encryptedAction = SNTRemovableMediaActionAllow;
+  [rop encryptedRemovableMediaAction:^(SNTRemovableMediaAction response) {
+    encryptedAction = response;
   }];
 
   __block NSArray<NSString*>* encryptedRemovableMediaRemountFlags = nil;
   [rop encryptedRemovableMediaRemountFlags:^(NSArray<NSString*>* response) {
     encryptedRemovableMediaRemountFlags = response;
-  }];
-
-  __block NSArray<NSString*>* remountUSBMode;
-  [rop remountUSBMode:^(NSArray<NSString*>* response) {
-    remountUSBMode = response;
   }];
 
   __block BOOL isSyncV2Enabled = NO;
@@ -320,6 +320,15 @@ REGISTER_COMMAND_NAME(@"status")
                                    componentsJoinedByString:@", "]
                              : @"None (all blocked)";
 
+  NSString* (^ActionToString)(SNTRemovableMediaAction) =
+      ^NSString*(SNTRemovableMediaAction action) {
+        switch (action) {
+          case SNTRemovableMediaActionBlock: return @"Block";
+          case SNTRemovableMediaActionRemount: return @"Remount";
+          default: return @"Allow";
+        }
+      };
+
   if ([arguments containsObject:@"--json"]) {
     NSMutableDictionary* stats = [@{
       @"daemon" : @{
@@ -330,10 +339,10 @@ REGISTER_COMMAND_NAME(@"status")
         @"watchdog_ram_events" : @(ramEvents),
         @"watchdog_cpu_peak" : @(cpuPeak),
         @"watchdog_ram_peak" : @(ramPeak),
-        @"block_usb" : @(blockUSBMount),
-        @"encrypted_removable_media_action" : (encryptedRemovableMediaAction ?: @""),
+        @"removable_media_action" : ActionToString(removableMediaAction),
+        @"removable_media_remount_flags" : (removableMediaRemountFlags ?: @[]),
+        @"encrypted_removable_media_action" : ActionToString(encryptedAction),
         @"encrypted_removable_media_remount_flags" : (encryptedRemovableMediaRemountFlags ?: @[]),
-        @"remount_usb_mode" : ((blockUSBMount && remountUSBMode.count) ? remountUSBMode : @""),
         @"on_start_usb_options" : StartupOptionToString(configurator.onStartUSBOptions),
         @"static_rules" : @(staticRuleCount),
       },
@@ -446,14 +455,17 @@ REGISTER_COMMAND_NAME(@"status")
     printf("  %-40s | %s\n", "Mode", [clientMode UTF8String]);
     printf("  %-40s | %s\n", "Log Type", [eventLogType UTF8String]);
     printf("  %-40s | %s\n", "File Logging", (fileLogging ? "Yes" : "No"));
-    printf("  %-40s | %s\n", "Removable Media Blocking", (blockUSBMount ? "Yes" : "No"));
-    if (blockUSBMount && remountUSBMode.count > 0) {
-      printf("  %-40s | %s\n", "Removable Media Remounting Mode",
-             [[remountUSBMode componentsJoinedByString:@", "] UTF8String]);
+    printf("  %-40s | %s\n", "Removable Media Action",
+           [ActionToString(removableMediaAction) UTF8String]);
+    if (removableMediaAction == SNTRemovableMediaActionRemount &&
+        removableMediaRemountFlags.count > 0) {
+      printf("  %-40s | %s\n", "Removable Media Remount Flags",
+             [[removableMediaRemountFlags componentsJoinedByString:@", "] UTF8String]);
     }
     printf("  %-40s | %s\n", "Encrypted Removable Media Action",
-           (encryptedRemovableMediaAction ? [encryptedRemovableMediaAction UTF8String] : "None"));
-    if (encryptedRemovableMediaRemountFlags.count > 0) {
+           [ActionToString(encryptedAction) UTF8String]);
+    if (encryptedAction == SNTRemovableMediaActionRemount &&
+        encryptedRemovableMediaRemountFlags.count > 0) {
       printf("  %-40s | %s\n", "Encrypted Removable Media Remount Flags",
              [[encryptedRemovableMediaRemountFlags componentsJoinedByString:@", "] UTF8String]);
     }

@@ -40,9 +40,9 @@ typedef void (^SNTNetworkMountCallback)(SNTStoredNetworkMountEvent* event);
 @interface SNTEndpointSecurityDeviceManager
     : SNTEndpointSecurityClient <SNTEndpointSecurityEventHandler>
 
-@property(nonatomic, readwrite) BOOL blockUSBMount;
-@property(nonatomic, readwrite, nullable) NSArray<NSString*>* remountArgs;
-@property(nonatomic, readwrite, nullable) NSString* encryptedRemovableMediaAction;
+@property(nonatomic, readwrite) SNTRemovableMediaAction removableMediaAction;
+@property(nonatomic, readwrite, nullable) NSArray<NSString*>* removableMediaRemountFlags;
+@property(nonatomic, readwrite) SNTRemovableMediaAction encryptedRemovableMediaAction;
 @property(nonatomic, readwrite, nullable) NSArray<NSString*>* encryptedRemovableMediaRemountFlags;
 @property(nonatomic, nullable) SNTDeviceBlockCallback deviceBlockCallback;
 @property(nonatomic, nullable) SNTNetworkMountCallback networkMountCallback;
@@ -52,9 +52,9 @@ typedef void (^SNTNetworkMountCallback)(SNTStoredNetworkMountEvent* event);
                                  logger:(std::shared_ptr<santa::Logger>)logger
                                enricher:(std::shared_ptr<santa::Enricher>)enricher
                         authResultCache:(std::shared_ptr<santa::AuthResultCache>)authResultCache
-                          blockUSBMount:(BOOL)blockUSBMount
-                         remountUSBMode:(nullable NSArray<NSString*>*)remountUSBMode
-          encryptedRemovableMediaAction:(nullable NSString*)encryptedRemovableMediaAction
+                   removableMediaAction:(SNTRemovableMediaAction)removableMediaAction
+             removableMediaRemountFlags:(nullable NSArray<NSString*>*)removableMediaRemountFlags
+          encryptedRemovableMediaAction:(SNTRemovableMediaAction)encryptedRemovableMediaAction
     encryptedRemovableMediaRemountFlags:
         (nullable NSArray<NSString*>*)encryptedRemovableMediaRemountFlags
                      startupPreferences:(SNTDeviceManagerStartupPreferences)startupPrefs;

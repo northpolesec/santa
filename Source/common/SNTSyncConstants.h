@@ -31,8 +31,6 @@ extern NSString* const kUploadLogsURL;
 extern NSString* const kClientMode;
 extern NSString* const kClientModeMonitor;
 extern NSString* const kClientModeLockdown;
-extern NSString* const kBlockUSBMount;
-extern NSString* const kRemountUSBMode;
 extern NSString* const kCleanSyncDeprecated;
 extern NSString* const kSyncType;
 extern NSString* const kAllowedPathRegex;

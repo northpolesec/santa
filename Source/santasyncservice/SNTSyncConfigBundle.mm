@@ -26,8 +26,8 @@
 @property NSNumber* syncType;
 @property NSString* allowlistRegex;
 @property NSString* blocklistRegex;
-@property NSNumber* blockUSBMount;
-@property NSArray* remountUSBMode;
+@property NSString* removableMediaAction;
+@property NSArray<NSString*>* removableMediaRemountFlags;
 @property NSString* encryptedRemovableMediaAction;
 @property NSArray<NSString*>* encryptedRemovableMediaRemountFlags;
 @property NSNumber* blockNetworkMount;
@@ -71,8 +71,8 @@ SNTConfigBundle* PostflightConfigBundle(SNTSyncState* syncState) {
   bundle.syncType = syncState.syncType != SNTSyncTypeNormal ? @(SNTSyncTypeNormal) : nil;
   bundle.allowlistRegex = syncState.allowlistRegex;
   bundle.blocklistRegex = syncState.blocklistRegex;
-  bundle.blockUSBMount = syncState.blockUSBMount;
-  bundle.remountUSBMode = syncState.remountUSBMode;
+  bundle.removableMediaAction = syncState.removableMediaAction;
+  bundle.removableMediaRemountFlags = syncState.removableMediaRemountFlags;
   bundle.encryptedRemovableMediaAction = syncState.encryptedRemovableMediaAction;
   bundle.encryptedRemovableMediaRemountFlags = syncState.encryptedRemovableMediaRemountFlags;
   bundle.blockNetworkMount = syncState.blockNetworkMount;

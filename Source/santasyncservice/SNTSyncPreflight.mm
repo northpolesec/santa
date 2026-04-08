@@ -234,30 +234,36 @@ BOOL Preflight(SNTSyncPreflight* self, google::protobuf::Arena* arena,
     const auto& policy = resp.removable_media_policy();
     switch (policy.action_case()) {
       case Traits::RemovableMediaPolicyT::kAllow:
-        self.syncState.blockUSBMount = @NO;
-        self.syncState.remountUSBMode = nil;
+        self.syncState.removableMediaAction = @"Allow";
+        self.syncState.removableMediaRemountFlags = nil;
         break;
       case Traits::RemovableMediaPolicyT::kBlock:
-        self.syncState.blockUSBMount = @YES;
-        self.syncState.remountUSBMode = nil;
+        self.syncState.removableMediaAction = @"Block";
+        self.syncState.removableMediaRemountFlags = nil;
         break;
       case Traits::RemovableMediaPolicyT::kRemount: {
-        self.syncState.blockUSBMount = @YES;
+        self.syncState.removableMediaAction = @"Remount";
         NSMutableArray<NSString*>* flags = [NSMutableArray array];
         for (const std::string& flag : policy.remount().flags()) {
           [flags addObject:StringToNSString(flag)];
         }
-        self.syncState.remountUSBMode = flags;
+        self.syncState.removableMediaRemountFlags = flags;
         break;
       }
       default: break;
     }
   } else if (resp.has_block_usb_mount()) {
-    // Deprecated fallback.
-    self.syncState.blockUSBMount = @(resp.block_usb_mount());
-    self.syncState.remountUSBMode = [NSMutableArray array];
-    for (const std::string& mode : resp.remount_usb_mode()) {
-      [(NSMutableArray*)self.syncState.remountUSBMode addObject:StringToNSString(mode)];
+    // Deprecated fallback — convert to new format at parse time.
+    if (resp.block_usb_mount()) {
+      NSMutableArray<NSString*>* flags = [NSMutableArray array];
+      for (const std::string& mode : resp.remount_usb_mode()) {
+        [flags addObject:StringToNSString(mode)];
+      }
+      self.syncState.removableMediaAction = [flags count] > 0 ? @"Remount" : @"Block";
+      self.syncState.removableMediaRemountFlags = [flags count] > 0 ? flags : nil;
+    } else {
+      self.syncState.removableMediaAction = @"Allow";
+      self.syncState.removableMediaRemountFlags = nil;
     }
   }
 

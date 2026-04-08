@@ -377,9 +377,9 @@
   [self stubRequestBody:respData response:nil error:nil validateBlock:nil];
 
   XCTAssertTrue([sut sync]);
-  XCTAssertEqualObjects(self.syncState.blockUSBMount, @1);
-  NSArray<NSString*>* wantRemountUSBMode = @[ @"rdonly", @"noexec" ];
-  XCTAssertEqualObjects(self.syncState.remountUSBMode, wantRemountUSBMode);
+  XCTAssertEqualObjects(self.syncState.removableMediaAction, @"Remount");
+  NSArray<NSString*>* wantRemovableMediaRemountFlags = @[ @"rdonly", @"noexec" ];
+  XCTAssertEqualObjects(self.syncState.removableMediaRemountFlags, wantRemovableMediaRemountFlags);
 }
 
 - (void)testPreflightTurnOffBlockUSBMount {
@@ -390,7 +390,7 @@
   [self stubRequestBody:respData response:nil error:nil validateBlock:nil];
 
   XCTAssertTrue([sut sync]);
-  XCTAssertEqualObjects(self.syncState.blockUSBMount, @0);
+  XCTAssertEqualObjects(self.syncState.removableMediaAction, @"Allow");
 }
 
 - (void)testPreflightBlockUSBMountAbsent {
@@ -401,7 +401,7 @@
   [self stubRequestBody:respData response:nil error:nil validateBlock:nil];
 
   XCTAssertTrue([sut sync]);
-  XCTAssertNil(self.syncState.blockUSBMount);
+  XCTAssertNil(self.syncState.removableMediaAction);
 }
 
 - (void)testPreflightOverrideFileAccessAction {

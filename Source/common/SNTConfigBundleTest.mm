@@ -27,10 +27,10 @@
 @property NSNumber* syncType;
 @property NSString* allowlistRegex;
 @property NSString* blocklistRegex;
-@property NSNumber* blockUSBMount;
+@property NSString* removableMediaAction;
+@property NSArray<NSString*>* removableMediaRemountFlags;
 @property NSString* encryptedRemovableMediaAction;
 @property NSArray<NSString*>* encryptedRemovableMediaRemountFlags;
-@property NSArray* remountUSBMode;
 @property NSNumber* blockNetworkMount;
 @property NSString* bannedNetworkMountBlockMessage;
 @property NSArray<NSString*>* allowedNetworkMountHosts;
@@ -70,10 +70,10 @@
   bundle.syncType = @(SNTSyncTypeNormal);
   bundle.allowlistRegex = @"allow";
   bundle.blocklistRegex = @"block";
-  bundle.blockUSBMount = @(YES);
+  bundle.removableMediaAction = @"Block";
+  bundle.removableMediaRemountFlags = @[ @"foo" ];
   bundle.encryptedRemovableMediaAction = @"Remount";
   bundle.encryptedRemovableMediaRemountFlags = @[ @"rdonly" ];
-  bundle.remountUSBMode = @[ @"foo" ];
   bundle.blockNetworkMount = @(YES);
   bundle.bannedNetworkMountBlockMessage = @"Network mount blocked";
   bundle.allowedNetworkMountHosts = @[ @"example.com", @"localhost" ];
@@ -118,8 +118,13 @@
     [exp fulfill];
   }];
 
-  [bundle blockUSBMount:^(BOOL val) {
-    XCTAssertNotEqual(val, NO);
+  [bundle removableMediaAction:^(NSString* val) {
+    XCTAssertEqualObjects(val, @"Block");
+    [exp fulfill];
+  }];
+
+  [bundle removableMediaRemountFlags:^(NSArray<NSString*>* val) {
+    XCTAssertEqualObjects(val, @[ @"foo" ]);
     [exp fulfill];
   }];
 
@@ -130,11 +135,6 @@
 
   [bundle encryptedRemovableMediaRemountFlags:^(NSArray<NSString*>* val) {
     XCTAssertEqualObjects(val, @[ @"rdonly" ]);
-    [exp fulfill];
-  }];
-
-  [bundle remountUSBMode:^(NSArray* val) {
-    XCTAssertEqualObjects(val, @[ @"foo" ]);
     [exp fulfill];
   }];
 
@@ -271,7 +271,11 @@
     XCTFail(@"This shouldn't be called");
   }];
 
-  [bundle blockUSBMount:^(BOOL val) {
+  [bundle removableMediaAction:^(NSString* val) {
+    XCTFail(@"This shouldn't be called");
+  }];
+
+  [bundle removableMediaRemountFlags:^(NSArray<NSString*>* val) {
     XCTFail(@"This shouldn't be called");
   }];
 
@@ -280,10 +284,6 @@
   }];
 
   [bundle encryptedRemovableMediaRemountFlags:^(NSArray<NSString*>* val) {
-    XCTFail(@"This shouldn't be called");
-  }];
-
-  [bundle remountUSBMode:^(NSArray* val) {
     XCTFail(@"This shouldn't be called");
   }];
 

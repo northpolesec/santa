@@ -423,20 +423,20 @@ double watchdogRAMPeak = 0;
   reply([[SNTConfigurator configurator] syncTypeRequired]);
 }
 
-- (void)blockUSBMount:(void (^)(BOOL))reply {
-  reply([[SNTConfigurator configurator] blockUSBMount]);
+- (void)removableMediaAction:(void (^)(SNTRemovableMediaAction))reply {
+  reply([[SNTConfigurator configurator] removableMediaAction]);
 }
 
-- (void)encryptedRemovableMediaAction:(void (^)(NSString*))reply {
+- (void)removableMediaRemountFlags:(void (^)(NSArray<NSString*>*))reply {
+  reply([[SNTConfigurator configurator] removableMediaRemountFlags]);
+}
+
+- (void)encryptedRemovableMediaAction:(void (^)(SNTRemovableMediaAction))reply {
   reply([[SNTConfigurator configurator] encryptedRemovableMediaAction]);
 }
 
 - (void)encryptedRemovableMediaRemountFlags:(void (^)(NSArray<NSString*>*))reply {
   reply([[SNTConfigurator configurator] encryptedRemovableMediaRemountFlags]);
-}
-
-- (void)remountUSBMode:(void (^)(NSArray<NSString*>*))reply {
-  reply([[SNTConfigurator configurator] remountUSBMode]);
 }
 
 - (void)blockNetworkMount:(void (^)(NSNumber*))reply {
@@ -495,8 +495,12 @@ double watchdogRAMPeak = 0;
                                                                                   error:NULL]];
   }];
 
-  [result blockUSBMount:^(BOOL val) {
-    [configurator setSyncServerBlockUSBMount:val];
+  [result removableMediaAction:^(NSString* val) {
+    [configurator setSyncServerRemovableMediaAction:val];
+  }];
+
+  [result removableMediaRemountFlags:^(NSArray<NSString*>* val) {
+    [configurator setSyncServerRemovableMediaRemountFlags:val];
   }];
 
   [result encryptedRemovableMediaAction:^(NSString* val) {
@@ -505,10 +509,6 @@ double watchdogRAMPeak = 0;
 
   [result encryptedRemovableMediaRemountFlags:^(NSArray<NSString*>* val) {
     [configurator setSyncServerEncryptedRemovableMediaRemountFlags:val];
-  }];
-
-  [result remountUSBMode:^(NSArray* val) {
-    [configurator setRemountUSBMode:val];
   }];
 
   [result blockNetworkMount:^(BOOL val) {
