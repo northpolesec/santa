@@ -109,6 +109,62 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
                               }];
 }
 
+- (void)testInitMigratesRemovableMediaSyncStateKeys {
+  // BlockUSBMount=YES + RemountUSBMode → RemovableMediaAction="Remount" + flags
+  [self runMigrationTestsWithSyncState:@{
+    @"BlockUSBMount" : @YES,
+    @"RemountUSBMode" : @[ @"rdonly", @"noexec" ],
+  }
+                              verifier:^(SNTConfigurator* cfg) {
+                                XCTAssertNil(cfg.syncState[@"BlockUSBMount"]);
+                                XCTAssertNil(cfg.syncState[@"RemountUSBMode"]);
+                                XCTAssertEqualObjects(cfg.syncState[@"RemovableMediaAction"],
+                                                      @"Remount");
+                                XCTAssertEqualObjects(cfg.syncState[@"RemovableMediaRemountFlags"],
+                                                      (@[ @"rdonly", @"noexec" ]));
+                              }];
+
+  // BlockUSBMount=YES + no RemountUSBMode → RemovableMediaAction="Block"
+  [self runMigrationTestsWithSyncState:@{@"BlockUSBMount" : @YES}
+                              verifier:^(SNTConfigurator* cfg) {
+                                XCTAssertNil(cfg.syncState[@"BlockUSBMount"]);
+                                XCTAssertEqualObjects(cfg.syncState[@"RemovableMediaAction"],
+                                                      @"Block");
+                                XCTAssertNil(cfg.syncState[@"RemovableMediaRemountFlags"]);
+                              }];
+
+  // BlockUSBMount=NO → RemovableMediaAction="Allow"
+  [self runMigrationTestsWithSyncState:@{@"BlockUSBMount" : @NO}
+                              verifier:^(SNTConfigurator* cfg) {
+                                XCTAssertNil(cfg.syncState[@"BlockUSBMount"]);
+                                XCTAssertEqualObjects(cfg.syncState[@"RemovableMediaAction"],
+                                                      @"Allow");
+                                XCTAssertNil(cfg.syncState[@"RemovableMediaRemountFlags"]);
+                              }];
+
+  // BlockUSBMount + RemovableMediaAction already set → does NOT overwrite
+  [self runMigrationTestsWithSyncState:@{
+    @"BlockUSBMount" : @YES,
+    @"RemountUSBMode" : @[ @"rdonly" ],
+    @"RemovableMediaAction" : @"Allow",
+  }
+                              verifier:^(SNTConfigurator* cfg) {
+                                XCTAssertNil(cfg.syncState[@"BlockUSBMount"]);
+                                XCTAssertNil(cfg.syncState[@"RemountUSBMode"]);
+                                // Existing value preserved, not overwritten
+                                XCTAssertEqualObjects(cfg.syncState[@"RemovableMediaAction"],
+                                                      @"Allow");
+                                XCTAssertNil(cfg.syncState[@"RemovableMediaRemountFlags"]);
+                              }];
+
+  // No BlockUSBMount → no migration
+  [self runMigrationTestsWithSyncState:@{}
+                              verifier:^(SNTConfigurator* cfg) {
+                                XCTAssertNil(cfg.syncState[@"RemovableMediaAction"]);
+                                XCTAssertNil(cfg.syncState[@"RemovableMediaRemountFlags"]);
+                              }];
+}
+
 - (void)testTelemetryFilterExpressions {
   SNTConfigurator* sut = [[SNTConfigurator alloc] init];
 

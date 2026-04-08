@@ -196,7 +196,7 @@ DADissenterRef __nullable DADissenterCreate(CFAllocatorRef __nullable allocator,
 void DARegisterDiskMountApprovalCallback(DASessionRef session, CFDictionaryRef __nullable match,
                                          DADiskMountApprovalCallback callback,
                                          void* __nullable context) {
-  // Stub — tests call handleMountApproval: directly.
+  // Stub — tests call handleEncryptedMountApproval: directly.
 }
 
 DAReturn DADissenterGetStatus(DADissenterRef dissenter) {

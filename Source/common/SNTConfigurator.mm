@@ -55,6 +55,21 @@ static NSArray<NSString*>* EnsureArrayOfStrings(id obj) {
   return obj;
 }
 
+static SNTRemovableMediaAction ActionFromString(NSString* action) {
+  if (!action) return SNTRemovableMediaActionAllow;
+  if ([action caseInsensitiveCompare:@"Allow"] == NSOrderedSame) {
+    return SNTRemovableMediaActionAllow;
+  }
+  if ([action caseInsensitiveCompare:@"Block"] == NSOrderedSame) {
+    return SNTRemovableMediaActionBlock;
+  }
+  if ([action caseInsensitiveCompare:@"Remount"] == NSOrderedSame) {
+    return SNTRemovableMediaActionRemount;
+  }
+  LOGW(@"Unrecognized RemovableMediaAction value: %@, defaulting to Allow", action);
+  return SNTRemovableMediaActionAllow;
+}
+
 @interface SNTConfigurator ()
 @property(readonly, nonatomic) NSUserDefaults* defaults;
 
@@ -220,9 +235,12 @@ static NSString* const kAllowedSantaCommandsKey = @"AllowedSantaCommands";
 // The keys managed by a sync server or mobileconfig.
 static NSString* const kClientModeKey = @"ClientMode";
 static NSString* const kBlockUSBMountKey = @"BlockUSBMount";
-static NSString* const kBlockUnencryptedRemovableMediaMountKey =
-    @"BlockUnencryptedRemovableMediaMount";
 static NSString* const kRemountUSBModeKey = @"RemountUSBMode";
+static NSString* const kRemovableMediaActionKey = @"RemovableMediaAction";
+static NSString* const kRemovableMediaRemountFlagsKey = @"RemovableMediaRemountFlags";
+static NSString* const kEncryptedRemovableMediaActionKey = @"EncryptedRemovableMediaAction";
+static NSString* const kEncryptedRemovableMediaRemountFlagsKey =
+    @"EncryptedRemovableMediaRemountFlags";
 static NSString* const kBlockNetworkMountKey = @"BlockNetworkMount";
 static NSString* const kAllowedNetworkMountHosts = @"AllowedNetworkMountHosts";
 static NSString* const kEnableTransitiveRulesKey = @"EnableTransitiveRules";
@@ -286,8 +304,11 @@ static NSString* const kPushTokenChainKey = @"PushTokenChain";
       kBlockedPathRegexKey : re,
       kBlockedPathRegexKeyDeprecated : re,
       kBlockUSBMountKey : number,
-      kBlockUnencryptedRemovableMediaMountKey : number,
       kRemountUSBModeKey : array,
+      kRemovableMediaActionKey : string,
+      kRemovableMediaRemountFlagsKey : array,
+      kEncryptedRemovableMediaActionKey : string,
+      kEncryptedRemovableMediaRemountFlagsKey : array,
       kBlockNetworkMountKey : number,
       kBannedNetworkMountBlockMessage : string,
       kAllowedNetworkMountHosts : array,
@@ -323,8 +344,11 @@ static NSString* const kPushTokenChainKey = @"PushTokenChain";
       kBlockedPathRegexKey : re,
       kBlockedPathRegexKeyDeprecated : re,
       kBlockUSBMountKey : number,
-      kBlockUnencryptedRemovableMediaMountKey : number,
       kRemountUSBModeKey : array,
+      kRemovableMediaActionKey : string,
+      kRemovableMediaRemountFlagsKey : array,
+      kEncryptedRemovableMediaActionKey : string,
+      kEncryptedRemovableMediaRemountFlagsKey : array,
       kOnStartUSBOptions : string,
       kEnablePageZeroProtectionKey : number,
       kEnableBadSignatureProtectionKey : number,
@@ -784,20 +808,24 @@ static SNTConfigurator* sharedConfigurator = nil;
   return [self configStateSet];
 }
 
-+ (NSSet*)keyPathsForValuesAffectingBlockUSBMount {
++ (NSSet*)keyPathsForValuesAffectingRemovableMediaAction {
   return [self syncAndConfigStateSet];
 }
 
-+ (NSSet*)keyPathsForValuesAffectingBlockUnencryptedRemovableMediaMount {
++ (NSSet*)keyPathsForValuesAffectingRemovableMediaRemountFlags {
+  return [self syncAndConfigStateSet];
+}
+
++ (NSSet*)keyPathsForValuesAffectingEncryptedRemovableMediaAction {
+  return [self syncAndConfigStateSet];
+}
+
++ (NSSet*)keyPathsForValuesAffectingEncryptedRemovableMediaRemountFlags {
   return [self syncAndConfigStateSet];
 }
 
 + (NSSet*)keyPathsForValuesAffectingBannedUSBBlockMessage {
   return [self configStateSet];
-}
-
-+ (NSSet*)keyPathsForValuesAffectingRemountUSBMode {
-  return [self syncAndConfigStateSet];
 }
 
 + (NSSet*)keyPathsForValuesAffectingRemountUSBBlockMessage {
@@ -1058,23 +1086,6 @@ static SNTConfigurator* sharedConfigurator = nil;
     }
   }
   return filters;
-}
-
-- (void)setRemountUSBMode:(NSArray<NSString*>*)args {
-  [self updateSyncStateForKey:kRemountUSBModeKey value:args];
-}
-
-- (NSArray<NSString*>*)remountUSBMode {
-  NSArray<NSString*>* args = self.syncState[kRemountUSBModeKey];
-  if (!args) {
-    args = (NSArray<NSString*>*)self.configState[kRemountUSBModeKey];
-  }
-  for (id arg in args) {
-    if (![arg isKindOfClass:[NSString class]]) {
-      return nil;
-    }
-  }
-  return args;
 }
 
 - (SNTDeviceManagerStartupPreferences)onStartUSBOptions {
@@ -1658,26 +1669,84 @@ static SNTConfigurator* sharedConfigurator = nil;
   return YES;
 }
 
-- (void)setSyncServerBlockUSBMount:(BOOL)enabled {
-  [self updateSyncStateForKey:kBlockUSBMountKey value:@(enabled)];
+- (void)setSyncServerRemovableMediaAction:(nullable NSString*)action {
+  [self updateSyncStateForKey:kRemovableMediaActionKey value:action];
 }
 
-- (BOOL)blockUSBMount {
-  NSNumber* n = self.syncState[kBlockUSBMountKey];
-  if (n) return [n boolValue];
+- (SNTRemovableMediaAction)removableMediaAction {
+  // New keys take precedence
+  NSString* s = self.syncState[kRemovableMediaActionKey];
+  if (!s) s = self.configState[kRemovableMediaActionKey];
+  if (s) return ActionFromString(s);
 
-  return [self.configState[kBlockUSBMountKey] boolValue];
+  // Deprecated sync state key (should be migrated, but handle gracefully)
+  NSNumber* syncBlock = self.syncState[kBlockUSBMountKey];
+  if (syncBlock) {
+    if (![syncBlock boolValue]) return SNTRemovableMediaActionAllow;
+    NSArray* flags = EnsureArrayOfStrings(self.syncState[kRemountUSBModeKey]);
+    return [flags count] > 0 ? SNTRemovableMediaActionRemount : SNTRemovableMediaActionBlock;
+  }
+
+  // Deprecated mobileconfig keys (can't migrate MDM-managed profiles)
+  if ([self.configState[kBlockUSBMountKey] boolValue]) {
+    NSArray* flags = EnsureArrayOfStrings(self.configState[kRemountUSBModeKey]);
+    return [flags count] > 0 ? SNTRemovableMediaActionRemount : SNTRemovableMediaActionBlock;
+  }
+
+  return SNTRemovableMediaActionAllow;
 }
 
-- (void)setSyncServerBlockUnencryptedRemovableMediaMount:(BOOL)enabled {
-  [self updateSyncStateForKey:kBlockUnencryptedRemovableMediaMountKey value:@(enabled)];
+- (void)setSyncServerRemovableMediaRemountFlags:(nullable NSArray<NSString*>*)flags {
+  [self updateSyncStateForKey:kRemovableMediaRemountFlagsKey value:flags];
 }
 
-- (BOOL)blockUnencryptedRemovableMediaMount {
-  NSNumber* n = self.syncState[kBlockUnencryptedRemovableMediaMountKey];
-  if (n) return [n boolValue];
+- (nullable NSArray<NSString*>*)removableMediaRemountFlags {
+  NSArray* flags = EnsureArrayOfStrings(self.syncState[kRemovableMediaRemountFlagsKey]);
+  if (flags) return flags;
 
-  return [self.configState[kBlockUnencryptedRemovableMediaMountKey] boolValue];
+  flags = EnsureArrayOfStrings(self.configState[kRemovableMediaRemountFlagsKey]);
+  if (flags) return flags;
+
+  // Fall back to deprecated key
+  flags = EnsureArrayOfStrings(self.syncState[kRemountUSBModeKey]);
+  if (flags) return flags;
+
+  return EnsureArrayOfStrings(self.configState[kRemountUSBModeKey]);
+}
+
+- (void)setSyncServerEncryptedRemovableMediaAction:(nullable NSString*)action {
+  [self updateSyncStateForKey:kEncryptedRemovableMediaActionKey value:action];
+}
+
+- (SNTRemovableMediaAction)encryptedRemovableMediaAction {
+  NSString* s = self.syncState[kEncryptedRemovableMediaActionKey];
+  if (!s) s = self.configState[kEncryptedRemovableMediaActionKey];
+  if (s) return ActionFromString(s);
+
+  // No explicit encrypted policy — fall through to baseline
+  return [self removableMediaAction];
+}
+
+- (void)setSyncServerEncryptedRemovableMediaRemountFlags:(nullable NSArray<NSString*>*)flags {
+  [self updateSyncStateForKey:kEncryptedRemovableMediaRemountFlagsKey value:flags];
+}
+
+- (nullable NSArray<NSString*>*)encryptedRemovableMediaRemountFlags {
+  NSArray<NSString*>* args =
+      EnsureArrayOfStrings(self.syncState[kEncryptedRemovableMediaRemountFlagsKey]);
+  if (!args) {
+    args = EnsureArrayOfStrings(self.configState[kEncryptedRemovableMediaRemountFlagsKey]);
+  }
+  if (args) return args;
+
+  // If encrypted action is explicitly set, don't fall through to baseline flags.
+  // Remount with no flags = Allow (handled by device manager early return).
+  NSString* s = self.syncState[kEncryptedRemovableMediaActionKey];
+  if (!s) s = self.configState[kEncryptedRemovableMediaActionKey];
+  if (s) return nil;
+
+  // No encrypted override at all — fall through to baseline
+  return [self removableMediaRemountFlags];
 }
 
 - (void)setSyncServerBannedNetworkMountBlockMessage:(NSString*)msg {
@@ -1891,27 +1960,43 @@ static SNTConfigurator* sharedConfigurator = nil;
 ///  Returns YES if any keys were migrated. Otherwise NO.
 ///
 - (BOOL)migrateDeprecatedSyncStateKeys {
-  // Currently only one key to migrate
-  if (!self.syncState[kSyncCleanRequiredDeprecated]) {
-    return NO;
-  }
-
+  BOOL migrated = NO;
   NSMutableDictionary* syncState = self.syncState.mutableCopy;
 
-  // If the kSyncTypeRequired key exists, its current value will take precedence.
-  // Otherwise, migrate the old value to be compatible with the new logic.
-  if (!self.syncState[kSyncTypeRequired]) {
-    syncState[kSyncTypeRequired] = [self.syncState[kSyncCleanRequiredDeprecated] boolValue]
-                                       ? @(SNTSyncTypeClean)
-                                       : @(SNTSyncTypeNormal);
+  // Migrate kSyncCleanRequiredDeprecated → kSyncTypeRequired
+  if (syncState[kSyncCleanRequiredDeprecated]) {
+    if (!syncState[kSyncTypeRequired]) {
+      syncState[kSyncTypeRequired] = [syncState[kSyncCleanRequiredDeprecated] boolValue]
+                                         ? @(SNTSyncTypeClean)
+                                         : @(SNTSyncTypeNormal);
+    }
+    syncState[kSyncCleanRequiredDeprecated] = nil;
+    migrated = YES;
   }
 
-  // Delete the deprecated key
-  syncState[kSyncCleanRequiredDeprecated] = nil;
+  // Migrate BlockUSBMount + RemountUSBMode → RemovableMediaAction + RemovableMediaRemountFlags
+  if (syncState[kBlockUSBMountKey]) {
+    if (!syncState[kRemovableMediaActionKey]) {
+      if ([syncState[kBlockUSBMountKey] boolValue]) {
+        NSArray* flags = EnsureArrayOfStrings(syncState[kRemountUSBModeKey]);
+        syncState[kRemovableMediaActionKey] = [flags count] > 0 ? @"Remount" : @"Block";
+        if ([flags count] > 0) {
+          syncState[kRemovableMediaRemountFlagsKey] = flags;
+        }
+      } else {
+        syncState[kRemovableMediaActionKey] = @"Allow";
+      }
+    }
+    syncState[kBlockUSBMountKey] = nil;
+    syncState[kRemountUSBModeKey] = nil;
+    migrated = YES;
+  }
 
-  self.syncState = syncState;
+  if (migrated) {
+    self.syncState = syncState;
+  }
 
-  return YES;
+  return migrated;
 }
 
 ///

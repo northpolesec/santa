@@ -847,32 +847,47 @@ extern NSString* _Nonnull const kEnableMenuItemUserOverride;
 #pragma mark - USB Settings
 
 ///
-/// USB Mount Blocking. Defaults to false.
+/// The action to apply to all removable media. Defaults to Allow.
+/// If unset, falls back to deprecated BlockUSBMount + RemountUSBMode.
 ///
-@property(nonatomic, readonly) BOOL blockUSBMount;
+@property(nonatomic, readonly) SNTRemovableMediaAction removableMediaAction;
 
 ///
-///  Set the block USB mount state as received from a sync server.
+///  Set the removable media action as received from a sync server.
 ///
-- (void)setSyncServerBlockUSBMount:(BOOL)enabled;
+- (void)setSyncServerRemovableMediaAction:(nullable NSString*)action;
 
 ///
-/// If YES, unencrypted external USB storage devices will be blocked from mounting.
-/// Encrypted devices will be allowed (or remounted per RemountUSBMode).
-/// This setting is independent of BlockUSBMount. Defaults to NO.
+/// Mount flags for removable media when action is "Remount".
+/// If unset, falls back to deprecated RemountUSBMode.
 ///
-@property(nonatomic, readonly) BOOL blockUnencryptedRemovableMediaMount;
+@property(nullable, nonatomic, readonly) NSArray<NSString*>* removableMediaRemountFlags;
 
 ///
-///  Set the block unencrypted USB mount state as received from a sync server.
+///  Set the removable media remount flags as received from a sync server.
 ///
-- (void)setSyncServerBlockUnencryptedRemovableMediaMount:(BOOL)enabled;
+- (void)setSyncServerRemovableMediaRemountFlags:(nullable NSArray<NSString*>*)flags;
 
 ///
-/// Comma-separated `$ mount -o` arguments used for forced remounting of USB devices. Default
-/// to fully allow/deny without remounting if unset.
+/// The action to apply to encrypted removable media.
+/// If unset, encrypted volumes use removableMediaAction.
 ///
-@property(nullable, nonatomic) NSArray<NSString*>* remountUSBMode;
+@property(nonatomic, readonly) SNTRemovableMediaAction encryptedRemovableMediaAction;
+
+///
+///  Set the encrypted removable media action as received from a sync server.
+///
+- (void)setSyncServerEncryptedRemovableMediaAction:(nullable NSString*)action;
+
+///
+/// Mount flags for encrypted removable media when action is "Remount".
+///
+@property(nullable, nonatomic, readonly) NSArray<NSString*>* encryptedRemovableMediaRemountFlags;
+
+///
+///  Set the encrypted removable media remount flags as received from a sync server.
+///
+- (void)setSyncServerEncryptedRemovableMediaRemountFlags:(nullable NSArray<NSString*>*)flags;
 
 ///
 /// Network Mount Blocking. Defaults to false.

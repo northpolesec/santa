@@ -189,6 +189,12 @@ typedef NS_ENUM(NSInteger, SNTDeviceManagerStartupPreferences) {
   SNTDeviceManagerStartupPreferencesForceRemount,
 };
 
+typedef NS_ENUM(NSInteger, SNTRemovableMediaAction) {
+  SNTRemovableMediaActionAllow,
+  SNTRemovableMediaActionBlock,
+  SNTRemovableMediaActionRemount,
+};
+
 typedef NS_ENUM(NSInteger, SNTSyncType) {
   SNTSyncTypeNormal,
   SNTSyncTypeClean,
