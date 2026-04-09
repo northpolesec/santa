@@ -4,36 +4,36 @@ sidebar_position: 11
 
 # Lite Package
 
-Alongside the regular Santa deployment package, we also offer a "lite" package,
-which is named `santa-lite-YYYY.X.pkg`. This package has a few features that are
-only available to Workshop customers stripped out.
+Alongside the regular Santa deployment package, we also make available a "lite"
+package, which is named `santa-lite-YYYY.X.pkg`. This package has Workshop-only
+components removed.
+
+### Why does the Lite package exist?
+
+Santa includes an optional network extension for adding telemetry of network
+events. While this extension can only be activated by Workshop customers, its
+mere presence on disk concerns some users, despite being inert without being
+connected to Workshop.
+
+### What's the downside of the Lite package?
+
+The lite package is built from the same artifacts as the full package, then
+re-signed and re-notarized after removing components. It receives less testing -
+we run upgrade testing for each release but do not include the Lite variant, as
+it would significantly expand our test matrix.
+
+Should you ever want to activate the removed features, you'll need to do a
+migration from Lite to full package.
 
 ### Should I use the Lite package?
 
 If you're a Workshop customer: no, this will prevent certain features from
 working.
 
-If you're not a Workshop customer: not unless you have a good reason. The lite
-package will save you a few megabytes of disk space from the removed components.
-but those components will not enable themselves without Workshop anyway.
+If you're not a Workshop customer: we recommend the full package. The Lite
+package only saves a few megabytes, and teh removed components are inert without
+Workshop.
 
-### Why does the Lite package exist?
-
-Santa includes an optional network extension for adding telemetry of network
-events. While this extension can only be activated by Workshop customers, its
-presence on disk is enough to make a small number of users uncomfortable.
-
-### What's the downside of the Lite package?
-
-The lite package is created from the exact same build as the regular package
-but is signed, notarized, and packaged after the extra components are removed.
-This package also receives less testing than we do for the full package -
-specifically we regularly perform upgrade testing for each new release but we
-cannot do this also for the Lite package as this increases our test matrix far
-too much.
-
-Should you ever want to activate the removed features, you'll need to do a
-migration from Lite to full package.
 
 ### Can I upgrade from Lite to full package?
 
