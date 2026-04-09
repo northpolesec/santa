@@ -82,9 +82,12 @@ extern "C" bool NATSLeafCertHasPushDomain(X509* cert) {
     const char* dnsName = (const char*)ASN1_STRING_get0_data(san->d.dNSName);
     size_t dnsLen = (size_t)ASN1_STRING_length(san->d.dNSName);
 
+    // Reject SANs with embedded NUL bytes (CVE-2009-2408 class attack).
+    if (memchr(dnsName, '\0', dnsLen) != NULL) continue;
+
     if (dnsLen > kRequiredDomainSuffixLen &&
-        memcmp(dnsName + dnsLen - kRequiredDomainSuffixLen, kRequiredDomainSuffix,
-               kRequiredDomainSuffixLen) == 0) {
+        strncasecmp(dnsName + dnsLen - kRequiredDomainSuffixLen, kRequiredDomainSuffix,
+                    kRequiredDomainSuffixLen) == 0) {
       matched = true;
       break;
     }
@@ -98,7 +101,6 @@ extern "C" bool NATSLeafCertHasPushDomain(X509* cert) {
 // standard chain validation performed by preverifyOk. This closes the MITM gap that
 // exists when hostname verification is not enabled via NATS_FORCE_HOST_VERIFICATION:
 // without this check, any certificate from any trusted CA would be accepted.
-#ifndef DEBUG
 static int NATSSSLVerifyCallback(int preverifyOk, void* ctx) {
   if (!preverifyOk) return 0;
 
@@ -111,9 +113,17 @@ static int NATSSSLVerifyCallback(int preverifyOk, void* ctx) {
   X509* cert = X509_STORE_CTX_get_current_cert(storeCtx);
   if (!cert) return 0;
 
-  return NATSLeafCertHasPushDomain(cert) ? 1 : 0;
+  bool ok = NATSLeafCertHasPushDomain(cert);
+#ifdef DEBUG
+  if (!ok) {
+    LOGW(@"NATS: Leaf certificate SAN does not match *.push.northpole.security "
+         @"(allowed in DEBUG build)");
+  }
+  return 1;
+#else
+  return ok ? 1 : 0;
+#endif
 }
-#endif  // !DEBUG
 
 @interface SNTPushClientNATS ()
 @property(weak) id<SNTPushNotificationsSyncDelegate> syncDelegate;
@@ -395,14 +405,12 @@ static int NATSSSLVerifyCallback(int preverifyOk, void* ctx) {
       return;
     }
 
-#ifndef DEBUG
     status = natsOptions_SetSSLVerificationCallback(opts, NATSSSLVerifyCallback);
     if (status != NATS_OK) {
       LOGE(@"NATS: Failed to set SSL verification callback: %s", natsStatus_GetText(status));
       natsOptions_Destroy(opts);
       return;
     }
-#endif
 
     // Set nkey and JWT for authentication
     // Create a combined string with JWT and seed (nkey) separated by newlines

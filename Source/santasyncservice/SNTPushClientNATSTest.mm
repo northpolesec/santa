@@ -50,6 +50,24 @@ static X509* CreateCertWithDNSSAN(const char* dnsName) {
   return cert;
 }
 
+// Creates a minimal X509 certificate with a DNS SAN from raw bytes (may contain NUL).
+static X509* CreateCertWithDNSSANBytes(const char* data, size_t len) {
+  X509* cert = X509_new();
+  if (!cert) return nullptr;
+
+  GENERAL_NAME* gen = GENERAL_NAME_new();
+  ASN1_IA5STRING* ia5 = ASN1_IA5STRING_new();
+  ASN1_STRING_set(ia5, data, (int)len);
+  GENERAL_NAME_set0_value(gen, GEN_DNS, ia5);
+
+  GENERAL_NAMES* gens = sk_GENERAL_NAME_new_null();
+  sk_GENERAL_NAME_push(gens, gen);
+  X509_add1_ext_i2d(cert, NID_subject_alt_name, gens, 0, X509V3_ADD_DEFAULT);
+  sk_GENERAL_NAME_pop_free(gens, GENERAL_NAME_free);
+
+  return cert;
+}
+
 // Expose private methods for testing
 @interface SNTPushClientNATS (Testing)
 @property(nonatomic) natsConnection* conn;
@@ -736,6 +754,26 @@ static X509* CreateCertWithDNSSAN(const char* dnsName) {
   sk_GENERAL_NAME_pop_free(gens, GENERAL_NAME_free);
 
   XCTAssertFalse(NATSLeafCertHasPushDomain(cert));
+  X509_free(cert);
+}
+
+- (void)testLeafCertHasPushDomain_nullByteInjection_returnsFalse {
+  // SAN: "evil.com\0.push.northpole.security" — classic CVE-2009-2408 attack
+  const char san[] = "evil.com\0.push.northpole.security";
+  X509* cert = CreateCertWithDNSSANBytes(san, sizeof(san) - 1);
+  XCTAssertFalse(NATSLeafCertHasPushDomain(cert));
+  X509_free(cert);
+}
+
+- (void)testLeafCertHasPushDomain_mixedCase_returnsTrue {
+  X509* cert = CreateCertWithDNSSAN("East1.Push.NorthPole.Security");
+  XCTAssertTrue(NATSLeafCertHasPushDomain(cert));
+  X509_free(cert);
+}
+
+- (void)testLeafCertHasPushDomain_upperCase_returnsTrue {
+  X509* cert = CreateCertWithDNSSAN("WEST3.PUSH.NORTHPOLE.SECURITY");
+  XCTAssertTrue(NATSLeafCertHasPushDomain(cert));
   X509_free(cert);
 }
 
