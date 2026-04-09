@@ -2413,10 +2413,30 @@ static SNTConfigurator* sharedConfigurator = nil;
 - (NSArray*)validateFileAccessPolicy:(NSDictionary*)policy {
   NSMutableArray* errors = [NSMutableArray array];
 
+  // First validate top-level config structure.
   NSError* error;
   if (!santa::WatchItems::IsValidConfig(policy, &error)) {
     [errors addObject:[NSString stringWithFormat:@"FileAccessPolicy: %@",
                                                  error.localizedDescription ?: @"Unknown error"]];
+  }
+
+  // Then validate each rule individually to report per-rule errors.
+  NSDictionary* watchItems = policy[kWatchItemConfigKeyWatchItems];
+  if ([watchItems isKindOfClass:[NSDictionary class]]) {
+    for (NSString* name in watchItems) {
+      if (![watchItems[name] isKindOfClass:[NSDictionary class]]) {
+        [errors addObject:[NSString stringWithFormat:@"FileAccessPolicy rule '%@' is invalid: "
+                                                     @"Value must be a dictionary",
+                                                     name]];
+        continue;
+      }
+      NSError* ruleError;
+      if (!santa::WatchItems::IsValidRule(name, watchItems[name], &ruleError)) {
+        [errors addObject:[NSString
+                              stringWithFormat:@"FileAccessPolicy rule '%@' is invalid: %@", name,
+                                               ruleError.localizedDescription ?: @"Unknown error"]];
+      }
+    }
   }
 
   return errors;
