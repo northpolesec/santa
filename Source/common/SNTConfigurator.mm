@@ -174,6 +174,7 @@ static NSString* const kEnablePageZeroProtectionKey = @"EnablePageZeroProtection
 static NSString* const kEnableBadSignatureProtectionKey = @"EnableBadSignatureProtection";
 static NSString* const kEnableAntiTamperProcessSuspendResumeKey =
     @"EnableAntiTamperProcessSuspendResume";
+static NSString* const kAntiSuspendSigningIDsKey = @"AntiSuspendSigningIDs";
 static NSString* const kFailClosedKey = @"FailClosed";
 static NSString* const kDisableUnknownEventUploadKey = @"DisableUnknownEventUpload";
 
@@ -353,6 +354,7 @@ static NSString* const kPushTokenChainKey = @"PushTokenChain";
       kEnablePageZeroProtectionKey : number,
       kEnableBadSignatureProtectionKey : number,
       kEnableAntiTamperProcessSuspendResumeKey : number,
+      kAntiSuspendSigningIDsKey : array,
       kEnableStandalonePasswordFallbackKey : number,
       kEnableSilentModeKey : number,
       kEnableSilentTTYModeKey : number,
@@ -808,6 +810,10 @@ static SNTConfigurator* sharedConfigurator = nil;
   return [self configStateSet];
 }
 
++ (NSSet*)keyPathsForValuesAffectingAntiSuspendSigningIDs {
+  return [self configStateSet];
+}
+
 + (NSSet*)keyPathsForValuesAffectingRemovableMediaAction {
   return [self syncAndConfigStateSet];
 }
@@ -1147,6 +1153,10 @@ static SNTConfigurator* sharedConfigurator = nil;
 - (BOOL)enableAntiTamperProcessSuspendResume {
   NSNumber* number = self.configState[kEnableAntiTamperProcessSuspendResumeKey];
   return number ? [number boolValue] : YES;
+}
+
+- (NSArray<NSString*>*)antiSuspendSigningIDs {
+  return EnsureArrayOfStrings(self.configState[kAntiSuspendSigningIDsKey]);
 }
 
 - (BOOL)enableStandalonePasswordFallback {
