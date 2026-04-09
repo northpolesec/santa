@@ -31,7 +31,7 @@ If you're a Workshop customer: no, this will prevent certain features from
 working.
 
 If you're not a Workshop customer: we recommend the full package. The Lite
-package only saves a few megabytes, and teh removed components are inert without
+package only saves a few megabytes, and the removed components are inert without
 Workshop.
 
 
