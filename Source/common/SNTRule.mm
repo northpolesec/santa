@@ -35,6 +35,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
 @property(readwrite) NSString* comment;
 @property(readwrite) NSString* identifier;
 @property(readwrite) NSString* celExpr;
+@property(readwrite) int64_t ruleId;
 @end
 
 @implementation SNTRule
@@ -47,6 +48,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
                          timestamp:(NSUInteger)timestamp
                            comment:(NSString*)comment
                            celExpr:(NSString*)celExpr
+                            ruleId:(int64_t)ruleId
                              error:(NSError**)error {
   self = [super init];
   if (self) {
@@ -181,6 +183,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     _timestamp = timestamp;
     _comment = comment;
     _celExpr = celExpr;
+    _ruleId = ruleId;
   }
   return self;
 }
@@ -190,7 +193,8 @@ static const NSUInteger kExpectedTeamIDLength = 10;
                               type:(SNTRuleType)type
                          customMsg:(NSString*)customMsg
                          customURL:(NSString*)customURL
-                           celExpr:(NSString*)celExpr {
+                           celExpr:(NSString*)celExpr
+                            ruleId:(int64_t)ruleId {
   self = [self initWithIdentifier:identifier
                             state:state
                              type:type
@@ -199,6 +203,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
                         timestamp:0
                           comment:nil
                           celExpr:celExpr
+                           ruleId:ruleId
                             error:nil];
   // Initialize timestamp to current time if rule is transitive.
   if (self && state == SNTRuleStateAllowTransitive) {
@@ -218,6 +223,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
                         timestamp:0
                           comment:nil
                           celExpr:nil
+                           ruleId:0
                             error:nil];
 }
 
@@ -361,6 +367,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
                         timestamp:0
                           comment:comment
                           celExpr:celExpr
+                           ruleId:0
                             error:error];
 }
 
@@ -388,6 +395,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
   ENCODE(coder, comment);
   ENCODE(coder, celExpr);
   ENCODE_BOXABLE(coder, staticRule);
+  ENCODE_BOXABLE(coder, ruleId);
 }
 
 - (instancetype)initWithCoder:(NSCoder*)decoder {
@@ -402,6 +410,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     DECODE(decoder, comment, NSString);
     DECODE(decoder, celExpr, NSString);
     DECODE_SELECTOR(decoder, staticRule, NSNumber, boolValue);
+    DECODE_SELECTOR(decoder, ruleId, NSNumber, longLongValue);
   }
   return self;
 }

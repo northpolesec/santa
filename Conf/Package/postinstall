@@ -34,6 +34,8 @@ if [ -z "${GOOGLE_SANTA_ACTIVATED}" ]; then
     # update is valid, the system extension will take care of finishing the
     # install.
 
+    /bin/chmod +x /Applications/Santa.app/Contents/MacOS/santactl
+
     SANTA_VERSION=$(/Applications/Santa.app/Contents/MacOS/santactl version | /usr/bin/awk '/^santad/ { print $3 }')
     SANTA_MODE=$(/Applications/Santa.app/Contents/MacOS/santactl status | /usr/bin/awk '/ *Mode/ { print $3 }')
 

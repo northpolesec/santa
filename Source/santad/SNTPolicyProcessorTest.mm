@@ -723,6 +723,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
                  timestamp:0
                    comment:nil
                    celExpr:celExpr
+                    ruleId:0
                      error:NULL];
   };
   {
@@ -906,6 +907,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
                  timestamp:0
                    comment:nil
                    celExpr:celExpr
+                    ruleId:0
                      error:NULL];
   };
 
@@ -1249,6 +1251,38 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   XCTAssertEqual(cd.decision, SNTEventStateBlockCELFallback);
   XCTAssertEqualObjects(cd.customMsg, @"Custom block message");
   XCTAssertEqualObjects(cd.customURL, @"https://example.com/details");
+}
+
+- (void)testRuleIdPropagation {
+  SNTRule* rule = [[SNTRule alloc] initWithIdentifier:@"a023fbe5361a5bbd793dc3889556e93f41ec9bb8"
+                                                state:SNTRuleStateBlock
+                                                 type:SNTRuleTypeCDHash
+                                            customMsg:nil
+                                            customURL:nil
+                                              celExpr:nil
+                                               ruleId:42];
+
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+  cd.cdhash = rule.identifier;
+  [self.processor decision:cd forRule:rule withTransitiveRules:YES andCELActivationCallback:nil];
+  XCTAssertEqual(cd.decision, SNTEventStateBlockCDHash);
+  XCTAssertEqual(cd.ruleId, 42LL);
+}
+
+- (void)testRuleIdZeroWhenNotSet {
+  SNTRule* rule = [[SNTRule alloc] initWithDictionary:@{
+    @"rule_type" : @"BINARY",
+    @"identifier" : @"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+    @"policy" : @"ALLOWLIST"
+  }
+                                                error:nil];
+  XCTAssertNotNil(rule);
+
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+  cd.sha256 = rule.identifier;
+  [self.processor decision:cd forRule:rule withTransitiveRules:YES andCELActivationCallback:nil];
+  XCTAssertEqual(cd.decision, SNTEventStateAllowBinary);
+  XCTAssertEqual(cd.ruleId, 0LL);
 }
 
 @end

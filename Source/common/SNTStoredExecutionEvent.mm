@@ -83,6 +83,7 @@
   ENCODE_BOXABLE(coder, holdAndAsk);
   ENCODE_BOXABLE(coder, silentTouchID);
   ENCODE_BOXABLE(coder, staticRule);
+  ENCODE_BOXABLE(coder, ruleId);
   ENCODE(coder, pid);
   ENCODE(coder, ppid);
   ENCODE(coder, parentName);
@@ -129,6 +130,7 @@
     DECODE_SELECTOR(decoder, holdAndAsk, NSNumber, boolValue);
     DECODE_SELECTOR(decoder, silentTouchID, NSNumber, boolValue);
     DECODE_SELECTOR(decoder, staticRule, NSNumber, boolValue);
+    DECODE_SELECTOR(decoder, ruleId, NSNumber, longLongValue);
     DECODE(decoder, pid, NSNumber);
     DECODE(decoder, ppid, NSNumber);
     DECODE(decoder, parentName, NSString);

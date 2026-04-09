@@ -23,12 +23,21 @@
 #import "Source/common/es/SNTEndpointSecurityEventHandler.h"
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
 
+NS_ASSUME_NONNULL_BEGIN
+
 /// ES Client focused on mitigating accidental or malicious tampering of Santa and its components.
 @interface SNTEndpointSecurityTamperResistance
     : SNTEndpointSecurityClient <SNTEndpointSecurityEventHandler>
 
+/// Set the signing IDs to protect from pid_suspend/pid_resume.
+/// Accepts an NSArray of NSStrings but stores internally as a hash set for O(1) lookup.
+- (void)setAntiSuspendSigningIDs:(nullable NSArray<NSString*>*)antiSuspendSigningIDs;
+
 - (instancetype)initWithESAPI:(std::shared_ptr<santa::EndpointSecurityAPI>)esApi
                       metrics:(std::shared_ptr<santa::ESMetricsObserver>)metrics
-                       logger:(std::shared_ptr<santa::Logger>)logger;
+                       logger:(std::shared_ptr<santa::Logger>)logger
+        antiSuspendSigningIDs:(nullable NSArray<NSString*>*)antiSuspendSigningIDs;
 
 @end
+
+NS_ASSUME_NONNULL_END

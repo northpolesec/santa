@@ -80,10 +80,10 @@
 @property NSNumber* enableTransitiveRules;
 @property NSNumber* enableAllEventUpload;
 @property NSNumber* disableUnknownEventUpload;
-@property NSNumber* blockUSBMount;
-@property NSNumber* blockUnencryptedRemovableMediaMount;
-// Array of mount args for the forced remounting feature.
-@property NSArray* remountUSBMode;
+@property NSString* removableMediaAction;
+@property NSArray<NSString*>* removableMediaRemountFlags;
+@property NSString* encryptedRemovableMediaAction;
+@property NSArray<NSString*>* encryptedRemovableMediaRemountFlags;
 @property NSNumber* blockNetworkMount;
 @property NSString* bannedNetworkMountBlockMessage;
 @property NSArray<NSString*>* allowedNetworkMountHosts;

@@ -229,21 +229,65 @@ BOOL Preflight(SNTSyncPreflight* self, google::protobuf::Arena* arena,
     self.syncState.blocklistRegex = StringToNSString(resp.deprecated_blacklist_regex());
   }
 
-  if (resp.has_block_usb_mount()) {
-    self.syncState.blockUSBMount = @(resp.block_usb_mount());
+  // New removable_media_policy takes precedence over deprecated fields.
+  if (resp.has_removable_media_policy()) {
+    const auto& policy = resp.removable_media_policy();
+    switch (policy.action_case()) {
+      case Traits::RemovableMediaPolicyT::kAllow:
+        self.syncState.removableMediaAction = @"Allow";
+        self.syncState.removableMediaRemountFlags = nil;
+        break;
+      case Traits::RemovableMediaPolicyT::kBlock:
+        self.syncState.removableMediaAction = @"Block";
+        self.syncState.removableMediaRemountFlags = nil;
+        break;
+      case Traits::RemovableMediaPolicyT::kRemount: {
+        self.syncState.removableMediaAction = @"Remount";
+        NSMutableArray<NSString*>* flags = [NSMutableArray array];
+        for (const std::string& flag : policy.remount().flags()) {
+          [flags addObject:StringToNSString(flag)];
+        }
+        self.syncState.removableMediaRemountFlags = flags;
+        break;
+      }
+      default: break;
+    }
+  } else if (resp.has_block_usb_mount()) {
+    // Deprecated fallback — convert to new format at parse time.
+    if (resp.block_usb_mount()) {
+      NSMutableArray<NSString*>* flags = [NSMutableArray array];
+      for (const std::string& mode : resp.remount_usb_mode()) {
+        [flags addObject:StringToNSString(mode)];
+      }
+      self.syncState.removableMediaAction = [flags count] > 0 ? @"Remount" : @"Block";
+      self.syncState.removableMediaRemountFlags = [flags count] > 0 ? flags : nil;
+    } else {
+      self.syncState.removableMediaAction = @"Allow";
+      self.syncState.removableMediaRemountFlags = nil;
+    }
   }
 
-  if (resp.has_block_unencrypted_removable_media()) {
-    self.syncState.blockUnencryptedRemovableMediaMount =
-        @(resp.block_unencrypted_removable_media());
-  }
-
-  // remount_usb_mode is shared between block_usb_mount and
-  // block_unencrypted_removable_media (which are mutually exclusive).
-  if (resp.has_block_usb_mount() || resp.has_block_unencrypted_removable_media()) {
-    self.syncState.remountUSBMode = [NSMutableArray array];
-    for (const std::string& mode : resp.remount_usb_mode()) {
-      [(NSMutableArray*)self.syncState.remountUSBMode addObject:StringToNSString(mode)];
+  if (resp.has_encrypted_removable_media_policy()) {
+    const auto& policy = resp.encrypted_removable_media_policy();
+    switch (policy.action_case()) {
+      case Traits::RemovableMediaPolicyT::kAllow:
+        self.syncState.encryptedRemovableMediaAction = @"Allow";
+        self.syncState.encryptedRemovableMediaRemountFlags = nil;
+        break;
+      case Traits::RemovableMediaPolicyT::kBlock:
+        self.syncState.encryptedRemovableMediaAction = @"Block";
+        self.syncState.encryptedRemovableMediaRemountFlags = nil;
+        break;
+      case Traits::RemovableMediaPolicyT::kRemount: {
+        self.syncState.encryptedRemovableMediaAction = @"Remount";
+        NSMutableArray<NSString*>* flags = [NSMutableArray array];
+        for (const std::string& flag : policy.remount().flags()) {
+          [flags addObject:StringToNSString(flag)];
+        }
+        self.syncState.encryptedRemovableMediaRemountFlags = flags;
+        break;
+      }
+      default: break;
     }
   }
 

@@ -27,8 +27,12 @@
 #include <tuple>
 #include <unordered_set>
 
+#include "absl/container/flat_hash_set.h"
+#include "absl/synchronization/mutex.h"
+
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTLogging.h"
+#import "Source/common/SigningIDHelpers.h"
 #import "Source/common/String.h"
 #include "Source/common/es/ESMetricsObserver.h"
 #include "Source/common/es/Message.h"
@@ -124,22 +128,53 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message& esMsg) {
   return {ES_AUTH_RESULT_ALLOW, false};
 }
 
+@interface SNTEndpointSecurityTamperResistance ()
+@property(atomic) BOOL enabled;
+@end
+
 @implementation SNTEndpointSecurityTamperResistance {
   std::shared_ptr<Logger> _logger;
+  absl::Mutex _antiSuspendMutex;
+  absl::flat_hash_set<std::string> _antiSuspendSigningIDs ABSL_GUARDED_BY(_antiSuspendMutex);
 }
 
 - (instancetype)initWithESAPI:(std::shared_ptr<EndpointSecurityAPI>)esApi
                       metrics:(std::shared_ptr<santa::ESMetricsObserver>)metrics
-                       logger:(std::shared_ptr<Logger>)logger {
+                       logger:(std::shared_ptr<Logger>)logger
+        antiSuspendSigningIDs:(NSArray<NSString*>*)antiSuspendSigningIDs {
   self = [super initWithESAPI:std::move(esApi)
                       metrics:std::move(metrics)
                     processor:santa::Processor::kTamperResistance];
   if (self) {
     _logger = logger;
+    [self setAntiSuspendSigningIDs:antiSuspendSigningIDs];
 
     [self establishClientOrDie];
   }
   return self;
+}
+
+- (void)setAntiSuspendSigningIDs:(NSArray<NSString*>*)antiSuspendSigningIDs {
+  {
+    absl::WriterMutexLock lock(_antiSuspendMutex);
+    _antiSuspendSigningIDs.clear();
+    for (NSString* signingID in antiSuspendSigningIDs) {
+      _antiSuspendSigningIDs.insert(santa::NSStringToUTF8String(signingID));
+    }
+  }
+  [self muteAllProcessesForSuspendResumeIfNeeded];
+}
+
+- (void)muteAllProcessesForSuspendResumeIfNeeded {
+  if (!self.enabled) return;
+
+  {
+    absl::ReaderMutexLock lock(_antiSuspendMutex);
+    if (_antiSuspendSigningIDs.empty()) return;
+  }
+
+  SetPairPathAndType allProcesses = {{"/", WatchItemPathType::kPrefix}};
+  [super muteTargetPaths:allProcesses forEvents:{ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME}];
 }
 
 - (NSString*)description {
@@ -213,12 +248,32 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message& esMsg) {
     }
 
     case ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME: {
+      es_process_t* target = esMsg->event.proc_suspend_resume.target;
+
       if ([[SNTConfigurator configurator] enableAntiTamperProcessSuspendResume] &&
-          audit_token_to_pid(esMsg->event.proc_suspend_resume.target->audit_token) == getpid()) {
+          audit_token_to_pid(target->audit_token) == getpid()) {
         LOGE(@"Preventing attempt to suspend/resume Santa (type: %d. from PID %d, %s)",
              esMsg->event.proc_suspend_resume.type, audit_token_to_pid(esMsg->process->audit_token),
              esMsg->process->executable->path.data);
         result = ES_AUTH_RESULT_DENY;
+        break;
+      }
+
+      {
+        absl::ReaderMutexLock lock(_antiSuspendMutex);
+        if (!_antiSuspendSigningIDs.empty()) {
+          NSString* targetSigningID = FormatSigningID(
+              santa::StringTokenToNSString(target->signing_id),
+              santa::StringTokenToNSString(target->team_id), target->is_platform_binary);
+          if (targetSigningID &&
+              _antiSuspendSigningIDs.contains(santa::NSStringToUTF8String(targetSigningID))) {
+            LOGE(@"Preventing attempt to suspend/resume %@ (type: %d. from PID %d, %s)",
+                 targetSigningID, esMsg->event.proc_suspend_resume.type,
+                 audit_token_to_pid(esMsg->process->audit_token),
+                 esMsg->process->executable->path.data);
+            result = ES_AUTH_RESULT_DENY;
+          }
+        }
       }
       break;
     }
@@ -272,8 +327,15 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message& esMsg) {
   protectedPaths.insert({"/Library/SystemExtensions", WatchItemPathType::kPrefix});
   protectedPaths.insert({"/bin/launchctl", WatchItemPathType::kLiteral});
 
-  // Begin watching the protected set
+  // Begin watching the protected set for path-based event types.
   [super muteTargetPaths:protectedPaths];
+
+  // With inverted target path muting, only events whose target matches a muted path are delivered.
+  // PROC_SUSPEND_RESUME targets processes, so we mute "/" as a prefix to match all executable
+  // paths, ensuring all suspend/resume events are delivered for signing ID matching. Only do this
+  // if there are non-Santa processes that are being protected too.
+  self.enabled = YES;
+  [self muteAllProcessesForSuspendResumeIfNeeded];
 
   [super subscribeAndClearCache:{
                                     ES_EVENT_TYPE_AUTH_SIGNAL,

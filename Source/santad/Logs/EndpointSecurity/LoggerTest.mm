@@ -107,14 +107,14 @@ class MockSerializer : public Empty {
               (const std::string& policy_version, const std::string& policy_name,
                const santa::Message& msg, const santa::EnrichedProcess& enriched_process,
                size_t target_index, std::optional<santa::EnrichedFile> enriched_event_target,
-               FileAccessPolicyDecision decision, std::string_view operation_id),
+               FileAccessPolicyDecision decision, std::string_view operation_id, int64_t rule_id),
               (override));
 
   MOCK_METHOD(std::vector<uint8_t>, SerializeFileAccess,
               (const std::string& policy_version, const std::string& policy_name,
                const santa::Message& msg, const santa::EnrichedProcess& enriched_process,
                size_t target_index, std::optional<santa::EnrichedFile> enriched_event_target,
-               FileAccessPolicyDecision decision),
+               FileAccessPolicyDecision decision, int64_t rule_id),
               (override));
 };
 
@@ -353,7 +353,7 @@ class MockSleighLauncher : public santa::SleighLauncher {
 
   mockESApi->SetExpectationsRetainReleaseMessage();
   using testing::_;
-  EXPECT_CALL(*mockSerializer, SerializeFileAccess(_, _, _, _, _, _, _));
+  EXPECT_CALL(*mockSerializer, SerializeFileAccess(_, _, _, _, _, _, _, _));
   EXPECT_CALL(*mockWriter, Write);
 
   Logger(nil, nil, TelemetryEvent::kEverything, 1, 1, 1, mockSerializer, mockWriter)
@@ -362,7 +362,7 @@ class MockSleighLauncher : public santa::SleighLauncher {
           EnrichedProcess(std::nullopt, std::nullopt, std::nullopt, std::nullopt,
                           EnrichedFile(std::nullopt, std::nullopt, std::nullopt), std::nullopt),
           0, EnrichedFile(std::nullopt, std::nullopt, std::nullopt),
-          FileAccessPolicyDecision::kDenied);
+          FileAccessPolicyDecision::kDenied, 0);
 
   XCTBubbleMockVerifyAndClearExpectations(mockSerializer.get());
   XCTBubbleMockVerifyAndClearExpectations(mockWriter.get());

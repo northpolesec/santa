@@ -45,6 +45,9 @@ class EndpointSecurityAPI : public std::enable_shared_from_this<EndpointSecurity
 
   virtual bool MuteTargetPath(const Client& client, std::string_view path,
                               santa::WatchItemPathType path_type);
+  virtual bool MuteTargetPathEvents(const Client& client, std::string_view path,
+                                    santa::WatchItemPathType path_type,
+                                    const std::set<es_event_type_t>& events);
   virtual bool UnmuteTargetPath(const Client& client, std::string_view path,
                                 santa::WatchItemPathType path_type);
 

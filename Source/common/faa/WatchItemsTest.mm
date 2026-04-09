@@ -1156,6 +1156,42 @@ BlockGenResult CreatePolicyBlockGen() {
               @{kWatchItemConfigKeyOptionsCustomMessage : RepeatedString(@"A", 4096)}
         },
         &data_policies, &proc_policies, &err));
+
+    // kWatchItemConfigKeyOptionsRuleId - Invalid type (string)
+    XCTAssertFalse(ParseConfigSingleWatchItem(
+        @"", kVersion, @{
+          kWatchItemConfigKeyPaths : @[ @"a" ],
+          kWatchItemConfigKeyOptions : @{kWatchItemConfigKeyOptionsRuleId : @"42"}
+        },
+        &data_policies, &proc_policies, &err));
+
+    // kWatchItemConfigKeyOptionsRuleId - Invalid negative value
+    XCTAssertFalse(ParseConfigSingleWatchItem(
+        @"", kVersion, @{
+          kWatchItemConfigKeyPaths : @[ @"a" ],
+          kWatchItemConfigKeyOptions : @{kWatchItemConfigKeyOptionsRuleId : @(-1)}
+        },
+        &data_policies, &proc_policies, &err));
+
+    // kWatchItemConfigKeyOptionsRuleId - Valid zero (default)
+    data_policies.clear();
+    XCTAssertTrue(ParseConfigSingleWatchItem(
+        @"", kVersion, @{
+          kWatchItemConfigKeyPaths : @[ @"a" ],
+          kWatchItemConfigKeyOptions : @{kWatchItemConfigKeyOptionsRuleId : @(0)}
+        },
+        &data_policies, &proc_policies, &err));
+    XCTAssertEqual(data_policies.begin()->get()->rule_id, 0);
+
+    // kWatchItemConfigKeyOptionsRuleId - Valid positive value
+    data_policies.clear();
+    XCTAssertTrue(ParseConfigSingleWatchItem(
+        @"", kVersion, @{
+          kWatchItemConfigKeyPaths : @[ @"a" ],
+          kWatchItemConfigKeyOptions : @{kWatchItemConfigKeyOptionsRuleId : @(12345)}
+        },
+        &data_policies, &proc_policies, &err));
+    XCTAssertEqual(data_policies.begin()->get()->rule_id, 12345);
   }
 
   // If processes are specified, they must be valid format

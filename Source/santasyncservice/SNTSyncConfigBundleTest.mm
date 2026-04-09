@@ -29,9 +29,10 @@
 @property NSNumber* syncType;
 @property NSString* allowlistRegex;
 @property NSString* blocklistRegex;
-@property NSNumber* blockUSBMount;
-@property NSNumber* blockUnencryptedRemovableMediaMount;
-@property NSArray* remountUSBMode;
+@property NSString* removableMediaAction;
+@property NSArray<NSString*>* removableMediaRemountFlags;
+@property NSString* encryptedRemovableMediaAction;
+@property NSArray<NSString*>* encryptedRemovableMediaRemountFlags;
 @property NSNumber* blockNetworkMount;
 @property NSString* bannedNetworkMountBlockMessage;
 @property NSArray<NSString*>* allowedNetworkMountHosts;
@@ -73,9 +74,10 @@
   XCTAssertNil(bundle.syncType);
   XCTAssertNil(bundle.allowlistRegex);
   XCTAssertNil(bundle.blocklistRegex);
-  XCTAssertNil(bundle.blockUSBMount);
-  XCTAssertNil(bundle.blockUnencryptedRemovableMediaMount);
-  XCTAssertNil(bundle.remountUSBMode);
+  XCTAssertNil(bundle.removableMediaAction);
+  XCTAssertNil(bundle.removableMediaRemountFlags);
+  XCTAssertNil(bundle.encryptedRemovableMediaAction);
+  XCTAssertNil(bundle.encryptedRemovableMediaRemountFlags);
   XCTAssertNil(bundle.blockNetworkMount);
   XCTAssertNil(bundle.bannedNetworkMountBlockMessage);
   XCTAssertNil(bundle.allowedNetworkMountHosts);
@@ -140,9 +142,11 @@
   bundle = PostflightConfigBundle(syncState);
   XCTAssertEqualObjects(bundle.fileAccessEventDetailText, syncState.fileAccessEventDetailText);
 
-  syncState.blockUnencryptedRemovableMediaMount = @(YES);
+  syncState.encryptedRemovableMediaAction = @"Remount";
+  syncState.encryptedRemovableMediaRemountFlags = @[ @"rdonly" ];
   bundle = PostflightConfigBundle(syncState);
-  XCTAssertTrue([bundle.blockUnencryptedRemovableMediaMount boolValue]);
+  XCTAssertEqualObjects(bundle.encryptedRemovableMediaAction, @"Remount");
+  XCTAssertEqualObjects(bundle.encryptedRemovableMediaRemountFlags, (@[ @"rdonly" ]));
 
   syncState.blockNetworkMount = @(YES);
   syncState.bannedNetworkMountBlockMessage = @"banban";
@@ -188,9 +192,10 @@
   XCTAssertNil(bundle.syncType);
   XCTAssertNil(bundle.allowlistRegex);
   XCTAssertNil(bundle.blocklistRegex);
-  XCTAssertNil(bundle.blockUSBMount);
-  XCTAssertNil(bundle.blockUnencryptedRemovableMediaMount);
-  XCTAssertNil(bundle.remountUSBMode);
+  XCTAssertNil(bundle.removableMediaAction);
+  XCTAssertNil(bundle.removableMediaRemountFlags);
+  XCTAssertNil(bundle.encryptedRemovableMediaAction);
+  XCTAssertNil(bundle.encryptedRemovableMediaRemountFlags);
   XCTAssertNil(bundle.blockNetworkMount);
   XCTAssertNil(bundle.bannedNetworkMountBlockMessage);
   XCTAssertNil(bundle.allowedNetworkMountHosts);
@@ -227,9 +232,10 @@
   XCTAssertNil(bundle.clientMode);
   XCTAssertNil(bundle.allowlistRegex);
   XCTAssertNil(bundle.blocklistRegex);
-  XCTAssertNil(bundle.blockUSBMount);
-  XCTAssertNil(bundle.blockUnencryptedRemovableMediaMount);
-  XCTAssertNil(bundle.remountUSBMode);
+  XCTAssertNil(bundle.removableMediaAction);
+  XCTAssertNil(bundle.removableMediaRemountFlags);
+  XCTAssertNil(bundle.encryptedRemovableMediaAction);
+  XCTAssertNil(bundle.encryptedRemovableMediaRemountFlags);
   XCTAssertNil(bundle.blockNetworkMount);
   XCTAssertNil(bundle.bannedNetworkMountBlockMessage);
   XCTAssertNil(bundle.allowedNetworkMountHosts);

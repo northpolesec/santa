@@ -58,6 +58,7 @@ NSString* const kWatchItemConfigKeyOptionsCustomMessage = @"BlockMessage";
 NSString* const kWatchItemConfigKeyOptionsEventDetailURL = kWatchItemConfigKeyEventDetailURL;
 NSString* const kWatchItemConfigKeyOptionsEventDetailText = kWatchItemConfigKeyEventDetailText;
 NSString* const kWatchItemConfigKeyOptionsVersion = kWatchItemConfigKeyVersion;
+NSString* const kWatchItemConfigKeyOptionsRuleId = @"RuleId";
 NSString* const kWatchItemConfigKeyProcesses = @"Processes";
 NSString* const kWatchItemConfigKeyProcessesBinaryPath = @"BinaryPath";
 NSString* const kWatchItemConfigKeyProcessesCertificateSha256 = @"CertificateSha256";
@@ -171,6 +172,17 @@ ValidatorBlock HexValidator(NSUInteger expected_length) {
       return false;
     }
 
+    return true;
+  };
+}
+
+// Returns a ValidatorBlock that confirms the NSNumber value is non-negative.
+ValidatorBlock NonNegativeValidator() {
+  return ^bool(NSNumber* val, NSError** err) {
+    if ([val longLongValue] < 0) {
+      [SNTError populateError:err withFormat:@"Value must be non-negative. Got: %@", val];
+      return false;
+    }
     return true;
   };
 }
@@ -489,6 +501,11 @@ bool ParseConfigSingleWatchItem(NSString* name, std::string_view fallback_policy
                          false, LenRangeValidator(0, kWatchItemConfigEventDetailTextMaxLength))) {
       return false;
     }
+
+    if (!VerifyConfigKey(options, kWatchItemConfigKeyOptionsRuleId, [NSNumber class], err, false,
+                         NonNegativeValidator())) {
+      return false;
+    }
   }
 
   std::string policy_version;
@@ -539,6 +556,8 @@ bool ParseConfigSingleWatchItem(NSString* name, std::string_view fallback_policy
     return true;
   }
 
+  int64_t rule_id = [options[kWatchItemConfigKeyOptionsRuleId] longLongValue];
+
   switch (rule_type) {
     case WatchItemRuleType::kPathsWithAllowedProcesses: [[fallthrough]];
     case WatchItemRuleType::kPathsWithDeniedProcesses:
@@ -550,7 +569,7 @@ bool ParseConfigSingleWatchItem(NSString* name, std::string_view fallback_policy
             NSStringToUTF8StringView(options[kWatchItemConfigKeyOptionsCustomMessage]),
             options[kWatchItemConfigKeyOptionsEventDetailURL],
             options[kWatchItemConfigKeyOptionsEventDetailText],
-            std::get<SetWatchItemProcess>(proc_list)));
+            std::get<SetWatchItemProcess>(proc_list), rule_id));
       }
 
       break;
@@ -563,7 +582,7 @@ bool ParseConfigSingleWatchItem(NSString* name, std::string_view fallback_policy
           NSStringToUTF8StringView(options[kWatchItemConfigKeyOptionsCustomMessage]),
           options[kWatchItemConfigKeyOptionsEventDetailURL],
           options[kWatchItemConfigKeyOptionsEventDetailText],
-          std::get<SetWatchItemProcess>(proc_list)));
+          std::get<SetWatchItemProcess>(proc_list), rule_id));
 
       break;
   }

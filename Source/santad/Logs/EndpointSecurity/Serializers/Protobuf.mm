@@ -600,6 +600,10 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedExec& msg, SNTCach
     pb_exec->set_static_rule(true);
   }
 
+  if (cd.ruleId > 0) {
+    pb_exec->set_rule_id(cd.ruleId);
+  }
+
   return FinalizeProto(santa_msg);
 }
 
@@ -1412,7 +1416,7 @@ std::vector<uint8_t> Protobuf::SerializeFileAccess(
     const std::string& policy_version, const std::string& policy_name, const Message& msg,
     const EnrichedProcess& enriched_process, size_t target_index,
     std::optional<santa::EnrichedFile> enriched_event_target, FileAccessPolicyDecision decision,
-    std::string_view operation_id) {
+    std::string_view operation_id, int64_t rule_id) {
   Arena arena;
   ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
 
@@ -1436,6 +1440,10 @@ std::vector<uint8_t> Protobuf::SerializeFileAccess(
   file_access->set_access_type(GetAccessType(msg->event_type));
   file_access->set_policy_decision(GetPolicyDecision(decision));
   file_access->set_operation_id(operation_id);
+
+  if (rule_id > 0) {
+    file_access->set_rule_id(rule_id);
+  }
 
   return FinalizeProto(santa_msg);
 }

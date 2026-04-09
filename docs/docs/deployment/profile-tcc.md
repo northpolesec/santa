@@ -1,5 +1,5 @@
 ---
-sidebar_position: 3
+sidebar_position: 4
 ---
 
 # Profiles: TCC
@@ -37,7 +37,26 @@ will need the following information to configure this profile:
 - Permission or Service: `SystemPolicyAllFiles` or `Full-disk Access`
 - Access: Allow
 
-#### App/Process #2:
+#### App/Process #2 (Network Extension):
+
+:::info Network Extension
+This entry is only required if you are deploying the [network
+extension](network-extension.md). It can be safely omitted otherwise.
+:::
+
+- Identifier type: "Bundle ID"
+- Identifier: `com.northpolesec.santa.netd`
+- Code Requirement:
+
+  ```
+  identifier "com.northpolesec.santa.netd" and anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] /* exists */ and certificate leaf[field.1.2.840.113635.100.6.1.13] /* exists */ and certificate leaf[subject.OU] = ZMCG7MLDV9
+  ```
+
+- Statically validate this requirement: False
+- Permission or Service: `SystemPolicyAllFiles` or `Full-disk Access`
+- Access: Allow
+
+#### App/Process #3:
 
 - Identifier type: "Bundle ID"
 - Identifier: `com.northpolesec.santa.bundleservice`
@@ -117,6 +136,22 @@ for deploying custom profiles, you can use the following example as a template.
 						<key>StaticCode</key>
 						<false/>
 					</dict>
+<!-- highlight-start -->
+					<dict>
+						<key>Allowed</key>
+						<true/>
+						<key>CodeRequirement</key>
+						<string>identifier "com.northpolesec.santa.netd" and anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] /* exists */ and certificate leaf[field.1.2.840.113635.100.6.1.13] /* exists */ and certificate leaf[subject.OU] = ZMCG7MLDV9</string>
+						<key>Comment</key>
+						<string>Network extension - remove if not deploying santanetd</string>
+						<key>Identifier</key>
+						<string>com.northpolesec.santa.netd</string>
+						<key>IdentifierType</key>
+						<string>bundleID</string>
+						<key>StaticCode</key>
+						<false/>
+					</dict>
+<!-- highlight-end -->
 					<dict>
 						<key>Allowed</key>
 						<true/>

@@ -477,6 +477,7 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
   cd.customMsg = rule.customMsg;
   cd.customURL = rule.customURL;
   cd.staticRule = rule.staticRule;
+  cd.ruleId = rule.ruleId;
 
   return YES;
 }

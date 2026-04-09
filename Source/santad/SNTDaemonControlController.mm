@@ -423,16 +423,20 @@ double watchdogRAMPeak = 0;
   reply([[SNTConfigurator configurator] syncTypeRequired]);
 }
 
-- (void)blockUSBMount:(void (^)(BOOL))reply {
-  reply([[SNTConfigurator configurator] blockUSBMount]);
+- (void)removableMediaAction:(void (^)(SNTRemovableMediaAction))reply {
+  reply([[SNTConfigurator configurator] removableMediaAction]);
 }
 
-- (void)blockUnencryptedRemovableMediaMount:(void (^)(BOOL))reply {
-  reply([[SNTConfigurator configurator] blockUnencryptedRemovableMediaMount]);
+- (void)removableMediaRemountFlags:(void (^)(NSArray<NSString*>*))reply {
+  reply([[SNTConfigurator configurator] removableMediaRemountFlags]);
 }
 
-- (void)remountUSBMode:(void (^)(NSArray<NSString*>*))reply {
-  reply([[SNTConfigurator configurator] remountUSBMode]);
+- (void)encryptedRemovableMediaAction:(void (^)(SNTRemovableMediaAction))reply {
+  reply([[SNTConfigurator configurator] encryptedRemovableMediaAction]);
+}
+
+- (void)encryptedRemovableMediaRemountFlags:(void (^)(NSArray<NSString*>*))reply {
+  reply([[SNTConfigurator configurator] encryptedRemovableMediaRemountFlags]);
 }
 
 - (void)blockNetworkMount:(void (^)(NSNumber*))reply {
@@ -491,16 +495,20 @@ double watchdogRAMPeak = 0;
                                                                                   error:NULL]];
   }];
 
-  [result blockUSBMount:^(BOOL val) {
-    [configurator setSyncServerBlockUSBMount:val];
+  [result removableMediaAction:^(NSString* val) {
+    [configurator setSyncServerRemovableMediaAction:val];
   }];
 
-  [result blockUnencryptedRemovableMediaMount:^(BOOL val) {
-    [configurator setSyncServerBlockUnencryptedRemovableMediaMount:val];
+  [result removableMediaRemountFlags:^(NSArray<NSString*>* val) {
+    [configurator setSyncServerRemovableMediaRemountFlags:val];
   }];
 
-  [result remountUSBMode:^(NSArray* val) {
-    [configurator setRemountUSBMode:val];
+  [result encryptedRemovableMediaAction:^(NSString* val) {
+    [configurator setSyncServerEncryptedRemovableMediaAction:val];
+  }];
+
+  [result encryptedRemovableMediaRemountFlags:^(NSArray<NSString*>* val) {
+    [configurator setSyncServerEncryptedRemovableMediaRemountFlags:val];
   }];
 
   [result blockNetworkMount:^(BOOL val) {

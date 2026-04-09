@@ -751,17 +751,19 @@ changes in the release notes of any future release that changes them.`,
   usb: [
     {
       key: "BlockUSBMount",
-      description: "If true, blocking Removable Media (e.g. USB Mass storage) feature is enabled.",
+      description: "Deprecated: use RemovableMediaAction instead. If true, blocking Removable Media (e.g. USB Mass storage) feature is enabled.",
       type: "bool",
       syncConfigurable: true,
       defaultValue: false,
+      versionDeprecated: "2026.3",
     },
     {
       key: "RemountUSBMode",
-      description: `Array of strings for arguments to pass to \`mount -o\` when forcibly remounting devices.`,
+      description: `Deprecated: use RemovableMediaRemountFlags instead. Array of strings for arguments to pass to \`mount -o\` when forcibly remounting devices.`,
       type: "string",
       syncConfigurable: true,
       repeated: true,
+      versionDeprecated: "2026.3",
       possibleValues: [
         { value: "rdonly" },
         { value: "noexec" },
@@ -775,11 +777,73 @@ changes in the release notes of any future release that changes them.`,
       enableIf: (data) => data.BlockUSBMount,
     },
     {
+      key: "RemovableMediaAction",
+      description:
+        "Action for all removable media. If unset, falls back to deprecated BlockUSBMount + RemountUSBMode.",
+      type: "string",
+      syncConfigurable: true,
+      possibleValues: [
+        { value: "Allow" },
+        { value: "Block" },
+        { value: "Remount" },
+      ],
+    },
+    {
+      key: "RemovableMediaRemountFlags",
+      description:
+        "Array of mount flag arguments when RemovableMediaAction is Remount. If unset, falls back to deprecated RemountUSBMode.",
+      type: "string",
+      syncConfigurable: true,
+      repeated: true,
+      possibleValues: [
+        { value: "rdonly" },
+        { value: "noexec" },
+        { value: "nosuid" },
+        { value: "nobrowse" },
+        { value: "noowners" },
+        { value: "nodev" },
+        { value: "async" },
+        { value: "-j" },
+      ],
+      enableIf: (data) => data.RemovableMediaAction === "Remount",
+    },
+    {
+      key: "EncryptedRemovableMediaAction",
+      description:
+        "Action for encrypted removable media. If unset, encrypted volumes use the baseline policy.",
+      type: "string",
+      syncConfigurable: true,
+      possibleValues: [
+        { value: "Allow" },
+        { value: "Block" },
+        { value: "Remount" },
+      ],
+    },
+    {
+      key: "EncryptedRemovableMediaRemountFlags",
+      description:
+        "Array of mount flag arguments for encrypted removable media when EncryptedRemovableMediaAction is Remount.",
+      type: "string",
+      syncConfigurable: true,
+      repeated: true,
+      possibleValues: [
+        { value: "rdonly" },
+        { value: "noexec" },
+        { value: "nosuid" },
+        { value: "nobrowse" },
+        { value: "noowners" },
+        { value: "nodev" },
+        { value: "async" },
+        { value: "-j" },
+      ],
+      enableIf: (data) => data.EncryptedRemovableMediaAction === "Remount",
+    },
+    {
       key: "OnStartUSBOptions",
       description: `If set, defines the action that should be taken on existing Removable Media (e.g. USB device) mounts when Santa starts up.
 
 **Note**: “remounts” are implemented by first unmounting and then mounting the device again). Existing mounts with
-mount flags that are a superset of \`RemountUSBMode\` are unaffected and left as-is.`,
+mount flags that are a superset of \`RemovableMediaRemountFlags\` or \`EncryptedRemovableMediaRemountFlags\` are unaffected and left as-is.`,
       type: "string",
       syncConfigurable: true,
       possibleValues: [

@@ -48,6 +48,7 @@ struct ProtoTraits<false> {
   using FileAccessEventT = ::santa::sync::v1::FileAccessEvent;
   using ProcessT = ::santa::sync::v1::Process;
   using RuleT = ::santa::sync::v1::Rule;
+  using RemovableMediaPolicyT = ::santa::sync::v1::RemovableMediaPolicy;
 
   // Enum aliases
   using ClientMode = ::santa::sync::v1::ClientMode;
@@ -146,6 +147,7 @@ struct ProtoTraits<true> {
   using FileAccessRuleT = ::santa::sync::v2::FileAccessRule;
   using ProcessT = ::santa::sync::v2::Process;
   using RuleT = ::santa::sync::v2::Rule;
+  using RemovableMediaPolicyT = ::santa::sync::v2::RemovableMediaPolicy;
 
   // Enum Aliases
   using ClientMode = ::santa::sync::v2::ClientMode;

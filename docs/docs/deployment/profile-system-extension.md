@@ -41,6 +41,18 @@ and malicious scripts from bypassing Santa. If you decide at some later point to
 uninstall Santa, you will need to remove the system extension profile before
 attempting to uninstall.
 
+:::info Network Extension
+Enterprise deployments that include Santa's [network
+extension](profile-network-extension.md) should also allow the following in this
+profile:
+
+- Allowed extension types: `NetworkExtension`
+- Allowed extensions: `com.northpolesec.santa.netd`
+
+The highlighted lines in the example below include the network extension. These
+lines can be safely removed if you are not deploying the network extension.
+:::
+
 ## Example Profile
 
 If your MDM doesn't have an option to add a System Extension profile but does
@@ -97,6 +109,8 @@ example as a template.
 				<key>ZMCG7MLDV9</key>
 				<array>
 					<string>com.northpolesec.santa.daemon</string>
+<!-- highlight-next-line -->
+					<string>com.northpolesec.santa.netd</string>
 				</array>
 			</dict>
 			<key>AllowedSystemExtensionTypes</key>
@@ -104,6 +118,8 @@ example as a template.
 				<key>ZMCG7MLDV9</key>
 				<array>
 					<string>EndpointSecurityExtension</string>
+<!-- highlight-next-line -->
+					<string>NetworkExtension</string>
 				</array>
 			</dict>
 			<key>NonRemovableSystemExtensions</key>
@@ -111,6 +127,8 @@ example as a template.
 				<key>ZMCG7MLDV9</key>
 				<array>
 					<string>com.northpolesec.santa.daemon</string>
+<!-- highlight-next-line -->
+					<string>com.northpolesec.santa.netd</string>
 				</array>
 			</dict>
 		</dict>

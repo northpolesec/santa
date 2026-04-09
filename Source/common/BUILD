@@ -1232,7 +1232,7 @@ objc_library(
     hdrs = ["MOLXPCConnection.h"],
     module_name = "santa_common_MOLXPCConnection",
     sdk_frameworks = ["Security"],
-    deps = [":MOLCodesignChecker"],
+    deps = [":ScopedCFTypeRef"],
 )
 
 santa_unit_test(

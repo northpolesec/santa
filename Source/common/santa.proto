@@ -347,6 +347,9 @@ message Execution {
 
   // Indicates whether the decision was made by a static rule or not
   optional bool static_rule = 17;
+
+  // The server-assigned rule ID that was used to make the decision
+  optional int64 rule_id = 18;
 }
 
 // Information about a fork event
@@ -563,6 +566,9 @@ message FileAccess {
   // This can happen, for example, when a single operation violates both Data
   // and Process File Access Authorization rules.
   optional string operation_id = 7;
+
+  // The server-assigned rule ID that triggered the file access event
+  optional int64 rule_id = 8;
 }
 
 // Session identifier for a graphical session

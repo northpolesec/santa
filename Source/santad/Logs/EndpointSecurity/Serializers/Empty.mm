@@ -164,7 +164,7 @@ std::vector<uint8_t> Empty::SerializeFileAccess(
     const std::string& policy_version, const std::string& policy_name, const Message& msg,
     const EnrichedProcess& enriched_process, size_t target_index,
     std::optional<santa::EnrichedFile> enriched_event_target, FileAccessPolicyDecision decision,
-    std::string_view operation_id) {
+    std::string_view operation_id, int64_t rule_id) {
   return {};
 }
 

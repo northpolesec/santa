@@ -79,7 +79,7 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
   EXPECT_CALL(*mockESApi, InvertTargetPathMuting).WillOnce(testing::Return(true));
   EXPECT_CALL(*mockESApi, UnmuteAllTargetPaths).WillOnce(testing::Return(true));
 
-  // Setup mocks to handle muting the rules db and events db
+  // Setup mocks to handle muting the protected paths
   EXPECT_CALL(*mockESApi, MuteTargetPath(testing::_, testing::_, WatchItemPathType::kLiteral))
       .WillRepeatedly(testing::Return(true));
   EXPECT_CALL(*mockESApi, MuteTargetPath(testing::_, testing::_, WatchItemPathType::kPrefix))
@@ -88,7 +88,8 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
   SNTEndpointSecurityTamperResistance* tamperClient =
       [[SNTEndpointSecurityTamperResistance alloc] initWithESAPI:mockESApi
                                                          metrics:nullptr
-                                                          logger:nullptr];
+                                                          logger:nullptr
+                                           antiSuspendSigningIDs:nil];
   id mockTamperClient = OCMPartialMock(tamperClient);
 
   [mockTamperClient enable];
@@ -96,6 +97,97 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
   for (const auto& event : expectedEventSubs) {
     XCTAssertNoThrow(santa::EventTypeToString(event));
   }
+
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+  [mockTamperClient stopMocking];
+}
+
+- (void)testEnableWithAntiSuspendSigningIDs {
+  std::set<es_event_type_t> expectedEventSubs{
+      ES_EVENT_TYPE_AUTH_SIGNAL, ES_EVENT_TYPE_AUTH_EXEC, ES_EVENT_TYPE_AUTH_UNLINK,
+      ES_EVENT_TYPE_AUTH_RENAME, ES_EVENT_TYPE_AUTH_OPEN, ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME,
+  };
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  EXPECT_CALL(*mockESApi, NewClient(testing::_))
+      .WillOnce(testing::Return(Client(nullptr, ES_NEW_CLIENT_RESULT_SUCCESS)));
+  EXPECT_CALL(*mockESApi, MuteProcess(testing::_, testing::_)).WillOnce(testing::Return(true));
+  EXPECT_CALL(*mockESApi, ClearCache(testing::_))
+      .After(EXPECT_CALL(*mockESApi, Subscribe(testing::_, expectedEventSubs))
+                 .WillOnce(testing::Return(true)))
+      .WillOnce(testing::Return(true));
+
+  EXPECT_CALL(*mockESApi, InvertTargetPathMuting).WillOnce(testing::Return(true));
+  EXPECT_CALL(*mockESApi, UnmuteAllTargetPaths).WillOnce(testing::Return(true));
+
+  EXPECT_CALL(*mockESApi, MuteTargetPath(testing::_, testing::_, WatchItemPathType::kLiteral))
+      .WillRepeatedly(testing::Return(true));
+  EXPECT_CALL(*mockESApi, MuteTargetPath(testing::_, testing::_, WatchItemPathType::kPrefix))
+      .WillRepeatedly(testing::Return(true));
+
+  // Expect muting "/" prefix for PROC_SUSPEND_RESUME when signing IDs are provided
+  EXPECT_CALL(*mockESApi,
+              MuteTargetPathEvents(testing::_, testing::_, WatchItemPathType::kPrefix, testing::_))
+      .WillOnce(testing::Return(true));
+
+  SNTEndpointSecurityTamperResistance* tamperClient = [[SNTEndpointSecurityTamperResistance alloc]
+              initWithESAPI:mockESApi
+                    metrics:nullptr
+                     logger:nullptr
+      antiSuspendSigningIDs:@[ @"ABCDE12345:com.example.protected" ]];
+  id mockTamperClient = OCMPartialMock(tamperClient);
+
+  [mockTamperClient enable];
+
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+  [mockTamperClient stopMocking];
+}
+
+- (void)testSetAntiSuspendSigningIDsAfterEnable {
+  std::set<es_event_type_t> expectedEventSubs{
+      ES_EVENT_TYPE_AUTH_SIGNAL, ES_EVENT_TYPE_AUTH_EXEC, ES_EVENT_TYPE_AUTH_UNLINK,
+      ES_EVENT_TYPE_AUTH_RENAME, ES_EVENT_TYPE_AUTH_OPEN, ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME,
+  };
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  EXPECT_CALL(*mockESApi, NewClient(testing::_))
+      .WillOnce(testing::Return(Client(nullptr, ES_NEW_CLIENT_RESULT_SUCCESS)));
+  EXPECT_CALL(*mockESApi, MuteProcess(testing::_, testing::_)).WillOnce(testing::Return(true));
+  EXPECT_CALL(*mockESApi, ClearCache(testing::_))
+      .After(EXPECT_CALL(*mockESApi, Subscribe(testing::_, expectedEventSubs))
+                 .WillOnce(testing::Return(true)))
+      .WillOnce(testing::Return(true));
+
+  EXPECT_CALL(*mockESApi, InvertTargetPathMuting).WillOnce(testing::Return(true));
+  EXPECT_CALL(*mockESApi, UnmuteAllTargetPaths).WillOnce(testing::Return(true));
+
+  EXPECT_CALL(*mockESApi, MuteTargetPath(testing::_, testing::_, WatchItemPathType::kLiteral))
+      .WillRepeatedly(testing::Return(true));
+  EXPECT_CALL(*mockESApi, MuteTargetPath(testing::_, testing::_, WatchItemPathType::kPrefix))
+      .WillRepeatedly(testing::Return(true));
+
+  // No MuteTargetPathEvents during enable (nil signing IDs)
+  EXPECT_CALL(*mockESApi,
+              MuteTargetPathEvents(testing::_, testing::_, WatchItemPathType::kPrefix, testing::_))
+      .Times(0);
+
+  SNTEndpointSecurityTamperResistance* tamperClient =
+      [[SNTEndpointSecurityTamperResistance alloc] initWithESAPI:mockESApi
+                                                         metrics:nullptr
+                                                          logger:nullptr
+                                           antiSuspendSigningIDs:nil];
+  id mockTamperClient = OCMPartialMock(tamperClient);
+
+  [mockTamperClient enable];
+
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+
+  // Now setting signing IDs post-enable should trigger the mute
+  EXPECT_CALL(*mockESApi,
+              MuteTargetPathEvents(testing::_, testing::_, WatchItemPathType::kPrefix, testing::_))
+      .WillOnce(testing::Return(true));
+
+  [tamperClient setAntiSuspendSigningIDs:@[ @"ABCDE12345:com.example.protected" ]];
 
   XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
   [mockTamperClient stopMocking];
@@ -141,7 +233,8 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
   SNTEndpointSecurityTamperResistance* tamperClient =
       [[SNTEndpointSecurityTamperResistance alloc] initWithESAPI:mockESApi
                                                          metrics:nullptr
-                                                          logger:nullptr];
+                                                          logger:nullptr
+                                           antiSuspendSigningIDs:nil];
 
   id mockTamperClient = OCMPartialMock(tamperClient);
 
@@ -264,6 +357,7 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
   // Check PROC_SUSPEND_RESUME tamper events - EnableAntiTamperProcessSuspendResume = NO
   {
     esMsg.event_type = ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME;
+    [tamperClient setAntiSuspendSigningIDs:nil];
 
     for (const auto& kv : pidsToResultProcSuspendResume) {
       OCMExpect([self.mockConfigurator enableAntiTamperProcessSuspendResume]).andReturn(NO);
@@ -309,6 +403,84 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
       XCTAssertEqual(gotAuthResult, kv.second);
       XCTAssertEqual(gotCachable, kv.second == ES_AUTH_RESULT_ALLOW);
     }
+  }
+
+  // Check PROC_SUSPEND_RESUME - AntiSuspendSigningIDs blocks matching signing ID
+  {
+    esMsg.event_type = ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME;
+    [tamperClient setAntiSuspendSigningIDs:@[ @"ABCDE12345:com.example.protected" ]];
+
+    OCMExpect([self.mockConfigurator enableAntiTamperProcessSuspendResume]).andReturn(NO);
+    Message msg(mockESApi, &esMsg);
+    es_process_t target_proc = MakeESProcess(&file);
+    target_proc.audit_token = MakeAuditToken(435, 42);
+    target_proc.team_id = MakeESStringToken("ABCDE12345");
+    target_proc.signing_id = MakeESStringToken("com.example.protected");
+    target_proc.is_platform_binary = false;
+    esMsg.event.proc_suspend_resume.target = &target_proc;
+    esMsg.process->audit_token = MakeAuditToken(98381, 42);
+
+    [mockTamperClient handleMessage:std::move(msg)
+                 recordEventMetrics:^(EventDisposition d) {
+                   XCTAssertEqual(d, EventDisposition::kProcessed);
+                   dispatch_semaphore_signal(semaMetrics);
+                 }];
+
+    XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
+    XCTAssertEqual(gotAuthResult, ES_AUTH_RESULT_DENY);
+    XCTAssertEqual(gotCachable, NO);
+  }
+
+  // Check PROC_SUSPEND_RESUME - AntiSuspendSigningIDs allows non-matching signing ID
+  {
+    esMsg.event_type = ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME;
+    [tamperClient setAntiSuspendSigningIDs:@[ @"ABCDE12345:com.example.protected" ]];
+
+    OCMExpect([self.mockConfigurator enableAntiTamperProcessSuspendResume]).andReturn(NO);
+    Message msg(mockESApi, &esMsg);
+    es_process_t target_proc = MakeESProcess(&file);
+    target_proc.audit_token = MakeAuditToken(435, 42);
+    target_proc.team_id = MakeESStringToken("ABCDE12345");
+    target_proc.signing_id = MakeESStringToken("com.example.other");
+    target_proc.is_platform_binary = false;
+    esMsg.event.proc_suspend_resume.target = &target_proc;
+    esMsg.process->audit_token = MakeAuditToken(98381, 42);
+
+    [mockTamperClient handleMessage:std::move(msg)
+                 recordEventMetrics:^(EventDisposition d) {
+                   XCTAssertEqual(d, EventDisposition::kDropped);
+                   dispatch_semaphore_signal(semaMetrics);
+                 }];
+
+    XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
+    XCTAssertEqual(gotAuthResult, ES_AUTH_RESULT_ALLOW);
+    XCTAssertEqual(gotCachable, YES);
+  }
+
+  // Check PROC_SUSPEND_RESUME - AntiSuspendSigningIDs with platform binary
+  {
+    esMsg.event_type = ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME;
+    [tamperClient setAntiSuspendSigningIDs:@[ @"platform:com.apple.protected" ]];
+
+    OCMExpect([self.mockConfigurator enableAntiTamperProcessSuspendResume]).andReturn(NO);
+    Message msg(mockESApi, &esMsg);
+    es_process_t target_proc = MakeESProcess(&file);
+    target_proc.audit_token = MakeAuditToken(435, 42);
+    target_proc.team_id = MakeESStringToken("");
+    target_proc.signing_id = MakeESStringToken("com.apple.protected");
+    target_proc.is_platform_binary = true;
+    esMsg.event.proc_suspend_resume.target = &target_proc;
+    esMsg.process->audit_token = MakeAuditToken(98381, 42);
+
+    [mockTamperClient handleMessage:std::move(msg)
+                 recordEventMetrics:^(EventDisposition d) {
+                   XCTAssertEqual(d, EventDisposition::kProcessed);
+                   dispatch_semaphore_signal(semaMetrics);
+                 }];
+
+    XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
+    XCTAssertEqual(gotAuthResult, ES_AUTH_RESULT_DENY);
+    XCTAssertEqual(gotCachable, NO);
   }
 
   // Check OPEN tamper events
