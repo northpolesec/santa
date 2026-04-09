@@ -2422,6 +2422,7 @@ static SNTConfigurator* sharedConfigurator = nil;
 
   // Then validate each rule individually to report per-rule errors.
   NSDictionary* watchItems = policy[kWatchItemConfigKeyWatchItems];
+  NSString* policyVersion = policy[kWatchItemConfigKeyVersion];
   if ([watchItems isKindOfClass:[NSDictionary class]]) {
     for (NSString* name in watchItems) {
       if (![watchItems[name] isKindOfClass:[NSDictionary class]]) {
@@ -2431,7 +2432,7 @@ static SNTConfigurator* sharedConfigurator = nil;
         continue;
       }
       NSError* ruleError;
-      if (!santa::WatchItems::IsValidRule(name, watchItems[name], &ruleError)) {
+      if (!santa::WatchItems::IsValidRule(name, watchItems[name], &ruleError, policyVersion)) {
         [errors addObject:[NSString
                               stringWithFormat:@"FileAccessPolicy rule '%@' is invalid: %@", name,
                                                ruleError.localizedDescription ?: @"Unknown error"]];

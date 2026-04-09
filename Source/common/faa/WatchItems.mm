@@ -804,9 +804,11 @@ WatchItems::WatchItems(PassKey, DataSource data_source, NSString* config_path, N
       q_(q),
       periodic_task_complete_f_(periodic_task_complete_f) {}
 
-bool WatchItems::IsValidRule(NSString* name, NSDictionary* rule, NSError** error) {
+bool WatchItems::IsValidRule(NSString* name, NSDictionary* rule, NSError** error,
+                             NSString* policyVersion) {
+  std::string version = policyVersion ? NSStringToUTF8String(policyVersion) : "";
   return IsWatchItemNameValid(name, error) &&
-         ParseConfigSingleWatchItem(name, "", rule, nullptr, nullptr, error);
+         ParseConfigSingleWatchItem(name, version, rule, nullptr, nullptr, error);
 }
 
 bool WatchItems::IsValidConfig(NSDictionary* config, NSError** error) {
