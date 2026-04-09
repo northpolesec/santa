@@ -23,7 +23,31 @@
 #import "Source/santasyncservice/SNTSyncState.h"
 
 extern "C" {
+#include <openssl/x509v3.h>
 #import "src/nats.h"
+}
+
+// Forward declaration of the extracted domain-check function.
+extern "C" bool NATSLeafCertHasPushDomain(X509* cert);
+
+// Creates a minimal X509 certificate with a single DNS Subject Alternative Name.
+// The certificate is not signed and has no key material; it is only suitable for
+// testing SAN-parsing logic.
+static X509* CreateCertWithDNSSAN(const char* dnsName) {
+  X509* cert = X509_new();
+  if (!cert) return nullptr;
+
+  GENERAL_NAME* gen = GENERAL_NAME_new();
+  ASN1_IA5STRING* ia5 = ASN1_IA5STRING_new();
+  ASN1_STRING_set(ia5, dnsName, (int)strlen(dnsName));
+  GENERAL_NAME_set0_value(gen, GEN_DNS, ia5);
+
+  GENERAL_NAMES* gens = sk_GENERAL_NAME_new_null();
+  sk_GENERAL_NAME_push(gens, gen);
+  X509_add1_ext_i2d(cert, NID_subject_alt_name, gens, 0, X509V3_ADD_DEFAULT);
+  sk_GENERAL_NAME_pop_free(gens, GENERAL_NAME_free);
+
+  return cert;
 }
 
 // Expose private methods for testing
@@ -629,6 +653,90 @@ extern "C" {
 
   // Then: syncSecondsFromNow should be called with 0 (no jitter)
   [self waitForExpectations:@[ expectation ] timeout:2.0];
+}
+
+#pragma mark - SSL Certificate Domain Verification Tests
+
+- (void)testLeafCertHasPushDomain_validPushHost {
+  X509* cert = CreateCertWithDNSSAN("east1.push.northpole.security");
+  XCTAssertTrue(NATSLeafCertHasPushDomain(cert));
+  X509_free(cert);
+}
+
+- (void)testLeafCertHasPushDomain_otherValidPushHosts {
+  const char* hosts[] = {
+      "west3.push.northpole.security",
+      "central2.push.northpole.security",
+      "eu1.push.northpole.security",
+  };
+  for (const char* host : hosts) {
+    X509* cert = CreateCertWithDNSSAN(host);
+    XCTAssertTrue(NATSLeafCertHasPushDomain(cert), @"Expected match for %s", host);
+    X509_free(cert);
+  }
+}
+
+- (void)testLeafCertHasPushDomain_nonPushDomain_returnsFalse {
+  const char* hosts[] = {
+      "attacker.example.com",
+      "push.northpole.security",           // exact domain, no subdomain
+      "evil.push.northpole.security.com",  // suffix after the expected domain
+      "notpush.northpole.security",        // different subdomain of northpole.security
+  };
+  for (const char* host : hosts) {
+    X509* cert = CreateCertWithDNSSAN(host);
+    XCTAssertFalse(NATSLeafCertHasPushDomain(cert), @"Expected no match for %s", host);
+    X509_free(cert);
+  }
+}
+
+- (void)testLeafCertHasPushDomain_noSAN_returnsFalse {
+  X509* cert = X509_new();
+  XCTAssertFalse(NATSLeafCertHasPushDomain(cert));
+  X509_free(cert);
+}
+
+- (void)testLeafCertHasPushDomain_multipleSANs_oneMatches_returnsTrue {
+  // Build a cert with two SANs: one non-matching, one matching.
+  X509* cert = X509_new();
+
+  GENERAL_NAMES* gens = sk_GENERAL_NAME_new_null();
+
+  auto addDNS = [&](const char* name) {
+    GENERAL_NAME* gen = GENERAL_NAME_new();
+    ASN1_IA5STRING* ia5 = ASN1_IA5STRING_new();
+    ASN1_STRING_set(ia5, name, (int)strlen(name));
+    GENERAL_NAME_set0_value(gen, GEN_DNS, ia5);
+    sk_GENERAL_NAME_push(gens, gen);
+  };
+
+  addDNS("attacker.example.com");
+  addDNS("east2.push.northpole.security");
+
+  X509_add1_ext_i2d(cert, NID_subject_alt_name, gens, 0, X509V3_ADD_DEFAULT);
+  sk_GENERAL_NAME_pop_free(gens, GENERAL_NAME_free);
+
+  XCTAssertTrue(NATSLeafCertHasPushDomain(cert));
+  X509_free(cert);
+}
+
+- (void)testLeafCertHasPushDomain_ipSANOnly_returnsFalse {
+  X509* cert = X509_new();
+
+  GENERAL_NAME* gen = GENERAL_NAME_new();
+  // 1.2.3.4 as a 4-byte IP address
+  ASN1_OCTET_STRING* ip = ASN1_OCTET_STRING_new();
+  uint8_t addr[4] = {1, 2, 3, 4};
+  ASN1_OCTET_STRING_set(ip, addr, 4);
+  GENERAL_NAME_set0_value(gen, GEN_IPADD, ip);
+
+  GENERAL_NAMES* gens = sk_GENERAL_NAME_new_null();
+  sk_GENERAL_NAME_push(gens, gen);
+  X509_add1_ext_i2d(cert, NID_subject_alt_name, gens, 0, X509V3_ADD_DEFAULT);
+  sk_GENERAL_NAME_pop_free(gens, GENERAL_NAME_free);
+
+  XCTAssertFalse(NATSLeafCertHasPushDomain(cert));
+  X509_free(cert);
 }
 
 @end

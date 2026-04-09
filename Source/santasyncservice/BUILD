@@ -460,6 +460,7 @@ santa_unit_test(
         "//Source/common:SNTSyncConstants",
         "//Source/common:SNTSystemInfo",
         "@OCMock",
+        "@boringssl//:crypto",
     ],
 )
 
