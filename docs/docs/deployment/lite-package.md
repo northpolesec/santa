@@ -34,17 +34,17 @@ If you're not a Workshop customer: we recommend the full package. The Lite
 package only saves a few megabytes, and the removed components are inert without
 Workshop.
 
-
 ### Can I upgrade from Lite to full package?
 
-_Yes_ but the Santa system extension will not be replaced unless the version
-number is higher. In practice this _shouldn't_ be a problem as the code for the
-running extension should be identical but this scenario is not one that we test.
-You may also find systems reporting that they're running the Lite version after
-being replaced with the full version until the machines reboot.
+_Yes_, but the Santa system extension will not be replaced unless the version
+number is higher. In practice the code for the running extension should be
+identical, but this scenario is not one we test. You may also find systems
+reporting that they're running the Lite version after being replaced with the
+full version until the machines reboot.
 
 ### Can I downgrade from the full package to Lite?
 
 _Yes_ with the same caveat as above and another exception: if Santa is connected
-to Workshop it will prevent a downgrade to the Lite package to prevent
-functionality from being broken.
+to Workshop it will block a downgrade to the Lite package to avoid breaking
+functionality.
+
