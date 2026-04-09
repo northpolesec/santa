@@ -24,7 +24,7 @@ def _non_module_deps_impl(_module_ctx):
     git_repository(
         name = "nats_c",
         remote = "https://github.com/nats-io/nats.c.git",
-        tag = "v3.8.2",  # Latest stable release
+        tag = "v3.12.0",  # Latest stable release
         build_file = Label("//deps:BUILD.nats"),
     )
 

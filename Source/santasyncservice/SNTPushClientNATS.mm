@@ -34,6 +34,8 @@ __BEGIN_DECLS
 // Include NATS C client header
 #import "src/nats.h"
 
+#include <openssl/x509v3.h>
+
 __END_DECLS
 
 namespace pbv1 = ::santa::commands::v1;
@@ -61,6 +63,66 @@ NSString* ResponseCodeToString(::pbv1::SantaCommandResponse::Error code) {
   // Last resort: return the numeric value with hex for debugging
   return [NSString stringWithFormat:@"UNKNOWN(%d/0x%x)", static_cast<int>(code),
                                     static_cast<unsigned int>(code)];
+}
+
+// Returns true if the leaf certificate has at least one DNS SAN that is a subdomain of
+// push.northpole.security. Extracted from NATSSSLVerifyCallback for testability.
+extern "C" bool NATSLeafCertHasPushDomain(X509* cert) {
+  static const char kRequiredDomainSuffix[] = ".push.northpole.security";
+  static const size_t kRequiredDomainSuffixLen = sizeof(kRequiredDomainSuffix) - 1;
+
+  GENERAL_NAMES* sans = (GENERAL_NAMES*)X509_get_ext_d2i(cert, NID_subject_alt_name, NULL, NULL);
+  if (!sans) return false;
+
+  bool matched = false;
+  for (int i = 0; i < sk_GENERAL_NAME_num(sans); i++) {
+    GENERAL_NAME* san = sk_GENERAL_NAME_value(sans, i);
+    if (san->type != GEN_DNS) continue;
+
+    const char* dnsName = (const char*)ASN1_STRING_get0_data(san->d.dNSName);
+    size_t dnsLen = (size_t)ASN1_STRING_length(san->d.dNSName);
+
+    // Reject SANs with embedded NUL bytes (CVE-2009-2408 class attack).
+    if (memchr(dnsName, '\0', dnsLen) != NULL) continue;
+
+    if (dnsLen > kRequiredDomainSuffixLen &&
+        strncasecmp(dnsName + dnsLen - kRequiredDomainSuffixLen, kRequiredDomainSuffix,
+                    kRequiredDomainSuffixLen) == 0) {
+      matched = true;
+      break;
+    }
+  }
+  GENERAL_NAMES_free(sans);
+  return matched;
+}
+
+// SSL verification callback for production NATS connections. Enforces that the leaf
+// certificate's SAN is a hostname within push.northpole.security, in addition to the
+// standard chain validation performed by preverifyOk. This closes the MITM gap that
+// exists when hostname verification is not enabled via NATS_FORCE_HOST_VERIFICATION:
+// without this check, any certificate from any trusted CA would be accepted.
+static int NATSSSLVerifyCallback(int preverifyOk, void* ctx) {
+  if (!preverifyOk) return 0;
+
+  X509_STORE_CTX* storeCtx = (X509_STORE_CTX*)ctx;
+
+  // Only apply the domain check to the leaf certificate; intermediate and root
+  // CAs are validated by preverifyOk alone.
+  if (X509_STORE_CTX_get_error_depth(storeCtx) != 0) return 1;
+
+  X509* cert = X509_STORE_CTX_get_current_cert(storeCtx);
+  if (!cert) return 0;
+
+  bool ok = NATSLeafCertHasPushDomain(cert);
+#ifdef DEBUG
+  if (!ok) {
+    LOGW(@"NATS: Leaf certificate SAN does not match *.push.northpole.security "
+         @"(allowed in DEBUG build)");
+  }
+  return 1;
+#else
+  return ok ? 1 : 0;
+#endif
 }
 
 @interface SNTPushClientNATS ()
@@ -339,6 +401,13 @@ NSString* ResponseCodeToString(::pbv1::SantaCommandResponse::Error code) {
     status = natsOptions_SetURL(opts, [serverURL UTF8String]);
     if (status != NATS_OK) {
       LOGE(@"NATS: Failed to set URL %@: %s", serverURL, natsStatus_GetText(status));
+      natsOptions_Destroy(opts);
+      return;
+    }
+
+    status = natsOptions_SetSSLVerificationCallback(opts, NATSSSLVerifyCallback);
+    if (status != NATS_OK) {
+      LOGE(@"NATS: Failed to set SSL verification callback: %s", natsStatus_GetText(status));
       natsOptions_Destroy(opts);
       return;
     }
@@ -700,19 +769,19 @@ static void messageHandler(natsConnection* nc, natsSubscription* sub, natsMsg* m
 }
 
 // Helper function to safely get the last error from a NATS connection as an NSString.
-// This copies the error text to avoid lifetime issues with the internal NATS buffer,
-// which may be overwritten by subsequent NATS operations.
 static NSString* GetNATSLastError(natsConnection* nc) {
   if (!nc) {
     return nil;
   }
 
-  const char* lastError = NULL;
-  natsConnection_GetLastError(nc, &lastError);
+  // natsConnection_ReadLastError truncates to this size; 256 matches the internal
+  // NATS_MAX_ERR_LEN defined in nats.c.
+  static constexpr size_t kNATSErrBufSize = 256;
+  char errBuf[kNATSErrBufSize] = {};
+  natsConnection_ReadLastError(nc, errBuf, kNATSErrBufSize);
 
-  // Copy to NSString to avoid lifetime issues.
-  if (lastError && *lastError != '\0') {
-    return @(lastError);
+  if (errBuf[0] != '\0') {
+    return @(errBuf);
   }
   return nil;
 }
