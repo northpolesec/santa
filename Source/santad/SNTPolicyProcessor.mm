@@ -199,16 +199,12 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
     return NO;
   }
 
-  LOGD(@"Evaluating %zu CEL fallback rule(s) for sha256=%@", rules.size(), cd.sha256);
-
   auto activation = activationCallback(/*useV2=*/true);
 
   // Use a stack-local arena for evaluation temporaries.
   google::protobuf::Arena evalArena;
 
   for (size_t i = 0; i < rules.size(); ++i) {
-    LOGD(@"Evaluating CEL fallback rule %zu", i);
-
     CELEvaluationResult celResult = [self evaluateCompiledCELExpression:rules[i].expression.get()
                                                                   useV2:true
                                                          cachedDecision:cd
@@ -231,7 +227,6 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
     return YES;
   }
 
-  LOGD(@"All CEL fallback rules exhausted without a decision for sha256=%@", cd.sha256);
   return NO;
 }
 
@@ -283,14 +278,11 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
     // V1 doesn't support TouchID, so cooldown is always nullopt
   }
 
-  LOGD(@"Ran CEL program and received result: %d (cacheable %d)", returnValue, cacheable);
-
   SNTRuleState resultState;
   if (useV2) {
     using ReturnValue = santa::cel::CELProtoTraits<true>::ReturnValue;
     switch (static_cast<ReturnValue>(returnValue)) {
       case ReturnValue::UNSPECIFIED:
-        LOGD(@"CEL expression returned UNSPECIFIED, skipping");
         return {.succeeded = false, .decisionMade = false, .resultState = {}};
       case ReturnValue::ALLOWLIST: resultState = SNTRuleStateAllow; break;
       case ReturnValue::ALLOWLIST_COMPILER: resultState = SNTRuleStateAllowCompiler; break;
@@ -343,8 +335,6 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
                                  activationCallback:(ActivationCallbackBlock)activationCallback {
   bool useV2 = (rule.state == SNTRuleStateCELv2);
   auto activation = activationCallback(useV2);
-
-  LOGD(@"Evaluating CEL expression: %@", rule.celExpr);
 
   google::protobuf::Arena arena;
 
