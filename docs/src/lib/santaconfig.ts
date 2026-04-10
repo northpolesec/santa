@@ -133,6 +133,13 @@ export const SantaConfigKeyGroups: SantaConfigGroups = {
         See Stats documentation for complete details`,
       type: "string",
     },
+    {
+      key: "AntiSuspendSigningIDs",
+      description: "A list of Signing IDs to protect from `pid_suspend` calls.",
+      type: "string",
+      repeated: true,
+      versionAdded: "2026.3",
+    },
   ],
   gui: [
     {
