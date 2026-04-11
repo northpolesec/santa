@@ -173,6 +173,13 @@ using santa::NSStringToUTF8String;
       request = mutableRequest;
       continue;
     }
+
+    // Most 4xx errors indicate a client-side problem that won't resolve by retrying.
+    // Exceptions: 408 (timeout) and 429 (rate limited) are transient and worth retrying.
+    if (response.statusCode >= 400 && response.statusCode < 500 && response.statusCode != 408 &&
+        response.statusCode != 429) {
+      break;
+    }
   }
 
   // If the final attempt resulted in an error, log the error and return nil.
