@@ -81,13 +81,11 @@ class ScopedFile {
   ScopedFile(const ScopedFile&) = delete;
   ScopedFile& operator=(const ScopedFile&) = delete;
 
-  ScopedFile(ScopedFile&& other) {
-    fd_ = other.fd_;
-    other.fd_ = -1;
-  }
+  ScopedFile(ScopedFile&& other) : fd_(other.fd_) { other.fd_ = -1; }
 
   ScopedFile& operator=(ScopedFile&& rhs) {
     if (this != &rhs) {
+      if (fd_ >= 0) close(fd_);
       fd_ = rhs.fd_;
       rhs.fd_ = -1;
     }
