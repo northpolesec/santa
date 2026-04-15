@@ -488,11 +488,12 @@
                        errors:&err];
   XCTAssertNil(err);
 
-  // This test is only concerend about sqlite's behavior. Ensure static rules are ignored.
+  // This test is only concerned about sqlite's behavior. Ensure static rules are ignored.
   [self.sut updateStaticRules:nil];
 
-  // This test verifies that the implicit rule ordering we've been abusing is still working.
-  // See the comment in SNTRuleTable#executionRuleForIdentifiers:
+  // This test verifies that rule precedence ordering is correct.
+  // The query uses UNION ALL with ORDER BY type ASC to guarantee the highest-priority
+  // rule is returned. See the comment in SNTRuleTable#executionRuleForIdentifiers:
   SNTRule* r = [self.sut
       executionRuleForIdentifiers:
           (struct RuleIdentifiers){
@@ -505,7 +506,7 @@
           }];
   XCTAssertNotNil(r);
   XCTAssertEqualObjects(r.identifier, @"dbe8c39801f93e05fc7bc53a02af5b4d3cfc670a");
-  XCTAssertEqual(r.type, SNTRuleTypeCDHash, @"Implicit rule ordering failed");
+  XCTAssertEqual(r.type, SNTRuleTypeCDHash, @"Rule precedence ordering failed");
 
   r = [self.sut
       executionRuleForIdentifiers:
@@ -520,7 +521,7 @@
   XCTAssertNotNil(r);
   XCTAssertEqualObjects(r.identifier,
                         @"b7c1e3fd640c5f211c89b02c2c6122f78ce322aa5c56eb0bb54bc422a8f8b670");
-  XCTAssertEqual(r.type, SNTRuleTypeBinary, @"Implicit rule ordering failed");
+  XCTAssertEqual(r.type, SNTRuleTypeBinary, @"Rule precedence ordering failed");
 
   r = [self.sut
       executionRuleForIdentifiers:
@@ -535,7 +536,7 @@
   XCTAssertNotNil(r);
   XCTAssertEqualObjects(r.identifier,
                         @"b7c1e3fd640c5f211c89b02c2c6122f78ce322aa5c56eb0bb54bc422a8f8b670");
-  XCTAssertEqual(r.type, SNTRuleTypeBinary, @"Implicit rule ordering failed");
+  XCTAssertEqual(r.type, SNTRuleTypeBinary, @"Rule precedence ordering failed");
 
   r = [self.sut executionRuleForIdentifiers:
                     (struct RuleIdentifiers){
@@ -550,7 +551,7 @@
   XCTAssertNotNil(r);
   XCTAssertEqualObjects(r.identifier,
                         @"7ae80b9ab38af0c63a9a81765f434d9a7cd8f720eb6037ef303de39d779bc258");
-  XCTAssertEqual(r.type, SNTRuleTypeCertificate, @"Implicit rule ordering failed");
+  XCTAssertEqual(r.type, SNTRuleTypeCertificate, @"Rule precedence ordering failed");
 
   r = [self.sut executionRuleForIdentifiers:(struct RuleIdentifiers){
                                                 .cdhash = @"unknown",
