@@ -38,8 +38,25 @@ using santa::Message;
 static const pid_t PID_MAX = 99999;
 static constexpr std::string_view kIgnoredCompilerProcessPathPrefix = "/dev/";
 
+// Tracks compiler PIDs using pidversion to prevent PID reuse attacks.
+//
+// Each slot stores the pidversion of the active compiler at that PID index, or 0
+// to indicate no compiler. This ensures that if a compiler exits and its EXIT
+// event is dropped by ES, a new process that reuses the same PID will not be
+// falsely treated as a compiler (since its pidversion will differ).
+//
+// Edge case: pidversion is a signed 32-bit kernel counter (incremented globally
+// via OSIncrementAtomic on each fork) that can wrap through all 2^32 values. If
+// a compiler happens to fork at the exact moment pidversion wraps to 0, the
+// stored value will be indistinguishable from "no compiler" — a false negative.
+// This requires ~2^32 forks (~62 days at a sustained ~800 fork/sec) and only
+// affects the single compiler instance at that moment. The failure mode is that
+// transitive rules are not created for that compiler's output, potentially
+// causing legitimate binaries to be blocked until the next compiler invocation
+// (which will have a non-zero pidversion). This is a correctness blip, not a
+// security issue, and is self-healing.
 @interface SNTCompilerController () {
-  std::atomic<bool> _compilerPIDs[PID_MAX];
+  std::atomic<int32_t> _compilerPIDs[PID_MAX];
 }
 @end
 
@@ -47,7 +64,15 @@ static constexpr std::string_view kIgnoredCompilerProcessPathPrefix = "/dev/";
 
 - (BOOL)isCompiler:(const audit_token_t&)tok {
   pid_t pid = audit_token_to_pid(tok);
-  return pid >= 0 && pid < PID_MAX && self->_compilerPIDs[pid].load();
+  if (pid < 0 || pid >= PID_MAX) return NO;
+  int32_t stored = self->_compilerPIDs[pid].load(std::memory_order_relaxed);
+  if (stored == 0) return NO;
+  int32_t pidversion = audit_token_to_pidversion(tok);
+  if (stored == pidversion) return YES;
+  // Stale entry: the original compiler exited and the PID was recycled.
+  // Clear it eagerly so subsequent checks short-circuit on 0.
+  self->_compilerPIDs[pid].store(0, std::memory_order_relaxed);
+  return NO;
 }
 
 - (void)setProcess:(const audit_token_t&)tok isCompiler:(bool)isCompiler {
@@ -57,9 +82,10 @@ static constexpr std::string_view kIgnoredCompilerProcessPathPrefix = "/dev/";
   } else if (pid >= PID_MAX) {
     LOGE(@"Unable to watch compiler pid=%d >= PID_MAX(%d)", pid, PID_MAX);
   } else {
-    self->_compilerPIDs[pid].store(isCompiler);
+    int32_t val = isCompiler ? audit_token_to_pidversion(tok) : 0;
+    self->_compilerPIDs[pid].store(val, std::memory_order_relaxed);
     if (isCompiler) {
-      LOGD(@"Watching compiler pid=%d", pid);
+      LOGD(@"Watching compiler pid=%d pidver=%d", pid, val);
     }
   }
 }
