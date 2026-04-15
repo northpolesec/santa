@@ -62,7 +62,7 @@
                   @"un=%username%&mid=%machine_id%&hn=%hostname%&u=%uuid%&s=%serial%";
   NSString* wantUrl = @"http://"
                       @"localhost?fs=my_fi&fi=my_fi&bfi=my_fi&"
-                      @"fbid=s.n.t&ti=SNT&si=SNT:s.n.t&ch=abc&"
+                      @"fbid=s.n.t&ti=SNT&si=SNT%3As.n.t&ch=abc&"
                       @"un=my_un&mid=my_mid&hn=my_hn&u=my_u&s=my_s";
 
   NSURL* gotUrl = [SNTBlockMessage eventDetailURLForEvent:se customURL:url];
@@ -72,7 +72,7 @@
 
   wantUrl = @"http://"
             @"localhost?fs=my_fbh&fi=my_fi&bfi=my_fbh&"
-            @"fbid=s.n.t&ti=SNT&si=SNT:s.n.t&ch=abc&"
+            @"fbid=s.n.t&ti=SNT&si=SNT%3As.n.t&ch=abc&"
             @"un=my_un&mid=my_mid&hn=my_hn&u=my_u&s=my_s";
 
   gotUrl = [SNTBlockMessage eventDetailURLForEvent:se customURL:url];
@@ -102,7 +102,7 @@
       @"ap=%accessed_path%&un=%username%&mid=%machine_id%&hn=%hostname%&u=%uuid%&s=%serial%";
   NSString* wantUrl = @"http://"
                       @"localhost?rv=my_rv&rn=my_rn&fi=my_fi&"
-                      @"ti=SNT&si=SNT:s.n.t&ch=abc&"
+                      @"ti=SNT&si=SNT%3As.n.t&ch=abc&"
                       @"ap=my_ap&un=my_un&mid=my_mid&hn=my_hn&u=my_u&s=my_s";
 
   NSURL* gotUrl = [SNTBlockMessage eventDetailURLForFileAccessEvent:fae customURL:url];
@@ -313,6 +313,67 @@
       @"/> Making a note here, huge success!";
   got = [SNTBlockMessage stringFromHTML:html];
   XCTAssertEqualObjects(got, @"This was a a triumph  Making a note here, huge success!");
+}
+
+- (void)testEventDetailURLEncodesUnsafeCharacters {
+  SNTStoredExecutionEvent* se = [[SNTStoredExecutionEvent alloc] init];
+
+  se.fileSHA256 = @"abc123";
+  se.executingUser = @"José García";
+  se.fileBundleID = @"com.example.my app";
+
+  NSString* url = @"http://localhost?un=%username%&fbid=%file_bundle_id%&fi=%file_identifier%";
+  NSURL* gotUrl = [SNTBlockMessage eventDetailURLForEvent:se customURL:url];
+
+  XCTAssertNotNil(gotUrl, @"URL with encoded values must not be nil");
+  XCTAssertEqualObjects(gotUrl.absoluteString, @"http://localhost?"
+                                               @"un=Jos%C3%A9%20Garc%C3%ADa&"
+                                               @"fbid=com.example.my%20app&"
+                                               @"fi=abc123");
+}
+
+- (void)testEventDetailURLEncodesQueryMetacharacters {
+  SNTStoredExecutionEvent* se = [[SNTStoredExecutionEvent alloc] init];
+
+  se.fileSHA256 = @"abc123";
+  se.executingUser = @"user&admin=true";
+
+  NSString* url = @"http://localhost?un=%username%&fi=%file_identifier%";
+  NSURL* gotUrl = [SNTBlockMessage eventDetailURLForEvent:se customURL:url];
+
+  XCTAssertNotNil(gotUrl);
+  XCTAssertEqualObjects(gotUrl.absoluteString,
+                        @"http://localhost?un=user%26admin%3Dtrue&fi=abc123");
+}
+
+- (void)testEventDetailURLEncodesEmptyValues {
+  SNTStoredExecutionEvent* se = [[SNTStoredExecutionEvent alloc] init];
+
+  se.fileSHA256 = @"abc123";
+  se.fileBundleID = @"";
+
+  NSString* url = @"http://localhost?fbid=%file_bundle_id%&fi=%file_identifier%";
+  NSURL* gotUrl = [SNTBlockMessage eventDetailURLForEvent:se customURL:url];
+
+  XCTAssertNotNil(gotUrl);
+  XCTAssertEqualObjects(gotUrl.absoluteString, @"http://localhost?fbid=&fi=abc123");
+}
+
+- (void)testFileAccessEventDetailURLEncodesUnsafeCharacters {
+  SNTStoredFileAccessEvent* fae = [[SNTStoredFileAccessEvent alloc] init];
+
+  fae.ruleName = @"block #secrets";
+  fae.accessedPath = @"/Users/me/My Documents/file.txt";
+  fae.ruleVersion = @"v1";
+
+  NSString* url = @"http://localhost?rn=%rule_name%&ap=%accessed_path%&rv=%rule_version%";
+  NSURL* gotUrl = [SNTBlockMessage eventDetailURLForFileAccessEvent:fae customURL:url];
+
+  XCTAssertNotNil(gotUrl, @"URL with encoded values must not be nil");
+  XCTAssertEqualObjects(gotUrl.absoluteString, @"http://localhost?"
+                                               @"rn=block%20%23secrets&"
+                                               @"ap=%2FUsers%2Fme%2FMy%20Documents%2Ffile.txt&"
+                                               @"rv=v1");
 }
 
 @end
