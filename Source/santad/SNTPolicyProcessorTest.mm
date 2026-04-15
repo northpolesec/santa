@@ -723,6 +723,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
                  timestamp:0
                    comment:nil
                    celExpr:celExpr
+            seatbeltPolicy:nil
                     ruleId:0
                      error:NULL];
   };
@@ -907,6 +908,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
                  timestamp:0
                    comment:nil
                    celExpr:celExpr
+            seatbeltPolicy:nil
                     ruleId:0
                      error:NULL];
   };
@@ -1260,6 +1262,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
                                             customMsg:nil
                                             customURL:nil
                                               celExpr:nil
+                                       seatbeltPolicy:nil
                                                ruleId:42];
 
   SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];

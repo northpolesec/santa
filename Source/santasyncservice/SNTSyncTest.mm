@@ -1080,6 +1080,7 @@
                  customMsg:@"Hi There"
                  customURL:@"http://northpole.security"
                    celExpr:nil
+            seatbeltPolicy:nil
                     ruleId:0],
     [[SNTRule alloc] initWithIdentifier:@"AAAAAAAAAA"
                                   state:SNTRuleStateBlock
@@ -1087,6 +1088,7 @@
                               customMsg:@"Banned team ID"
                               customURL:@"http://northpole.security"
                                 celExpr:nil
+                         seatbeltPolicy:nil
                                  ruleId:0],
   ];
 
@@ -1126,6 +1128,7 @@
                               customMsg:nil
                               customURL:nil
                                 celExpr:@"target.signing_time >= timestamp('2025-05-31T00:00:00Z')"
+                         seatbeltPolicy:nil
                                  ruleId:0],
     [[SNTRule alloc] initWithIdentifier:@"BBBBBBBBBB"
                                   state:state
@@ -1133,6 +1136,7 @@
                               customMsg:nil
                               customURL:nil
                                 celExpr:@"this is an invalid expression"
+                         seatbeltPolicy:nil
                                  ruleId:0],
   ];
 

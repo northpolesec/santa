@@ -302,6 +302,12 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
           cd.touchIDCooldownMinutes = @(touchIDCooldownMinutes.value());
         }
         break;
+      case ReturnValue::SEATBELT:
+        // SEATBELT responses are not cacheable, as the ancestor check must be
+        // performed on every execution.
+        resultState = SNTRuleStateSeatbelt;
+        cd.cacheable = NO;
+        break;
       default:
         LOGW(@"Unexpected return value from CEL expression: %d", returnValue);
         return {.succeeded = false, .decisionMade = false, .resultState = {}};
@@ -417,6 +423,16 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
           {{SNTRuleTypeTeamID, SNTRuleStateAllow}, SNTEventStateAllowTeamID},
           {{SNTRuleTypeTeamID, SNTRuleStateSilentBlock}, SNTEventStateBlockTeamID},
           {{SNTRuleTypeTeamID, SNTRuleStateBlock}, SNTEventStateBlockTeamID},
+          // Seatbelt rules start out as a block of the rule's type. If the
+          // ancestor/sandbox check succeeds in the execution controller, the
+          // decision is flipped to the matching allow state via
+          // BlockToAllowDecision. Starting at block means the fail-safe outcome
+          // is to deny if the check is ever skipped.
+          {{SNTRuleTypeCDHash, SNTRuleStateSeatbelt}, SNTEventStateBlockCDHash},
+          {{SNTRuleTypeBinary, SNTRuleStateSeatbelt}, SNTEventStateBlockBinary},
+          {{SNTRuleTypeSigningID, SNTRuleStateSeatbelt}, SNTEventStateBlockSigningID},
+          {{SNTRuleTypeCertificate, SNTRuleStateSeatbelt}, SNTEventStateBlockCertificate},
+          {{SNTRuleTypeTeamID, SNTRuleStateSeatbelt}, SNTEventStateBlockTeamID},
       };
 
   auto iterator = decisions.find(std::pair<SNTRuleType, SNTRuleState>{type, state});
@@ -457,6 +473,12 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
         cd.decision = SNTEventStateUnknown;
         return NO;
       }
+      break;
+    case SNTRuleStateSeatbelt:
+      // Seatbelt decisions must not be cached because the ancestor check
+      // must be performed on every execution.
+      cd.cacheable = NO;
+      cd.seatbeltRequired = YES;
       break;
     default:
       // If its not one of the special cases above, we don't need to do anything.

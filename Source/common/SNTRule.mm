@@ -35,6 +35,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
 @property(readwrite) NSString* comment;
 @property(readwrite) NSString* identifier;
 @property(readwrite) NSString* celExpr;
+@property(readwrite) NSString* seatbeltPolicy;
 @property(readwrite) int64_t ruleId;
 @end
 
@@ -48,6 +49,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
                          timestamp:(NSUInteger)timestamp
                            comment:(NSString*)comment
                            celExpr:(NSString*)celExpr
+                    seatbeltPolicy:(NSString*)seatbeltPolicy
                             ruleId:(int64_t)ruleId
                              error:(NSError**)error {
   self = [super init];
@@ -175,6 +177,13 @@ static const NSUInteger kExpectedTeamIDLength = 10;
       return nil;
     }
 
+    if (state == SNTRuleStateSeatbelt && seatbeltPolicy.length == 0) {
+      [SNTError populateError:error
+                     withCode:SNTErrorCodeRuleInvalid
+                       format:@"Rule received with seatbelt state but missing seatbelt policy"];
+      return nil;
+    }
+
     _identifier = identifier;
     _state = state;
     _type = type;
@@ -183,6 +192,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     _timestamp = timestamp;
     _comment = comment;
     _celExpr = celExpr;
+    _seatbeltPolicy = seatbeltPolicy;
     _ruleId = ruleId;
   }
   return self;
@@ -194,6 +204,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
                          customMsg:(NSString*)customMsg
                          customURL:(NSString*)customURL
                            celExpr:(NSString*)celExpr
+                    seatbeltPolicy:(NSString*)seatbeltPolicy
                             ruleId:(int64_t)ruleId {
   self = [self initWithIdentifier:identifier
                             state:state
@@ -203,6 +214,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
                         timestamp:0
                           comment:nil
                           celExpr:celExpr
+                   seatbeltPolicy:seatbeltPolicy
                            ruleId:ruleId
                             error:nil];
   // Initialize timestamp to current time if rule is transitive.
@@ -223,6 +235,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
                         timestamp:0
                           comment:nil
                           celExpr:nil
+                   seatbeltPolicy:nil
                            ruleId:0
                             error:nil];
 }
@@ -367,6 +380,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
                         timestamp:0
                           comment:comment
                           celExpr:celExpr
+                   seatbeltPolicy:nil
                            ruleId:0
                             error:error];
 }
@@ -394,6 +408,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
   ENCODE_BOXABLE(coder, timestamp);
   ENCODE(coder, comment);
   ENCODE(coder, celExpr);
+  ENCODE(coder, seatbeltPolicy);
   ENCODE_BOXABLE(coder, staticRule);
   ENCODE_BOXABLE(coder, ruleId);
 }
@@ -409,6 +424,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     DECODE_SELECTOR(decoder, timestamp, NSNumber, unsignedIntegerValue);
     DECODE(decoder, comment, NSString);
     DECODE(decoder, celExpr, NSString);
+    DECODE(decoder, seatbeltPolicy, NSString);
     DECODE_SELECTOR(decoder, staticRule, NSNumber, boolValue);
     DECODE_SELECTOR(decoder, ruleId, NSNumber, longLongValue);
   }
@@ -426,6 +442,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     case SNTRuleStateAllowLocalBinary: return kRulePolicyAllowlistLocalBinary;
     case SNTRuleStateAllowLocalSigningID: return kRulePolicyAllowlistLocalSigningID;
     case SNTRuleStateCEL: return kRulePolicyCEL;
+    case SNTRuleStateSeatbelt: return @"Seatbelt";
     // This should never be hit. But is here for completion.
     default: return @"Unknown";
   }
@@ -462,7 +479,8 @@ static const NSUInteger kExpectedTeamIDLength = 10;
   if (![other isKindOfClass:[SNTRule class]]) return NO;
   SNTRule* o = other;
   return ([self.identifier isEqual:o.identifier] && self.state == o.state && self.type == o.type &&
-          (self.celExpr == nil || [self.celExpr isEqual:o.celExpr]));
+          (self.celExpr == nil || [self.celExpr isEqual:o.celExpr]) &&
+          (self.seatbeltPolicy == nil || [self.seatbeltPolicy isEqual:o.seatbeltPolicy]));
 }
 
 - (NSUInteger)hash {
@@ -472,7 +490,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
   result = prime * result + self.state;
   result = prime * result + self.type;
   result = prime * result + [self.celExpr hash];
-  result = prime * result + [self.celExpr hash];
+  result = prime * result + [self.seatbeltPolicy hash];
   return result;
 }
 
@@ -502,6 +520,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
       break;
     case SNTRuleStateCEL: OS_FALLTHROUGH;
     case SNTRuleStateCELv2: output = [@"CEL" mutableCopy]; break;
+    case SNTRuleStateSeatbelt: output = [@"Seatbelt" mutableCopy]; break;
     case SNTRuleStateRemove: OS_FALLTHROUGH;
     default:
       output = [NSMutableString stringWithFormat:@"Unexpected rule state: %ld", self.state];

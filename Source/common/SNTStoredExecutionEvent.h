@@ -95,6 +95,11 @@
 /// Skip showing the block dialog and go directly to TouchID authorization.
 @property BOOL silentTouchID;
 
+/// The matched rule requires running under `santactl sandbox`. Surfaced so the
+/// GUI and CLI can indicate the sandbox requirement as part of the block
+/// reason.
+@property BOOL seatbeltRequired;
+
 /// Indicates whether the decision was made by a static rule.
 @property BOOL staticRule;
 
