@@ -69,4 +69,27 @@
   XCTAssertEqualObjects(readContents, writeContents);
 }
 
+- (void)testMoveAssignmentClosesExistingFD {
+  int originalFD;
+  int movedFD;
+
+  auto file1 = santa::ScopedFile::CreateTemporary();
+  XCTAssertStatusOk(file1);
+  originalFD = file1->UnsafeFD();
+
+  auto file2 = santa::ScopedFile::CreateTemporary();
+  XCTAssertStatusOk(file2);
+  movedFD = file2->UnsafeFD();
+
+  // Move-assign file2 into file1. file1's original FD should be closed.
+  *file1 = std::move(*file2);
+
+  XCTAssertEqual(file1->UnsafeFD(), movedFD);
+  XCTAssertEqual(file2->UnsafeFD(), -1);
+
+  // The original FD should have been closed by the move assignment.
+  XCTAssertLessThan(close(originalFD), 0);
+  XCTAssertEqual(errno, EBADF);
+}
+
 @end

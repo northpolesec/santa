@@ -22,8 +22,30 @@
 #import "Source/common/SNTStoredFileAccessEvent.h"
 #import "Source/common/SNTSystemInfo.h"
 
-static id ValueOrNull(id value) {
-  return value ?: [NSNull null];
+// Percent-encode a string so it is safe in both URL path and query positions.
+// Only RFC 3986 unreserved characters (ALPHA / DIGIT / "-" / "." / "_" / "~")
+// are left unencoded, since admin-controlled templates may place values in either.
+static NSString* PercentEncodeTemplateValue(NSString* value) {
+  if (!value) return nil;
+  static NSCharacterSet* allowed;
+  static dispatch_once_t onceToken;
+  dispatch_once(&onceToken, ^{
+    NSMutableCharacterSet* chars = [NSMutableCharacterSet new];
+    [chars addCharactersInRange:NSMakeRange('A', 26)];
+    [chars addCharactersInRange:NSMakeRange('a', 26)];
+    [chars addCharactersInRange:NSMakeRange('0', 10)];
+    [chars addCharactersInString:@"-._~"];
+    allowed = [chars copy];
+  });
+  return [value stringByAddingPercentEncodingWithAllowedCharacters:allowed];
+}
+
+static id EncodedValueOrNull(id value) {
+  if (!value) return [NSNull null];
+  if ([value isKindOfClass:[NSString class]]) {
+    return PercentEncodeTemplateValue(value) ?: [NSNull null];
+  }
+  return value;
 }
 
 @implementation SNTBlockMessage
@@ -253,19 +275,20 @@ static id ValueOrNull(id value) {
 + (NSDictionary*)eventDetailTemplateMappingForEvent:(SNTStoredExecutionEvent*)event {
   SNTConfigurator* config = [SNTConfigurator configurator];
   return @{
-    @"%file_sha%" : ValueOrNull(event.fileSHA256 ? event.fileBundleHash ?: event.fileSHA256 : nil),
-    @"%file_identifier%" : ValueOrNull(event.fileSHA256),
+    @"%file_sha%" :
+        EncodedValueOrNull(event.fileSHA256 ? event.fileBundleHash ?: event.fileSHA256 : nil),
+    @"%file_identifier%" : EncodedValueOrNull(event.fileSHA256),
     @"%bundle_or_file_identifier%" :
-        ValueOrNull(event.fileSHA256 ? event.fileBundleHash ?: event.fileSHA256 : nil),
-    @"%username%" : ValueOrNull(event.executingUser),
-    @"%file_bundle_id%" : ValueOrNull(event.fileBundleID),
-    @"%team_id%" : ValueOrNull(event.teamID),
-    @"%signing_id%" : ValueOrNull(event.signingID),
-    @"%cdhash%" : ValueOrNull(event.cdhash),
-    @"%machine_id%" : ValueOrNull(config.machineID),
-    @"%hostname%" : ValueOrNull([SNTSystemInfo longHostname]),
-    @"%uuid%" : ValueOrNull([SNTSystemInfo hardwareUUID]),
-    @"%serial%" : ValueOrNull([SNTSystemInfo serialNumber]),
+        EncodedValueOrNull(event.fileSHA256 ? event.fileBundleHash ?: event.fileSHA256 : nil),
+    @"%username%" : EncodedValueOrNull(event.executingUser),
+    @"%file_bundle_id%" : EncodedValueOrNull(event.fileBundleID),
+    @"%team_id%" : EncodedValueOrNull(event.teamID),
+    @"%signing_id%" : EncodedValueOrNull(event.signingID),
+    @"%cdhash%" : EncodedValueOrNull(event.cdhash),
+    @"%machine_id%" : EncodedValueOrNull(config.machineID),
+    @"%hostname%" : EncodedValueOrNull([SNTSystemInfo longHostname]),
+    @"%uuid%" : EncodedValueOrNull([SNTSystemInfo hardwareUUID]),
+    @"%serial%" : EncodedValueOrNull([SNTSystemInfo serialNumber]),
   };
 }
 
@@ -288,18 +311,18 @@ static id ValueOrNull(id value) {
 //
 + (NSDictionary*)fileAccessEventDetailTemplateMappingForEvent:(SNTStoredFileAccessEvent*)event {
   return @{
-    @"%rule_version%" : ValueOrNull(event.ruleVersion),
-    @"%rule_name%" : ValueOrNull(event.ruleName),
-    @"%accessed_path%" : ValueOrNull(event.accessedPath),
-    @"%file_identifier%" : ValueOrNull(event.process.fileSHA256),
-    @"%username%" : ValueOrNull(event.process.executingUser),
-    @"%team_id%" : ValueOrNull(event.process.teamID),
-    @"%signing_id%" : ValueOrNull(event.process.signingID),
-    @"%cdhash%" : ValueOrNull(event.process.cdhash),
-    @"%machine_id%" : ValueOrNull([[SNTConfigurator configurator] machineID]),
-    @"%hostname%" : ValueOrNull([SNTSystemInfo longHostname]),
-    @"%uuid%" : ValueOrNull([SNTSystemInfo hardwareUUID]),
-    @"%serial%" : ValueOrNull([SNTSystemInfo serialNumber]),
+    @"%rule_version%" : EncodedValueOrNull(event.ruleVersion),
+    @"%rule_name%" : EncodedValueOrNull(event.ruleName),
+    @"%accessed_path%" : EncodedValueOrNull(event.accessedPath),
+    @"%file_identifier%" : EncodedValueOrNull(event.process.fileSHA256),
+    @"%username%" : EncodedValueOrNull(event.process.executingUser),
+    @"%team_id%" : EncodedValueOrNull(event.process.teamID),
+    @"%signing_id%" : EncodedValueOrNull(event.process.signingID),
+    @"%cdhash%" : EncodedValueOrNull(event.process.cdhash),
+    @"%machine_id%" : EncodedValueOrNull([[SNTConfigurator configurator] machineID]),
+    @"%hostname%" : EncodedValueOrNull([SNTSystemInfo longHostname]),
+    @"%uuid%" : EncodedValueOrNull([SNTSystemInfo hardwareUUID]),
+    @"%serial%" : EncodedValueOrNull([SNTSystemInfo serialNumber]),
   };
 }
 

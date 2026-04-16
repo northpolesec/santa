@@ -89,6 +89,44 @@ static const pid_t PID_MAX = 99999;
   XCTAssertFalse([cc isCompiler:self.tok1]);
 }
 
+- (void)testIsCompilerChecksPidversion {
+  SNTCompilerController* cc = [[SNTCompilerController alloc] init];
+
+  // Register PID 12 with pidversion 11
+  audit_token_t compilerTok = MakeAuditToken(12, 11);
+  [cc setProcess:compilerTok isCompiler:true];
+  XCTAssertTrue([cc isCompiler:compilerTok]);
+
+  // Same PID, different pidversion (simulates PID reuse after missed EXIT)
+  audit_token_t reusedTok = MakeAuditToken(12, 99);
+  XCTAssertFalse([cc isCompiler:reusedTok]);
+
+  // Stale entry should have been eagerly cleared — even the original token returns NO now
+  XCTAssertFalse([cc isCompiler:compilerTok]);
+
+  // Negative pidversion should work normally
+  audit_token_t negPidverTok = MakeAuditToken(50, -1);
+  [cc setProcess:negPidverTok isCompiler:true];
+  XCTAssertTrue([cc isCompiler:negPidverTok]);
+
+  // Same PID, different negative pidversion
+  audit_token_t differentNegPidverTok = MakeAuditToken(50, -2);
+  XCTAssertFalse([cc isCompiler:differentNegPidverTok]);
+
+  // Stale entry should have been eagerly cleared
+  XCTAssertFalse([cc isCompiler:negPidverTok]);
+}
+
+- (void)testIsCompilerPidversionZeroEdgeCase {
+  SNTCompilerController* cc = [[SNTCompilerController alloc] init];
+
+  // Pidversion 0 is indistinguishable from "no compiler" — this is a known
+  // false negative that requires ~2^32 forks to trigger. Verify the behavior.
+  audit_token_t zeroPidverTok = MakeAuditToken(42, 0);
+  [cc setProcess:zeroPidverTok isCompiler:true];
+  XCTAssertFalse([cc isCompiler:zeroPidverTok]);
+}
+
 - (void)testSetProcessIsCompiler {
   SNTCompilerController* cc = [[SNTCompilerController alloc] init];
 

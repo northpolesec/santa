@@ -18,7 +18,6 @@
 #import <Foundation/Foundation.h>
 
 #include <bsm/libbsm.h>
-#include <copyfile.h>
 #include <libproc.h>
 #include <pwd.h>
 #include <sys/param.h>
@@ -107,10 +106,6 @@ static SNTEventState BlockToAllowDecision(SNTEventState blockDecision) {
   // Expected team ID for santactl ancestor verification in seatbelt rules.
   std::string _expectedTeamID;
 }
-
-static NSString* const kPrinterProxy =
-    (@"/System/Library/PrivateFrameworks/PrintingPrivate.framework/"
-     @"Versions/Current/Plugins/PrinterProxy.app/Contents/MacOS/PrinterProxy");
 
 #pragma mark Initializers
 
@@ -257,13 +252,6 @@ static NSString* const kPrinterProxy =
       postAction(SNTActionRespondAllow, nil);
       [self.events incrementForFieldValues:@[ (NSString*)kAllowNoFileInfo ]];
     }
-    return;
-  }
-
-  // PrinterProxy workaround, see description above the method for more details.
-  if ([self printerProxyWorkaround:binInfo]) {
-    postAction(SNTActionRespondDeny, nil);
-    [self.events incrementForFieldValues:@[ (NSString*)kBlockPrinterWorkaround ]];
     return;
   }
 
@@ -572,49 +560,6 @@ static NSString* const kPrinterProxy =
 }
 
 #pragma mark Helpers
-
-/**
-  Workaround for issue with PrinterProxy.app.
-
-  Every time a new printer is added to the machine, a copy of the PrinterProxy.app is copied from
-  the Print.framework to ~/Library/Printers with the name of the printer as the name of the app.
-  The binary inside is changed slightly (in a way that is unique to the printer name) and then
-  re-signed with an adhoc signature. I don't know why this is done but it seems that the binary
-  itself doesn't need to be changed as copying the old one back in-place seems to work,
-  so that's what we do.
-
-  If this workaround is applied the decision request is not responded to as the existing request
-  is invalidated when the file is closed which will trigger a brand new request coming from the
-  kernel.
-
-  @param fi SNTFileInfo object for the binary being executed.
-  @return YES if the workaround was applied, NO otherwise.
-*/
-- (BOOL)printerProxyWorkaround:(SNTFileInfo*)fi {
-  if ([fi.path hasSuffix:@"/Contents/MacOS/PrinterProxy"] &&
-      [fi.path containsString:@"Library/Printers"]) {
-    SNTFileInfo* proxyFi = [self printerProxyFileInfo];
-    if ([proxyFi.SHA256 isEqual:fi.SHA256]) return NO;
-
-    copyfile_flags_t copyflags = COPYFILE_ALL | COPYFILE_UNLINK;
-    if (copyfile(proxyFi.path.UTF8String, fi.path.UTF8String, NULL, copyflags) != 0) {
-      LOGE(@"Failed to apply PrinterProxy workaround for %@", fi.path);
-    } else {
-      LOGI(@"PrinterProxy workaround applied to: %@", fi.path);
-    }
-
-    return YES;
-  }
-  return NO;
-}
-
-/**
-  Returns an SNTFileInfo for the system PrinterProxy path on this system.
-*/
-- (SNTFileInfo*)printerProxyFileInfo {
-  SNTFileInfo* proxyInfo = [[SNTFileInfo alloc] initWithPath:kPrinterProxy];
-  return proxyInfo;
-}
 
 - (void)loggedInUsers:(NSArray**)users sessions:(NSArray**)sessions {
   NSMutableSet* loggedInUsers = [NSMutableSet set];
