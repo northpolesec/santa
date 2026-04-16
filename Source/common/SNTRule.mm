@@ -478,9 +478,10 @@ static const NSUInteger kExpectedTeamIDLength = 10;
   if (other == self) return YES;
   if (![other isKindOfClass:[SNTRule class]]) return NO;
   SNTRule* o = other;
-  return ([self.identifier isEqual:o.identifier] && self.state == o.state && self.type == o.type &&
-          (self.celExpr == nil || [self.celExpr isEqual:o.celExpr]) &&
-          (self.seatbeltPolicy == nil || [self.seatbeltPolicy isEqual:o.seatbeltPolicy]));
+  return (
+      [self.identifier isEqual:o.identifier] && self.state == o.state && self.type == o.type &&
+      (self.celExpr == o.celExpr || [self.celExpr isEqual:o.celExpr]) &&
+      (self.seatbeltPolicy == o.seatbeltPolicy || [self.seatbeltPolicy isEqual:o.seatbeltPolicy]));
 }
 
 - (NSUInteger)hash {
