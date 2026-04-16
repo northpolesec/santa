@@ -17,6 +17,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <sandbox.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -128,10 +129,14 @@ REGISTER_COMMAND_NAME(@"sandbox")
     exit(EXIT_FAILURE);
   }
 
-  // Open the file and hold it open until we exec, so subsequent operations all
-  // see the same inode. Using /dev/fd/N for identifier computation and for the
-  // eventual exec closes the TOCTOU window where the resolved path (or a
-  // symlink in it) could be swapped between our checks and the exec.
+  // Open the file and hold it open (fd) so subsequent parent-side reads all see
+  // the same inode. We reference it via /dev/fd/N in SNTFileInfo/
+  // MOLCodesignChecker below so identifier computation is pinned to the inode,
+  // regardless of symlink retargeting. Note: we do NOT exec via /dev/fd/N or
+  // fexecve — macOS lacks fexecve and the seatbelt profile applied in the
+  // child typically denies /dev/fd access. See the execv(resolvedPath…) call
+  // further down; the small window between identifier computation here and the
+  // exec is intentional and no worse than a normal shell.
   int fd = open(resolvedPath.fileSystemRepresentation, O_RDONLY | O_CLOEXEC);
   if (fd < 0) {
     fprintf(stderr, "Error: unable to open %s: %s\n", resolvedPath.UTF8String, strerror(errno));
@@ -183,6 +188,24 @@ REGISTER_COMMAND_NAME(@"sandbox")
     exit(EXIT_FAILURE);
   }
 
+  // Materialize everything the child will need as raw C strings BEFORE fork.
+  // Calling into the Objective-C runtime (method dispatch, autorelease pools,
+  // etc.) after fork is not async-signal-safe: the child may deadlock if any
+  // other thread was holding a runtime lock at fork time. After this point,
+  // the child path uses only POSIX/libc calls.
+  char* policyCStr = strdup(rule.seatbeltPolicy.UTF8String);
+  char* execPathCStr = strdup(resolvedPath.fileSystemRepresentation);
+  NSUInteger argc = commandArgs.count;
+  char** argv = (char**)calloc(argc + 1, sizeof(char*));
+  for (NSUInteger i = 0; i < argc; i++) {
+    argv[i] = strdup([commandArgs[i] fileSystemRepresentation]);
+  }
+  argv[argc] = NULL;
+
+  if (printProfile) {
+    fprintf(stderr, "--- seatbelt profile ---\n%s\n--- end profile ---\n", policyCStr);
+  }
+
   // Seatbelt rule found — fork, apply sandbox, and exec.
   pid_t pid = fork();
   if (pid < 0) {
@@ -191,36 +214,21 @@ REGISTER_COMMAND_NAME(@"sandbox")
   }
 
   if (pid == 0) {
-    // Child process: apply sandbox profile.
-    if (printProfile) {
-      fprintf(stderr, "--- seatbelt profile ---\n%s\n--- end profile ---\n",
-              rule.seatbeltPolicy.UTF8String);
-    }
+    // Child: only POSIX/libc from here. argv[0] keeps the caller-supplied
+    // command name; we exec the already-resolved path via execv so no second
+    // PATH search happens. We do not exec via /dev/fd/N because the seatbelt
+    // profile typically denies /dev/fd access.
     char* errorbuf = NULL;
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-    if (sandbox_init(rule.seatbeltPolicy.UTF8String, 0, &errorbuf) != 0) {
+    if (sandbox_init(policyCStr, 0, &errorbuf) != 0) {
       fprintf(stderr, "sandbox_init failed: %s\n", errorbuf ? errorbuf : "unknown error");
       sandbox_free_error(errorbuf);
       _exit(EXIT_FAILURE);
     }
 #pragma clang diagnostic pop
 
-    // Build argv. argv[0] keeps the caller-supplied command name so the child
-    // sees the expected program name, but we exec the already-resolved path
-    // via execv (not execvp) so no second PATH search happens in the child.
-    // Note: we intentionally do not exec via /dev/fd/N here because the
-    // just-applied seatbelt profile will typically deny access to /dev/fd,
-    // causing execv to fail. The small TOCTOU window between parent-side
-    // identifier computation and this exec is no worse than a normal shell.
-    NSUInteger argc = commandArgs.count;
-    const char** argv = (const char**)calloc(argc + 1, sizeof(char*));
-    for (NSUInteger i = 0; i < argc; i++) {
-      argv[i] = [commandArgs[i] fileSystemRepresentation];
-    }
-    argv[argc] = NULL;
-
-    execv(resolvedPath.fileSystemRepresentation, (char* const*)argv);
+    execv(execPathCStr, argv);
     // execv only returns on error.
     perror("execv");
     _exit(EXIT_FAILURE);
