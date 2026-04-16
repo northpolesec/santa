@@ -22,6 +22,8 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <vector>
+
 #import "Source/common/MOLCodesignChecker.h"
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTCommonEnums.h"
@@ -188,23 +190,36 @@ REGISTER_COMMAND_NAME(@"sandbox")
     exit(EXIT_FAILURE);
   }
 
-  // Materialize everything the child will need as raw C strings BEFORE fork.
-  // Calling into the Objective-C runtime (method dispatch, autorelease pools,
-  // etc.) after fork is not async-signal-safe: the child may deadlock if any
-  // other thread was holding a runtime lock at fork time. After this point,
-  // the child path uses only POSIX/libc calls.
-  char* policyCStr = strdup(rule.seatbeltPolicy.UTF8String);
-  char* execPathCStr = strdup(resolvedPath.fileSystemRepresentation);
-  NSUInteger argc = commandArgs.count;
-  char** argv = (char**)calloc(argc + 1, sizeof(char*));
-  for (NSUInteger i = 0; i < argc; i++) {
-    argv[i] = strdup([commandArgs[i] fileSystemRepresentation]);
+  // Materialize raw C pointers BEFORE fork. Calling into the Objective-C
+  // runtime (method dispatch, autorelease pools, etc.) after fork is not
+  // async-signal-safe: the child may deadlock if any other thread was holding
+  // a runtime lock at fork time. We don't need to copy these buffers: the
+  // NSStrings that own them stay in the parent's scope, fork duplicates that
+  // memory into the child, and the child runs only POSIX/libc before
+  // _exit/execv — no ARC release ever fires against them.
+  // `fileSystemRepresentation` raises on failure so it can't return NULL;
+  // `UTF8String` is nullable, so it gets an explicit check.
+  const char* policyCStr = rule.seatbeltPolicy.UTF8String;
+  if (!policyCStr) {
+    fprintf(stderr, "Error: seatbelt policy cannot be represented as UTF-8\n");
+    exit(EXIT_FAILURE);
   }
-  argv[argc] = NULL;
+  const char* execPathCStr = resolvedPath.fileSystemRepresentation;
+  NSUInteger argc = commandArgs.count;
+  std::vector<const char*> argv(argc + 1);
+  for (NSUInteger i = 0; i < argc; i++) {
+    argv[i] = [commandArgs[i] fileSystemRepresentation];
+  }
+  argv[argc] = nullptr;
 
   if (printProfile) {
     fprintf(stderr, "--- seatbelt profile ---\n%s\n--- end profile ---\n", policyCStr);
   }
+
+  // We're done reading the binary via /dev/fd/N. Close the pinned fd before
+  // fork so it doesn't linger in the parent (the child re-opens what it needs
+  // on its own, and O_CLOEXEC would close it on exec regardless).
+  close(fd);
 
   // Seatbelt rule found — fork, apply sandbox, and exec.
   pid_t pid = fork();
@@ -228,7 +243,7 @@ REGISTER_COMMAND_NAME(@"sandbox")
     }
 #pragma clang diagnostic pop
 
-    execv(execPathCStr, argv);
+    execv(execPathCStr, const_cast<char* const*>(argv.data()));
     // execv only returns on error.
     perror("execv");
     _exit(EXIT_FAILURE);
