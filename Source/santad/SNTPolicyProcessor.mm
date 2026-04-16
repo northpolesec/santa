@@ -218,6 +218,19 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
       continue;
     }
 
+    // SEATBELT is not supported from CEL fallback rules: a fallback rule does
+    // not carry a seatbelt_policy, so there is nothing to enforce with. Skip
+    // any such results and continue evaluating subsequent fallback rules.
+    // Also clear cd.seatbeltRequired (set by evaluateCompiledCELExpression)
+    // so the execution controller doesn't try to enforce the ancestor check
+    // without a policy in hand.
+    if (celResult.resultState == SNTRuleStateSeatbelt) {
+      LOGW(@"CEL fallback expression returned SEATBELT; ignoring (fallback rules cannot carry a "
+           @"seatbelt policy)");
+      cd.seatbeltRequired = NO;
+      continue;
+    }
+
     cd.decision = (celResult.resultState == SNTRuleStateAllow ||
                    celResult.resultState == SNTRuleStateAllowCompiler)
                       ? SNTEventStateAllowCELFallback

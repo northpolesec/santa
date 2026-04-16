@@ -56,9 +56,10 @@ REGISTER_COMMAND_NAME(@"sandbox")
   return (@"Usage: santactl sandbox [--print-profile] <command> [arguments...]\n"
           @"\n"
           @"  Looks up the seatbelt policy for the given command from Santa's rule\n"
-          @"  database. If a seatbelt rule exists, applies the sandbox profile via\n"
-          @"  sandbox_init and then executes the command. If no seatbelt rule is\n"
-          @"  found, the command is executed without sandboxing.\n"
+          @"  database. If a rule with a seatbelt policy exists, applies the sandbox\n"
+          @"  profile via sandbox_init and then executes the command. If no matching\n"
+          @"  rule is found or the matched rule has no seatbelt policy, santactl\n"
+          @"  refuses to run the command and exits with a non-zero status.\n"
           @"\n"
           @"  Options:\n"
           @"    --print-profile: Print the sandbox profile to stderr before applying it.\n");

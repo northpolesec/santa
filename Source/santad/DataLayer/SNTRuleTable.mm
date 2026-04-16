@@ -891,19 +891,21 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
 
   santa::Xxhash128 hash;
 
-  FMResultSet* rs =
-      [db executeQuery:
-              @"SELECT identifier, state, type, cel_expr FROM execution_rules WHERE state != ?",
-              @(SNTRuleStateAllowTransitive)];
+  FMResultSet* rs = [db executeQuery:@"SELECT identifier, state, type, cel_expr, seatbelt_policy "
+                                     @"FROM execution_rules WHERE state != ?",
+                                     @(SNTRuleStateAllowTransitive)];
   while ([rs next]) {
     NSString* identifier = [rs stringForColumn:@"identifier"];
     NSString* cel = [rs stringForColumn:@"cel_expr"];
+    NSString* seatbeltPolicy = [rs stringForColumn:@"seatbelt_policy"];
     int state = [rs intForColumn:@"state"];
     int type = [rs intForColumn:@"type"];
 
     hash.Update(identifier.UTF8String,
                 [identifier lengthOfBytesUsingEncoding:NSUTF8StringEncoding]);
     hash.Update(cel.UTF8String, [cel lengthOfBytesUsingEncoding:NSUTF8StringEncoding]);
+    hash.Update(seatbeltPolicy.UTF8String,
+                [seatbeltPolicy lengthOfBytesUsingEncoding:NSUTF8StringEncoding]);
     hash.Update(static_cast<void*>(&state), sizeof(state));
     hash.Update(static_cast<void*>(&type), sizeof(type));
   }
