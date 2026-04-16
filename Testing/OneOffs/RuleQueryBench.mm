@@ -69,6 +69,7 @@ are also randomized per-iteration for the same reason.
 #include <stdlib.h>
 
 #include <iostream>
+#include <optional>
 #include <random>
 #include <string>
 #include <vector>
