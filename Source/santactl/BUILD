@@ -85,6 +85,23 @@ objc_library(
 )
 
 objc_library(
+    name = "SNTCommandSandbox",
+    srcs = ["Commands/SNTCommandSandbox.mm"],
+    deps = [
+        ":santactl_cmd",
+        "//Source/common:MOLCodesignChecker",
+        "//Source/common:MOLXPCConnection",
+        "//Source/common:SNTCommonEnums",
+        "//Source/common:SNTFileInfo",
+        "//Source/common:SNTLogging",
+        "//Source/common:SNTRule",
+        "//Source/common:SNTRuleIdentifiers",
+        "//Source/common:SNTXPCControlInterface",
+        "//Source/common:SigningIDHelpers",
+    ],
+)
+
+objc_library(
     name = "santactl_lib",
     srcs = [
         "Commands/SNTCommandCheckCache.mm",
@@ -115,6 +132,7 @@ objc_library(
         ":SNTCommandInstall",
         ":SNTCommandMonitorMode",
         ":SNTCommandPrintLog",
+        ":SNTCommandSandbox",
         ":SNTCommandTelemetry",
         ":santactl_cmd",
         "//Source/common:CertificateHelpers",

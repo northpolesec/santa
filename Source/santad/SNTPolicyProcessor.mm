@@ -218,6 +218,19 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
       continue;
     }
 
+    // SEATBELT is not supported from CEL fallback rules: a fallback rule does
+    // not carry a seatbelt_policy, so there is nothing to enforce with. Skip
+    // any such results and continue evaluating subsequent fallback rules.
+    // Also clear cd.seatbeltRequired (set by evaluateCompiledCELExpression)
+    // so the execution controller doesn't try to enforce the ancestor check
+    // without a policy in hand.
+    if (celResult.resultState == SNTRuleStateSeatbelt) {
+      LOGW(@"CEL fallback expression returned SEATBELT; ignoring (fallback rules cannot carry a "
+           @"seatbelt policy)");
+      cd.seatbeltRequired = NO;
+      continue;
+    }
+
     cd.decision = (celResult.resultState == SNTRuleStateAllow ||
                    celResult.resultState == SNTRuleStateAllowCompiler)
                       ? SNTEventStateAllowCELFallback
@@ -301,6 +314,12 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
         if (touchIDCooldownMinutes.has_value()) {
           cd.touchIDCooldownMinutes = @(touchIDCooldownMinutes.value());
         }
+        break;
+      case ReturnValue::SEATBELT:
+        // SEATBELT responses are not cacheable, as the ancestor check must be
+        // performed on every execution.
+        resultState = SNTRuleStateSeatbelt;
+        cd.cacheable = NO;
         break;
       default:
         LOGW(@"Unexpected return value from CEL expression: %d", returnValue);
@@ -417,6 +436,16 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
           {{SNTRuleTypeTeamID, SNTRuleStateAllow}, SNTEventStateAllowTeamID},
           {{SNTRuleTypeTeamID, SNTRuleStateSilentBlock}, SNTEventStateBlockTeamID},
           {{SNTRuleTypeTeamID, SNTRuleStateBlock}, SNTEventStateBlockTeamID},
+          // Seatbelt rules start out as a block of the rule's type. If the
+          // ancestor/sandbox check succeeds in the execution controller, the
+          // decision is flipped to the matching allow state via
+          // BlockToAllowDecision. Starting at block means the fail-safe outcome
+          // is to deny if the check is ever skipped.
+          {{SNTRuleTypeCDHash, SNTRuleStateSeatbelt}, SNTEventStateBlockCDHash},
+          {{SNTRuleTypeBinary, SNTRuleStateSeatbelt}, SNTEventStateBlockBinary},
+          {{SNTRuleTypeSigningID, SNTRuleStateSeatbelt}, SNTEventStateBlockSigningID},
+          {{SNTRuleTypeCertificate, SNTRuleStateSeatbelt}, SNTEventStateBlockCertificate},
+          {{SNTRuleTypeTeamID, SNTRuleStateSeatbelt}, SNTEventStateBlockTeamID},
       };
 
   auto iterator = decisions.find(std::pair<SNTRuleType, SNTRuleState>{type, state});
@@ -457,6 +486,12 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
         cd.decision = SNTEventStateUnknown;
         return NO;
       }
+      break;
+    case SNTRuleStateSeatbelt:
+      // Seatbelt decisions must not be cached because the ancestor check
+      // must be performed on every execution.
+      cd.cacheable = NO;
+      cd.seatbeltRequired = YES;
       break;
     default:
       // If its not one of the special cases above, we don't need to do anything.

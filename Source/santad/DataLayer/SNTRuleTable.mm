@@ -34,7 +34,7 @@
 #include "Source/common/String.h"
 #include "Source/common/cel/Evaluator.h"
 
-static const uint32_t kRuleTableCurrentVersion = 11;
+static const uint32_t kRuleTableCurrentVersion = 12;
 
 // How many rules must be in database before we start trying to remove transitive rules.
 static const int64_t kTransitiveRuleCullingThreshold = 500000;
@@ -313,6 +313,11 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
     newVersion = 11;
   }
 
+  if (version < 12) {
+    [db executeUpdate:@"ALTER TABLE 'execution_rules' ADD 'seatbelt_policy' TEXT"];
+    newVersion = 12;
+  }
+
   // Save signing info for launchd and santad. Used to ensure they are always allowed.
   self.santadCSInfo = [[MOLCodesignChecker alloc] initWithSelf];
   self.launchdCSInfo = [[MOLCodesignChecker alloc] initWithPID:1];
@@ -439,6 +444,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
                                    timestamp:[rs intForColumn:@"timestamp"]
                                      comment:[rs stringForColumn:@"comment"]
                                      celExpr:[rs stringForColumn:@"cel_expr"]
+                              seatbeltPolicy:[rs stringForColumn:@"seatbelt_policy"]
                                       ruleId:[rs longLongIntForColumn:@"rule_id"]
                                        error:nil];
 }
@@ -606,11 +612,11 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
     } else {
       if (![db executeUpdate:@"INSERT OR REPLACE INTO execution_rules "
                              @"(identifier, state, type, custommsg, customurl, timestamp, "
-                             @"comment, cel_expr, rule_id) "
-                             @"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);",
+                             @"comment, cel_expr, seatbelt_policy, rule_id) "
+                             @"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
                              rule.identifier, @(rule.state), @(rule.type), rule.customMsg,
                              rule.customURL, @(rule.timestamp), rule.comment, rule.celExpr,
-                             @(rule.ruleId)]) {
+                             rule.seatbeltPolicy, @(rule.ruleId)]) {
         [errors addObject:[SNTError createErrorWithCode:SNTErrorCodeInsertOrReplaceRuleFailed
                                                 message:@"A database error occurred while "
                                                         @"inserting/replacing a rule"
@@ -880,19 +886,21 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
 
   santa::Xxhash128 hash;
 
-  FMResultSet* rs =
-      [db executeQuery:
-              @"SELECT identifier, state, type, cel_expr FROM execution_rules WHERE state != ?",
-              @(SNTRuleStateAllowTransitive)];
+  FMResultSet* rs = [db executeQuery:@"SELECT identifier, state, type, cel_expr, seatbelt_policy "
+                                     @"FROM execution_rules WHERE state != ?",
+                                     @(SNTRuleStateAllowTransitive)];
   while ([rs next]) {
     NSString* identifier = [rs stringForColumn:@"identifier"];
     NSString* cel = [rs stringForColumn:@"cel_expr"];
+    NSString* seatbeltPolicy = [rs stringForColumn:@"seatbelt_policy"];
     int state = [rs intForColumn:@"state"];
     int type = [rs intForColumn:@"type"];
 
     hash.Update(identifier.UTF8String,
                 [identifier lengthOfBytesUsingEncoding:NSUTF8StringEncoding]);
     hash.Update(cel.UTF8String, [cel lengthOfBytesUsingEncoding:NSUTF8StringEncoding]);
+    hash.Update(seatbeltPolicy.UTF8String,
+                [seatbeltPolicy lengthOfBytesUsingEncoding:NSUTF8StringEncoding]);
     hash.Update(static_cast<void*>(&state), sizeof(state));
     hash.Update(static_cast<void*>(&type), sizeof(type));
   }

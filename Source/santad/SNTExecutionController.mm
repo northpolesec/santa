@@ -102,6 +102,9 @@ static SNTEventState BlockToAllowDecision(SNTEventState blockDecision) {
   std::unique_ptr<SantaCache<std::string, uint64_t>> _touchIDApprovalCache;
 
   std::shared_ptr<santa::santad::process_tree::ProcessTree> _processTree;
+
+  // Expected team ID for santactl ancestor verification in seatbelt rules.
+  std::string _expectedTeamID;
 }
 
 #pragma mark Initializers
@@ -135,7 +138,10 @@ static SNTEventState BlockToAllowDecision(SNTEventState blockDecision) {
 
     // This establishes the XPC connection between libsecurity and syspolicyd.
     // Not doing this causes a deadlock as establishing this link goes through xpcproxy.
-    (void)[[MOLCodesignChecker alloc] initWithSelf];
+    MOLCodesignChecker* selfCS = [[MOLCodesignChecker alloc] initWithSelf];
+    if (selfCS.teamID) {
+      _expectedTeamID = santa::NSStringToUTF8String(selfCS.teamID);
+    }
 
     SNTMetricSet* metricSet = [SNTMetricSet sharedInstance];
     _events = [metricSet counterWithName:@"/santa/events"
@@ -272,6 +278,29 @@ static SNTEventState BlockToAllowDecision(SNTEventState blockDecision) {
   cd.codesigningFlags = targetProc->codesigning_flags;
   cd.vnodeId = SantaVnode::VnodeForFile(targetProc->executable);
 
+  // Seatbelt ancestor check: verify that the direct caller is santactl.
+  // We use esMsg->process (the pre-exec calling process) rather than the process
+  // tree, because the parent santactl process may have already exited by the time
+  // this event is processed. The ES message always has valid caller info.
+  if (cd.seatbeltRequired) {
+    bool hasSandboxAncestor = false;
+    const es_process_t* caller = esMsg->process;
+    std::string_view callerSigningID(caller->signing_id.data, caller->signing_id.length);
+    std::string_view callerTeamID(caller->team_id.data, caller->team_id.length);
+
+    if (callerSigningID == "com.northpolesec.santa.ctl" &&
+        std::string(callerTeamID) == _expectedTeamID) {
+      hasSandboxAncestor = true;
+    }
+
+    if (hasSandboxAncestor) {
+      cd.decision = BlockToAllowDecision(cd.decision);
+    } else {
+      cd.decisionExtra =
+          @"Binary requires seatbelt sandbox but santactl sandbox is not an ancestor";
+    }
+  }
+
   // Formulate an initial action from the decision.
   SNTAction action = (SNTEventStateAllow & cd.decision)
                          ? (cd.cacheable ? SNTActionRespondAllow : SNTActionRespondAllowNoCache)
@@ -345,6 +374,7 @@ static SNTEventState BlockToAllowDecision(SNTEventState blockDecision) {
     se.decision = cd.decision;
     se.holdAndAsk = cd.holdAndAsk;
     se.silentTouchID = cd.silentTouchID;
+    se.seatbeltRequired = cd.seatbeltRequired;
     se.staticRule = cd.staticRule;
     se.ruleId = cd.ruleId;
 
@@ -434,8 +464,8 @@ static SNTEventState BlockToAllowDecision(SNTEventState blockDecision) {
                             @"\033[1mPath:      \033[0m %@\n"
                             @"\033[1mIdentifier:\033[0m %@\n"
                             @"\033[1mParent:    \033[0m %@ (%@)\n\n",
-                            [SNTBlockMessage blockReasonForEventState:cd.decision], se.filePath,
-                            se.fileSHA256, se.parentName, se.ppid];
+                            [SNTBlockMessage blockReasonForEvent:se], se.filePath, se.fileSHA256,
+                            se.parentName, se.ppid];
           NSURL* detailURL =
               [SNTBlockMessage eventDetailURLForEvent:se
                                             customURL:(cd.customURL ?: config.eventDetailURL)];
@@ -588,6 +618,7 @@ static SNTEventState BlockToAllowDecision(SNTEventState blockDecision) {
                                                timestamp:[[NSDate now] timeIntervalSince1970]
                                                  comment:commentStr
                                                  celExpr:nil
+                                          seatbeltPolicy:nil
                                                   ruleId:0
                                                    error:&err];
   if (err) {

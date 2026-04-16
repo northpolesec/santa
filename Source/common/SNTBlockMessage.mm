@@ -151,31 +151,53 @@ static id EncodedValueOrNull(id value) {
   return [SNTBlockMessage formatMessage:customMsg withFallback:defaultBannedMessage];
 }
 
-+ (NSString*)blockReasonForEventState:(SNTEventState)decision {
-  switch (decision) {
++ (NSString*)blockReasonForEvent:(SNTStoredExecutionEvent*)event {
+  NSString* reason;
+  switch (event.decision) {
     case SNTEventStateBlockBinary:
-      return NSLocalizedString(@"Binary rule", @"Block reason for binary rule match");
+      reason = NSLocalizedString(@"Binary rule", @"Block reason for binary rule match");
+      break;
     case SNTEventStateBlockCertificate:
-      return NSLocalizedString(@"Certificate rule", @"Block reason for certificate rule match");
+      reason = NSLocalizedString(@"Certificate rule", @"Block reason for certificate rule match");
+      break;
     case SNTEventStateBlockTeamID:
-      return NSLocalizedString(@"Team ID rule", @"Block reason for Team ID rule match");
+      reason = NSLocalizedString(@"Team ID rule", @"Block reason for Team ID rule match");
+      break;
     case SNTEventStateBlockSigningID:
-      return NSLocalizedString(@"Signing ID rule", @"Block reason for Signing ID rule match");
+      reason = NSLocalizedString(@"Signing ID rule", @"Block reason for Signing ID rule match");
+      break;
     case SNTEventStateBlockCDHash:
-      return NSLocalizedString(@"CDHash rule", @"Block reason for CDHash rule match");
+      reason = NSLocalizedString(@"CDHash rule", @"Block reason for CDHash rule match");
+      break;
     case SNTEventStateBlockScope:
-      return NSLocalizedString(@"Blocked path regex", @"Block reason for blocked path regex match");
+      reason =
+          NSLocalizedString(@"Blocked path regex", @"Block reason for blocked path regex match");
+      break;
     case SNTEventStateBlockCELFallback:
-      return NSLocalizedString(@"CEL fallback rule", @"Block reason for CEL fallback rule match");
+      reason = NSLocalizedString(@"CEL fallback rule", @"Block reason for CEL fallback rule match");
+      break;
     case SNTEventStateBlockLongPath:
-      return NSLocalizedString(@"Path too long",
-                               @"Block reason when file path exceeds maximum length");
+      reason = NSLocalizedString(@"Path too long",
+                                 @"Block reason when file path exceeds maximum length");
+      break;
     case SNTEventStateBlockUnknown:
-      return NSLocalizedString(@"No matching rule",
-                               @"Block reason when no rule matched in lockdown mode");
+      reason = NSLocalizedString(@"No matching rule",
+                                 @"Block reason when no rule matched in lockdown mode");
+      break;
     default:
-      return NSLocalizedString(@"Unknown", @"Block reason when decision state is unrecognized");
+      reason = NSLocalizedString(@"Unknown", @"Block reason when decision state is unrecognized");
+      break;
   }
+
+  if (event.seatbeltRequired) {
+    reason = [reason
+        stringByAppendingString:NSLocalizedString(
+                                    @" (requires running under santactl sandbox)",
+                                    @"Block reason suffix for rules that require a seatbelt "
+                                    @"sandbox ancestor")];
+  }
+
+  return reason;
 }
 
 + (NSString*)stringFromHTML:(NSString*)html {

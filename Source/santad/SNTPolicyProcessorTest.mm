@@ -723,6 +723,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
                  timestamp:0
                    comment:nil
                    celExpr:celExpr
+            seatbeltPolicy:nil
                     ruleId:0
                      error:NULL];
   };
@@ -823,6 +824,49 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     XCTAssertFalse(cd.silentBlock);
     XCTAssertFalse(cd.cacheable);
   }
+  {
+    // CELv2 expression returning SEATBELT: rule starts at the block state for
+    // its rule type, with cd.seatbeltRequired set so the execution controller
+    // performs the ancestor check; non-cacheable because that check must run
+    // every time.
+    SNTRule* r = createCELRule(@"SEATBELT", true);
+    SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+    cd.sha256 = r.identifier;
+    [self.processor decision:cd
+                         forRule:r
+             withTransitiveRules:YES
+        andCELActivationCallback:activation];
+    XCTAssertEqual(cd.decision, SNTEventStateBlockBinary);
+    XCTAssertTrue(cd.seatbeltRequired);
+    XCTAssertFalse(cd.cacheable);
+  }
+  {
+    // Direct seatbelt rule (no CEL): same expectations as above, plus a
+    // non-empty seatbeltPolicy on the rule.
+    SNTRule* r = [[SNTRule alloc]
+        initWithIdentifier:@"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+                     state:SNTRuleStateSeatbelt
+                      type:SNTRuleTypeBinary
+                 customMsg:nil
+                 customURL:nil
+                 timestamp:0
+                   comment:nil
+                   celExpr:nil
+            seatbeltPolicy:@"(version 1)(deny default)"
+                    ruleId:0
+                     error:NULL];
+    XCTAssertNotNil(r);
+    XCTAssertEqualObjects(r.seatbeltPolicy, @"(version 1)(deny default)");
+    SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+    cd.sha256 = r.identifier;
+    [self.processor decision:cd
+                         forRule:r
+             withTransitiveRules:YES
+        andCELActivationCallback:activation];
+    XCTAssertEqual(cd.decision, SNTEventStateBlockBinary);
+    XCTAssertTrue(cd.seatbeltRequired);
+    XCTAssertFalse(cd.cacheable);
+  }
 }
 
 - (void)testCELAncestors {
@@ -907,6 +951,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
                  timestamp:0
                    comment:nil
                    celExpr:celExpr
+            seatbeltPolicy:nil
                     ruleId:0
                      error:NULL];
   };
@@ -1260,6 +1305,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
                                             customMsg:nil
                                             customURL:nil
                                               celExpr:nil
+                                       seatbeltPolicy:nil
                                                ruleId:42];
 
   SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
