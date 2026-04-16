@@ -22,7 +22,6 @@ const config: Config = {
   projectName: "santa",
 
   onBrokenLinks: "throw",
-  onBrokenMarkdownLinks: "warn",
 
   // Analytics scripts
   scripts: [
@@ -32,6 +31,9 @@ const config: Config = {
 
   markdown: {
     mermaid: true,
+    hooks: {
+      onBrokenMarkdownLinks: "warn",
+    },
   },
 
   themes: ["@docusaurus/theme-mermaid"],
