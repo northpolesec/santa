@@ -479,31 +479,26 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
 
   // Now query the database.
   //
-  // NOTE: This code is written with the intention that the binary rule is searched for first
-  // as Santa is designed to go with the most-specific rule possible.
-  //
   // The intended order of precedence is CDHash > Binaries > Signing IDs > Certificates > Team IDs.
-  //
-  // As such the query should have "ORDER BY type ASC" before the LIMIT, to ensure that is the
-  // case. However, in all tested versions of SQLite that ORDER BY clause is unnecessary: the query
-  // is performed 'as written' by doing separate lookups in the index and the later lookups are if
-  // the first returns a result. That behavior can be checked here: http://sqlfiddle.com/#!5/cdc42/1
-  //
-  // Adding the ORDER BY clause slows down this query, particularly in a database where
-  // the number of binary rules outweighs the number of certificate rules because:
-  //       a) now it can't avoid the certificate rule lookup when a binary rule is found
-  //       b) after fetching the results it now has to sort even if there's just 1 row
+  // The UNION ALL structure lets SQLite evaluate each sub-select independently (potentially
+  // short-circuiting via LIMIT 1), while ORDER BY type ASC guarantees the highest-priority
+  // rule is returned regardless of query planner behavior.
   //
   // There is a test for this in SNTRuleTableTests in case SQLite behavior changes in the future.
   //
   [self inDatabase:^(FMDatabase* db) {
     FMResultSet* rs =
-        [db executeQuery:@"SELECT * FROM execution_rules WHERE "
-                         @"   (identifier=? AND type=500) "
-                         @"OR (identifier=? AND type=1000) "
-                         @"OR (identifier=? AND type=2000) "
-                         @"OR (identifier=? AND type=3000) "
-                         @"OR (identifier=? AND type=4000) LIMIT 1",
+        [db executeQuery:@"SELECT * FROM ("
+                         @"  SELECT * FROM execution_rules WHERE identifier=? AND type=500 "
+                         @"  UNION ALL "
+                         @"  SELECT * FROM execution_rules WHERE identifier=? AND type=1000 "
+                         @"  UNION ALL "
+                         @"  SELECT * FROM execution_rules WHERE identifier=? AND type=2000 "
+                         @"  UNION ALL "
+                         @"  SELECT * FROM execution_rules WHERE identifier=? AND type=3000 "
+                         @"  UNION ALL "
+                         @"  SELECT * FROM execution_rules WHERE identifier=? AND type=4000"
+                         @") ORDER BY type ASC LIMIT 1",
                          identifiers.cdhash, identifiers.binarySHA256, identifiers.signingID,
                          identifiers.certificateSHA256, identifiers.teamID];
     if ([rs next]) {

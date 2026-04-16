@@ -30,9 +30,18 @@ objc_library(
     ],
 )
 
+objc_library(
+    name = "RuleQueryBench",
+    srcs = ["RuleQueryBench.mm"],
+    deps = [
+        "@FMDB",
+    ],
+)
+
 santa_unit_test(
     name = "OneOffBuildAll",
     deps = [
+        ":RuleQueryBench",
         ":SNTFileAccessRuleArchiveGenerator",
         ":SNTStoredEventArchiveGenerator",
     ],
@@ -58,6 +67,21 @@ macos_command_line_application(
     version = "//:version",
     visibility = ["//:santa_package_group"],
     deps = [":SNTStoredEventArchiveGenerator"],
+)
+
+macos_command_line_application(
+    name = "rule_query_bench",
+    bundle_id = "com.northpolesec.testing.rule_query_bench",
+    codesignopts = [
+        "--force",
+        "--options library,kill,runtime",
+    ],
+    infoplists = None,
+    minimum_os_version = SANTA_MINIMUM_OS_VERSION,
+    provisioning_profile = None,
+    version = "//:version",
+    visibility = ["//:santa_package_group"],
+    deps = [":RuleQueryBench"],
 )
 
 macos_command_line_application(
