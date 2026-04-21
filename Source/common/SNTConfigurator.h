@@ -705,6 +705,12 @@ extern NSString* _Nonnull const kEnableMenuItemUserOverride;
 @property(nullable, readonly, nonatomic) NSURL* syncBaseURL;
 
 ///
+///  Whether a SyncBaseURL value exists in the configuration, without any parsing or validation.
+///  Use this to distinguish "no URL configured" from "URL configured but rejected by policy."
+///
+@property(readonly, nonatomic) BOOL syncBaseURLConfigured;
+
+///
 ///  If enabled, syncing will use binary protobufs for transfer instead
 ///  of JSON. Defaults to NO.
 ///
