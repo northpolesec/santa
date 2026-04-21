@@ -566,6 +566,10 @@ static SNTConfigurator* sharedConfigurator = nil;
   return [self configStateSet];
 }
 
++ (NSSet*)keyPathsForValuesAffectingSyncBaseURLConfigured {
+  return [self configStateSet];
+}
+
 + (NSSet*)keyPathsForValuesAffectingSyncEnableProtoTransfer {
   return [self configStateSet];
 }
