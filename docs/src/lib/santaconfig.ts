@@ -996,7 +996,7 @@ thousand static rules working correctly, but we don't recommend using StaticRule
   sync: [
     {
       key: "SyncBaseURL",
-      description: `The base URL of the sync server`,
+      description: `The base URL of the sync server. HTTPS is required unless the host is localhost (localhost, 127.0.0.1, or ::1).`,
       type: "string",
     },
     {
