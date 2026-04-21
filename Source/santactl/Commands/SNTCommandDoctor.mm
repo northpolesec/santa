@@ -208,7 +208,7 @@ REGISTER_COMMAND_NAME(@"doctor")
     print(@"[+] Sync is disabled");
     print(@"");
     // Don't treat this as an error.
-    return YES;
+    return NO;
   }
   print(@"[+] Sync is enabled");
   print(@"[+] Machine ID: %s", config.machineID.UTF8String ?: "(not set)");
