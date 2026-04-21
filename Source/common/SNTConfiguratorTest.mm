@@ -165,6 +165,64 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
                               }];
 }
 
+- (void)testSyncBaseURLRejectsNonLocalhostHTTP {
+  SNTConfigurator* sut = [[SNTConfigurator alloc] init];
+
+  // HTTPS is always allowed.
+  sut.configState[@"SyncBaseURL"] = @"https://example.com/api";
+  XCTAssertNotNil(sut.syncBaseURL);
+  XCTAssertEqualObjects(sut.syncBaseURL.host, @"example.com");
+
+  // HTTP to localhost is allowed.
+  sut.configState[@"SyncBaseURL"] = @"http://localhost:8080/api";
+  XCTAssertNotNil(sut.syncBaseURL);
+  XCTAssertEqualObjects(sut.syncBaseURL.host, @"localhost");
+
+  // HTTP to 127.0.0.1 is allowed.
+  sut.configState[@"SyncBaseURL"] = @"http://127.0.0.1:8080/api";
+  XCTAssertNotNil(sut.syncBaseURL);
+  XCTAssertEqualObjects(sut.syncBaseURL.host, @"127.0.0.1");
+
+  // HTTP to ::1 is allowed.
+  sut.configState[@"SyncBaseURL"] = @"http://[::1]:8080/api";
+  XCTAssertNotNil(sut.syncBaseURL);
+  XCTAssertEqualObjects(sut.syncBaseURL.host, @"::1");
+
+  // HTTP to a non-localhost host is rejected.
+  sut.configState[@"SyncBaseURL"] = @"http://example.com/api";
+  XCTAssertNil(sut.syncBaseURL);
+
+  sut.configState[@"SyncBaseURL"] = @"http://10.0.0.1/api";
+  XCTAssertNil(sut.syncBaseURL);
+
+  // Empty and missing values return nil.
+  sut.configState[@"SyncBaseURL"] = @"";
+  XCTAssertNil(sut.syncBaseURL);
+
+  sut.configState[@"SyncBaseURL"] = nil;
+  XCTAssertNil(sut.syncBaseURL);
+}
+
+- (void)testSyncBaseURLConfigured {
+  SNTConfigurator* sut = [[SNTConfigurator alloc] init];
+
+  // A value is configured, even if syncBaseURL rejects it.
+  sut.configState[@"SyncBaseURL"] = @"http://example.com/api";
+  XCTAssertNil(sut.syncBaseURL);
+  XCTAssertTrue(sut.syncBaseURLConfigured);
+
+  // A valid value is also reported as configured.
+  sut.configState[@"SyncBaseURL"] = @"https://example.com/api";
+  XCTAssertTrue(sut.syncBaseURLConfigured);
+
+  // Empty and missing values are not configured.
+  sut.configState[@"SyncBaseURL"] = @"";
+  XCTAssertFalse(sut.syncBaseURLConfigured);
+
+  sut.configState[@"SyncBaseURL"] = nil;
+  XCTAssertFalse(sut.syncBaseURLConfigured);
+}
+
 - (void)testTelemetryFilterExpressions {
   SNTConfigurator* sut = [[SNTConfigurator alloc] init];
 
