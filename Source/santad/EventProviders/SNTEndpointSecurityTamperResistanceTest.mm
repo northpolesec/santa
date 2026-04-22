@@ -62,8 +62,10 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
 - (void)testEnable {
   // Ensure the client subscribes to expected event types
   std::set<es_event_type_t> expectedEventSubs{
-      ES_EVENT_TYPE_AUTH_SIGNAL, ES_EVENT_TYPE_AUTH_EXEC, ES_EVENT_TYPE_AUTH_UNLINK,
-      ES_EVENT_TYPE_AUTH_RENAME, ES_EVENT_TYPE_AUTH_OPEN, ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME,
+      ES_EVENT_TYPE_AUTH_SIGNAL, ES_EVENT_TYPE_AUTH_EXEC,
+      ES_EVENT_TYPE_AUTH_UNLINK, ES_EVENT_TYPE_AUTH_RENAME,
+      ES_EVENT_TYPE_AUTH_OPEN,   ES_EVENT_TYPE_AUTH_TRUNCATE,
+      ES_EVENT_TYPE_AUTH_LINK,   ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME,
   };
 
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
@@ -104,8 +106,10 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
 
 - (void)testEnableWithAntiSuspendSigningIDs {
   std::set<es_event_type_t> expectedEventSubs{
-      ES_EVENT_TYPE_AUTH_SIGNAL, ES_EVENT_TYPE_AUTH_EXEC, ES_EVENT_TYPE_AUTH_UNLINK,
-      ES_EVENT_TYPE_AUTH_RENAME, ES_EVENT_TYPE_AUTH_OPEN, ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME,
+      ES_EVENT_TYPE_AUTH_SIGNAL, ES_EVENT_TYPE_AUTH_EXEC,
+      ES_EVENT_TYPE_AUTH_UNLINK, ES_EVENT_TYPE_AUTH_RENAME,
+      ES_EVENT_TYPE_AUTH_OPEN,   ES_EVENT_TYPE_AUTH_TRUNCATE,
+      ES_EVENT_TYPE_AUTH_LINK,   ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME,
   };
 
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
@@ -145,8 +149,10 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
 
 - (void)testSetAntiSuspendSigningIDsAfterEnable {
   std::set<es_event_type_t> expectedEventSubs{
-      ES_EVENT_TYPE_AUTH_SIGNAL, ES_EVENT_TYPE_AUTH_EXEC, ES_EVENT_TYPE_AUTH_UNLINK,
-      ES_EVENT_TYPE_AUTH_RENAME, ES_EVENT_TYPE_AUTH_OPEN, ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME,
+      ES_EVENT_TYPE_AUTH_SIGNAL, ES_EVENT_TYPE_AUTH_EXEC,
+      ES_EVENT_TYPE_AUTH_UNLINK, ES_EVENT_TYPE_AUTH_RENAME,
+      ES_EVENT_TYPE_AUTH_OPEN,   ES_EVENT_TYPE_AUTH_TRUNCATE,
+      ES_EVENT_TYPE_AUTH_LINK,   ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME,
   };
 
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
@@ -196,7 +202,7 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
 - (void)testHandleMessage {
   es_file_t file = MakeESFile("foo");
   es_process_t proc = MakeESProcess(&file);
-  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_LINK, &proc, ActionType::Auth);
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_READLINK, &proc, ActionType::Auth);
 
   es_file_t fileEventsDB = MakeESFile(kEventsDBPath.data());
   es_file_t fileRulesDB = MakeESFile(kRulesDBPath.data());
@@ -268,6 +274,50 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
     for (const auto& kv : pathToResult) {
       Message msg(mockESApi, &esMsg);
       esMsg.event.unlink.target = kv.first;
+
+      [mockTamperClient
+               handleMessage:std::move(msg)
+          recordEventMetrics:^(EventDisposition d) {
+            XCTAssertEqual(d, kv.second == ES_AUTH_RESULT_DENY ? EventDisposition::kProcessed
+                                                               : EventDisposition::kDropped);
+            dispatch_semaphore_signal(semaMetrics);
+          }];
+
+      XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
+
+      XCTAssertEqual(gotAuthResult, kv.second);
+      XCTAssertEqual(gotCachable, kv.second == ES_AUTH_RESULT_ALLOW);
+    }
+  }
+
+  // Check LINK tamper events
+  {
+    esMsg.event_type = ES_EVENT_TYPE_AUTH_LINK;
+    for (const auto& kv : pathToResult) {
+      Message msg(mockESApi, &esMsg);
+      esMsg.event.link.source = kv.first;
+
+      [mockTamperClient
+               handleMessage:std::move(msg)
+          recordEventMetrics:^(EventDisposition d) {
+            XCTAssertEqual(d, kv.second == ES_AUTH_RESULT_DENY ? EventDisposition::kProcessed
+                                                               : EventDisposition::kDropped);
+            dispatch_semaphore_signal(semaMetrics);
+          }];
+
+      XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
+
+      XCTAssertEqual(gotAuthResult, kv.second);
+      XCTAssertEqual(gotCachable, kv.second == ES_AUTH_RESULT_ALLOW);
+    }
+  }
+
+  // Check TRUNCATE tamper events
+  {
+    esMsg.event_type = ES_EVENT_TYPE_AUTH_TRUNCATE;
+    for (const auto& kv : pathToResult) {
+      Message msg(mockESApi, &esMsg);
+      esMsg.event.truncate.target = kv.first;
 
       [mockTamperClient
                handleMessage:std::move(msg)

@@ -197,6 +197,28 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message& esMsg) {
       break;
     }
 
+    case ES_EVENT_TYPE_AUTH_TRUNCATE: {
+      if ([SNTEndpointSecurityTamperResistance
+              isProtectedPath:esMsg->event.truncate.target->path.data]) {
+        result = ES_AUTH_RESULT_DENY;
+        LOGW(@"Preventing attempt (by PID %d, %@) to truncate important Santa files!",
+             audit_token_to_pid(esMsg->process->audit_token),
+             santa::StringTokenToNSString(esMsg->process->executable->path));
+      }
+      break;
+    }
+
+    case ES_EVENT_TYPE_AUTH_LINK: {
+      if ([SNTEndpointSecurityTamperResistance
+              isProtectedPath:esMsg->event.link.source->path.data]) {
+        result = ES_AUTH_RESULT_DENY;
+        LOGW(@"Preventing attempt (by PID %d, %@) to hard link important Santa files!",
+             audit_token_to_pid(esMsg->process->audit_token),
+             santa::StringTokenToNSString(esMsg->process->executable->path));
+      }
+      break;
+    }
+
     case ES_EVENT_TYPE_AUTH_RENAME: {
       if ([SNTEndpointSecurityTamperResistance
               isProtectedPath:esMsg->event.rename.source->path.data]) {
@@ -343,6 +365,8 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message& esMsg) {
                                     ES_EVENT_TYPE_AUTH_UNLINK,
                                     ES_EVENT_TYPE_AUTH_RENAME,
                                     ES_EVENT_TYPE_AUTH_OPEN,
+                                    ES_EVENT_TYPE_AUTH_TRUNCATE,
+                                    ES_EVENT_TYPE_AUTH_LINK,
                                     ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME,
   }];
 }
