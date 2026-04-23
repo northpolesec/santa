@@ -82,6 +82,21 @@ void RemoveLegacyLaunchdPlists() {
   }
 }
 
+/// Return a short human-readable name for the event types handled by the unified path-target
+/// tamper switch. Falls back to the numeric enum value when an unexpected type reaches the handler
+/// so future additions to the switch don't silently lose log fidelity.
+static NSString* TamperEventName(es_event_type_t type) {
+  switch (type) {
+    case ES_EVENT_TYPE_AUTH_UNLINK: return @"unlink";
+    case ES_EVENT_TYPE_AUTH_TRUNCATE: return @"truncate";
+    case ES_EVENT_TYPE_AUTH_CREATE: return @"create";
+    case ES_EVENT_TYPE_AUTH_LINK: return @"link";
+    case ES_EVENT_TYPE_AUTH_RENAME: return @"rename";
+    case ES_EVENT_TYPE_AUTH_OPEN: return @"open";
+    default: return [NSString stringWithFormat:@"%d", type];
+  }
+}
+
 /// Return a pair of whether or not to allow the exec and whether or not the ES response should be
 /// cached. If the exec is not launchctl, the response can be cached, otherwise the response should
 /// not be cached.
@@ -186,134 +201,31 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message& esMsg) {
   es_auth_result_t result = ES_AUTH_RESULT_ALLOW;
   bool cacheable = true;
   switch (esMsg->event_type) {
-    case ES_EVENT_TYPE_AUTH_UNLINK: {
-      if ([SNTEndpointSecurityTamperResistance
-              isProtectedPath:esMsg->event.unlink.target->path.data]) {
-        result = ES_AUTH_RESULT_DENY;
-        LOGW(@"Preventing attempt (by PID %d, %@) to delete important Santa files!",
-             audit_token_to_pid(esMsg->process->audit_token),
-             santa::StringTokenToNSString(esMsg->process->executable->path));
-      }
-      break;
-    }
-
-    case ES_EVENT_TYPE_AUTH_TRUNCATE: {
-      if ([SNTEndpointSecurityTamperResistance
-              isProtectedPath:esMsg->event.truncate.target->path.data]) {
-        result = ES_AUTH_RESULT_DENY;
-        LOGW(@"Preventing attempt (by PID %d, %@) to truncate important Santa files!",
-             audit_token_to_pid(esMsg->process->audit_token),
-             santa::StringTokenToNSString(esMsg->process->executable->path));
-      }
-      break;
-    }
-
-    case ES_EVENT_TYPE_AUTH_CREATE: {
-      cacheable = false;
-      if (esMsg->event.create.destination_type == ES_DESTINATION_TYPE_EXISTING_FILE) {
-        if ([SNTEndpointSecurityTamperResistance
-                isProtectedPath:esMsg->event.create.destination.existing_file->path.data]) {
-          result = ES_AUTH_RESULT_DENY;
-          LOGW(@"Preventing attempt (by PID %d, %@) to create over protected Santa files!",
-               audit_token_to_pid(esMsg->process->audit_token),
-               santa::StringTokenToNSString(esMsg->process->executable->path));
-        }
-      } else {
-        std::string destPath =
-            std::string(esMsg->event.create.destination.new_path.dir->path.data) + "/" +
-            std::string(esMsg->event.create.destination.new_path.filename.data,
-                        esMsg->event.create.destination.new_path.filename.length);
-        if ([SNTEndpointSecurityTamperResistance isProtectedPath:destPath]) {
-          result = ES_AUTH_RESULT_DENY;
-          LOGW(@"Preventing attempt (by PID %d, %@) to create files in protected Santa path!",
-               audit_token_to_pid(esMsg->process->audit_token),
-               santa::StringTokenToNSString(esMsg->process->executable->path));
-        }
-      }
-      break;
-    }
-
-    case ES_EVENT_TYPE_AUTH_LINK: {
-      if ([SNTEndpointSecurityTamperResistance
-              isProtectedPath:esMsg->event.link.source->path.data]) {
-        result = ES_AUTH_RESULT_DENY;
-        LOGW(@"Preventing attempt (by PID %d, %@) to hard link important Santa files!",
-             audit_token_to_pid(esMsg->process->audit_token),
-             santa::StringTokenToNSString(esMsg->process->executable->path));
-        break;
-      }
-
-      std::string destPath = std::string(esMsg->event.link.target_dir->path.data) + "/" +
-                             std::string(esMsg->event.link.target_filename.data,
-                                         esMsg->event.link.target_filename.length);
-      if ([SNTEndpointSecurityTamperResistance isProtectedPath:destPath]) {
-        result = ES_AUTH_RESULT_DENY;
-        LOGW(@"Preventing attempt (by PID %d, %@) to hard link into protected Santa path!",
-             audit_token_to_pid(esMsg->process->audit_token),
-             santa::StringTokenToNSString(esMsg->process->executable->path));
-      }
-      break;
-    }
-
-    case ES_EVENT_TYPE_AUTH_RENAME: {
-      if ([SNTEndpointSecurityTamperResistance
-              isProtectedPath:esMsg->event.rename.source->path.data]) {
-        result = ES_AUTH_RESULT_DENY;
-        LOGW(@"Preventing attempt (by PID %d, %@) to rename important Santa files!",
-             audit_token_to_pid(esMsg->process->audit_token),
-             santa::StringTokenToNSString(esMsg->process->executable->path));
-        break;
-      }
-
-      if (esMsg->event.rename.destination_type == ES_DESTINATION_TYPE_EXISTING_FILE) {
-        if ([SNTEndpointSecurityTamperResistance
-                isProtectedPath:esMsg->event.rename.destination.existing_file->path.data]) {
-          result = ES_AUTH_RESULT_DENY;
-          LOGW(@"Preventing attempt (by PID %d, %@) to overwrite important Santa files!",
-               audit_token_to_pid(esMsg->process->audit_token),
-               santa::StringTokenToNSString(esMsg->process->executable->path));
-          break;
-        }
-      } else if (esMsg->event.rename.destination_type == ES_DESTINATION_TYPE_NEW_PATH) {
-        std::string destPath =
-            std::string(esMsg->event.rename.destination.new_path.dir->path.data) + "/" +
-            std::string(esMsg->event.rename.destination.new_path.filename.data,
-                        esMsg->event.rename.destination.new_path.filename.length);
-        if ([SNTEndpointSecurityTamperResistance isProtectedPath:destPath]) {
-          result = ES_AUTH_RESULT_DENY;
-          LOGW(@"Preventing attempt (by PID %d, %@) to rename into protected Santa path!",
-               audit_token_to_pid(esMsg->process->audit_token),
-               santa::StringTokenToNSString(esMsg->process->executable->path));
-          break;
-        }
-      }
-
-      break;
-    }
-
+    case ES_EVENT_TYPE_AUTH_UNLINK:
+    case ES_EVENT_TYPE_AUTH_TRUNCATE:
+    case ES_EVENT_TYPE_AUTH_CREATE:
+    case ES_EVENT_TYPE_AUTH_LINK:
+    case ES_EVENT_TYPE_AUTH_RENAME:
     case ES_EVENT_TYPE_AUTH_OPEN: {
-      if ((esMsg->event.open.fflag & FWRITE) &&
-          [SNTEndpointSecurityTamperResistance isProtectedPath:esMsg->event.open.file->path.data]) {
-        LOGW(@"Preventing attempt (by PID %d, %@) to open important Santa files as writable!",
-             audit_token_to_pid(esMsg->process->audit_token),
-             santa::StringTokenToNSString(esMsg->process->executable->path));
-        result = ES_AUTH_RESULT_DENY;
-        break;
-      }
-      if ([SNTEndpointSecurityTamperResistance
-              isLiteralProtectedPath:esMsg->event.open.file->path.data]) {
-        LOGW(@"Preventing attempt (by PID %d, %@) to open sensitive Santa files as readable!",
-             audit_token_to_pid(esMsg->process->audit_token),
-             santa::StringTokenToNSString(esMsg->process->executable->path));
-        result = ES_AUTH_RESULT_DENY;
-        break;
+      // CREATE destinations may not exist yet, so caching an ALLOW by vnode has no effect.
+      // OPEN responses cannot currently convey a subset of allowed flags, so they can't be cached
+      // either without risking later opens of different flag combinations being incorrectly
+      // allowed.
+      if (esMsg->event_type == ES_EVENT_TYPE_AUTH_CREATE ||
+          esMsg->event_type == ES_EVENT_TYPE_AUTH_OPEN) {
+        cacheable = false;
       }
 
-      result = ES_AUTH_RESULT_ALLOW;
-      // OPEN events are not currently cacheable because we haven't yet implemented a method to
-      // respond with a subset of allowed flags. This could be changed in the future if desired, but
-      // currently this is not a hot enough path to worry about.
-      cacheable = false;
+      for (const auto& target : esMsg.PathTargets()) {
+        if ([SNTEndpointSecurityTamperResistance isTamperedPath:target.Path() forMessage:esMsg]) {
+          result = ES_AUTH_RESULT_DENY;
+          LOGW(@"Preventing tamper attempt (%@ by PID %d, %@) on protected path: %.*s",
+               TamperEventName(esMsg->event_type), audit_token_to_pid(esMsg->process->audit_token),
+               santa::StringTokenToNSString(esMsg->process->executable->path),
+               (int)target.Path().size(), target.Path().data());
+          break;
+        }
+      }
       break;
     }
 
@@ -455,6 +367,21 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message& esMsg) {
     if (pf.second == WatchItemPathType::kLiteral && path == pf.first) return true;
   }
   return false;
+}
+
+// Returns true when `path` in the context of `esMsg` should be denied as a tamper attempt.
+// Encapsulates the per-event-type semantics: OPEN requires the FWRITE flag to deny a
+// prefix-protected path, and separately denies any open of a literal-protected path
+// regardless of flags (the .db / .plist files should not be readable to outside processes).
++ (bool)isTamperedPath:(std::string_view)path forMessage:(const santa::Message&)esMsg {
+  if (esMsg->event_type == ES_EVENT_TYPE_AUTH_OPEN) {
+    if ((esMsg->event.open.fflag & FWRITE) &&
+        [SNTEndpointSecurityTamperResistance isProtectedPath:path]) {
+      return true;
+    }
+    return [SNTEndpointSecurityTamperResistance isLiteralProtectedPath:path];
+  }
+  return [SNTEndpointSecurityTamperResistance isProtectedPath:path];
 }
 
 @end
