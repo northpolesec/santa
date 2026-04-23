@@ -369,30 +369,6 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
     }
   }
 
-  // Check CREATE `existing_file` tamper events
-  {
-    esMsg.event_type = ES_EVENT_TYPE_AUTH_CREATE;
-    for (const auto& kv : pathToResult) {
-      Message msg(mockESApi, &esMsg);
-      esMsg.event.create.destination_type = ES_DESTINATION_TYPE_EXISTING_FILE;
-      esMsg.event.create.destination.existing_file = kv.first;
-
-      [mockTamperClient
-               handleMessage:std::move(msg)
-          recordEventMetrics:^(EventDisposition d) {
-            XCTAssertEqual(d, kv.second == ES_AUTH_RESULT_DENY ? EventDisposition::kProcessed
-                                                               : EventDisposition::kDropped);
-            dispatch_semaphore_signal(semaMetrics);
-          }];
-
-      XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
-
-      XCTAssertEqual(gotAuthResult, kv.second);
-      // CREATE events are never cached
-      XCTAssertFalse(gotCachable);
-    }
-  }
-
   // Check CREATE `new_path` tamper events
   {
     esMsg.event_type = ES_EVENT_TYPE_AUTH_CREATE;
@@ -426,6 +402,26 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
       // CREATE events are never cached
       XCTAssertFalse(gotCachable);
     }
+  }
+
+  // CREATE with EXISTING_FILE destination is not expected per the
+  // Message::PathTargets contract. Verify such events fall through to ALLOW
+  // rather than crashing, even if existing_file points to a protected path.
+  {
+    esMsg.event_type = ES_EVENT_TYPE_AUTH_CREATE;
+    esMsg.event.create.destination_type = ES_DESTINATION_TYPE_EXISTING_FILE;
+    esMsg.event.create.destination.existing_file = &fileRulesDB;
+
+    Message msg(mockESApi, &esMsg);
+    [mockTamperClient handleMessage:std::move(msg)
+                 recordEventMetrics:^(EventDisposition d) {
+                   XCTAssertEqual(d, EventDisposition::kDropped);
+                   dispatch_semaphore_signal(semaMetrics);
+                 }];
+
+    XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
+    XCTAssertEqual(gotAuthResult, ES_AUTH_RESULT_ALLOW);
+    XCTAssertFalse(gotCachable);
   }
 
   // Check RENAME `source` tamper events
@@ -665,13 +661,45 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
     XCTAssertEqual(gotCachable, NO);
   }
 
-  // Check OPEN tamper events
+  // Check OPEN tamper events (writable)
   {
     esMsg.event_type = ES_EVENT_TYPE_AUTH_OPEN;
     for (const auto& kv : pathToResult) {
       Message msg(mockESApi, &esMsg);
       esMsg.event.open.file = kv.first;
       esMsg.event.open.fflag = FWRITE;
+
+      [mockTamperClient
+               handleMessage:std::move(msg)
+          recordEventMetrics:^(EventDisposition d) {
+            XCTAssertEqual(d, kv.second == ES_AUTH_RESULT_DENY ? EventDisposition::kProcessed
+                                                               : EventDisposition::kDropped);
+            dispatch_semaphore_signal(semaMetrics);
+          }];
+
+      XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
+
+      XCTAssertEqual(gotAuthResult, kv.second);
+      // OPEN events are currently never cached
+      XCTAssertFalse(gotCachable);
+    }
+  }
+
+  // Check OPEN tamper events (read-only). Literal-protected files (.db, .plist) must still
+  // be denied even for reads, while prefix-protected content (Santa.app contents, LaunchAgents
+  // plists) is allowed when opened without FWRITE.
+  {
+    esMsg.event_type = ES_EVENT_TYPE_AUTH_OPEN;
+    std::map<es_file_t*, es_auth_result_t> openReadOnlyToResult{
+        {&fileEventsDB, ES_AUTH_RESULT_DENY},         // literal-protected
+        {&fileRulesDB, ES_AUTH_RESULT_DENY},          // literal-protected
+        {&fileSantaAppPrefix, ES_AUTH_RESULT_ALLOW},  // prefix-protected, read-only OK
+        {&fileBenign, ES_AUTH_RESULT_ALLOW},
+    };
+    for (const auto& kv : openReadOnlyToResult) {
+      Message msg(mockESApi, &esMsg);
+      esMsg.event.open.file = kv.first;
+      esMsg.event.open.fflag = 0;
 
       [mockTamperClient
                handleMessage:std::move(msg)
