@@ -103,7 +103,10 @@ SNTProxyClosure* _Nullable SNTProxyClosureCreate(SNTProxyConfig* config) {
 void SNTProxyClosureDestroy(SNTProxyClosure* closure) {
   if (!closure) return;
   free(closure->proxyHost);
-  free(closure->basicAuth);
+  if (closure->basicAuth) {
+    memset(closure->basicAuth, 0, strlen(closure->basicAuth));
+    free(closure->basicAuth);
+  }
   free(closure->customCAPEM);
   free(closure);
 }
@@ -234,7 +237,7 @@ natsStatus SNTNATSProxyConnHandler(natsSock* fd, char* host, int port, void* clo
   hints.ai_family = AF_UNSPEC;
   hints.ai_socktype = SOCK_STREAM;
 
-  char portStr[16];
+  char portStr[16] = {};
   snprintf(portStr, sizeof(portStr), "%d", proxy->proxyPort);
 
   struct addrinfo* res = NULL;
@@ -251,6 +254,9 @@ natsStatus SNTNATSProxyConnHandler(natsSock* fd, char* host, int port, void* clo
     freeaddrinfo(res);
     return NATS_ERR;
   }
+
+  int on = 1;
+  setsockopt(sock, SOL_SOCKET, SO_NOSIGPIPE, &on, sizeof(on));
 
   struct timeval tv = {.tv_sec = 30, .tv_usec = 0};
   setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
@@ -285,10 +291,11 @@ natsStatus SNTNATSProxyConnHandler(natsSock* fd, char* host, int port, void* clo
 
     SSL_set_fd(ssl, sock);
     SSL_set_tlsext_host_name(ssl, proxy->proxyHost);
+    SSL_set1_host(ssl, proxy->proxyHost);
 
     if (SSL_connect(ssl) != 1) {
       uint32_t sslErr = (uint32_t)ERR_get_error();
-      char errBuf[256];
+      char errBuf[256] = {};
       ERR_error_string_n(sslErr, errBuf, sizeof(errBuf));
       LOGE(@"NATS proxy: TLS handshake with proxy %s:%d failed: %s", proxy->proxyHost,
            proxy->proxyPort, errBuf);
@@ -365,7 +372,7 @@ natsStatus SNTNATSProxyConnHandler(natsSock* fd, char* host, int port, void* clo
     return NATS_OK;
   }
 
-  int pair[2];
+  int pair[2] = {};
   if (socketpair(AF_UNIX, SOCK_STREAM, 0, pair) != 0) {
     LOGE(@"NATS proxy: socketpair failed: %s", strerror(errno));
     SSL_free(ssl);
@@ -374,7 +381,20 @@ natsStatus SNTNATSProxyConnHandler(natsSock* fd, char* host, int port, void* clo
     return NATS_ERR;
   }
 
+  int nosig = 1;
+  setsockopt(pair[0], SOL_SOCKET, SO_NOSIGPIPE, &nosig, sizeof(nosig));
+  setsockopt(pair[1], SOL_SOCKET, SO_NOSIGPIPE, &nosig, sizeof(nosig));
+
   SSLBridgeCtx* bridgeCtx = (SSLBridgeCtx*)calloc(1, sizeof(SSLBridgeCtx));
+  if (!bridgeCtx) {
+    LOGE(@"NATS proxy: Failed to allocate bridge context");
+    SSL_free(ssl);
+    SSL_CTX_free(sslCtx);
+    close(sock);
+    close(pair[0]);
+    close(pair[1]);
+    return NATS_ERR;
+  }
   bridgeCtx->localFd = pair[1];
   bridgeCtx->proxySock = sock;
   bridgeCtx->ssl = ssl;
