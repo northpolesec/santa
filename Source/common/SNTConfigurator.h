@@ -725,6 +725,26 @@ extern NSString* _Nonnull const kEnableMenuItemUserOverride;
 @property(nullable, readonly, nonatomic) NSDictionary* syncProxyConfig;
 
 ///
+///  Proxy URL for the NATS push connection.
+///  Accepted formats: http://host:port, https://host:port, http://user:pass@host:port, https://user:pass@host:port.
+///  When set, NATS push connections are tunneled through this proxy via HTTP CONNECT.
+///
+@property(nullable, readonly, nonatomic) NSString* pushProxyURL;
+
+///
+///  File path to a PEM-encoded CA certificate to trust for NATS push TLS connections.
+///  Used in MITM proxy environments where the proxy re-signs TLS traffic with a corporate CA.
+///
+@property(nullable, readonly, nonatomic) NSString* pushProxyCAFile;
+
+///
+///  Inline PEM-encoded CA certificate data for NATS push TLS connections.
+///  Alternative to PushProxyCAFile for MDM distribution.
+///  Takes precedence over PushProxyCAFile if both are set.
+///
+@property(nullable, readonly, nonatomic) NSData* pushProxyCAData;
+
+///
 ///  Extra headers to include in all requests made during syncing.
 ///  Keys and values must all be strings, any other type will be silently ignored.
 ///  Some headers cannot be set through this key, including:

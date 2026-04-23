@@ -128,6 +128,9 @@ static NSString* const kStaticRulesKey = @"StaticRules";
 static NSString* const kSyncBaseURLKey = @"SyncBaseURL";
 static NSString* const kSyncEnableProtoTransfer = @"SyncEnableProtoTransfer";
 static NSString* const kSyncProxyConfigKey = @"SyncProxyConfiguration";
+static NSString* const kPushProxyURLKey = @"PushProxyURL";
+static NSString* const kPushProxyCAFileKey = @"PushProxyCAFile";
+static NSString* const kPushProxyCADataKey = @"PushProxyCAData";
 static NSString* const kSyncExtraHeadersKey = @"SyncExtraHeaders";
 static NSString* const kSyncEnableCleanSyncEventUpload = @"SyncEnableCleanSyncEventUpload";
 static NSString* const kClientAuthCertificateFileKey = @"ClientAuthCertificateFile";
@@ -380,6 +383,9 @@ static NSString* const kPushTokenChainKey = @"PushTokenChain";
       kSyncEnableProtoTransfer : number,
       kSyncEnableCleanSyncEventUpload : number,
       kSyncProxyConfigKey : dictionary,
+      kPushProxyURLKey : string,
+      kPushProxyCAFileKey : string,
+      kPushProxyCADataKey : data,
       kSyncExtraHeadersKey : dictionary,
       kClientAuthCertificateFileKey : string,
       kClientAuthCertificatePasswordKey : string,
@@ -926,6 +932,18 @@ static SNTConfigurator* sharedConfigurator = nil;
   return [self configStateSet];
 }
 
++ (NSSet*)keyPathsForValuesAffectingPushProxyURL {
+  return [self configStateSet];
+}
+
++ (NSSet*)keyPathsForValuesAffectingPushProxyCAFile {
+  return [self configStateSet];
+}
+
++ (NSSet*)keyPathsForValuesAffectingPushProxyCAData {
+  return [self configStateSet];
+}
+
 #pragma mark Public Interface
 
 - (SNTClientMode)clientMode {
@@ -1156,6 +1174,18 @@ static SNTConfigurator* sharedConfigurator = nil;
 
 - (NSDictionary*)syncProxyConfig {
   return self.configState[kSyncProxyConfigKey];
+}
+
+- (NSString*)pushProxyURL {
+  return self.configState[kPushProxyURLKey];
+}
+
+- (NSString*)pushProxyCAFile {
+  return self.configState[kPushProxyCAFileKey];
+}
+
+- (NSData*)pushProxyCAData {
+  return self.configState[kPushProxyCADataKey];
 }
 
 - (NSDictionary*)syncExtraHeaders {
