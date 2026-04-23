@@ -290,12 +290,50 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
     }
   }
 
-  // Check LINK tamper events
+  // Check LINK `source` tamper events
   {
     esMsg.event_type = ES_EVENT_TYPE_AUTH_LINK;
+    es_file_t linkBenignDir = MakeESFile("/tmp");
+    es_string_token_t linkBenignFilename = MakeESStringToken("benign");
     for (const auto& kv : pathToResult) {
       Message msg(mockESApi, &esMsg);
       esMsg.event.link.source = kv.first;
+      esMsg.event.link.target_dir = &linkBenignDir;
+      esMsg.event.link.target_filename = linkBenignFilename;
+
+      [mockTamperClient
+               handleMessage:std::move(msg)
+          recordEventMetrics:^(EventDisposition d) {
+            XCTAssertEqual(d, kv.second == ES_AUTH_RESULT_DENY ? EventDisposition::kProcessed
+                                                               : EventDisposition::kDropped);
+            dispatch_semaphore_signal(semaMetrics);
+          }];
+
+      XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
+
+      XCTAssertEqual(gotAuthResult, kv.second);
+      XCTAssertEqual(gotCachable, kv.second == ES_AUTH_RESULT_ALLOW);
+    }
+  }
+
+  // Check LINK `dest` tamper events
+  {
+    esMsg.event_type = ES_EVENT_TYPE_AUTH_LINK;
+    esMsg.event.link.source = &fileBenign;
+
+    es_file_t linkDestDirProtected = MakeESFile("/Applications/Santa.app/Contents");
+    es_file_t linkDestDirBenign = MakeESFile("/some/other");
+    es_string_token_t linkDestFilename = MakeESStringToken("test");
+
+    std::map<es_file_t*, es_auth_result_t> linkDestToResult{
+        {&linkDestDirProtected, ES_AUTH_RESULT_DENY},
+        {&linkDestDirBenign, ES_AUTH_RESULT_ALLOW},
+    };
+
+    for (const auto& kv : linkDestToResult) {
+      Message msg(mockESApi, &esMsg);
+      esMsg.event.link.target_dir = kv.first;
+      esMsg.event.link.target_filename = linkDestFilename;
 
       [mockTamperClient
                handleMessage:std::move(msg)

@@ -215,6 +215,17 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message& esMsg) {
         LOGW(@"Preventing attempt (by PID %d, %@) to hard link important Santa files!",
              audit_token_to_pid(esMsg->process->audit_token),
              santa::StringTokenToNSString(esMsg->process->executable->path));
+        break;
+      }
+
+      std::string destPath = std::string(esMsg->event.link.target_dir->path.data) + "/" +
+                             std::string(esMsg->event.link.target_filename.data,
+                                         esMsg->event.link.target_filename.length);
+      if ([SNTEndpointSecurityTamperResistance isProtectedPath:destPath]) {
+        result = ES_AUTH_RESULT_DENY;
+        LOGW(@"Preventing attempt (by PID %d, %@) to hard link into protected Santa path!",
+             audit_token_to_pid(esMsg->process->audit_token),
+             santa::StringTokenToNSString(esMsg->process->executable->path));
       }
       break;
     }
