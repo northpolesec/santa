@@ -208,6 +208,31 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message& esMsg) {
       break;
     }
 
+    case ES_EVENT_TYPE_AUTH_CREATE: {
+      cacheable = false;
+      if (esMsg->event.create.destination_type == ES_DESTINATION_TYPE_EXISTING_FILE) {
+        if ([SNTEndpointSecurityTamperResistance
+                isProtectedPath:esMsg->event.create.destination.existing_file->path.data]) {
+          result = ES_AUTH_RESULT_DENY;
+          LOGW(@"Preventing attempt (by PID %d, %@) to create over protected Santa files!",
+               audit_token_to_pid(esMsg->process->audit_token),
+               santa::StringTokenToNSString(esMsg->process->executable->path));
+        }
+      } else {
+        std::string destPath =
+            std::string(esMsg->event.create.destination.new_path.dir->path.data) + "/" +
+            std::string(esMsg->event.create.destination.new_path.filename.data,
+                        esMsg->event.create.destination.new_path.filename.length);
+        if ([SNTEndpointSecurityTamperResistance isProtectedPath:destPath]) {
+          result = ES_AUTH_RESULT_DENY;
+          LOGW(@"Preventing attempt (by PID %d, %@) to create files in protected Santa path!",
+               audit_token_to_pid(esMsg->process->audit_token),
+               santa::StringTokenToNSString(esMsg->process->executable->path));
+        }
+      }
+      break;
+    }
+
     case ES_EVENT_TYPE_AUTH_LINK: {
       if ([SNTEndpointSecurityTamperResistance
               isProtectedPath:esMsg->event.link.source->path.data]) {
@@ -245,6 +270,18 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message& esMsg) {
                 isProtectedPath:esMsg->event.rename.destination.existing_file->path.data]) {
           result = ES_AUTH_RESULT_DENY;
           LOGW(@"Preventing attempt (by PID %d, %@) to overwrite important Santa files!",
+               audit_token_to_pid(esMsg->process->audit_token),
+               santa::StringTokenToNSString(esMsg->process->executable->path));
+          break;
+        }
+      } else if (esMsg->event.rename.destination_type == ES_DESTINATION_TYPE_NEW_PATH) {
+        std::string destPath =
+            std::string(esMsg->event.rename.destination.new_path.dir->path.data) + "/" +
+            std::string(esMsg->event.rename.destination.new_path.filename.data,
+                        esMsg->event.rename.destination.new_path.filename.length);
+        if ([SNTEndpointSecurityTamperResistance isProtectedPath:destPath]) {
+          result = ES_AUTH_RESULT_DENY;
+          LOGW(@"Preventing attempt (by PID %d, %@) to rename into protected Santa path!",
                audit_token_to_pid(esMsg->process->audit_token),
                santa::StringTokenToNSString(esMsg->process->executable->path));
           break;
@@ -376,6 +413,7 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message& esMsg) {
                                     ES_EVENT_TYPE_AUTH_UNLINK,
                                     ES_EVENT_TYPE_AUTH_RENAME,
                                     ES_EVENT_TYPE_AUTH_OPEN,
+                                    ES_EVENT_TYPE_AUTH_CREATE,
                                     ES_EVENT_TYPE_AUTH_TRUNCATE,
                                     ES_EVENT_TYPE_AUTH_LINK,
                                     ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME,
