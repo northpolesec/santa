@@ -1055,14 +1055,14 @@ thousand static rules working correctly, but we don't recommend using StaticRule
     },
     {
       key: "PushProxyURL",
-      description: `Proxy URL for the NATS push connection. When set, all NATS push connections are tunneled through this proxy via HTTP CONNECT.
+      description: `Proxy URL for the push notification connection. When set, all push connections are tunneled through this proxy via HTTP CONNECT.
         Accepted formats: http://proxy.corp:8080, https://proxy.corp:8443, http://user:pass@proxy.corp:8080, https://user:pass@proxy.corp:8443.
         For https:// proxies, the connection to the proxy itself is TLS-encrypted (TLS-in-TLS)`,
       type: "string",
     },
     {
       key: "PushProxyCAFile",
-      description: `File path to a PEM-encoded CA certificate to trust for NATS TLS connections through the proxy.
+      description: `File path to a PEM-encoded CA certificate to trust for push TLS connections through the proxy.
         Used in MITM proxy environments where the proxy re-signs TLS traffic with a corporate CA`,
       type: "string",
     },
