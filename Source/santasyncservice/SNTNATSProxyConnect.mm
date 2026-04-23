@@ -121,13 +121,19 @@ static ssize_t ProxyWrite(int fd, SSL* ssl, const void* buf, size_t len) {
   return ssl ? SSL_write(ssl, buf, (int)len) : write(fd, buf, len);
 }
 
-static NSString* ReadLineFromProxy(int fd, SSL* ssl, int timeoutSecs) {
+static NSString* ReadLineFromProxy(int fd, SSL* ssl, NSDate* deadline) {
   NSMutableData* lineData = [NSMutableData data];
   char c;
-  struct timeval tv = {.tv_sec = timeoutSecs, .tv_usec = 0};
-  setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 
   while (lineData.length < 8192) {
+    NSTimeInterval remaining = [deadline timeIntervalSinceNow];
+    if (remaining <= 0) return nil;
+
+    // Clamp per-read timeout to time remaining on the overall deadline
+    int secs = (int)(remaining < 1.0 ? 1 : remaining);
+    struct timeval tv = {.tv_sec = secs, .tv_usec = 0};
+    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+
     ssize_t n = ProxyRead(fd, ssl, &c, 1);
     if (n <= 0) return nil;
     if (c == '\n') {
@@ -310,6 +316,19 @@ natsStatus SNTNATSProxyConnHandler(natsSock* fd, char* host, int port, void* clo
     LOGD(@"NATS proxy: TLS established with proxy %s:%d", proxy->proxyHost, proxy->proxyPort);
   }
 
+  // Validate host from NATS callback does not contain CRLF (HTTP header injection)
+  for (const char* p = host; *p; p++) {
+    if (*p == '\r' || *p == '\n') {
+      LOGE(@"NATS proxy: Rejecting host containing CR/LF characters");
+      if (ssl) {
+        SSL_free(ssl);
+        SSL_CTX_free(sslCtx);
+      }
+      close(sock);
+      return NATS_ERR;
+    }
+  }
+
   NSMutableString* request = [NSMutableString stringWithFormat:@"CONNECT %s:%d HTTP/1.1\r\n"
                                                                @"Host: %s:%d\r\n",
                                                                host, port, host, port];
@@ -330,7 +349,11 @@ natsStatus SNTNATSProxyConnHandler(natsSock* fd, char* host, int port, void* clo
     return NATS_ERR;
   }
 
-  NSString* statusLine = ReadLineFromProxy(sock, ssl, 30);
+  // Overall deadline for the CONNECT handshake response (prevents slow-loris)
+  static const NSTimeInterval kConnectHandshakeTimeoutSecs = 30;
+  NSDate* deadline = [NSDate dateWithTimeIntervalSinceNow:kConnectHandshakeTimeoutSecs];
+
+  NSString* statusLine = ReadLineFromProxy(sock, ssl, deadline);
   if (!statusLine) {
     LOGE(@"NATS proxy: No response from proxy %s:%d", proxy->proxyHost, proxy->proxyPort);
     if (ssl) {
@@ -343,9 +366,14 @@ natsStatus SNTNATSProxyConnHandler(natsSock* fd, char* host, int port, void* clo
 
   int statusCode = SNTParseHTTPStatusLine(statusLine);
 
+  // Consume remaining response headers; cap at 64 to bound a misbehaving proxy
+  static const int kMaxProxyResponseHeaders = 64;
+  int headerCount = 0;
   NSString* headerLine;
-  while ((headerLine = ReadLineFromProxy(sock, ssl, 30)) != nil) {
+  while (headerCount < kMaxProxyResponseHeaders &&
+         (headerLine = ReadLineFromProxy(sock, ssl, deadline)) != nil) {
     if (headerLine.length == 0) break;
+    headerCount++;
   }
 
   if (statusCode < 200 || statusCode > 299) {
