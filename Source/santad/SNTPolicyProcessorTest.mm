@@ -827,8 +827,8 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   {
     // CELv2 expression returning SEATBELT: rule starts at the block state for
     // its rule type, with cd.seatbeltRequired set so the execution controller
-    // performs the ancestor check; non-cacheable because that check must run
-    // every time.
+    // can enforce the expectation; non-cacheable because santactl registers
+    // a fresh expectation per exec.
     SNTRule* r = createCELRule(@"SEATBELT", true);
     SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
     cd.sha256 = r.identifier;

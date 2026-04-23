@@ -182,6 +182,8 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator* configurator,
     logger->Log(std::move(enrichedMsg));
   };
 
+  auto sandbox_expectations = std::make_shared<santa::SandboxExpectations>();
+
   SNTExecutionController* exec_controller =
       [[SNTExecutionController alloc] initWithRuleTable:rule_table
                                              eventTable:event_table
@@ -191,7 +193,8 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator* configurator,
                                               ttyWriter:tty_writer
                                         policyProcessor:policy_processor
                                     processControlBlock:processControlBlock
-                                            processTree:process_tree];
+                                            processTree:process_tree
+                                    sandboxExpectations:sandbox_expectations];
   if (!exec_controller) {
     LOGE(@"Failed to initialize exec controller.");
     exit(EXIT_FAILURE);
@@ -247,7 +250,7 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator* configurator,
       esapi, logger, std::move(metrics), std::move(watch_items), std::move(auth_result_cache),
       control_connection, compiler_controller, notifier_queue, syncd_queue, netext_queue,
       exec_controller, prefix_tree, std::move(tty_writer), std::move(process_tree),
-      std::move(entitlements_filter));
+      std::move(entitlements_filter), std::move(sandbox_expectations));
 }
 
 SantadDeps::SantadDeps(
@@ -259,7 +262,8 @@ SantadDeps::SantadDeps(
     SNTExecutionController* exec_controller, std::shared_ptr<::PrefixTree<Unit>> prefix_tree,
     std::shared_ptr<::TTYWriter> tty_writer,
     std::shared_ptr<santa::santad::process_tree::ProcessTree> process_tree,
-    std::shared_ptr<santa::EntitlementsFilter> entitlements_filter)
+    std::shared_ptr<santa::EntitlementsFilter> entitlements_filter,
+    std::shared_ptr<santa::SandboxExpectations> sandbox_expectations)
     : esapi_(std::move(esapi)),
       logger_(std::move(logger)),
       metrics_(std::move(metrics)),
@@ -275,7 +279,8 @@ SantadDeps::SantadDeps(
       prefix_tree_(prefix_tree),
       tty_writer_(std::move(tty_writer)),
       process_tree_(std::move(process_tree)),
-      entitlements_filter_(std::move(entitlements_filter)) {}
+      entitlements_filter_(std::move(entitlements_filter)),
+      sandbox_expectations_(std::move(sandbox_expectations)) {}
 
 std::shared_ptr<::AuthResultCache> SantadDeps::AuthResultCache() {
   return auth_result_cache_;
@@ -338,6 +343,10 @@ std::shared_ptr<santa::santad::process_tree::ProcessTree> SantadDeps::ProcessTre
 
 std::shared_ptr<santa::EntitlementsFilter> SantadDeps::EntitlementsFilter() {
   return entitlements_filter_;
+}
+
+std::shared_ptr<santa::SandboxExpectations> SantadDeps::SandboxExpectations() {
+  return sandbox_expectations_;
 }
 
 }  // namespace santa

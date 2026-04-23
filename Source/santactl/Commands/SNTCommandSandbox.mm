@@ -19,18 +19,17 @@
 #include <sandbox.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <sys/wait.h>
 #include <unistd.h>
 
+#include <atomic>
+#include <memory>
 #include <vector>
 
 #import "Source/common/MOLCodesignChecker.h"
 #import "Source/common/MOLXPCConnection.h"
-#import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTFileInfo.h"
-#import "Source/common/SNTLogging.h"
-#import "Source/common/SNTRule.h"
 #import "Source/common/SNTRuleIdentifiers.h"
+#import "Source/common/SNTSandboxExecRequest.h"
 #import "Source/common/SNTXPCControlInterface.h"
 #import "Source/common/SigningIDHelpers.h"
 #import "Source/santactl/SNTCommand.h"
@@ -56,16 +55,24 @@ REGISTER_COMMAND_NAME(@"sandbox")
 }
 
 + (NSString*)longHelpText {
-  return (@"Usage: santactl sandbox [--print-profile] <command> [arguments...]\n"
-          @"\n"
-          @"  Looks up the seatbelt policy for the given command from Santa's rule\n"
-          @"  database. If a rule with a seatbelt policy exists, applies the sandbox\n"
-          @"  profile via sandbox_init and then executes the command. If no matching\n"
-          @"  rule is found or the matched rule has no seatbelt policy, santactl\n"
-          @"  refuses to run the command and exits with a non-zero status.\n"
-          @"\n"
-          @"  Options:\n"
-          @"    --print-profile: Print the sandbox profile to stderr before applying it.\n");
+  return (
+#ifdef DEBUG
+      @"Usage: santactl sandbox [--print-profile] <command> [arguments...]\n"
+#else
+      @"Usage: santactl sandbox <command> [arguments...]\n"
+#endif
+      @"\n"
+      @"  Looks up the seatbelt policy for the given command from Santa's rule\n"
+      @"  database. If a rule with a seatbelt policy exists, applies the sandbox\n"
+      @"  profile via sandbox_init and then executes the command. If no matching\n"
+      @"  rule is found or the matched rule has no seatbelt policy, santactl\n"
+      @"  refuses to run the command and exits with a non-zero status.\n"
+#ifdef DEBUG
+      @"\n"
+      @"  Options:\n"
+      @"    --print-profile: Print the sandbox profile to stderr before applying it.\n"
+#endif
+  );
 }
 
 + (NSSet<NSString*>*)aliases {
@@ -77,9 +84,15 @@ REGISTER_COMMAND_NAME(@"sandbox")
 - (NSString*)resolveCommand:(NSString*)command {
   if (command.length == 0) return nil;
 
+  BOOL (^isExecutableFile)(NSString*) = ^BOOL(NSString* path) {
+    const char* cPath = path.fileSystemRepresentation;
+    struct stat sb;
+    return stat(cPath, &sb) == 0 && S_ISREG(sb.st_mode) && access(cPath, X_OK) == 0;
+  };
+
   // If the command contains a slash, treat it as a path.
   if ([command containsString:@"/"]) {
-    return command;
+    return isExecutableFile(command) ? command : nil;
   }
 
   const char* pathEnv = getenv("PATH");
@@ -90,33 +103,29 @@ REGISTER_COMMAND_NAME(@"sandbox")
     if (dir.length == 0 || ![dir hasPrefix:@"/"]) continue;
 
     NSString* fullPath = [dir stringByAppendingPathComponent:command];
-    const char* cPath = fullPath.fileSystemRepresentation;
-    struct stat sb;
-    if (stat(cPath, &sb) == 0 && S_ISREG(sb.st_mode) && access(cPath, X_OK) == 0) {
-      return fullPath;
-    }
+    if (isExecutableFile(fullPath)) return fullPath;
   }
   return nil;
 }
 
 - (void)runWithArguments:(NSArray*)arguments {
-  // The subcommand name ("sandbox"/"sb") has already been stripped by main.mm.
-  // Parse leading flags, then the remaining arguments are the command and args.
+#ifdef DEBUG
   BOOL printProfile = NO;
+#endif
   NSUInteger idx = 0;
   while (idx < arguments.count) {
     NSString* arg = arguments[idx];
+#ifdef DEBUG
     if ([arg isEqualToString:@"--print-profile"]) {
       printProfile = YES;
       idx++;
-    } else if ([arg isEqualToString:@"--"]) {
-      idx++;
-      break;
-    } else {
-      break;
+      continue;
     }
+#endif
+    // `--` consumes itself; any other arg is the command name and is left in place.
+    if ([arg isEqualToString:@"--"]) idx++;
+    break;
   }
-
   if (idx >= arguments.count) {
     [self printErrorUsageAndExit:@"No command specified."];
   }
@@ -124,21 +133,22 @@ REGISTER_COMMAND_NAME(@"sandbox")
   NSArray* commandArgs = [arguments subarrayWithRange:NSMakeRange(idx, arguments.count - idx)];
   NSString* command = commandArgs[0];
 
-  // Resolve the binary path.
   NSString* resolvedPath = [self resolveCommand:command];
   if (!resolvedPath) {
     fprintf(stderr, "Error: command not found: %s\n", command.UTF8String);
     exit(EXIT_FAILURE);
   }
 
-  // Open the file and hold it open (fd) so subsequent parent-side reads all see
-  // the same inode. We reference it via /dev/fd/N in SNTFileInfo/
-  // MOLCodesignChecker below so identifier computation is pinned to the inode,
-  // regardless of symlink retargeting. Note: we do NOT exec via /dev/fd/N or
-  // fexecve — macOS lacks fexecve and the seatbelt profile applied in the
-  // child typically denies /dev/fd access. See the execv(resolvedPath…) call
-  // further down; the small window between identifier computation here and the
-  // exec is intentional and no worse than a normal shell.
+  // O_RDONLY | O_CLOEXEC pins the file for the duration of this flow:
+  //   * the kernel will not reuse inode number st_ino on this volume while
+  //     the fd is open, so the (fsDev, fsIno) we register with santad
+  //     unambiguously identifies the vnode we hashed;
+  //   * cdhash and sha256 are computed off /dev/fd/N so they reflect the
+  //     pinned file's content, not whatever the path resolves to later;
+  //   * the fd closes automatically at execve, so the pin lasts exactly
+  //     as long as needed.
+  // santad's AUTH_EXEC handler verifies the expectation against the
+  // kernel-reported vnode and cdhash at exec time.
   int fd = open(resolvedPath.fileSystemRepresentation, O_RDONLY | O_CLOEXEC);
   if (fd < 0) {
     fprintf(stderr, "Error: unable to open %s: %s\n", resolvedPath.UTF8String, strerror(errno));
@@ -151,8 +161,6 @@ REGISTER_COMMAND_NAME(@"sandbox")
   }
   NSString* fdPath = [NSString stringWithFormat:@"/dev/fd/%d", fd];
 
-  // Compute identifiers for the binary via /dev/fd/N so they reflect the file
-  // we've pinned open, not whatever might replace the path later.
   NSError* fileInfoError;
   SNTFileInfo* fileInfo = [[SNTFileInfo alloc] initWithResolvedPath:fdPath error:&fileInfoError];
   if (!fileInfo) {
@@ -160,46 +168,61 @@ REGISTER_COMMAND_NAME(@"sandbox")
             fileInfoError.localizedDescription.UTF8String);
     exit(EXIT_FAILURE);
   }
-
-  NSString* binarySHA256 = fileInfo.SHA256;
   MOLCodesignChecker* csc = [fileInfo codesignCheckerWithError:nil];
-  NSString* signingID = FormatSigningID(csc);
-  NSString* certSHA256 = csc.leafCertificate.SHA256;
-  NSString* teamID = csc.teamID;
-  NSString* cdhash = csc.cdhash;
 
-  struct RuleIdentifiers identifiers = {
-      .cdhash = cdhash,
-      .binarySHA256 = binarySHA256,
-      .signingID = signingID,
-      .certificateSHA256 = certSHA256,
-      .teamID = teamID,
+  SNTRuleIdentifiers* ruleIds = [[SNTRuleIdentifiers alloc]
+      initWithRuleIdentifiers:{.cdhash = csc.cdhash,
+                               .binarySHA256 = fileInfo.SHA256,
+                               .signingID = FormatSigningID(csc),
+                               .certificateSHA256 = csc.leafCertificate.SHA256,
+                               .teamID = csc.teamID}];
+
+  SNTSandboxExecRequest* req =
+      [[SNTSandboxExecRequest alloc] initWithIdentifiers:ruleIds
+                                                   fsDev:static_cast<uint64_t>(sb.st_dev)
+                                                   fsIno:static_cast<uint64_t>(sb.st_ino)
+                                            resolvedPath:resolvedPath];
+
+  // Atomic flag raised by the XPC invalidation handler — checked below
+  // before sandbox_init. If santad dies between the RPC reply and execv,
+  // santad's AUTH_EXEC handler denies the exec as a fail-safe (no expectation
+  // registered → deny), so the worst outcome is a clear failure message.
+  //
+  // The flag is owned by a shared_ptr captured by both the invalidation
+  // block and the enclosing scope; either side may outlive the other
+  // (e.g. the connection can fire its handler on a background thread after
+  // the main flow returns from the RPC), so reference-counted storage keeps
+  // the atomic alive until both release it.
+  auto daemonGone = std::make_shared<std::atomic<bool>>(false);
+  self.daemonConn.invalidationHandler = ^{
+    daemonGone->store(true, std::memory_order_release);
   };
-  SNTRuleIdentifiers* ruleIds = [[SNTRuleIdentifiers alloc] initWithRuleIdentifiers:identifiers];
 
-  // Look up the seatbelt rule from santad.
-  __block SNTRule* rule = nil;
-  [[self.daemonConn synchronousRemoteObjectProxy] databaseRuleForIdentifiers:ruleIds
-                                                                       reply:^(SNTRule* r) {
-                                                                         rule = r;
-                                                                       }];
+  __block NSString* profile = nil;
+  __block NSError* rpcError = nil;
+  [[self.daemonConn synchronousRemoteObjectProxy] prepareSandboxExec:req
+                                                               reply:^(NSString* p, NSError* err) {
+                                                                 profile = p;
+                                                                 rpcError = err;
+                                                               }];
 
-  if (!rule || !rule.seatbeltPolicy.length) {
-    fprintf(stderr, "Warning: no seatbelt policy found for %s, refusing to run.\n",
-            resolvedPath.UTF8String);
+  if (daemonGone->load(std::memory_order_acquire)) {
+    fprintf(stderr, "Error: santad is unavailable\n");
+    exit(EXIT_FAILURE);
+  }
+  if (rpcError || profile.length == 0) {
+    fprintf(stderr, "Error: %s\n",
+            rpcError.localizedDescription.UTF8String ?: "no seatbelt policy returned");
     exit(EXIT_FAILURE);
   }
 
-  // Materialize raw C pointers BEFORE fork. Calling into the Objective-C
-  // runtime (method dispatch, autorelease pools, etc.) after fork is not
-  // async-signal-safe: the child may deadlock if any other thread was holding
-  // a runtime lock at fork time. We don't need to copy these buffers: the
-  // NSStrings that own them stay in the parent's scope, fork duplicates that
-  // memory into the child, and the child runs only POSIX/libc before
-  // _exit/execv — no ARC release ever fires against them.
-  // `fileSystemRepresentation` raises on failure so it can't return NULL;
-  // `UTF8String` is nullable, so it gets an explicit check.
-  const char* policyCStr = rule.seatbeltPolicy.UTF8String;
+#ifdef DEBUG
+  if (printProfile) {
+    fprintf(stderr, "--- seatbelt profile ---\n%s\n--- end profile ---\n", profile.UTF8String);
+  }
+#endif
+
+  const char* policyCStr = profile.UTF8String;
   if (!policyCStr) {
     fprintf(stderr, "Error: seatbelt policy cannot be represented as UTF-8\n");
     exit(EXIT_FAILURE);
@@ -212,60 +235,23 @@ REGISTER_COMMAND_NAME(@"sandbox")
   }
   argv[argc] = nullptr;
 
-  if (printProfile) {
-    fprintf(stderr, "--- seatbelt profile ---\n%s\n--- end profile ---\n", policyCStr);
-  }
-
-  // We're done reading the binary via /dev/fd/N. Close the pinned fd before
-  // fork so it doesn't linger in the parent (the child re-opens what it needs
-  // on its own, and O_CLOEXEC would close it on exec regardless).
-  close(fd);
-
-  // Seatbelt rule found — fork, apply sandbox, and exec.
-  pid_t pid = fork();
-  if (pid < 0) {
-    perror("fork");
-    exit(EXIT_FAILURE);
-  }
-
-  if (pid == 0) {
-    // Child: only POSIX/libc from here. argv[0] keeps the caller-supplied
-    // command name; we exec the already-resolved path via execv so no second
-    // PATH search happens. We do not exec via /dev/fd/N because the seatbelt
-    // profile typically denies /dev/fd access.
-    char* errorbuf = NULL;
+  char* errorbuf = NULL;
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-    if (sandbox_init(policyCStr, 0, &errorbuf) != 0) {
-      fprintf(stderr, "sandbox_init failed: %s\n", errorbuf ? errorbuf : "unknown error");
-      sandbox_free_error(errorbuf);
-      _exit(EXIT_FAILURE);
-    }
+  if (sandbox_init(policyCStr, 0, &errorbuf) != 0) {
+    fprintf(stderr, "sandbox_init failed: %s\n", errorbuf ? errorbuf : "unknown error");
+    sandbox_free_error(errorbuf);
+    exit(EXIT_FAILURE);
+  }
 #pragma clang diagnostic pop
 
-    execv(execPathCStr, const_cast<char* const*>(argv.data()));
-    // execv only returns on error.
-    perror("execv");
-    _exit(EXIT_FAILURE);
-  }
-
-  // Parent process: wait for the child to finish and propagate its exit status.
-  // We cannot simply _exit() here because state inherited across fork (XPC
-  // connections, pipes, terminal session) can cause the still-running child to
-  // be terminated when the parent goes away.
-  int status = 0;
-  while (waitpid(pid, &status, 0) < 0) {
-    if (errno != EINTR) {
-      perror("waitpid");
-      _exit(EXIT_FAILURE);
-    }
-  }
-  if (WIFEXITED(status)) {
-    _exit(WEXITSTATUS(status));
-  } else if (WIFSIGNALED(status)) {
-    _exit(128 + WTERMSIG(status));
-  }
-  _exit(EXIT_FAILURE);
+  // fd is O_CLOEXEC; execve closes it atomically. Execute by real path so
+  // _NSGetExecutablePath / NSBundle / @executable_path behave correctly for
+  // both CLI binaries and .app bundles. santad's AUTH_EXEC handler verifies
+  // the kernel-reported cdhash against the expectation registered above.
+  execv(execPathCStr, const_cast<char* const*>(argv.data()));
+  perror("execv");
+  exit(EXIT_FAILURE);
 }
 
 @end

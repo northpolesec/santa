@@ -23,12 +23,14 @@
 #include <sys/param.h>
 #include <utmpx.h>
 
+#include <cstring>
 #include <memory>
 #include <set>
 #include <string>
 #include <utility>
 
 #include "Source/common/BranchPrediction.h"
+#include "Source/common/CodeSigningIdentifierUtils.h"
 #import "Source/common/MOLCodesignChecker.h"
 #include "Source/common/PrefixTree.h"
 #import "Source/common/SNTBlockMessage.h"
@@ -102,9 +104,7 @@ static SNTEventState BlockToAllowDecision(SNTEventState blockDecision) {
   std::unique_ptr<SantaCache<std::string, uint64_t>> _touchIDApprovalCache;
 
   std::shared_ptr<santa::santad::process_tree::ProcessTree> _processTree;
-
-  // Expected team ID for santactl ancestor verification in seatbelt rules.
-  std::string _expectedTeamID;
+  std::shared_ptr<santa::SandboxExpectations> _sandboxExpectations;
 }
 
 #pragma mark Initializers
@@ -118,7 +118,8 @@ static SNTEventState BlockToAllowDecision(SNTEventState blockDecision) {
                   policyProcessor:(SNTPolicyProcessor*)policyProcessor
               processControlBlock:(santa::ProcessControlBlock)processControlBlock
                       processTree:
-                          (std::shared_ptr<santa::santad::process_tree::ProcessTree>)processTree {
+                          (std::shared_ptr<santa::santad::process_tree::ProcessTree>)processTree
+              sandboxExpectations:(std::shared_ptr<santa::SandboxExpectations>)sandboxExpectations {
   self = [super init];
   if (self) {
     _ruleTable = ruleTable;
@@ -132,16 +133,14 @@ static SNTEventState BlockToAllowDecision(SNTEventState blockDecision) {
     _touchIDApprovalCache = std::make_unique<SantaCache<std::string, uint64_t>>(100);
     _processControlBlock = processControlBlock;
     _processTree = std::move(processTree);
+    _sandboxExpectations = std::move(sandboxExpectations);
 
     _eventQueue =
         dispatch_queue_create("com.northpolesec.santa.daemon.event_upload", DISPATCH_QUEUE_SERIAL);
 
     // This establishes the XPC connection between libsecurity and syspolicyd.
     // Not doing this causes a deadlock as establishing this link goes through xpcproxy.
-    MOLCodesignChecker* selfCS = [[MOLCodesignChecker alloc] initWithSelf];
-    if (selfCS.teamID) {
-      _expectedTeamID = santa::NSStringToUTF8String(selfCS.teamID);
-    }
+    (void)[[MOLCodesignChecker alloc] initWithSelf];
 
     SNTMetricSet* metricSet = [SNTMetricSet sharedInstance];
     _events = [metricSet counterWithName:@"/santa/events"
@@ -278,26 +277,49 @@ static SNTEventState BlockToAllowDecision(SNTEventState blockDecision) {
   cd.codesigningFlags = targetProc->codesigning_flags;
   cd.vnodeId = SantaVnode::VnodeForFile(targetProc->executable);
 
-  // Seatbelt ancestor check: verify that the direct caller is santactl.
-  // We use esMsg->process (the pre-exec calling process) rather than the process
-  // tree, because the parent santactl process may have already exited by the time
-  // this event is processed. The ES message always has valid caller info.
+  // Seatbelt expectation check: the sandboxed exec is authorized iff
+  // santactl pre-registered an expectation for the caller's audit token,
+  // and the expectation matches the exec target under one of two modes:
+  //   * Strict (CS_VALID & (CS_HARD|CS_KILL)): the kernel refuses or kills
+  //     on any page-hash mismatch (verified against XNU cs_invalid_page),
+  //     so cdhash is a strong binding to executed content.
+  //   * Fallback: the kernel does not enforce page integrity, so binary
+  //     identity is verified via (dev, ino, sha256). `(dev, ino)` binds
+  //     the exec'd vnode to the inode santactl pinned; sha256 binds
+  //     content at santad's read time to santactl's hash. This matches
+  //     Santa's posture for every other rule state (see SNTPolicyProcessor).
+  // No expectation -> deny.
+  //
+  // Cache safety: flipping the decision here must not let a later exec of
+  // the same vnode be auto-allowed without re-checking its expectation.
+  // SNTPolicyProcessor sets cd.cacheable=NO for every SEATBELT rule hit,
+  // so the action below becomes SNTActionRespondAllowNoCache rather than
+  // SNTActionRespondAllow.
   if (cd.seatbeltRequired) {
-    bool hasSandboxAncestor = false;
-    const es_process_t* caller = esMsg->process;
-    std::string_view callerSigningID(caller->signing_id.data, caller->signing_id.length);
-    std::string_view callerTeamID(caller->team_id.data, caller->team_id.length);
+    auto maybeExp = _sandboxExpectations->Consume(esMsg->process->audit_token);
+    bool authorized = false;
 
-    if (callerSigningID == "com.northpolesec.santa.ctl" &&
-        std::string(callerTeamID) == _expectedTeamID) {
-      hasSandboxAncestor = true;
+    if (!maybeExp) {
+      cd.decisionExtra = @"Binary requires seatbelt sandbox but no expectation was registered";
+    } else {
+      if (santa::CdhashStrictlyEnforced(targetProc->codesigning_flags)) {
+        authorized = memcmp(maybeExp->cdhash.data(), targetProc->cdhash, CS_CDHASH_LEN) == 0;
+      } else {
+        authorized = maybeExp->dev == targetProc->executable->stat.st_dev &&
+                     maybeExp->ino == targetProc->executable->stat.st_ino && cd.sha256.length > 0 &&
+                     !maybeExp->sha256.empty() &&
+                     santa::NSStringToUTF8String(cd.sha256) == maybeExp->sha256;
+      }
+
+      if (!authorized) {
+        // Intentionally opaque: distinguishing which specific check failed
+        // would give an attacker a tuning signal.
+        cd.decisionExtra = @"Seatbelt expectation verification failed";
+      }
     }
 
-    if (hasSandboxAncestor) {
+    if (authorized) {
       cd.decision = BlockToAllowDecision(cd.decision);
-    } else {
-      cd.decisionExtra =
-          @"Binary requires seatbelt sandbox but santactl sandbox is not an ancestor";
     }
   }
 
