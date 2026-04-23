@@ -17,6 +17,7 @@
 #include <sys/cdefs.h>
 
 #import "Source/common/SNTConfigurator.h"
+#import "Source/santasyncservice/SNTNATSProxyConnect.h"
 #import "Source/santasyncservice/SNTPushClientNATS.h"
 
 __BEGIN_DECLS
@@ -260,5 +261,54 @@ __END_DECLS
 //   // (This will fail with invalid credentials or if NATS server doesn't accept them)
 //   XCTAssertTrue(self.client.isConnected, @"Should connect with valid nkey/JWT");
 // }
+
+- (void)testConnectWithProxyConfigured {
+  // Given: Client with proxy configured
+  self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
+
+  OCMStub([self.mockConfigurator pushProxyURL]).andReturn(@"http://proxy.example:8080");
+  OCMStub([self.mockConfigurator pushProxyCAData]).andReturn(nil);
+  OCMStub([self.mockConfigurator pushProxyCAFile]).andReturn(nil);
+
+  [self.client configureWithPushServer:@"nats-server"
+                             pushToken:@"test-key"
+                                   jwt:@"test-jwt"
+                          pushDeviceID:@"testmachine12345"
+                                  tags:@[ @"test-tag" ]];
+
+  [NSThread sleepForTimeInterval:0.1];
+
+  // When: Attempt to connect (will fail since proxy doesn't exist, but verifies
+  // the proxy code path is exercised without crashing)
+  [self.client connect];
+  [NSThread sleepForTimeInterval:0.5];
+
+  // Then: Should not be connected (proxy unreachable) but should not crash
+  XCTAssertFalse(self.client.isConnected);
+}
+
+- (void)testConnectWithInvalidProxyURL {
+  // Given: Client with invalid proxy URL
+  self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
+
+  OCMStub([self.mockConfigurator pushProxyURL]).andReturn(@"not-a-valid-url");
+  OCMStub([self.mockConfigurator pushProxyCAData]).andReturn(nil);
+  OCMStub([self.mockConfigurator pushProxyCAFile]).andReturn(nil);
+
+  [self.client configureWithPushServer:@"nats-server"
+                             pushToken:@"test-key"
+                                   jwt:@"test-jwt"
+                          pushDeviceID:@"testmachine12345"
+                                  tags:@[ @"test-tag" ]];
+
+  [NSThread sleepForTimeInterval:0.1];
+
+  // When: Attempt to connect
+  [self.client connect];
+  [NSThread sleepForTimeInterval:0.2];
+
+  // Then: Should not connect due to invalid proxy URL
+  XCTAssertFalse(self.client.isConnected);
+}
 
 @end
