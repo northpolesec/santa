@@ -63,8 +63,7 @@ typedef struct {
 /// Create a closure struct from an SNTProxyConfig. Caller must free with SNTProxyClosureDestroy().
 SNTProxyClosure *_Nullable SNTProxyClosureCreate(SNTProxyConfig *_Nonnull config);
 
-/// Free a closure struct and all its owned strings. Also shuts down any active
-/// SSL bridge threads.
+/// Free a closure struct and all its owned strings.
 void SNTProxyClosureDestroy(SNTProxyClosure *_Nullable closure);
 
 /// NATS proxy connection handler callback. Register with natsOptions_SetProxyConnHandler().

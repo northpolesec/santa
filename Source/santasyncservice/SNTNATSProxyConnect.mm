@@ -18,6 +18,7 @@
 
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <poll.h>
 #include <pthread.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -77,6 +78,10 @@ SNTProxyClosure *_Nullable SNTProxyClosureCreate(SNTProxyConfig *config) {
   if (!closure) return NULL;
 
   closure->proxyHost = strdup(config.host.UTF8String);
+  if (!closure->proxyHost) {
+    free(closure);
+    return NULL;
+  }
   closure->proxyPort = config.port;
   closure->proxyUseTLS = config.useTLS;
 
@@ -156,14 +161,8 @@ typedef struct {
 static void *SSLBridgeThread(void *arg) {
   SSLBridgeCtx *ctx = (SSLBridgeCtx *)arg;
   char buf[16384];
-  fd_set readfds;
 
   while (true) {
-    FD_ZERO(&readfds);
-    FD_SET(ctx->localFd, &readfds);
-    FD_SET(ctx->proxySock, &readfds);
-    int maxfd = (ctx->localFd > ctx->proxySock ? ctx->localFd : ctx->proxySock) + 1;
-
     if (SSL_pending(ctx->ssl) > 0) {
       int n = SSL_read(ctx->ssl, buf, sizeof(buf));
       if (n <= 0) break;
@@ -171,17 +170,22 @@ static void *SSLBridgeThread(void *arg) {
       continue;
     }
 
-    struct timeval tv = {.tv_sec = 300, .tv_usec = 0};
-    int ready = select(maxfd, &readfds, NULL, NULL, &tv);
+    struct pollfd pfds[2];
+    pfds[0].fd = ctx->localFd;
+    pfds[0].events = POLLIN;
+    pfds[1].fd = ctx->proxySock;
+    pfds[1].events = POLLIN;
+
+    int ready = poll(pfds, 2, 300 * 1000);
     if (ready <= 0) break;
 
-    if (FD_ISSET(ctx->localFd, &readfds)) {
+    if (pfds[0].revents & POLLIN) {
       ssize_t n = read(ctx->localFd, buf, sizeof(buf));
       if (n <= 0) break;
       if (SSL_write(ctx->ssl, buf, (int)n) <= 0) break;
     }
 
-    if (FD_ISSET(ctx->proxySock, &readfds)) {
+    if (pfds[1].revents & POLLIN) {
       int n = SSL_read(ctx->ssl, buf, sizeof(buf));
       if (n <= 0) break;
       if (write(ctx->localFd, buf, n) <= 0) break;
@@ -345,6 +349,9 @@ natsStatus SNTNATSProxyConnHandler(natsSock *fd, char *host, int port, void *clo
        proxy->proxyPort, host, port);
 
   if (!ssl) {
+    // Reset receive timeout before handing socket to NATS
+    struct timeval tv_zero = {0, 0};
+    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv_zero, sizeof(tv_zero));
     *fd = (natsSock)sock;
     return NATS_OK;
   }
