@@ -28,13 +28,13 @@ NS_ASSUME_NONNULL_BEGIN
 
 /// Parsed components of a proxy URL.
 @interface SNTProxyConfig : NSObject
-@property(nonatomic, copy) NSString *host;
+@property(nonatomic, copy) NSString* host;
 @property(nonatomic) int port;
 @property(nonatomic) BOOL useTLS;
 /// Base64-encoded "user:pass" for Proxy-Authorization header. Nil if no credentials.
-@property(nullable, nonatomic, copy) NSString *basicAuth;
+@property(nullable, nonatomic, copy) NSString* basicAuth;
 /// PEM-encoded custom CA certificate data. Nil if using system trust store.
-@property(nullable, nonatomic, copy) NSData *customCAData;
+@property(nullable, nonatomic, copy) NSData* customCAData;
 @end
 
 NS_ASSUME_NONNULL_END
@@ -43,28 +43,28 @@ NS_ASSUME_NONNULL_END
 /// Accepted formats: http://host:port, https://host:port,
 /// http://user:pass@host:port, https://user:pass@host:port.
 /// Returns nil if the URL is malformed or has an unsupported scheme.
-SNTProxyConfig *_Nullable SNTParseProxyURL(NSString *_Nonnull proxyURL);
+SNTProxyConfig* _Nullable SNTParseProxyURL(NSString* _Nonnull proxyURL);
 
 /// Parse an HTTP response status line (e.g. "HTTP/1.1 200 Connection established").
 /// Returns the status code, or -1 if the line is malformed.
 /// Accepts both HTTP/1.0 and HTTP/1.1.
-int SNTParseHTTPStatusLine(NSString *_Nonnull statusLine);
+int SNTParseHTTPStatusLine(NSString* _Nonnull statusLine);
 
 /// Closure structure passed to the NATS proxy connection handler callback.
 /// Heap-allocated; caller is responsible for freeing with SNTProxyClosureDestroy().
 typedef struct {
-  char *_Nonnull proxyHost;
+  char* _Nonnull proxyHost;
   int proxyPort;
   bool proxyUseTLS;
-  char *_Nullable basicAuth;      // Base64-encoded "user:pass", or NULL
-  char *_Nullable customCAPEM;    // PEM CA data as C string, or NULL
+  char* _Nullable basicAuth;    // Base64-encoded "user:pass", or NULL
+  char* _Nullable customCAPEM;  // PEM CA data as C string, or NULL
 } SNTProxyClosure;
 
 /// Create a closure struct from an SNTProxyConfig. Caller must free with SNTProxyClosureDestroy().
-SNTProxyClosure *_Nullable SNTProxyClosureCreate(SNTProxyConfig *_Nonnull config);
+SNTProxyClosure* _Nullable SNTProxyClosureCreate(SNTProxyConfig* _Nonnull config);
 
 /// Free a closure struct and all its owned strings.
-void SNTProxyClosureDestroy(SNTProxyClosure *_Nullable closure);
+void SNTProxyClosureDestroy(SNTProxyClosure* _Nullable closure);
 
 /// NATS proxy connection handler callback. Register with natsOptions_SetProxyConnHandler().
 /// The closure parameter must be a SNTProxyClosure*.
@@ -73,5 +73,5 @@ void SNTProxyClosureDestroy(SNTProxyClosure *_Nullable closure);
 /// For https:// proxies: performs TLS to the proxy, creates a socketpair, and
 /// spawns a detached bridge thread that shuttles bytes between the socketpair
 /// and the SSL connection. Returns one end of the socketpair to NATS.
-natsStatus SNTNATSProxyConnHandler(natsSock *_Nonnull fd, char *_Nonnull host, int port,
-                                    void *_Nullable closure);
+natsStatus SNTNATSProxyConnHandler(natsSock* _Nonnull fd, char* _Nonnull host, int port,
+                                   void* _Nullable closure);

@@ -24,7 +24,7 @@
 #pragma mark - URL Parsing Tests
 
 - (void)testParseHTTPProxyURL {
-  SNTProxyConfig *config = SNTParseProxyURL(@"http://proxy.corp:8080");
+  SNTProxyConfig* config = SNTParseProxyURL(@"http://proxy.corp:8080");
   XCTAssertNotNil(config);
   XCTAssertEqualObjects(config.host, @"proxy.corp");
   XCTAssertEqual(config.port, 8080);
@@ -33,7 +33,7 @@
 }
 
 - (void)testParseHTTPSProxyURL {
-  SNTProxyConfig *config = SNTParseProxyURL(@"https://proxy.corp:8443");
+  SNTProxyConfig* config = SNTParseProxyURL(@"https://proxy.corp:8443");
   XCTAssertNotNil(config);
   XCTAssertEqualObjects(config.host, @"proxy.corp");
   XCTAssertEqual(config.port, 8443);
@@ -42,32 +42,32 @@
 }
 
 - (void)testParseProxyURLWithBasicAuth {
-  SNTProxyConfig *config = SNTParseProxyURL(@"http://user:pass@proxy.corp:8080");
+  SNTProxyConfig* config = SNTParseProxyURL(@"http://user:pass@proxy.corp:8080");
   XCTAssertNotNil(config);
   XCTAssertEqualObjects(config.host, @"proxy.corp");
   XCTAssertEqual(config.port, 8080);
   XCTAssertFalse(config.useTLS);
   XCTAssertNotNil(config.basicAuth);
-  NSData *decoded = [[NSData alloc] initWithBase64EncodedString:config.basicAuth options:0];
-  NSString *decodedStr = [[NSString alloc] initWithData:decoded encoding:NSUTF8StringEncoding];
+  NSData* decoded = [[NSData alloc] initWithBase64EncodedString:config.basicAuth options:0];
+  NSString* decodedStr = [[NSString alloc] initWithData:decoded encoding:NSUTF8StringEncoding];
   XCTAssertEqualObjects(decodedStr, @"user:pass");
 }
 
 - (void)testParseHTTPSProxyURLWithBasicAuth {
-  SNTProxyConfig *config = SNTParseProxyURL(@"https://admin:s3cret@proxy.corp:8443");
+  SNTProxyConfig* config = SNTParseProxyURL(@"https://admin:s3cret@proxy.corp:8443");
   XCTAssertNotNil(config);
   XCTAssertTrue(config.useTLS);
   XCTAssertNotNil(config.basicAuth);
-  NSData *decoded = [[NSData alloc] initWithBase64EncodedString:config.basicAuth options:0];
-  NSString *decodedStr = [[NSString alloc] initWithData:decoded encoding:NSUTF8StringEncoding];
+  NSData* decoded = [[NSData alloc] initWithBase64EncodedString:config.basicAuth options:0];
+  NSString* decodedStr = [[NSString alloc] initWithData:decoded encoding:NSUTF8StringEncoding];
   XCTAssertEqualObjects(decodedStr, @"admin:s3cret");
 }
 
 - (void)testParseProxyURLWithSpecialCharsInPassword {
-  SNTProxyConfig *config = SNTParseProxyURL(@"http://user:p%40ss%3Aword@proxy.corp:8080");
+  SNTProxyConfig* config = SNTParseProxyURL(@"http://user:p%40ss%3Aword@proxy.corp:8080");
   XCTAssertNotNil(config);
-  NSData *decoded = [[NSData alloc] initWithBase64EncodedString:config.basicAuth options:0];
-  NSString *decodedStr = [[NSString alloc] initWithData:decoded encoding:NSUTF8StringEncoding];
+  NSData* decoded = [[NSData alloc] initWithBase64EncodedString:config.basicAuth options:0];
+  NSString* decodedStr = [[NSString alloc] initWithData:decoded encoding:NSUTF8StringEncoding];
   XCTAssertEqualObjects(decodedStr, @"user:p@ss:word");
 }
 
@@ -120,8 +120,8 @@
 #pragma mark - Closure Lifecycle Tests
 
 - (void)testClosureCreateAndDestroy {
-  SNTProxyConfig *config = SNTParseProxyURL(@"http://user:pass@proxy.corp:8080");
-  SNTProxyClosure *closure = SNTProxyClosureCreate(config);
+  SNTProxyConfig* config = SNTParseProxyURL(@"http://user:pass@proxy.corp:8080");
+  SNTProxyClosure* closure = SNTProxyClosureCreate(config);
   XCTAssertTrue(closure != NULL);
   XCTAssertEqual(strcmp(closure->proxyHost, "proxy.corp"), 0);
   XCTAssertEqual(closure->proxyPort, 8080);
@@ -132,10 +132,10 @@
 }
 
 - (void)testClosureWithCustomCA {
-  SNTProxyConfig *config = SNTParseProxyURL(@"http://proxy.corp:8080");
+  SNTProxyConfig* config = SNTParseProxyURL(@"http://proxy.corp:8080");
   config.customCAData = [@"-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----"
       dataUsingEncoding:NSUTF8StringEncoding];
-  SNTProxyClosure *closure = SNTProxyClosureCreate(config);
+  SNTProxyClosure* closure = SNTProxyClosureCreate(config);
   XCTAssertTrue(closure != NULL);
   XCTAssertTrue(closure->customCAPEM != NULL);
   XCTAssertTrue(strstr(closure->customCAPEM, "BEGIN CERTIFICATE") != NULL);

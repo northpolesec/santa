@@ -518,8 +518,8 @@ santa_unit_test(
     },
     tags = ["manual"],  # Only run when explicitly requested
     deps = [
-        ":NATS_lib",
         ":NATSProxyConnect",
+        ":NATS_lib",
         "//Source/common:SNTConfigurator",
         "@OCMock",
         "@nats_c//:nats",

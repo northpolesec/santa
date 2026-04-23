@@ -726,8 +726,9 @@ extern NSString* _Nonnull const kEnableMenuItemUserOverride;
 
 ///
 ///  Proxy URL for the NATS push connection.
-///  Accepted formats: http://host:port, https://host:port, http://user:pass@host:port, https://user:pass@host:port.
-///  When set, NATS push connections are tunneled through this proxy via HTTP CONNECT.
+///  Accepted formats: http://host:port, https://host:port, http://user:pass@host:port,
+///  https://user:pass@host:port. When set, NATS push connections are tunneled through this proxy
+///  via HTTP CONNECT.
 ///
 @property(nullable, readonly, nonatomic) NSString* pushProxyURL;
 

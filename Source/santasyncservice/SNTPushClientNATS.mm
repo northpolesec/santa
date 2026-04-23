@@ -27,8 +27,8 @@
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTSystemInfo.h"
-#import "Source/santasyncservice/SNTSyncState.h"
 #import "Source/santasyncservice/SNTNATSProxyConnect.h"
+#import "Source/santasyncservice/SNTSyncState.h"
 
 __BEGIN_DECLS
 
@@ -160,7 +160,7 @@ static int NATSSSLVerifyCallback(int preverifyOk, void* ctx) {
 // Track the last error for better retry diagnostics
 @property(nonatomic, copy) NSString* lastConnectionError;
 // Proxy connection closure -- must remain valid for NATS reconnections
-@property(nonatomic) SNTProxyClosure *proxyClosure;
+@property(nonatomic) SNTProxyClosure* proxyClosure;
 @end
 
 @implementation SNTPushClientNATS
@@ -447,9 +447,9 @@ static int NATSSSLVerifyCallback(int preverifyOk, void* ctx) {
     natsOptions_SetClosedCB(opts, &closedCallback, (__bridge void*)self);
 
     // Configure proxy if set
-    NSString *proxyURL = [[SNTConfigurator configurator] pushProxyURL];
+    NSString* proxyURL = [[SNTConfigurator configurator] pushProxyURL];
     if (proxyURL.length) {
-      SNTProxyConfig *proxyConfig = SNTParseProxyURL(proxyURL);
+      SNTProxyConfig* proxyConfig = SNTParseProxyURL(proxyURL);
       if (!proxyConfig) {
         LOGE(@"NATS: Invalid PushProxyURL: %@", proxyURL);
         natsOptions_Destroy(opts);
@@ -457,14 +457,15 @@ static int NATSSSLVerifyCallback(int preverifyOk, void* ctx) {
       }
 
       // Load custom CA if configured (PushProxyCAData takes precedence over PushProxyCAFile)
-      NSData *caData = [[SNTConfigurator configurator] pushProxyCAData];
+      NSData* caData = [[SNTConfigurator configurator] pushProxyCAData];
       if (!caData) {
-        NSString *caFile = [[SNTConfigurator configurator] pushProxyCAFile];
+        NSString* caFile = [[SNTConfigurator configurator] pushProxyCAFile];
         if (caFile.length) {
-          NSError *error;
+          NSError* error;
           caData = [NSData dataWithContentsOfFile:caFile options:0 error:&error];
           if (!caData) {
-            LOGW(@"NATS: Failed to read PushProxyCAFile %@: %@", caFile, error.localizedDescription);
+            LOGW(@"NATS: Failed to read PushProxyCAFile %@: %@", caFile,
+                 error.localizedDescription);
             natsOptions_Destroy(opts);
             return;
           }
@@ -475,7 +476,7 @@ static int NATSSSLVerifyCallback(int preverifyOk, void* ctx) {
       // Load custom CA into NATS TLS context for the inner connection too.
       // natsOptions_SetCATrustedCertificates takes PEM string data directly (not a file path).
       if (caData) {
-        NSString *pemStr = [[NSString alloc] initWithData:caData encoding:NSUTF8StringEncoding];
+        NSString* pemStr = [[NSString alloc] initWithData:caData encoding:NSUTF8StringEncoding];
         if (!pemStr) {
           LOGW(@"NATS: PushProxyCAData/PushProxyCAFile is not valid UTF-8 PEM data");
           natsOptions_Destroy(opts);

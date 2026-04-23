@@ -31,38 +31,38 @@
 @implementation SNTProxyConfig
 @end
 
-SNTProxyConfig *_Nullable SNTParseProxyURL(NSString *proxyURL) {
+SNTProxyConfig* _Nullable SNTParseProxyURL(NSString* proxyURL) {
   if (!proxyURL.length) return nil;
 
-  NSURL *url = [NSURL URLWithString:proxyURL];
+  NSURL* url = [NSURL URLWithString:proxyURL];
   if (!url || !url.host || !url.port) return nil;
 
-  NSString *scheme = url.scheme.lowercaseString;
+  NSString* scheme = url.scheme.lowercaseString;
   if (![scheme isEqualToString:@"http"] && ![scheme isEqualToString:@"https"]) return nil;
 
-  SNTProxyConfig *config = [[SNTProxyConfig alloc] init];
+  SNTProxyConfig* config = [[SNTProxyConfig alloc] init];
   config.host = url.host;
   config.port = url.port.intValue;
   config.useTLS = [scheme isEqualToString:@"https"];
 
   if (url.user && url.password) {
-    NSString *user = url.user.stringByRemovingPercentEncoding;
-    NSString *password = url.password.stringByRemovingPercentEncoding;
-    NSString *credentials = [NSString stringWithFormat:@"%@:%@", user, password];
-    NSData *credData = [credentials dataUsingEncoding:NSUTF8StringEncoding];
+    NSString* user = url.user.stringByRemovingPercentEncoding;
+    NSString* password = url.password.stringByRemovingPercentEncoding;
+    NSString* credentials = [NSString stringWithFormat:@"%@:%@", user, password];
+    NSData* credData = [credentials dataUsingEncoding:NSUTF8StringEncoding];
     config.basicAuth = [credData base64EncodedStringWithOptions:0];
   }
 
   return config;
 }
 
-int SNTParseHTTPStatusLine(NSString *statusLine) {
+int SNTParseHTTPStatusLine(NSString* statusLine) {
   if (!statusLine.length) return -1;
 
-  NSArray<NSString *> *parts = [statusLine componentsSeparatedByString:@" "];
+  NSArray<NSString*>* parts = [statusLine componentsSeparatedByString:@" "];
   if (parts.count < 2) return -1;
 
-  NSString *version = parts[0];
+  NSString* version = parts[0];
   if (![version hasPrefix:@"HTTP/"]) return -1;
 
   NSInteger code = parts[1].integerValue;
@@ -71,10 +71,10 @@ int SNTParseHTTPStatusLine(NSString *statusLine) {
   return (int)code;
 }
 
-SNTProxyClosure *_Nullable SNTProxyClosureCreate(SNTProxyConfig *config) {
+SNTProxyClosure* _Nullable SNTProxyClosureCreate(SNTProxyConfig* config) {
   if (!config) return NULL;
 
-  SNTProxyClosure *closure = (SNTProxyClosure *)calloc(1, sizeof(SNTProxyClosure));
+  SNTProxyClosure* closure = (SNTProxyClosure*)calloc(1, sizeof(SNTProxyClosure));
   if (!closure) return NULL;
 
   closure->proxyHost = strdup(config.host.UTF8String);
@@ -90,7 +90,7 @@ SNTProxyClosure *_Nullable SNTProxyClosureCreate(SNTProxyConfig *config) {
   }
 
   if (config.customCAData) {
-    NSString *pemStr = [[NSString alloc] initWithData:config.customCAData
+    NSString* pemStr = [[NSString alloc] initWithData:config.customCAData
                                              encoding:NSUTF8StringEncoding];
     if (pemStr) {
       closure->customCAPEM = strdup(pemStr.UTF8String);
@@ -100,7 +100,7 @@ SNTProxyClosure *_Nullable SNTProxyClosureCreate(SNTProxyConfig *config) {
   return closure;
 }
 
-void SNTProxyClosureDestroy(SNTProxyClosure *closure) {
+void SNTProxyClosureDestroy(SNTProxyClosure* closure) {
   if (!closure) return;
   free(closure->proxyHost);
   free(closure->basicAuth);
@@ -110,16 +110,16 @@ void SNTProxyClosureDestroy(SNTProxyClosure *closure) {
 
 #pragma mark - I/O Helpers
 
-static ssize_t ProxyRead(int fd, SSL *ssl, void *buf, size_t len) {
+static ssize_t ProxyRead(int fd, SSL* ssl, void* buf, size_t len) {
   return ssl ? SSL_read(ssl, buf, (int)len) : read(fd, buf, len);
 }
 
-static ssize_t ProxyWrite(int fd, SSL *ssl, const void *buf, size_t len) {
+static ssize_t ProxyWrite(int fd, SSL* ssl, const void* buf, size_t len) {
   return ssl ? SSL_write(ssl, buf, (int)len) : write(fd, buf, len);
 }
 
-static NSString *ReadLineFromProxy(int fd, SSL *ssl, int timeoutSecs) {
-  NSMutableData *lineData = [NSMutableData data];
+static NSString* ReadLineFromProxy(int fd, SSL* ssl, int timeoutSecs) {
+  NSMutableData* lineData = [NSMutableData data];
   char c;
   struct timeval tv = {.tv_sec = timeoutSecs, .tv_usec = 0};
   setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
@@ -128,7 +128,7 @@ static NSString *ReadLineFromProxy(int fd, SSL *ssl, int timeoutSecs) {
     ssize_t n = ProxyRead(fd, ssl, &c, 1);
     if (n <= 0) return nil;
     if (c == '\n') {
-      NSString *line = [[NSString alloc] initWithData:lineData encoding:NSUTF8StringEncoding];
+      NSString* line = [[NSString alloc] initWithData:lineData encoding:NSUTF8StringEncoding];
       if ([line hasSuffix:@"\r"]) line = [line substringToIndex:line.length - 1];
       return line;
     }
@@ -137,8 +137,8 @@ static NSString *ReadLineFromProxy(int fd, SSL *ssl, int timeoutSecs) {
   return nil;
 }
 
-static bool SendAllToProxy(int fd, SSL *ssl, const void *data, size_t len) {
-  const char *p = (const char *)data;
+static bool SendAllToProxy(int fd, SSL* ssl, const void* data, size_t len) {
+  const char* p = (const char*)data;
   size_t remaining = len;
   while (remaining > 0) {
     ssize_t n = ProxyWrite(fd, ssl, p, remaining);
@@ -154,12 +154,12 @@ static bool SendAllToProxy(int fd, SSL *ssl, const void *data, size_t len) {
 typedef struct {
   int localFd;
   int proxySock;
-  SSL *ssl;
-  SSL_CTX *sslCtx;
+  SSL* ssl;
+  SSL_CTX* sslCtx;
 } SSLBridgeCtx;
 
-static void *SSLBridgeThread(void *arg) {
-  SSLBridgeCtx *ctx = (SSLBridgeCtx *)arg;
+static void* SSLBridgeThread(void* arg) {
+  SSLBridgeCtx* ctx = (SSLBridgeCtx*)arg;
   char buf[16384];
 
   while (true) {
@@ -203,15 +203,15 @@ static void *SSLBridgeThread(void *arg) {
 
 #pragma mark - HTTP CONNECT Handler
 
-static SSL_CTX *CreateProxySSLContext(const char *customCAPEM) {
-  SSL_CTX *ctx = SSL_CTX_new(TLS_client_method());
+static SSL_CTX* CreateProxySSLContext(const char* customCAPEM) {
+  SSL_CTX* ctx = SSL_CTX_new(TLS_client_method());
   if (!ctx) return NULL;
 
   if (customCAPEM) {
-    BIO *bio = BIO_new_mem_buf(customCAPEM, -1);
+    BIO* bio = BIO_new_mem_buf(customCAPEM, -1);
     if (bio) {
-      X509_STORE *store = SSL_CTX_get_cert_store(ctx);
-      X509 *cert;
+      X509_STORE* store = SSL_CTX_get_cert_store(ctx);
+      X509* cert;
       while ((cert = PEM_read_bio_X509(bio, NULL, NULL, NULL)) != NULL) {
         X509_STORE_add_cert(store, cert);
         X509_free(cert);
@@ -226,8 +226,8 @@ static SSL_CTX *CreateProxySSLContext(const char *customCAPEM) {
   return ctx;
 }
 
-natsStatus SNTNATSProxyConnHandler(natsSock *fd, char *host, int port, void *closure) {
-  SNTProxyClosure *proxy = (SNTProxyClosure *)closure;
+natsStatus SNTNATSProxyConnHandler(natsSock* fd, char* host, int port, void* closure) {
+  SNTProxyClosure* proxy = (SNTProxyClosure*)closure;
   if (!proxy) return NATS_ERR;
 
   struct addrinfo hints = {};
@@ -237,7 +237,7 @@ natsStatus SNTNATSProxyConnHandler(natsSock *fd, char *host, int port, void *clo
   char portStr[16];
   snprintf(portStr, sizeof(portStr), "%d", proxy->proxyPort);
 
-  struct addrinfo *res = NULL;
+  struct addrinfo* res = NULL;
   int gaiErr = getaddrinfo(proxy->proxyHost, portStr, &hints, &res);
   if (gaiErr != 0 || !res) {
     LOGE(@"NATS proxy: Failed to resolve %s:%d: %s", proxy->proxyHost, proxy->proxyPort,
@@ -264,8 +264,8 @@ natsStatus SNTNATSProxyConnHandler(natsSock *fd, char *host, int port, void *clo
   }
   freeaddrinfo(res);
 
-  SSL_CTX *sslCtx = NULL;
-  SSL *ssl = NULL;
+  SSL_CTX* sslCtx = NULL;
+  SSL* ssl = NULL;
 
   if (proxy->proxyUseTLS) {
     sslCtx = CreateProxySSLContext(proxy->customCAPEM);
@@ -300,7 +300,7 @@ natsStatus SNTNATSProxyConnHandler(natsSock *fd, char *host, int port, void *clo
     LOGD(@"NATS proxy: TLS established with proxy %s:%d", proxy->proxyHost, proxy->proxyPort);
   }
 
-  NSMutableString *request = [NSMutableString stringWithFormat:@"CONNECT %s:%d HTTP/1.1\r\n"
+  NSMutableString* request = [NSMutableString stringWithFormat:@"CONNECT %s:%d HTTP/1.1\r\n"
                                                                @"Host: %s:%d\r\n",
                                                                host, port, host, port];
   if (proxy->basicAuth) {
@@ -308,26 +308,32 @@ natsStatus SNTNATSProxyConnHandler(natsSock *fd, char *host, int port, void *clo
   }
   [request appendString:@"\r\n"];
 
-  const char *reqBytes = request.UTF8String;
+  const char* reqBytes = request.UTF8String;
   if (!SendAllToProxy(sock, ssl, reqBytes, strlen(reqBytes))) {
     LOGE(@"NATS proxy: Failed to send CONNECT request to %s:%d", proxy->proxyHost,
          proxy->proxyPort);
-    if (ssl) { SSL_free(ssl); SSL_CTX_free(sslCtx); }
+    if (ssl) {
+      SSL_free(ssl);
+      SSL_CTX_free(sslCtx);
+    }
     close(sock);
     return NATS_ERR;
   }
 
-  NSString *statusLine = ReadLineFromProxy(sock, ssl, 30);
+  NSString* statusLine = ReadLineFromProxy(sock, ssl, 30);
   if (!statusLine) {
     LOGE(@"NATS proxy: No response from proxy %s:%d", proxy->proxyHost, proxy->proxyPort);
-    if (ssl) { SSL_free(ssl); SSL_CTX_free(sslCtx); }
+    if (ssl) {
+      SSL_free(ssl);
+      SSL_CTX_free(sslCtx);
+    }
     close(sock);
     return NATS_ERR;
   }
 
   int statusCode = SNTParseHTTPStatusLine(statusLine);
 
-  NSString *headerLine;
+  NSString* headerLine;
   while ((headerLine = ReadLineFromProxy(sock, ssl, 30)) != nil) {
     if (headerLine.length == 0) break;
   }
@@ -340,7 +346,10 @@ natsStatus SNTNATSProxyConnHandler(natsSock *fd, char *host, int port, void *clo
       LOGE(@"NATS proxy: CONNECT failed with status %d from %s:%d: %@", statusCode,
            proxy->proxyHost, proxy->proxyPort, statusLine);
     }
-    if (ssl) { SSL_free(ssl); SSL_CTX_free(sslCtx); }
+    if (ssl) {
+      SSL_free(ssl);
+      SSL_CTX_free(sslCtx);
+    }
     close(sock);
     return NATS_ERR;
   }
@@ -365,7 +374,7 @@ natsStatus SNTNATSProxyConnHandler(natsSock *fd, char *host, int port, void *clo
     return NATS_ERR;
   }
 
-  SSLBridgeCtx *bridgeCtx = (SSLBridgeCtx *)calloc(1, sizeof(SSLBridgeCtx));
+  SSLBridgeCtx* bridgeCtx = (SSLBridgeCtx*)calloc(1, sizeof(SSLBridgeCtx));
   bridgeCtx->localFd = pair[1];
   bridgeCtx->proxySock = sock;
   bridgeCtx->ssl = ssl;
