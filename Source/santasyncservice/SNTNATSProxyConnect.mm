@@ -248,27 +248,30 @@ natsStatus SNTNATSProxyConnHandler(natsSock* fd, char* host, int port, void* clo
     return NATS_ERR;
   }
 
-  int sock = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-  if (sock < 0) {
-    LOGE(@"NATS proxy: Failed to create socket: %s", strerror(errno));
-    freeaddrinfo(res);
-    return NATS_ERR;
-  }
+  // Iterate all resolved addresses (e.g. IPv4 + IPv6) until one connects
+  int sock = -1;
+  for (struct addrinfo* rp = res; rp != NULL; rp = rp->ai_next) {
+    sock = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+    if (sock < 0) continue;
 
-  int on = 1;
-  setsockopt(sock, SOL_SOCKET, SO_NOSIGPIPE, &on, sizeof(on));
+    int on = 1;
+    setsockopt(sock, SOL_SOCKET, SO_NOSIGPIPE, &on, sizeof(on));
 
-  struct timeval tv = {.tv_sec = 30, .tv_usec = 0};
-  setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+    struct timeval tv = {.tv_sec = 30, .tv_usec = 0};
+    setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
 
-  if (connect(sock, res->ai_addr, res->ai_addrlen) != 0) {
-    LOGE(@"NATS proxy: Failed to connect to %s:%d: %s", proxy->proxyHost, proxy->proxyPort,
-         strerror(errno));
+    if (connect(sock, rp->ai_addr, rp->ai_addrlen) == 0) break;
+
     close(sock);
-    freeaddrinfo(res);
-    return NATS_ERR;
+    sock = -1;
   }
   freeaddrinfo(res);
+
+  if (sock < 0) {
+    LOGE(@"NATS proxy: Failed to connect to %s:%d: %s", proxy->proxyHost, proxy->proxyPort,
+         strerror(errno));
+    return NATS_ERR;
+  }
 
   SSL_CTX* sslCtx = NULL;
   SSL* ssl = NULL;
@@ -365,9 +368,10 @@ natsStatus SNTNATSProxyConnHandler(natsSock* fd, char* host, int port, void* clo
        proxy->proxyPort, host, port);
 
   if (!ssl) {
-    // Reset receive timeout before handing socket to NATS
+    // Reset timeouts before handing socket to NATS
     struct timeval tv_zero = {0, 0};
     setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv_zero, sizeof(tv_zero));
+    setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv_zero, sizeof(tv_zero));
     *fd = (natsSock)sock;
     return NATS_OK;
   }
