@@ -140,6 +140,20 @@ export const SantaConfigKeyGroups: SantaConfigGroups = {
       repeated: true,
       versionAdded: "2026.3",
     },
+    {
+      key: "AllowedSantaCommands",
+      description:
+        `Array of allowed Santa Commands. If the key \`AllowedSantaCommands\` is unset (nil), all commands are allowed. 
+        If  \`AllowedSantaCommands\` is an empty array none of the commands are allowed.`,
+      type: "string",
+      syncConfigurable: false,
+      repeated: true,
+      possibleValues: [
+        { value: "kill" },
+        { value: "ping" },
+      ],
+      versionAdded: "2026.3",
+    },
   ],
   gui: [
     {
@@ -758,7 +772,7 @@ changes in the release notes of any future release that changes them.`,
   usb: [
     {
       key: "BlockUSBMount",
-      description: "Deprecated: use RemovableMediaAction instead. If true, blocking Removable Media (e.g. USB Mass storage) feature is enabled.",
+      description: "Deprecated: use \`RemovableMediaAction\` instead. If true, blocking Removable Media (e.g. USB Mass storage) feature is enabled.",
       type: "bool",
       syncConfigurable: true,
       defaultValue: false,
@@ -766,7 +780,7 @@ changes in the release notes of any future release that changes them.`,
     },
     {
       key: "RemountUSBMode",
-      description: `Deprecated: use RemovableMediaRemountFlags instead. Array of strings for arguments to pass to \`mount -o\` when forcibly remounting devices.`,
+      description: `Deprecated: use \`RemovableMediaRemountFlags\` instead. Array of strings for arguments to pass to \`mount -o\` when forcibly remounting devices.`,
       type: "string",
       syncConfigurable: true,
       repeated: true,
@@ -786,7 +800,7 @@ changes in the release notes of any future release that changes them.`,
     {
       key: "RemovableMediaAction",
       description:
-        "Action for all removable media. If unset, falls back to deprecated BlockUSBMount + RemountUSBMode.",
+        "Action for all removable media. If unset, falls back to deprecated \`BlockUSBMount\` + \`RemountUSBMode\`.",
       type: "string",
       syncConfigurable: true,
       possibleValues: [
@@ -798,7 +812,7 @@ changes in the release notes of any future release that changes them.`,
     {
       key: "RemovableMediaRemountFlags",
       description:
-        "Array of mount flag arguments when RemovableMediaAction is Remount. If unset, falls back to deprecated RemountUSBMode.",
+        "Array of mount flag arguments when \`RemovableMediaAction\` is Remount. If unset, falls back to deprecated \`RemountUSBMode\`.",
       type: "string",
       syncConfigurable: true,
       repeated: true,
@@ -829,7 +843,7 @@ changes in the release notes of any future release that changes them.`,
     {
       key: "EncryptedRemovableMediaRemountFlags",
       description:
-        "Array of mount flag arguments for encrypted removable media when EncryptedRemovableMediaAction is Remount.",
+        "Array of mount flag arguments for encrypted removable media when \`EncryptedRemovableMediaAction\` is Remount.",
       type: "string",
       syncConfigurable: true,
       repeated: true,
