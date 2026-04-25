@@ -15,12 +15,15 @@
 
 #include <CoreFoundation/CoreFoundation.h>
 #include <IOKit/IOKitLib.h>
-#include <IOKit/usb/IOUSBLib.h>
 #import <XCTest/XCTest.h>
 
 #include "Source/common/ScopedIOObjectRef.h"
 
 using santa::ScopedIOObjectRef;
+
+// Always-present, single-instance IOKit class used to obtain a real
+// io_service_t for these tests without depending on attached hardware.
+static constexpr const char* kTestIOServiceClass = "IOPlatformExpertDevice";
 
 @interface ScopedIOObjectRefTest : XCTestCase
 @end
@@ -43,7 +46,7 @@ using santa::ScopedIOObjectRef;
 
   // Operator bool is `true` when object is NOT null
   {
-    CFMutableDictionaryRef matchingDict = IOServiceMatching(kIOUSBDeviceClassName);
+    CFMutableDictionaryRef matchingDict = IOServiceMatching(kTestIOServiceClass);
     XCTAssertNotEqual((CFMutableDictionaryRef)NULL, matchingDict);
 
     io_service_t service = IOServiceGetMatchingService(kIOMainPortDefault, matchingDict);
@@ -57,7 +60,7 @@ using santa::ScopedIOObjectRef;
 }
 
 - (void)testAssume {
-  CFMutableDictionaryRef matchingDict = IOServiceMatching(kIOUSBDeviceClassName);
+  CFMutableDictionaryRef matchingDict = IOServiceMatching(kTestIOServiceClass);
   XCTAssertNotEqual((CFMutableDictionaryRef)NULL, matchingDict);
 
   io_service_t service = IOServiceGetMatchingService(kIOMainPortDefault, matchingDict);
@@ -77,7 +80,7 @@ using santa::ScopedIOObjectRef;
 }
 
 - (void)testRetain {
-  CFMutableDictionaryRef matchingDict = IOServiceMatching(kIOUSBDeviceClassName);
+  CFMutableDictionaryRef matchingDict = IOServiceMatching(kTestIOServiceClass);
   XCTAssertNotEqual((CFMutableDictionaryRef)NULL, matchingDict);
 
   io_service_t service = IOServiceGetMatchingService(kIOMainPortDefault, matchingDict);
