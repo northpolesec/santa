@@ -155,11 +155,16 @@
 - (instancetype)initWithBinaryPath:(NSString*)binaryPath;
 
 /**
-  Wrapper around initWithBinaryPath:error: that takes a file descriptor for reading.
-  The file descriptor will be used to read binary header infomation. This provides a minor
-  performace increase if the caller already has the file open.
+  Initialize with a binary on disk via a caller-supplied file descriptor.
 
-  @note The file offset will be set to the amount of bytes read while parsing the header.
+  The descriptor must refer to a regular-file Mach-O. SecStaticCode operates
+  on the descriptor's vnode (via /dev/fd/N) rather than re-resolving
+  `binaryPath`, so a rename of `binaryPath` between the caller's open() and
+  this call does not affect the result. The caller-supplied path is retained
+  for display via the `binaryPath` accessor only.
+
+  @note The file offset will be set to the amount of bytes read while parsing
+  the header.
 */
 - (instancetype)initWithBinaryPath:(NSString*)binaryPath
                     fileDescriptor:(int)fileDescriptor
