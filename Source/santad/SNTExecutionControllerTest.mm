@@ -28,6 +28,7 @@
 #import "Source/common/SNTMetricSet.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTRuleIdentifiers.h"
+#include "Source/common/String.h"
 #include "Source/common/TestUtils.h"
 #include "Source/common/es/Message.h"
 #include "Source/common/es/MockEndpointSecurityAPI.h"
@@ -60,6 +61,10 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
 @property(readwrite) SNTRuleState state;
 @property(readwrite) SNTRuleType type;
 @property(readwrite) NSString* customMsg;
+@end
+
+@interface SNTExecutionController (Testing)
+- (void)incrementEventCounters:(SNTEventState)eventType;
 @end
 
 @interface SNTExecutionControllerTest : XCTestCase
@@ -229,6 +234,24 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
 
   if (messageSetupBlock) {
     messageSetupBlock(&esMsg);
+  }
+
+  // Configure mockCodesignChecker to match procExec's identity so that
+  // VerifyIdentity returns kMatch and does not short-circuit policy evaluation.
+  // Tests in this file are not exercising identity verification; that is covered
+  // by the +verifyIdentityForTargetProc:fd:csInfo: tests at the bottom of
+  // SNTPolicyProcessorTest.mm.
+  {
+    const es_process_t* target = esMsg.event.exec.target;
+    NSString* cdhexStr = santa::StringToNSString(santa::BufToHexString(target->cdhash, 20));
+    // Stubs below must mirror target identity; otherwise verifyIdentity short-circuits.
+    OCMStub([self.mockCodesignChecker cdhash]).andReturn(cdhexStr);
+    if (target->team_id.length > 0) {
+      OCMStub([self.mockCodesignChecker teamID]).andReturn(@(target->team_id.data));
+    }
+    if (target->signing_id.length > 0) {
+      OCMStub([self.mockCodesignChecker signingID]).andReturn(@(target->signing_id.data));
+    }
   }
 
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
@@ -430,6 +453,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
 }
 
 - (void)testTeamIDAllowRule {
+  // Must match target->team_id set in messageSetup; otherwise verifyIdentity short-circuits.
   OCMStub([self.mockCodesignChecker teamID]).andReturn(@(kExampleTeamID));
 
   SNTRule* rule = [[SNTRule alloc] init];
@@ -446,6 +470,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
 }
 
 - (void)testTeamIDBlockRule {
+  // Must match target->team_id set in messageSetup; otherwise verifyIdentity short-circuits.
   OCMStub([self.mockCodesignChecker teamID]).andReturn(@(kExampleTeamID));
 
   SNTRule* rule = [[SNTRule alloc] init];
@@ -1038,6 +1063,11 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
 
   // Just verify that flush doesn't crash - the cache internals are private
   XCTAssertNoThrow([controller flushTouchIDApprovalCache]);
+}
+
+- (void)testIncrementEventCountersHandlesBinaryMismatch {
+  [self.sut incrementEventCounters:SNTEventStateBlockBinaryMismatch];
+  [self checkMetricCounters:kBlockBinaryMismatch expected:@1];
 }
 
 @end

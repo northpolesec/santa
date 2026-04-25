@@ -356,6 +356,7 @@ static inline void EncodeCertificateInfo(::pbv1::CertificateInfo* pb_cert_info, 
     case SNTEventStateBlockCDHash: return ::pbv1::Execution::REASON_CDHASH;
     case SNTEventStateBlockCELFallback: return ::pbv1::Execution::REASON_CEL_FALLBACK;
     case SNTEventStateBlockLongPath: return ::pbv1::Execution::REASON_LONG_PATH;
+    case SNTEventStateBlockBinaryMismatch: return ::pbv1::Execution::REASON_BINARY_MISMATCH;
     case SNTEventStateBlockUnknown: return ::pbv1::Execution::REASON_UNKNOWN;
     case SNTEventStateUnknown: return ::pbv1::Execution::REASON_UNKNOWN;
     case SNTEventStateAllow: return ::pbv1::Execution::REASON_UNKNOWN;

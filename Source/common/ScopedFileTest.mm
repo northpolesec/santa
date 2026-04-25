@@ -51,7 +51,7 @@
   // The shouldn't exist before creating the temporary file
   XCTAssertFalse([fileMgr fileExistsAtPath:fullPath]);
 
-  auto file = santa::ScopedFile::CreateTemporary(prefix, uuid);
+  auto file = santa::ScopedFile::CreateTemporary(prefix, /*size=*/0, uuid);
   XCTAssertStatusOk(file);
 
   // The path still shouldn't exist after getting a handle
@@ -67,6 +67,31 @@
   NSData* readContents = [reader readDataToEndOfFileAndReturnError:nil];
 
   XCTAssertEqualObjects(readContents, writeContents);
+}
+
+- (void)testCreateTemporaryWithSize {
+  auto file = santa::ScopedFile::CreateTemporary(/*path_prefix=*/nil, /*size=*/1024);
+  XCTAssertStatusOk(file);
+
+  struct stat sb;
+  XCTAssertEqual(fstat(file->UnsafeFD(), &sb), 0);
+  XCTAssertEqual(sb.st_size, 1024);
+}
+
+- (void)testCreateTemporaryKeepsPathWhenRequested {
+  NSFileManager* fileMgr = [NSFileManager defaultManager];
+  NSString* savedPath;
+  {
+    auto file = santa::ScopedFile::CreateTemporary(/*path_prefix=*/nil, /*size=*/16,
+                                                   /*filename_template=*/@"santa_test_XXXXXX",
+                                                   /*keep_path=*/true);
+    XCTAssertStatusOk(file);
+    XCTAssertNotNil(file->Path());
+    XCTAssertTrue([fileMgr fileExistsAtPath:file->Path()]);
+    savedPath = file->Path();
+  }
+  // Destructor should have unlinked the path.
+  XCTAssertFalse([fileMgr fileExistsAtPath:savedPath]);
 }
 
 - (void)testMoveAssignmentClosesExistingFD {

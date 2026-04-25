@@ -31,6 +31,9 @@
 /* Authorize temporary Monitor Mode exception */
 "authorize temporary Monitor Mode" = "дозволити тимчасовий режим монітора";
 
+/* Block reason when ES event and on-disk binary identity disagree */
+"Binary identity verification failed" = "Не вдалося перевірити ідентичність бінарного файлу";
+
 /* No comment provided by engineer. */
 "Binary Path" = "Двійковий шлях";
 
