@@ -157,8 +157,16 @@ NSString* const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
   OSStatus status = errSecSuccess;
   SecStaticCodeRef codeRef = NULL;
 
-  // Get SecStaticCodeRef for binary
-  status = SecStaticCodeCreateWithPath((__bridge CFURLRef)[NSURL fileURLWithPath:binaryPath],
+  // When a fd is provided, point SecStaticCode at the caller's vnode via
+  // /dev/fd/N rather than re-resolving binaryPath. The descriptor must refer
+  // to a regular file; SecStaticCode rejects directory descriptors with
+  // errSecCSBadDiskRep, so callers passing a bundle directory fd will get an
+  // error here. The caller-supplied path is retained for display only.
+  NSString* secCodePath = (fileDescriptor != -1)
+                              ? [NSString stringWithFormat:@"/dev/fd/%d", fileDescriptor]
+                              : binaryPath;
+
+  status = SecStaticCodeCreateWithPath((__bridge CFURLRef)[NSURL fileURLWithPath:secCodePath],
                                        kSecCSDefaultFlags, &codeRef);
   if (status != errSecSuccess) {
     if (error) {
