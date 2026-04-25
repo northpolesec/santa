@@ -103,6 +103,7 @@ typedef NS_ENUM(uint64_t, SNTEventState) {
   SNTEventStateBlockSigningID = 1ULL << 22,
   SNTEventStateBlockCDHash = 1ULL << 23,
   SNTEventStateBlockCELFallback = 1ULL << 24,
+  SNTEventStateBlockBinaryMismatch = 1ULL << 25,
 
   // Bits 40-63 store allow decision types
   SNTEventStateAllowUnknown = 1ULL << 40,

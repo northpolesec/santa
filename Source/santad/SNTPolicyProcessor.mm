@@ -20,6 +20,8 @@
 #include <Kernel/kern/cs_blobs.h>
 #import <Security/SecCode.h>
 #import <Security/Security.h>
+#include <string.h>
+#include <sys/stat.h>
 
 #import "Source/common/CertificateHelpers.h"
 #import "Source/common/MOLCodesignChecker.h"
@@ -44,6 +46,15 @@ enum class PlatformBinaryState {
   kRuntimeFalse,
   kStaticCheck,
 };
+
+using VerifyIdentityBlock = IdentityVerifyResult (^)(MOLCodesignChecker* _Nullable csInfo);
+
+static BOOL CdhashEqual(const uint8_t* targetCdhash, NSString* _Nullable diskCdhashHex) {
+  if (!diskCdhashHex || diskCdhashHex.length != CS_CDHASH_LEN * 2) return NO;
+  std::vector<uint8_t> diskBytes = santa::HexStringToBuf(diskCdhashHex);
+  if (diskBytes.size() != CS_CDHASH_LEN) return NO;
+  return memcmp(targetCdhash, diskBytes.data(), CS_CDHASH_LEN) == 0;
+}
 
 struct CELEvaluationResult {
   bool succeeded;            // Whether CEL evaluation succeeded
@@ -519,6 +530,53 @@ static void UpdateCachedDecisionSigningInfo(
   cd.signingTime = csInfo.signingTime;
 }
 
++ (IdentityVerifyResult)verifyIdentityForTargetProc:(const es_process_t*)targetProc
+                                                 fd:(int)fd
+                                             csInfo:(MOLCodesignChecker*)csInfo {
+  BOOL esSigned = (targetProc->codesigning_flags & CS_SIGNED) != 0;
+  BOOL diskSigned = (csInfo != nil && csInfo.cdhash.length > 0);
+
+  // Case 1: signedness disagrees.
+  if (esSigned != diskSigned) return IdentityVerifyResult::kMismatch;
+
+  if (esSigned) {
+    BOOL esHasIDs = targetProc->team_id.length > 0 && targetProc->signing_id.length > 0;
+    BOOL diskHasIDs = csInfo.teamID.length > 0 && csInfo.signingID.length > 0;
+
+    // Case 2: TID/SID presence disagrees.
+    if (esHasIDs != diskHasIDs) return IdentityVerifyResult::kMismatch;
+
+    if (esHasIDs) {
+      // Case 3: both signed, both have TID/SID — compare IDs then cdhash.
+      NSString* esTeam = @(targetProc->team_id.data);
+      NSString* esSID = @(targetProc->signing_id.data);
+      if (![esTeam isEqualToString:csInfo.teamID] || ![esSID isEqualToString:csInfo.signingID]) {
+        return IdentityVerifyResult::kMismatch;
+      }
+      return CdhashEqual(targetProc->cdhash, csInfo.cdhash) ? IdentityVerifyResult::kMatch
+                                                            : IdentityVerifyResult::kDriftAllowed;
+    }
+
+    // Case 4: both signed, neither has TID/SID (ad-hoc / platform-only) -> cdhash must match.
+    return CdhashEqual(targetProc->cdhash, csInfo.cdhash) ? IdentityVerifyResult::kMatch
+                                                          : IdentityVerifyResult::kMismatch;
+  }
+
+  // Case 5: both unsigned -> stat compare on (dev, ino, size, mtime).
+  struct stat st;
+  if (fstat(fd, &st) != 0) return IdentityVerifyResult::kMismatch;  // fail-closed
+  const struct stat* esStat = &targetProc->executable->stat;
+  if (st.st_dev != esStat->st_dev || st.st_ino != esStat->st_ino) {
+    return IdentityVerifyResult::kMismatch;
+  }
+  if (st.st_size != esStat->st_size) return IdentityVerifyResult::kMismatch;
+  if (st.st_mtimespec.tv_sec != esStat->st_mtimespec.tv_sec ||
+      st.st_mtimespec.tv_nsec != esStat->st_mtimespec.tv_nsec) {
+    return IdentityVerifyResult::kMismatch;
+  }
+  return IdentityVerifyResult::kMatch;
+}
+
 - (nonnull SNTCachedDecision*)
            decisionForFileInfo:(nonnull SNTFileInfo*)fileInfo
                    configState:(nonnull SNTConfigState*)configState
@@ -526,6 +584,7 @@ static void UpdateCachedDecisionSigningInfo(
            platformBinaryState:(PlatformBinaryState)platformBinaryState
          signingStatusCallback:(SNTSigningStatus (^_Nonnull)())signingStatusCallback
             activationCallback:(nullable ActivationCallbackBlock)activationCallback
+                verifyIdentity:(nullable VerifyIdentityBlock)verifyIdentity
     entitlementsFilterCallback:
         (NSDictionary* _Nullable (^_Nullable)(NSDictionary* _Nullable entitlements))
             entitlementsFilterCallback {
@@ -553,6 +612,22 @@ static void UpdateCachedDecisionSigningInfo(
     // even if validity check fails. Once that is done, this code can be updated to grab
     // cert information so that it can still be reported to the sync server.
     MOLCodesignChecker* csInfo = [fileInfo codesignCheckerWithError:&csInfoError];
+    MOLCodesignChecker* checkerForVerify = csInfoError ? nil : csInfo;
+
+    if (verifyIdentity) {
+      switch (verifyIdentity(checkerForVerify)) {
+        case IdentityVerifyResult::kMismatch:
+          cd.decision = SNTEventStateBlockBinaryMismatch;
+          cd.decisionExtra = @"Binary identity mismatch between ES event and on-disk file";
+          return cd;
+        case IdentityVerifyResult::kDriftAllowed:
+          cd.decisionExtra = @"CDHash drift allowed by matching TeamID/SigningID";
+          break;
+        case IdentityVerifyResult::kMatch:
+          break;
+      }
+    }
+
     if (csInfoError) {
       csInfo = nil;
       cd.decisionExtra = [NSString
@@ -667,6 +742,14 @@ static void UpdateCachedDecisionSigningInfo(
     }
   }
 
+  VerifyIdentityBlock verifyIdentity = nil;
+  if (!existingDecision) {
+    int fd = fileInfo.fileHandle.fileDescriptor;
+    verifyIdentity = ^IdentityVerifyResult(MOLCodesignChecker* _Nullable csInfo) {
+      return [SNTPolicyProcessor verifyIdentityForTargetProc:targetProc fd:fd csInfo:csInfo];
+    };
+  }
+
   return [self decisionForFileInfo:fileInfo
       configState:configState
       cachedDecision:cd
@@ -686,6 +769,7 @@ static void UpdateCachedDecisionSigningInfo(
         }
       }
       activationCallback:activationCallback
+      verifyIdentity:verifyIdentity
       entitlementsFilterCallback:^NSDictionary*(NSDictionary* entitlements) {
         return entitlementsFilter_->Filter(entitlementsFilterTeamID, entitlements);
       }];

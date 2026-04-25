@@ -36,6 +36,14 @@
 using ActivationCallbackBlock =
     std::unique_ptr<::google::api::expr::runtime::BaseActivation> (^)(bool useV2);
 
+/// Outcome of comparing the kernel's view of an about-to-execute binary against
+/// Santa's on-disk view at policy-evaluation time.
+enum class IdentityVerifyResult {
+  kMatch,
+  kDriftAllowed,
+  kMismatch,
+};
+
 ///
 ///  Creates SNTCachedDecision objects from a SNTFileInfo object or a file path. Decisions are based
 ///  on any existing rules for that specific binary, its signing certificate and the operating mode
@@ -74,5 +82,16 @@ using ActivationCallbackBlock =
                      forRule:(nonnull SNTRule*)rule
          withTransitiveRules:(BOOL)transitive
     andCELActivationCallback:(nullable ActivationCallbackBlock)activationCallback;
+
+/// Compares the kernel's view of the about-to-execute binary (`targetProc`) against Santa's
+/// on-disk view (`csInfo` for signed, or `fstat(fd)` for unsigned / codesign-error fallback).
+///
+/// - `targetProc`: ES event's process; must be non-NULL.
+/// - `fd`: a valid file descriptor opened on the binary path (used only on the unsigned path).
+/// - `csInfo`: nil if codesign check errored or the binary is unsigned; otherwise the checker
+///   produced by `-[SNTFileInfo codesignCheckerWithError:]`.
++ (IdentityVerifyResult)verifyIdentityForTargetProc:(nonnull const es_process_t*)targetProc
+                                                 fd:(int)fd
+                                             csInfo:(nullable MOLCodesignChecker*)csInfo;
 
 @end

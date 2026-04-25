@@ -77,6 +77,7 @@ struct ProtoTraits<false> {
   // v1 doesn't have CEL fallback decisions; fall back to UNKNOWN.
   static constexpr Decision ALLOW_CEL_FALLBACK = ::santa::sync::v1::ALLOW_UNKNOWN;
   static constexpr Decision BLOCK_CEL_FALLBACK = ::santa::sync::v1::BLOCK_UNKNOWN;
+  static constexpr Decision BLOCK_BINARY_MISMATCH = ::santa::sync::v1::BLOCK_BINARY_MISMATCH;
 
   using FileAccessAction = ::santa::sync::v1::FileAccessAction;
   static constexpr FileAccessAction FILE_ACCESS_ACTION_UNSPECIFIED = ::santa::sync::v1::FILE_ACCESS_ACTION_UNSPECIFIED;
@@ -175,6 +176,7 @@ struct ProtoTraits<true> {
   static constexpr Decision BUNDLE_BINARY = ::santa::sync::v2::BUNDLE_BINARY;
   static constexpr Decision ALLOW_CEL_FALLBACK = ::santa::sync::v2::ALLOW_CEL_FALLBACK;
   static constexpr Decision BLOCK_CEL_FALLBACK = ::santa::sync::v2::BLOCK_CEL_FALLBACK;
+  static constexpr Decision BLOCK_BINARY_MISMATCH = ::santa::sync::v2::BLOCK_BINARY_MISMATCH;
 
   using FileAccessAction = ::santa::sync::v2::FileAccessAction;
   static constexpr FileAccessAction FILE_ACCESS_ACTION_UNSPECIFIED = ::santa::sync::v2::FILE_ACCESS_ACTION_UNSPECIFIED;
