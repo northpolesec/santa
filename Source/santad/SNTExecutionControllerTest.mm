@@ -236,15 +236,21 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
     messageSetupBlock(&esMsg);
   }
 
-  // Configure mockCodesignChecker to match procExec's identity so that
-  // VerifyIdentity returns kMatch and does not short-circuit policy evaluation.
-  // Tests in this file are not exercising identity verification; that is covered
-  // by the +verifyIdentityForTargetProc:fd:csInfo: tests at the bottom of
+  // Auto-mirror target identity onto the mock codesign checker so that
+  // VerifyIdentity returns kMatch and doesn't short-circuit policy evaluation.
+  // Tests in this file aren't exercising identity verification — that's covered
+  // by the +verifyIdentityForTargetProc:fd:csInfo: tests in
   // SNTPolicyProcessorTest.mm.
+  //
+  // Tests should set target identity via messageSetupBlock and let this fixture
+  // mirror it onto the mock. Do NOT add per-test OCMStubs for cdhash, teamID,
+  // or signingID — OCMock resolves stubs FIFO, so a per-test stub added before
+  // validateExecEvent runs would shadow the mirror below and silently trip
+  // kMismatch if its value differs from what messageSetupBlock writes onto
+  // target.
   {
     const es_process_t* target = esMsg.event.exec.target;
     NSString* cdhexStr = santa::StringToNSString(santa::BufToHexString(target->cdhash, 20));
-    // Stubs below must mirror target identity; otherwise verifyIdentity short-circuits.
     OCMStub([self.mockCodesignChecker cdhash]).andReturn(cdhexStr);
     if (target->team_id.length > 0) {
       OCMStub([self.mockCodesignChecker teamID]).andReturn(@(target->team_id.data));
@@ -453,9 +459,6 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
 }
 
 - (void)testTeamIDAllowRule {
-  // Must match target->team_id set in messageSetup; otherwise verifyIdentity short-circuits.
-  OCMStub([self.mockCodesignChecker teamID]).andReturn(@(kExampleTeamID));
-
   SNTRule* rule = [[SNTRule alloc] init];
   rule.state = SNTRuleStateAllow;
   rule.type = SNTRuleTypeTeamID;
@@ -470,9 +473,6 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
 }
 
 - (void)testTeamIDBlockRule {
-  // Must match target->team_id set in messageSetup; otherwise verifyIdentity short-circuits.
-  OCMStub([self.mockCodesignChecker teamID]).andReturn(@(kExampleTeamID));
-
   SNTRule* rule = [[SNTRule alloc] init];
   rule.state = SNTRuleStateBlock;
   rule.type = SNTRuleTypeTeamID;

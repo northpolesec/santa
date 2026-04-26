@@ -1358,7 +1358,8 @@ static MOLCodesignChecker* MakeMockChecker(NSString* cdhash, NSString* teamID,
                                                 cachedDecision:nil];
 
   XCTAssertEqual(cd.decision, SNTEventStateBlockBinaryMismatch);
-  XCTAssertNotNil(cd.decisionExtra);
+  XCTAssertEqualObjects(cd.decisionExtra,
+                        @"Binary identity mismatch between ES event and on-disk file");
   XCTAssertFalse(cd.holdAndAsk, @"mismatch must never be TouchID-overridable");
   XCTAssertNotEqual(cd.decision & SNTEventStateBlock, (SNTEventState)0);
   XCTAssertEqual(cd.decision & SNTEventStateAllow, (SNTEventState)0);

@@ -589,7 +589,10 @@ static void UpdateCachedDecisionSigningInfo(
         (NSDictionary* _Nullable (^_Nullable)(NSDictionary* _Nullable entitlements))
             entitlementsFilterCallback {
   // If the binary is a critical system binary, don't check its signature.
-  // The binary was validated at startup when the rule table was initialized.
+  // Critical binaries are SIP or tamper protected and were validated at
+  // startup when the rule table was initialized; the kernel's CS_KILL/CS_HARD
+  // enforcement guarantees the SigningID matched here can only be issued for
+  // legitimately-signed binaries with that identity.
   SNTCachedDecision* systemCd = [self.ruleTable.criticalSystemBinaries[cd.signingID] copy];
   if (systemCd) {
     systemCd.decisionClientMode = configState.clientMode;
