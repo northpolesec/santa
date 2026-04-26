@@ -80,7 +80,9 @@
   copy.customMsg = _customMsg;
   copy.customURL = _customURL;
   copy.silentBlock = _silentBlock;
+  copy.seatbeltRequired = _seatbeltRequired;
   copy.staticRule = _staticRule;
+  copy.ruleId = _ruleId;
   copy.cacheable = _cacheable;
   copy.holdAndAsk = _holdAndAsk;
   copy.silentTouchID = _silentTouchID;

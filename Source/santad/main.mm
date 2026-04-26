@@ -140,7 +140,7 @@ int main(int argc, char* argv[]) {
                deps->AuthResultCache(), deps->ControlConnection(), deps->CompilerController(),
                deps->NotifierQueue(), deps->SyncdQueue(), deps->NetworkExtensionQueue(),
                deps->ExecController(), deps->PrefixTree(), deps->TTYWriter(), deps->ProcessTree(),
-               deps->EntitlementsFilter());
+               deps->EntitlementsFilter(), deps->SandboxExpectations());
   }
 
   return 0;
