@@ -31,6 +31,9 @@
 /* Authorize temporary Monitor Mode exception */
 "authorize temporary Monitor Mode" = "一時的なモニターモードを許可する";
 
+/* Block reason when ES event and on-disk binary identity disagree */
+"Binary identity verification failed" = "バイナリの同一性検証に失敗しました";
+
 /* No comment provided by engineer. */
 "Binary Path" = "バイナリーパス";
 

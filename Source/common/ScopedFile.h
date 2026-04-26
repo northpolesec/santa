@@ -29,7 +29,8 @@ namespace santa {
 class ScopedFile {
  public:
   static absl::StatusOr<ScopedFile> CreateTemporary(
-      NSString* path_prefix = nil, NSString* filename_template = @"santa_test_XXXXXX") {
+      NSString* path_prefix = nil, size_t size = 0,
+      NSString* filename_template = @"santa_test_XXXXXX", bool keep_path = false) {
     if (filename_template.length == 0) {
       return absl::FailedPreconditionError("No temp file template provided");
     }
@@ -62,17 +63,29 @@ class ScopedFile {
     path = [NSString stringWithCString:mutable_path encoding:NSUTF8StringEncoding];
     free(mutable_path);
 
-    if (unlink(path.UTF8String) != 0) {
-      // Log warning, but otherwise continue.
-      LOGW(@"Unable to unlink backing temp file: %@. Error: %d: %s", path, errno, strerror(errno));
+    if (!keep_path) {
+      if (unlink(path.UTF8String) != 0) {
+        // Log warning, but otherwise continue.
+        LOGW(@"Unable to unlink backing temp file: %@. Error: %d: %s", path, errno,
+             strerror(errno));
+      }
+      path = nil;
     }
 
-    return ScopedFile(fd);
+    if (size > 0 && ftruncate(fd, static_cast<off_t>(size)) != 0) {
+      int saved_errno = errno;
+      if (path) unlink(path.UTF8String);
+      close(fd);
+      return absl::ErrnoToStatus(saved_errno, "Failed to size temp file");
+    }
+
+    return ScopedFile(fd, path);
   }
 
-  explicit ScopedFile(int fd) : fd_(fd) {}
+  explicit ScopedFile(int fd, NSString* path = nil) : fd_(fd), path_(path) {}
 
   ~ScopedFile() {
+    if (path_) unlink(path_.UTF8String);
     if (fd_ >= 0) {
       close(fd_);
     }
@@ -81,13 +94,19 @@ class ScopedFile {
   ScopedFile(const ScopedFile&) = delete;
   ScopedFile& operator=(const ScopedFile&) = delete;
 
-  ScopedFile(ScopedFile&& other) : fd_(other.fd_) { other.fd_ = -1; }
+  ScopedFile(ScopedFile&& other) : fd_(other.fd_), path_(other.path_) {
+    other.fd_ = -1;
+    other.path_ = nil;
+  }
 
   ScopedFile& operator=(ScopedFile&& rhs) {
     if (this != &rhs) {
+      if (path_) unlink(path_.UTF8String);
       if (fd_ >= 0) close(fd_);
       fd_ = rhs.fd_;
+      path_ = rhs.path_;
       rhs.fd_ = -1;
+      rhs.path_ = nil;
     }
     return *this;
   }
@@ -105,8 +124,13 @@ class ScopedFile {
   // doesn't outlast the lifetime of this object.
   int UnsafeFD() const { return fd_; }
 
+  // The on-disk path, or nil if the file was unlinked at creation time
+  // (the default `keep_path = false` behavior).
+  NSString* Path() const { return path_; }
+
  private:
   int fd_ = -1;
+  NSString* path_ = nil;
 };
 
 }  // namespace santa

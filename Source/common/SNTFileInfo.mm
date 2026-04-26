@@ -796,7 +796,12 @@
 - (MOLCodesignChecker*)codesignCheckerWithError:(NSError**)error {
   if (!self.cachedCodesignChecker && !self.codesignCheckerError) {
     NSError* e;
-    self.cachedCodesignChecker = [[MOLCodesignChecker alloc] initWithBinaryPath:self.path error:&e];
+    // Pass the descriptor SNTFileInfo already has open so SecStaticCode
+    // operates on the same vnode (via /dev/fd/N), not a fresh path resolution.
+    self.cachedCodesignChecker =
+        [[MOLCodesignChecker alloc] initWithBinaryPath:self.path
+                                        fileDescriptor:self.fileHandle.fileDescriptor
+                                                 error:&e];
     self.codesignCheckerError = e;
   }
   if (error) *error = self.codesignCheckerError;

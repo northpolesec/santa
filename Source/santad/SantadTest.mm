@@ -76,9 +76,7 @@ static void SetBinaryDataFromHexString(const char* hexStr, uint8_t* buf, size_t 
 
 static const char* kAllowedSigningID = "com.google.allowed_signing_id";
 static const char* kBlockedSigningID = "com.google.blocked_signing_id";
-static const char* kNoRuleMatchSigningID = "com.google.no_rule_match_signing_id";
 static const char* kBlockedTeamID = "EQHXZ8M8AV";
-static const char* kAllowedTeamID = "TJNVEKW352";
 static const char* kAllowedCDHash = "dedebf2eac732d873008b17b3e44a56599dd614b";
 static const char* kBlockedCDHash = "7218eddfee4d3eba4873dedf22d1391d79aea25f";
 
@@ -188,6 +186,35 @@ static const char* kBlockedCDHash = "7218eddfee4d3eba4873dedf22d1391d79aea25f";
   es_process_t proc = MakeESProcess(&file);
   proc.is_platform_binary = false;
   proc.codesigning_flags = CS_SIGNED | CS_VALID | CS_HARD | CS_KILL;
+
+  // Mirror the disk-side binary's identity into the ES-side proc fields so
+  // SNTPolicyProcessor's identity verifier sees matching ES vs on-disk
+  // identity (the production reality for an unmolested exec). Buffers are
+  // stack-rooted in this method's frame, which lives until the dispatch
+  // semaphore signals at the bottom of this method.
+  char teamIDBuf[64] = {0};
+  char signingIDBuf[256] = {0};
+  NSError* csError = nil;
+  MOLCodesignChecker* csInfo = [[MOLCodesignChecker alloc] initWithBinaryPath:binaryPath
+                                                                        error:&csError];
+  if (csInfo == nil || csInfo.cdhash.length == 0) {
+    // On-disk binary is unsigned. Clear ES-side CS_SIGNED so the verifier's
+    // signedness-disagrees check (case 1) doesn't fire and we fall through
+    // to the unsigned stat-compare path.
+    proc.codesigning_flags = 0;
+  } else {
+    if (csInfo.cdhash.length == sizeof(proc.cdhash) * 2) {
+      SetBinaryDataFromHexString(csInfo.cdhash.UTF8String, proc.cdhash, sizeof(proc.cdhash));
+    }
+    if (csInfo.teamID.length > 0) {
+      strlcpy(teamIDBuf, csInfo.teamID.UTF8String, sizeof(teamIDBuf));
+      proc.team_id = MakeESStringToken(teamIDBuf);
+    }
+    if (csInfo.signingID.length > 0) {
+      strlcpy(signingIDBuf, csInfo.signingID.UTF8String, sizeof(signingIDBuf));
+      proc.signing_id = MakeESStringToken(signingIDBuf);
+    }
+  }
 
   // Set a 6.5 second deadline for the message and clamp deadline headroom to 5
   // seconds. This means there is a 1.5 second leeway given for the processing block
@@ -349,82 +376,62 @@ static const char* kBlockedCDHash = "7218eddfee4d3eba4873dedf22d1391d79aea25f";
                  }];
 }
 
+// "NoSigningIDMatch" tests rely on the on-disk binary's actual signing_id
+// (com.google.custom_signing_id for allowed_teamid, banned_teamid for
+// banned_teamid) not appearing in the rules.db, so the team_id rule is the
+// one that fires. Identity is auto-mirrored from disk in checkBinaryExecution.
 - (void)testBinaryWithTeamIDAllowRuleAndNoSigningIDMatchIsAllowedInLockdownMode {
   [self checkBinaryExecution:@"allowed_teamid"
-      wantResult:ES_AUTH_RESULT_ALLOW
-      clientMode:SNTClientModeLockdown
-      cdValidator:^BOOL(SNTCachedDecision* cd) {
-        return cd.decision == SNTEventStateAllowTeamID;
-      }
-      messageSetup:^(es_message_t* msg) {
-        msg->event.exec.target->team_id = MakeESStringToken(kAllowedTeamID);
-        msg->event.exec.target->signing_id = MakeESStringToken(kNoRuleMatchSigningID);
-      }];
+                  wantResult:ES_AUTH_RESULT_ALLOW
+                  clientMode:SNTClientModeLockdown
+                 cdValidator:^BOOL(SNTCachedDecision* cd) {
+                   return cd.decision == SNTEventStateAllowTeamID;
+                 }];
 }
 
 - (void)testBinaryWithTeamIDAllowRuleAndNoSigningIDMatchIsAllowedInStandaloneMode {
   [self checkBinaryExecution:@"allowed_teamid"
-      wantResult:ES_AUTH_RESULT_ALLOW
-      clientMode:SNTClientModeStandalone
-      cdValidator:^BOOL(SNTCachedDecision* cd) {
-        return cd.decision == SNTEventStateAllowTeamID;
-      }
-      messageSetup:^(es_message_t* msg) {
-        msg->event.exec.target->team_id = MakeESStringToken(kAllowedTeamID);
-        msg->event.exec.target->signing_id = MakeESStringToken(kNoRuleMatchSigningID);
-      }];
+                  wantResult:ES_AUTH_RESULT_ALLOW
+                  clientMode:SNTClientModeStandalone
+                 cdValidator:^BOOL(SNTCachedDecision* cd) {
+                   return cd.decision == SNTEventStateAllowTeamID;
+                 }];
 }
 
 - (void)testBinaryWithTeamIDAllowRuleAndNoSigningIDMatchIsAllowedInMonitorMode {
   [self checkBinaryExecution:@"allowed_teamid"
-      wantResult:ES_AUTH_RESULT_ALLOW
-      clientMode:SNTClientModeMonitor
-      cdValidator:^BOOL(SNTCachedDecision* cd) {
-        return cd.decision == SNTEventStateAllowTeamID;
-      }
-      messageSetup:^(es_message_t* msg) {
-        msg->event.exec.target->team_id = MakeESStringToken(kAllowedTeamID);
-        msg->event.exec.target->signing_id = MakeESStringToken(kNoRuleMatchSigningID);
-      }];
+                  wantResult:ES_AUTH_RESULT_ALLOW
+                  clientMode:SNTClientModeMonitor
+                 cdValidator:^BOOL(SNTCachedDecision* cd) {
+                   return cd.decision == SNTEventStateAllowTeamID;
+                 }];
 }
 
 - (void)testBinaryWithTeamIDBlockRuleAndNoSigningIDMatchIsBlockedInLockdownMode {
   [self checkBinaryExecution:@"banned_teamid"
-      wantResult:ES_AUTH_RESULT_DENY
-      clientMode:SNTClientModeLockdown
-      cdValidator:^BOOL(SNTCachedDecision* cd) {
-        return cd.decision == SNTEventStateBlockTeamID;
-      }
-      messageSetup:^(es_message_t* msg) {
-        msg->event.exec.target->team_id = MakeESStringToken(kBlockedTeamID);
-        msg->event.exec.target->signing_id = MakeESStringToken(kNoRuleMatchSigningID);
-      }];
+                  wantResult:ES_AUTH_RESULT_DENY
+                  clientMode:SNTClientModeLockdown
+                 cdValidator:^BOOL(SNTCachedDecision* cd) {
+                   return cd.decision == SNTEventStateBlockTeamID;
+                 }];
 }
 
 - (void)testBinaryWithTeamIDBlockRuleAndNoSigningIDMatchIsBlockedInStandaloneMode {
   [self checkBinaryExecution:@"banned_teamid"
-      wantResult:ES_AUTH_RESULT_DENY
-      clientMode:SNTClientModeStandalone
-      cdValidator:^BOOL(SNTCachedDecision* cd) {
-        return cd.decision == SNTEventStateBlockTeamID;
-      }
-      messageSetup:^(es_message_t* msg) {
-        msg->event.exec.target->team_id = MakeESStringToken(kBlockedTeamID);
-        msg->event.exec.target->signing_id = MakeESStringToken(kNoRuleMatchSigningID);
-      }];
+                  wantResult:ES_AUTH_RESULT_DENY
+                  clientMode:SNTClientModeStandalone
+                 cdValidator:^BOOL(SNTCachedDecision* cd) {
+                   return cd.decision == SNTEventStateBlockTeamID;
+                 }];
 }
 
 - (void)testBinaryWithTeamIDBlockRuleAndNoSigningIDMatchIsBlockedInMonitorMode {
   [self checkBinaryExecution:@"banned_teamid"
-      wantResult:ES_AUTH_RESULT_DENY
-      clientMode:SNTClientModeMonitor
-      cdValidator:^BOOL(SNTCachedDecision* cd) {
-        return cd.decision == SNTEventStateBlockTeamID;
-      }
-      messageSetup:^(es_message_t* msg) {
-        msg->event.exec.target->team_id = MakeESStringToken(kBlockedTeamID);
-        msg->event.exec.target->signing_id = MakeESStringToken(kNoRuleMatchSigningID);
-      }];
+                  wantResult:ES_AUTH_RESULT_DENY
+                  clientMode:SNTClientModeMonitor
+                 cdValidator:^BOOL(SNTCachedDecision* cd) {
+                   return cd.decision == SNTEventStateBlockTeamID;
+                 }];
 }
 
 - (void)testBinaryWithSigningIDBlockRuleIsBlockedInLockdownMode {
@@ -583,43 +590,34 @@ static const char* kBlockedCDHash = "7218eddfee4d3eba4873dedf22d1391d79aea25f";
       }];
 }
 
+// banned_teamid_allowed_binary is signed by EQHXZ8M8AV (a blocked team_id) but
+// has a SHA-256 allow rule that wins. Identity is auto-mirrored from disk; no
+// override needed.
 - (void)testBinaryWithSHA256AllowRuleAndBlockedTeamIDRuleIsAllowedInLockdownMode {
   [self checkBinaryExecution:@"banned_teamid_allowed_binary"
-      wantResult:ES_AUTH_RESULT_ALLOW
-      clientMode:SNTClientModeLockdown
-      cdValidator:^BOOL(SNTCachedDecision* cd) {
-        return cd.decision == SNTEventStateAllowBinary;
-      }
-      messageSetup:^(es_message_t* msg) {
-        msg->event.exec.target->team_id = MakeESStringToken(kBlockedTeamID);
-        msg->event.exec.target->signing_id = MakeESStringToken(kNoRuleMatchSigningID);
-      }];
+                  wantResult:ES_AUTH_RESULT_ALLOW
+                  clientMode:SNTClientModeLockdown
+                 cdValidator:^BOOL(SNTCachedDecision* cd) {
+                   return cd.decision == SNTEventStateAllowBinary;
+                 }];
 }
 
 - (void)testBinaryWithSHA256AllowRuleAndBlockedTeamIDRuleIsAllowedInStandaloneMode {
   [self checkBinaryExecution:@"banned_teamid_allowed_binary"
-      wantResult:ES_AUTH_RESULT_ALLOW
-      clientMode:SNTClientModeStandalone
-      cdValidator:^BOOL(SNTCachedDecision* cd) {
-        return cd.decision == SNTEventStateAllowBinary;
-      }
-      messageSetup:^(es_message_t* msg) {
-        msg->event.exec.target->team_id = MakeESStringToken(kBlockedTeamID);
-        msg->event.exec.target->signing_id = MakeESStringToken(kNoRuleMatchSigningID);
-      }];
+                  wantResult:ES_AUTH_RESULT_ALLOW
+                  clientMode:SNTClientModeStandalone
+                 cdValidator:^BOOL(SNTCachedDecision* cd) {
+                   return cd.decision == SNTEventStateAllowBinary;
+                 }];
 }
 
 - (void)testBinaryWithSHA256AllowRuleAndBlockedTeamIDRuleIsAllowedInMonitorMode {
   [self checkBinaryExecution:@"banned_teamid_allowed_binary"
-      wantResult:ES_AUTH_RESULT_ALLOW
-      clientMode:SNTClientModeMonitor
-      cdValidator:^BOOL(SNTCachedDecision* cd) {
-        return cd.decision == SNTEventStateAllowBinary;
-      }
-      messageSetup:^(es_message_t* msg) {
-        msg->event.exec.target->team_id = MakeESStringToken(kBlockedTeamID);
-        msg->event.exec.target->signing_id = MakeESStringToken(kNoRuleMatchSigningID);
-      }];
+                  wantResult:ES_AUTH_RESULT_ALLOW
+                  clientMode:SNTClientModeMonitor
+                 cdValidator:^BOOL(SNTCachedDecision* cd) {
+                   return cd.decision == SNTEventStateAllowBinary;
+                 }];
 }
 
 - (void)testBinaryWithoutBlockOrAllowRuleIsBlockedInLockdownMode {

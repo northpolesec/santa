@@ -34,6 +34,9 @@
 /* Authorize temporary Monitor Mode exception */
 "authorize temporary Monitor Mode" = "autoriser le mode Moniteur temporaire";
 
+/* Block reason when ES event and on-disk binary identity disagree */
+"Binary identity verification failed" = "Échec de la vérification de l'identité du binaire";
+
 /* No comment provided by engineer. */
 "Binary Path" = "Chemin du binaire";
 

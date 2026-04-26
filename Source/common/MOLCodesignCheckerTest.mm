@@ -15,7 +15,9 @@
 
 #import <XCTest/XCTest.h>
 
+#include <fcntl.h>
 #include <mach-o/fat.h>
+#include <unistd.h>
 
 #import "Source/common/MOLCodesignChecker.h"
 
@@ -126,6 +128,85 @@
   int fd = open(path.UTF8String, O_RDONLY | O_CLOEXEC);
   MOLCodesignChecker* sut = [[MOLCodesignChecker alloc] initWithBinaryPath:path fileDescriptor:fd];
   XCTAssertNotNil(sut.signingInformation);
+  close(fd);
+}
+
+// fd-based init must reflect the caller's vnode, not the path. Stage two
+// distinct signed binaries; open the fd of one; atomic-rename the other into
+// the staged path; verify the fd-based checker still reports the original
+// vnode's cdhash, and a path-based checker reports the swapped binary's
+// cdhash.
+- (void)testInitWithFileDescriptor_SurvivesAtomicRenameSwap {
+  NSString* tmp = NSTemporaryDirectory();
+  NSString* a =
+      [tmp stringByAppendingPathComponent:[NSString stringWithFormat:@"mol_a_%d_%@", getpid(),
+                                                                     [[NSUUID UUID] UUIDString]]];
+  NSString* b =
+      [tmp stringByAppendingPathComponent:[NSString stringWithFormat:@"mol_b_%d_%@", getpid(),
+                                                                     [[NSUUID UUID] UUIDString]]];
+  NSError* err;
+  XCTAssertTrue([[NSFileManager defaultManager] copyItemAtPath:@"/usr/bin/yes"
+                                                        toPath:a
+                                                         error:&err]);
+  XCTAssertTrue([[NSFileManager defaultManager] copyItemAtPath:@"/usr/bin/true"
+                                                        toPath:b
+                                                         error:&err]);
+
+  int fd = open(a.UTF8String, O_RDONLY | O_CLOEXEC);
+  XCTAssertGreaterThanOrEqual(fd, 0, "open: %s", strerror(errno));
+
+  MOLCodesignChecker* aRef = [[MOLCodesignChecker alloc] initWithBinaryPath:a fileDescriptor:fd];
+  MOLCodesignChecker* bRef = [[MOLCodesignChecker alloc] initWithBinaryPath:b];
+  XCTAssertNotNil(aRef.cdhash);
+  XCTAssertNotNil(bRef.cdhash);
+  XCTAssertNotEqualObjects(aRef.cdhash, bRef.cdhash);
+  NSString* originalACdhash = aRef.cdhash;
+  NSString* originalBCdhash = bRef.cdhash;
+
+  // Atomic swap: rename(b, a) makes path `a` point at b's vnode. Original
+  // a-vnode survives only via the open fd.
+  XCTAssertEqual(rename(b.UTF8String, a.UTF8String), 0, "rename: %s", strerror(errno));
+
+  // fd-based: must still see A's identity.
+  MOLCodesignChecker* afterFD = [[MOLCodesignChecker alloc] initWithBinaryPath:a fileDescriptor:fd];
+  XCTAssertEqualObjects(afterFD.cdhash, originalACdhash);
+
+  // Path-based control: now sees B's identity (proving the rename happened
+  // and was visible to a path-based reader).
+  MOLCodesignChecker* afterPath = [[MOLCodesignChecker alloc] initWithBinaryPath:a];
+  XCTAssertEqualObjects(afterPath.cdhash, originalBCdhash);
+
+  close(fd);
+  [[NSFileManager defaultManager] removeItemAtPath:a error:nil];
+}
+
+// fd-based init must succeed even when the original path has been removed
+// after the caller's open(): the fd holds the vnode regardless.
+- (void)testInitWithFileDescriptor_SurvivesUnlink {
+  NSString* tmp = NSTemporaryDirectory();
+  NSString* path =
+      [tmp stringByAppendingPathComponent:[NSString stringWithFormat:@"mol_unlink_%d_%@", getpid(),
+                                                                     [[NSUUID UUID] UUIDString]]];
+  NSError* err;
+  XCTAssertTrue([[NSFileManager defaultManager] copyItemAtPath:@"/usr/bin/yes"
+                                                        toPath:path
+                                                         error:&err]);
+
+  int fd = open(path.UTF8String, O_RDONLY | O_CLOEXEC);
+  XCTAssertGreaterThanOrEqual(fd, 0);
+
+  XCTAssertEqual(unlink(path.UTF8String), 0);
+
+  MOLCodesignChecker* sut = [[MOLCodesignChecker alloc] initWithBinaryPath:path fileDescriptor:fd];
+  XCTAssertNotNil(sut.cdhash);
+
+  // Path-based at the now-missing path must fail, confirming the fd was the
+  // load-bearing source.
+  NSError* pathErr;
+  MOLCodesignChecker* viaPath = [[MOLCodesignChecker alloc] initWithBinaryPath:path error:&pathErr];
+  XCTAssertNil(viaPath);
+  XCTAssertNotNil(pathErr);
+
   close(fd);
 }
 

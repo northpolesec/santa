@@ -548,6 +548,9 @@ void SerializeAndCheckNonESEvents(
       case SNTEventStateUnknown: want = ::pbv1::Execution::REASON_UNKNOWN; break;
       case SNTEventStateBundleBinary: want = ::pbv1::Execution::REASON_UNKNOWN; break;
       case SNTEventStateBlockUnknown: want = ::pbv1::Execution::REASON_UNKNOWN; break;
+      case SNTEventStateBlockBinaryMismatch:
+        want = ::pbv1::Execution::REASON_BINARY_MISMATCH;
+        break;
       case SNTEventStateBlockBinary: want = ::pbv1::Execution::REASON_BINARY; break;
       case SNTEventStateBlockCertificate: want = ::pbv1::Execution::REASON_CERT; break;
       case SNTEventStateBlockScope: want = ::pbv1::Execution::REASON_SCOPE; break;

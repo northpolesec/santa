@@ -1466,6 +1466,7 @@ std::string BasicStringSerializeMessage(es_message_t* esMsg) {
       case SNTEventStateUnknown: want = "UNKNOWN"; break;
       case SNTEventStateBundleBinary: want = "UNKNOWN"; break;
       case SNTEventStateBlockUnknown: want = "UNKNOWN"; break;
+      case SNTEventStateBlockBinaryMismatch: want = "BINARY_MISMATCH"; break;
       case SNTEventStateBlockBinary: want = "BINARY"; break;
       case SNTEventStateBlockCertificate: want = "CERT"; break;
       case SNTEventStateBlockScope: want = "SCOPE"; break;

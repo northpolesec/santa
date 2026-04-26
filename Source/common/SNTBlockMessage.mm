@@ -167,6 +167,9 @@ static id EncodedValueOrNull(id value) {
       return NSLocalizedString(@"Blocked path regex", @"Block reason for blocked path regex match");
     case SNTEventStateBlockCELFallback:
       return NSLocalizedString(@"CEL fallback rule", @"Block reason for CEL fallback rule match");
+    case SNTEventStateBlockBinaryMismatch:
+      return NSLocalizedString(@"Binary identity verification failed",
+                               @"Block reason when ES event and on-disk binary identity disagree");
     case SNTEventStateBlockLongPath:
       return NSLocalizedString(@"Path too long",
                                @"Block reason when file path exceeds maximum length");
