@@ -27,6 +27,7 @@
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTSystemInfo.h"
+#import "Source/santasyncservice/SNTNATSProxyConnect.h"
 #import "Source/santasyncservice/SNTSyncState.h"
 
 __BEGIN_DECLS
@@ -158,6 +159,8 @@ static int NATSSSLVerifyCallback(int preverifyOk, void* ctx) {
 @property(atomic) BOOL isRetrying;
 // Track the last error for better retry diagnostics
 @property(nonatomic, copy) NSString* lastConnectionError;
+// Proxy connection closure -- must remain valid for NATS reconnections
+@property(nonatomic) SNTProxyClosure* proxyClosure;
 @end
 
 @implementation SNTPushClientNATS
@@ -188,6 +191,10 @@ static int NATSSSLVerifyCallback(int preverifyOk, void* ctx) {
   // Cleanup should be done explicitly before dealloc
   if (self.conn && self.isConnected) {
     LOGW(@"NATS: Client deallocated without proper disconnect");
+  }
+  if (self.proxyClosure) {
+    SNTProxyClosureDestroy(self.proxyClosure);
+    self.proxyClosure = NULL;
   }
 }
 
@@ -439,6 +446,77 @@ static int NATSSSLVerifyCallback(int preverifyOk, void* ctx) {
     natsOptions_SetReconnectedCB(opts, &reconnectedCallback, (__bridge void*)self);
     natsOptions_SetClosedCB(opts, &closedCallback, (__bridge void*)self);
 
+    // Configure proxy if set
+    NSString* proxyURL = [[SNTConfigurator configurator] pushProxyURL];
+    if (proxyURL.length) {
+      SNTProxyConfig* proxyConfig = SNTParseProxyURL(proxyURL);
+      if (!proxyConfig) {
+        LOGE(@"NATS: Invalid PushProxyURL: %@", proxyURL);
+        natsOptions_Destroy(opts);
+        return;
+      }
+
+      // Load custom CA if configured (PushProxyCAData takes precedence over PushProxyCAFile)
+      NSData* caData = [[SNTConfigurator configurator] pushProxyCAData];
+      if (!caData) {
+        NSString* caFile = [[SNTConfigurator configurator] pushProxyCAFile];
+        if (caFile.length) {
+          NSError* error;
+          caData = [NSData dataWithContentsOfFile:caFile options:0 error:&error];
+          if (!caData) {
+            LOGW(@"NATS: Failed to read PushProxyCAFile %@: %@", caFile,
+                 error.localizedDescription);
+            natsOptions_Destroy(opts);
+            return;
+          }
+        }
+      }
+      proxyConfig.customCAData = caData;
+
+      // Load custom CA into NATS TLS context for the inner connection too.
+      // natsOptions_SetCATrustedCertificates takes PEM string data directly (not a file path).
+      if (caData) {
+        NSString* pemStr = [[NSString alloc] initWithData:caData encoding:NSUTF8StringEncoding];
+        if (!pemStr) {
+          LOGW(@"NATS: PushProxyCAData/PushProxyCAFile is not valid UTF-8 PEM data");
+          natsOptions_Destroy(opts);
+          return;
+        }
+        status = natsOptions_SetCATrustedCertificates(opts, pemStr.UTF8String);
+        if (status != NATS_OK) {
+          LOGW(@"NATS: Failed to set custom CA for NATS TLS: %s", natsStatus_GetText(status));
+          natsOptions_Destroy(opts);
+          return;
+        }
+      }
+
+      // Free any previous proxy closure from a prior connection attempt
+      if (self.proxyClosure) {
+        SNTProxyClosureDestroy(self.proxyClosure);
+        self.proxyClosure = NULL;
+      }
+
+      self.proxyClosure = SNTProxyClosureCreate(proxyConfig);
+      if (!self.proxyClosure) {
+        LOGE(@"NATS: Failed to create proxy closure");
+        natsOptions_Destroy(opts);
+        return;
+      }
+
+      status = natsOptions_SetProxyConnHandler(opts, &SNTNATSProxyConnHandler, self.proxyClosure);
+      if (status != NATS_OK) {
+        LOGE(@"NATS: Failed to set proxy handler: %s", natsStatus_GetText(status));
+        SNTProxyClosureDestroy(self.proxyClosure);
+        self.proxyClosure = NULL;
+        natsOptions_Destroy(opts);
+        return;
+      }
+
+      // Log proxy usage (redact credentials)
+      LOGI(@"NATS: Using proxy %@://%@:%d", proxyConfig.useTLS ? @"https" : @"http",
+           proxyConfig.host, proxyConfig.port);
+    }
+
     // Create connection
     natsConnection* conn = NULL;
     status = natsConnection_Connect(&conn, opts);
@@ -523,6 +601,11 @@ static int NATSSSLVerifyCallback(int preverifyOk, void* ctx) {
       LOGD(@"NATS: Destroying connection");
       natsConnection_Destroy(self.conn);
       self.conn = NULL;
+    }
+
+    if (self.proxyClosure) {
+      SNTProxyClosureDestroy(self.proxyClosure);
+      self.proxyClosure = NULL;
     }
 
     self.isConnected = NO;

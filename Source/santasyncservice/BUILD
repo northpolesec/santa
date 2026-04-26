@@ -15,6 +15,18 @@ objc_library(
 )
 
 objc_library(
+    name = "NATSProxyConnect",
+    srcs = ["SNTNATSProxyConnect.mm"],
+    hdrs = ["SNTNATSProxyConnect.h"],
+    deps = [
+        "//Source/common:SNTLogging",
+        "@boringssl//:crypto",
+        "@boringssl//:ssl",
+        "@nats_c//:nats",
+    ],
+)
+
+objc_library(
     name = "NATS_lib",
     srcs = [
         "SNTPushClientNATS.mm",
@@ -26,6 +38,7 @@ objc_library(
         "SNTPushNotifications.h",
     ],
     deps = [
+        ":NATSProxyConnect",
         ":SNTSyncState",
         "//Source/common:MOLXPCConnection",
         "//Source/common:SNTConfigurator",
@@ -505,9 +518,19 @@ santa_unit_test(
     },
     tags = ["manual"],  # Only run when explicitly requested
     deps = [
+        ":NATSProxyConnect",
         ":NATS_lib",
         "//Source/common:SNTConfigurator",
         "@OCMock",
+        "@nats_c//:nats",
+    ],
+)
+
+santa_unit_test(
+    name = "SNTNATSProxyConnectTest",
+    srcs = ["SNTNATSProxyConnectTest.mm"],
+    deps = [
+        ":NATSProxyConnect",
         "@nats_c//:nats",
     ],
 )
@@ -526,6 +549,7 @@ santa_unit_test(
 test_suite(
     name = "unit_tests",
     tests = [
+        ":SNTNATSProxyConnectTest",
         ":SNTPushClientNATSCommandTest",
         ":SNTPushClientNATSConnectionTest",
         ":SNTPushClientNATSTest",
