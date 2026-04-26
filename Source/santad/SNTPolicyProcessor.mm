@@ -626,8 +626,7 @@ static void UpdateCachedDecisionSigningInfo(
         case IdentityVerifyResult::kDriftAllowed:
           cd.decisionExtra = @"CDHash drift allowed by matching TeamID/SigningID";
           break;
-        case IdentityVerifyResult::kMatch:
-          break;
+        case IdentityVerifyResult::kMatch: break;
       }
     }
 

@@ -77,7 +77,8 @@ static const uint8_t kHashB[20] = {0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00, 0x1
 
 static NSString* HexOf(const uint8_t* b, size_t n) {
   NSMutableString* s = [NSMutableString stringWithCapacity:n * 2];
-  for (size_t i = 0; i < n; i++) [s appendFormat:@"%02x", b[i]];
+  for (size_t i = 0; i < n; i++)
+    [s appendFormat:@"%02x", b[i]];
   return s;
 }
 
@@ -1338,8 +1339,8 @@ static MOLCodesignChecker* MakeMockChecker(NSString* cdhash, NSString* teamID,
       /*filename_template=*/@"santa_test_XXXXXX", /*keep_path=*/true);
   XCTAssertStatusOk(scopedFile);
 
-  NSError *err;
-  SNTFileInfo *fi = [[SNTFileInfo alloc] initWithPath:scopedFile->Path() error:&err];
+  NSError* err;
+  SNTFileInfo* fi = [[SNTFileInfo alloc] initWithPath:scopedFile->Path() error:&err];
   XCTAssertNotNil(fi);
 
   struct stat fakeStat = MakeStat(/*offset=*/42);  // differs from the real file's stat
@@ -1349,13 +1350,13 @@ static MOLCodesignChecker* MakeMockChecker(NSString* cdhash, NSString* teamID,
   esProc.team_id = MakeESStringToken("");
   esProc.signing_id = MakeESStringToken("");
 
-  SNTConfigState *cs = [[SNTConfigState alloc] initWithConfig:[SNTConfigurator configurator]];
+  SNTConfigState* cs = [[SNTConfigState alloc] initWithConfig:[SNTConfigurator configurator]];
 
-  SNTCachedDecision *cd = [self.processor decisionForFileInfo:fi
-                                                 targetProcess:&esProc
-                                                   configState:cs
-                                            activationCallback:nil
-                                                cachedDecision:nil];
+  SNTCachedDecision* cd = [self.processor decisionForFileInfo:fi
+                                                targetProcess:&esProc
+                                                  configState:cs
+                                           activationCallback:nil
+                                               cachedDecision:nil];
 
   XCTAssertEqual(cd.decision, SNTEventStateBlockBinaryMismatch);
   XCTAssertEqualObjects(cd.decisionExtra,
@@ -1372,8 +1373,8 @@ static MOLCodesignChecker* MakeMockChecker(NSString* cdhash, NSString* teamID,
                                                        /*keep_path=*/true);
   XCTAssertStatusOk(scopedFile);
 
-  NSError *err;
-  SNTFileInfo *fi = [[SNTFileInfo alloc] initWithPath:scopedFile->Path() error:&err];
+  NSError* err;
+  SNTFileInfo* fi = [[SNTFileInfo alloc] initWithPath:scopedFile->Path() error:&err];
   XCTAssertNotNil(fi);
 
   // Deliberate stat mismatch — if verifyIdentity ran, this would short-circuit to
@@ -1390,16 +1391,16 @@ static MOLCodesignChecker* MakeMockChecker(NSString* cdhash, NSString* teamID,
   // if it were non-nil. The bypass invariant under test is that the outer method
   // passes verifyIdentity:nil whenever existingDecision is non-nil (per spec §4),
   // independent of the inner method's certSHA256-skip optimization.
-  SNTCachedDecision *existing = [[SNTCachedDecision alloc] init];
+  SNTCachedDecision* existing = [[SNTCachedDecision alloc] init];
   // Do NOT set certSHA256.
 
-  SNTConfigState *cs = [[SNTConfigState alloc] initWithConfig:[SNTConfigurator configurator]];
+  SNTConfigState* cs = [[SNTConfigState alloc] initWithConfig:[SNTConfigurator configurator]];
 
-  SNTCachedDecision *cd = [self.processor decisionForFileInfo:fi
-                                                 targetProcess:&esProc
-                                                   configState:cs
-                                            activationCallback:nil
-                                                cachedDecision:existing];
+  SNTCachedDecision* cd = [self.processor decisionForFileInfo:fi
+                                                targetProcess:&esProc
+                                                  configState:cs
+                                           activationCallback:nil
+                                               cachedDecision:existing];
 
   XCTAssertNotEqual(cd.decision, SNTEventStateBlockBinaryMismatch,
                     @"re-eval path must never surface BinaryMismatch (outer method "
@@ -1413,8 +1414,8 @@ static MOLCodesignChecker* MakeMockChecker(NSString* cdhash, NSString* teamID,
                                                        /*keep_path=*/true);
   XCTAssertStatusOk(scopedFile);
 
-  NSError *err;
-  SNTFileInfo *fi = [[SNTFileInfo alloc] initWithPath:scopedFile->Path() error:&err];
+  NSError* err;
+  SNTFileInfo* fi = [[SNTFileInfo alloc] initWithPath:scopedFile->Path() error:&err];
   XCTAssertNotNil(fi);
 
   struct stat realStat;
@@ -1426,13 +1427,13 @@ static MOLCodesignChecker* MakeMockChecker(NSString* cdhash, NSString* teamID,
   esProc.team_id = MakeESStringToken("");
   esProc.signing_id = MakeESStringToken("");
 
-  SNTConfigState *cs = [[SNTConfigState alloc] initWithConfig:[SNTConfigurator configurator]];
+  SNTConfigState* cs = [[SNTConfigState alloc] initWithConfig:[SNTConfigurator configurator]];
 
-  SNTCachedDecision *cd = [self.processor decisionForFileInfo:fi
-                                                 targetProcess:&esProc
-                                                   configState:cs
-                                            activationCallback:nil
-                                                cachedDecision:nil];
+  SNTCachedDecision* cd = [self.processor decisionForFileInfo:fi
+                                                targetProcess:&esProc
+                                                  configState:cs
+                                           activationCallback:nil
+                                               cachedDecision:nil];
 
   XCTAssertNotEqual(cd.decision, SNTEventStateBlockBinaryMismatch);
 }
@@ -1559,9 +1560,10 @@ static MOLCodesignChecker* MakeMockChecker(NSString* cdhash, NSString* teamID,
   es_file_t file;
   es_process_t proc;
   MakeTargetProc(&file, &proc, "/tmp/test", realStat, /*csFlags=*/0, "", "", kHashA);
-  XCTAssertEqual(
-      [SNTPolicyProcessor verifyIdentityForTargetProc:&proc fd:scopedFile->UnsafeFD() csInfo:nil],
-      IdentityVerifyResult::kMatch);
+  XCTAssertEqual([SNTPolicyProcessor verifyIdentityForTargetProc:&proc
+                                                              fd:scopedFile->UnsafeFD()
+                                                          csInfo:nil],
+                 IdentityVerifyResult::kMatch);
 }
 
 // Case 5: both unsigned, st_dev differs -> Mismatch.
@@ -1574,9 +1576,10 @@ static MOLCodesignChecker* MakeMockChecker(NSString* cdhash, NSString* teamID,
   es_file_t file;
   es_process_t proc;
   MakeTargetProc(&file, &proc, "/tmp/test", realStat, 0, "", "", kHashA);
-  XCTAssertEqual(
-      [SNTPolicyProcessor verifyIdentityForTargetProc:&proc fd:scopedFile->UnsafeFD() csInfo:nil],
-      IdentityVerifyResult::kMismatch);
+  XCTAssertEqual([SNTPolicyProcessor verifyIdentityForTargetProc:&proc
+                                                              fd:scopedFile->UnsafeFD()
+                                                          csInfo:nil],
+                 IdentityVerifyResult::kMismatch);
 }
 
 // Case 5: both unsigned, st_ino differs -> Mismatch.
@@ -1589,9 +1592,10 @@ static MOLCodesignChecker* MakeMockChecker(NSString* cdhash, NSString* teamID,
   es_file_t file;
   es_process_t proc;
   MakeTargetProc(&file, &proc, "/tmp/test", realStat, 0, "", "", kHashA);
-  XCTAssertEqual(
-      [SNTPolicyProcessor verifyIdentityForTargetProc:&proc fd:scopedFile->UnsafeFD() csInfo:nil],
-      IdentityVerifyResult::kMismatch);
+  XCTAssertEqual([SNTPolicyProcessor verifyIdentityForTargetProc:&proc
+                                                              fd:scopedFile->UnsafeFD()
+                                                          csInfo:nil],
+                 IdentityVerifyResult::kMismatch);
 }
 
 // Case 5: both unsigned, st_size differs -> Mismatch.
@@ -1604,9 +1608,10 @@ static MOLCodesignChecker* MakeMockChecker(NSString* cdhash, NSString* teamID,
   es_file_t file;
   es_process_t proc;
   MakeTargetProc(&file, &proc, "/tmp/test", realStat, 0, "", "", kHashA);
-  XCTAssertEqual(
-      [SNTPolicyProcessor verifyIdentityForTargetProc:&proc fd:scopedFile->UnsafeFD() csInfo:nil],
-      IdentityVerifyResult::kMismatch);
+  XCTAssertEqual([SNTPolicyProcessor verifyIdentityForTargetProc:&proc
+                                                              fd:scopedFile->UnsafeFD()
+                                                          csInfo:nil],
+                 IdentityVerifyResult::kMismatch);
 }
 
 // Case 5: both unsigned, st_mtimespec.tv_sec differs -> Mismatch.
@@ -1619,9 +1624,10 @@ static MOLCodesignChecker* MakeMockChecker(NSString* cdhash, NSString* teamID,
   es_file_t file;
   es_process_t proc;
   MakeTargetProc(&file, &proc, "/tmp/test", realStat, 0, "", "", kHashA);
-  XCTAssertEqual(
-      [SNTPolicyProcessor verifyIdentityForTargetProc:&proc fd:scopedFile->UnsafeFD() csInfo:nil],
-      IdentityVerifyResult::kMismatch);
+  XCTAssertEqual([SNTPolicyProcessor verifyIdentityForTargetProc:&proc
+                                                              fd:scopedFile->UnsafeFD()
+                                                          csInfo:nil],
+                 IdentityVerifyResult::kMismatch);
 }
 
 // Case 5: both unsigned, st_mtimespec.tv_nsec differs -> Mismatch.
@@ -1634,9 +1640,10 @@ static MOLCodesignChecker* MakeMockChecker(NSString* cdhash, NSString* teamID,
   es_file_t file;
   es_process_t proc;
   MakeTargetProc(&file, &proc, "/tmp/test", realStat, 0, "", "", kHashA);
-  XCTAssertEqual(
-      [SNTPolicyProcessor verifyIdentityForTargetProc:&proc fd:scopedFile->UnsafeFD() csInfo:nil],
-      IdentityVerifyResult::kMismatch);
+  XCTAssertEqual([SNTPolicyProcessor verifyIdentityForTargetProc:&proc
+                                                              fd:scopedFile->UnsafeFD()
+                                                          csInfo:nil],
+                 IdentityVerifyResult::kMismatch);
 }
 
 // Case 5: both unsigned, fstat fails (invalid fd) -> Mismatch (fail-closed).

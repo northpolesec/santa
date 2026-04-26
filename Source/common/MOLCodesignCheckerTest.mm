@@ -138,19 +138,24 @@
 // cdhash.
 - (void)testInitWithFileDescriptor_SurvivesAtomicRenameSwap {
   NSString* tmp = NSTemporaryDirectory();
-  NSString* a = [tmp stringByAppendingPathComponent:[NSString
-      stringWithFormat:@"mol_a_%d_%@", getpid(), [[NSUUID UUID] UUIDString]]];
-  NSString* b = [tmp stringByAppendingPathComponent:[NSString
-      stringWithFormat:@"mol_b_%d_%@", getpid(), [[NSUUID UUID] UUIDString]]];
+  NSString* a =
+      [tmp stringByAppendingPathComponent:[NSString stringWithFormat:@"mol_a_%d_%@", getpid(),
+                                                                     [[NSUUID UUID] UUIDString]]];
+  NSString* b =
+      [tmp stringByAppendingPathComponent:[NSString stringWithFormat:@"mol_b_%d_%@", getpid(),
+                                                                     [[NSUUID UUID] UUIDString]]];
   NSError* err;
-  XCTAssertTrue([[NSFileManager defaultManager] copyItemAtPath:@"/usr/bin/yes" toPath:a error:&err]);
-  XCTAssertTrue([[NSFileManager defaultManager] copyItemAtPath:@"/usr/bin/true" toPath:b error:&err]);
+  XCTAssertTrue([[NSFileManager defaultManager] copyItemAtPath:@"/usr/bin/yes"
+                                                        toPath:a
+                                                         error:&err]);
+  XCTAssertTrue([[NSFileManager defaultManager] copyItemAtPath:@"/usr/bin/true"
+                                                        toPath:b
+                                                         error:&err]);
 
   int fd = open(a.UTF8String, O_RDONLY | O_CLOEXEC);
   XCTAssertGreaterThanOrEqual(fd, 0, "open: %s", strerror(errno));
 
-  MOLCodesignChecker* aRef =
-      [[MOLCodesignChecker alloc] initWithBinaryPath:a fileDescriptor:fd];
+  MOLCodesignChecker* aRef = [[MOLCodesignChecker alloc] initWithBinaryPath:a fileDescriptor:fd];
   MOLCodesignChecker* bRef = [[MOLCodesignChecker alloc] initWithBinaryPath:b];
   XCTAssertNotNil(aRef.cdhash);
   XCTAssertNotNil(bRef.cdhash);
@@ -163,8 +168,7 @@
   XCTAssertEqual(rename(b.UTF8String, a.UTF8String), 0, "rename: %s", strerror(errno));
 
   // fd-based: must still see A's identity.
-  MOLCodesignChecker* afterFD =
-      [[MOLCodesignChecker alloc] initWithBinaryPath:a fileDescriptor:fd];
+  MOLCodesignChecker* afterFD = [[MOLCodesignChecker alloc] initWithBinaryPath:a fileDescriptor:fd];
   XCTAssertEqualObjects(afterFD.cdhash, originalACdhash);
 
   // Path-based control: now sees B's identity (proving the rename happened
@@ -180,8 +184,9 @@
 // after the caller's open(): the fd holds the vnode regardless.
 - (void)testInitWithFileDescriptor_SurvivesUnlink {
   NSString* tmp = NSTemporaryDirectory();
-  NSString* path = [tmp stringByAppendingPathComponent:[NSString
-      stringWithFormat:@"mol_unlink_%d_%@", getpid(), [[NSUUID UUID] UUIDString]]];
+  NSString* path =
+      [tmp stringByAppendingPathComponent:[NSString stringWithFormat:@"mol_unlink_%d_%@", getpid(),
+                                                                     [[NSUUID UUID] UUIDString]]];
   NSError* err;
   XCTAssertTrue([[NSFileManager defaultManager] copyItemAtPath:@"/usr/bin/yes"
                                                         toPath:path
@@ -192,15 +197,13 @@
 
   XCTAssertEqual(unlink(path.UTF8String), 0);
 
-  MOLCodesignChecker* sut =
-      [[MOLCodesignChecker alloc] initWithBinaryPath:path fileDescriptor:fd];
+  MOLCodesignChecker* sut = [[MOLCodesignChecker alloc] initWithBinaryPath:path fileDescriptor:fd];
   XCTAssertNotNil(sut.cdhash);
 
   // Path-based at the now-missing path must fail, confirming the fd was the
   // load-bearing source.
   NSError* pathErr;
-  MOLCodesignChecker* viaPath = [[MOLCodesignChecker alloc] initWithBinaryPath:path
-                                                                         error:&pathErr];
+  MOLCodesignChecker* viaPath = [[MOLCodesignChecker alloc] initWithBinaryPath:path error:&pathErr];
   XCTAssertNil(viaPath);
   XCTAssertNotNil(pathErr);
 
