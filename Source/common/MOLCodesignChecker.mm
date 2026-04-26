@@ -440,12 +440,16 @@ NSString* const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
   }
 
   if (!offsets) return nil;
+  // When a fd is provided, validate each slice against the same vnode the
+  // primary code ref is bound to (see initWithBinaryPath:fileDescriptor:error:).
+  // The fd-derived offsets are only meaningful relative to that vnode's bytes.
+  NSString* secCodePath = (fd != -1) ? [NSString stringWithFormat:@"/dev/fd/%d", fd] : path;
   NSMutableArray* infos = [NSMutableArray arrayWithCapacity:offsets.count];
   for (NSString* arch in offsets) {
     NSDictionary* attributes =
         @{(__bridge NSString*)kSecCodeAttributeUniversalFileOffset : offsets[arch]};
     SecStaticCodeRef codeRef = NULL;
-    SecStaticCodeCreateWithPathAndAttributes((__bridge CFURLRef)[NSURL fileURLWithPath:path],
+    SecStaticCodeCreateWithPathAndAttributes((__bridge CFURLRef)[NSURL fileURLWithPath:secCodePath],
                                              kSecCSDefaultFlags,
                                              (__bridge CFDictionaryRef)attributes, &codeRef);
     CFDictionaryRef signingDict = NULL;

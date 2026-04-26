@@ -127,7 +127,8 @@ typedef id (^SNTAttributeBlock)(SNTCommandFileInfo*, SNTFileInfo*);
 
 - (void)testCodeSignedNo {
   NSError* err = [NSError errorWithDomain:@"" code:errSecCSUnsigned userInfo:nil];
-  OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY error:[OCMArg setTo:err]])
+  OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY fileDescriptor:0 error:[OCMArg setTo:err]])
+      .ignoringNonObjectArgs()
       .andReturn(self.cscMock);
   XCTAssertEqualObjects(self.cfi.codeSigned(self.cfi, self.fileInfo), @"No");
 }
@@ -135,7 +136,8 @@ typedef id (^SNTAttributeBlock)(SNTCommandFileInfo*, SNTFileInfo*);
 - (void)testCodeSignedSignatureFailed {
   NSString* expected = @"Yes, but code/signature changed/unverifiable";
   NSError* err = [NSError errorWithDomain:@"" code:errSecCSSignatureFailed userInfo:nil];
-  OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY error:[OCMArg setTo:err]])
+  OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY fileDescriptor:0 error:[OCMArg setTo:err]])
+      .ignoringNonObjectArgs()
       .andReturn(self.cscMock);
   XCTAssertEqualObjects(self.cfi.codeSigned(self.cfi, self.fileInfo), expected);
 }
@@ -143,7 +145,8 @@ typedef id (^SNTAttributeBlock)(SNTCommandFileInfo*, SNTFileInfo*);
 - (void)testCodeSignedStaticCodeChanged {
   NSString* expected = @"Yes, but code/signature changed/unverifiable";
   NSError* err = [NSError errorWithDomain:@"" code:errSecCSStaticCodeChanged userInfo:nil];
-  OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY error:[OCMArg setTo:err]])
+  OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY fileDescriptor:0 error:[OCMArg setTo:err]])
+      .ignoringNonObjectArgs()
       .andReturn(self.cscMock);
   XCTAssertEqualObjects(self.cfi.codeSigned(self.cfi, self.fileInfo), expected);
 }
@@ -151,7 +154,8 @@ typedef id (^SNTAttributeBlock)(SNTCommandFileInfo*, SNTFileInfo*);
 - (void)testCodeSignedSignatureNotVerifiable {
   NSString* expected = @"Yes, but code/signature changed/unverifiable";
   NSError* err = [NSError errorWithDomain:@"" code:errSecCSSignatureNotVerifiable userInfo:nil];
-  OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY error:[OCMArg setTo:err]])
+  OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY fileDescriptor:0 error:[OCMArg setTo:err]])
+      .ignoringNonObjectArgs()
       .andReturn(self.cscMock);
   XCTAssertEqualObjects(self.cfi.codeSigned(self.cfi, self.fileInfo), expected);
 }
@@ -159,7 +163,8 @@ typedef id (^SNTAttributeBlock)(SNTCommandFileInfo*, SNTFileInfo*);
 - (void)testCodeSignedSignatureUnsupported {
   NSString* expected = @"Yes, but code/signature changed/unverifiable";
   NSError* err = [NSError errorWithDomain:@"" code:errSecCSSignatureUnsupported userInfo:nil];
-  OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY error:[OCMArg setTo:err]])
+  OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY fileDescriptor:0 error:[OCMArg setTo:err]])
+      .ignoringNonObjectArgs()
       .andReturn(self.cscMock);
   XCTAssertEqualObjects(self.cfi.codeSigned(self.cfi, self.fileInfo), expected);
 }
@@ -167,7 +172,8 @@ typedef id (^SNTAttributeBlock)(SNTCommandFileInfo*, SNTFileInfo*);
 - (void)testCodeSignedResourceDirectoryFailed {
   NSString* expected = @"Yes, but resources invalid";
   NSError* err = [NSError errorWithDomain:@"" code:errSecCSResourceDirectoryFailed userInfo:nil];
-  OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY error:[OCMArg setTo:err]])
+  OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY fileDescriptor:0 error:[OCMArg setTo:err]])
+      .ignoringNonObjectArgs()
       .andReturn(self.cscMock);
   XCTAssertEqualObjects(self.cfi.codeSigned(self.cfi, self.fileInfo), expected);
 }
@@ -175,7 +181,8 @@ typedef id (^SNTAttributeBlock)(SNTCommandFileInfo*, SNTFileInfo*);
 - (void)testCodeSignedResourceNotSupported {
   NSString* expected = @"Yes, but resources invalid";
   NSError* err = [NSError errorWithDomain:@"" code:errSecCSResourceNotSupported userInfo:nil];
-  OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY error:[OCMArg setTo:err]])
+  OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY fileDescriptor:0 error:[OCMArg setTo:err]])
+      .ignoringNonObjectArgs()
       .andReturn(self.cscMock);
   XCTAssertEqualObjects(self.cfi.codeSigned(self.cfi, self.fileInfo), expected);
 }
@@ -183,7 +190,8 @@ typedef id (^SNTAttributeBlock)(SNTCommandFileInfo*, SNTFileInfo*);
 - (void)testCodeSignedResourceRulesInvalid {
   NSString* expected = @"Yes, but resources invalid";
   NSError* err = [NSError errorWithDomain:@"" code:errSecCSResourceRulesInvalid userInfo:nil];
-  OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY error:[OCMArg setTo:err]])
+  OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY fileDescriptor:0 error:[OCMArg setTo:err]])
+      .ignoringNonObjectArgs()
       .andReturn(self.cscMock);
   XCTAssertEqualObjects(self.cfi.codeSigned(self.cfi, self.fileInfo), expected);
 }
@@ -191,7 +199,8 @@ typedef id (^SNTAttributeBlock)(SNTCommandFileInfo*, SNTFileInfo*);
 - (void)testCodeSignedResourcesInvalid {
   NSString* expected = @"Yes, but resources invalid";
   NSError* err = [NSError errorWithDomain:@"" code:errSecCSResourcesInvalid userInfo:nil];
-  OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY error:[OCMArg setTo:err]])
+  OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY fileDescriptor:0 error:[OCMArg setTo:err]])
+      .ignoringNonObjectArgs()
       .andReturn(self.cscMock);
   XCTAssertEqualObjects(self.cfi.codeSigned(self.cfi, self.fileInfo), expected);
 }
@@ -199,7 +208,8 @@ typedef id (^SNTAttributeBlock)(SNTCommandFileInfo*, SNTFileInfo*);
 - (void)testCodeSignedResourcesNotFound {
   NSString* expected = @"Yes, but resources invalid";
   NSError* err = [NSError errorWithDomain:@"" code:errSecCSResourcesNotFound userInfo:nil];
-  OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY error:[OCMArg setTo:err]])
+  OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY fileDescriptor:0 error:[OCMArg setTo:err]])
+      .ignoringNonObjectArgs()
       .andReturn(self.cscMock);
   XCTAssertEqualObjects(self.cfi.codeSigned(self.cfi, self.fileInfo), expected);
 }
@@ -207,7 +217,8 @@ typedef id (^SNTAttributeBlock)(SNTCommandFileInfo*, SNTFileInfo*);
 - (void)testCodeSignedResourcesNotSealed {
   NSString* expected = @"Yes, but resources invalid";
   NSError* err = [NSError errorWithDomain:@"" code:errSecCSResourcesNotSealed userInfo:nil];
-  OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY error:[OCMArg setTo:err]])
+  OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY fileDescriptor:0 error:[OCMArg setTo:err]])
+      .ignoringNonObjectArgs()
       .andReturn(self.cscMock);
   XCTAssertEqualObjects(self.cfi.codeSigned(self.cfi, self.fileInfo), expected);
 }
@@ -215,7 +226,8 @@ typedef id (^SNTAttributeBlock)(SNTCommandFileInfo*, SNTFileInfo*);
 - (void)testCodeSignedReqFailed {
   NSString* expected = @"Yes, but failed requirement validation";
   NSError* err = [NSError errorWithDomain:@"" code:errSecCSReqFailed userInfo:nil];
-  OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY error:[OCMArg setTo:err]])
+  OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY fileDescriptor:0 error:[OCMArg setTo:err]])
+      .ignoringNonObjectArgs()
       .andReturn(self.cscMock);
   XCTAssertEqualObjects(self.cfi.codeSigned(self.cfi, self.fileInfo), expected);
 }
@@ -223,7 +235,8 @@ typedef id (^SNTAttributeBlock)(SNTCommandFileInfo*, SNTFileInfo*);
 - (void)testCodeSignedReqInvalid {
   NSString* expected = @"Yes, but failed requirement validation";
   NSError* err = [NSError errorWithDomain:@"" code:errSecCSReqInvalid userInfo:nil];
-  OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY error:[OCMArg setTo:err]])
+  OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY fileDescriptor:0 error:[OCMArg setTo:err]])
+      .ignoringNonObjectArgs()
       .andReturn(self.cscMock);
   XCTAssertEqualObjects(self.cfi.codeSigned(self.cfi, self.fileInfo), expected);
 }
@@ -231,7 +244,8 @@ typedef id (^SNTAttributeBlock)(SNTCommandFileInfo*, SNTFileInfo*);
 - (void)testCodeSignedReqUnsupported {
   NSString* expected = @"Yes, but failed requirement validation";
   NSError* err = [NSError errorWithDomain:@"" code:errSecCSReqUnsupported userInfo:nil];
-  OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY error:[OCMArg setTo:err]])
+  OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY fileDescriptor:0 error:[OCMArg setTo:err]])
+      .ignoringNonObjectArgs()
       .andReturn(self.cscMock);
   XCTAssertEqualObjects(self.cfi.codeSigned(self.cfi, self.fileInfo), expected);
 }
@@ -239,7 +253,8 @@ typedef id (^SNTAttributeBlock)(SNTCommandFileInfo*, SNTFileInfo*);
 - (void)testCodeSignedInfoPlistFailed {
   NSString* expected = @"Yes, but can't validate as the Info.plist has been modified";
   NSError* err = [NSError errorWithDomain:@"" code:errSecCSInfoPlistFailed userInfo:nil];
-  OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY error:[OCMArg setTo:err]])
+  OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY fileDescriptor:0 error:[OCMArg setTo:err]])
+      .ignoringNonObjectArgs()
       .andReturn(self.cscMock);
   XCTAssertEqualObjects(self.cfi.codeSigned(self.cfi, self.fileInfo), expected);
 }
@@ -247,7 +262,8 @@ typedef id (^SNTAttributeBlock)(SNTCommandFileInfo*, SNTFileInfo*);
 - (void)testCodeSignedDefault {
   NSString* expected = @"Yes, but failed to validate (999)";
   NSError* err = [NSError errorWithDomain:@"" code:999 userInfo:nil];
-  OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY error:[OCMArg setTo:err]])
+  OCMStub([self.cscMock initWithBinaryPath:OCMOCK_ANY fileDescriptor:0 error:[OCMArg setTo:err]])
+      .ignoringNonObjectArgs()
       .andReturn(self.cscMock);
   XCTAssertEqualObjects(self.cfi.codeSigned(self.cfi, self.fileInfo), expected);
 }
