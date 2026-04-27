@@ -560,8 +560,13 @@ std::optional<FAAPolicyProcessor::ESResult> FAAPolicyProcessor::ImmediateRespons
   // targets can be determined to be readable can be considered. E.g., for
   // clone, the destination must still be evaluated so the reads_cache_ is not
   // consulted.
+  // Truncated paths must skip this fast path so they reach the truncation
+  // branch in ProcessTargetAndPolicy and fail closed per the configured
+  // override action. This mirrors the !path_target.truncated guard on the
+  // cache update in ProcessMessage.
   if (msg->event_type == ES_EVENT_TYPE_AUTH_OPEN &&
       !(msg->event.open.fflag & kOpenFlagsIndicatingWrite) &&
+      !msg->event.open.file->path_truncated &&
       reads_cache_.Contains(MakeReadsCacheKey(msg->process->audit_token, client_type),
                             std::pair<dev_t, ino_t>{msg->event.open.file->stat.st_dev,
                                                     msg->event.open.file->stat.st_ino})) {
