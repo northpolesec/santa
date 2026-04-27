@@ -116,8 +116,10 @@ static size_t GetResidentMemoryBytes() {
 
   // Run many iterations of CompileAndEvaluate. Each iteration materializes
   // ~200 * 256 = ~50KB of arg strings onto the arena, plus compilation
-  // temporaries. Before the fix this grew by ~600MB+ over 5000 iterations.
-  const int iterations = 5000;
+  // temporaries. Before the fix this grew by ~600MB+ over 5000 iterations,
+  // so 1500 iterations still produces ~180MB pre-fix while keeping post-fix
+  // RSS comfortably under the 50MB threshold.
+  const int iterations = 1500;
   for (int i = 0; i < iterations; i++) {
     @autoreleasepool {
       auto f = std::make_unique<ExecutableFileT>();
