@@ -32,8 +32,8 @@ static inline void PushBackPathTarget(std::vector<Message::PathTarget>& vec,
 }
 
 // Compound path (dir + "/" + filename): must materialize a std::string.
-static inline void PushBackPathTarget(std::vector<Message::PathTarget>& vec,
-                                      const es_file_t* dir, const es_string_token_t& name) {
+static inline void PushBackPathTarget(std::vector<Message::PathTarget>& vec, const es_file_t* dir,
+                                      const es_string_token_t& name) {
   std::string full_path;
   full_path.reserve(dir->path.length + 1 + name.length);
   full_path.append(dir->path.data, dir->path.length);
@@ -118,14 +118,14 @@ void Message::PopulatePathTargets() {
     case ES_EVENT_TYPE_AUTH_CLONE:
       PushBackPathTarget(targets, es_msg_->event.clone.source, true);
       PushBackPathTarget(targets, es_msg_->event.clone.target_dir,
-                             es_msg_->event.clone.target_name);
+                         es_msg_->event.clone.target_name);
       break;
 
     case ES_EVENT_TYPE_AUTH_CREATE:
       // AUTH CREATE events should always be ES_DESTINATION_TYPE_NEW_PATH
       if (es_msg_->event.create.destination_type == ES_DESTINATION_TYPE_NEW_PATH) {
         PushBackPathTarget(targets, es_msg_->event.create.destination.new_path.dir,
-                               es_msg_->event.create.destination.new_path.filename);
+                           es_msg_->event.create.destination.new_path.filename);
       } else {
         LOGW(@"Unexpected destination type for create event: %d. Ignoring target.",
              es_msg_->event.create.destination_type);
@@ -138,7 +138,7 @@ void Message::PopulatePathTargets() {
         PushBackPathTarget(targets, es_msg_->event.copyfile.target_file);
       } else {
         PushBackPathTarget(targets, es_msg_->event.copyfile.target_dir,
-                               es_msg_->event.copyfile.target_name);
+                           es_msg_->event.copyfile.target_name);
       }
       break;
 
@@ -150,7 +150,7 @@ void Message::PopulatePathTargets() {
     case ES_EVENT_TYPE_AUTH_LINK:
       PushBackPathTarget(targets, es_msg_->event.link.source);
       PushBackPathTarget(targets, es_msg_->event.link.target_dir,
-                             es_msg_->event.link.target_filename);
+                         es_msg_->event.link.target_filename);
       break;
 
     case ES_EVENT_TYPE_AUTH_OPEN:
@@ -163,7 +163,7 @@ void Message::PopulatePathTargets() {
         PushBackPathTarget(targets, es_msg_->event.rename.destination.existing_file);
       } else if (es_msg_->event.rename.destination_type == ES_DESTINATION_TYPE_NEW_PATH) {
         PushBackPathTarget(targets, es_msg_->event.rename.destination.new_path.dir,
-                               es_msg_->event.rename.destination.new_path.filename);
+                           es_msg_->event.rename.destination.new_path.filename);
       } else {
         LOGW(@"Unexpected destination type for rename event: %d. Ignoring destination.",
              es_msg_->event.rename.destination_type);
