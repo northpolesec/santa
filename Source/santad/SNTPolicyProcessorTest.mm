@@ -1655,4 +1655,71 @@ static MOLCodesignChecker* MakeMockChecker(NSString* cdhash, NSString* teamID,
                  IdentityVerifyResult::kMismatch);
 }
 
+#pragma mark - Platform-binary team_id suppression (ES quirk)
+
+// ES does not populate team_id on the target field for binaries with
+// is_platform_binary=true, even when the on-disk signature carries a TeamID.
+// Observed in production for Apple-signed XPC services inside framework
+// bundles (Xcode helpers, Apple developer tooling). The verifier accommodates
+// this by suspending the team_id presence and equality checks on that path —
+// signing_id and cdhash continue to bind identity end-to-end. The four tests
+// below pin: the production case matches, drift still reaches kDriftAllowed,
+// signing_id mismatch still bites, and the non-platform path is unaffected.
+
+// Platform binary, ES team_id suppressed, disk has team_id, signing_id and
+// cdhash agree -> Match. The shape every Apple-signed XPC service produces.
+- (void)testVerifyIdentity_PlatformBinary_ESTeamSuppressed_DiskHasTeam_ReturnsMatch {
+  es_file_t file;
+  es_process_t proc;
+  MakeTargetProc(&file, &proc, "/tmp/test", MakeStat(), CS_SIGNED, /*team=*/"",
+                 /*sid=*/"com.apple.dt.X", kHashA);
+  XCTAssertTrue(proc.is_platform_binary);  // default from MakeESProcess
+  MOLCodesignChecker* csInfo =
+      MakeMockChecker(HexOf(kHashA, 20), @"59GAB85EFG", @"com.apple.dt.X");
+  XCTAssertEqual([SNTPolicyProcessor verifyIdentityForTargetProc:&proc fd:-1 csInfo:csInfo],
+                 IdentityVerifyResult::kMatch);
+}
+
+// Platform binary, ES team_id suppressed, signing_id agrees, cdhash drifts ->
+// DriftAllowed. Same publisher (signing_id namespace), so the existing
+// drift-within-publisher reasoning carries over.
+- (void)testVerifyIdentity_PlatformBinary_ESTeamSuppressed_CdhashDrifts_ReturnsDriftAllowed {
+  es_file_t file;
+  es_process_t proc;
+  MakeTargetProc(&file, &proc, "/tmp/test", MakeStat(), CS_SIGNED, /*team=*/"",
+                 /*sid=*/"com.apple.dt.X", kHashA);
+  MOLCodesignChecker* csInfo =
+      MakeMockChecker(HexOf(kHashB, 20), @"59GAB85EFG", @"com.apple.dt.X");
+  XCTAssertEqual([SNTPolicyProcessor verifyIdentityForTargetProc:&proc fd:-1 csInfo:csInfo],
+                 IdentityVerifyResult::kDriftAllowed);
+}
+
+// Platform binary, ES team_id suppressed, signing_ids differ -> Mismatch.
+// Confirms signing_id equality still gates even when team is suppressed.
+- (void)testVerifyIdentity_PlatformBinary_ESTeamSuppressed_SigningIDDiffers_ReturnsMismatch {
+  es_file_t file;
+  es_process_t proc;
+  MakeTargetProc(&file, &proc, "/tmp/test", MakeStat(), CS_SIGNED, /*team=*/"",
+                 /*sid=*/"com.apple.dt.X", kHashA);
+  MOLCodesignChecker* csInfo =
+      MakeMockChecker(HexOf(kHashA, 20), @"59GAB85EFG", @"com.apple.dt.Y");
+  XCTAssertEqual([SNTPolicyProcessor verifyIdentityForTargetProc:&proc fd:-1 csInfo:csInfo],
+                 IdentityVerifyResult::kMismatch);
+}
+
+// Non-platform binary, ES omits team_id but disk has one -> Mismatch.
+// Confirms the platform-binary relaxation does not bleed into the third-party
+// path: ES omitting team_id outside is_platform_binary=true is a real
+// presence disagreement and case-2 still bites.
+- (void)testVerifyIdentity_NonPlatform_ESNoTeam_DiskHasTeam_ReturnsMismatch {
+  es_file_t file;
+  es_process_t proc;
+  MakeTargetProc(&file, &proc, "/tmp/test", MakeStat(), CS_SIGNED, /*team=*/"", /*sid=*/"S",
+                 kHashA);
+  proc.is_platform_binary = false;
+  MOLCodesignChecker* csInfo = MakeMockChecker(HexOf(kHashA, 20), @"T", @"S");
+  XCTAssertEqual([SNTPolicyProcessor verifyIdentityForTargetProc:&proc fd:-1 csInfo:csInfo],
+                 IdentityVerifyResult::kMismatch);
+}
+
 @end

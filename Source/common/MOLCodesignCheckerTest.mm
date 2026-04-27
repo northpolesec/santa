@@ -305,6 +305,67 @@
   XCTAssertTrue(sut.platformBinary);
 }
 
+// MOLCodesignChecker must continue to populate `_signingInformation` even
+// when SecStaticCodeCheckValidityWithErrors returns a non-fatal error. Bundle
+// binaries opened by fd produce errSecCSInfoPlistFailed (the bundle's
+// Info.plist hash slot in the Mach-O signature can't be matched against an
+// on-disk Info.plist when SecStaticCode is fed /dev/fd/N), and downstream
+// callers — notably SNTPolicyProcessor's identity verifier — depend on the
+// signing dictionary remaining accessible so the cdhash / TeamID / SigningID
+// can still be read off the binary. This test pins that contract: a future
+// refactor that returns nil or skips dictionary population on any error
+// would silently regress identity verification for every signed bundle
+// binary on the system (~all GUI apps and many framework-housed tools).
+- (void)testInitWithFileDescriptor_BundleBinary_PreservesSigningInfoOnPartialError {
+  NSArray<NSString*>* candidates = @[
+    @"/System/Applications/Calculator.app/Contents/MacOS/Calculator",
+    @"/System/Applications/Utilities/Terminal.app/Contents/MacOS/Terminal",
+    @"/System/Library/Frameworks/Foundation.framework/Versions/Current/Foundation",
+  ];
+  NSString* path = nil;
+  for (NSString* c in candidates) {
+    if ([[NSFileManager defaultManager] fileExistsAtPath:c]) {
+      path = c;
+      break;
+    }
+  }
+  if (!path) {
+    XCTSkip(@"No signed bundle binary available on this host");
+  }
+
+  // Sanity baseline: path-based init succeeds cleanly and gives us reference
+  // identity values to compare against.
+  NSError* viaPathErr;
+  MOLCodesignChecker* viaPath = [[MOLCodesignChecker alloc] initWithBinaryPath:path
+                                                                         error:&viaPathErr];
+  XCTAssertNotNil(viaPath);
+  XCTAssertNil(viaPathErr);
+  XCTAssertNotNil(viaPath.cdhash);
+
+  int fd = open(path.UTF8String, O_RDONLY | O_CLOEXEC);
+  XCTAssertGreaterThanOrEqual(fd, 0, "open(%@): %s", path, strerror(errno));
+
+  // fd-based init must surface the validity error AND populate the signing
+  // dictionary anyway. The two behaviors are independent — together they let
+  // the SNT-377 verifier compare identity even when bundle context is
+  // unavailable through /dev/fd/N.
+  NSError* err;
+  MOLCodesignChecker* sut = [[MOLCodesignChecker alloc] initWithBinaryPath:path
+                                                            fileDescriptor:fd
+                                                                     error:&err];
+  XCTAssertNotNil(sut, @"init must return an instance, not nil, on partial validity failure");
+  XCTAssertNotNil(err, @"validity check failure must surface to the caller");
+
+  XCTAssertNotNil(sut.signingInformation, @"signing dictionary must be populated");
+  XCTAssertEqualObjects(sut.cdhash, viaPath.cdhash,
+                        @"fd-based cdhash must agree with path-based cdhash");
+  XCTAssertEqualObjects(sut.signingID, viaPath.signingID);
+  XCTAssertEqualObjects(sut.teamID, viaPath.teamID);
+  XCTAssertNotNil(sut.leafCertificate, @"leaf certificate must be readable");
+
+  close(fd);
+}
+
 - (void)testEntitlements {
   NSError* error;
   NSBundle* bundle = [NSBundle bundleForClass:[self class]];
