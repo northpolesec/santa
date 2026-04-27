@@ -16,6 +16,7 @@
 #import <XCTest/XCTest.h>
 
 #import "Source/common/SNTFileInfo.h"
+#import "Source/common/TestUtils.h"
 
 @interface SNTFileInfoTest : XCTestCase
 @end
@@ -262,6 +263,51 @@
     XCTAssertNotNil(sut);
     XCTAssertEqualObjects([sut codesignStatus], @"Yes, platform binary");
   }
+}
+
+- (void)testInitWithEndpointSecurityExecEvent_StoresCpuType {
+  // Use a real path so the underlying initWithResolvedPath:stat:error: succeeds.
+  const char* path = "/usr/bin/yes";
+  struct stat sb;
+  XCTAssertEqual(stat(path, &sb), 0);
+
+  es_file_t file = MakeESFile(path, sb);
+  es_process_t proc = MakeESProcess(&file);
+  es_event_exec_t exec = {
+      .target = &proc,
+      .image_cputype = CPU_TYPE_ARM64,
+      .image_cpusubtype = CPU_SUBTYPE_ARM64_ALL,
+  };
+
+  NSError* error;
+  SNTFileInfo* sut = [[SNTFileInfo alloc] initWithEndpointSecurityExecEvent:&exec error:&error];
+  XCTAssertNotNil(sut);
+  XCTAssertNil(error);
+  XCTAssertEqual(sut.cpuType, CPU_TYPE_ARM64);
+  XCTAssertEqual(sut.cpuSubtype, CPU_SUBTYPE_ARM64_ALL);
+}
+
+- (void)testInitWithEndpointSecurityFile_DefaultsCpuTypeToAny {
+  const char* path = "/usr/bin/yes";
+  struct stat sb;
+  XCTAssertEqual(stat(path, &sb), 0);
+
+  es_file_t file = MakeESFile(path, sb);
+
+  NSError* error;
+  SNTFileInfo* sut = [[SNTFileInfo alloc] initWithEndpointSecurityFile:&file error:&error];
+  XCTAssertNotNil(sut);
+  XCTAssertEqual(sut.cpuType, CPU_TYPE_ANY);
+  XCTAssertEqual(sut.cpuSubtype, CPU_SUBTYPE_ANY);
+}
+
+- (void)testInitWithPath_DefaultsCpuTypeToAny {
+  // Path-based init: cputype/cpusubtype default to ANY since there's no
+  // exec-event context to infer them from.
+  SNTFileInfo* sut = [[SNTFileInfo alloc] initWithPath:@"/usr/bin/yes"];
+  XCTAssertNotNil(sut);
+  XCTAssertEqual(sut.cpuType, CPU_TYPE_ANY);
+  XCTAssertEqual(sut.cpuSubtype, CPU_SUBTYPE_ANY);
 }
 
 @end

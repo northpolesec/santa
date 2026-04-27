@@ -101,7 +101,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
 
   self.mockFileInfo = OCMClassMock([SNTFileInfo class]);
   OCMStub([self.mockFileInfo alloc]).andReturn(self.mockFileInfo);
-  OCMStub([self.mockFileInfo initWithEndpointSecurityFile:NULL error:[OCMArg setTo:nil]])
+  OCMStub([self.mockFileInfo initWithEndpointSecurityExecEvent:NULL error:[OCMArg setTo:nil]])
       .ignoringNonObjectArgs()
       .andReturn(self.mockFileInfo);
   OCMStub([self.mockFileInfo codesignCheckerWithError:[OCMArg setTo:nil]])

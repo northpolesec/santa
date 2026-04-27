@@ -263,6 +263,9 @@ objc_library(
 santa_unit_test(
     name = "SNTPolicyProcessorTest",
     srcs = ["SNTPolicyProcessorTest.mm"],
+    resources = [
+        "//Source/common:testdata_cal_yikes_universal_signed",
+    ],
     sdk_dylibs = [
         "EndpointSecurity",
     ],

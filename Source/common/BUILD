@@ -11,6 +11,14 @@ package(
 
 licenses(["notice"])
 
+# Expose individual test fixtures for use by tests in other packages.
+exports_files(["testdata/cal-yikes-universal_signed"])
+
+filegroup(
+    name = "testdata_cal_yikes_universal_signed",
+    srcs = ["testdata/cal-yikes-universal_signed"],
+)
+
 proto_library(
     name = "santa_proto",
     srcs = ["santa.proto"],
@@ -1045,7 +1053,10 @@ santa_unit_test(
         "testdata/BundleExample.app/**",
         "testdata/DirectoryBundle/**",
     ]),
-    deps = [":SNTFileInfo"],
+    deps = [
+        ":SNTFileInfo",
+        ":TestUtils",
+    ],
 )
 
 santa_unit_test(

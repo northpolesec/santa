@@ -75,6 +75,11 @@ NSString* const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
 
 // Cached on-disk binary file descriptor
 @property int binaryFileDescriptor;
+
+// Active-slice hint; values <= 0 mean no hint (CPU_TYPE_ANY is -1; ivar zero-default
+// from non-fd init paths also fails the > 0 gate in -initWithSecStaticCodeRef:error:).
+@property cpu_type_t cpuTypeHint;
+@property cpu_subtype_t cpuSubtypeHint;
 @end
 
 @implementation MOLCodesignChecker
@@ -98,6 +103,12 @@ NSString* const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
       }
     });
 
+    // hintActiveForFat is YES when the caller passed a real arch hint and we're
+    // looking at a fat binary. In that mode the per-slice dict is the authority
+    // for _signingInformation/_certificates; the whole-binary fallback below is
+    // suppressed regardless of whether a matching slice was found.
+    BOOL hintActiveForFat = NO;
+
     // For static code checks perform additional checks across all slices
     if (CFGetTypeID(codeRef) == SecStaticCodeGetTypeID()) {
       // Ensure signing is consistent for all architectures.
@@ -106,6 +117,26 @@ NSString* const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
       NSArray* infos = [self universalSigningInformationForBinaryPath:_binaryPath
                                                        fileDescriptor:_binaryFileDescriptor];
       if (infos) _universalSigningInformation = infos;
+
+      // When the caller provided an active-slice hint and this is a fat binary,
+      // populate _signingInformation/_certificates from the matching slice.
+      // The cross-slice consistency check below still runs and still surfaces
+      // its error informationally; the per-arch identity is already locked in
+      // via the active-slice extraction. If no slice matches the hint (e.g. a
+      // PowerPC hint against an i386/x86_64 binary), _signingInformation stays
+      // nil and hintActiveForFat suppresses the whole-binary fallback below so
+      // callers see an empty identity for the mismatched arch request.
+      hintActiveForFat = (_cpuTypeHint > 0 && _universalSigningInformation.count > 0);
+      if (hintActiveForFat) {
+        NSDictionary* sliceDict = [self perSliceDictForCpuType:_cpuTypeHint
+                                                    cpuSubtype:_cpuSubtypeHint];
+        if (sliceDict.count > 0) {
+          _signingInformation = sliceDict;
+          NSArray* certs = sliceDict[(__bridge id)kSecCodeInfoCertificates];
+          _certificates = [MOLCertificate certificatesFromArray:certs];
+        }
+      }
+
       if (infos && ![self allSigningInformationMatches:infos]) {
         status = errSecCSSignatureInvalid;
         scopedError = ScopedCFError::BridgeRetain([self
@@ -114,9 +145,14 @@ NSString* const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
       }
     }
 
-    // Do not set _signingInformation or _certificates for universal binaries with signing issues.
+    // Do not set _signingInformation or _certificates for universal binaries with
+    // signing issues EXCEPT when the cputype hint already populated them from the
+    // active slice (above). Also suppress when hint mode is active but no slice
+    // matched — callers asked for a specific arch and should not receive the
+    // whole-binary aggregate identity.
     NSError* err = scopedError.BridgeRelease<NSError*>();
-    if (!([err.domain isEqualToString:kMOLCodesignCheckerErrorDomain] &&
+    if (!_signingInformation && !hintActiveForFat &&
+        !([err.domain isEqualToString:kMOLCodesignCheckerErrorDomain] &&
           status == errSecCSSignatureInvalid)) {
       // Get CFDictionary of signing information for binary
       CFDictionaryRef signingDict = NULL;
@@ -154,6 +190,18 @@ NSString* const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
 - (instancetype)initWithBinaryPath:(NSString*)binaryPath
                     fileDescriptor:(int)fileDescriptor
                              error:(NSError**)error {
+  return [self initWithBinaryPath:binaryPath
+                   fileDescriptor:fileDescriptor
+                          cpuType:CPU_TYPE_ANY
+                       cpuSubtype:CPU_SUBTYPE_ANY
+                            error:error];
+}
+
+- (instancetype)initWithBinaryPath:(NSString*)binaryPath
+                    fileDescriptor:(int)fileDescriptor
+                           cpuType:(cpu_type_t)cpuType
+                        cpuSubtype:(cpu_subtype_t)cpuSubtype
+                             error:(NSError**)error {
   OSStatus status = errSecSuccess;
   SecStaticCodeRef codeRef = NULL;
 
@@ -177,6 +225,8 @@ NSString* const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
 
   _binaryPath = binaryPath;
   _binaryFileDescriptor = (fileDescriptor != -1) ? fileDescriptor : -1;
+  _cpuTypeHint = cpuType;
+  _cpuSubtypeHint = cpuSubtype;
 
   self = [self initWithSecStaticCodeRef:codeRef error:error];
   if (codeRef) CFRelease(codeRef);  // it was retained above
@@ -415,6 +465,11 @@ NSString* const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
   return [self errorWithCode:code description:nil];
 }
 
+// Reports whether every slice of a universal binary shares the same signing
+// identity (cert chain, or "-" for ad-hoc). Callers that care about per-arch
+// identity should use the cputype-aware initializer instead; this check is
+// retained as an informational signal that surfaces `errSecCSSignatureInvalid`
+// in MOL's error domain for cross-slice inconsistencies.
 - (BOOL)allSigningInformationMatches:(NSArray*)signingInformation {
   NSMutableSet* chains = [NSMutableSet set];
   for (NSDictionary* arch in signingInformation) {
@@ -458,6 +513,17 @@ NSString* const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
     if (codeRef) CFRelease(codeRef);
   }
   return infos.count ? infos : nil;
+}
+
+- (NSDictionary*)perSliceDictForCpuType:(cpu_type_t)cpuType cpuSubtype:(cpu_subtype_t)cpuSubtype {
+  const char* nameRaw = macho_arch_name_for_cpu_type(cpuType, cpuSubtype);
+  NSString* archName =
+      nameRaw ? @(nameRaw) : [NSString stringWithFormat:@"%i:%i", cpuType, cpuSubtype];
+  for (NSDictionary* arch in _universalSigningInformation) {
+    NSDictionary* dict = arch[archName];
+    if (dict) return dict;
+  }
+  return nil;
 }
 
 - (NSString*)architectureString:(struct fat_arch*)fatArch bigEndian:(BOOL)bigEndian {

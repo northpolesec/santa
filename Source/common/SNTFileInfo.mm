@@ -56,6 +56,8 @@
 @property SantaVnode vnode;
 @property NSString* fileOwnerHomeDir;
 @property NSString* sha256Storage;
+@property(readwrite) cpu_type_t cpuType;
+@property(readwrite) cpu_subtype_t cpuSubtype;
 
 // Cached properties
 @property NSBundle* bundleRef;
@@ -80,6 +82,18 @@
   return [self initWithResolvedPath:@(esFile->path.data) stat:&esFile->stat error:error];
 }
 
+- (instancetype)initWithEndpointSecurityExecEvent:(const es_event_exec_t*)esExec
+                                            error:(NSError**)error {
+  self = [self initWithResolvedPath:@(esExec->target->executable->path.data)
+                               stat:&esExec->target->executable->stat
+                              error:error];
+  if (self) {
+    _cpuType = esExec->image_cputype;
+    _cpuSubtype = esExec->image_cpusubtype;
+  }
+  return self;
+}
+
 - (instancetype)initWithResolvedPath:(NSString*)path
                                 stat:(const struct stat*)fileStat
                                error:(NSError**)error {
@@ -91,6 +105,9 @@
 
   self = [super init];
   if (self) {
+    _cpuType = CPU_TYPE_ANY;
+    _cpuSubtype = CPU_SUBTYPE_ANY;
+
     _path = path;
     if (!_path.length) {
       [SNTError populateError:error
@@ -796,11 +813,16 @@
 - (MOLCodesignChecker*)codesignCheckerWithError:(NSError**)error {
   if (!self.cachedCodesignChecker && !self.codesignCheckerError) {
     NSError* e;
-    // Pass the descriptor SNTFileInfo already has open so SecStaticCode
-    // operates on the same vnode (via /dev/fd/N), not a fresh path resolution.
+    // Pass the descriptor SNTFileInfo already has open so SecStaticCode operates
+    // on the same vnode (via /dev/fd/N), not a fresh path resolution. Pass the
+    // cputype/cpusubtype hint (CPU_TYPE_ANY / CPU_SUBTYPE_ANY when not initialized
+    // via -initWithEndpointSecurityExecEvent:) so universal binaries produce
+    // active-slice-correct identity.
     self.cachedCodesignChecker =
         [[MOLCodesignChecker alloc] initWithBinaryPath:self.path
                                         fileDescriptor:self.fileHandle.fileDescriptor
+                                               cpuType:self.cpuType
+                                            cpuSubtype:self.cpuSubtype
                                                  error:&e];
     self.codesignCheckerError = e;
   }

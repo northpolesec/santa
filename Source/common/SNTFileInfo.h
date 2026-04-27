@@ -15,6 +15,7 @@
 
 #import <EndpointSecurity/EndpointSecurity.h>
 #import <Foundation/Foundation.h>
+#import <mach/machine.h>
 
 #import "Source/common/SantaVnode.h"
 
@@ -43,6 +44,17 @@
 ///      Assumes that the path is a resolved path.
 ///
 - (instancetype)initWithEndpointSecurityFile:(const es_file_t*)esFile error:(NSError**)error;
+
+///
+///  Initialize with an Endpoint Security `es_event_exec_t`. Captures the active-slice
+///  CPU type/subtype from `image_cputype` / `image_cpusubtype` so subsequent
+///  `codesignCheckerWithError:` calls return active-slice-correct identity for
+///  fat binaries.
+///
+///  Equivalent to `initWithEndpointSecurityFile:` for thin binaries.
+///
+- (instancetype)initWithEndpointSecurityExecEvent:(const es_event_exec_t*)esExec
+                                            error:(NSError**)error;
 
 ///
 ///  Convenience initializer.
@@ -232,6 +244,18 @@
 ///  @return The underlying file handle.
 ///
 @property(readonly) NSFileHandle* fileHandle;
+
+///
+///  Active-slice CPU type captured at init time (from `es_event_exec_t.image_cputype`).
+///  Defaults to `CPU_TYPE_ANY` for inits without exec-event context.
+///
+@property(readonly) cpu_type_t cpuType;
+
+///
+///  Active-slice CPU subtype captured at init time (from `es_event_exec_t.image_cpusubtype`).
+///  Defaults to `CPU_SUBTYPE_ANY` for inits without exec-event context.
+///
+@property(readonly) cpu_subtype_t cpuSubtype;
 
 ///
 ///  @return Returns an instance of MOLCodeSignChecker initialized with the file's binary path.

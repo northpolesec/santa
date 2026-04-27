@@ -20,6 +20,7 @@
 #import <XCTest/XCTest.h>
 
 #include <Kernel/kern/cs_blobs.h>
+#include <mach/machine.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -1438,6 +1439,81 @@ static MOLCodesignChecker* MakeMockChecker(NSString* cdhash, NSString* teamID,
   XCTAssertNotEqual(cd.decision, SNTEventStateBlockBinaryMismatch);
 }
 
+// Per-arch-inconsistent universal binary: the active slice's cert chain must populate
+// cd.certSHA256. This exercises the end-to-end path through decisionForFileInfo:targetProcess: with
+// a real fixture that carries two different cert chains across its slices.
+- (void)testOuter_PerArchInconsistent_ActiveSlicePopulatesCertSHA256 {
+  NSBundle* bundle = [NSBundle bundleForClass:[self class]];
+  NSString* fixturePath = [bundle pathForResource:@"cal-yikes-universal_signed" ofType:@""];
+  XCTAssertNotNil(fixturePath, @"fixture missing — check BUILD resources");
+
+  struct stat realStat;
+  XCTAssertEqual(stat(fixturePath.UTF8String, &realStat), 0);
+
+  // Compute the expected leaf-cert SHA256 directly from MOL using the same arch hint,
+  // so the assertion is grounded in the fixture's actual cert chain rather than a
+  // hard-coded string.
+  NSError* csErr;
+  MOLCodesignChecker* expectedCS =
+      [[MOLCodesignChecker alloc] initWithBinaryPath:fixturePath
+                                      fileDescriptor:-1
+                                             cpuType:CPU_TYPE_I386
+                                          cpuSubtype:CPU_SUBTYPE_I386_ALL
+                                               error:&csErr];
+  NSString* expectedCertSHA256 = expectedCS.leafCertificate.SHA256;
+  XCTAssertNotNil(expectedCertSHA256, @"expected real cert chain on the i386 slice");
+
+  // Build a synthetic es_file_t + es_process_t for the fixture path.
+  // The i386 slice of cal-yikes-universal_signed has team "998Z9C32TC" and
+  // identifier "yikes-i386-signed".  kHashA is a placeholder cdhash that won't
+  // match the on-disk cdhash; the verifier returns kDriftAllowed (team+SID match,
+  // cdhash drifts), allowing the signing path to proceed and populate certSHA256.
+  // This is the realistic scenario: the ES event carries the kernel-assigned cdhash
+  // for the loaded slice while MOL re-evaluates from the file, with the same result
+  // for a legitimately-signed binary with a small page-hash refresh.
+  // CS_SIGNED|CS_VALID|CS_KILL: signingStatusCallback() returns Production.
+  es_file_t esFile;
+  es_process_t esProc;
+  MakeTargetProc(&esFile, &esProc, fixturePath.UTF8String, realStat, CS_SIGNED | CS_VALID | CS_KILL,
+                 /*team=*/"998Z9C32TC",
+                 /*sid=*/"yikes-i386-signed", kHashA);
+
+  // Attach the arch hint via a synthetic es_event_exec_t so that SNTFileInfo picks up
+  // the i386 slice when it opens the Mach-O.
+  es_event_exec_t esExec = {};
+  esExec.target = &esProc;
+  esExec.image_cputype = CPU_TYPE_I386;
+  esExec.image_cpusubtype = CPU_SUBTYPE_I386_ALL;
+
+  NSError* fiErr;
+  SNTFileInfo* fi = [[SNTFileInfo alloc] initWithEndpointSecurityExecEvent:&esExec error:&fiErr];
+  XCTAssertNotNil(fi);
+  XCTAssertEqual(fi.cpuType, CPU_TYPE_I386);
+
+  // Verify codesignChecker is non-nil and has a cdhash (pre-flight the assumption
+  // this integration test is built on).
+  NSError* csCheckErr;
+  MOLCodesignChecker* csCheck = [fi codesignCheckerWithError:&csCheckErr];
+  XCTAssertNotNil(csCheck, @"codesignChecker must be non-nil for a signed fixture");
+  XCTAssertGreaterThan(csCheck.cdhash.length, 0u, @"cdhash must be non-empty for the active slice");
+  XCTAssertNotNil(csCheck.leafCertificate, @"leaf cert must be present for the active slice");
+  XCTAssertEqualObjects(csCheck.leafCertificate.SHA256, expectedCertSHA256,
+                        @"SNTFileInfo codesignChecker must return the i386-slice cert chain");
+
+  SNTConfigState* cs = [[SNTConfigState alloc] initWithConfig:[SNTConfigurator configurator]];
+
+  SNTCachedDecision* cd = [self.processor decisionForFileInfo:fi
+                                                targetProcess:&esProc
+                                                  configState:cs
+                                           activationCallback:nil
+                                               cachedDecision:nil];
+
+  XCTAssertEqualObjects(cd.certSHA256, expectedCertSHA256,
+                        @"cert chain should populate from the active i386 slice");
+  XCTAssertNotEqual(cd.signingStatus, SNTSigningStatusInvalid,
+                    @"signingStatus must reflect the active slice's real state, not Invalid");
+}
+
 #pragma mark - +verifyIdentityForTargetProc:fd:csInfo: tests
 
 // Case 1: ES signed, disk unsigned (csInfo == nil) -> Mismatch.
@@ -1674,8 +1750,7 @@ static MOLCodesignChecker* MakeMockChecker(NSString* cdhash, NSString* teamID,
   MakeTargetProc(&file, &proc, "/tmp/test", MakeStat(), CS_SIGNED, /*team=*/"",
                  /*sid=*/"com.apple.dt.X", kHashA);
   XCTAssertTrue(proc.is_platform_binary);  // default from MakeESProcess
-  MOLCodesignChecker* csInfo =
-      MakeMockChecker(HexOf(kHashA, 20), @"59GAB85EFG", @"com.apple.dt.X");
+  MOLCodesignChecker* csInfo = MakeMockChecker(HexOf(kHashA, 20), @"59GAB85EFG", @"com.apple.dt.X");
   XCTAssertEqual([SNTPolicyProcessor verifyIdentityForTargetProc:&proc fd:-1 csInfo:csInfo],
                  IdentityVerifyResult::kMatch);
 }
@@ -1688,8 +1763,7 @@ static MOLCodesignChecker* MakeMockChecker(NSString* cdhash, NSString* teamID,
   es_process_t proc;
   MakeTargetProc(&file, &proc, "/tmp/test", MakeStat(), CS_SIGNED, /*team=*/"",
                  /*sid=*/"com.apple.dt.X", kHashA);
-  MOLCodesignChecker* csInfo =
-      MakeMockChecker(HexOf(kHashB, 20), @"59GAB85EFG", @"com.apple.dt.X");
+  MOLCodesignChecker* csInfo = MakeMockChecker(HexOf(kHashB, 20), @"59GAB85EFG", @"com.apple.dt.X");
   XCTAssertEqual([SNTPolicyProcessor verifyIdentityForTargetProc:&proc fd:-1 csInfo:csInfo],
                  IdentityVerifyResult::kDriftAllowed);
 }
@@ -1701,8 +1775,7 @@ static MOLCodesignChecker* MakeMockChecker(NSString* cdhash, NSString* teamID,
   es_process_t proc;
   MakeTargetProc(&file, &proc, "/tmp/test", MakeStat(), CS_SIGNED, /*team=*/"",
                  /*sid=*/"com.apple.dt.X", kHashA);
-  MOLCodesignChecker* csInfo =
-      MakeMockChecker(HexOf(kHashA, 20), @"59GAB85EFG", @"com.apple.dt.Y");
+  MOLCodesignChecker* csInfo = MakeMockChecker(HexOf(kHashA, 20), @"59GAB85EFG", @"com.apple.dt.Y");
   XCTAssertEqual([SNTPolicyProcessor verifyIdentityForTargetProc:&proc fd:-1 csInfo:csInfo],
                  IdentityVerifyResult::kMismatch);
 }

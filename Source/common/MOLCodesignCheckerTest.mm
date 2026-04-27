@@ -17,6 +17,7 @@
 
 #include <fcntl.h>
 #include <mach-o/fat.h>
+#include <mach/machine.h>
 #include <unistd.h>
 
 #import "Source/common/MOLCodesignChecker.h"
@@ -384,6 +385,133 @@
   [wantedEntitlements enumerateKeysAndObjectsUsingBlock:^(id key, id value, BOOL* stop) {
     XCTAssertEqualObjects(sut.entitlements[key], value);
   }];
+}
+
+// yikes-universal_signed has i386 + x86_64, both signed with the same cert chain.
+- (void)testCpuTypeHint_ConsistentFat_PicksActiveSlice {
+  NSError* error;
+  NSBundle* bundle = [NSBundle bundleForClass:[self class]];
+  NSString* path = [bundle pathForResource:@"yikes-universal_signed" ofType:@""];
+
+  MOLCodesignChecker* sutA = [[MOLCodesignChecker alloc] initWithBinaryPath:path
+                                                             fileDescriptor:-1
+                                                                    cpuType:CPU_TYPE_I386
+                                                                 cpuSubtype:CPU_SUBTYPE_I386_ALL
+                                                                      error:&error];
+  XCTAssertNotNil(sutA);
+  XCTAssertNil(error);
+  XCTAssertGreaterThan(sutA.cdhash.length, 0u);
+
+  error = nil;
+  MOLCodesignChecker* sutB = [[MOLCodesignChecker alloc] initWithBinaryPath:path
+                                                             fileDescriptor:-1
+                                                                    cpuType:CPU_TYPE_X86_64
+                                                                 cpuSubtype:CPU_SUBTYPE_X86_64_ALL
+                                                                      error:&error];
+  XCTAssertNotNil(sutB);
+  XCTAssertNil(error);
+  XCTAssertGreaterThan(sutB.cdhash.length, 0u);
+
+  // Per-slice cdhashes always differ across slices of the same fat file.
+  XCTAssertNotEqualObjects(sutA.cdhash, sutB.cdhash);
+}
+
+// cal-yikes-universal_signed: two different cert chains, one per slice.
+- (void)testCpuTypeHint_InconsistentFat_PopulatesActiveSlice_AndSurfacesError {
+  NSError* error;
+  NSBundle* bundle = [NSBundle bundleForClass:[self class]];
+  NSString* path = [bundle pathForResource:@"cal-yikes-universal_signed" ofType:@""];
+
+  MOLCodesignChecker* sut = [[MOLCodesignChecker alloc] initWithBinaryPath:path
+                                                            fileDescriptor:-1
+                                                                   cpuType:CPU_TYPE_I386
+                                                                cpuSubtype:CPU_SUBTYPE_I386_ALL
+                                                                     error:&error];
+  XCTAssertNotNil(sut);
+  // Active-slice signing info is now present despite the per-arch inconsistency.
+  XCTAssertGreaterThan(sut.cdhash.length, 0u);
+  XCTAssertNotNil(sut.leafCertificate);
+  // The consistency-check error still surfaces informationally.
+  XCTAssertEqual(error.code, errSecCSSignatureInvalid);
+  XCTAssertEqualObjects(error.domain, kMOLCodesignCheckerErrorDomain);
+}
+
+// cal-yikes-universal: unknown-arch slice is cert-signed; i386 slice is unsigned.
+// Requesting i386 should yield empty identity with a consistency-check error.
+- (void)testCpuTypeHint_InconsistentFat_UnsignedActiveSlice_LeavesEmpty {
+  NSError* error;
+  NSBundle* bundle = [NSBundle bundleForClass:[self class]];
+  NSString* path = [bundle pathForResource:@"cal-yikes-universal" ofType:@""];
+
+  MOLCodesignChecker* sut = [[MOLCodesignChecker alloc] initWithBinaryPath:path
+                                                            fileDescriptor:-1
+                                                                   cpuType:CPU_TYPE_I386
+                                                                cpuSubtype:CPU_SUBTYPE_I386_ALL
+                                                                     error:&error];
+  XCTAssertNotNil(sut);
+  XCTAssertEqual(sut.cdhash.length, 0u);
+  XCTAssertNil(sut.leafCertificate);
+  XCTAssertEqual(error.code, errSecCSSignatureInvalid);
+  XCTAssertEqualObjects(error.domain, kMOLCodesignCheckerErrorDomain);
+}
+
+// PowerPC won't be in any modern universal fixture; requesting it should leave empty identity.
+- (void)testCpuTypeHint_NoMatchingSlice_LeavesEmpty {
+  NSError* error;
+  NSBundle* bundle = [NSBundle bundleForClass:[self class]];
+  NSString* path = [bundle pathForResource:@"yikes-universal_signed" ofType:@""];
+
+  MOLCodesignChecker* sut = [[MOLCodesignChecker alloc] initWithBinaryPath:path
+                                                            fileDescriptor:-1
+                                                                   cpuType:CPU_TYPE_POWERPC
+                                                                cpuSubtype:CPU_SUBTYPE_POWERPC_ALL
+                                                                     error:&error];
+  XCTAssertNotNil(sut);
+  XCTAssertEqual(sut.cdhash.length, 0u);
+  XCTAssertNil(sut.leafCertificate);
+}
+
+// signed-with-teamid is a thin x86_64 fixture. The cputype hint must be inert
+// for thin binaries: behavior must match the no-hint path exactly.
+- (void)testCpuTypeHint_ThinBinary_Ignored {
+  NSError* error;
+  NSError* errorWithoutHint;
+  NSBundle* bundle = [NSBundle bundleForClass:[self class]];
+  NSString* path = [bundle pathForResource:@"signed-with-teamid" ofType:@""];
+
+  MOLCodesignChecker* sutNoHint = [[MOLCodesignChecker alloc] initWithBinaryPath:path
+                                                                           error:&errorWithoutHint];
+
+  MOLCodesignChecker* sutWithHint =
+      [[MOLCodesignChecker alloc] initWithBinaryPath:path
+                                      fileDescriptor:-1
+                                             cpuType:CPU_TYPE_X86_64
+                                          cpuSubtype:CPU_SUBTYPE_X86_64_ALL
+                                               error:&error];
+  XCTAssertNotNil(sutNoHint);
+  XCTAssertNotNil(sutWithHint);
+  XCTAssertEqualObjects(sutNoHint.cdhash, sutWithHint.cdhash);
+  XCTAssertEqualObjects(sutNoHint.teamID, sutWithHint.teamID);
+  XCTAssertEqualObjects(sutNoHint.signingID, sutWithHint.signingID);
+}
+
+// CPU_TYPE_ANY must fall back to today's (no-hint) behavior.
+- (void)testCpuTypeAny_FallsBackToTodayBehavior {
+  NSError* errorBaseline;
+  NSError* errorSentinel;
+  NSBundle* bundle = [NSBundle bundleForClass:[self class]];
+  NSString* path = [bundle pathForResource:@"yikes-universal_signed" ofType:@""];
+
+  MOLCodesignChecker* sutBaseline = [[MOLCodesignChecker alloc] initWithBinaryPath:path
+                                                                             error:&errorBaseline];
+  MOLCodesignChecker* sutSentinel = [[MOLCodesignChecker alloc] initWithBinaryPath:path
+                                                                    fileDescriptor:-1
+                                                                           cpuType:CPU_TYPE_ANY
+                                                                        cpuSubtype:CPU_SUBTYPE_ANY
+                                                                             error:&errorSentinel];
+  XCTAssertEqualObjects(sutBaseline.cdhash, sutSentinel.cdhash);
+  XCTAssertEqualObjects(sutBaseline.teamID, sutSentinel.teamID);
+  XCTAssertEqualObjects(sutBaseline.signingID, sutSentinel.signingID);
 }
 
 @end

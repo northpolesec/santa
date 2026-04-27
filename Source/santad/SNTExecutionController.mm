@@ -233,8 +233,8 @@ static SNTEventState BlockToAllowDecision(SNTEventState blockDecision) {
 
   // Get info about the file. If we can't get this info, respond appropriately and log an error.
   NSError* fileInfoError;
-  SNTFileInfo* binInfo = [[SNTFileInfo alloc] initWithEndpointSecurityFile:targetProc->executable
-                                                                     error:&fileInfoError];
+  SNTFileInfo* binInfo = [[SNTFileInfo alloc] initWithEndpointSecurityExecEvent:&esMsg->event.exec
+                                                                          error:&fileInfoError];
   if (unlikely(!binInfo)) {
     if (config.failClosed) {
       LOGE(@"Failed to read file %@: %@ and denying action", @(targetProc->executable->path.data),
