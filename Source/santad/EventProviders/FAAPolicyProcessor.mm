@@ -63,7 +63,7 @@ FileAccessPolicyDecision ApplyOverrideToDecision(FileAccessPolicyDecision decisi
 
     // If the override action is to disable policy, return a decision that will
     // be treated as if no policy applied to the operation.
-    case SNTOverrideFileAccessActionDiable: return FileAccessPolicyDecision::kNoPolicy;
+    case SNTOverrideFileAccessActionDisable: return FileAccessPolicyDecision::kNoPolicy;
 
     default:
       // This is a programming error. Bail.

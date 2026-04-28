@@ -113,7 +113,7 @@ using ProcessRuleCache = SantaCache<PidPidverPair, std::shared_ptr<ProcessWatchI
 
   // TODO: Hook up KVO watcher to unsubscribe the ES client when FAA is disabled via override
   // action. If the override action is set to Disable, return immediately.
-  if (overrideAction == SNTOverrideFileAccessActionDiable) {
+  if (overrideAction == SNTOverrideFileAccessActionDisable) {
     if (esMsg->action_type == ES_ACTION_TYPE_AUTH) {
       [self respondToMessage:esMsg withAuthResult:ES_AUTH_RESULT_ALLOW cacheable:false];
     }
@@ -252,8 +252,6 @@ using ProcessRuleCache = SantaCache<PidPidverPair, std::shared_ptr<ProcessWatchI
   if (!self.isSubscribed) {
     if ([super subscribe:events]) {
       LOGD(@"Proc FAA subscribed");
-      LOGW(@"Process-centric FAA rule types are currently in beta. Please report any issue to: "
-           @"https://github.com/northpolesec/santa");
       self.isSubscribed = true;
     }
   }

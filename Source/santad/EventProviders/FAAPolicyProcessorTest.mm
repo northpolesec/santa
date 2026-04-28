@@ -158,13 +158,13 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess& proc) {
            FileAccessPolicyDecision::kAllowedAuditOnly},
 
           // Override action: Disable - Always changes the decision to be no policy applied
-          {{FileAccessPolicyDecision::kAllowed, SNTOverrideFileAccessActionDiable},
+          {{FileAccessPolicyDecision::kAllowed, SNTOverrideFileAccessActionDisable},
            FileAccessPolicyDecision::kNoPolicy},
-          {{FileAccessPolicyDecision::kDenied, SNTOverrideFileAccessActionDiable},
+          {{FileAccessPolicyDecision::kDenied, SNTOverrideFileAccessActionDisable},
            FileAccessPolicyDecision::kNoPolicy},
-          {{FileAccessPolicyDecision::kAllowedReadAccess, SNTOverrideFileAccessActionDiable},
+          {{FileAccessPolicyDecision::kAllowedReadAccess, SNTOverrideFileAccessActionDisable},
            FileAccessPolicyDecision::kNoPolicy},
-          {{FileAccessPolicyDecision::kAllowedAuditOnly, SNTOverrideFileAccessActionDiable},
+          {{FileAccessPolicyDecision::kAllowedAuditOnly, SNTOverrideFileAccessActionDisable},
            FileAccessPolicyDecision::kNoPolicy},
   };
 
@@ -538,7 +538,7 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess& proc) {
 
   // Override = Disable → kNoPolicy (defensive — handler short-circuits earlier in production)
   XCTAssertEqual(faaPolicyProcessor.ProcessTargetAndPolicyWrapper(
-                     msg, pair, matcher, deniedBlock, SNTOverrideFileAccessActionDiable),
+                     msg, pair, matcher, deniedBlock, SNTOverrideFileAccessActionDisable),
                  FileAccessPolicyDecision::kNoPolicy);
   XCTAssertSemaFalse(matcherSema, "Matcher must not be invoked for truncated target");
   XCTAssertSemaFalse(deniedBlockSema, "Denied block must not be invoked for truncated target");

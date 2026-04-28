@@ -1839,7 +1839,7 @@ static SNTConfigurator* sharedConfigurator = nil;
   if ([action isEqualToString:@"audit_only"] || [action isEqualToString:@"auditonly"]) {
     return SNTOverrideFileAccessActionAuditOnly;
   } else if ([action isEqualToString:@"disable"]) {
-    return SNTOverrideFileAccessActionDiable;
+    return SNTOverrideFileAccessActionDisable;
   } else {
     return SNTOverrideFileAccessActionNone;
   }

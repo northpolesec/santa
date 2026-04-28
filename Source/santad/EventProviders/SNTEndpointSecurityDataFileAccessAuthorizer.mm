@@ -133,7 +133,7 @@ using santa::Message;
 
   // TODO: Hook up KVO watcher to unsubscribe the ES client when FAA is disabled via override
   // action. If the override action is set to Disable, return immediately.
-  if (overrideAction == SNTOverrideFileAccessActionDiable) {
+  if (overrideAction == SNTOverrideFileAccessActionDisable) {
     if (esMsg->action_type == ES_ACTION_TYPE_AUTH) {
       [self respondToMessage:esMsg withAuthResult:ES_AUTH_RESULT_ALLOW cacheable:false];
     }
