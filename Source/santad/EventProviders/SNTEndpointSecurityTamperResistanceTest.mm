@@ -723,6 +723,57 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
   [mockTamperClient stopMocking];
 }
 
+- (void)testHandleMessageTruncatedPath {
+  es_file_t file = MakeESFile("foo");
+  es_process_t proc = MakeESProcess(&file);
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_UNLINK, &proc, ActionType::Auth);
+
+  // A benign target path that would normally ALLOW, but with path_truncated set.
+  es_file_t fileBenign = MakeESFile(kBenignPath.data());
+  fileBenign.path_truncated = true;
+
+  dispatch_semaphore_t semaMetrics = dispatch_semaphore_create(0);
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsESNewClient();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+
+  SNTEndpointSecurityTamperResistance* tamperClient =
+      [[SNTEndpointSecurityTamperResistance alloc] initWithESAPI:mockESApi
+                                                         metrics:nullptr
+                                                          logger:nullptr
+                                           antiSuspendSigningIDs:nil];
+
+  id mockTamperClient = OCMPartialMock(tamperClient);
+
+  __block es_auth_result_t gotAuthResult;
+  __block bool gotCachable;
+  OCMStub([mockTamperClient respondToMessage:Message(mockESApi, &esMsg)
+                              withAuthResult:(es_auth_result_t)0
+                                   cacheable:false])
+      .ignoringNonObjectArgs()
+      .andDo(^(NSInvocation* inv) {
+        [inv getArgument:&gotAuthResult atIndex:3];
+        [inv getArgument:&gotCachable atIndex:4];
+      });
+
+  Message msg(mockESApi, &esMsg);
+  esMsg.event.unlink.target = &fileBenign;
+
+  [mockTamperClient handleMessage:std::move(msg)
+               recordEventMetrics:^(EventDisposition d) {
+                 XCTAssertEqual(d, EventDisposition::kProcessed);
+                 dispatch_semaphore_signal(semaMetrics);
+               }];
+
+  XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
+
+  XCTAssertEqual(gotAuthResult, ES_AUTH_RESULT_DENY);
+  XCTAssertFalse(gotCachable);
+
+  [mockTamperClient stopMocking];
+}
+
 - (void)testIsProtectedPath {
   XCTAssertTrue(
       [SNTEndpointSecurityTamperResistance isProtectedPath:"/private/var/db/santa/rules.db"]);

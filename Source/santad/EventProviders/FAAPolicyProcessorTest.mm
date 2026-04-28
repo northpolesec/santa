@@ -158,13 +158,13 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess& proc) {
            FileAccessPolicyDecision::kAllowedAuditOnly},
 
           // Override action: Disable - Always changes the decision to be no policy applied
-          {{FileAccessPolicyDecision::kAllowed, SNTOverrideFileAccessActionDiable},
+          {{FileAccessPolicyDecision::kAllowed, SNTOverrideFileAccessActionDisable},
            FileAccessPolicyDecision::kNoPolicy},
-          {{FileAccessPolicyDecision::kDenied, SNTOverrideFileAccessActionDiable},
+          {{FileAccessPolicyDecision::kDenied, SNTOverrideFileAccessActionDisable},
            FileAccessPolicyDecision::kNoPolicy},
-          {{FileAccessPolicyDecision::kAllowedReadAccess, SNTOverrideFileAccessActionDiable},
+          {{FileAccessPolicyDecision::kAllowedReadAccess, SNTOverrideFileAccessActionDisable},
            FileAccessPolicyDecision::kNoPolicy},
-          {{FileAccessPolicyDecision::kAllowedAuditOnly, SNTOverrideFileAccessActionDiable},
+          {{FileAccessPolicyDecision::kAllowedAuditOnly, SNTOverrideFileAccessActionDisable},
            FileAccessPolicyDecision::kNoPolicy},
   };
 
@@ -475,6 +475,73 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess& proc) {
         FileAccessPolicyDecision::kDenied);
     XCTAssertSemaTrue(sema, 1, "CheckIfPolicyMatchesBlock was never called");
   }
+
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+}
+
+- (void)testProcessTargetAndPolicyTruncated {
+  es_file_t esFile = MakeESFile("/proc/instigator");
+  es_process_t esProc = MakeESProcess(&esFile);
+  esProc.codesigning_flags = CS_SIGNED | CS_VALID;
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_OPEN, &esProc);
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+
+  MockFAAPolicyProcessor faaPolicyProcessor(self.dcMock, nullptr, nullptr, nullptr, nullptr, 0, 0,
+                                            nil, nil);
+
+  // Build a Message and force a truncated AUTH_OPEN target.
+  es_file_t truncFile = MakeESFile("/very/long/path/that/was/truncated");
+  truncFile.path_truncated = true;
+  esMsg.event.open.file = &truncFile;
+  esMsg.event.open.fflag = FWRITE;
+  Message msg(mockESApi, &esMsg);
+
+  // Sanity: the message reports one truncated path target.
+  std::vector<Message::PathTarget> targets = msg.PathTargets();
+  XCTAssertEqual(targets.size(), 1);
+  XCTAssertTrue(targets[0].truncated);
+
+  // The matcher block must NEVER be invoked for a truncated target — the
+  // early-return branch bypasses ApplyPolicy entirely.
+  dispatch_semaphore_t matcherSema = dispatch_semaphore_create(0);
+  auto matcher =
+      ^bool(const santa::WatchItemPolicyBase&, const Message::PathTarget&, const Message&) {
+        dispatch_semaphore_signal(matcherSema);
+        return false;
+      };
+
+  // The denied-block must NEVER be invoked either — telemetry is intentionally
+  // skipped for truncated paths in this design.
+  dispatch_semaphore_t deniedBlockSema = dispatch_semaphore_create(0);
+  SNTFileAccessDeniedBlock deniedBlock =
+      ^(SNTStoredFileAccessEvent*, NSString*, NSString*, NSString*) {
+        dispatch_semaphore_signal(deniedBlockSema);
+      };
+
+  FAAPolicyProcessor::TargetPolicyPair pair{0, std::nullopt};
+
+  // Override = None → kDenied
+  XCTAssertEqual(faaPolicyProcessor.ProcessTargetAndPolicyWrapper(msg, pair, matcher, deniedBlock,
+                                                                  SNTOverrideFileAccessActionNone),
+                 FileAccessPolicyDecision::kDenied);
+  XCTAssertSemaFalse(matcherSema, "Matcher must not be invoked for truncated target");
+  XCTAssertSemaFalse(deniedBlockSema, "Denied block must not be invoked for truncated target");
+
+  // Override = AuditOnly → kAllowedAuditOnly (downgraded by ApplyOverrideToDecision)
+  XCTAssertEqual(faaPolicyProcessor.ProcessTargetAndPolicyWrapper(
+                     msg, pair, matcher, deniedBlock, SNTOverrideFileAccessActionAuditOnly),
+                 FileAccessPolicyDecision::kAllowedAuditOnly);
+  XCTAssertSemaFalse(matcherSema, "Matcher must not be invoked for truncated target");
+  XCTAssertSemaFalse(deniedBlockSema, "Denied block must not be invoked for truncated target");
+
+  // Override = Disable → kNoPolicy (defensive — handler short-circuits earlier in production)
+  XCTAssertEqual(faaPolicyProcessor.ProcessTargetAndPolicyWrapper(
+                     msg, pair, matcher, deniedBlock, SNTOverrideFileAccessActionDisable),
+                 FileAccessPolicyDecision::kNoPolicy);
+  XCTAssertSemaFalse(matcherSema, "Matcher must not be invoked for truncated target");
+  XCTAssertSemaFalse(deniedBlockSema, "Denied block must not be invoked for truncated target");
 
   XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
 }

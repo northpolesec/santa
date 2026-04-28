@@ -217,6 +217,14 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message& esMsg) {
       }
 
       for (const auto& target : esMsg.PathTargets()) {
+        if (target.truncated) {
+          LOGW(@"Denying %@ event with truncated path target (PID %d, %@)",
+               TamperEventName(esMsg->event_type), audit_token_to_pid(esMsg->process->audit_token),
+               santa::StringTokenToNSString(esMsg->process->executable->path));
+          result = ES_AUTH_RESULT_DENY;
+          cacheable = false;
+          break;
+        }
         if ([SNTEndpointSecurityTamperResistance isTamperedPath:target.Path() forMessage:esMsg]) {
           result = ES_AUTH_RESULT_DENY;
           LOGW(@"Preventing tamper attempt (%@ by PID %d, %@) on protected path: %.*s",

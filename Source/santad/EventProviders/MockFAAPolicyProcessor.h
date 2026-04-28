@@ -78,6 +78,14 @@ class MockFAAPolicyProcessor : public FAAPolicyProcessor {
       FAAPolicyProcessor::CheckIfPolicyMatchesBlock checkIfPolicyMatchesBlock) {
     return FAAPolicyProcessor::ApplyPolicy(msg, target, optional_policy, checkIfPolicyMatchesBlock);
   }
+
+  FileAccessPolicyDecision ProcessTargetAndPolicyWrapper(
+      const Message& msg, const FAAPolicyProcessor::TargetPolicyPair& target_policy_pair,
+      FAAPolicyProcessor::CheckIfPolicyMatchesBlock checkIfPolicyMatchesBlock,
+      SNTFileAccessDeniedBlock fileAccessDeniedBlock, SNTOverrideFileAccessAction overrideAction) {
+    return FAAPolicyProcessor::ProcessTargetAndPolicy(
+        msg, target_policy_pair, checkIfPolicyMatchesBlock, fileAccessDeniedBlock, overrideAction);
+  }
 };
 
 }  // namespace santa

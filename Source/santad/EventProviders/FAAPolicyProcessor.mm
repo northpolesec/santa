@@ -21,6 +21,7 @@
 #import "Source/common/MOLCertificate.h"
 #import "Source/common/MOLCodesignChecker.h"
 #import "Source/common/SNTBlockMessage.h"
+#import "Source/common/SNTLogging.h"
 #import "Source/common/SNTStoredFileAccessEvent.h"
 #include "Source/common/String.h"
 #include "Source/common/es/EnrichedTypes.h"
@@ -62,7 +63,7 @@ FileAccessPolicyDecision ApplyOverrideToDecision(FileAccessPolicyDecision decisi
 
     // If the override action is to disable policy, return a decision that will
     // be treated as if no policy applied to the operation.
-    case SNTOverrideFileAccessActionDiable: return FileAccessPolicyDecision::kNoPolicy;
+    case SNTOverrideFileAccessActionDisable: return FileAccessPolicyDecision::kNoPolicy;
 
     default:
       // This is a programming error. Bail.
@@ -440,6 +441,13 @@ FileAccessPolicyDecision FAAPolicyProcessor::ProcessTargetAndPolicy(
     SNTFileAccessDeniedBlock file_access_denied_block,
     SNTOverrideFileAccessAction override_action) {
   const Message::PathTarget& target = msg.PathTargetAtIndex(target_policy_pair.first);
+
+  if (target.truncated) {
+    LOGW(@"FAA: truncated path target on event=%d, pid=%d, proc=%s", msg->event_type,
+         audit_token_to_pid(msg->process->audit_token), msg->process->executable->path.data);
+    return ApplyOverrideToDecision(FileAccessPolicyDecision::kDenied, override_action);
+  }
+
   const std::optional<std::shared_ptr<WatchItemPolicyBase>> optional_policy =
       target_policy_pair.second;
   FileAccessPolicyDecision decision = ApplyOverrideToDecision(
@@ -523,9 +531,9 @@ FAAPolicyProcessor::ESResult FAAPolicyProcessor::ProcessMessage(
     // Note: As long as a policy allows read access, the caller's read cache can be updated
     // regardless of the RuleType of the policy.
     if (decision != FileAccessPolicyDecision::kNoPolicy &&
-        decision != FileAccessPolicyDecision::kDeniedInvalidSignature && path_target.is_readable &&
-        path_target.unsafe_file && target_policy_pair.second.has_value() &&
-        (*target_policy_pair.second)->allow_read_access) {
+        decision != FileAccessPolicyDecision::kDeniedInvalidSignature && !path_target.truncated &&
+        path_target.is_readable && path_target.unsafe_file &&
+        target_policy_pair.second.has_value() && (*target_policy_pair.second)->allow_read_access) {
       reads_cache_.Set(MakeReadsCacheKey(msg->process->audit_token, client_type),
                        std::pair<dev_t, ino_t>({path_target.unsafe_file->stat.st_dev,
                                                 path_target.unsafe_file->stat.st_ino}));
@@ -552,8 +560,13 @@ std::optional<FAAPolicyProcessor::ESResult> FAAPolicyProcessor::ImmediateRespons
   // targets can be determined to be readable can be considered. E.g., for
   // clone, the destination must still be evaluated so the reads_cache_ is not
   // consulted.
+  // Truncated paths must skip this fast path so they reach the truncation
+  // branch in ProcessTargetAndPolicy and fail closed per the configured
+  // override action. This mirrors the !path_target.truncated guard on the
+  // cache update in ProcessMessage.
   if (msg->event_type == ES_EVENT_TYPE_AUTH_OPEN &&
       !(msg->event.open.fflag & kOpenFlagsIndicatingWrite) &&
+      !msg->event.open.file->path_truncated &&
       reads_cache_.Contains(MakeReadsCacheKey(msg->process->audit_token, client_type),
                             std::pair<dev_t, ino_t>{msg->event.open.file->stat.st_dev,
                                                     msg->event.open.file->stat.st_ino})) {

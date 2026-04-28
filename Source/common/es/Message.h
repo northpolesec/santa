@@ -43,6 +43,10 @@ class Message {
     // pointers that are valid, and callers must not store or otherwise
     // reference the pointer to ensure no valid access is made.
     const es_file_t* unsafe_file;
+    // True if any es_file_t contributing to this entry had path_truncated set.
+    // The path string is whatever EndpointSecurity captured (up to PATH_MAX);
+    // it is partial and unreliable for security decisions.
+    bool truncated;
 
     // Returns a view of the path, regardless of which variant is held.
     std::string_view Path() const {
