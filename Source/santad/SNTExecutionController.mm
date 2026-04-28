@@ -87,6 +87,8 @@ static SNTEventState BlockToAllowDecision(SNTEventState blockDecision) {
     case SNTEventStateBlockCDHash: return SNTEventStateAllowCDHash;
     case SNTEventStateBlockCELFallback: return SNTEventStateAllowCELFallback;
     case SNTEventStateBlockLongPath: return SNTEventStateAllowUnknown;  // No direct equivalent
+    case SNTEventStateBlockBinaryMismatch:
+      return SNTEventStateAllowUnknown;  // No direct equivalent
     default: return SNTEventStateAllowUnknown;
   }
 }

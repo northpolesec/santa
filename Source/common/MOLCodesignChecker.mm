@@ -30,6 +30,24 @@ using ScopedCFError = santa::ScopedCFTypeRef<CFErrorRef>;
 using ScopedCFString = santa::ScopedCFTypeRef<CFStringRef>;
 using ScopedSecStaticCode = santa::ScopedCFTypeRef<SecStaticCodeRef>;
 
+// Reads exactly `len` bytes from `fd` at `offset`, retrying on EINTR and
+// short reads. Returns YES on full read, NO on any other failure (including
+// premature EOF).
+static BOOL PreadFull(int fd, void* buf, size_t len, off_t offset) {
+  size_t total = 0;
+  while (total < len) {
+    ssize_t n = pread(fd, (uint8_t*)buf + total, len - total, offset + (off_t)total);
+    if (n > 0) {
+      total += (size_t)n;
+    } else if (n == -1 && errno == EINTR) {
+      continue;
+    } else {
+      return NO;
+    }
+  }
+  return YES;
+}
+
 /**
   kStaticSigningFlags are the flags used when validating signatures on disk.
 
@@ -543,7 +561,7 @@ NSString* const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
   // file table entry (and offset) with the original fd; using pread() here
   // avoids contributing further to that shared offset's drift.
   const uint8* headerBytes = (const uint8*)alloca(len);
-  if (pread(fd, (void*)headerBytes, len, 0) != (ssize_t)len) return nil;
+  if (!PreadFull(fd, (void*)headerBytes, len, 0)) return nil;
   struct fat_header* fh = (struct fat_header*)headerBytes;
   uint32_t m = fh->magic;
   if (!(m == FAT_MAGIC || m == FAT_CIGAM || m == FAT_MAGIC_64 || m == FAT_CIGAM_64)) return nil;
@@ -556,7 +574,7 @@ NSString* const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
 
   len = use64 ? sizeof(struct fat_arch_64) * archCount : sizeof(struct fat_arch) * archCount;
   const uint8* archBytes = (const uint8*)alloca(len);
-  if (pread(fd, (void*)archBytes, len, sizeof(struct fat_header)) != (ssize_t)len) return nil;
+  if (!PreadFull(fd, (void*)archBytes, len, sizeof(struct fat_header))) return nil;
 
   NSMutableDictionary* offsets = [NSMutableDictionary dictionaryWithCapacity:archCount];
   if (use64) {

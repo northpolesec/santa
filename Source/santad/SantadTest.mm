@@ -197,7 +197,14 @@ static const char* kBlockedCDHash = "7218eddfee4d3eba4873dedf22d1391d79aea25f";
   NSError* csError = nil;
   MOLCodesignChecker* csInfo = [[MOLCodesignChecker alloc] initWithBinaryPath:binaryPath
                                                                         error:&csError];
-  if (csInfo == nil || csInfo.cdhash.length == 0) {
+  // A nil checker means MOL itself failed to construct (bad fixture path,
+  // unreadable file, etc.) — that's a setup bug, not a normal unsigned
+  // binary. Treat empty cdhash on a non-nil checker as the unsigned case.
+  if (csInfo == nil) {
+    XCTFail(@"MOLCodesignChecker init failed for fixture %@: %@", binaryPath, csError);
+    return NO;
+  }
+  if (csInfo.cdhash.length == 0) {
     // On-disk binary is unsigned. Clear ES-side CS_SIGNED so the verifier's
     // signedness-disagrees check (case 1) doesn't fire and we fall through
     // to the unsigned stat-compare path.
