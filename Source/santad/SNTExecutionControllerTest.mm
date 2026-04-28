@@ -28,6 +28,7 @@
 #import "Source/common/SNTMetricSet.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTRuleIdentifiers.h"
+#include "Source/common/String.h"
 #include "Source/common/TestUtils.h"
 #include "Source/common/es/Message.h"
 #include "Source/common/es/MockEndpointSecurityAPI.h"
@@ -60,6 +61,10 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
 @property(readwrite) SNTRuleState state;
 @property(readwrite) SNTRuleType type;
 @property(readwrite) NSString* customMsg;
+@end
+
+@interface SNTExecutionController (Testing)
+- (void)incrementEventCounters:(SNTEventState)eventType;
 @end
 
 @interface SNTExecutionControllerTest : XCTestCase
@@ -96,7 +101,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
 
   self.mockFileInfo = OCMClassMock([SNTFileInfo class]);
   OCMStub([self.mockFileInfo alloc]).andReturn(self.mockFileInfo);
-  OCMStub([self.mockFileInfo initWithEndpointSecurityFile:NULL error:[OCMArg setTo:nil]])
+  OCMStub([self.mockFileInfo initWithEndpointSecurityExecEvent:NULL error:[OCMArg setTo:nil]])
       .ignoringNonObjectArgs()
       .andReturn(self.mockFileInfo);
   OCMStub([self.mockFileInfo codesignCheckerWithError:[OCMArg setTo:nil]])
@@ -229,6 +234,30 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
 
   if (messageSetupBlock) {
     messageSetupBlock(&esMsg);
+  }
+
+  // Auto-mirror target identity onto the mock codesign checker so that
+  // VerifyIdentity returns kMatch and doesn't short-circuit policy evaluation.
+  // Tests in this file aren't exercising identity verification — that's covered
+  // by the +verifyIdentityForTargetProc:fd:csInfo: tests in
+  // SNTPolicyProcessorTest.mm.
+  //
+  // Tests should set target identity via messageSetupBlock and let this fixture
+  // mirror it onto the mock. Do NOT add per-test OCMStubs for cdhash, teamID,
+  // or signingID — OCMock resolves stubs FIFO, so a per-test stub added before
+  // validateExecEvent runs would shadow the mirror below and silently trip
+  // kMismatch if its value differs from what messageSetupBlock writes onto
+  // target.
+  {
+    const es_process_t* target = esMsg.event.exec.target;
+    NSString* cdhexStr = santa::StringToNSString(santa::BufToHexString(target->cdhash, 20));
+    OCMStub([self.mockCodesignChecker cdhash]).andReturn(cdhexStr);
+    if (target->team_id.length > 0) {
+      OCMStub([self.mockCodesignChecker teamID]).andReturn(@(target->team_id.data));
+    }
+    if (target->signing_id.length > 0) {
+      OCMStub([self.mockCodesignChecker signingID]).andReturn(@(target->signing_id.data));
+    }
   }
 
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
@@ -430,8 +459,6 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
 }
 
 - (void)testTeamIDAllowRule {
-  OCMStub([self.mockCodesignChecker teamID]).andReturn(@(kExampleTeamID));
-
   SNTRule* rule = [[SNTRule alloc] init];
   rule.state = SNTRuleStateAllow;
   rule.type = SNTRuleTypeTeamID;
@@ -446,8 +473,6 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
 }
 
 - (void)testTeamIDBlockRule {
-  OCMStub([self.mockCodesignChecker teamID]).andReturn(@(kExampleTeamID));
-
   SNTRule* rule = [[SNTRule alloc] init];
   rule.state = SNTRuleStateBlock;
   rule.type = SNTRuleTypeTeamID;
@@ -1038,6 +1063,11 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
 
   // Just verify that flush doesn't crash - the cache internals are private
   XCTAssertNoThrow([controller flushTouchIDApprovalCache]);
+}
+
+- (void)testIncrementEventCountersHandlesBinaryMismatch {
+  [self.sut incrementEventCounters:SNTEventStateBlockBinaryMismatch];
+  [self checkMetricCounters:kBlockBinaryMismatch expected:@1];
 }
 
 @end

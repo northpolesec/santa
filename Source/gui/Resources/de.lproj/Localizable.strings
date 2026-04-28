@@ -31,6 +31,9 @@
 /* Authorize execution of an application with name */
 "authorize execution of the application %@" = "Die Ausführung der Anwendung autorisieren %@";
 
+/* Block reason when ES event and on-disk binary identity disagree */
+"Binary identity verification failed" = "Identitätsprüfung der Binärdatei fehlgeschlagen";
+
 /* No comment provided by engineer. */
 "Binary Path" = "Binärer Pfad";
 

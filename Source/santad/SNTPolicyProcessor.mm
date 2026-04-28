@@ -20,6 +20,8 @@
 #include <Kernel/kern/cs_blobs.h>
 #import <Security/SecCode.h>
 #import <Security/Security.h>
+#include <string.h>
+#include <sys/stat.h>
 
 #import "Source/common/CertificateHelpers.h"
 #import "Source/common/MOLCodesignChecker.h"
@@ -44,6 +46,15 @@ enum class PlatformBinaryState {
   kRuntimeFalse,
   kStaticCheck,
 };
+
+using VerifyIdentityBlock = IdentityVerifyResult (^)(MOLCodesignChecker* _Nullable csInfo);
+
+static BOOL CdhashEqual(const uint8_t* targetCdhash, NSString* _Nullable diskCdhashHex) {
+  if (!diskCdhashHex || diskCdhashHex.length != CS_CDHASH_LEN * 2) return NO;
+  std::vector<uint8_t> diskBytes = santa::HexStringToBuf(diskCdhashHex);
+  if (diskBytes.size() != CS_CDHASH_LEN) return NO;
+  return memcmp(targetCdhash, diskBytes.data(), CS_CDHASH_LEN) == 0;
+}
 
 struct CELEvaluationResult {
   bool succeeded;            // Whether CEL evaluation succeeded
@@ -519,6 +530,109 @@ static void UpdateCachedDecisionSigningInfo(
   cd.signingTime = csInfo.signingTime;
 }
 
++ (IdentityVerifyResult)verifyIdentityForTargetProc:(const es_process_t*)targetProc
+                                                 fd:(int)fd
+                                             csInfo:(MOLCodesignChecker*)csInfo {
+  // Each non-match return emits a log. Lazily hex-encode the cdhash so no penalty on the happy path
+  NSString* (^esCdhashHex)(void) = ^NSString*(void) {
+    return santa::StringToNSString(santa::BufToHexString(targetProc->cdhash, CS_CDHASH_LEN));
+  };
+  NSString* path =
+      targetProc->executable->path.data ? @(targetProc->executable->path.data) : @"(null)";
+
+  BOOL esSigned = (targetProc->codesigning_flags & CS_SIGNED) != 0;
+  BOOL diskSigned = (csInfo != nil && csInfo.cdhash.length > 0);
+
+  // Case 1: signedness disagrees.
+  if (esSigned != diskSigned) {
+    LOGW(@"Identity verification: signedness mismatch path=%@ es_signed=%d disk_signed=%d "
+         @"es_cdhash=%@ disk_cdhash=%@",
+         path, esSigned, diskSigned, esCdhashHex(), csInfo.cdhash ?: @"(nil)");
+    return IdentityVerifyResult::kMismatch;
+  }
+
+  if (esSigned) {
+    // ES suppresses team_id on platform binaries even when the on-disk
+    // signature carries an Apple TeamID (observed for Apple-signed XPC
+    // services inside framework bundles, e.g. Xcode's helpers). Skip the
+    // team_id presence and equality checks for that class; signing_id and
+    // cdhash still bind identity end-to-end.
+    BOOL esTeamSuppressed = targetProc->is_platform_binary;
+    BOOL esHasTeam = targetProc->team_id.length > 0;
+    BOOL diskHasTeam = csInfo.teamID.length > 0;
+    BOOL esHasSID = targetProc->signing_id.length > 0;
+    BOOL diskHasSID = csInfo.signingID.length > 0;
+
+    // Case 2: presence disagrees on a non-suppressed dimension.
+    if (esHasSID != diskHasSID || (!esTeamSuppressed && esHasTeam != diskHasTeam)) {
+      LOGW(@"Identity verification: signing identifier presence mismatch path=%@ "
+           @"es_platform=%d es_has_team=%d disk_has_team=%d "
+           @"es_has_sid=%d disk_has_sid=%d es_team=%s es_sid=%s disk_team=%@ disk_sid=%@",
+           path, esTeamSuppressed, esHasTeam, diskHasTeam, esHasSID, diskHasSID,
+           esHasTeam ? targetProc->team_id.data : "", esHasSID ? targetProc->signing_id.data : "",
+           csInfo.teamID ?: @"", csInfo.signingID ?: @"");
+      return IdentityVerifyResult::kMismatch;
+    }
+
+    if (esHasSID) {
+      // Case 3: signing_id must match. team_id is only enforced when ES
+      // surfaced one — platform binaries skip team_id equality entirely
+      // since the ES side is suppressed.
+      NSString* esSID = @(targetProc->signing_id.data);
+      if (![esSID isEqualToString:csInfo.signingID]) {
+        LOGW(@"Identity verification: signing ID mismatch path=%@ es_sid=%@ disk_sid=%@", path,
+             esSID, csInfo.signingID);
+        return IdentityVerifyResult::kMismatch;
+      }
+      if (esHasTeam) {
+        NSString* esTeam = @(targetProc->team_id.data);
+        if (![esTeam isEqualToString:csInfo.teamID]) {
+          LOGW(@"Identity verification: team ID mismatch path=%@ es_team=%@ disk_team=%@ sid=%@",
+               path, esTeam, csInfo.teamID, esSID);
+          return IdentityVerifyResult::kMismatch;
+        }
+      }
+      if (CdhashEqual(targetProc->cdhash, csInfo.cdhash)) {
+        return IdentityVerifyResult::kMatch;
+      }
+      LOGW(@"Identity verification: cdhash drift (allowed) path=%@ "
+           @"es_platform=%d sid=%@ disk_team=%@ es_cdhash=%@ disk_cdhash=%@",
+           path, esTeamSuppressed, esSID, csInfo.teamID ?: @"", esCdhashHex(),
+           csInfo.cdhash ?: @"(nil)");
+      return IdentityVerifyResult::kDriftAllowed;
+    }
+
+    // Case 4: no signing_id either side (ad-hoc) -> cdhash must match.
+    if (CdhashEqual(targetProc->cdhash, csInfo.cdhash)) {
+      return IdentityVerifyResult::kMatch;
+    }
+    LOGW(@"Identity verification: ad hoc cdhash mismatch path=%@ es_cdhash=%@ disk_cdhash=%@", path,
+         esCdhashHex(), csInfo.cdhash ?: @"(nil)");
+    return IdentityVerifyResult::kMismatch;
+  }
+
+  // Case 5: both unsigned -> stat compare on (dev, ino, size, mtime).
+  struct stat st;
+  if (fstat(fd, &st) != 0) {
+    LOGW(@"Identity verification: disk fstat failed path=%@ errno=%d", path, errno);
+    return IdentityVerifyResult::kMismatch;  // fail-closed
+  }
+  const struct stat* esStat = &targetProc->executable->stat;
+  if (st.st_dev != esStat->st_dev || st.st_ino != esStat->st_ino || st.st_size != esStat->st_size ||
+      st.st_mtimespec.tv_sec != esStat->st_mtimespec.tv_sec ||
+      st.st_mtimespec.tv_nsec != esStat->st_mtimespec.tv_nsec) {
+    LOGW(@"Identity verification: unsigned binary metadata mismatch path=%@ "
+         @"es_dev=%d disk_dev=%d es_ino=%llu disk_ino=%llu "
+         @"es_size=%lld disk_size=%lld es_mtime=%ld.%09ld disk_mtime=%ld.%09ld",
+         path, esStat->st_dev, st.st_dev, (unsigned long long)esStat->st_ino,
+         (unsigned long long)st.st_ino, (long long)esStat->st_size, (long long)st.st_size,
+         (long)esStat->st_mtimespec.tv_sec, (long)esStat->st_mtimespec.tv_nsec,
+         (long)st.st_mtimespec.tv_sec, (long)st.st_mtimespec.tv_nsec);
+    return IdentityVerifyResult::kMismatch;
+  }
+  return IdentityVerifyResult::kMatch;
+}
+
 - (nonnull SNTCachedDecision*)
            decisionForFileInfo:(nonnull SNTFileInfo*)fileInfo
                    configState:(nonnull SNTConfigState*)configState
@@ -526,11 +640,15 @@ static void UpdateCachedDecisionSigningInfo(
            platformBinaryState:(PlatformBinaryState)platformBinaryState
          signingStatusCallback:(SNTSigningStatus (^_Nonnull)())signingStatusCallback
             activationCallback:(nullable ActivationCallbackBlock)activationCallback
+                verifyIdentity:(nullable VerifyIdentityBlock)verifyIdentity
     entitlementsFilterCallback:
         (NSDictionary* _Nullable (^_Nullable)(NSDictionary* _Nullable entitlements))
             entitlementsFilterCallback {
   // If the binary is a critical system binary, don't check its signature.
-  // The binary was validated at startup when the rule table was initialized.
+  // Critical binaries are SIP or tamper protected and were validated at
+  // startup when the rule table was initialized; the kernel's CS_KILL/CS_HARD
+  // enforcement guarantees the SigningID matched here can only be issued for
+  // legitimately-signed binaries with that identity.
   SNTCachedDecision* systemCd = [self.ruleTable.criticalSystemBinaries[cd.signingID] copy];
   if (systemCd) {
     systemCd.decisionClientMode = configState.clientMode;
@@ -547,20 +665,39 @@ static void UpdateCachedDecisionSigningInfo(
 
   NSError* csInfoError;
   if (!cd.certSHA256.length) {
-    // Grab the code signature, if there's an error don't try to capture
-    // any of the signature details.
-    // TODO(mlw): MOLCodesignChecker should be updated to still grab signing information
-    // even if validity check fails. Once that is done, this code can be updated to grab
-    // cert information so that it can still be reported to the sync server.
     MOLCodesignChecker* csInfo = [fileInfo codesignCheckerWithError:&csInfoError];
-    if (csInfoError) {
-      csInfo = nil;
+
+    // The verifier compares ES-side identity against whatever identity MOL
+    // was able to extract. MOLCodesignChecker populates `_signingInformation`
+    // for partial-validity errors that still let SecCodeCopySigningInformation
+    // succeed (e.g. errSecCSInfoPlistFailed for binaries inside bundles, where
+    // SecStaticCode via /dev/fd/N can't reach the bundle's Info.plist). When
+    // identity could not be extracted (createWithPath failed, or MOL's per-arch
+    // consistency check tripped errSecCSSignatureInvalid in MOL's domain), the
+    // cdhash is empty and the verifier's case-1 signedness check returns a
+    // mismatch on its own — no special-casing needed at the call site.
+    if (verifyIdentity) {
+      switch (verifyIdentity(csInfo)) {
+        case IdentityVerifyResult::kMismatch:
+          cd.decision = SNTEventStateBlockBinaryMismatch;
+          cd.decisionExtra = @"Binary identity mismatch between ES event and on-disk file";
+          return cd;
+        case IdentityVerifyResult::kDriftAllowed:
+          cd.decisionExtra = @"CDHash drift allowed by matching TeamID/SigningID";
+          break;
+        case IdentityVerifyResult::kMatch: break;
+      }
+    }
+
+    if (csInfo && csInfo.cdhash.length > 0) {
+      // Identity was extracted — populate signing details and keep whatever
+      // signingStatus the kernel reported, even if csInfoError is set.
+      UpdateCachedDecisionSigningInfo(cd, csInfo, platformBinaryState, entitlementsFilterCallback);
+    } else if (csInfoError) {
       cd.decisionExtra = [NSString
           stringWithFormat:@"Signature ignored due to error: %ld", (long)csInfoError.code];
       cd.signingStatus = (cd.signingStatus == SNTSigningStatusUnsigned ? SNTSigningStatusUnsigned
                                                                        : SNTSigningStatusInvalid);
-    } else {
-      UpdateCachedDecisionSigningInfo(cd, csInfo, platformBinaryState, entitlementsFilterCallback);
     }
   }
 
@@ -667,6 +804,14 @@ static void UpdateCachedDecisionSigningInfo(
     }
   }
 
+  VerifyIdentityBlock verifyIdentity = nil;
+  if (!existingDecision) {
+    int fd = fileInfo.fileHandle.fileDescriptor;
+    verifyIdentity = ^IdentityVerifyResult(MOLCodesignChecker* _Nullable csInfo) {
+      return [SNTPolicyProcessor verifyIdentityForTargetProc:targetProc fd:fd csInfo:csInfo];
+    };
+  }
+
   return [self decisionForFileInfo:fileInfo
       configState:configState
       cachedDecision:cd
@@ -686,6 +831,7 @@ static void UpdateCachedDecisionSigningInfo(
         }
       }
       activationCallback:activationCallback
+      verifyIdentity:verifyIdentity
       entitlementsFilterCallback:^NSDictionary*(NSDictionary* entitlements) {
         return entitlementsFilter_->Filter(entitlementsFilterTeamID, entitlements);
       }];

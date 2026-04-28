@@ -30,6 +30,24 @@ using ScopedCFError = santa::ScopedCFTypeRef<CFErrorRef>;
 using ScopedCFString = santa::ScopedCFTypeRef<CFStringRef>;
 using ScopedSecStaticCode = santa::ScopedCFTypeRef<SecStaticCodeRef>;
 
+// Reads exactly `len` bytes from `fd` at `offset`, retrying on EINTR and
+// short reads. Returns YES on full read, NO on any other failure (including
+// premature EOF).
+static BOOL PreadFull(int fd, void* buf, size_t len, off_t offset) {
+  size_t total = 0;
+  while (total < len) {
+    ssize_t n = pread(fd, (uint8_t*)buf + total, len - total, offset + (off_t)total);
+    if (n > 0) {
+      total += (size_t)n;
+    } else if (n == -1 && errno == EINTR) {
+      continue;
+    } else {
+      return NO;
+    }
+  }
+  return YES;
+}
+
 /**
   kStaticSigningFlags are the flags used when validating signatures on disk.
 
@@ -75,6 +93,11 @@ NSString* const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
 
 // Cached on-disk binary file descriptor
 @property int binaryFileDescriptor;
+
+// Active-slice hint; values <= 0 mean no hint (CPU_TYPE_ANY is -1; ivar zero-default
+// from non-fd init paths also fails the > 0 gate in -initWithSecStaticCodeRef:error:).
+@property cpu_type_t cpuTypeHint;
+@property cpu_subtype_t cpuSubtypeHint;
 @end
 
 @implementation MOLCodesignChecker
@@ -98,6 +121,12 @@ NSString* const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
       }
     });
 
+    // hintActiveForFat is YES when the caller passed a real arch hint and we're
+    // looking at a fat binary. In that mode the per-slice dict is the authority
+    // for _signingInformation/_certificates; the whole-binary fallback below is
+    // suppressed regardless of whether a matching slice was found.
+    BOOL hintActiveForFat = NO;
+
     // For static code checks perform additional checks across all slices
     if (CFGetTypeID(codeRef) == SecStaticCodeGetTypeID()) {
       // Ensure signing is consistent for all architectures.
@@ -106,6 +135,26 @@ NSString* const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
       NSArray* infos = [self universalSigningInformationForBinaryPath:_binaryPath
                                                        fileDescriptor:_binaryFileDescriptor];
       if (infos) _universalSigningInformation = infos;
+
+      // When the caller provided an active-slice hint and this is a fat binary,
+      // populate _signingInformation/_certificates from the matching slice.
+      // The cross-slice consistency check below still runs and still surfaces
+      // its error informationally; the per-arch identity is already locked in
+      // via the active-slice extraction. If no slice matches the hint (e.g. a
+      // PowerPC hint against an i386/x86_64 binary), _signingInformation stays
+      // nil and hintActiveForFat suppresses the whole-binary fallback below so
+      // callers see an empty identity for the mismatched arch request.
+      hintActiveForFat = (_cpuTypeHint > 0 && _universalSigningInformation.count > 0);
+      if (hintActiveForFat) {
+        NSDictionary* sliceDict = [self perSliceDictForCpuType:_cpuTypeHint
+                                                    cpuSubtype:_cpuSubtypeHint];
+        if (sliceDict.count > 0) {
+          _signingInformation = sliceDict;
+          NSArray* certs = sliceDict[(__bridge id)kSecCodeInfoCertificates];
+          _certificates = [MOLCertificate certificatesFromArray:certs];
+        }
+      }
+
       if (infos && ![self allSigningInformationMatches:infos]) {
         status = errSecCSSignatureInvalid;
         scopedError = ScopedCFError::BridgeRetain([self
@@ -114,9 +163,14 @@ NSString* const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
       }
     }
 
-    // Do not set _signingInformation or _certificates for universal binaries with signing issues.
+    // Do not set _signingInformation or _certificates for universal binaries with
+    // signing issues EXCEPT when the cputype hint already populated them from the
+    // active slice (above). Also suppress when hint mode is active but no slice
+    // matched — callers asked for a specific arch and should not receive the
+    // whole-binary aggregate identity.
     NSError* err = scopedError.BridgeRelease<NSError*>();
-    if (!([err.domain isEqualToString:kMOLCodesignCheckerErrorDomain] &&
+    if (!_signingInformation && !hintActiveForFat &&
+        !([err.domain isEqualToString:kMOLCodesignCheckerErrorDomain] &&
           status == errSecCSSignatureInvalid)) {
       // Get CFDictionary of signing information for binary
       CFDictionaryRef signingDict = NULL;
@@ -154,11 +208,31 @@ NSString* const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
 - (instancetype)initWithBinaryPath:(NSString*)binaryPath
                     fileDescriptor:(int)fileDescriptor
                              error:(NSError**)error {
+  return [self initWithBinaryPath:binaryPath
+                   fileDescriptor:fileDescriptor
+                          cpuType:CPU_TYPE_ANY
+                       cpuSubtype:CPU_SUBTYPE_ANY
+                            error:error];
+}
+
+- (instancetype)initWithBinaryPath:(NSString*)binaryPath
+                    fileDescriptor:(int)fileDescriptor
+                           cpuType:(cpu_type_t)cpuType
+                        cpuSubtype:(cpu_subtype_t)cpuSubtype
+                             error:(NSError**)error {
   OSStatus status = errSecSuccess;
   SecStaticCodeRef codeRef = NULL;
 
-  // Get SecStaticCodeRef for binary
-  status = SecStaticCodeCreateWithPath((__bridge CFURLRef)[NSURL fileURLWithPath:binaryPath],
+  // When a fd is provided, point SecStaticCode at the caller's vnode via
+  // /dev/fd/N rather than re-resolving binaryPath. The descriptor must refer
+  // to a regular file; SecStaticCode rejects directory descriptors with
+  // errSecCSBadDiskRep, so callers passing a bundle directory fd will get an
+  // error here. The caller-supplied path is retained for display only.
+  NSString* secCodePath = (fileDescriptor != -1)
+                              ? [NSString stringWithFormat:@"/dev/fd/%d", fileDescriptor]
+                              : binaryPath;
+
+  status = SecStaticCodeCreateWithPath((__bridge CFURLRef)[NSURL fileURLWithPath:secCodePath],
                                        kSecCSDefaultFlags, &codeRef);
   if (status != errSecSuccess) {
     if (error) {
@@ -169,6 +243,8 @@ NSString* const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
 
   _binaryPath = binaryPath;
   _binaryFileDescriptor = (fileDescriptor != -1) ? fileDescriptor : -1;
+  _cpuTypeHint = cpuType;
+  _cpuSubtypeHint = cpuSubtype;
 
   self = [self initWithSecStaticCodeRef:codeRef error:error];
   if (codeRef) CFRelease(codeRef);  // it was retained above
@@ -407,6 +483,11 @@ NSString* const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
   return [self errorWithCode:code description:nil];
 }
 
+// Reports whether every slice of a universal binary shares the same signing
+// identity (cert chain, or "-" for ad-hoc). Callers that care about per-arch
+// identity should use the cputype-aware initializer instead; this check is
+// retained as an informational signal that surfaces `errSecCSSignatureInvalid`
+// in MOL's error domain for cross-slice inconsistencies.
 - (BOOL)allSigningInformationMatches:(NSArray*)signingInformation {
   NSMutableSet* chains = [NSMutableSet set];
   for (NSDictionary* arch in signingInformation) {
@@ -432,12 +513,16 @@ NSString* const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
   }
 
   if (!offsets) return nil;
+  // When a fd is provided, validate each slice against the same vnode the
+  // primary code ref is bound to (see initWithBinaryPath:fileDescriptor:error:).
+  // The fd-derived offsets are only meaningful relative to that vnode's bytes.
+  NSString* secCodePath = (fd != -1) ? [NSString stringWithFormat:@"/dev/fd/%d", fd] : path;
   NSMutableArray* infos = [NSMutableArray arrayWithCapacity:offsets.count];
   for (NSString* arch in offsets) {
     NSDictionary* attributes =
         @{(__bridge NSString*)kSecCodeAttributeUniversalFileOffset : offsets[arch]};
     SecStaticCodeRef codeRef = NULL;
-    SecStaticCodeCreateWithPathAndAttributes((__bridge CFURLRef)[NSURL fileURLWithPath:path],
+    SecStaticCodeCreateWithPathAndAttributes((__bridge CFURLRef)[NSURL fileURLWithPath:secCodePath],
                                              kSecCSDefaultFlags,
                                              (__bridge CFDictionaryRef)attributes, &codeRef);
     CFDictionaryRef signingDict = NULL;
@@ -446,6 +531,17 @@ NSString* const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
     if (codeRef) CFRelease(codeRef);
   }
   return infos.count ? infos : nil;
+}
+
+- (NSDictionary*)perSliceDictForCpuType:(cpu_type_t)cpuType cpuSubtype:(cpu_subtype_t)cpuSubtype {
+  const char* nameRaw = macho_arch_name_for_cpu_type(cpuType, cpuSubtype);
+  NSString* archName =
+      nameRaw ? @(nameRaw) : [NSString stringWithFormat:@"%i:%i", cpuType, cpuSubtype];
+  for (NSDictionary* arch in _universalSigningInformation) {
+    NSDictionary* dict = arch[archName];
+    if (dict) return dict;
+  }
+  return nil;
 }
 
 - (NSString*)architectureString:(struct fat_arch*)fatArch bigEndian:(BOOL)bigEndian {
@@ -460,9 +556,12 @@ NSString* const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
 
 - (NSDictionary*)architectureAndOffsetsForFileDescriptor:(int)fd {
   size_t len = sizeof(struct fat_header);
+  // Use pread() so the caller's file offset is preserved. SecStaticCode
+  // operates on this descriptor via /dev/fd/N, which shares the underlying
+  // file table entry (and offset) with the original fd; using pread() here
+  // avoids contributing further to that shared offset's drift.
   const uint8* headerBytes = (const uint8*)alloca(len);
-  lseek(fd, 0, SEEK_SET);
-  if (read(fd, (void*)headerBytes, len) != len) return nil;
+  if (!PreadFull(fd, (void*)headerBytes, len, 0)) return nil;
   struct fat_header* fh = (struct fat_header*)headerBytes;
   uint32_t m = fh->magic;
   if (!(m == FAT_MAGIC || m == FAT_CIGAM || m == FAT_MAGIC_64 || m == FAT_CIGAM_64)) return nil;
@@ -471,11 +570,11 @@ NSString* const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
   BOOL use64 = (m == FAT_MAGIC_64 || m == FAT_CIGAM_64);
 
   int archCount = bigEndian ? OSSwapBigToHostInt32(fh->nfat_arch) : fh->nfat_arch;
-  if (archCount < 1 || archCount > 128) return nil;  // Upper bound of 4k
+  if (archCount < 1 || archCount > 128) return nil;
 
   len = use64 ? sizeof(struct fat_arch_64) * archCount : sizeof(struct fat_arch) * archCount;
   const uint8* archBytes = (const uint8*)alloca(len);
-  if (read(fd, (void*)archBytes, len) != len) return nil;
+  if (!PreadFull(fd, (void*)archBytes, len, sizeof(struct fat_header))) return nil;
 
   NSMutableDictionary* offsets = [NSMutableDictionary dictionaryWithCapacity:archCount];
   if (use64) {

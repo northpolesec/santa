@@ -229,6 +229,9 @@ objc_library(
     name = "SNTPolicyProcessor",
     srcs = ["SNTPolicyProcessor.mm"],
     hdrs = ["SNTPolicyProcessor.h"],
+    sdk_dylibs = [
+        "EndpointSecurity",
+    ],
     deps = [
         ":EntitlementsFilter",
         ":SNTRuleTable",
@@ -260,13 +263,24 @@ objc_library(
 santa_unit_test(
     name = "SNTPolicyProcessorTest",
     srcs = ["SNTPolicyProcessorTest.mm"],
+    resources = [
+        "//Source/common:testdata_cal_yikes_universal_signed",
+    ],
+    sdk_dylibs = [
+        "EndpointSecurity",
+    ],
     deps = [
         ":SNTPolicyProcessor",
+        "//Source/common:MOLCodesignChecker",
         "//Source/common:SNTCELFallbackRule",
         "//Source/common:SNTCachedDecision",
+        "//Source/common:SNTConfigState",
         "//Source/common:SNTConfigurator",
+        "//Source/common:SNTFileInfo",
         "//Source/common:SNTRule",
+        "//Source/common:ScopedFile",
         "//Source/common:TestUtils",
+        "@OCMock",
     ],
 )
 
@@ -1489,6 +1503,7 @@ santa_unit_test(
         "//Source/common:SNTMetricSet",
         "//Source/common:SNTRule",
         "//Source/common:SNTRuleIdentifiers",
+        "//Source/common:String",
         "//Source/common:TestUtils",
         "//Source/common/es:EndpointSecurityMessage",
         "//Source/common/es:MockEndpointSecurityAPI",

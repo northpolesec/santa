@@ -56,6 +56,8 @@
 @property SantaVnode vnode;
 @property NSString* fileOwnerHomeDir;
 @property NSString* sha256Storage;
+@property(readwrite) cpu_type_t cpuType;
+@property(readwrite) cpu_subtype_t cpuSubtype;
 
 // Cached properties
 @property NSBundle* bundleRef;
@@ -80,6 +82,18 @@
   return [self initWithResolvedPath:@(esFile->path.data) stat:&esFile->stat error:error];
 }
 
+- (instancetype)initWithEndpointSecurityExecEvent:(const es_event_exec_t*)esExec
+                                            error:(NSError**)error {
+  self = [self initWithResolvedPath:@(esExec->target->executable->path.data)
+                               stat:&esExec->target->executable->stat
+                              error:error];
+  if (self) {
+    _cpuType = esExec->image_cputype;
+    _cpuSubtype = esExec->image_cpusubtype;
+  }
+  return self;
+}
+
 - (instancetype)initWithResolvedPath:(NSString*)path
                                 stat:(const struct stat*)fileStat
                                error:(NSError**)error {
@@ -91,6 +105,9 @@
 
   self = [super init];
   if (self) {
+    _cpuType = CPU_TYPE_ANY;
+    _cpuSubtype = CPU_SUBTYPE_ANY;
+
     _path = path;
     if (!_path.length) {
       [SNTError populateError:error
@@ -796,7 +813,24 @@
 - (MOLCodesignChecker*)codesignCheckerWithError:(NSError**)error {
   if (!self.cachedCodesignChecker && !self.codesignCheckerError) {
     NSError* e;
-    self.cachedCodesignChecker = [[MOLCodesignChecker alloc] initWithBinaryPath:self.path error:&e];
+    if (self.cpuType > 0) {
+      // Exec-event path: bind SecStaticCode to the descriptor SNTFileInfo
+      // already has open (via /dev/fd/N) so policy-time identity comparisons
+      // see the same vnode the kernel saw, and forward the active-slice
+      // cputype hint so universal binaries report the slice that was loaded.
+      self.cachedCodesignChecker =
+          [[MOLCodesignChecker alloc] initWithBinaryPath:self.path
+                                          fileDescriptor:self.fileHandle.fileDescriptor
+                                                 cpuType:self.cpuType
+                                              cpuSubtype:self.cpuSubtype
+                                                   error:&e];
+    } else {
+      // Diagnostic path (santactl, compiler controller, GUI, etc.): re-resolve
+      // the on-disk path so SecStaticCode has full bundle context, producing
+      // richer signing-status output (e.g. proper Info.plist validation).
+      self.cachedCodesignChecker = [[MOLCodesignChecker alloc] initWithBinaryPath:self.path
+                                                                            error:&e];
+    }
     self.codesignCheckerError = e;
   }
   if (error) *error = self.codesignCheckerError;

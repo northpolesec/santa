@@ -31,6 +31,9 @@
 /* Authorize temporary Monitor Mode exception */
 "authorize temporary Monitor Mode" = "разрешить временный режим мониторинга";
 
+/* Block reason when ES event and on-disk binary identity disagree */
+"Binary identity verification failed" = "Не удалось проверить идентичность исполняемого файла";
+
 /* No comment provided by engineer. */
 "Binary Path" = "Путь к исполняемому файлу";
 

@@ -16,14 +16,25 @@
 #import "Source/santad/SNTPolicyProcessor.h"
 
 #import <Foundation/Foundation.h>
+#import <OCMock/OCMock.h>
 #import <XCTest/XCTest.h>
 
+#include <Kernel/kern/cs_blobs.h>
+#include <mach/machine.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+#import "Source/common/MOLCodesignChecker.h"
 #import "Source/common/SNTCELFallbackRule.h"
 #import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTCommonEnums.h"
+#import "Source/common/SNTConfigState.h"
 #import "Source/common/SNTConfigurator.h"
+#import "Source/common/SNTFileInfo.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTRuleIdentifiers.h"
+#include "Source/common/ScopedFile.h"
+#import "Source/common/TestUtils.h"
 #import "Source/common/cel/Activation.h"
 
 #include "cel/v1.pb.h"
@@ -57,6 +68,41 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   XCTAssertTrue(res, "teamID mismatch: got: %@, want: %@", r1.teamID, r2.teamID);
 
   return res;
+}
+
+// Helpers for the verifyIdentity tests at the bottom of the file.
+static const uint8_t kHashA[20] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a,
+                                   0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14};
+static const uint8_t kHashB[20] = {0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00, 0x11, 0x22, 0x33,
+                                   0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd};
+
+static NSString* HexOf(const uint8_t* b, size_t n) {
+  NSMutableString* s = [NSMutableString stringWithCapacity:n * 2];
+  for (size_t i = 0; i < n; i++)
+    [s appendFormat:@"%02x", b[i]];
+  return s;
+}
+
+// Builds an es_file_t + es_process_t pair. The es_file_t is stored in an out-param
+// since es_process_t holds a pointer into it. Caller keeps both alive for the test.
+static void MakeTargetProc(es_file_t* outFile, es_process_t* outProc, const char* path,
+                           struct stat sb, uint32_t csFlags, const char* teamID,
+                           const char* signingID, const uint8_t cdhash[20]) {
+  *outFile = MakeESFile(path, sb);
+  *outProc = MakeESProcess(outFile);
+  outProc->codesigning_flags = csFlags;
+  outProc->team_id = MakeESStringToken(teamID);
+  outProc->signing_id = MakeESStringToken(signingID);
+  memcpy(outProc->cdhash, cdhash, 20);
+}
+
+static MOLCodesignChecker* MakeMockChecker(NSString* cdhash, NSString* teamID,
+                                           NSString* signingID) {
+  MOLCodesignChecker* m = OCMClassMock([MOLCodesignChecker class]);
+  OCMStub([m cdhash]).andReturn(cdhash);
+  OCMStub([m teamID]).andReturn(teamID);
+  OCMStub([m signingID]).andReturn(signingID);
+  return m;
 }
 
 @interface SNTPolicyProcessorTest : XCTestCase
@@ -1283,6 +1329,470 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   [self.processor decision:cd forRule:rule withTransitiveRules:YES andCELActivationCallback:nil];
   XCTAssertEqual(cd.decision, SNTEventStateAllowBinary);
   XCTAssertEqual(cd.ruleId, 0LL);
+}
+
+#pragma mark - End-to-end integration tests (outer decisionForFileInfo:targetProcess:…)
+
+// Unsigned file + ES stat that disagrees with disk → should return BlockBinaryMismatch.
+- (void)testOuter_Unsigned_StatMismatch_ReturnsBlockBinaryMismatch {
+  auto scopedFile = santa::ScopedFile::CreateTemporary(
+      /*path_prefix=*/nil, /*size=*/16,
+      /*filename_template=*/@"santa_test_XXXXXX", /*keep_path=*/true);
+  XCTAssertStatusOk(scopedFile);
+
+  NSError* err;
+  SNTFileInfo* fi = [[SNTFileInfo alloc] initWithPath:scopedFile->Path() error:&err];
+  XCTAssertNotNil(fi);
+
+  struct stat fakeStat = MakeStat(/*offset=*/42);  // differs from the real file's stat
+  es_file_t esFile = MakeESFile(scopedFile->Path().UTF8String, fakeStat);
+  es_process_t esProc = MakeESProcess(&esFile);
+  esProc.codesigning_flags = 0;  // unsigned
+  esProc.team_id = MakeESStringToken("");
+  esProc.signing_id = MakeESStringToken("");
+
+  SNTConfigState* cs = [[SNTConfigState alloc] initWithConfig:[SNTConfigurator configurator]];
+
+  SNTCachedDecision* cd = [self.processor decisionForFileInfo:fi
+                                                targetProcess:&esProc
+                                                  configState:cs
+                                           activationCallback:nil
+                                               cachedDecision:nil];
+
+  XCTAssertEqual(cd.decision, SNTEventStateBlockBinaryMismatch);
+  XCTAssertEqualObjects(cd.decisionExtra,
+                        @"Binary identity mismatch between ES event and on-disk file");
+  XCTAssertFalse(cd.holdAndAsk, @"mismatch must never be TouchID-overridable");
+  XCTAssertNotEqual(cd.decision & SNTEventStateBlock, (SNTEventState)0);
+  XCTAssertEqual(cd.decision & SNTEventStateAllow, (SNTEventState)0);
+}
+
+// Re-eval path (existingDecision non-nil) with ES/disk disagreement: verifyIdentity is skipped,
+// so BlockBinaryMismatch must NOT be returned.
+- (void)testOuter_ReEvalPath_VerificationSkipped {
+  auto scopedFile = santa::ScopedFile::CreateTemporary(nil, 16, @"santa_test_XXXXXX",
+                                                       /*keep_path=*/true);
+  XCTAssertStatusOk(scopedFile);
+
+  NSError* err;
+  SNTFileInfo* fi = [[SNTFileInfo alloc] initWithPath:scopedFile->Path() error:&err];
+  XCTAssertNotNil(fi);
+
+  // Deliberate stat mismatch — if verifyIdentity ran, this would short-circuit to
+  // SNTEventStateBlockBinaryMismatch.
+  struct stat fakeStat = MakeStat(/*offset=*/42);
+  es_file_t esFile = MakeESFile(scopedFile->Path().UTF8String, fakeStat);
+  es_process_t esProc = MakeESProcess(&esFile);
+  esProc.codesigning_flags = 0;
+  esProc.team_id = MakeESStringToken("");
+  esProc.signing_id = MakeESStringToken("");
+
+  // Seed an existing decision with NO certSHA256 — so the inner method's codesign
+  // branch (`if (!cd.certSHA256.length)`) would fire and would invoke verifyIdentity
+  // if it were non-nil. The bypass invariant under test is that the outer method
+  // passes verifyIdentity:nil whenever existingDecision is non-nil (per spec §4),
+  // independent of the inner method's certSHA256-skip optimization.
+  SNTCachedDecision* existing = [[SNTCachedDecision alloc] init];
+  // Do NOT set certSHA256.
+
+  SNTConfigState* cs = [[SNTConfigState alloc] initWithConfig:[SNTConfigurator configurator]];
+
+  SNTCachedDecision* cd = [self.processor decisionForFileInfo:fi
+                                                targetProcess:&esProc
+                                                  configState:cs
+                                           activationCallback:nil
+                                               cachedDecision:existing];
+
+  XCTAssertNotEqual(cd.decision, SNTEventStateBlockBinaryMismatch,
+                    @"re-eval path must never surface BinaryMismatch (outer method "
+                    @"is required to pass verifyIdentity:nil when existingDecision "
+                    @"is non-nil per spec §4)");
+}
+
+// Unsigned file + ES stat that agrees with disk → should NOT return BlockBinaryMismatch.
+- (void)testOuter_Unsigned_StatMatches_NoMismatch {
+  auto scopedFile = santa::ScopedFile::CreateTemporary(nil, 16, @"santa_test_XXXXXX",
+                                                       /*keep_path=*/true);
+  XCTAssertStatusOk(scopedFile);
+
+  NSError* err;
+  SNTFileInfo* fi = [[SNTFileInfo alloc] initWithPath:scopedFile->Path() error:&err];
+  XCTAssertNotNil(fi);
+
+  struct stat realStat;
+  XCTAssertEqual(fstat(fi.fileHandle.fileDescriptor, &realStat), 0);
+
+  es_file_t esFile = MakeESFile(scopedFile->Path().UTF8String, realStat);
+  es_process_t esProc = MakeESProcess(&esFile);
+  esProc.codesigning_flags = 0;
+  esProc.team_id = MakeESStringToken("");
+  esProc.signing_id = MakeESStringToken("");
+
+  SNTConfigState* cs = [[SNTConfigState alloc] initWithConfig:[SNTConfigurator configurator]];
+
+  SNTCachedDecision* cd = [self.processor decisionForFileInfo:fi
+                                                targetProcess:&esProc
+                                                  configState:cs
+                                           activationCallback:nil
+                                               cachedDecision:nil];
+
+  XCTAssertNotEqual(cd.decision, SNTEventStateBlockBinaryMismatch);
+}
+
+// Per-arch-inconsistent universal binary: the active slice's cert chain must populate
+// cd.certSHA256. This exercises the end-to-end path through decisionForFileInfo:targetProcess: with
+// a real fixture that carries two different cert chains across its slices.
+- (void)testOuter_PerArchInconsistent_ActiveSlicePopulatesCertSHA256 {
+  NSBundle* bundle = [NSBundle bundleForClass:[self class]];
+  NSString* fixturePath = [bundle pathForResource:@"cal-yikes-universal_signed" ofType:@""];
+  XCTAssertNotNil(fixturePath, @"fixture missing — check BUILD resources");
+
+  struct stat realStat;
+  XCTAssertEqual(stat(fixturePath.UTF8String, &realStat), 0);
+
+  // Compute the expected leaf-cert SHA256 directly from MOL using the same arch hint,
+  // so the assertion is grounded in the fixture's actual cert chain rather than a
+  // hard-coded string.
+  NSError* csErr;
+  MOLCodesignChecker* expectedCS =
+      [[MOLCodesignChecker alloc] initWithBinaryPath:fixturePath
+                                      fileDescriptor:-1
+                                             cpuType:CPU_TYPE_I386
+                                          cpuSubtype:CPU_SUBTYPE_I386_ALL
+                                               error:&csErr];
+  NSString* expectedCertSHA256 = expectedCS.leafCertificate.SHA256;
+  XCTAssertNotNil(expectedCertSHA256, @"expected real cert chain on the i386 slice");
+
+  // Build a synthetic es_file_t + es_process_t for the fixture path.
+  // The i386 slice of cal-yikes-universal_signed has team "998Z9C32TC" and
+  // identifier "yikes-i386-signed".  kHashA is a placeholder cdhash that won't
+  // match the on-disk cdhash; the verifier returns kDriftAllowed (team+SID match,
+  // cdhash drifts), allowing the signing path to proceed and populate certSHA256.
+  // This is the realistic scenario: the ES event carries the kernel-assigned cdhash
+  // for the loaded slice while MOL re-evaluates from the file, with the same result
+  // for a legitimately-signed binary with a small page-hash refresh.
+  // CS_SIGNED|CS_VALID|CS_KILL: signingStatusCallback() returns Production.
+  es_file_t esFile;
+  es_process_t esProc;
+  MakeTargetProc(&esFile, &esProc, fixturePath.UTF8String, realStat, CS_SIGNED | CS_VALID | CS_KILL,
+                 /*team=*/"998Z9C32TC",
+                 /*sid=*/"yikes-i386-signed", kHashA);
+
+  // Attach the arch hint via a synthetic es_event_exec_t so that SNTFileInfo picks up
+  // the i386 slice when it opens the Mach-O.
+  es_event_exec_t esExec = {};
+  esExec.target = &esProc;
+  esExec.image_cputype = CPU_TYPE_I386;
+  esExec.image_cpusubtype = CPU_SUBTYPE_I386_ALL;
+
+  NSError* fiErr;
+  SNTFileInfo* fi = [[SNTFileInfo alloc] initWithEndpointSecurityExecEvent:&esExec error:&fiErr];
+  XCTAssertNotNil(fi);
+  XCTAssertEqual(fi.cpuType, CPU_TYPE_I386);
+
+  // Verify codesignChecker is non-nil and has a cdhash (pre-flight the assumption
+  // this integration test is built on).
+  NSError* csCheckErr;
+  MOLCodesignChecker* csCheck = [fi codesignCheckerWithError:&csCheckErr];
+  XCTAssertNotNil(csCheck, @"codesignChecker must be non-nil for a signed fixture");
+  XCTAssertGreaterThan(csCheck.cdhash.length, 0u, @"cdhash must be non-empty for the active slice");
+  XCTAssertNotNil(csCheck.leafCertificate, @"leaf cert must be present for the active slice");
+  XCTAssertEqualObjects(csCheck.leafCertificate.SHA256, expectedCertSHA256,
+                        @"SNTFileInfo codesignChecker must return the i386-slice cert chain");
+
+  SNTConfigState* cs = [[SNTConfigState alloc] initWithConfig:[SNTConfigurator configurator]];
+
+  SNTCachedDecision* cd = [self.processor decisionForFileInfo:fi
+                                                targetProcess:&esProc
+                                                  configState:cs
+                                           activationCallback:nil
+                                               cachedDecision:nil];
+
+  XCTAssertEqualObjects(cd.certSHA256, expectedCertSHA256,
+                        @"cert chain should populate from the active i386 slice");
+  XCTAssertNotEqual(cd.signingStatus, SNTSigningStatusInvalid,
+                    @"signingStatus must reflect the active slice's real state, not Invalid");
+}
+
+#pragma mark - +verifyIdentityForTargetProc:fd:csInfo: tests
+
+// Case 1: ES signed, disk unsigned (csInfo == nil) -> Mismatch.
+- (void)testVerifyIdentity_SignednessDisagrees_EsSignedDiskUnsigned_ReturnsMismatch {
+  es_file_t file;
+  es_process_t proc;
+  MakeTargetProc(&file, &proc, "/tmp/test", MakeStat(), CS_SIGNED, "T", "S", kHashA);
+  XCTAssertEqual([SNTPolicyProcessor verifyIdentityForTargetProc:&proc fd:-1 csInfo:nil],
+                 IdentityVerifyResult::kMismatch);
+}
+
+// Case 1 (symmetric): ES unsigned, disk signed -> Mismatch.
+- (void)testVerifyIdentity_SignednessDisagrees_EsUnsignedDiskSigned_ReturnsMismatch {
+  es_file_t file;
+  es_process_t proc;
+  MakeTargetProc(&file, &proc, "/tmp/test", MakeStat(), /*csFlags=*/0, "", "", kHashA);
+  MOLCodesignChecker* csInfo = MakeMockChecker(HexOf(kHashA, 20), @"T", @"S");
+  XCTAssertEqual([SNTPolicyProcessor verifyIdentityForTargetProc:&proc fd:-1 csInfo:csInfo],
+                 IdentityVerifyResult::kMismatch);
+}
+
+// Case 2: only ES has TID/SID -> Mismatch.
+- (void)testVerifyIdentity_IDPresenceDisagrees_OnlyEsHasIDs_ReturnsMismatch {
+  es_file_t file;
+  es_process_t proc;
+  MakeTargetProc(&file, &proc, "/tmp/test", MakeStat(), CS_SIGNED, "T", "S", kHashA);
+  MOLCodesignChecker* csInfo = MakeMockChecker(HexOf(kHashA, 20), @"", @"");
+  XCTAssertEqual([SNTPolicyProcessor verifyIdentityForTargetProc:&proc fd:-1 csInfo:csInfo],
+                 IdentityVerifyResult::kMismatch);
+}
+
+// Case 2: only disk has TID/SID -> Mismatch.
+- (void)testVerifyIdentity_IDPresenceDisagrees_OnlyDiskHasIDs_ReturnsMismatch {
+  es_file_t file;
+  es_process_t proc;
+  MakeTargetProc(&file, &proc, "/tmp/test", MakeStat(), CS_SIGNED, "", "", kHashA);
+  MOLCodesignChecker* csInfo = MakeMockChecker(HexOf(kHashA, 20), @"T", @"S");
+  XCTAssertEqual([SNTPolicyProcessor verifyIdentityForTargetProc:&proc fd:-1 csInfo:csInfo],
+                 IdentityVerifyResult::kMismatch);
+}
+
+// Case 3: both have IDs, team ID differs -> Mismatch.
+- (void)testVerifyIdentity_BothHaveIDs_TeamIDDiffers_ReturnsMismatch {
+  es_file_t file;
+  es_process_t proc;
+  MakeTargetProc(&file, &proc, "/tmp/test", MakeStat(), CS_SIGNED, "T1", "S", kHashA);
+  MOLCodesignChecker* csInfo = MakeMockChecker(HexOf(kHashA, 20), @"T2", @"S");
+  XCTAssertEqual([SNTPolicyProcessor verifyIdentityForTargetProc:&proc fd:-1 csInfo:csInfo],
+                 IdentityVerifyResult::kMismatch);
+}
+
+// Case 3: both have IDs, signing ID differs -> Mismatch.
+- (void)testVerifyIdentity_BothHaveIDs_SigningIDDiffers_ReturnsMismatch {
+  es_file_t file;
+  es_process_t proc;
+  MakeTargetProc(&file, &proc, "/tmp/test", MakeStat(), CS_SIGNED, "T", "S1", kHashA);
+  MOLCodesignChecker* csInfo = MakeMockChecker(HexOf(kHashA, 20), @"T", @"S2");
+  XCTAssertEqual([SNTPolicyProcessor verifyIdentityForTargetProc:&proc fd:-1 csInfo:csInfo],
+                 IdentityVerifyResult::kMismatch);
+}
+
+// Case 3: both have IDs, IDs agree, cdhash agrees -> Match.
+- (void)testVerifyIdentity_BothHaveIDs_IDsAgreeCdhashAgrees_ReturnsMatch {
+  es_file_t file;
+  es_process_t proc;
+  MakeTargetProc(&file, &proc, "/tmp/test", MakeStat(), CS_SIGNED, "T", "S", kHashA);
+  MOLCodesignChecker* csInfo = MakeMockChecker(HexOf(kHashA, 20), @"T", @"S");
+  XCTAssertEqual([SNTPolicyProcessor verifyIdentityForTargetProc:&proc fd:-1 csInfo:csInfo],
+                 IdentityVerifyResult::kMatch);
+}
+
+// Case 3: both have IDs, IDs agree, cdhash drifts -> DriftAllowed.
+- (void)testVerifyIdentity_BothHaveIDs_IDsAgreeCdhashDrifts_ReturnsDriftAllowed {
+  es_file_t file;
+  es_process_t proc;
+  MakeTargetProc(&file, &proc, "/tmp/test", MakeStat(), CS_SIGNED, "T", "S", kHashA);
+  MOLCodesignChecker* csInfo = MakeMockChecker(HexOf(kHashB, 20), @"T", @"S");
+  XCTAssertEqual([SNTPolicyProcessor verifyIdentityForTargetProc:&proc fd:-1 csInfo:csInfo],
+                 IdentityVerifyResult::kDriftAllowed);
+}
+
+// Case 4: both signed, neither has TID/SID (ad-hoc), cdhash agrees -> Match.
+- (void)testVerifyIdentity_BothSignedNeitherHasIDs_CdhashAgrees_ReturnsMatch {
+  es_file_t file;
+  es_process_t proc;
+  MakeTargetProc(&file, &proc, "/tmp/test", MakeStat(), CS_SIGNED, "", "", kHashA);
+  MOLCodesignChecker* csInfo = MakeMockChecker(HexOf(kHashA, 20), nil, nil);
+  XCTAssertEqual([SNTPolicyProcessor verifyIdentityForTargetProc:&proc fd:-1 csInfo:csInfo],
+                 IdentityVerifyResult::kMatch);
+}
+
+// Case 4: both signed, neither has TID/SID (ad-hoc), cdhash differs -> Mismatch.
+- (void)testVerifyIdentity_BothSignedNeitherHasIDs_CdhashDiffers_ReturnsMismatch {
+  es_file_t file;
+  es_process_t proc;
+  MakeTargetProc(&file, &proc, "/tmp/test", MakeStat(), CS_SIGNED, "", "", kHashA);
+  MOLCodesignChecker* csInfo = MakeMockChecker(HexOf(kHashB, 20), nil, nil);
+  XCTAssertEqual([SNTPolicyProcessor verifyIdentityForTargetProc:&proc fd:-1 csInfo:csInfo],
+                 IdentityVerifyResult::kMismatch);
+}
+
+// Edge case: signed ES target but disk cdhash is empty -> diskSigned=false ->
+// signedness disagrees (Case 1) -> Mismatch. (This path returns from Case 1, not
+// from the unsigned-path Case 5.)
+- (void)testVerifyIdentity_SignedTargetDiskCdhashEmpty_TreatedAsUnsigned_ReturnsMismatch {
+  es_file_t file;
+  es_process_t proc;
+  MakeTargetProc(&file, &proc, "/tmp/test", MakeStat(), CS_SIGNED, "T", "S", kHashA);
+  MOLCodesignChecker* csInfo = MakeMockChecker(@"", @"T", @"S");
+  XCTAssertEqual([SNTPolicyProcessor verifyIdentityForTargetProc:&proc fd:-1 csInfo:csInfo],
+                 IdentityVerifyResult::kMismatch);
+}
+
+// Case 5: both unsigned, stat fields all agree -> Match.
+- (void)testVerifyIdentity_Unsigned_StatMatches_ReturnsMatch {
+  auto scopedFile = santa::ScopedFile::CreateTemporary(/*path_prefix=*/nil, /*size=*/100);
+  XCTAssertStatusOk(scopedFile);
+  struct stat realStat;
+  XCTAssertEqual(fstat(scopedFile->UnsafeFD(), &realStat), 0);
+  es_file_t file;
+  es_process_t proc;
+  MakeTargetProc(&file, &proc, "/tmp/test", realStat, /*csFlags=*/0, "", "", kHashA);
+  XCTAssertEqual([SNTPolicyProcessor verifyIdentityForTargetProc:&proc
+                                                              fd:scopedFile->UnsafeFD()
+                                                          csInfo:nil],
+                 IdentityVerifyResult::kMatch);
+}
+
+// Case 5: both unsigned, st_dev differs -> Mismatch.
+- (void)testVerifyIdentity_Unsigned_DevDiffers_ReturnsMismatch {
+  auto scopedFile = santa::ScopedFile::CreateTemporary(nil, 100);
+  XCTAssertStatusOk(scopedFile);
+  struct stat realStat;
+  XCTAssertEqual(fstat(scopedFile->UnsafeFD(), &realStat), 0);
+  realStat.st_dev += 1;
+  es_file_t file;
+  es_process_t proc;
+  MakeTargetProc(&file, &proc, "/tmp/test", realStat, 0, "", "", kHashA);
+  XCTAssertEqual([SNTPolicyProcessor verifyIdentityForTargetProc:&proc
+                                                              fd:scopedFile->UnsafeFD()
+                                                          csInfo:nil],
+                 IdentityVerifyResult::kMismatch);
+}
+
+// Case 5: both unsigned, st_ino differs -> Mismatch.
+- (void)testVerifyIdentity_Unsigned_InoDiffers_ReturnsMismatch {
+  auto scopedFile = santa::ScopedFile::CreateTemporary(nil, 100);
+  XCTAssertStatusOk(scopedFile);
+  struct stat realStat;
+  XCTAssertEqual(fstat(scopedFile->UnsafeFD(), &realStat), 0);
+  realStat.st_ino += 1;
+  es_file_t file;
+  es_process_t proc;
+  MakeTargetProc(&file, &proc, "/tmp/test", realStat, 0, "", "", kHashA);
+  XCTAssertEqual([SNTPolicyProcessor verifyIdentityForTargetProc:&proc
+                                                              fd:scopedFile->UnsafeFD()
+                                                          csInfo:nil],
+                 IdentityVerifyResult::kMismatch);
+}
+
+// Case 5: both unsigned, st_size differs -> Mismatch.
+- (void)testVerifyIdentity_Unsigned_SizeDiffers_ReturnsMismatch {
+  auto scopedFile = santa::ScopedFile::CreateTemporary(nil, 100);
+  XCTAssertStatusOk(scopedFile);
+  struct stat realStat;
+  XCTAssertEqual(fstat(scopedFile->UnsafeFD(), &realStat), 0);
+  realStat.st_size += 1;
+  es_file_t file;
+  es_process_t proc;
+  MakeTargetProc(&file, &proc, "/tmp/test", realStat, 0, "", "", kHashA);
+  XCTAssertEqual([SNTPolicyProcessor verifyIdentityForTargetProc:&proc
+                                                              fd:scopedFile->UnsafeFD()
+                                                          csInfo:nil],
+                 IdentityVerifyResult::kMismatch);
+}
+
+// Case 5: both unsigned, st_mtimespec.tv_sec differs -> Mismatch.
+- (void)testVerifyIdentity_Unsigned_MtimeSecDiffers_ReturnsMismatch {
+  auto scopedFile = santa::ScopedFile::CreateTemporary(nil, 100);
+  XCTAssertStatusOk(scopedFile);
+  struct stat realStat;
+  XCTAssertEqual(fstat(scopedFile->UnsafeFD(), &realStat), 0);
+  realStat.st_mtimespec.tv_sec += 1;
+  es_file_t file;
+  es_process_t proc;
+  MakeTargetProc(&file, &proc, "/tmp/test", realStat, 0, "", "", kHashA);
+  XCTAssertEqual([SNTPolicyProcessor verifyIdentityForTargetProc:&proc
+                                                              fd:scopedFile->UnsafeFD()
+                                                          csInfo:nil],
+                 IdentityVerifyResult::kMismatch);
+}
+
+// Case 5: both unsigned, st_mtimespec.tv_nsec differs -> Mismatch.
+- (void)testVerifyIdentity_Unsigned_MtimeNsecDiffers_ReturnsMismatch {
+  auto scopedFile = santa::ScopedFile::CreateTemporary(nil, 100);
+  XCTAssertStatusOk(scopedFile);
+  struct stat realStat;
+  XCTAssertEqual(fstat(scopedFile->UnsafeFD(), &realStat), 0);
+  realStat.st_mtimespec.tv_nsec += 1;
+  es_file_t file;
+  es_process_t proc;
+  MakeTargetProc(&file, &proc, "/tmp/test", realStat, 0, "", "", kHashA);
+  XCTAssertEqual([SNTPolicyProcessor verifyIdentityForTargetProc:&proc
+                                                              fd:scopedFile->UnsafeFD()
+                                                          csInfo:nil],
+                 IdentityVerifyResult::kMismatch);
+}
+
+// Case 5: both unsigned, fstat fails (invalid fd) -> Mismatch (fail-closed).
+- (void)testVerifyIdentity_Unsigned_FstatFails_ReturnsMismatch {
+  es_file_t file;
+  es_process_t proc;
+  MakeTargetProc(&file, &proc, "/tmp/test", MakeStat(), /*csFlags=*/0, "", "", kHashA);
+  XCTAssertEqual([SNTPolicyProcessor verifyIdentityForTargetProc:&proc fd:-1 csInfo:nil],
+                 IdentityVerifyResult::kMismatch);
+}
+
+#pragma mark - Platform-binary team_id suppression (ES quirk)
+
+// ES does not populate team_id on the target field for binaries with
+// is_platform_binary=true, even when the on-disk signature carries a TeamID.
+// Observed in production for Apple-signed XPC services inside framework
+// bundles (Xcode helpers, Apple developer tooling). The verifier accommodates
+// this by suspending the team_id presence and equality checks on that path —
+// signing_id and cdhash continue to bind identity end-to-end. The four tests
+// below pin: the production case matches, drift still reaches kDriftAllowed,
+// signing_id mismatch still bites, and the non-platform path is unaffected.
+
+// Platform binary, ES team_id suppressed, disk has team_id, signing_id and
+// cdhash agree -> Match. The shape every Apple-signed XPC service produces.
+- (void)testVerifyIdentity_PlatformBinary_ESTeamSuppressed_DiskHasTeam_ReturnsMatch {
+  es_file_t file;
+  es_process_t proc;
+  MakeTargetProc(&file, &proc, "/tmp/test", MakeStat(), CS_SIGNED, /*team=*/"",
+                 /*sid=*/"com.apple.dt.X", kHashA);
+  XCTAssertTrue(proc.is_platform_binary);  // default from MakeESProcess
+  MOLCodesignChecker* csInfo = MakeMockChecker(HexOf(kHashA, 20), @"59GAB85EFG", @"com.apple.dt.X");
+  XCTAssertEqual([SNTPolicyProcessor verifyIdentityForTargetProc:&proc fd:-1 csInfo:csInfo],
+                 IdentityVerifyResult::kMatch);
+}
+
+// Platform binary, ES team_id suppressed, signing_id agrees, cdhash drifts ->
+// DriftAllowed. Same publisher (signing_id namespace), so the existing
+// drift-within-publisher reasoning carries over.
+- (void)testVerifyIdentity_PlatformBinary_ESTeamSuppressed_CdhashDrifts_ReturnsDriftAllowed {
+  es_file_t file;
+  es_process_t proc;
+  MakeTargetProc(&file, &proc, "/tmp/test", MakeStat(), CS_SIGNED, /*team=*/"",
+                 /*sid=*/"com.apple.dt.X", kHashA);
+  MOLCodesignChecker* csInfo = MakeMockChecker(HexOf(kHashB, 20), @"59GAB85EFG", @"com.apple.dt.X");
+  XCTAssertEqual([SNTPolicyProcessor verifyIdentityForTargetProc:&proc fd:-1 csInfo:csInfo],
+                 IdentityVerifyResult::kDriftAllowed);
+}
+
+// Platform binary, ES team_id suppressed, signing_ids differ -> Mismatch.
+// Confirms signing_id equality still gates even when team is suppressed.
+- (void)testVerifyIdentity_PlatformBinary_ESTeamSuppressed_SigningIDDiffers_ReturnsMismatch {
+  es_file_t file;
+  es_process_t proc;
+  MakeTargetProc(&file, &proc, "/tmp/test", MakeStat(), CS_SIGNED, /*team=*/"",
+                 /*sid=*/"com.apple.dt.X", kHashA);
+  MOLCodesignChecker* csInfo = MakeMockChecker(HexOf(kHashA, 20), @"59GAB85EFG", @"com.apple.dt.Y");
+  XCTAssertEqual([SNTPolicyProcessor verifyIdentityForTargetProc:&proc fd:-1 csInfo:csInfo],
+                 IdentityVerifyResult::kMismatch);
+}
+
+// Non-platform binary, ES omits team_id but disk has one -> Mismatch.
+// Confirms the platform-binary relaxation does not bleed into the third-party
+// path: ES omitting team_id outside is_platform_binary=true is a real
+// presence disagreement and case-2 still bites.
+- (void)testVerifyIdentity_NonPlatform_ESNoTeam_DiskHasTeam_ReturnsMismatch {
+  es_file_t file;
+  es_process_t proc;
+  MakeTargetProc(&file, &proc, "/tmp/test", MakeStat(), CS_SIGNED, /*team=*/"", /*sid=*/"S",
+                 kHashA);
+  proc.is_platform_binary = false;
+  MOLCodesignChecker* csInfo = MakeMockChecker(HexOf(kHashA, 20), @"T", @"S");
+  XCTAssertEqual([SNTPolicyProcessor verifyIdentityForTargetProc:&proc fd:-1 csInfo:csInfo],
+                 IdentityVerifyResult::kMismatch);
 }
 
 @end

@@ -16,6 +16,7 @@
 @class MOLCertificate;
 
 #import <Foundation/Foundation.h>
+#import <mach/machine.h>
 
 /**
   `MOLCodesignChecker` validates a binary (either on-disk or in memory) has been signed
@@ -155,11 +156,16 @@
 - (instancetype)initWithBinaryPath:(NSString*)binaryPath;
 
 /**
-  Wrapper around initWithBinaryPath:error: that takes a file descriptor for reading.
-  The file descriptor will be used to read binary header infomation. This provides a minor
-  performace increase if the caller already has the file open.
+  Initialize with a binary on disk via a caller-supplied file descriptor.
 
-  @note The file offset will be set to the amount of bytes read while parsing the header.
+  The descriptor must refer to a regular-file Mach-O. SecStaticCode operates
+  on the descriptor's vnode (via /dev/fd/N) rather than re-resolving
+  `binaryPath`, so a rename of `binaryPath` between the caller's open() and
+  this call does not affect the result. The caller-supplied path is retained
+  for display via the `binaryPath` accessor only.
+
+  @note The file offset will be set to the amount of bytes read while parsing
+  the header.
 */
 - (instancetype)initWithBinaryPath:(NSString*)binaryPath
                     fileDescriptor:(int)fileDescriptor
@@ -168,6 +174,30 @@
   Wrapper around initWithBinaryPath:fileDescriptor:error:.
 */
 - (instancetype)initWithBinaryPath:(NSString*)binaryPath fileDescriptor:(int)fileDescriptor;
+
+/**
+  Initialize with a binary on disk via a caller-supplied file descriptor, with an
+  active-slice hint for universal binaries.
+
+  When `cpuType` is non-sentinel and the binary is fat, the per-slice signing dict
+  for the matching arch is used to populate `_signingInformation` and `_certificates`,
+  regardless of cross-slice signing consistency. The per-arch consistency check still
+  runs and still surfaces `errSecCSSignatureInvalid` on the error param informationally.
+
+  When `cpuType == CPU_TYPE_ANY` (and/or for thin binaries) this method behaves
+  identically to `initWithBinaryPath:fileDescriptor:error:`.
+
+  @param binaryPath     Path to a binary file on disk (display only when fd is provided).
+  @param fileDescriptor Open fd to the binary, or `-1` to re-resolve `binaryPath`.
+  @param cpuType        Active-slice CPU type, or `CPU_TYPE_ANY` for no hint.
+  @param cpuSubtype     Active-slice CPU subtype, or `CPU_SUBTYPE_ANY` for no hint.
+  @param error          NSError to be filled in if validation fails.
+*/
+- (instancetype)initWithBinaryPath:(NSString*)binaryPath
+                    fileDescriptor:(int)fileDescriptor
+                           cpuType:(cpu_type_t)cpuType
+                        cpuSubtype:(cpu_subtype_t)cpuSubtype
+                             error:(NSError**)error;
 
 /**
   Initialize with a running binary using its process ID.

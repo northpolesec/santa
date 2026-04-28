@@ -15,7 +15,10 @@
 
 #import <XCTest/XCTest.h>
 
+#include <fcntl.h>
 #include <mach-o/fat.h>
+#include <mach/machine.h>
+#include <unistd.h>
 
 #import "Source/common/MOLCodesignChecker.h"
 
@@ -129,6 +132,85 @@
   close(fd);
 }
 
+// fd-based init must reflect the caller's vnode, not the path. Stage two
+// distinct signed binaries; open the fd of one; atomic-rename the other into
+// the staged path; verify the fd-based checker still reports the original
+// vnode's cdhash, and a path-based checker reports the swapped binary's
+// cdhash.
+- (void)testInitWithFileDescriptor_SurvivesAtomicRenameSwap {
+  NSString* tmp = NSTemporaryDirectory();
+  NSString* a =
+      [tmp stringByAppendingPathComponent:[NSString stringWithFormat:@"mol_a_%d_%@", getpid(),
+                                                                     [[NSUUID UUID] UUIDString]]];
+  NSString* b =
+      [tmp stringByAppendingPathComponent:[NSString stringWithFormat:@"mol_b_%d_%@", getpid(),
+                                                                     [[NSUUID UUID] UUIDString]]];
+  NSError* err;
+  XCTAssertTrue([[NSFileManager defaultManager] copyItemAtPath:@"/usr/bin/yes"
+                                                        toPath:a
+                                                         error:&err]);
+  XCTAssertTrue([[NSFileManager defaultManager] copyItemAtPath:@"/usr/bin/true"
+                                                        toPath:b
+                                                         error:&err]);
+
+  int fd = open(a.UTF8String, O_RDONLY | O_CLOEXEC);
+  XCTAssertGreaterThanOrEqual(fd, 0, "open: %s", strerror(errno));
+
+  MOLCodesignChecker* aRef = [[MOLCodesignChecker alloc] initWithBinaryPath:a fileDescriptor:fd];
+  MOLCodesignChecker* bRef = [[MOLCodesignChecker alloc] initWithBinaryPath:b];
+  XCTAssertNotNil(aRef.cdhash);
+  XCTAssertNotNil(bRef.cdhash);
+  XCTAssertNotEqualObjects(aRef.cdhash, bRef.cdhash);
+  NSString* originalACdhash = aRef.cdhash;
+  NSString* originalBCdhash = bRef.cdhash;
+
+  // Atomic swap: rename(b, a) makes path `a` point at b's vnode. Original
+  // a-vnode survives only via the open fd.
+  XCTAssertEqual(rename(b.UTF8String, a.UTF8String), 0, "rename: %s", strerror(errno));
+
+  // fd-based: must still see A's identity.
+  MOLCodesignChecker* afterFD = [[MOLCodesignChecker alloc] initWithBinaryPath:a fileDescriptor:fd];
+  XCTAssertEqualObjects(afterFD.cdhash, originalACdhash);
+
+  // Path-based control: now sees B's identity (proving the rename happened
+  // and was visible to a path-based reader).
+  MOLCodesignChecker* afterPath = [[MOLCodesignChecker alloc] initWithBinaryPath:a];
+  XCTAssertEqualObjects(afterPath.cdhash, originalBCdhash);
+
+  close(fd);
+  [[NSFileManager defaultManager] removeItemAtPath:a error:nil];
+}
+
+// fd-based init must succeed even when the original path has been removed
+// after the caller's open(): the fd holds the vnode regardless.
+- (void)testInitWithFileDescriptor_SurvivesUnlink {
+  NSString* tmp = NSTemporaryDirectory();
+  NSString* path =
+      [tmp stringByAppendingPathComponent:[NSString stringWithFormat:@"mol_unlink_%d_%@", getpid(),
+                                                                     [[NSUUID UUID] UUIDString]]];
+  NSError* err;
+  XCTAssertTrue([[NSFileManager defaultManager] copyItemAtPath:@"/usr/bin/yes"
+                                                        toPath:path
+                                                         error:&err]);
+
+  int fd = open(path.UTF8String, O_RDONLY | O_CLOEXEC);
+  XCTAssertGreaterThanOrEqual(fd, 0);
+
+  XCTAssertEqual(unlink(path.UTF8String), 0);
+
+  MOLCodesignChecker* sut = [[MOLCodesignChecker alloc] initWithBinaryPath:path fileDescriptor:fd];
+  XCTAssertNotNil(sut.cdhash);
+
+  // Path-based at the now-missing path must fail, confirming the fd was the
+  // load-bearing source.
+  NSError* pathErr;
+  MOLCodesignChecker* viaPath = [[MOLCodesignChecker alloc] initWithBinaryPath:path error:&pathErr];
+  XCTAssertNil(viaPath);
+  XCTAssertNotNil(pathErr);
+
+  close(fd);
+}
+
 - (void)testAllArchitectures {
   NSError* error;
   NSBundle* bundle = [NSBundle bundleForClass:[self class]];
@@ -224,6 +306,67 @@
   XCTAssertTrue(sut.platformBinary);
 }
 
+// MOLCodesignChecker must continue to populate `_signingInformation` even
+// when SecStaticCodeCheckValidityWithErrors returns a non-fatal error. Bundle
+// binaries opened by fd produce errSecCSInfoPlistFailed (the bundle's
+// Info.plist hash slot in the Mach-O signature can't be matched against an
+// on-disk Info.plist when SecStaticCode is fed /dev/fd/N), and downstream
+// callers — notably SNTPolicyProcessor's identity verifier — depend on the
+// signing dictionary remaining accessible so the cdhash / TeamID / SigningID
+// can still be read off the binary. This test pins that contract: a future
+// refactor that returns nil or skips dictionary population on any error
+// would silently regress identity verification for every signed bundle
+// binary on the system (~all GUI apps and many framework-housed tools).
+- (void)testInitWithFileDescriptor_BundleBinary_PreservesSigningInfoOnPartialError {
+  NSArray<NSString*>* candidates = @[
+    @"/System/Applications/Calculator.app/Contents/MacOS/Calculator",
+    @"/System/Applications/Utilities/Terminal.app/Contents/MacOS/Terminal",
+    @"/System/Library/Frameworks/Foundation.framework/Versions/Current/Foundation",
+  ];
+  NSString* path = nil;
+  for (NSString* c in candidates) {
+    if ([[NSFileManager defaultManager] fileExistsAtPath:c]) {
+      path = c;
+      break;
+    }
+  }
+  if (!path) {
+    XCTSkip(@"No signed bundle binary available on this host");
+  }
+
+  // Sanity baseline: path-based init succeeds cleanly and gives us reference
+  // identity values to compare against.
+  NSError* viaPathErr;
+  MOLCodesignChecker* viaPath = [[MOLCodesignChecker alloc] initWithBinaryPath:path
+                                                                         error:&viaPathErr];
+  XCTAssertNotNil(viaPath);
+  XCTAssertNil(viaPathErr);
+  XCTAssertNotNil(viaPath.cdhash);
+
+  int fd = open(path.UTF8String, O_RDONLY | O_CLOEXEC);
+  XCTAssertGreaterThanOrEqual(fd, 0, "open(%@): %s", path, strerror(errno));
+
+  // fd-based init must surface the validity error AND populate the signing
+  // dictionary anyway. The two behaviors are independent — together they let
+  // the SNT-377 verifier compare identity even when bundle context is
+  // unavailable through /dev/fd/N.
+  NSError* err;
+  MOLCodesignChecker* sut = [[MOLCodesignChecker alloc] initWithBinaryPath:path
+                                                            fileDescriptor:fd
+                                                                     error:&err];
+  XCTAssertNotNil(sut, @"init must return an instance, not nil, on partial validity failure");
+  XCTAssertNotNil(err, @"validity check failure must surface to the caller");
+
+  XCTAssertNotNil(sut.signingInformation, @"signing dictionary must be populated");
+  XCTAssertEqualObjects(sut.cdhash, viaPath.cdhash,
+                        @"fd-based cdhash must agree with path-based cdhash");
+  XCTAssertEqualObjects(sut.signingID, viaPath.signingID);
+  XCTAssertEqualObjects(sut.teamID, viaPath.teamID);
+  XCTAssertNotNil(sut.leafCertificate, @"leaf certificate must be readable");
+
+  close(fd);
+}
+
 - (void)testEntitlements {
   NSError* error;
   NSBundle* bundle = [NSBundle bundleForClass:[self class]];
@@ -242,6 +385,133 @@
   [wantedEntitlements enumerateKeysAndObjectsUsingBlock:^(id key, id value, BOOL* stop) {
     XCTAssertEqualObjects(sut.entitlements[key], value);
   }];
+}
+
+// yikes-universal_signed has i386 + x86_64, both signed with the same cert chain.
+- (void)testCpuTypeHint_ConsistentFat_PicksActiveSlice {
+  NSError* error;
+  NSBundle* bundle = [NSBundle bundleForClass:[self class]];
+  NSString* path = [bundle pathForResource:@"yikes-universal_signed" ofType:@""];
+
+  MOLCodesignChecker* sutA = [[MOLCodesignChecker alloc] initWithBinaryPath:path
+                                                             fileDescriptor:-1
+                                                                    cpuType:CPU_TYPE_I386
+                                                                 cpuSubtype:CPU_SUBTYPE_I386_ALL
+                                                                      error:&error];
+  XCTAssertNotNil(sutA);
+  XCTAssertNil(error);
+  XCTAssertGreaterThan(sutA.cdhash.length, 0u);
+
+  error = nil;
+  MOLCodesignChecker* sutB = [[MOLCodesignChecker alloc] initWithBinaryPath:path
+                                                             fileDescriptor:-1
+                                                                    cpuType:CPU_TYPE_X86_64
+                                                                 cpuSubtype:CPU_SUBTYPE_X86_64_ALL
+                                                                      error:&error];
+  XCTAssertNotNil(sutB);
+  XCTAssertNil(error);
+  XCTAssertGreaterThan(sutB.cdhash.length, 0u);
+
+  // Per-slice cdhashes always differ across slices of the same fat file.
+  XCTAssertNotEqualObjects(sutA.cdhash, sutB.cdhash);
+}
+
+// cal-yikes-universal_signed: two different cert chains, one per slice.
+- (void)testCpuTypeHint_InconsistentFat_PopulatesActiveSlice_AndSurfacesError {
+  NSError* error;
+  NSBundle* bundle = [NSBundle bundleForClass:[self class]];
+  NSString* path = [bundle pathForResource:@"cal-yikes-universal_signed" ofType:@""];
+
+  MOLCodesignChecker* sut = [[MOLCodesignChecker alloc] initWithBinaryPath:path
+                                                            fileDescriptor:-1
+                                                                   cpuType:CPU_TYPE_I386
+                                                                cpuSubtype:CPU_SUBTYPE_I386_ALL
+                                                                     error:&error];
+  XCTAssertNotNil(sut);
+  // Active-slice signing info is now present despite the per-arch inconsistency.
+  XCTAssertGreaterThan(sut.cdhash.length, 0u);
+  XCTAssertNotNil(sut.leafCertificate);
+  // The consistency-check error still surfaces informationally.
+  XCTAssertEqual(error.code, errSecCSSignatureInvalid);
+  XCTAssertEqualObjects(error.domain, kMOLCodesignCheckerErrorDomain);
+}
+
+// cal-yikes-universal: unknown-arch slice is cert-signed; i386 slice is unsigned.
+// Requesting i386 should yield empty identity with a consistency-check error.
+- (void)testCpuTypeHint_InconsistentFat_UnsignedActiveSlice_LeavesEmpty {
+  NSError* error;
+  NSBundle* bundle = [NSBundle bundleForClass:[self class]];
+  NSString* path = [bundle pathForResource:@"cal-yikes-universal" ofType:@""];
+
+  MOLCodesignChecker* sut = [[MOLCodesignChecker alloc] initWithBinaryPath:path
+                                                            fileDescriptor:-1
+                                                                   cpuType:CPU_TYPE_I386
+                                                                cpuSubtype:CPU_SUBTYPE_I386_ALL
+                                                                     error:&error];
+  XCTAssertNotNil(sut);
+  XCTAssertEqual(sut.cdhash.length, 0u);
+  XCTAssertNil(sut.leafCertificate);
+  XCTAssertEqual(error.code, errSecCSSignatureInvalid);
+  XCTAssertEqualObjects(error.domain, kMOLCodesignCheckerErrorDomain);
+}
+
+// PowerPC won't be in any modern universal fixture; requesting it should leave empty identity.
+- (void)testCpuTypeHint_NoMatchingSlice_LeavesEmpty {
+  NSError* error;
+  NSBundle* bundle = [NSBundle bundleForClass:[self class]];
+  NSString* path = [bundle pathForResource:@"yikes-universal_signed" ofType:@""];
+
+  MOLCodesignChecker* sut = [[MOLCodesignChecker alloc] initWithBinaryPath:path
+                                                            fileDescriptor:-1
+                                                                   cpuType:CPU_TYPE_POWERPC
+                                                                cpuSubtype:CPU_SUBTYPE_POWERPC_ALL
+                                                                     error:&error];
+  XCTAssertNotNil(sut);
+  XCTAssertEqual(sut.cdhash.length, 0u);
+  XCTAssertNil(sut.leafCertificate);
+}
+
+// signed-with-teamid is a thin x86_64 fixture. The cputype hint must be inert
+// for thin binaries: behavior must match the no-hint path exactly.
+- (void)testCpuTypeHint_ThinBinary_Ignored {
+  NSError* error;
+  NSError* errorWithoutHint;
+  NSBundle* bundle = [NSBundle bundleForClass:[self class]];
+  NSString* path = [bundle pathForResource:@"signed-with-teamid" ofType:@""];
+
+  MOLCodesignChecker* sutNoHint = [[MOLCodesignChecker alloc] initWithBinaryPath:path
+                                                                           error:&errorWithoutHint];
+
+  MOLCodesignChecker* sutWithHint =
+      [[MOLCodesignChecker alloc] initWithBinaryPath:path
+                                      fileDescriptor:-1
+                                             cpuType:CPU_TYPE_X86_64
+                                          cpuSubtype:CPU_SUBTYPE_X86_64_ALL
+                                               error:&error];
+  XCTAssertNotNil(sutNoHint);
+  XCTAssertNotNil(sutWithHint);
+  XCTAssertEqualObjects(sutNoHint.cdhash, sutWithHint.cdhash);
+  XCTAssertEqualObjects(sutNoHint.teamID, sutWithHint.teamID);
+  XCTAssertEqualObjects(sutNoHint.signingID, sutWithHint.signingID);
+}
+
+// CPU_TYPE_ANY must fall back to today's (no-hint) behavior.
+- (void)testCpuTypeAny_FallsBackToTodayBehavior {
+  NSError* errorBaseline;
+  NSError* errorSentinel;
+  NSBundle* bundle = [NSBundle bundleForClass:[self class]];
+  NSString* path = [bundle pathForResource:@"yikes-universal_signed" ofType:@""];
+
+  MOLCodesignChecker* sutBaseline = [[MOLCodesignChecker alloc] initWithBinaryPath:path
+                                                                             error:&errorBaseline];
+  MOLCodesignChecker* sutSentinel = [[MOLCodesignChecker alloc] initWithBinaryPath:path
+                                                                    fileDescriptor:-1
+                                                                           cpuType:CPU_TYPE_ANY
+                                                                        cpuSubtype:CPU_SUBTYPE_ANY
+                                                                             error:&errorSentinel];
+  XCTAssertEqualObjects(sutBaseline.cdhash, sutSentinel.cdhash);
+  XCTAssertEqualObjects(sutBaseline.teamID, sutSentinel.teamID);
+  XCTAssertEqualObjects(sutBaseline.signingID, sutSentinel.signingID);
 }
 
 @end
