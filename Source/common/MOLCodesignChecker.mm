@@ -538,9 +538,12 @@ NSString* const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
 
 - (NSDictionary*)architectureAndOffsetsForFileDescriptor:(int)fd {
   size_t len = sizeof(struct fat_header);
+  // Use pread() so the caller's file offset is preserved. SecStaticCode
+  // operates on this descriptor via /dev/fd/N, which shares the underlying
+  // file table entry (and offset) with the original fd; using pread() here
+  // avoids contributing further to that shared offset's drift.
   const uint8* headerBytes = (const uint8*)alloca(len);
-  lseek(fd, 0, SEEK_SET);
-  if (read(fd, (void*)headerBytes, len) != len) return nil;
+  if (pread(fd, (void*)headerBytes, len, 0) != (ssize_t)len) return nil;
   struct fat_header* fh = (struct fat_header*)headerBytes;
   uint32_t m = fh->magic;
   if (!(m == FAT_MAGIC || m == FAT_CIGAM || m == FAT_MAGIC_64 || m == FAT_CIGAM_64)) return nil;
@@ -549,11 +552,11 @@ NSString* const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
   BOOL use64 = (m == FAT_MAGIC_64 || m == FAT_CIGAM_64);
 
   int archCount = bigEndian ? OSSwapBigToHostInt32(fh->nfat_arch) : fh->nfat_arch;
-  if (archCount < 1 || archCount > 128) return nil;  // Upper bound of 4k
+  if (archCount < 1 || archCount > 128) return nil;
 
   len = use64 ? sizeof(struct fat_arch_64) * archCount : sizeof(struct fat_arch) * archCount;
   const uint8* archBytes = (const uint8*)alloca(len);
-  if (read(fd, (void*)archBytes, len) != len) return nil;
+  if (pread(fd, (void*)archBytes, len, sizeof(struct fat_header)) != (ssize_t)len) return nil;
 
   NSMutableDictionary* offsets = [NSMutableDictionary dictionaryWithCapacity:archCount];
   if (use64) {

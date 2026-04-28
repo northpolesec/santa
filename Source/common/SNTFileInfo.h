@@ -243,6 +243,13 @@
 ///
 ///  @return The underlying file handle.
 ///
+///  @note The file offset is unspecified after `codesignCheckerWithError:`
+///  has been called: SecStaticCode operates on the descriptor via
+///  `/dev/fd/N`, which shares its file offset with this fd, and consumes
+///  bytes during validation. Callers reading directly from
+///  `fileHandle.fileDescriptor` should use `pread(2)` (or seek explicitly
+///  before each read) rather than relying on a particular offset.
+///
 @property(readonly) NSFileHandle* fileHandle;
 
 ///

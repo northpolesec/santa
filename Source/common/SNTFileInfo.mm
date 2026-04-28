@@ -813,17 +813,24 @@
 - (MOLCodesignChecker*)codesignCheckerWithError:(NSError**)error {
   if (!self.cachedCodesignChecker && !self.codesignCheckerError) {
     NSError* e;
-    // Pass the descriptor SNTFileInfo already has open so SecStaticCode operates
-    // on the same vnode (via /dev/fd/N), not a fresh path resolution. Pass the
-    // cputype/cpusubtype hint (CPU_TYPE_ANY / CPU_SUBTYPE_ANY when not initialized
-    // via -initWithEndpointSecurityExecEvent:) so universal binaries produce
-    // active-slice-correct identity.
-    self.cachedCodesignChecker =
-        [[MOLCodesignChecker alloc] initWithBinaryPath:self.path
-                                        fileDescriptor:self.fileHandle.fileDescriptor
-                                               cpuType:self.cpuType
-                                            cpuSubtype:self.cpuSubtype
-                                                 error:&e];
+    if (self.cpuType > 0) {
+      // Exec-event path: bind SecStaticCode to the descriptor SNTFileInfo
+      // already has open (via /dev/fd/N) so policy-time identity comparisons
+      // see the same vnode the kernel saw, and forward the active-slice
+      // cputype hint so universal binaries report the slice that was loaded.
+      self.cachedCodesignChecker =
+          [[MOLCodesignChecker alloc] initWithBinaryPath:self.path
+                                          fileDescriptor:self.fileHandle.fileDescriptor
+                                                 cpuType:self.cpuType
+                                              cpuSubtype:self.cpuSubtype
+                                                   error:&e];
+    } else {
+      // Diagnostic path (santactl, compiler controller, GUI, etc.): re-resolve
+      // the on-disk path so SecStaticCode has full bundle context, producing
+      // richer signing-status output (e.g. proper Info.plist validation).
+      self.cachedCodesignChecker = [[MOLCodesignChecker alloc] initWithBinaryPath:self.path
+                                                                            error:&e];
+    }
     self.codesignCheckerError = e;
   }
   if (error) *error = self.codesignCheckerError;

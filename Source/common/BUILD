@@ -1054,6 +1054,7 @@ santa_unit_test(
         "testdata/DirectoryBundle/**",
     ]),
     deps = [
+        ":MOLCodesignChecker",
         ":SNTFileInfo",
         ":TestUtils",
     ],
