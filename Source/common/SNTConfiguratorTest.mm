@@ -271,7 +271,7 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
 
 - (void)testAllowDelegatedSignalsDefault {
   SNTConfigurator* sut = [[SNTConfigurator alloc] init];
-  // Default must be NO so the bypass closes out of the box on 15.5+.
+  // Default must be NO
   XCTAssertFalse(sut.allowDelegatedSignals);
 }
 
