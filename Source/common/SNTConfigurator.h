@@ -197,6 +197,15 @@
 @property(readonly, nonatomic, nullable) NSArray<NSString*>* antiSuspendSigningIDs;
 
 ///
+///  When YES, signals delegated by launchd on behalf of any Apple platform
+///  binary (instigator->is_platform_binary == true) targeting santad are
+///  allowed, in addition to the hardcoded allowlist baked into the tamper
+///  resistance client. Defaults to NO. Available on macOS 15.5+ where the ES
+///  SIGNAL event exposes the instigator field; ignored on older OSes.
+///
+@property(readonly, nonatomic) BOOL allowDelegatedSignals;
+
+///
 ///  Defines how event logs are stored. Options are:
 ///    SNTEventLogTypeSyslog "syslog": Sent to ASL or ULS (if built with the 10.12 SDK or later).
 ///    SNTEventLogTypeFilelog "file": Sent to a file on disk. Use eventLogPath to specify a path.

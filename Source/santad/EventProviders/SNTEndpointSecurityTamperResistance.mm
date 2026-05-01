@@ -30,6 +30,7 @@
 #include "absl/container/flat_hash_set.h"
 #include "absl/synchronization/mutex.h"
 
+#import "Source/common/Platform.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SigningIDHelpers.h"
@@ -57,6 +58,20 @@ constexpr std::pair<std::string_view, WatchItemPathType> kProtectedFiles[] = {
     {"/Library/LaunchAgents/com.northpolesec.santa.", WatchItemPathType::kPrefix},
     {"/Library/LaunchDaemons/com.northpolesec.santa.", WatchItemPathType::kPrefix},
 };
+
+#if HAVE_MACOS_15_5
+// Platform-binary signing-IDs that Santa trusts to ask launchd to deliver
+// a signal to santad. Extended at runtime via the `AllowDelegatedSignals`
+// config (any platform binary is trusted when YES).
+static const absl::flat_hash_set<std::string> kTrustedSignalInstigators = {
+    // launchd's own signing-id; covers internal launchd flows that surface
+    // launchd as the instigator (e.g., bootout teardown).
+    "platform:com.apple.xpc.launchd",
+    // /usr/libexec/smd, the Service Management daemon, drives
+    // SMAppService / SMJobBless flows that may signal santad.
+    "platform:com.apple.xpc.smd",
+};
+#endif  // HAVE_MACOS_15_5
 
 void RemoveLegacyLaunchdPlists() {
   constexpr std::string_view legacyPlists[] = {
@@ -156,12 +171,14 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message& esMsg) {
 - (instancetype)initWithESAPI:(std::shared_ptr<EndpointSecurityAPI>)esApi
                       metrics:(std::shared_ptr<santa::ESMetricsObserver>)metrics
                        logger:(std::shared_ptr<Logger>)logger
-        antiSuspendSigningIDs:(NSArray<NSString*>*)antiSuspendSigningIDs {
+        antiSuspendSigningIDs:(NSArray<NSString*>*)antiSuspendSigningIDs
+        allowDelegatedSignals:(BOOL)allowDelegatedSignals {
   self = [super initWithESAPI:std::move(esApi)
                       metrics:std::move(metrics)
                     processor:santa::Processor::kTamperResistance];
   if (self) {
     _logger = logger;
+    self.allowDelegatedSignals = allowDelegatedSignals;
     [self setAntiSuspendSigningIDs:antiSuspendSigningIDs];
 
     [self establishClientOrDie];
@@ -275,16 +292,48 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message& esMsg) {
         break;
       }
 
-      // Only block signals sent to us and not from launchd.
       pid_t sourcePid = audit_token_to_pid(esMsg->process->audit_token);
       pid_t targetPid = audit_token_to_pid(esMsg->event.signal.target->audit_token);
-      if (targetPid == getpid() && sourcePid != 1) {
+
+      if (targetPid != getpid()) {
+        break;
+      }
+
+      // Only launchd may deliver signals to santad.
+      if (sourcePid != 1) {
         LOGW(@"Preventing attempt to signal Santa daemon: signal %d, sending pid: %d, sending "
              @"process: %@",
              esMsg->event.signal.sig, sourcePid,
              santa::StringTokenToNSString(esMsg->process->executable->path));
         result = ES_AUTH_RESULT_DENY;
+        break;
       }
+
+      // When launchd delivers a signal on behalf of another process (msg
+      // version >= 9 with non-NULL instigator), the originator must match
+      // kTrustedSignalInstigators or be a platform binary while
+      // AllowDelegatedSignals is YES.
+#if HAVE_MACOS_15_5
+      if (esMsg->version >= 9) {
+        const es_process_t* instigator = esMsg->event.signal.instigator;
+        if (instigator != NULL) {
+          NSString* signingId = FormatSigningID(
+              santa::StringTokenToNSString(instigator->signing_id),
+              santa::StringTokenToNSString(instigator->team_id), instigator->is_platform_binary);
+          bool isAllowlisted = signingId && kTrustedSignalInstigators.contains(
+                                                santa::NSStringToUTF8String(signingId));
+          bool isPermittedPlatformBinary =
+              self.allowDelegatedSignals && instigator->is_platform_binary;
+          if (!isAllowlisted && !isPermittedPlatformBinary) {
+            LOGW(@"Preventing delegated signal to Santa daemon: signal %d, "
+                 @"instigator pid: %d, instigator process: %@",
+                 esMsg->event.signal.sig, audit_token_to_pid(instigator->audit_token),
+                 santa::StringTokenToNSString(instigator->executable->path));
+            result = ES_AUTH_RESULT_DENY;
+          }
+        }
+      }
+#endif  // HAVE_MACOS_15_5
       break;
     }
 

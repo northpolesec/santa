@@ -33,10 +33,16 @@ NS_ASSUME_NONNULL_BEGIN
 /// Accepts an NSArray of NSStrings but stores internally as a hash set for O(1) lookup.
 - (void)setAntiSuspendSigningIDs:(nullable NSArray<NSString*>*)antiSuspendSigningIDs;
 
+/// When YES, signals delegated by launchd on behalf of any Apple platform
+/// binary may target santad, in addition to the hardcoded allowlist.
+/// Synchronized for safe concurrent access; live-updated from KVO.
+@property(atomic) BOOL allowDelegatedSignals;
+
 - (instancetype)initWithESAPI:(std::shared_ptr<santa::EndpointSecurityAPI>)esApi
                       metrics:(std::shared_ptr<santa::ESMetricsObserver>)metrics
                        logger:(std::shared_ptr<santa::Logger>)logger
-        antiSuspendSigningIDs:(nullable NSArray<NSString*>*)antiSuspendSigningIDs;
+        antiSuspendSigningIDs:(nullable NSArray<NSString*>*)antiSuspendSigningIDs
+        allowDelegatedSignals:(BOOL)allowDelegatedSignals;
 
 @end
 

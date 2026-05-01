@@ -34,4 +34,11 @@
 #undef HAVE_MACOS_15_4
 #endif
 
+#if defined(MAC_OS_VERSION_15_5) && \
+    __MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_VERSION_15_5
+#define HAVE_MACOS_15_5 1
+#else
+#undef HAVE_MACOS_15_5
+#endif
+
 #endif  // SANTA_COMMON_PLATFORM_H
