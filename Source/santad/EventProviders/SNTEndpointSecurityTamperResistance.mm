@@ -286,6 +286,8 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message& esMsg) {
     }
 
     case ES_EVENT_TYPE_AUTH_SIGNAL: {
+      // signal event type in ES does not support caching
+      cacheable = false;
       if (esMsg->event.signal.sig == 0) {
         // Signal 0 doesn't actually get sent to the process, it is only used to
         // check if the process exists. Because of this, we don't need to block it.
