@@ -155,6 +155,16 @@ export const SantaConfigKeyGroups: SantaConfigGroups = {
       ],
       versionAdded: "2026.3",
     },
+    {
+      key: "AllowDelegatedSignals",
+      description:
+        `If true, signals delegated by \'launchd\' on behalf of any Apple platform binary targeting \'santad\'
+        are allowed.`,
+      type: "bool",
+      defaultValue: false,
+      syncConfigurable: false,
+      versionAdded: "2026.4",
+    },
   ],
   gui: [
     {
