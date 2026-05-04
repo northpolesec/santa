@@ -21,10 +21,10 @@ public let MAX_OUTER_VIEW_WIDTH = 560.0
 public let MAX_OUTER_VIEW_HEIGHT = 340.0
 
 extension Date {
-  public static var overrideDate: Date = Date()
+  public static var overrideDate: Date? = nil
 
   public static func now() -> Date {
-    return overrideDate
+    return overrideDate ?? Date()
   }
 }
 
