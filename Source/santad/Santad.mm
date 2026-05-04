@@ -168,7 +168,8 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
               initWithESAPI:esapi
                     metrics:metrics
                      logger:logger
-      antiSuspendSigningIDs:[configurator antiSuspendSigningIDs]];
+      antiSuspendSigningIDs:[configurator antiSuspendSigningIDs]
+      allowDelegatedSignals:[configurator allowDelegatedSignals]];
 
   auto faaPolicyProcessor = std::make_shared<santa::FAAPolicyProcessor>(
       [SNTDecisionCache sharedCache], enricher, logger, tty_writer, metrics,
@@ -475,6 +476,15 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
 
                                    LOGI(@"AntiSuspendSigningIDs changed");
                                    [tamper_client setAntiSuspendSigningIDs:newValue];
+                                 }],
+    [[SNTKVOManager alloc] initWithObject:configurator
+                                 selector:@selector(allowDelegatedSignals)
+                                     type:[NSNumber class]
+                                 callback:^(NSNumber* oldValue, NSNumber* newValue) {
+                                   if ([oldValue isEqual:newValue]) return;
+
+                                   LOGI(@"AllowDelegatedSignals changed: %@", newValue);
+                                   [tamper_client setAllowDelegatedSignals:[newValue boolValue]];
                                  }],
     [[SNTKVOManager alloc] initWithObject:configurator
                                  selector:@selector(staticRules)
