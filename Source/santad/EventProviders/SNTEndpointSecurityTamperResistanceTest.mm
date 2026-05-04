@@ -533,7 +533,7 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
 
       XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
       XCTAssertEqual(gotAuthResult, kv.second);
-      XCTAssertEqual(gotCachable, kv.second == ES_AUTH_RESULT_ALLOW);
+      XCTAssertFalse(gotCachable);
     }
   }
 
