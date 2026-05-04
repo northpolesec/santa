@@ -705,6 +705,12 @@ extern NSString* _Nonnull const kEnableMenuItemUserOverride;
 @property(nullable, readonly, nonatomic) NSURL* syncBaseURL;
 
 ///
+///  Whether a SyncBaseURL value exists in the configuration, without any parsing or validation.
+///  Use this to distinguish "no URL configured" from "URL configured but rejected by policy."
+///
+@property(readonly, nonatomic) BOOL syncBaseURLConfigured;
+
+///
 ///  If enabled, syncing will use binary protobufs for transfer instead
 ///  of JSON. Defaults to NO.
 ///
@@ -1113,7 +1119,7 @@ extern NSString* _Nonnull const kEnableMenuItemUserOverride;
 
 ///
 ///  If set, only the listed command types will be accepted from the sync server.
-///  Command names are lowercase strings matching proto field names: "kill", "ping".
+///  Command names are lowercase strings matching proto field names: "kill", "ping", "eventupload".
 ///  When unset (nil), all commands are allowed.
 ///
 ///  This is a forced config key (MDM only) — not settable via sync server.

@@ -545,6 +545,7 @@ objc_library(
         "//Source/common:SNTCachedDecision",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
+        "//Source/common:SNTLogging",
         "//Source/common:SNTStoredFileAccessEvent",
         "//Source/common:SantaCache",
         "//Source/common:SantaSetCache",

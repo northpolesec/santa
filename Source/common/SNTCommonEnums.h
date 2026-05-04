@@ -180,7 +180,7 @@ typedef NS_ENUM(NSInteger, SNTMetricFormatType) {
 typedef NS_ENUM(NSInteger, SNTOverrideFileAccessAction) {
   SNTOverrideFileAccessActionNone,
   SNTOverrideFileAccessActionAuditOnly,
-  SNTOverrideFileAccessActionDiable,
+  SNTOverrideFileAccessActionDisable,
 };
 
 typedef NS_ENUM(NSInteger, SNTDeviceManagerStartupPreferences) {

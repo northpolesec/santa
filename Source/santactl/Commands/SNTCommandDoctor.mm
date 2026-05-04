@@ -199,10 +199,16 @@ REGISTER_COMMAND_NAME(@"doctor")
 
   NSURL* syncBaseURL = config.syncBaseURL;
   if (!syncBaseURL) {
+    if (config.syncBaseURLConfigured) {
+      print(@"[-] SyncBaseURL is configured but was rejected "
+            @"(HTTP is only allowed for localhost)");
+      print(@"");
+      return YES;
+    }
     print(@"[+] Sync is disabled");
     print(@"");
     // Don't treat this as an error.
-    return YES;
+    return NO;
   }
   print(@"[+] Sync is enabled");
   print(@"[+] Machine ID: %s", config.machineID.UTF8String ?: "(not set)");

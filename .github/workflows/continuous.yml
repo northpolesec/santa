@@ -17,6 +17,15 @@ jobs:
 
       # Note: Using Bazel flags documented here to reduce memory footprint:
       # https://bazel.build/advanced/performance/memory
+      #
+      # The --noexperimental_collect_* flags disable bazel-internal metrics
+      # collectors that have no value here (we don't capture profiles or
+      # consume BEP from runner output). One of them (system network usage)
+      # was observed crashing the bazel server with `sysctl: Cannot allocate
+      # memory` on the 7GB macos runners. If a future Bazel bump fails with
+      # "Unrecognized option" on any of these, the `experimental_` prefix
+      # has likely been dropped or the flag renamed; run `bazel help build`
+      # against the new version to reconcile.
       - name: Check for flaky tests
         run: |
           bazel test \
@@ -26,6 +35,13 @@ jobs:
             --discard_analysis_cache \
             --notrack_incremental_state \
             --nokeep_state_after_build \
+            --noexperimental_collect_system_network_usage \
+            --noexperimental_collect_load_average_in_profiler \
+            --noexperimental_collect_resource_estimation \
+            --noexperimental_collect_local_sandbox_action_metrics \
+            --show_progress_rate_limit=5 \
+            --curses=no \
+            --color=no \
             --define=SANTA_BUILD_TYPE=adhoc \
             -t- \
             :unit_tests

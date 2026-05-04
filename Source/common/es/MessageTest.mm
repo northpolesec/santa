@@ -395,6 +395,68 @@ std::string GetProcessPath(pid_t pid) {
     XCTAssertEqual(targets.size(), 0);
     XCTAssertFalse(msg.HasPathTarget(0));
   }
+
+  // No-truncation regression (AUTH_OPEN, simple path)
+  {
+    Message msg(mockESApi, &esMsg);
+    esMsg.event_type = ES_EVENT_TYPE_AUTH_OPEN;
+    es_file_t notTruncated = MakeESFile("test_file_3", MakeStat(400));
+    notTruncated.path_truncated = false;
+    esMsg.event.open.file = &notTruncated;
+
+    std::vector<Message::PathTarget> targets = msg.PathTargets();
+
+    XCTAssertEqual(targets.size(), 1);
+    XCTAssertFalse(targets[0].truncated);
+  }
+
+  // Truncated simple-path file (AUTH_OPEN)
+  {
+    Message msg(mockESApi, &esMsg);
+    esMsg.event_type = ES_EVENT_TYPE_AUTH_OPEN;
+    es_file_t truncated = MakeESFile("truncated_file", MakeStat(500));
+    truncated.path_truncated = true;
+    esMsg.event.open.file = &truncated;
+
+    std::vector<Message::PathTarget> targets = msg.PathTargets();
+
+    XCTAssertEqual(targets.size(), 1);
+    XCTAssertTrue(targets[0].truncated);
+    XCTAssertEqual(targets[0].unsafe_file, &truncated);
+  }
+
+  // Truncated compound dir (AUTH_CREATE)
+  {
+    Message msg(mockESApi, &esMsg);
+    esMsg.event_type = ES_EVENT_TYPE_AUTH_CREATE;
+    es_file_t truncatedDir = MakeESFile("truncated_dir", MakeStat(600));
+    truncatedDir.path_truncated = true;
+    esMsg.event.create.destination_type = ES_DESTINATION_TYPE_NEW_PATH;
+    esMsg.event.create.destination.new_path.dir = &truncatedDir;
+    esMsg.event.create.destination.new_path.filename = testTok;
+
+    std::vector<Message::PathTarget> targets = msg.PathTargets();
+
+    XCTAssertEqual(targets.size(), 1);
+    XCTAssertTrue(targets[0].truncated);
+  }
+
+  // Mixed: truncated source + non-truncated target_dir (AUTH_CLONE)
+  {
+    Message msg(mockESApi, &esMsg);
+    esMsg.event_type = ES_EVENT_TYPE_AUTH_CLONE;
+    es_file_t truncatedSrc = MakeESFile("truncated_src", MakeStat(700));
+    truncatedSrc.path_truncated = true;
+    esMsg.event.clone.source = &truncatedSrc;
+    esMsg.event.clone.target_dir = &testDir;
+    esMsg.event.clone.target_name = testTok;
+
+    std::vector<Message::PathTarget> targets = msg.PathTargets();
+
+    XCTAssertEqual(targets.size(), 2);
+    XCTAssertTrue(targets[0].truncated);
+    XCTAssertFalse(targets[1].truncated);
+  }
 }
 
 @end

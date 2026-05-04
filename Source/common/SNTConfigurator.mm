@@ -566,6 +566,10 @@ static SNTConfigurator* sharedConfigurator = nil;
   return [self configStateSet];
 }
 
++ (NSSet*)keyPathsForValuesAffectingSyncBaseURLConfigured {
+  return [self configStateSet];
+}
+
 + (NSSet*)keyPathsForValuesAffectingSyncEnableProtoTransfer {
   return [self configStateSet];
 }
@@ -1124,7 +1128,25 @@ static SNTConfigurator* sharedConfigurator = nil;
     urlString = [urlString stringByAppendingString:@"/"];
   }
   NSURL* url = [NSURL URLWithString:urlString];
+
+  // Only allow HTTP for loopback addresses. Everything else must use HTTPS.
+  if ([[url.scheme lowercaseString] isEqualToString:@"http"]) {
+    NSString* host = [url.host lowercaseString];
+    if (![host isEqualToString:@"localhost"] && ![host isEqualToString:@"127.0.0.1"] &&
+        ![host isEqualToString:@"::1"]) {
+      LOGW(@"Rejecting non-localhost HTTP SyncBaseURL: %@", urlString);
+      return nil;
+    }
+  }
+
   return url;
+}
+
+// Raw check: returns YES if a SyncBaseURL string is present in the config, without any
+// URL parsing or validation. This lets callers distinguish "not configured" from
+// "configured but rejected by syncBaseURL policy" (e.g. non-localhost HTTP).
+- (BOOL)syncBaseURLConfigured {
+  return [self.configState[kSyncBaseURLKey] length] > 0;
 }
 
 - (BOOL)syncEnableProtoTransfer {
@@ -1817,7 +1839,7 @@ static SNTConfigurator* sharedConfigurator = nil;
   if ([action isEqualToString:@"audit_only"] || [action isEqualToString:@"auditonly"]) {
     return SNTOverrideFileAccessActionAuditOnly;
   } else if ([action isEqualToString:@"disable"]) {
-    return SNTOverrideFileAccessActionDiable;
+    return SNTOverrideFileAccessActionDisable;
   } else {
     return SNTOverrideFileAccessActionNone;
   }
