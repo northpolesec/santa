@@ -14,6 +14,7 @@
 /// limitations under the License.
 
 #import <Foundation/Foundation.h>
+#include <bsm/libbsm.h>
 
 /**
  A wrapper around NSXPCListener and NSXPCConnection to provide client multiplexing, signature
@@ -207,6 +208,17 @@
  Whether or not the XPC connection is currently established.
  */
 @property(readonly) BOOL isConnected;
+
+/**
+ Call from inside a server-side exported-method implementation. Returns the
+ audit_token_t of the peer whose message is currently being dispatched.
+ The token comes from the private -[NSXPCConnection auditToken] selector,
+ which returns the kernel-stamped audit token captured at connection
+ establishment — race-free with respect to pid reuse. Returns a zeroed
+ token if called outside a server context or if the selector is unavailable
+ on this OS version.
+ */
++ (audit_token_t)currentPeerAuditToken;
 
 @end
 

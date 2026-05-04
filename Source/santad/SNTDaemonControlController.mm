@@ -14,9 +14,9 @@
 /// limitations under the License.
 
 #import "Source/santad/SNTDaemonControlController.h"
-#include <sys/qos.h>
 
 #import <Foundation/Foundation.h>
+#include <sys/qos.h>
 
 #include <memory>
 
@@ -37,6 +37,7 @@
 #import "Source/common/SNTModeTransition.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTRuleIdentifiers.h"
+#import "Source/common/SNTSandboxExecRequest.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
 #import "Source/common/SNTStoredTemporaryMonitorModeAuditEvent.h"
 #import "Source/common/SNTStrengthify.h"
@@ -100,6 +101,7 @@ double watchdogRAMPeak = 0;
   std::shared_ptr<Logger> _logger;
   std::shared_ptr<WatchItems> _watchItems;
   std::shared_ptr<santa::TemporaryMonitorMode> _temporaryMonitorMode;
+  std::shared_ptr<santa::SandboxExpectations> _sandboxExpectations;
 }
 
 - (instancetype)initWithNotificationQueue:(SNTNotificationQueue*)notQueue
@@ -107,6 +109,8 @@ double watchdogRAMPeak = 0;
                         netExtensionQueue:(SNTNetworkExtensionQueue*)netExtQueue
                                    logger:(std::shared_ptr<santa::Logger>)logger
                                watchItems:(std::shared_ptr<santa::WatchItems>)watchItems
+                      sandboxExpectations:
+                          (std::shared_ptr<santa::SandboxExpectations>)sandboxExpectations
                           flushCacheBlock:(void (^)(santa::FlushCacheMode,
                                                     santa::FlushCacheReason))flushCacheBlock
                           cacheCountBlock:(NSArray<NSNumber*>* (^)(void))cacheCountBlock
@@ -116,6 +120,7 @@ double watchdogRAMPeak = 0;
   if (self) {
     _logger = logger;
     _watchItems = std::move(watchItems);
+    _sandboxExpectations = std::move(sandboxExpectations);
     _notQueue = notQueue;
     _syncdQueue = syncdQueue;
     _netExtQueue = netExtQueue;
@@ -972,6 +977,55 @@ double watchdogRAMPeak = 0;
 
 - (void)networkExtensionLoaded:(void (^)(BOOL loaded))reply {
   reply([self.netExtQueue isLoaded]);
+}
+
+#pragma mark Sandbox ops
+
+- (void)prepareSandboxExec:(SNTSandboxExecRequest*)request
+                     reply:(void (^)(NSString* profile, NSError* error))reply {
+  if (!request || !request.identifiers) {
+    reply(nil, [SNTError createErrorWithCode:SNTErrorCodeSandboxInvalidRequest
+                                      format:@"Invalid sandbox request"]);
+    return;
+  }
+
+  SNTRule* rule = [[SNTDatabaseController ruleTable]
+      executionRuleForIdentifiers:[request.identifiers toStruct]];
+  if (!rule) {
+    reply(nil, [SNTError createErrorWithCode:SNTErrorCodeSandboxRuleNotFound
+                                      format:@"No matching rule"]);
+    return;
+  }
+
+  if (rule.state != SNTRuleStateSeatbelt || rule.seatbeltPolicy.length == 0) {
+    reply(nil, [SNTError createErrorWithCode:SNTErrorCodeSandboxRuleNotSeatbelt
+                                      format:@"Rule is not a seatbelt rule"]);
+    return;
+  }
+
+  audit_token_t peer = [MOLXPCConnection currentPeerAuditToken];
+  if (audit_token_to_pid(peer) == 0) {
+    reply(nil, [SNTError createErrorWithCode:SNTErrorCodeSandboxInternal
+                                      format:@"Failed to obtain peer audit token"]);
+    return;
+  }
+
+  switch (_sandboxExpectations->Register(peer, request)) {
+    case santa::SandboxExpectations::RegisterResult::kOk: break;
+    case santa::SandboxExpectations::RegisterResult::kDuplicate:
+      reply(nil, [SNTError createErrorWithCode:SNTErrorCodeSandboxAlreadyPending
+                                        format:@"Concurrent sandbox request rejected"]);
+      return;
+    case santa::SandboxExpectations::RegisterResult::kCapacityExceeded:
+      reply(nil, [SNTError createErrorWithCode:SNTErrorCodeSandboxCapacityExceeded
+                                        format:@"Sandbox expectation capacity exceeded"]);
+      return;
+  }
+
+  LOGI(@"Registered sandbox expectation for %@ (dev=%llu ino=%llu)",
+       request.resolvedPath ?: @"(unknown)", request.fsDev, request.fsIno);
+
+  reply(rule.seatbeltPolicy, nil);
 }
 
 @end

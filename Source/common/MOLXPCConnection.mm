@@ -19,6 +19,16 @@
 
 #import "Source/common/ScopedCFTypeRef.h"
 
+// Private NSXPCConnection selector that returns the kernel-stamped audit
+// token captured when the connection was established. It has been stable
+// since macOS 10.7 and is used broadly inside and outside Apple. We prefer
+// it to pid-based task_name_for_pid lookups because it is race-free with
+// respect to pid reuse — the token is the one the kernel put on the
+// connection bootstrap message, not something we look up at call time.
+@interface NSXPCConnection (SantaPrivate)
+- (audit_token_t)auditToken;
+@end
+
 static NSString* const kDefaultCodeSigningRequirement =
     @"anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] /* exists */ and "
     @"certificate leaf[field.1.2.840.113635.100.6.1.13] /* exists */ and certificate "
@@ -322,6 +332,15 @@ static NSString* CopyDefaultCodeSigningRequirement(void) {
   } else if (self.listenerObject) {
     [self.listenerObject invalidate];
   }
+}
+
++ (audit_token_t)currentPeerAuditToken {
+  NSXPCConnection* current = [NSXPCConnection currentConnection];
+  if (!current) return audit_token_t{};
+
+  SEL sel = @selector(auditToken);
+  if (![current respondsToSelector:sel]) return audit_token_t{};
+  return [current auditToken];
 }
 
 @end

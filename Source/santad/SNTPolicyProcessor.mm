@@ -22,6 +22,7 @@
 #import <Security/Security.h>
 
 #import "Source/common/CertificateHelpers.h"
+#include "Source/common/CodeSigningIdentifierUtils.h"
 #import "Source/common/MOLCodesignChecker.h"
 #import "Source/common/SNTCELFallbackRule.h"
 #import "Source/common/SNTCachedDecision.h"
@@ -209,7 +210,8 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
                                                                   useV2:true
                                                          cachedDecision:cd
                                                              activation:*activation
-                                                              evalArena:&evalArena];
+                                                              evalArena:&evalArena
+                                                      inFallbackContext:YES];
 
     if (!celResult.succeeded) {
       if (celResult.decisionMade) {
@@ -235,7 +237,8 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
                             useV2:(bool)useV2
                    cachedDecision:(SNTCachedDecision*)cd
                        activation:(const ::google::api::expr::runtime::BaseActivation&)activation
-                        evalArena:(google::protobuf::Arena*)evalArena {
+                        evalArena:(google::protobuf::Arena*)evalArena
+                inFallbackContext:(BOOL)inFallbackContext {
   int returnValue = 0;
   bool cacheable = true;
   std::optional<uint64_t> touchIDCooldownMinutes;
@@ -301,6 +304,22 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
         if (touchIDCooldownMinutes.has_value()) {
           cd.touchIDCooldownMinutes = @(touchIDCooldownMinutes.value());
         }
+        break;
+      case ReturnValue::SEATBELT:
+        // SEATBELT is not supported from CEL fallback rules: a fallback rule
+        // does not carry a seatbelt_policy, so there is nothing to enforce
+        // with. Reject before touching `cd` so no state leaks to the next
+        // fallback iteration. The sync server should not send fallback rules
+        // that can return SEATBELT; this is a defense-in-depth check.
+        if (inFallbackContext) {
+          LOGW(@"CEL fallback expression returned SEATBELT; ignoring (fallback "
+               @"rules cannot carry a seatbelt policy)");
+          return {.succeeded = false, .decisionMade = false, .resultState = {}};
+        }
+        // SEATBELT responses are not cacheable: the per-exec expectation is
+        // one-shot, so every execution must re-check via prepareSandboxExec.
+        resultState = SNTRuleStateSeatbelt;
+        cd.cacheable = NO;
         break;
       default:
         LOGW(@"Unexpected return value from CEL expression: %d", returnValue);
@@ -370,7 +389,8 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
                                        useV2:useV2
                               cachedDecision:cd
                                   activation:*activation
-                                   evalArena:&arena];
+                                   evalArena:&arena
+                           inFallbackContext:NO];
 }
 
 // This method applies the rules to the cached decision object.
@@ -417,6 +437,16 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
           {{SNTRuleTypeTeamID, SNTRuleStateAllow}, SNTEventStateAllowTeamID},
           {{SNTRuleTypeTeamID, SNTRuleStateSilentBlock}, SNTEventStateBlockTeamID},
           {{SNTRuleTypeTeamID, SNTRuleStateBlock}, SNTEventStateBlockTeamID},
+          // Seatbelt rules start out as a block of the rule's type. If the
+          // ancestor/sandbox check succeeds in the execution controller, the
+          // decision is flipped to the matching allow state via
+          // BlockToAllowDecision. Starting at block means the fail-safe outcome
+          // is to deny if the check is ever skipped.
+          {{SNTRuleTypeCDHash, SNTRuleStateSeatbelt}, SNTEventStateBlockCDHash},
+          {{SNTRuleTypeBinary, SNTRuleStateSeatbelt}, SNTEventStateBlockBinary},
+          {{SNTRuleTypeSigningID, SNTRuleStateSeatbelt}, SNTEventStateBlockSigningID},
+          {{SNTRuleTypeCertificate, SNTRuleStateSeatbelt}, SNTEventStateBlockCertificate},
+          {{SNTRuleTypeTeamID, SNTRuleStateSeatbelt}, SNTEventStateBlockTeamID},
       };
 
   auto iterator = decisions.find(std::pair<SNTRuleType, SNTRuleState>{type, state});
@@ -457,6 +487,12 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
         cd.decision = SNTEventStateUnknown;
         return NO;
       }
+      break;
+    case SNTRuleStateSeatbelt:
+      // Seatbelt decisions must not be cached: the per-exec expectation is
+      // one-shot, so every execution must re-check via prepareSandboxExec.
+      cd.cacheable = NO;
+      cd.seatbeltRequired = YES;
       break;
     default:
       // If its not one of the special cases above, we don't need to do anything.
@@ -651,10 +687,10 @@ static void UpdateCachedDecisionSigningInfo(
         }
       }
 
-      // Only consider the CDHash for processes that have CS_KILL or CS_HARD set.
-      // This ensures that the OS will kill the process if the CDHash was tampered
-      // with and code was loaded that didn't match a page hash.
-      if (targetProc->codesigning_flags & CS_KILL || targetProc->codesigning_flags & CS_HARD) {
+      // Only consider the CDHash for processes where the kernel will
+      // refuse invalid pages or kill the process if a page is loaded that
+      // does not match its CodeDirectory slot hash.
+      if (santa::CdhashStrictlyEnforced(targetProc->codesigning_flags)) {
         static NSString* const kCDHashFormatString = @"%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x"
                                                       "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x";
 

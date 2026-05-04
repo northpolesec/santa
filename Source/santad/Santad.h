@@ -31,6 +31,7 @@
 #import "Source/santad/SNTNetworkExtensionQueue.h"
 #import "Source/santad/SNTNotificationQueue.h"
 #import "Source/santad/SNTSyncdQueue.h"
+#include "Source/santad/SandboxExpectations.h"
 #include "Source/santad/TTYWriter.h"
 
 void SantadMain(
@@ -48,6 +49,7 @@ void SantadMain(
     std::shared_ptr<santa::PrefixTree<santa::Unit>> prefix_tree,
     std::shared_ptr<santa::TTYWriter> tty_writer,
     std::shared_ptr<santa::santad::process_tree::ProcessTree> process_tree,
-    std::shared_ptr<santa::EntitlementsFilter> entitlements_filter);
+    std::shared_ptr<santa::EntitlementsFilter> entitlements_filter,
+    std::shared_ptr<santa::SandboxExpectations> sandbox_expectations);
 
 #endif  // SANTA_SANTAD_SANTAD_H

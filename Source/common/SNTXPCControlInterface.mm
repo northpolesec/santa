@@ -20,6 +20,7 @@
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTRule.h"
+#import "Source/common/SNTSandboxExecRequest.h"
 #import "Source/common/SNTStoredEvent.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
 #import "Source/common/ne/SNTNetworkExtensionSettings.h"
@@ -97,6 +98,12 @@ static NSString* const kSantanetdExtensionBundleID = @"com.northpolesec.santa.ne
         forSelector:@selector(registerNetworkExtensionWithProtocolVersion:reply:)
       argumentIndex:0
             ofReply:YES];
+
+  [r setClasses:[NSSet setWithObjects:[SNTSandboxExecRequest class], [SNTRuleIdentifiers class],
+                                      [NSData class], [NSString class], [NSNumber class], nil]
+        forSelector:@selector(prepareSandboxExec:reply:)
+      argumentIndex:0
+            ofReply:NO];
 }
 
 + (NSXPCInterface*)controlInterface {

@@ -702,6 +702,7 @@ objc_library(
     deps = [
         ":CoderMacros",
         ":SNTCommonEnums",
+        ":String",
     ],
 )
 
@@ -722,6 +723,22 @@ santa_unit_test(
         ":CodeSigningIdentifierUtils",
         ":SNTKillCommand",
     ],
+)
+
+objc_library(
+    name = "SNTSandboxExecRequest",
+    srcs = ["SNTSandboxExecRequest.mm"],
+    hdrs = ["SNTSandboxExecRequest.h"],
+    deps = [
+        ":CoderMacros",
+        ":SNTRuleIdentifiers",
+    ],
+)
+
+santa_unit_test(
+    name = "SNTSandboxExecRequestTest",
+    srcs = ["SNTSandboxExecRequestTest.mm"],
+    deps = [":SNTSandboxExecRequest"],
 )
 
 objc_library(
@@ -963,6 +980,7 @@ objc_library(
         ":SNTKillCommand",
         ":SNTRule",
         ":SNTRuleIdentifiers",
+        ":SNTSandboxExecRequest",
         ":SNTStoredEvent",
         ":SNTStoredExecutionEvent",
         ":SNTXPCUnprivilegedControlInterface",
@@ -1126,6 +1144,7 @@ test_suite(
         ":SNTModeTransitionTest",
         ":SNTProcessChainTest",
         ":SNTRuleTest",
+        ":SNTSandboxExecRequestTest",
         ":SNTStoredEventTest",
         ":SNTStoredExecutionEventTest",
         ":SNTStoredNetworkMountEventTest",
@@ -1232,7 +1251,9 @@ objc_library(
     hdrs = ["MOLXPCConnection.h"],
     module_name = "santa_common_MOLXPCConnection",
     sdk_frameworks = ["Security"],
-    deps = [":ScopedCFTypeRef"],
+    deps = [
+        ":ScopedCFTypeRef",
+    ],
 )
 
 santa_unit_test(

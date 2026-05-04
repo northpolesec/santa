@@ -389,6 +389,7 @@ REGISTER_COMMAND_NAME(@"rule")
                                                timestamp:0
                                                  comment:comment
                                                  celExpr:celExpr
+                                          seatbeltPolicy:nil
                                                   ruleId:0
                                                    error:nil];
 

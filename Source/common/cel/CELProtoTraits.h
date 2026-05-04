@@ -77,6 +77,7 @@ struct CELProtoTraits<true> {
       ::santa::cel::v2::REQUIRE_TOUCHID;
   static constexpr ReturnValue REQUIRE_TOUCHID_ONLY =
       ::santa::cel::v2::REQUIRE_TOUCHID_ONLY;
+  static constexpr ReturnValue SEATBELT = ::santa::cel::v2::SEATBELT;
 
   // Descriptor accessors
   static const google::protobuf::EnumDescriptor* ReturnValue_descriptor() {

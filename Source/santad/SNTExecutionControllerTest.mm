@@ -19,6 +19,7 @@
 #include <dispatch/dispatch.h>
 #include "Source/common/processtree/process_tree.h"
 
+#include "Source/common/AuditUtilities.h"
 #import "Source/common/MOLCertificate.h"
 #import "Source/common/MOLCodesignChecker.h"
 #import "Source/common/SNTCachedDecision.h"
@@ -28,6 +29,7 @@
 #import "Source/common/SNTMetricSet.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTRuleIdentifiers.h"
+#import "Source/common/SNTSandboxExecRequest.h"
 #include "Source/common/TestUtils.h"
 #include "Source/common/es/Message.h"
 #include "Source/common/es/MockEndpointSecurityAPI.h"
@@ -39,6 +41,7 @@
 #import "Source/santad/SNTExecutionController.h"
 #import "Source/santad/SNTNotificationQueue.h"
 #import "Source/santad/SNTPolicyProcessor.h"
+#include "Source/santad/SandboxExpectations.h"
 
 using santa::Message;
 
@@ -54,6 +57,24 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
     return true;
   };
 };
+
+static NSString* HexString(const uint8_t* bytes, size_t len) {
+  NSMutableString* s = [NSMutableString stringWithCapacity:len * 2];
+  for (size_t i = 0; i < len; i++) {
+    [s appendFormat:@"%02x", bytes[i]];
+  }
+  return s;
+}
+
+static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, const uint8_t* cdhash,
+                                                 NSString* sha256) {
+  SNTRuleIdentifiers* ids = [[SNTRuleIdentifiers alloc]
+      initWithRuleIdentifiers:{.cdhash = HexString(cdhash, 20), .binarySHA256 = sha256}];
+  return [[SNTSandboxExecRequest alloc] initWithIdentifiers:ids
+                                                      fsDev:dev
+                                                      fsIno:ino
+                                               resolvedPath:nil];
+}
 
 @interface SNTRule ()
 // Making these properties readwrite makes some tests much easier to write.
@@ -73,7 +94,9 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
 @property SNTExecutionController* sut;
 @end
 
-@implementation SNTExecutionControllerTest
+@implementation SNTExecutionControllerTest {
+  std::shared_ptr<santa::SandboxExpectations> _sandboxExpectations;
+}
 
 - (void)setUp {
   [super setUp];
@@ -111,6 +134,7 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
       [[SNTPolicyProcessor alloc] initWithRuleTable:self.mockRuleDatabase
                                  entitlementsFilter:entitlementsFilter];
 
+  _sandboxExpectations = std::make_shared<santa::SandboxExpectations>();
   self.sut = [[SNTExecutionController alloc] initWithRuleTable:self.mockRuleDatabase
                                                     eventTable:self.mockEventDatabase
                                                  notifierQueue:nil
@@ -119,7 +143,8 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
                                                      ttyWriter:santa::TTYWriter::Create(true)
                                                policyProcessor:policyProcessor
                                            processControlBlock:santa::ProdSuspendResumeBlock()
-                                                   processTree:nullptr];
+                                                   processTree:nullptr
+                                           sandboxExpectations:_sandboxExpectations];
 }
 
 - (void)tearDown {
@@ -819,16 +844,17 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
 
   std::shared_ptr<santa::santad::process_tree::ProcessTree> processTree;
 
-  SNTExecutionController* controller =
-      [[SNTExecutionController alloc] initWithRuleTable:self.mockRuleDatabase
-                                             eventTable:self.mockEventDatabase
-                                          notifierQueue:mockNotifierQueue
-                                             syncdQueue:nil
-                                                 logger:loggerBlock
-                                              ttyWriter:santa::TTYWriter::Create(true)
-                                        policyProcessor:mockPolicyProcessor
-                                    processControlBlock:processControl
-                                            processTree:processTree];
+  SNTExecutionController* controller = [[SNTExecutionController alloc]
+        initWithRuleTable:self.mockRuleDatabase
+               eventTable:self.mockEventDatabase
+            notifierQueue:mockNotifierQueue
+               syncdQueue:nil
+                   logger:loggerBlock
+                ttyWriter:santa::TTYWriter::Create(true)
+          policyProcessor:mockPolicyProcessor
+      processControlBlock:processControl
+              processTree:processTree
+      sandboxExpectations:std::make_shared<santa::SandboxExpectations>()];
 
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   mockESApi->SetExpectationsRetainReleaseMessage();
@@ -930,16 +956,17 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
 
   std::shared_ptr<santa::santad::process_tree::ProcessTree> processTree;
 
-  SNTExecutionController* controller =
-      [[SNTExecutionController alloc] initWithRuleTable:self.mockRuleDatabase
-                                             eventTable:self.mockEventDatabase
-                                          notifierQueue:mockNotifierQueue
-                                             syncdQueue:nil
-                                                 logger:loggerBlock
-                                              ttyWriter:santa::TTYWriter::Create(true)
-                                        policyProcessor:mockPolicyProcessor
-                                    processControlBlock:processControl
-                                            processTree:processTree];
+  SNTExecutionController* controller = [[SNTExecutionController alloc]
+        initWithRuleTable:self.mockRuleDatabase
+               eventTable:self.mockEventDatabase
+            notifierQueue:mockNotifierQueue
+               syncdQueue:nil
+                   logger:loggerBlock
+                ttyWriter:santa::TTYWriter::Create(true)
+          policyProcessor:mockPolicyProcessor
+      processControlBlock:processControl
+              processTree:processTree
+      sandboxExpectations:std::make_shared<santa::SandboxExpectations>()];
 
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   mockESApi->SetExpectationsRetainReleaseMessage();
@@ -1025,19 +1052,292 @@ VerifyPostActionBlock verifyPostAction = ^PostActionBlock(SNTAction wantAction) 
 
 // Test that flushTouchIDApprovalCache clears the cache
 - (void)testFlushTouchIDApprovalCache {
-  SNTExecutionController* controller =
-      [[SNTExecutionController alloc] initWithRuleTable:self.mockRuleDatabase
-                                             eventTable:self.mockEventDatabase
-                                          notifierQueue:nil
-                                             syncdQueue:nil
-                                                 logger:nullptr
-                                              ttyWriter:santa::TTYWriter::Create(true)
-                                        policyProcessor:nil
-                                    processControlBlock:santa::ProdSuspendResumeBlock()
-                                            processTree:nullptr];
+  SNTExecutionController* controller = [[SNTExecutionController alloc]
+        initWithRuleTable:self.mockRuleDatabase
+               eventTable:self.mockEventDatabase
+            notifierQueue:nil
+               syncdQueue:nil
+                   logger:nullptr
+                ttyWriter:santa::TTYWriter::Create(true)
+          policyProcessor:nil
+      processControlBlock:santa::ProdSuspendResumeBlock()
+              processTree:nullptr
+      sandboxExpectations:std::make_shared<santa::SandboxExpectations>()];
 
   // Just verify that flush doesn't crash - the cache internals are private
   XCTAssertNoThrow([controller flushTouchIDApprovalCache]);
+}
+
+- (void)testSeatbeltRuleNoExpectationDenies {
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateSeatbelt;
+  rule.type = SNTRuleTypeBinary;
+  [self stubRule:rule forIdentifiers:{.binarySHA256 = @"a"}];
+
+  [self validateExecEvent:SNTActionRespondDeny];
+}
+
+// ---------------- Strict mode ----------------
+
+- (void)testSeatbeltRuleStrictHardAllowsOnCDHashMatch {
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateSeatbelt;
+  rule.type = SNTRuleTypeBinary;
+  // CS_VALID | CS_HARD causes policy processor to populate cdhash identifier.
+  [self stubRule:rule
+      forIdentifiers:{.cdhash = @"7777777777777777777777777777777777777777", .binarySHA256 = @"a"}];
+
+  [self validateExecEvent:SNTActionRespondAllowNoCache
+             messageSetup:^(es_message_t* msg) {
+               msg->process->audit_token = santa::MakeStubAuditToken(201, 1);
+               msg->event.exec.target->codesigning_flags = CS_SIGNED | CS_VALID | CS_HARD;
+               uint8_t cdhash[20];
+               memset(cdhash, 0x77, sizeof(cdhash));
+               memcpy(msg->event.exec.target->cdhash, cdhash, 20);
+
+               _sandboxExpectations->Register(
+                   msg->process->audit_token,
+                   MakeSandboxRequest(/*dev=*/0, /*ino=*/0, cdhash, /*sha256=*/nil));
+             }];
+}
+
+- (void)testSeatbeltRuleStrictKillAllowsOnCDHashMatch {
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateSeatbelt;
+  rule.type = SNTRuleTypeBinary;
+  // CS_VALID | CS_KILL causes policy processor to populate cdhash identifier.
+  [self stubRule:rule
+      forIdentifiers:{.cdhash = @"5555555555555555555555555555555555555555", .binarySHA256 = @"a"}];
+
+  [self validateExecEvent:SNTActionRespondAllowNoCache
+             messageSetup:^(es_message_t* msg) {
+               msg->process->audit_token = santa::MakeStubAuditToken(202, 1);
+               msg->event.exec.target->codesigning_flags = CS_SIGNED | CS_VALID | CS_KILL;
+               uint8_t cdhash[20];
+               memset(cdhash, 0x55, sizeof(cdhash));
+               memcpy(msg->event.exec.target->cdhash, cdhash, 20);
+
+               _sandboxExpectations->Register(
+                   msg->process->audit_token,
+                   MakeSandboxRequest(/*dev=*/0, /*ino=*/0, cdhash, /*sha256=*/nil));
+             }];
+}
+
+- (void)testSeatbeltRuleStrictDeniesOnCDHashMismatch {
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateSeatbelt;
+  rule.type = SNTRuleTypeBinary;
+  // CS_VALID | CS_HARD: binary has cdhash 0xAA... so policy processor looks up by that cdhash.
+  [self stubRule:rule
+      forIdentifiers:{.cdhash = @"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", .binarySHA256 = @"a"}];
+
+  [self validateExecEvent:SNTActionRespondDeny
+             messageSetup:^(es_message_t* msg) {
+               msg->process->audit_token = santa::MakeStubAuditToken(203, 1);
+               msg->event.exec.target->codesigning_flags = CS_SIGNED | CS_VALID | CS_HARD;
+
+               uint8_t cdhashA[20];
+               memset(cdhashA, 0xAA, sizeof(cdhashA));
+               memcpy(msg->event.exec.target->cdhash, cdhashA, 20);
+
+               uint8_t cdhashB[20];
+               memset(cdhashB, 0xBB, sizeof(cdhashB));
+
+               _sandboxExpectations->Register(msg->process->audit_token,
+                                              MakeSandboxRequest(0, 0, cdhashB, nil));
+             }];
+}
+
+// ---------------- Fallback mode ----------------
+
+- (void)testSeatbeltRuleFallbackAllowsOnFullMatch {
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"cafebabe");
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateSeatbelt;
+  rule.type = SNTRuleTypeBinary;
+  [self stubRule:rule forIdentifiers:{.binarySHA256 = @"cafebabe"}];
+
+  [self validateExecEvent:SNTActionRespondAllowNoCache
+             messageSetup:^(es_message_t* msg) {
+               msg->process->audit_token = santa::MakeStubAuditToken(301, 1);
+               msg->event.exec.target->codesigning_flags = 0;
+               msg->event.exec.target->executable->stat.st_dev = 17;
+               msg->event.exec.target->executable->stat.st_ino = 42;
+
+               const uint8_t cdhash[20] = {0};
+               _sandboxExpectations->Register(msg->process->audit_token,
+                                              MakeSandboxRequest(17, 42, cdhash, @"cafebabe"));
+             }];
+}
+
+- (void)testSeatbeltRuleFallbackDeniesOnDevMismatch {
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"cafebabe");
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateSeatbelt;
+  rule.type = SNTRuleTypeBinary;
+  [self stubRule:rule forIdentifiers:{.binarySHA256 = @"cafebabe"}];
+
+  [self validateExecEvent:SNTActionRespondDeny
+             messageSetup:^(es_message_t* msg) {
+               msg->process->audit_token = santa::MakeStubAuditToken(302, 1);
+               msg->event.exec.target->codesigning_flags = 0;
+               msg->event.exec.target->executable->stat.st_dev = 17;
+               msg->event.exec.target->executable->stat.st_ino = 42;
+
+               const uint8_t cdhash[20] = {0};
+               _sandboxExpectations->Register(
+                   msg->process->audit_token,
+                   MakeSandboxRequest(/*dev=*/999, /*ino=*/42, cdhash, @"cafebabe"));
+             }];
+}
+
+- (void)testSeatbeltRuleFallbackDeniesOnInoMismatch {
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"cafebabe");
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateSeatbelt;
+  rule.type = SNTRuleTypeBinary;
+  [self stubRule:rule forIdentifiers:{.binarySHA256 = @"cafebabe"}];
+
+  [self validateExecEvent:SNTActionRespondDeny
+             messageSetup:^(es_message_t* msg) {
+               msg->process->audit_token = santa::MakeStubAuditToken(303, 1);
+               msg->event.exec.target->codesigning_flags = 0;
+               msg->event.exec.target->executable->stat.st_dev = 17;
+               msg->event.exec.target->executable->stat.st_ino = 42;
+
+               const uint8_t cdhash[20] = {0};
+               _sandboxExpectations->Register(
+                   msg->process->audit_token,
+                   MakeSandboxRequest(17, /*ino=*/999, cdhash, @"cafebabe"));
+             }];
+}
+
+- (void)testSeatbeltRuleFallbackDeniesOnSHA256Mismatch {
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"cafebabe");
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateSeatbelt;
+  rule.type = SNTRuleTypeBinary;
+  [self stubRule:rule forIdentifiers:{.binarySHA256 = @"cafebabe"}];
+
+  [self validateExecEvent:SNTActionRespondDeny
+             messageSetup:^(es_message_t* msg) {
+               msg->process->audit_token = santa::MakeStubAuditToken(304, 1);
+               msg->event.exec.target->codesigning_flags = 0;
+               msg->event.exec.target->executable->stat.st_dev = 17;
+               msg->event.exec.target->executable->stat.st_ino = 42;
+
+               const uint8_t cdhash[20] = {0};
+               _sandboxExpectations->Register(msg->process->audit_token,
+                                              MakeSandboxRequest(17, 42, cdhash, @"deadbeef"));
+             }];
+}
+
+- (void)testSeatbeltRuleFallbackDeniesWhenCdSHA256IsNil {
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo SHA256]).andReturn(nil);  // cd.sha256 ends up nil
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateSeatbelt;
+  rule.type = SNTRuleTypeBinary;
+  [self stubRule:rule forIdentifiers:{}];
+
+  [self validateExecEvent:SNTActionRespondDeny
+             messageSetup:^(es_message_t* msg) {
+               msg->process->audit_token = santa::MakeStubAuditToken(305, 1);
+               msg->event.exec.target->codesigning_flags = 0;
+               msg->event.exec.target->executable->stat.st_dev = 17;
+               msg->event.exec.target->executable->stat.st_ino = 42;
+
+               const uint8_t cdhash[20] = {0};
+               _sandboxExpectations->Register(msg->process->audit_token,
+                                              MakeSandboxRequest(17, 42, cdhash, @"cafebabe"));
+             }];
+}
+
+- (void)testSeatbeltRuleFallbackDeniesWhenExpectationSHA256IsEmpty {
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"cafebabe");
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateSeatbelt;
+  rule.type = SNTRuleTypeBinary;
+  [self stubRule:rule forIdentifiers:{.binarySHA256 = @"cafebabe"}];
+
+  [self validateExecEvent:SNTActionRespondDeny
+             messageSetup:^(es_message_t* msg) {
+               msg->process->audit_token = santa::MakeStubAuditToken(306, 1);
+               msg->event.exec.target->codesigning_flags = 0;
+               msg->event.exec.target->executable->stat.st_dev = 17;
+               msg->event.exec.target->executable->stat.st_ino = 42;
+
+               const uint8_t cdhash[20] = {0};
+               _sandboxExpectations->Register(msg->process->audit_token,
+                                              MakeSandboxRequest(17, 42, cdhash, /*sha256=*/nil));
+             }];
+}
+
+- (void)testSeatbeltRuleFallbackWhenStrictFlagsWithoutCSValid {
+  // CS_HARD|CS_KILL but missing CS_VALID -> falls to fallback branch.
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"cafebabe");
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateSeatbelt;
+  rule.type = SNTRuleTypeBinary;
+  [self stubRule:rule forIdentifiers:{.binarySHA256 = @"cafebabe"}];
+
+  [self validateExecEvent:SNTActionRespondAllowNoCache
+             messageSetup:^(es_message_t* msg) {
+               msg->process->audit_token = santa::MakeStubAuditToken(307, 1);
+               msg->event.exec.target->codesigning_flags =
+                   CS_SIGNED | CS_HARD | CS_KILL;  // no CS_VALID
+               msg->event.exec.target->executable->stat.st_dev = 17;
+               msg->event.exec.target->executable->stat.st_ino = 42;
+
+               const uint8_t cdhash[20] = {0};
+               _sandboxExpectations->Register(msg->process->audit_token,
+                                              MakeSandboxRequest(17, 42, cdhash, @"cafebabe"));
+             }];
+}
+
+- (void)testSeatbeltRuleAuditTokenMismatchDenies {
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateSeatbelt;
+  rule.type = SNTRuleTypeBinary;
+  [self stubRule:rule forIdentifiers:{.binarySHA256 = @"a"}];
+
+  [self validateExecEvent:SNTActionRespondDeny
+             messageSetup:^(es_message_t* msg) {
+               msg->process->audit_token = santa::MakeStubAuditToken(10, 1);
+
+               // Expectation registered under a different token (different pid).
+               audit_token_t other = santa::MakeStubAuditToken(20, 1);
+               const uint8_t cdhash[20] = {0};
+               _sandboxExpectations->Register(other, MakeSandboxRequest(0, 0, cdhash, nil));
+             }];
 }
 
 @end
