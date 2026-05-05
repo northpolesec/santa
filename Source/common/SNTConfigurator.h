@@ -16,6 +16,7 @@
 #import <Foundation/Foundation.h>
 
 #import "Source/common/SNTCommonEnums.h"
+#import "Source/common/SNTConfigBundle.h"
 
 @class SNTCELFallbackRule;
 @class SNTExportConfiguration;
@@ -1151,6 +1152,19 @@ extern NSString* _Nonnull const kEnableMenuItemUserOverride;
 ///  Clear the sync server configuration from the effective configuration.
 ///
 - (void)clearSyncState;
+
+///
+///  Atomically replace the persisted sync state with a new dictionary
+///  containing only the existing `PushTokenChain` (if present) plus any
+///  non-nil values from `bundle`. Performs a single `saveSyncStateToDisk`
+///  via `writeToFile:atomically:YES`.
+///
+///  Used by the daemon's `replaceSyncSettings:reply:` XPC handler when a
+///  clean sync's postflight is committing settings under the SNT-357
+///  semantics. Workshop-managed keys not present in `bundle` are
+///  cleared from disk by this call.
+///
+- (void)replaceSyncStateWithBundle:(nonnull SNTConfigBundle*)bundle;
 
 ///
 ///  Validate the configuration profile.

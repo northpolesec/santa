@@ -101,6 +101,13 @@
 /// Clean sync flag, if True, all existing rules should be deleted before inserting any new rules.
 @property SNTSyncType syncType;
 
+/// When YES, postflight uses the existing `updateSyncSettings:` path (per-key
+/// merge) instead of the SNT-357 atomic `replaceSyncSettings:` path. Set only
+/// via the santactl XPC entry when the operator passes `--keep-old-settings`
+/// alongside `--clean[-all]`. Internal triggers (timer, push notification)
+/// leave it at NO.
+@property BOOL keepOldSettings;
+
 /// Batch size for uploading events.
 @property NSUInteger eventBatchSize;
 

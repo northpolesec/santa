@@ -61,9 +61,15 @@
 ///  reply block will be called again with a SNTSyncStatusType when the sync has completed or
 ///  failed.
 ///
-///  Pass true to isClean to perform a clean sync, defaults to false.
+///  Pass `syncType` to control rule cleanup: `SNTSyncTypeNormal` for a regular
+///  sync, `SNTSyncTypeClean` to remove non-transitive rules, or
+///  `SNTSyncTypeCleanAll` to remove all rules. Pass `keepOldSettings = YES`
+///  on a clean sync to skip the SNT-357 settings clear at postflight (legacy
+///  per-key merge semantics); on Normal syncs the flag has no effect.
 ///
-- (void)syncType:(SNTSyncType)syncType withReply:(void (^)(SNTSyncStatusType))reply;
+- (void)syncType:(SNTSyncType)syncType
+    keepOldSettings:(BOOL)keepOldSettings
+          withReply:(void (^)(SNTSyncStatusType))reply;
 
 ///
 ///  Handle SNTSyncServiceXPC messages forwarded from SNTSyncService.

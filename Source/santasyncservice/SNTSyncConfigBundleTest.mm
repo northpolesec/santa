@@ -258,4 +258,39 @@
   XCTAssertNil(bundle.celFallbackRules);
 }
 
+// PostflightConfigBundle invariants: these tests pin behavior the SNT-357
+// atomic-replace path depends on. If a future refactor breaks either invariant,
+// `replaceSyncStateWithBundle:` would silently leave the on-disk plist in an
+// inconsistent state after a clean sync.
+
+- (void)testPostflightConfigBundleAlwaysSetsFullSyncLastSuccess {
+  for (SNTSyncType type :
+       (SNTSyncType[]){SNTSyncTypeNormal, SNTSyncTypeClean, SNTSyncTypeCleanAll}) {
+    SNTSyncState* state = [[SNTSyncState alloc] init];
+    state.syncType = type;
+    SNTConfigBundle* bundle = PostflightConfigBundle(state);
+    XCTAssertNotNil(bundle.fullSyncLastSuccess,
+                    @"PostflightConfigBundle must set fullSyncLastSuccess "
+                    @"for syncType=%lu (load-bearing for SNT-357 atomic replace).",
+                    (unsigned long)type);
+  }
+}
+
+- (void)testPostflightConfigBundleResetsSyncTypeToNormalAfterCleanSync {
+  SNTSyncState* cleanState = [[SNTSyncState alloc] init];
+  cleanState.syncType = SNTSyncTypeClean;
+  SNTConfigBundle* cleanBundle = PostflightConfigBundle(cleanState);
+  XCTAssertEqualObjects(cleanBundle.syncType, @(SNTSyncTypeNormal));
+
+  SNTSyncState* cleanAllState = [[SNTSyncState alloc] init];
+  cleanAllState.syncType = SNTSyncTypeCleanAll;
+  SNTConfigBundle* cleanAllBundle = PostflightConfigBundle(cleanAllState);
+  XCTAssertEqualObjects(cleanAllBundle.syncType, @(SNTSyncTypeNormal));
+
+  SNTSyncState* normalState = [[SNTSyncState alloc] init];
+  normalState.syncType = SNTSyncTypeNormal;
+  SNTConfigBundle* normalBundle = PostflightConfigBundle(normalState);
+  XCTAssertNil(normalBundle.syncType);
+}
+
 @end

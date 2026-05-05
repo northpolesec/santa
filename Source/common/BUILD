@@ -514,6 +514,7 @@ objc_library(
         ":Pinning",
         ":SNTCELFallbackRule",
         ":SNTCommonEnums",
+        ":SNTConfigBundle",
         ":SNTExportConfiguration",
         ":SNTLiteDetector",
         ":SNTLogging",
@@ -1094,6 +1095,7 @@ santa_unit_test(
     srcs = ["SNTConfiguratorTest.mm"],
     deps = [
         ":SNTCommonEnums",
+        ":SNTConfigBundle",
         ":SNTConfigurator",
         "@OCMock",
     ],

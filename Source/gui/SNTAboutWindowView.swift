@@ -206,7 +206,11 @@ struct SyncButtonView: View {
     lr?.resume()
 
     let proxy = ss?.remoteObjectProxy as? SNTSyncServiceXPC
-    proxy?.sync(withLogListener: logListener.endpoint, syncType: clean ? .clean : .normal) { status in
+    proxy?.sync(
+      withLogListener: logListener.endpoint,
+      syncType: clean ? .clean : .normal,
+      keepOldSettings: false
+    ) { status in
       lr = nil
 
       DispatchQueue.main.sync {

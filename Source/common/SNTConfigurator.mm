@@ -1959,11 +1959,17 @@ static SNTConfigurator* sharedConfigurator = nil;
 ///  immediately after the call completes.
 ///
 - (void)updateSyncStateForKey:(NSString*)key value:(id)value {
+  [self updateSyncStateForKey:key value:value writeToDisk:YES];
+}
+
+- (void)updateSyncStateForKey:(NSString*)key value:(id)value writeToDisk:(BOOL)writeToDisk {
   void (^block)(void) = ^{
     NSMutableDictionary* syncState = self.syncState.mutableCopy;
     syncState[key] = value;
     self.syncState = syncState;
-    [self saveSyncStateToDisk];
+    if (writeToDisk) {
+      [self saveSyncStateToDisk];
+    }
   };
   // Avoid deadlocks by directly calling the block when already running on the
   // main thread.
@@ -2061,9 +2067,133 @@ static SNTConfigurator* sharedConfigurator = nil;
 
 - (void)clearSyncState {
   self.syncState = [NSMutableDictionary dictionary];
-  // TODO: Start a timer to flush the state to disk. On startup, Santa should
-  // check for the presence of the state file and, if no SyncBaseURL is
-  // configured, start the timer to clear sync state and flush to disk.
+  [[NSFileManager defaultManager] removeItemAtPath:self.syncStateFilePath error:NULL];
+}
+
+- (void)replaceSyncStateWithBundle:(SNTConfigBundle*)bundle {
+  void (^block)(void) = ^{
+    NSMutableDictionary* newSyncState = [NSMutableDictionary dictionary];
+
+    NSArray* preservedChain = self.syncState[kPushTokenChainKey];
+    if ([preservedChain isKindOfClass:[NSArray class]] && preservedChain.count > 0) {
+      newSyncState[kPushTokenChainKey] = preservedChain;
+    }
+
+    self.syncState = newSyncState;
+
+    [self applySyncBundleSettersDeferringDiskWrites:bundle];
+
+    [self saveSyncStateToDisk];
+  };
+
+  if ([NSThread isMainThread]) {
+    block();
+  } else {
+    dispatch_sync(dispatch_get_main_queue(), block);
+  }
+}
+
+- (void)applySyncBundleSettersDeferringDiskWrites:(SNTConfigBundle*)bundle {
+  [bundle clientMode:^(SNTClientMode m) {
+    [self updateSyncStateForKey:kClientModeKey value:@(m) writeToDisk:NO];
+  }];
+  [bundle syncType:^(SNTSyncType val) {
+    [self updateSyncStateForKey:kSyncTypeRequired value:@(val) writeToDisk:NO];
+  }];
+  [bundle allowlistRegex:^(NSString* val) {
+    [self updateSyncStateForKey:kAllowedPathRegexKey
+                          value:[NSRegularExpression regularExpressionWithPattern:val
+                                                                          options:0
+                                                                            error:NULL]
+                    writeToDisk:NO];
+  }];
+  [bundle blocklistRegex:^(NSString* val) {
+    [self updateSyncStateForKey:kBlockedPathRegexKey
+                          value:[NSRegularExpression regularExpressionWithPattern:val
+                                                                          options:0
+                                                                            error:NULL]
+                    writeToDisk:NO];
+  }];
+  [bundle removableMediaAction:^(NSString* val) {
+    [self updateSyncStateForKey:kRemovableMediaActionKey value:val writeToDisk:NO];
+  }];
+  [bundle removableMediaRemountFlags:^(NSArray<NSString*>* val) {
+    [self updateSyncStateForKey:kRemovableMediaRemountFlagsKey value:val writeToDisk:NO];
+  }];
+  [bundle encryptedRemovableMediaAction:^(NSString* val) {
+    [self updateSyncStateForKey:kEncryptedRemovableMediaActionKey value:val writeToDisk:NO];
+  }];
+  [bundle encryptedRemovableMediaRemountFlags:^(NSArray<NSString*>* val) {
+    [self updateSyncStateForKey:kEncryptedRemovableMediaRemountFlagsKey value:val writeToDisk:NO];
+  }];
+  [bundle blockNetworkMount:^(BOOL val) {
+    [self updateSyncStateForKey:kBlockNetworkMountKey value:@(val) writeToDisk:NO];
+  }];
+  [bundle bannedNetworkMountBlockMessage:^(NSString* val) {
+    [self updateSyncStateForKey:kBannedNetworkMountBlockMessage value:val writeToDisk:NO];
+  }];
+  [bundle allowedNetworkMountHosts:^(NSArray<NSString*>* val) {
+    [self updateSyncStateForKey:kAllowedNetworkMountHosts value:val writeToDisk:NO];
+  }];
+  [bundle enableBundles:^(BOOL val) {
+    [self updateSyncStateForKey:kEnableBundlesKey value:@(val) writeToDisk:NO];
+  }];
+  [bundle enableTransitiveRules:^(BOOL val) {
+    [self updateSyncStateForKey:kEnableTransitiveRulesKey value:@(val) writeToDisk:NO];
+  }];
+  [bundle enableAllEventUpload:^(BOOL val) {
+    [self updateSyncStateForKey:kEnableAllEventUploadKey value:@(val) writeToDisk:NO];
+  }];
+  [bundle disableUnknownEventUpload:^(BOOL val) {
+    [self updateSyncStateForKey:kDisableUnknownEventUploadKey value:@(val) writeToDisk:NO];
+  }];
+  [bundle overrideFileAccessAction:^(NSString* val) {
+    [self updateSyncStateForKey:kOverrideFileAccessActionKey value:val writeToDisk:NO];
+  }];
+  [bundle exportConfiguration:^(SNTExportConfiguration* val) {
+    [self updateSyncStateForKey:kExportConfigurationKey value:[val serialize] writeToDisk:NO];
+  }];
+  [bundle fullSyncLastSuccess:^(NSDate* val) {
+    [self updateSyncStateForKey:kFullSyncLastSuccess value:val writeToDisk:NO];
+  }];
+  [bundle ruleSyncLastSuccess:^(NSDate* val) {
+    [self updateSyncStateForKey:kRuleSyncLastSuccess value:val writeToDisk:NO];
+  }];
+  [bundle modeTransition:^(SNTModeTransition* val) {
+    [self updateSyncStateForKey:kModeTransitionKey value:[val serialize] writeToDisk:NO];
+  }];
+  [bundle networkExtensionSettings:^(SNTSyncNetworkExtensionSettings* val) {
+    [self updateSyncStateForKey:kNetworkExtensionSettingsKey value:[val serialize] writeToDisk:NO];
+  }];
+  [bundle pushTokenChain:^(NSArray<NSString*>* val) {
+    [self updateSyncStateForKey:kPushTokenChainKey value:val writeToDisk:NO];
+  }];
+  [bundle telemetryFilterExpressions:^(NSArray<NSString*>* val) {
+    [self updateSyncStateForKey:kTelemetryFilterExpressionsKey value:val writeToDisk:NO];
+  }];
+  [bundle celFallbackRules:^(NSArray<SNTCELFallbackRule*>* val) {
+    [self updateSyncStateForKey:kCELFallbackRulesKey
+                          value:[SNTCELFallbackRule serializeArray:val]
+                    writeToDisk:NO];
+  }];
+  [bundle eventDetailURL:^(NSString* val) {
+    [self updateSyncStateForKey:kEventDetailURLKey value:val writeToDisk:NO];
+  }];
+  [bundle eventDetailText:^(NSString* val) {
+    [self updateSyncStateForKey:kEventDetailTextKey value:val writeToDisk:NO];
+  }];
+  [bundle fileAccessEventDetailURL:^(NSString* val) {
+    [self updateSyncStateForKey:kFileAccessEventDetailURLKey value:val writeToDisk:NO];
+  }];
+  [bundle fileAccessEventDetailText:^(NSString* val) {
+    [self updateSyncStateForKey:kFileAccessEventDetailTextKey value:val writeToDisk:NO];
+  }];
+  [bundle fullSyncInterval:^(NSUInteger val) {
+    [self updateSyncStateForKey:kFullSyncInterval value:val ? @(val) : nil writeToDisk:NO];
+  }];
+  [bundle pushNotificationsFullSyncInterval:^(NSUInteger val) {
+    [self updateSyncStateForKey:kFCMFullSyncInterval value:val ? @(val) : nil writeToDisk:NO];
+  }];
 }
 
 - (NSArray*)entitlementsPrefixFilter {

@@ -58,6 +58,14 @@ typedef NS_ENUM(NSInteger, SNTRuleAddSource) {
 - (void)updateSyncSettings:(SNTConfigBundle*)result reply:(void (^)(void))reply;
 
 ///
+///  Atomically replace the persisted sync state with the contents of `bundle`,
+///  preserving only `PushTokenChain` from the previous state. Used by the
+///  sync service's postflight stage when a clean sync (Clean or CleanAll)
+///  resolves and the user did not pass `--keep-old-settings`.
+///
+- (void)replaceSyncSettings:(SNTConfigBundle*)bundle reply:(void (^)(void))reply;
+
+///
 ///  Syncd Ops
 ///
 - (void)postRuleSyncNotificationForApplication:(NSString*)app reply:(void (^)(void))reply;

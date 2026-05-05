@@ -49,6 +49,7 @@
 //
 - (void)syncWithLogListener:(NSXPCListenerEndpoint*)logListener
                    syncType:(SNTSyncType)syncType
+            keepOldSettings:(BOOL)keepOldSettings
                       reply:(void (^)(SNTSyncStatusType))reply;
 
 // Publish metrics to the sync server. The metrics dictionary is the output of SNTMetricSet export.

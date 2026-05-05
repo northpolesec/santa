@@ -129,6 +129,7 @@
 
 - (void)syncWithLogListener:(NSXPCListenerEndpoint*)logListener
                    syncType:(SNTSyncType)syncType
+            keepOldSettings:(BOOL)keepOldSettings
                       reply:(void (^)(SNTSyncStatusType))reply {
   MOLXPCConnection* ll;
   if (logListener) {
@@ -138,6 +139,7 @@
     [ll resume];
   }
   [self.syncManager syncType:syncType
+             keepOldSettings:keepOldSettings
                    withReply:^(SNTSyncStatusType status) {
                      if (status == SNTSyncStatusTypeSyncStarted) {
                        if (ll) [[SNTSyncBroadcaster broadcaster] addLogListener:ll];

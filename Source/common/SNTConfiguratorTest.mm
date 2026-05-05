@@ -17,6 +17,7 @@
 #import <XCTest/XCTest.h>
 
 #import "Source/common/SNTCommonEnums.h"
+#import "Source/common/SNTConfigBundle.h"
 #import "Source/common/SNTConfigurator.h"
 
 typedef BOOL (^StateFileAccessAuthorizer)(void);
@@ -30,6 +31,15 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
 
 @property NSMutableDictionary* configState;
 @property NSMutableDictionary* syncState;
+@end
+
+// Expose SNTConfigBundle's writable properties for test setup. These properties
+// are declared as a class extension in SNTConfigBundle.mm; redeclaring them as
+// a category here gives the test typed setter access.
+@interface SNTConfigBundle (ConfigBundleCreator)
+@property NSNumber* clientMode;
+@property NSDate* fullSyncLastSuccess;
+@property NSArray<NSString*>* pushTokenChain;
 @end
 
 @interface SNTConfiguratorTest : XCTestCase
@@ -283,6 +293,152 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
 
   sut.configState[@"AllowDelegatedSignals"] = @NO;
   XCTAssertFalse(sut.allowDelegatedSignals);
+}
+
+#pragma mark - replaceSyncStateWithBundle: tests
+
+- (SNTConfigurator*)configuratorWithSyncState:(NSDictionary*)initialState
+                                    plistPath:(NSString*)plistPath {
+  if (initialState) {
+    XCTAssertTrue([initialState writeToFile:plistPath atomically:YES]);
+  }
+  return [[SNTConfigurator alloc] initWithSyncStateFile:plistPath
+      stateFile:@"/does/not/need/to/exist"
+      oldStateFile:@"/does/not/need/to/exist"
+      syncStateAccessAuthorizer:^{
+        return YES;
+      }
+      stateAccessAuthorizer:^BOOL {
+        return NO;
+      }];
+}
+
+- (void)testReplaceSyncStateWithBundleClearsWorkshopKeysPreservingPushTokenChain {
+  NSString* plistPath = [NSString stringWithFormat:@"%@/test-replace-state.plist", self.testDir];
+  NSArray<NSString*>* chain = @[ @"issuer-jwt-value", @"device-jwt-value" ];
+
+  SNTConfigurator* cfg = [self configuratorWithSyncState:@{
+    @"ClientMode" : @(SNTClientModeLockdown),
+    @"AllowedPathRegex" : @"old-allow-pattern",
+    @"PushTokenChain" : chain,
+  }
+                                               plistPath:plistPath];
+
+  SNTConfigBundle* bundle = [[SNTConfigBundle alloc] init];
+  bundle.clientMode = @(SNTClientModeMonitor);
+  bundle.fullSyncLastSuccess = [NSDate date];
+
+  [cfg replaceSyncStateWithBundle:bundle];
+
+  NSDictionary* onDisk = [NSDictionary dictionaryWithContentsOfFile:plistPath];
+  XCTAssertEqualObjects(onDisk[@"PushTokenChain"], chain);
+  XCTAssertEqual([onDisk[@"ClientMode"] integerValue], SNTClientModeMonitor);
+  XCTAssertNotNil(onDisk[@"FullSyncLastSuccess"]);
+  XCTAssertNil(onDisk[@"AllowedPathRegex"]);
+
+  XCTAssertTrue([self.fileMgr removeItemAtPath:plistPath error:nil]);
+}
+
+- (void)testReplaceSyncStateWithBundleNoExistingChainProducesNoChainOnDisk {
+  NSString* plistPath = [NSString stringWithFormat:@"%@/test-replace-state.plist", self.testDir];
+
+  SNTConfigurator* cfg = [self configuratorWithSyncState:@{
+    @"ClientMode" : @(SNTClientModeLockdown),
+  }
+                                               plistPath:plistPath];
+
+  SNTConfigBundle* bundle = [[SNTConfigBundle alloc] init];
+  bundle.clientMode = @(SNTClientModeMonitor);
+
+  [cfg replaceSyncStateWithBundle:bundle];
+
+  NSDictionary* onDisk = [NSDictionary dictionaryWithContentsOfFile:plistPath];
+  XCTAssertNil(onDisk[@"PushTokenChain"]);
+  XCTAssertEqual([onDisk[@"ClientMode"] integerValue], SNTClientModeMonitor);
+
+  XCTAssertTrue([self.fileMgr removeItemAtPath:plistPath error:nil]);
+}
+
+- (void)testReplaceSyncStateWithBundleEmptyBundleLeavesOnlyChain {
+  NSString* plistPath = [NSString stringWithFormat:@"%@/test-replace-state.plist", self.testDir];
+  NSArray<NSString*>* chain = @[ @"issuer", @"device" ];
+
+  SNTConfigurator* cfg = [self configuratorWithSyncState:@{
+    @"ClientMode" : @(SNTClientModeLockdown),
+    @"PushTokenChain" : chain,
+  }
+                                               plistPath:plistPath];
+
+  SNTConfigBundle* bundle = [[SNTConfigBundle alloc] init];
+
+  [cfg replaceSyncStateWithBundle:bundle];
+
+  NSDictionary* onDisk = [NSDictionary dictionaryWithContentsOfFile:plistPath];
+  XCTAssertEqualObjects(onDisk[@"PushTokenChain"], chain);
+  XCTAssertEqual(onDisk.count, (NSUInteger)1);
+
+  XCTAssertTrue([self.fileMgr removeItemAtPath:plistPath error:nil]);
+}
+
+- (void)testReplaceSyncStateWithBundleBundleChainOverridesPreserved {
+  NSString* plistPath = [NSString stringWithFormat:@"%@/test-replace-state.plist", self.testDir];
+  NSArray<NSString*>* staleChain = @[ @"old-issuer", @"old-device" ];
+  NSArray<NSString*>* freshChain = @[ @"new-issuer", @"new-device" ];
+
+  SNTConfigurator* cfg = [self configuratorWithSyncState:@{
+    @"PushTokenChain" : staleChain,
+  }
+                                               plistPath:plistPath];
+
+  SNTConfigBundle* bundle = [[SNTConfigBundle alloc] init];
+  bundle.pushTokenChain = freshChain;
+
+  [cfg replaceSyncStateWithBundle:bundle];
+
+  NSDictionary* onDisk = [NSDictionary dictionaryWithContentsOfFile:plistPath];
+  XCTAssertEqualObjects(onDisk[@"PushTokenChain"], freshChain);
+
+  XCTAssertTrue([self.fileMgr removeItemAtPath:plistPath error:nil]);
+}
+
+#pragma mark - clearSyncState tests (Bug 2)
+
+- (void)testClearSyncStateRemovesDiskFile {
+  NSString* plistPath = [NSString stringWithFormat:@"%@/test-clear-state.plist", self.testDir];
+  NSDictionary* contents = @{@"ClientMode" : @(SNTClientModeLockdown)};
+  XCTAssertTrue([contents writeToFile:plistPath atomically:YES]);
+  XCTAssertTrue([self.fileMgr fileExistsAtPath:plistPath]);
+
+  SNTConfigurator* cfg = [self configuratorWithSyncState:nil plistPath:plistPath];
+  cfg.syncState = contents.mutableCopy;
+
+  [cfg clearSyncState];
+
+  XCTAssertEqual(cfg.syncState.count, (NSUInteger)0);
+  XCTAssertFalse([self.fileMgr fileExistsAtPath:plistPath]);
+}
+
+- (void)testClearSyncStateNoFileDoesNotError {
+  NSString* plistPath = [NSString stringWithFormat:@"%@/test-clear-state.plist", self.testDir];
+  XCTAssertFalse([self.fileMgr fileExistsAtPath:plistPath]);
+
+  SNTConfigurator* cfg = [self configuratorWithSyncState:nil plistPath:plistPath];
+
+  XCTAssertNoThrow([cfg clearSyncState]);
+  XCTAssertFalse([self.fileMgr fileExistsAtPath:plistPath]);
+}
+
+- (void)testClearSyncStateIdempotent {
+  NSString* plistPath = [NSString stringWithFormat:@"%@/test-clear-state.plist", self.testDir];
+  NSDictionary* contents = @{@"ClientMode" : @(SNTClientModeLockdown)};
+  XCTAssertTrue([contents writeToFile:plistPath atomically:YES]);
+
+  SNTConfigurator* cfg = [self configuratorWithSyncState:nil plistPath:plistPath];
+  cfg.syncState = contents.mutableCopy;
+
+  [cfg clearSyncState];
+  XCTAssertNoThrow([cfg clearSyncState]);
+  XCTAssertFalse([self.fileMgr fileExistsAtPath:plistPath]);
 }
 
 @end

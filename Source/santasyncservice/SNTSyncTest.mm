@@ -1165,6 +1165,58 @@
   OCMVerify([self.daemonConnRop updateSyncSettings:OCMOCK_ANY reply:OCMOCK_ANY]);
 }
 
+- (void)testPostflightCleanSyncRoutesToReplaceSyncSettings {
+  [self setupDefaultDaemonConnResponses];
+  self.syncState.syncType = SNTSyncTypeClean;
+  self.syncState.keepOldSettings = NO;
+
+  SNTSyncPostflight* sut = [[SNTSyncPostflight alloc] initWithState:self.syncState];
+
+  [self stubRequestBody:nil response:nil error:nil validateBlock:nil];
+
+  XCTAssertTrue([sut sync]);
+  OCMVerify([self.daemonConnRop replaceSyncSettings:OCMOCK_ANY reply:OCMOCK_ANY]);
+}
+
+- (void)testPostflightCleanAllSyncRoutesToReplaceSyncSettings {
+  [self setupDefaultDaemonConnResponses];
+  self.syncState.syncType = SNTSyncTypeCleanAll;
+  self.syncState.keepOldSettings = NO;
+
+  SNTSyncPostflight* sut = [[SNTSyncPostflight alloc] initWithState:self.syncState];
+
+  [self stubRequestBody:nil response:nil error:nil validateBlock:nil];
+
+  XCTAssertTrue([sut sync]);
+  OCMVerify([self.daemonConnRop replaceSyncSettings:OCMOCK_ANY reply:OCMOCK_ANY]);
+}
+
+- (void)testPostflightCleanSyncWithKeepOldSettingsRoutesToUpdateSyncSettings {
+  [self setupDefaultDaemonConnResponses];
+  self.syncState.syncType = SNTSyncTypeClean;
+  self.syncState.keepOldSettings = YES;
+
+  SNTSyncPostflight* sut = [[SNTSyncPostflight alloc] initWithState:self.syncState];
+
+  [self stubRequestBody:nil response:nil error:nil validateBlock:nil];
+
+  XCTAssertTrue([sut sync]);
+  OCMVerify([self.daemonConnRop updateSyncSettings:OCMOCK_ANY reply:OCMOCK_ANY]);
+}
+
+- (void)testPostflightCleanAllSyncWithKeepOldSettingsRoutesToUpdateSyncSettings {
+  [self setupDefaultDaemonConnResponses];
+  self.syncState.syncType = SNTSyncTypeCleanAll;
+  self.syncState.keepOldSettings = YES;
+
+  SNTSyncPostflight* sut = [[SNTSyncPostflight alloc] initWithState:self.syncState];
+
+  [self stubRequestBody:nil response:nil error:nil validateBlock:nil];
+
+  XCTAssertTrue([sut sync]);
+  OCMVerify([self.daemonConnRop updateSyncSettings:OCMOCK_ANY reply:OCMOCK_ANY]);
+}
+
 #pragma mark - Dynamic NATS Push Client Lifecycle Tests
 
 - (void)testPreflightCreatesNATSWhenSyncV2 {

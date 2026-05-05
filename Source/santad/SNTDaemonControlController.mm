@@ -609,6 +609,11 @@ double watchdogRAMPeak = 0;
   reply();
 }
 
+- (void)replaceSyncSettings:(SNTConfigBundle*)bundle reply:(void (^)(void))reply {
+  [[SNTConfigurator configurator] replaceSyncStateWithBundle:bundle];
+  reply();
+}
+
 - (void)retrieveStatsState:(void (^)(NSDate*, NSString*))reply {
   reply([[SNTConfigurator configurator] lastStatsSubmissionTimestamp],
         [[SNTConfigurator configurator] lastStatsSubmissionVersion]);
