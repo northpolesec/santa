@@ -113,7 +113,7 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
       NSUInteger interval = self.pushNotifications ? self.pushNotifications.fullSyncInterval
                                                    : self.persistedFullSyncInterval;
       [self rescheduleTimerQueue:self.fullSyncTimer secondsFromNow:interval];
-      [self syncType:SNTSyncTypeNormal keepOldSettings:NO withReply:NULL];
+      [self syncType:SNTSyncTypeNormal withReply:NULL];
     }];
     _ruleSyncTimer = [self createSyncTimerWithBlock:^{
       dispatch_source_set_timer(self.ruleSyncTimer, DISPATCH_TIME_FOREVER, DISPATCH_TIME_FOREVER,
@@ -326,9 +326,7 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   [self rescheduleTimerQueue:self.fullSyncTimer secondsFromNow:seconds];
 }
 
-- (void)syncType:(SNTSyncType)syncType
-    keepOldSettings:(BOOL)keepOldSettings
-          withReply:(void (^)(SNTSyncStatusType))reply {
+- (void)syncType:(SNTSyncType)syncType withReply:(void (^)(SNTSyncStatusType))reply {
   if (dispatch_semaphore_wait(self.syncLimiter, DISPATCH_TIME_NOW)) {
     if (reply) reply(SNTSyncStatusTypeTooManySyncsInProgress);
     return;
@@ -348,7 +346,7 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
       }
     }
     if (reply) reply(SNTSyncStatusTypeSyncStarted);
-    SNTSyncStatusType status = [self preflightWithKeepOldSettings:keepOldSettings];
+    SNTSyncStatusType status = [self preflight];
     if (reply) reply(status);
     dispatch_semaphore_signal(self.syncLimiter);
   });
@@ -522,16 +520,11 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
 #pragma mark syncing chain
 
 - (SNTSyncStatusType)preflight {
-  return [self preflightWithKeepOldSettings:NO];
-}
-
-- (SNTSyncStatusType)preflightWithKeepOldSettings:(BOOL)keepOldSettings {
   SNTSyncStatusType status = SNTSyncStatusTypeUnknown;
   SNTSyncState* syncState = [self createSyncStateWithStatus:&status];
   if (!syncState) {
     return status;
   }
-  syncState.keepOldSettings = keepOldSettings;
   return [self preflightWithSyncState:syncState];
 }
 

@@ -58,18 +58,9 @@ BOOL Postflight(SNTSyncPostflight* self) {
 
   typename Traits::PostflightResponseT response;
   [self performRequest:[self requestWithMessage:req] intoMessage:&response timeout:30];
-  SNTConfigBundle* bundle = PostflightConfigBundle(self.syncState);
-  if ((self.syncState.syncType == SNTSyncTypeClean ||
-       self.syncState.syncType == SNTSyncTypeCleanAll) &&
-      !self.syncState.keepOldSettings) {
-    [rop replaceSyncSettings:bundle
-                       reply:^{
-                       }];
-  } else {
-    [rop updateSyncSettings:bundle
-                      reply:^{
-                      }];
-  }
+  [rop updateSyncSettings:PostflightConfigBundle(self.syncState)
+                    reply:^{
+                    }];
 
   return YES;
 }

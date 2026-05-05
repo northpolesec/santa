@@ -362,7 +362,6 @@ static NSString* const kNotificationSilencesKey = @"SilencedNotifications";
     [[ss synchronousRemoteObjectProxy]
         syncWithLogListener:nil
                    syncType:SNTSyncTypeNormal
-            keepOldSettings:NO
                       reply:^(SNTSyncStatusType status) {
                         dispatch_async(dispatch_get_main_queue(), ^{
                           self.syncMenuItem.target = self;

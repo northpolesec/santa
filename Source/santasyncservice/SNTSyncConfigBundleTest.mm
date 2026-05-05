@@ -293,4 +293,26 @@
   XCTAssertNil(normalBundle.syncType);
 }
 
+- (void)testPostflightConfigBundleForwardsPushTokenChain {
+  SNTSyncState* syncState = [[SNTSyncState alloc] init];
+  syncState.pushIssuerJWT = @"issuerToken";
+  syncState.pushJWT = @"userToken";
+
+  SNTConfigBundle* bundle = PostflightConfigBundle(syncState);
+  XCTAssertEqualObjects(bundle.pushTokenChain, (@[ @"issuerToken", @"userToken" ]));
+}
+
+- (void)testPostflightConfigBundleOmitsPushTokenChainWhenJWTsMissing {
+  SNTSyncState* syncState = [[SNTSyncState alloc] init];
+  // Both empty: no chain.
+  SNTConfigBundle* bundle = PostflightConfigBundle(syncState);
+  XCTAssertNil(bundle.pushTokenChain);
+
+  // One missing: still no chain (defensive — server is expected to always
+  // send both, but this ensures we don't ship a half-chain to the daemon).
+  syncState.pushIssuerJWT = @"issuerToken";
+  bundle = PostflightConfigBundle(syncState);
+  XCTAssertNil(bundle.pushTokenChain);
+}
+
 @end

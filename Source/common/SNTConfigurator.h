@@ -1149,22 +1149,15 @@ extern NSString* _Nonnull const kEnableMenuItemUserOverride;
 #endif
 
 ///
-///  Clear the sync server configuration from the effective configuration.
+///  Clear the persisted sync-managed state. The in-memory dictionary is
+///  reset and `sync-state.plist` is removed from disk. Called from two
+///  places: (a) `SNTSyncdQueue` after `SyncBaseURL` has been removed for
+///  10 minutes, to forget settings from the previous server; and
+///  (b) the daemon's `updateSyncSettings:` handler at the start of a
+///  clean-sync postflight, so settings the server stops sending no longer
+///  linger on disk after the bundle is applied.
 ///
 - (void)clearSyncState;
-
-///
-///  Atomically replace the persisted sync state with a new dictionary
-///  containing only the existing `PushTokenChain` (if present) plus any
-///  non-nil values from `bundle`. Performs a single `saveSyncStateToDisk`
-///  via `writeToFile:atomically:YES`.
-///
-///  Used by the daemon's `replaceSyncSettings:reply:` XPC handler when a
-///  clean sync's postflight is committing settings under the SNT-357
-///  semantics. Workshop-managed keys not present in `bundle` are
-///  cleared from disk by this call.
-///
-- (void)replaceSyncStateWithBundle:(nonnull SNTConfigBundle*)bundle;
 
 ///
 ///  Validate the configuration profile.

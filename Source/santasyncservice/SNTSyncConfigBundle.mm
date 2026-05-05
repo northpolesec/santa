@@ -68,6 +68,10 @@ SNTConfigBundle* PostflightConfigBundle(SNTSyncState* syncState) {
   SNTConfigBundle* bundle = [[SNTConfigBundle alloc] init];
 
   bundle.clientMode = syncState.clientMode ? @(syncState.clientMode) : nil;
+  // Clean syncs reset SyncTypeRequired to Normal. The daemon recognizes
+  // this exact transition (`syncType == @(Normal)`) as the signal that
+  // this is a clean-sync postflight bundle and clears persisted sync
+  // state before applying.
   bundle.syncType = syncState.syncType != SNTSyncTypeNormal ? @(SNTSyncTypeNormal) : nil;
   bundle.allowlistRegex = syncState.allowlistRegex;
   bundle.blocklistRegex = syncState.blocklistRegex;
@@ -94,6 +98,10 @@ SNTConfigBundle* PostflightConfigBundle(SNTSyncState* syncState) {
   bundle.celFallbackRules = syncState.celFallbackRules;
   bundle.fullSyncInterval = syncState.fullSyncInterval;
   bundle.pushNotificationsFullSyncInterval = syncState.pushNotificationsFullSyncInterval;
+
+  if (syncState.pushIssuerJWT.length && syncState.pushJWT.length) {
+    bundle.pushTokenChain = @[ syncState.pushIssuerJWT, syncState.pushJWT ];
+  }
 
   bundle.fullSyncLastSuccess = [NSDate now];
 

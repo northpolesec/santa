@@ -55,15 +55,15 @@ typedef NS_ENUM(NSInteger, SNTRuleAddSource) {
 ///
 ///  Config ops
 ///
+///  Apply `bundle` to the persisted sync state. Non-nil values are merged
+///  per-key into the existing state.
+///
+///  When `bundle.syncType == @(Normal)` (the marker `PostflightConfigBundle`
+///  sets only when reverting from Clean/CleanAll), the daemon first calls
+///  `clearSyncState` to wipe persisted sync state before applying the
+///  bundle so settings the server stops sending no longer linger.
+///
 - (void)updateSyncSettings:(SNTConfigBundle*)result reply:(void (^)(void))reply;
-
-///
-///  Atomically replace the persisted sync state with the contents of `bundle`,
-///  preserving only `PushTokenChain` from the previous state. Used by the
-///  sync service's postflight stage when a clean sync (Clean or CleanAll)
-///  resolves and the user did not pass `--keep-old-settings`.
-///
-- (void)replaceSyncSettings:(SNTConfigBundle*)bundle reply:(void (^)(void))reply;
 
 ///
 ///  Syncd Ops

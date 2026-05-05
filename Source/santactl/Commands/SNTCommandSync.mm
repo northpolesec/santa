@@ -51,14 +51,10 @@ REGISTER_COMMAND_NAME(@"sync")
           @"this is the command used for syncing.\n\n"
           @"Options:\n"
           @"  --clean: Perform a clean sync, erasing all existing non-transitive rules and\n"
-          @"           requesting a clean sync from the server. Also clears Workshop-managed\n"
-          @"           sync settings; pass --keep-old-settings to retain them.\n"
+          @"           requesting a clean sync from the server. Also clears sync-managed\n"
+          @"           settings.\n"
           @"  --clean-all: Perform a clean sync, erasing all existing rules and requesting a\n"
-          @"               clean sync from the server. Also clears Workshop-managed sync\n"
-          @"               settings; pass --keep-old-settings to retain them.\n"
-          @"  --keep-old-settings: Only valid with --clean or --clean-all. Preserve existing\n"
-          @"                       Workshop-managed sync settings on disk during the clean\n"
-          @"                       sync, instead of clearing them.\n"
+          @"               clean sync from the server. Also clears sync-managed settings.\n"
           @"  --debug: Enable verbose output.\n");
 }
 
@@ -73,23 +69,6 @@ REGISTER_COMMAND_NAME(@"sync")
     TEE_LOGE(@"Missing SyncBaseURL. Exiting.");
     exit(1);
   }
-
-  NSArray<NSString*>* args = NSProcessInfo.processInfo.arguments;
-  SNTSyncType syncType = SNTSyncTypeNormal;
-  if ([args containsObject:@"--clean-all"]) {
-    syncType = SNTSyncTypeCleanAll;
-  } else if ([args containsObject:@"--clean"]) {
-    syncType = SNTSyncTypeClean;
-  }
-
-  BOOL keepOldSettings = [args containsObject:@"--keep-old-settings"];
-  if (keepOldSettings && syncType == SNTSyncTypeNormal) {
-    TEE_LOGE(@"--keep-old-settings requires --clean or --clean-all. Exiting.");
-    exit(1);
-  }
-
-  self.enableDebugLogging = [args containsObject:@"--debug"];
-
   MOLXPCConnection* ss = [SNTXPCSyncServiceInterface configuredConnection];
   ss.invalidationHandler = ^(void) {
     TEE_LOGE(@"Failed to connect to the sync service.");
@@ -104,10 +83,18 @@ REGISTER_COMMAND_NAME(@"sync")
       [NSXPCInterface interfaceWithProtocol:@protocol(SNTSyncServiceLogReceiverXPC)];
   [lr resume];
 
+  SNTSyncType syncType = SNTSyncTypeNormal;
+  if ([NSProcessInfo.processInfo.arguments containsObject:@"--clean-all"]) {
+    syncType = SNTSyncTypeCleanAll;
+  } else if ([NSProcessInfo.processInfo.arguments containsObject:@"--clean"]) {
+    syncType = SNTSyncTypeClean;
+  }
+
+  self.enableDebugLogging = [NSProcessInfo.processInfo.arguments containsObject:@"--debug"];
+
   [[ss remoteObjectProxy]
       syncWithLogListener:logListener.endpoint
                  syncType:syncType
-          keepOldSettings:keepOldSettings
                     reply:^(SNTSyncStatusType status) {
                       if (status == SNTSyncStatusTypeTooManySyncsInProgress) {
                         [self didReceiveLog:@"Too many syncs in progress, try again later."
