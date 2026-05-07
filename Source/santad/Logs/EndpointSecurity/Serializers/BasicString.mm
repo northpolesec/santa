@@ -337,6 +337,10 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedExec& msg, SNTC
   str.append("|reason=");
   str.append(GetReasonString(cd.decision));
 
+  if (cd.auditReturn) {
+    str.append("|audit=true");
+  }
+
   if (cd.decisionExtra) {
     str.append("|explain=");
     str.append([cd.decisionExtra UTF8String]);

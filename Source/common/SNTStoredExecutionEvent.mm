@@ -80,6 +80,7 @@
 
   ENCODE(coder, executingUser);
   ENCODE_BOXABLE(coder, decision);
+  ENCODE_BOXABLE(coder, auditReturn);
   ENCODE_BOXABLE(coder, holdAndAsk);
   ENCODE_BOXABLE(coder, silentTouchID);
   ENCODE_BOXABLE(coder, seatbeltRequired);
@@ -128,6 +129,7 @@
 
     DECODE(decoder, executingUser, NSString);
     DECODE_SELECTOR(decoder, decision, NSNumber, unsignedLongLongValue);
+    DECODE_SELECTOR(decoder, auditReturn, NSNumber, boolValue);
     DECODE_SELECTOR(decoder, holdAndAsk, NSNumber, boolValue);
     DECODE_SELECTOR(decoder, silentTouchID, NSNumber, boolValue);
     DECODE_SELECTOR(decoder, seatbeltRequired, NSNumber, boolValue);

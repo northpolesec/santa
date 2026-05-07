@@ -75,4 +75,11 @@
 @property BOOL silentTouchID;
 @property NSNumber* touchIDCooldownMinutes;  // nil = no caching (prompt every time)
 
+/// YES if the matching CEL rule returned AUDIT. The execution itself is
+/// allowed (the decision is set to the underlying allow event state, e.g.
+/// SNTEventStateAllowBinary or SNTEventStateAllowCELFallback) but the event
+/// is logged and uploaded with this flag set so audit-only matches can be
+/// distinguished from regular allow decisions on the server.
+@property BOOL auditReturn;
+
 @end

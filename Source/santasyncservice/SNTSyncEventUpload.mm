@@ -317,6 +317,9 @@ typename santa::ProtoTraits<IsV2>::EventT* MessageForExecutionEvent(
     if (event.ruleId > 0) {
       e->set_rule_id(event.ruleId);
     }
+    if (event.auditReturn) {
+      e->set_audit_return(true);
+    }
   }
 
   return e;
