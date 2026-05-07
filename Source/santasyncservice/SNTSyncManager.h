@@ -64,9 +64,9 @@
 ///  Pass `syncType` to control rule cleanup: `SNTSyncTypeNormal` for a regular
 ///  sync, `SNTSyncTypeClean` to remove non-transitive rules, or
 ///  `SNTSyncTypeCleanAll` to remove all rules. On Clean and CleanAll, the
-///  postflight bundle signals the daemon to wipe persisted sync-managed
-///  state before applying the bundle so settings the server stops sending
-///  no longer linger.
+///  postflight bundle sets `clearSyncStateBeforeApply` so the daemon
+///  atomically replaces the persisted sync state instead of merging
+///  per-key — settings the server stops sending no longer linger on disk.
 ///
 - (void)syncType:(SNTSyncType)syncType withReply:(void (^)(SNTSyncStatusType))reply;
 

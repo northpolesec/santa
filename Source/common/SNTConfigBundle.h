@@ -55,5 +55,6 @@
 - (void)celFallbackRules:(void (^)(NSArray<SNTCELFallbackRule*>*))block;
 - (void)fullSyncInterval:(void (^)(NSUInteger))block;
 - (void)pushNotificationsFullSyncInterval:(void (^)(NSUInteger))block;
+- (void)clearSyncStateBeforeApply:(void (^)(BOOL))block;
 
 @end

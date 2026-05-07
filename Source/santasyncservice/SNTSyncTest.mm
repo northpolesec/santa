@@ -19,6 +19,7 @@
 
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTCommonEnums.h"
+#import "Source/common/SNTConfigBundle.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTModeTransition.h"
 #import "Source/common/SNTRule.h"
@@ -1421,6 +1422,73 @@
           }];
 
   XCTAssertTrue([sut sync]);
+}
+
+- (void)testCleanSyncPostflightBundleHasClearSyncStateBeforeApply {
+  // Drive a clean-sync flow through the two stages that ship
+  // updateSyncSettings: bundles bracketing the in-flight syncType (preflight
+  // and postflight), capture every bundle, and assert that exactly one of
+  // them (the postflight bundle) sets clearSyncStateBeforeApply == YES while
+  // none of the others do. This pins the contract that Task 4's clean-sync
+  // branch depends on: only the postflight bundle triggers the daemon's
+  // atomic swap; preflight bundles never carry the flag.
+  NSMutableArray<SNTConfigBundle*>* capturedBundles = [NSMutableArray array];
+  OCMStub([self.daemonConnRop updateSyncSettings:[OCMArg any] reply:[OCMArg any]])
+      .andDo(^(NSInvocation* inv) {
+        SNTConfigBundle* __unsafe_unretained bundle = nil;
+        [inv getArgument:&bundle atIndex:2];
+        @synchronized(capturedBundles) {
+          [capturedBundles addObject:bundle];
+        }
+        void (^__unsafe_unretained reply)(void) = nil;
+        [inv getArgument:&reply atIndex:3];
+        if (reply) reply();
+      });
+
+  // Default daemon stubs report Normal as the requested syncType; the server's
+  // preflight response below will override that to Clean.
+  [self setupDefaultDaemonConnResponses];
+
+  // Stage 1: preflight. Stub a server response that elects a Clean sync so
+  // syncState.syncType becomes Clean entering postflight.
+  NSData* preflightBody =
+      [@"{\"sync_type\": \"CLEAN\", \"client_mode\": \"MONITOR\", \"batch_size\": 100}"
+          dataUsingEncoding:NSUTF8StringEncoding];
+  [self stubRequestBody:preflightBody
+               response:nil
+                  error:nil
+          validateBlock:^BOOL(NSURLRequest* req) {
+            return [req.URL.absoluteString containsString:@"/preflight/"];
+          }];
+  XCTAssertTrue([[[SNTSyncPreflight alloc] initWithState:self.syncState] sync]);
+  XCTAssertEqual(self.syncState.syncType, SNTSyncTypeClean,
+                 @"Preflight must elect Clean for the postflight bundle to set the flag");
+
+  // Stage 2: postflight. Stub a generic response and run.
+  [self stubRequestBody:nil
+               response:nil
+                  error:nil
+          validateBlock:^BOOL(NSURLRequest* req) {
+            return [req.URL.absoluteString containsString:@"/postflight/"];
+          }];
+  XCTAssertTrue([[[SNTSyncPostflight alloc] initWithState:self.syncState] sync]);
+
+  NSUInteger withFlag = 0;
+  for (SNTConfigBundle* b in capturedBundles) {
+    __block BOOL fired = NO;
+    [b clearSyncStateBeforeApply:^(BOOL v) {
+      if (v) fired = YES;
+    }];
+    if (fired) withFlag++;
+  }
+  XCTAssertGreaterThanOrEqual(capturedBundles.count, (NSUInteger)2,
+                              @"Expected the clean-sync flow to ship at least two bundles "
+                              @"(preflight + postflight); got %lu",
+                              (unsigned long)capturedBundles.count);
+  XCTAssertEqual(withFlag, (NSUInteger)1,
+                 @"Expected exactly one bundle with clearSyncStateBeforeApply=YES "
+                 @"during a --clean sync (the postflight bundle); got %lu",
+                 (unsigned long)withFlag);
 }
 
 @end

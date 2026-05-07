@@ -52,6 +52,7 @@
 @property NSArray<SNTCELFallbackRule*>* celFallbackRules;
 @property NSNumber* fullSyncInterval;
 @property NSNumber* pushNotificationsFullSyncInterval;
+@property NSNumber* clearSyncStateBeforeApply;
 @end
 
 SNTConfigBundle* PreflightConfigBundle(SNTSyncState* syncState) {
@@ -104,6 +105,10 @@ SNTConfigBundle* PostflightConfigBundle(SNTSyncState* syncState) {
   }
 
   bundle.fullSyncLastSuccess = [NSDate now];
+
+  if (syncState.syncType != SNTSyncTypeNormal) {
+    bundle.clearSyncStateBeforeApply = @(YES);
+  }
 
   return bundle;
 }

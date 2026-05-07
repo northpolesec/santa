@@ -315,4 +315,53 @@
   XCTAssertNil(bundle.pushTokenChain);
 }
 
+- (void)testPostflightConfigBundleSetsClearSyncStateBeforeApplyOnCleanSync {
+  for (SNTSyncType type : (SNTSyncType[]){SNTSyncTypeClean, SNTSyncTypeCleanAll}) {
+    SNTSyncState* state = [[SNTSyncState alloc] init];
+    state.syncType = type;
+    SNTConfigBundle* bundle = PostflightConfigBundle(state);
+
+    __block BOOL fired = NO;
+    __block BOOL value = NO;
+    [bundle clearSyncStateBeforeApply:^(BOOL v) {
+      fired = YES;
+      value = v;
+    }];
+
+    XCTAssertTrue(fired,
+                  @"PostflightConfigBundle must set clearSyncStateBeforeApply for syncType=%lu",
+                  (unsigned long)type);
+    XCTAssertTrue(value);
+  }
+}
+
+- (void)testPostflightConfigBundleOmitsClearSyncStateBeforeApplyOnNormalSync {
+  SNTSyncState* state = [[SNTSyncState alloc] init];
+  state.syncType = SNTSyncTypeNormal;
+  SNTConfigBundle* bundle = PostflightConfigBundle(state);
+
+  __block BOOL fired = NO;
+  [bundle clearSyncStateBeforeApply:^(BOOL v) {
+    fired = YES;
+  }];
+  XCTAssertFalse(fired);
+}
+
+- (void)testNonPostflightFactoriesNeverSetClearSyncStateBeforeApply {
+  SNTSyncState* state = [[SNTSyncState alloc] init];
+  NSArray<SNTConfigBundle*>* bundles = @[
+    PreflightConfigBundle(state),
+    RuleSyncConfigBundle(),
+    SyncTypeConfigBundle(SNTSyncTypeClean),
+  ];
+
+  for (SNTConfigBundle* bundle in bundles) {
+    __block BOOL fired = NO;
+    [bundle clearSyncStateBeforeApply:^(BOOL v) {
+      fired = YES;
+    }];
+    XCTAssertFalse(fired);
+  }
+}
+
 @end

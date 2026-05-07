@@ -473,18 +473,33 @@ double watchdogRAMPeak = 0;
 - (void)updateSyncSettings:(SNTConfigBundle*)result reply:(void (^)(void))reply {
   SNTConfigurator* configurator = [SNTConfigurator configurator];
 
-  // PostflightConfigBundle sets the bundle's syncType to Normal only when
-  // the in-flight sync was Clean or CleanAll (the directive is consumed by
-  // resetting it on disk). That exact transition is the signal that this
-  // bundle is a clean-sync postflight: wipe persisted sync state before
-  // applying so settings the server stops sending don't linger. The
-  // per-key setters that follow recreate `sync-state.plist` from the
-  // bundle's contents.
-  [result syncType:^(SNTSyncType val) {
-    if (val == SNTSyncTypeNormal) {
-      [configurator clearSyncState];
-    }
+  __block BOOL atomicReplace = NO;
+  [result clearSyncStateBeforeApply:^(BOOL v) {
+    atomicReplace = v;
   }];
+
+  if (atomicReplace) {
+    // Capture pre-swap CEL state so the post-swap comparison detects "rules
+    // disappeared from the server's config" as a change too — not just
+    // modifications.
+    NSData* oldCELData = [SNTCELFallbackRule serializeArray:[configurator celFallbackRules]];
+
+    [configurator atomicallyApplyBundle:result];
+
+    // Side-effects pass. Persistence is already done by atomicallyApplyBundle:
+    // for every slot except modeTransition.
+    [result modeTransition:^(SNTModeTransition* val) {
+      _temporaryMonitorMode->NewModeTransitionReceived(val);
+    }];
+
+    NSData* newCELData = [SNTCELFallbackRule serializeArray:[configurator celFallbackRules]];
+    if (![oldCELData isEqualToData:newCELData] && self.flushCacheBlock) {
+      self.flushCacheBlock(FlushCacheMode::kAllCaches, FlushCacheReason::kCELFallbackRulesChanged);
+    }
+
+    reply();
+    return;
+  }
 
   [result clientMode:^(SNTClientMode m) {
     [configurator setSyncServerClientMode:m];

@@ -38,8 +38,31 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
 // a category here gives the test typed setter access.
 @interface SNTConfigBundle (ConfigBundleCreator)
 @property NSNumber* clientMode;
+@property NSNumber* syncType;
+@property NSString* allowlistRegex;
+@property NSString* blocklistRegex;
+@property NSString* removableMediaAction;
+@property NSArray<NSString*>* removableMediaRemountFlags;
+@property NSString* encryptedRemovableMediaAction;
+@property NSArray<NSString*>* encryptedRemovableMediaRemountFlags;
+@property NSNumber* blockNetworkMount;
+@property NSString* bannedNetworkMountBlockMessage;
+@property NSArray<NSString*>* allowedNetworkMountHosts;
+@property NSNumber* enableBundles;
+@property NSNumber* enableTransitiveRules;
+@property NSNumber* enableAllEventUpload;
+@property NSNumber* disableUnknownEventUpload;
+@property NSString* overrideFileAccessAction;
 @property NSDate* fullSyncLastSuccess;
+@property NSDate* ruleSyncLastSuccess;
+@property NSString* eventDetailURL;
+@property NSString* eventDetailText;
+@property NSString* fileAccessEventDetailURL;
+@property NSString* fileAccessEventDetailText;
 @property NSArray<NSString*>* pushTokenChain;
+@property NSArray<NSString*>* telemetryFilterExpressions;
+@property NSNumber* fullSyncInterval;
+@property NSNumber* pushNotificationsFullSyncInterval;
 @end
 
 @interface SNTConfiguratorTest : XCTestCase
@@ -351,20 +374,95 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
   XCTAssertFalse([self.fileMgr fileExistsAtPath:plistPath]);
 }
 
-- (void)testClearSyncStateFollowedBySetterPersistsOnlyNewValue {
-  NSString* plistPath = [NSString stringWithFormat:@"%@/test-clear-then-set.plist", self.testDir];
+#pragma mark - atomicallyApplyBundle: tests
+
+- (void)testAtomicallyApplyBundleReplacesAllKeys {
+  NSString* plistPath = [NSString stringWithFormat:@"%@/test-atomic-replace.plist", self.testDir];
+
+  // Pre-populate sync state with stale values — the atomic apply replaces all of them.
   SNTConfigurator* cfg = [self configuratorWithSyncState:@{
     @"ClientMode" : @(SNTClientModeLockdown),
     @"AllowedPathRegex" : @"old-pattern",
+    @"OverrideFileAccessAction" : @"disable",
+    @"full_sync_interval" : @(99999),
   }
                                                plistPath:plistPath];
 
-  [cfg clearSyncState];
-  [cfg setSyncServerClientMode:SNTClientModeMonitor];
+  // Build a bundle exercising every slot atomicallyApplyBundle: handles.
+  SNTConfigBundle* bundle = [[SNTConfigBundle alloc] init];
+  // Use the testing category to set bundle slots directly.
+  bundle.clientMode = @(SNTClientModeMonitor);
+  bundle.syncType = @(SNTSyncTypeNormal);
+  bundle.allowlistRegex = @"new-allow";
+  bundle.blocklistRegex = @"new-block";
+  bundle.removableMediaAction = @"Block";
+  bundle.removableMediaRemountFlags = @[ @"foo" ];
+  bundle.encryptedRemovableMediaAction = @"Remount";
+  bundle.encryptedRemovableMediaRemountFlags = @[ @"rdonly" ];
+  bundle.blockNetworkMount = @(YES);
+  bundle.bannedNetworkMountBlockMessage = @"blocked";
+  bundle.allowedNetworkMountHosts = @[ @"example.com" ];
+  bundle.enableBundles = @(YES);
+  bundle.enableTransitiveRules = @(YES);
+  bundle.enableAllEventUpload = @(NO);
+  bundle.disableUnknownEventUpload = @(YES);
+  bundle.overrideFileAccessAction = @"AuditOnly";  // case validated; original case stored
+  bundle.fullSyncLastSuccess = [NSDate dateWithTimeIntervalSince1970:1000];
+  bundle.ruleSyncLastSuccess = [NSDate dateWithTimeIntervalSince1970:2000];
+  bundle.eventDetailURL = @"https://x/details";
+  bundle.eventDetailText = @"View";
+  bundle.fileAccessEventDetailURL = @"https://x/faa";
+  bundle.fileAccessEventDetailText = @"View FAA";
+  bundle.pushTokenChain = @[ @"issuerJWT", @"jwt" ];
+  bundle.telemetryFilterExpressions = @[ @"expr" ];
+  bundle.fullSyncInterval = @(600);
+  bundle.pushNotificationsFullSyncInterval = @(21600);
 
+  [cfg atomicallyApplyBundle:bundle];
+
+  // FullSyncInterval set by the bundle replaces the stale 99999.
+  XCTAssertEqualObjects(cfg.syncState[@"full_sync_interval"], @(600));
+  // Pre-existing stale values are replaced (not merged).
+  XCTAssertTrue([cfg.syncState[@"AllowedPathRegex"] isKindOfClass:[NSRegularExpression class]]);
+  XCTAssertEqualObjects([cfg.syncState[@"AllowedPathRegex"] pattern], @"new-allow");
+  XCTAssertTrue([cfg.syncState[@"BlockedPathRegex"] isKindOfClass:[NSRegularExpression class]]);
+  XCTAssertEqualObjects([cfg.syncState[@"BlockedPathRegex"] pattern], @"new-block");
+
+  // ClientMode validated and stored.
+  XCTAssertEqualObjects(cfg.syncState[@"ClientMode"], @(SNTClientModeMonitor));
+
+  // OverrideFileAccessAction stored in original case (matching
+  // setSyncServerOverrideFileAccessAction:).
+  XCTAssertEqualObjects(cfg.syncState[@"OverrideFileAccessAction"], @"AuditOnly");
+
+  // Push token chain and telemetry filter expressions ensure-string-filtered.
+  XCTAssertEqualObjects(cfg.syncState[@"PushTokenChain"], (@[ @"issuerJWT", @"jwt" ]));
+  XCTAssertEqualObjects(cfg.syncState[@"TelemetryFilterExpressions"], (@[ @"expr" ]));
+
+  // Bundle slots that the method excludes are absent.
+  XCTAssertNil(cfg.syncState[@"ModeTransition"]);
+
+  // Disk file matches in-memory state (modulo regex flatten).
   NSDictionary* onDisk = [NSDictionary dictionaryWithContentsOfFile:plistPath];
-  XCTAssertEqual([onDisk[@"ClientMode"] integerValue], SNTClientModeMonitor);
-  XCTAssertNil(onDisk[@"AllowedPathRegex"]);
+  XCTAssertEqualObjects(onDisk[@"ClientMode"], @(SNTClientModeMonitor));
+  XCTAssertEqualObjects(onDisk[@"AllowedPathRegex"], @"new-allow");  // pattern string on disk
+  XCTAssertEqualObjects(onDisk[@"OverrideFileAccessAction"], @"AuditOnly");
+
+  XCTAssertTrue([self.fileMgr removeItemAtPath:plistPath error:nil]);
+}
+
+- (void)testAtomicallyApplyBundleDropsInvalidValues {
+  NSString* plistPath = [NSString stringWithFormat:@"%@/test-atomic-drops.plist", self.testDir];
+  SNTConfigurator* cfg = [self configuratorWithSyncState:@{} plistPath:plistPath];
+
+  SNTConfigBundle* bundle = [[SNTConfigBundle alloc] init];
+  bundle.clientMode = @(42);                  // invalid enum
+  bundle.overrideFileAccessAction = @"warn";  // not in allow-list
+
+  [cfg atomicallyApplyBundle:bundle];
+
+  XCTAssertNil(cfg.syncState[@"ClientMode"]);
+  XCTAssertNil(cfg.syncState[@"OverrideFileAccessAction"]);
 
   XCTAssertTrue([self.fileMgr removeItemAtPath:plistPath error:nil]);
 }

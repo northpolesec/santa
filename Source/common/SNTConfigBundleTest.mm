@@ -53,6 +53,7 @@
 @property NSArray<SNTCELFallbackRule*>* celFallbackRules;
 @property NSNumber* fullSyncInterval;
 @property NSNumber* pushNotificationsFullSyncInterval;
+@property NSNumber* clearSyncStateBeforeApply;
 @end
 
 @interface SNTConfigBundleTest : XCTestCase
@@ -62,7 +63,7 @@
 
 - (void)testGettersWithValues {
   __block XCTestExpectation* exp = [self expectationWithDescription:@"Result Blocks"];
-  exp.expectedFulfillmentCount = 29;
+  exp.expectedFulfillmentCount = 30;
   NSDate* nowDate = [NSDate now];
 
   SNTConfigBundle* bundle = [[SNTConfigBundle alloc] init];
@@ -97,6 +98,7 @@
   bundle.pushTokenChain = @[ @"issuerJWT", @"userJWT" ];
   bundle.fullSyncInterval = @(600);
   bundle.pushNotificationsFullSyncInterval = @(21600);
+  bundle.clearSyncStateBeforeApply = @(YES);
 
   [bundle clientMode:^(SNTClientMode val) {
     XCTAssertEqual(val, SNTClientModeLockdown);
@@ -248,6 +250,11 @@
     [exp fulfill];
   }];
 
+  [bundle clearSyncStateBeforeApply:^(BOOL val) {
+    XCTAssertNotEqual(val, NO);
+    [exp fulfill];
+  }];
+
   // Low timeout because code above is synchronous
   [self waitForExpectationsWithTimeout:0.1 handler:NULL];
 }
@@ -370,6 +377,52 @@
   [bundle pushNotificationsFullSyncInterval:^(NSUInteger val) {
     XCTFail(@"This shouldn't be called");
   }];
+
+  [bundle clearSyncStateBeforeApply:^(BOOL val) {
+    XCTFail(@"This shouldn't be called");
+  }];
+}
+
+- (void)testClearSyncStateBeforeApplyEncodesAndDecodes {
+  // When set to YES, the round-trip preserves the value and the accessor block fires.
+  SNTConfigBundle* set = [[SNTConfigBundle alloc] init];
+  set.clearSyncStateBeforeApply = @(YES);
+
+  NSError* error = nil;
+  NSData* setData = [NSKeyedArchiver archivedDataWithRootObject:set
+                                          requiringSecureCoding:YES
+                                                          error:&error];
+  XCTAssertNil(error);
+  SNTConfigBundle* setDecoded = [NSKeyedUnarchiver unarchivedObjectOfClass:[SNTConfigBundle class]
+                                                                  fromData:setData
+                                                                     error:&error];
+  XCTAssertNil(error);
+
+  __block BOOL setFired = NO;
+  __block BOOL setValue = NO;
+  [setDecoded clearSyncStateBeforeApply:^(BOOL v) {
+    setFired = YES;
+    setValue = v;
+  }];
+  XCTAssertTrue(setFired);
+  XCTAssertEqual(setValue, YES);
+
+  // When left unset, the round-trip preserves the unset state and the block does not fire.
+  SNTConfigBundle* unset = [[SNTConfigBundle alloc] init];
+  NSData* unsetData = [NSKeyedArchiver archivedDataWithRootObject:unset
+                                            requiringSecureCoding:YES
+                                                            error:&error];
+  XCTAssertNil(error);
+  SNTConfigBundle* unsetDecoded = [NSKeyedUnarchiver unarchivedObjectOfClass:[SNTConfigBundle class]
+                                                                    fromData:unsetData
+                                                                       error:&error];
+  XCTAssertNil(error);
+
+  __block BOOL unsetFired = NO;
+  [unsetDecoded clearSyncStateBeforeApply:^(BOOL v) {
+    unsetFired = YES;
+  }];
+  XCTAssertFalse(unsetFired);
 }
 
 @end

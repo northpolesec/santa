@@ -1150,14 +1150,23 @@ extern NSString* _Nonnull const kEnableMenuItemUserOverride;
 
 ///
 ///  Clear the persisted sync-managed state. The in-memory dictionary is
-///  reset and `sync-state.plist` is removed from disk. Called from two
-///  places: (a) `SNTSyncdQueue` after `SyncBaseURL` has been removed for
-///  10 minutes, to forget settings from the previous server; and
-///  (b) the daemon's `updateSyncSettings:` handler at the start of a
-///  clean-sync postflight, so settings the server stops sending no longer
-///  linger on disk after the bundle is applied.
+///  reset and `sync-state.plist` is removed from disk. Called by
+///  `SNTSyncdQueue` after `SyncBaseURL` has been removed for 10 minutes,
+///  to forget settings from the previous server.
 ///
 - (void)clearSyncState;
+
+///
+///  Atomically replace the persisted sync-managed state with the bundle's contents.
+///  Walks the bundle once, builds a fresh in-memory dictionary (with inline
+///  validation/translation matching the existing per-key setters), then performs
+///  a single in-memory swap and a single disk write. Used by the daemon's
+///  `updateSyncSettings:` clean-sync branch (when `bundle.clearSyncStateBeforeApply`
+///  is YES). Slots intentionally not handled: `clearSyncStateBeforeApply` itself
+///  (consumed by the daemon's branching), and `modeTransition` (owned by
+///  `_temporaryMonitorMode` for combined persistence + side effects).
+///
+- (void)atomicallyApplyBundle:(nonnull SNTConfigBundle*)bundle;
 
 ///
 ///  Validate the configuration profile.

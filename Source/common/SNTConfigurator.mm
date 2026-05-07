@@ -2071,6 +2071,124 @@ static SNTConfigurator* sharedConfigurator = nil;
   }
 }
 
+- (void)atomicallyApplyBundle:(SNTConfigBundle*)bundle {
+  NSMutableDictionary* newSyncState = [NSMutableDictionary dictionary];
+
+  [bundle clientMode:^(SNTClientMode m) {
+    if (m == SNTClientModeMonitor || m == SNTClientModeLockdown || m == SNTClientModeStandalone) {
+      newSyncState[kClientModeKey] = @(m);
+    }
+  }];
+  [bundle syncType:^(SNTSyncType v) {
+    newSyncState[kSyncTypeRequired] = @(v);
+  }];
+  [bundle allowlistRegex:^(NSString* pattern) {
+    NSRegularExpression* re = [NSRegularExpression regularExpressionWithPattern:pattern
+                                                                        options:0
+                                                                          error:NULL];
+    if (re) {
+      newSyncState[kAllowedPathRegexKey] = re;
+    }
+  }];
+  [bundle blocklistRegex:^(NSString* pattern) {
+    NSRegularExpression* re = [NSRegularExpression regularExpressionWithPattern:pattern
+                                                                        options:0
+                                                                          error:NULL];
+    if (re) {
+      newSyncState[kBlockedPathRegexKey] = re;
+    }
+  }];
+  [bundle removableMediaAction:^(NSString* v) {
+    newSyncState[kRemovableMediaActionKey] = v;
+  }];
+  [bundle removableMediaRemountFlags:^(NSArray<NSString*>* v) {
+    newSyncState[kRemovableMediaRemountFlagsKey] = v;
+  }];
+  [bundle encryptedRemovableMediaAction:^(NSString* v) {
+    newSyncState[kEncryptedRemovableMediaActionKey] = v;
+  }];
+  [bundle encryptedRemovableMediaRemountFlags:^(NSArray<NSString*>* v) {
+    newSyncState[kEncryptedRemovableMediaRemountFlagsKey] = v;
+  }];
+  [bundle blockNetworkMount:^(BOOL v) {
+    newSyncState[kBlockNetworkMountKey] = @(v);
+  }];
+  [bundle bannedNetworkMountBlockMessage:^(NSString* v) {
+    newSyncState[kBannedNetworkMountBlockMessage] = v;
+  }];
+  [bundle allowedNetworkMountHosts:^(NSArray<NSString*>* v) {
+    newSyncState[kAllowedNetworkMountHosts] = v;
+  }];
+  [bundle enableBundles:^(BOOL v) {
+    newSyncState[kEnableBundlesKey] = @(v);
+  }];
+  [bundle enableTransitiveRules:^(BOOL v) {
+    newSyncState[kEnableTransitiveRulesKey] = @(v);
+  }];
+  [bundle enableAllEventUpload:^(BOOL v) {
+    newSyncState[kEnableAllEventUploadKey] = @(v);
+  }];
+  [bundle disableUnknownEventUpload:^(BOOL v) {
+    newSyncState[kDisableUnknownEventUploadKey] = @(v);
+  }];
+  [bundle overrideFileAccessAction:^(NSString* v) {
+    NSString* lower = [v lowercaseString];
+    if ([lower isEqualToString:@"auditonly"] || [lower isEqualToString:@"disable"] ||
+        [lower isEqualToString:@"none"] || [lower isEqualToString:@""]) {
+      newSyncState[kOverrideFileAccessActionKey] = v;
+    }
+  }];
+  [bundle exportConfiguration:^(SNTExportConfiguration* v) {
+    newSyncState[kExportConfigurationKey] = [v serialize];
+  }];
+  [bundle fullSyncLastSuccess:^(NSDate* v) {
+    newSyncState[kFullSyncLastSuccess] = v;
+  }];
+  [bundle ruleSyncLastSuccess:^(NSDate* v) {
+    newSyncState[kRuleSyncLastSuccess] = v;
+  }];
+  [bundle eventDetailURL:^(NSString* v) {
+    newSyncState[kEventDetailURLKey] = v;
+  }];
+  [bundle eventDetailText:^(NSString* v) {
+    newSyncState[kEventDetailTextKey] = v;
+  }];
+  [bundle fileAccessEventDetailURL:^(NSString* v) {
+    newSyncState[kFileAccessEventDetailURLKey] = v;
+  }];
+  [bundle fileAccessEventDetailText:^(NSString* v) {
+    newSyncState[kFileAccessEventDetailTextKey] = v;
+  }];
+  [bundle networkExtensionSettings:^(SNTSyncNetworkExtensionSettings* v) {
+    newSyncState[kNetworkExtensionSettingsKey] = [v serialize];
+  }];
+  [bundle pushTokenChain:^(NSArray<NSString*>* v) {
+    newSyncState[kPushTokenChainKey] = EnsureArrayOfStrings(v);
+  }];
+  [bundle telemetryFilterExpressions:^(NSArray<NSString*>* v) {
+    newSyncState[kTelemetryFilterExpressionsKey] = EnsureArrayOfStrings(v);
+  }];
+  [bundle celFallbackRules:^(NSArray<SNTCELFallbackRule*>* v) {
+    newSyncState[kCELFallbackRulesKey] = [SNTCELFallbackRule serializeArray:v];
+  }];
+  [bundle fullSyncInterval:^(NSUInteger v) {
+    newSyncState[kFullSyncInterval] = v ? @(v) : nil;
+  }];
+  [bundle pushNotificationsFullSyncInterval:^(NSUInteger v) {
+    newSyncState[kFCMFullSyncInterval] = v ? @(v) : nil;
+  }];
+
+  void (^commit)(void) = ^{
+    self.syncState = newSyncState;
+    [self saveSyncStateToDisk];
+  };
+  if ([NSThread isMainThread]) {
+    commit();
+  } else {
+    dispatch_sync(dispatch_get_main_queue(), commit);
+  }
+}
+
 - (NSArray*)entitlementsPrefixFilter {
   return EnsureArrayOfStrings(self.configState[kEntitlementsPrefixFilterKey]);
 }

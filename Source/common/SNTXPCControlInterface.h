@@ -55,13 +55,18 @@ typedef NS_ENUM(NSInteger, SNTRuleAddSource) {
 ///
 ///  Config ops
 ///
-///  Apply `bundle` to the persisted sync state. Non-nil values are merged
-///  per-key into the existing state.
+///  Apply `bundle` to the persisted sync state. By default, non-nil values
+///  are merged per-key into the existing state (every other sync stage's
+///  incremental write).
 ///
-///  When `bundle.syncType == @(Normal)` (the marker `PostflightConfigBundle`
-///  sets only when reverting from Clean/CleanAll), the daemon first calls
-///  `clearSyncState` to wipe persisted sync state before applying the
-///  bundle so settings the server stops sending no longer linger.
+///  When `bundle.clearSyncStateBeforeApply == YES` (set by
+///  `PostflightConfigBundle` only when the in-flight sync was Clean or
+///  CleanAll), the daemon takes an atomic-swap branch: it calls
+///  `[SNTConfigurator atomicallyApplyBundle:]`, which builds a fresh
+///  in-memory dictionary from the bundle and performs a single in-memory
+///  swap + single disk write. The mode-transition handler and CEL fallback
+///  rule cache flush still fire after the swap; persistence for every other
+///  slot is owned by the atomic-apply call.
 ///
 - (void)updateSyncSettings:(SNTConfigBundle*)result reply:(void (^)(void))reply;
 
