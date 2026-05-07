@@ -69,10 +69,10 @@ SNTConfigBundle* PostflightConfigBundle(SNTSyncState* syncState) {
   SNTConfigBundle* bundle = [[SNTConfigBundle alloc] init];
 
   bundle.clientMode = syncState.clientMode ? @(syncState.clientMode) : nil;
-  // Clean syncs reset SyncTypeRequired to Normal. The daemon recognizes
-  // this exact transition (`syncType == @(Normal)`) as the signal that
-  // this is a clean-sync postflight bundle and clears persisted sync
-  // state before applying.
+  // After a Clean or CleanAll sync, reset SyncTypeRequired to Normal so the
+  // directive doesn't repeat on the next sync. The daemon's atomic-swap
+  // branch is gated by `clearSyncStateBeforeApply` (set below), not by this
+  // syncType value.
   bundle.syncType = syncState.syncType != SNTSyncTypeNormal ? @(SNTSyncTypeNormal) : nil;
   bundle.allowlistRegex = syncState.allowlistRegex;
   bundle.blocklistRegex = syncState.blocklistRegex;
@@ -106,6 +106,9 @@ SNTConfigBundle* PostflightConfigBundle(SNTSyncState* syncState) {
 
   bundle.fullSyncLastSuccess = [NSDate now];
 
+  // On Clean/CleanAll syncs, signal the daemon to atomically replace the
+  // persisted sync state instead of merging per-key, so settings the server
+  // has stopped sending no longer linger on disk.
   if (syncState.syncType != SNTSyncTypeNormal) {
     bundle.clearSyncStateBeforeApply = @(YES);
   }
