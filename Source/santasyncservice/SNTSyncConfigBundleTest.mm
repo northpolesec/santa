@@ -308,6 +308,12 @@
   syncState.pushIssuerJWT = @"issuerToken";
   bundle = PostflightConfigBundle(syncState);
   XCTAssertNil(bundle.pushTokenChain);
+
+  // Symmetric: only pushJWT set, pushIssuerJWT missing — still no chain.
+  syncState.pushIssuerJWT = nil;
+  syncState.pushJWT = @"userToken";
+  bundle = PostflightConfigBundle(syncState);
+  XCTAssertNil(bundle.pushTokenChain);
 }
 
 - (void)testPostflightConfigBundleSetsClearSyncStateBeforeApplyOnCleanSync {

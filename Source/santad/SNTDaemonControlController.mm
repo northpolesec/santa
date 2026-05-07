@@ -493,7 +493,8 @@ double watchdogRAMPeak = 0;
     }];
 
     NSData* newCELData = [SNTCELFallbackRule serializeArray:[configurator celFallbackRules]];
-    if (![oldCELData isEqualToData:newCELData] && self.flushCacheBlock) {
+    if (oldCELData != newCELData && ![oldCELData isEqualToData:newCELData] &&
+        self.flushCacheBlock) {
       self.flushCacheBlock(FlushCacheMode::kAllCaches, FlushCacheReason::kCELFallbackRulesChanged);
     }
 
