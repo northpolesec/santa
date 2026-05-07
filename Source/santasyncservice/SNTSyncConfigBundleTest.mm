@@ -258,11 +258,6 @@
   XCTAssertNil(bundle.celFallbackRules);
 }
 
-// PostflightConfigBundle invariants: these tests pin behavior the SNT-357
-// atomic-replace path depends on. If a future refactor breaks either invariant,
-// `replaceSyncStateWithBundle:` would silently leave the on-disk plist in an
-// inconsistent state after a clean sync.
-
 - (void)testPostflightConfigBundleAlwaysSetsFullSyncLastSuccess {
   for (SNTSyncType type :
        (SNTSyncType[]){SNTSyncTypeNormal, SNTSyncTypeClean, SNTSyncTypeCleanAll}) {
@@ -271,7 +266,7 @@
     SNTConfigBundle* bundle = PostflightConfigBundle(state);
     XCTAssertNotNil(bundle.fullSyncLastSuccess,
                     @"PostflightConfigBundle must set fullSyncLastSuccess "
-                    @"for syncType=%lu (load-bearing for SNT-357 atomic replace).",
+                    @"for syncType=%lu",
                     (unsigned long)type);
   }
 }
