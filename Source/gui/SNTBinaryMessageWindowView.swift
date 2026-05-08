@@ -177,8 +177,8 @@ struct MoreDetailsView: View {
             }
           }
           .buttonStyle(ScalingButtonStyle())
-          .keyboardShortcut(.escape, modifiers: .command)
-          .help("⌘ Esc")
+          .keyboardShortcut(.cancelAction)
+          .help("Esc")
         }
 
         Spacer()
@@ -333,6 +333,7 @@ struct SNTBinaryMessageWindowView: View {
         DismissButton(
           customText: getDismissText(),
           silence: preventFutureNotifications,
+          window: window,
           action: dismissButton
         )
       }

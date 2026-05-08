@@ -56,7 +56,7 @@ struct SNTDeviceMessageWindowView: View {
       Spacer()
 
       HStack(spacing: 15.0) {
-        DismissButton(customText: nil, silence: nil, action: dismissButton)
+        DismissButton(customText: nil, silence: nil, window: window, action: dismissButton)
       }
 
       Spacer()

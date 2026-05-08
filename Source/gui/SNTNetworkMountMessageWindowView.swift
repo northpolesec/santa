@@ -153,8 +153,8 @@ struct MoreDetailsView: View {
             }
           }
           .buttonStyle(ScalingButtonStyle())
-          .keyboardShortcut(.escape, modifiers: .command)
-          .help("⌘ Esc")
+          .keyboardShortcut(.cancelAction)
+          .help("Esc")
         }
 
         Spacer()
@@ -223,7 +223,9 @@ struct SNTNetworkMountMessageWindowView: View {
       Spacer()
 
       HStack(spacing: 15.0) {
-        DismissButton(customText: nil, silence: preventFutureNotifications, action: dismissButton)
+        DismissButton(
+          customText: nil, silence: preventFutureNotifications, window: window,
+          action: dismissButton)
       }
 
       Spacer()

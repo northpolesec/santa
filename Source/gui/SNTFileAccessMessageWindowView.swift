@@ -161,8 +161,8 @@ struct MoreDetailsView: View {
             }
           }
           .buttonStyle(ScalingButtonStyle())
-          .keyboardShortcut(.escape, modifiers: .command)
-          .help("⌘ Esc")
+          .keyboardShortcut(.cancelAction)
+          .help("Esc")
         }
 
         Spacer()
@@ -258,7 +258,8 @@ struct SNTFileAccessMessageWindowView: View {
           if effectiveURL != nil {
             OpenEventButton(customText: effectiveText, action: openButton)
           }
-          DismissButton(silence: preventFutureNotifications, action: dismissButton)
+          DismissButton(
+            silence: preventFutureNotifications, window: window, action: dismissButton)
         }
         Spacer()
       }

@@ -14,6 +14,8 @@
 
 #import "Source/gui/SNTMessageWindowController.h"
 
+#import "Source/gui/SNTMessageView-Swift.h"
+
 @interface SNTMessageWindowController ()
 @property BOOL hasBeenCentered;
 @end
@@ -22,11 +24,12 @@
 
 + (NSWindow*)defaultWindow {
   NSWindow* window =
-      [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 0, 0)
-                                  styleMask:NSWindowStyleMaskClosable | NSWindowStyleMaskResizable |
-                                            NSWindowStyleMaskTitled
-                                    backing:NSBackingStoreBuffered
-                                      defer:NO];
+      [[SNTNotificationWindow alloc] initWithContentRect:NSMakeRect(0, 0, 0, 0)
+                                               styleMask:NSWindowStyleMaskClosable |
+                                                         NSWindowStyleMaskResizable |
+                                                         NSWindowStyleMaskTitled
+                                                 backing:NSBackingStoreBuffered
+                                                   defer:NO];
 
   window.titlebarAppearsTransparent = YES;
   window.movableByWindowBackground = YES;

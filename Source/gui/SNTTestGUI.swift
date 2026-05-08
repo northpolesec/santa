@@ -22,6 +22,7 @@ import santa_common_SNTStoredExecutionEvent
 import Source_gui_SNTDeviceMessageWindowView
 import Source_gui_SNTBinaryMessageWindowView
 import Source_gui_SNTAboutWindowView
+import santa_gui_SNTMessageView
 
 func ShowWindow(_ vc: NSViewController, _ window: NSWindow, appearance: AppearanceMode = .system) {
   window.contentRect(forFrameRect: NSMakeRect(0, 0, 0, 0))
@@ -270,13 +271,17 @@ struct BinaryView: View {
         case .Nov25: Date.overrideDate = Date(timeIntervalSince1970: 1732544115)
         }
 
-        let window = NSWindow()
+        // Mirror SNTExecutionController.mm: customURL falls back to the EventDetailURL
+        // config so the Open Event button appears in the harness.
+        let effectiveURL = customURL.isEmpty ? eventDetailURL : customURL
+
+        let window = SNTNotificationWindow()
         ShowWindow(
           SNTBinaryMessageWindowViewFactory.createWith(
             window: window,
             event: event,
             customMsg: customMsg as NSString?,
-            customURL: customURL as NSString?,
+            customURL: effectiveURL.isEmpty ? nil : (effectiveURL as NSString),
             configState: SNTConfigState(config: SNTConfigurator.configurator()),
             bundleProgress: SNTBundleProgress(),
             uiStateCallback: { interval in print("Silence interval was set to \(interval)") },
@@ -367,7 +372,7 @@ struct DeviceView: View {
         }
         SNTConfigurator.overrideConfig(configMap)
 
-        let window = NSWindow()
+        let window = SNTNotificationWindow()
         ShowWindow(
           SNTDeviceMessageWindowViewFactory.createWith(window: window, event: event),
           window,
@@ -427,7 +432,7 @@ struct AboutView: View {
           SNTConfigurator.overrideConfig(configMap)
         }
 
-        let window = NSWindow()
+        let window = SNTNotificationWindow()
         ShowWindow(SNTAboutWindowViewFactory.createWith(window: window), window, appearance: appearanceMode)
       }
     }

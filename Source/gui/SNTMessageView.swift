@@ -328,6 +328,7 @@ public func StandaloneButton(action: @escaping () -> Void) -> some View {
 public func DismissButton(
   customText: String? = nil,
   silence: Bool?,
+  window: NSWindow? = nil,
   action: @escaping () -> Void
 )
   -> some View
@@ -343,8 +344,58 @@ public func DismissButton(
       Text(t).frame(maxWidth: 200.0)
     }
   )
-  .keyboardShortcut(.escape, modifiers: .command)
-  .help("⌘ Esc")
+  .help("⌘ W")
+  .modifier(CmdWDismiss(window: window, action: action))
+}
+
+// SwiftUI's `.keyboardShortcut("w", modifiers: .command)` doesn't reliably fire on a SwiftUI
+// Button when the surrounding window is an NSHostingController owned by an ObjC controller,
+// and Cmd+Esc is consumed system-side before reaching the app at all. SNTNotificationWindow
+// (instantiated by SNTMessageWindowController.defaultWindow) overrides performKeyEquivalent:
+// and performClose: to invoke its `closeAction` block; this modifier just plumbs the dismiss
+// action onto the window for the lifetime of the view.
+private struct CmdWDismiss: ViewModifier {
+  let window: NSWindow?
+  let action: () -> Void
+
+  func body(content: Content) -> some View {
+    content
+      .onAppear {
+        (window as? SNTNotificationWindow)?.closeAction = action
+      }
+      .onDisappear {
+        (window as? SNTNotificationWindow)?.closeAction = nil
+      }
+  }
+}
+
+// NSWindow subclass that routes Cmd+W (both the direct keypress and the menu-driven
+// File > Close path) to a closure. Used by SNTMessageWindowController so every
+// notification-style window respects the Dismiss button's ⌘ W shortcut.
+@objc public class SNTNotificationWindow: NSWindow {
+  @objc public var closeAction: (() -> Void)?
+
+  // kVK_ANSI_W from <Carbon/HIToolbox/Events.h>.
+  private static let wKeyCode: UInt16 = 13
+
+  public override func performKeyEquivalent(with event: NSEvent) -> Bool {
+    if event.keyCode == Self.wKeyCode,
+      event.modifierFlags.intersection(.deviceIndependentFlagsMask).contains(.command),
+      let action = closeAction
+    {
+      action()
+      return true
+    }
+    return super.performKeyEquivalent(with: event)
+  }
+
+  public override func performClose(_ sender: Any?) {
+    if let action = closeAction {
+      action()
+      return
+    }
+    super.performClose(sender)
+  }
 }
 
 // TextWithLimit is like Text() but it supports a limit on the number of characters in the

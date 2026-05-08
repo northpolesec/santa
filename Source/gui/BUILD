@@ -180,6 +180,7 @@ objc_library(
         ":SNTDeviceMessageWindowView",
         ":SNTFileAccessMessageWindowView",
         ":SNTFileInfoView",
+        ":SNTMessageView",
         ":SNTNetworkMountMessageWindowView",
         ":SNTSystemExtensionDelegate",
         "//Source/common:CertificateHelpers",
