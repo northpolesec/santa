@@ -2221,17 +2221,24 @@ static SNTConfigurator* sharedConfigurator = nil;
   return [NSRegularExpression regularExpressionWithPattern:pattern options:0 error:NULL];
 }
 
-- (void)applyOverrides:(NSMutableDictionary*)forcedConfig {
-  // Overrides should only be applied under debug builds.
+// Whether the debug-only config-override-file mechanism is active in this process.
+// Off by default under xctest so override values don't leak into tests; opt in per
+// test with `bazel test --test_env=ENABLE_CONFIG_OVERRIDES=1 ...`.
+- (BOOL)overridesEnabled {
 #ifdef DEBUG
-  if ([[[NSProcessInfo processInfo] processName] isEqualToString:@"xctest"] &&
-      ![[[NSProcessInfo processInfo] environment] objectForKey:@"ENABLE_CONFIG_OVERRIDES"]) {
-    // By default, config overrides are not applied when running tests to help
-    // mitigate potential issues due to unexpected config values. This behavior
-    // can be overriden if desired by using the env variable: `ENABLE_CONFIG_OVERRIDES`.
-    //
-    // E.g.:
-    //   bazel test --test_env=ENABLE_CONFIG_OVERRIDES=1 ...other test args...
+  if (![[[NSProcessInfo processInfo] processName] isEqualToString:@"xctest"]) {
+    return YES;
+  } else {
+    return
+        [[[NSProcessInfo processInfo] environment] objectForKey:@"ENABLE_CONFIG_OVERRIDES"] != nil;
+  }
+#else
+  return NO;
+#endif
+}
+
+- (void)applyOverrides:(NSMutableDictionary*)forcedConfig {
+  if (![self overridesEnabled]) {
     return;
   }
 
@@ -2251,7 +2258,6 @@ static SNTConfigurator* sharedConfigurator = nil;
       forcedConfig[key] = [self expressionForPattern:pattern];
     }
   }
-#endif
 }
 
 - (id)overriderValue:(id)value forKey:(NSString*)key {
@@ -2304,9 +2310,11 @@ static SNTConfigurator* sharedConfigurator = nil;
                                                name:NSUserDefaultsDidChangeNotification
                                              object:nil];
 #ifdef DEBUG
-  dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
-    [self watchOverridesFile];
-  });
+  if ([self overridesEnabled]) {
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+      [self watchOverridesFile];
+    });
+  }
 #endif
 }
 
