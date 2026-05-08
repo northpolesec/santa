@@ -26,7 +26,7 @@
 
 #include "absl/status/statusor.h"
 
-static size_t GetResidentMemoryBytes() {
+[[maybe_unused]] static size_t GetResidentMemoryBytes() {
   mach_task_basic_info_data_t info;
   mach_msg_type_number_t count = MACH_TASK_BASIC_INFO_COUNT;
   if (task_info(mach_task_self(), MACH_TASK_BASIC_INFO, (task_info_t)&info, &count) !=
@@ -56,8 +56,7 @@ static size_t GetResidentMemoryBytes() {
   // quarantine, which swamps the growth signal this test measures. Non-
   // sanitized runs cover this test.
   XCTSkip(@"Skipping under sanitizers (RSS measurement is unreliable)");
-  return;
-#endif
+#else
   using ExecutableFileT = santa::cel::CELProtoTraits<true>::ExecutableFileT;
   using AncestorT = santa::cel::CELProtoTraits<true>::AncestorT;
   using FileDescriptorT = santa::cel::CELProtoTraits<true>::FileDescriptorT;
@@ -178,6 +177,7 @@ static size_t GetResidentMemoryBytes() {
                     @"CompileAndEvaluate leaked %.1fMB over %d iterations "
                     @"(threshold: %.0fMB). This indicates unbounded arena growth.",
                     growthMB, iterations, thresholdMB);
+#endif
 }
 
 @end
