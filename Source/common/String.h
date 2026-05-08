@@ -64,6 +64,9 @@ static inline std::string StringTokenToString(es_string_token_t es_str) {
 }
 
 static inline NSString* StringTokenToNSString(es_string_token_t es_str) {
+  if (es_str.length == 0) {
+    return nil;
+  }
   return StringToNSString(es_str.data);
 }
 
