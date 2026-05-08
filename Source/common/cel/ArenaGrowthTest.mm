@@ -51,6 +51,13 @@ static size_t GetResidentMemoryBytes() {
 /// The fix uses a stack-local Arena in CompileAndEvaluate so temporaries are
 /// freed at end of scope. This test verifies memory stays bounded.
 - (void)testCompileAndEvaluateArenaGrowth {
+#if defined(ADDRESS_SANITIZER) || defined(THREAD_SANITIZER)
+  // Sanitizers inflate RSS via shadow memory, redzones, and the freed-memory
+  // quarantine, which swamps the growth signal this test measures. Non-
+  // sanitized runs cover this test.
+  XCTSkip(@"Skipping under sanitizers (RSS measurement is unreliable)");
+  return;
+#endif
   using ExecutableFileT = santa::cel::CELProtoTraits<true>::ExecutableFileT;
   using AncestorT = santa::cel::CELProtoTraits<true>::AncestorT;
   using FileDescriptorT = santa::cel::CELProtoTraits<true>::FileDescriptorT;
