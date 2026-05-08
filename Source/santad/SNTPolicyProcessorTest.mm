@@ -1514,6 +1514,65 @@ static MOLCodesignChecker* MakeMockChecker(NSString* cdhash, NSString* teamID,
                     @"signingStatus must reflect the active slice's real state, not Invalid");
 }
 
+// enableBadSignatureProtection must NOT fire when MOL surfaces a partial-validity
+// error but identity was still extractable (the bundle-binary fd-binding case
+// where SecStaticCode via /dev/fd/N reports errSecCSInfoPlistFailed even though
+// cdhash / teamID / signingID / cert chain are all intact). Without the
+// identity-extracted gate at the bad-sig protection callsite, every bundle binary
+// on a host with enableBadSignatureProtection=YES would short-circuit to
+// BlockCertificate.
+- (void)testOuter_BadSigProtection_DoesNotFire_WhenIdentityExtracted {
+  id mockConfig = OCMClassMock([SNTConfigurator class]);
+  OCMStub([mockConfig configurator]).andReturn(mockConfig);
+  OCMStub([mockConfig enableBadSignatureProtection]).andReturn(YES);
+  OCMStub([mockConfig clientMode]).andReturn(SNTClientModeMonitor);
+
+  es_file_t file;
+  es_process_t proc;
+  MakeTargetProc(&file, &proc, "/tmp/fake_bundle_bin", MakeStat(), CS_SIGNED | CS_VALID | CS_KILL,
+                 /*team=*/"T", /*sid=*/"S", kHashA);
+  proc.is_platform_binary = false;
+
+  // The bundle-binary partial-validity shape: csInfo is non-nil with a populated
+  // cdhash, AND codesignCheckerWithError: surfaces errSecCSInfoPlistFailed.
+  NSError* infoPlistErr = [NSError errorWithDomain:NSOSStatusErrorDomain
+                                              code:errSecCSInfoPlistFailed
+                                          userInfo:nil];
+  MOLCodesignChecker* mockChecker = MakeMockChecker(HexOf(kHashA, 20), @"T", @"S");
+
+  id mockFileInfo = OCMClassMock([SNTFileInfo class]);
+  OCMStub([mockFileInfo SHA256])
+      .andReturn(@"abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890");
+  OCMStub([mockFileInfo quarantineDataURL]).andReturn(nil);
+  OCMStub([mockFileInfo path]).andReturn(@"/tmp/fake_bundle_bin");
+  // fileHandle.fileDescriptor is consulted by the verifier block; -1 makes
+  // case-5 fstat fail-closed, but case-3 (signed, ID match, cdhash match) wins
+  // before that ever runs.
+  id mockHandle = OCMClassMock([NSFileHandle class]);
+  OCMStub([(NSFileHandle*)mockHandle fileDescriptor]).andReturn(-1);
+  OCMStub([mockFileInfo fileHandle]).andReturn(mockHandle);
+  OCMStub([mockFileInfo codesignCheckerWithError:[OCMArg setTo:infoPlistErr]])
+      .andReturn(mockChecker);
+
+  SNTConfigState* cs = [[SNTConfigState alloc] initWithConfig:mockConfig];
+
+  SNTCachedDecision* cd = [self.processor decisionForFileInfo:mockFileInfo
+                                                targetProcess:&proc
+                                                  configState:cs
+                                           activationCallback:nil
+                                               cachedDecision:nil];
+
+  XCTAssertNotEqual(cd.decision, SNTEventStateBlockCertificate,
+                    @"bad-sig protection must not fire when identity is intact");
+  XCTAssertFalse([cd.decisionExtra hasPrefix:@"Blocked due to signature error"],
+                 @"decisionExtra must not carry the bad-sig blocked message; got %@",
+                 cd.decisionExtra);
+
+  [mockConfig stopMocking];
+  [mockFileInfo stopMocking];
+  [mockHandle stopMocking];
+}
+
 #pragma mark - +verifyIdentityForTargetProc:fd:csInfo: tests
 
 // Case 1: ES signed, disk unsigned (csInfo == nil) -> Mismatch.

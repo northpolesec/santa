@@ -664,8 +664,9 @@ static void UpdateCachedDecisionSigningInfo(
   cd.quarantineURL = fileInfo.quarantineDataURL;
 
   NSError* csInfoError;
+  MOLCodesignChecker* csInfo;
   if (!cd.certSHA256.length) {
-    MOLCodesignChecker* csInfo = [fileInfo codesignCheckerWithError:&csInfoError];
+    csInfo = [fileInfo codesignCheckerWithError:&csInfoError];
 
     // The verifier compares ES-side identity against whatever identity MOL
     // was able to extract. MOLCodesignChecker populates `_signingInformation`
@@ -712,8 +713,14 @@ static void UpdateCachedDecisionSigningInfo(
     }
   }
 
+  // Skip bad-sig protection when MOL surfaced a partial-validity error but
+  // identity was still extractable (e.g. errSecCSInfoPlistFailed when reading
+  // a bundle binary via /dev/fd/N — the signature itself is intact, only the
+  // bundle's side-input Info.plist file was unreachable through the fd).
+  // Mirrors the same identity-extracted predicate used at the
+  // UpdateCachedDecisionSigningInfo callsite above.
   if ([[SNTConfigurator configurator] enableBadSignatureProtection] && csInfoError &&
-      csInfoError.code != errSecCSUnsigned) {
+      csInfoError.code != errSecCSUnsigned && !(csInfo && csInfo.cdhash.length > 0)) {
     cd.decisionExtra =
         [NSString stringWithFormat:@"Blocked due to signature error: %ld", (long)csInfoError.code];
     cd.decision = SNTEventStateBlockCertificate;
