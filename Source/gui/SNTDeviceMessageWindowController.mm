@@ -24,10 +24,11 @@ NS_ASSUME_NONNULL_BEGIN
 
 @implementation SNTDeviceMessageWindowController
 
-- (instancetype)initWithEvent:(SNTDeviceEvent*)event {
+- (instancetype)initWithEvent:(SNTDeviceEvent*)event configBundle:(SNTConfigBundle*)configBundle {
   self = [super init];
   if (self) {
     _event = event;
+    _configBundle = configBundle;
   }
   return self;
 }
@@ -37,15 +38,27 @@ NS_ASSUME_NONNULL_BEGIN
 
   self.window = [SNTMessageWindowController defaultWindow];
 
-  self.window.contentViewController =
-      [SNTDeviceMessageWindowViewFactory createWithWindow:self.window event:self.event];
+  self.window.contentViewController = [SNTDeviceMessageWindowViewFactory
+      createWithWindow:self.window
+                 event:self.event
+          configBundle:self.configBundle
+       uiStateCallback:^(NSTimeInterval preventNotificationsPeriod) {
+         self.silenceFutureNotificationsPeriod = preventNotificationsPeriod;
+       }];
   self.window.delegate = self;
 
   [super showWindow:sender];
 }
 
 - (NSString*)messageHash {
-  return self.event.mntonname;
+  // Use model + media UUID — these are stable across re-mounts of the same
+  // physical device, unlike the user-controllable mount-on path or the
+  // per-mount BSD device path. If neither is available, return nil so no
+  // silence entry is recorded (better than silencing by an unstable key).
+  NSString* model = self.event.deviceModel;
+  NSString* uuid = self.event.mediaUUID;
+  if (!model.length && !uuid.length) return nil;
+  return [NSString stringWithFormat:@"usb:%@|%@", model ?: @"", uuid ?: @""];
 }
 
 @end

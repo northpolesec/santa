@@ -75,7 +75,7 @@
   // 1. The current file access rule version
   // 2. The name of the rule that was violated
   // 3. The path of the process
-  return [NSString stringWithFormat:@"%@|%@|%@", self.event.ruleVersion, self.event.ruleName,
+  return [NSString stringWithFormat:@"faa:%@|%@|%@", self.event.ruleVersion, self.event.ruleName,
                                     self.event.process.filePath];
 }
 

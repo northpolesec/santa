@@ -104,10 +104,16 @@
 "FS Type" = "Тип ФС";
 
 /* No comment provided by engineer. */
-"Label after time period picker" = "\U2800";
+"Label after time period picker (application)" = "\U2800";
 
 /* No comment provided by engineer. */
-"Label before time period picker" = "Запобігти майбутнім сповіщенням для цієї заявки для ";
+"Label after time period picker (mount)" = "\U2800";
+
+/* No comment provided by engineer. */
+"Label before time period picker (application)" = "Запобігти майбутнім сповіщенням для цієї заявки для ";
+
+/* No comment provided by engineer. */
+"Label before time period picker (mount)" = "Запобігти майбутнім сповіщенням для цього монтування протягом ";
 
 /* Label shown before company branding */
 "Managed by:" = "Керується:";

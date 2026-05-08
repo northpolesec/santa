@@ -426,13 +426,14 @@ static NSString* const silencedNotificationsKey = @"SilencedNotifications";
   [self queueMessage:pendingMsg enableSilences:configState.enableNotificationSilences];
 }
 
-- (void)postUSBBlockNotification:(SNTDeviceEvent*)event {
+- (void)postUSBBlockNotification:(SNTDeviceEvent*)event
+                    configBundle:(SNTConfigBundle*)configBundle {
   if (!event) {
     LOGI(@"Error: Missing event object in message received from daemon!");
     return;
   }
   SNTDeviceMessageWindowController* pendingMsg =
-      [[SNTDeviceMessageWindowController alloc] initWithEvent:event];
+      [[SNTDeviceMessageWindowController alloc] initWithEvent:event configBundle:configBundle];
 
   [self queueMessage:pendingMsg enableSilences:YES];
 }

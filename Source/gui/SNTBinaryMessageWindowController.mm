@@ -106,7 +106,7 @@
 }
 
 - (NSString*)messageHash {
-  return self.event.fileSHA256;
+  return [@"binary:" stringByAppendingString:self.event.fileSHA256 ?: @""];
 }
 
 - (void)performSilentTouchIDAuthorization {

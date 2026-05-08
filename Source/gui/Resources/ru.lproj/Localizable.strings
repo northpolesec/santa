@@ -104,10 +104,16 @@
 "FS Type" = "Тип файловой системы";
 
 /* No comment provided by engineer. */
-"Label after time period picker" = "\U2800";
+"Label after time period picker (application)" = "\U2800";
 
 /* No comment provided by engineer. */
-"Label before time period picker" = "Отключить будущие уведомления для этого приложения на ";
+"Label after time period picker (mount)" = "\U2800";
+
+/* No comment provided by engineer. */
+"Label before time period picker (application)" = "Отключить будущие уведомления для этого приложения на ";
+
+/* No comment provided by engineer. */
+"Label before time period picker (mount)" = "Отключить будущие уведомления для этого монтирования на ";
 
 /* Label shown before company branding */
 "Managed by:" = "Под управлением:";

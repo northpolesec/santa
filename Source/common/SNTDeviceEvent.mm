@@ -36,6 +36,8 @@
   ENCODE(coder, mntfromname);
   ENCODE(coder, remountArgs);
   ENCODE_BOXABLE(coder, isEncrypted);
+  ENCODE(coder, deviceModel);
+  ENCODE(coder, mediaUUID);
 }
 
 - (instancetype)initWithCoder:(NSCoder*)decoder {
@@ -45,6 +47,8 @@
     DECODE(decoder, mntfromname, NSString);
     DECODE_ARRAY(decoder, remountArgs, NSString);
     DECODE_SELECTOR(decoder, isEncrypted, NSNumber, boolValue);
+    DECODE(decoder, deviceModel, NSString);
+    DECODE(decoder, mediaUUID, NSString);
   }
   return self;
 }

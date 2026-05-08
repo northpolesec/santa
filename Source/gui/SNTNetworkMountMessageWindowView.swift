@@ -216,8 +216,13 @@ struct SNTNetworkMountMessageWindowView: View {
     SNTMessageView(getBlockMessage()) {
       Event(e: event, window: window)
 
-      if getEnableNotificationSilences() {
-        SNTNotificationSilenceView(silence: $preventFutureNotifications, period: $preventFutureNotificationPeriod)
+      if configBundle.notificationSilencesEnabled() {
+        SNTNotificationSilenceView(
+          silence: $preventFutureNotifications,
+          period: $preventFutureNotificationPeriod,
+          labelBefore: "Label before time period picker (mount)",
+          labelAfter: "Label after time period picker (mount)"
+        )
       }
 
       Spacer()
@@ -236,14 +241,6 @@ struct SNTNetworkMountMessageWindowView: View {
       customMessage = message
     }
     return SNTBlockMessage.attributedBlockMessageForNetworkMountEvent(withCustomMessage: customMessage)
-  }
-
-  func getEnableNotificationSilences() -> Bool {
-    var silencesEnabled: Bool = true
-    configBundle.enableNotificationSilences { val in
-      silencesEnabled = val
-    }
-    return silencesEnabled
   }
 
   func dismissButton() {

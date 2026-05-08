@@ -596,6 +596,13 @@ NS_ASSUME_NONNULL_BEGIN
       stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
   NSString* protocol = [diskInfo[(__bridge NSString*)kDADiskDescriptionDeviceProtocolKey]
       stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+  CFUUIDRef mediaUUID =
+      (__bridge CFUUIDRef)diskInfo[(__bridge NSString*)kDADiskDescriptionMediaUUIDKey];
+
+  event.deviceModel = model;
+  if (mediaUUID) {
+    event.mediaUUID = CFBridgingRelease(CFUUIDCreateString(NULL, mediaUUID));
+  }
   SNTStoredUSBMountEvent* storedUSBMountEvent;
 
   if (action == SNTRemovableMediaActionRemount) {
@@ -740,6 +747,12 @@ NS_ASSUME_NONNULL_BEGIN
     SNTDeviceEvent* event = [[SNTDeviceEvent alloc] initWithOnName:mountOnName fromName:bsdName];
     event.remountArgs = self.encryptedRemovableMediaRemountFlags;
     event.isEncrypted = YES;
+    event.deviceModel = model;
+    CFUUIDRef mediaUUID =
+        (__bridge CFUUIDRef)diskInfo[(__bridge NSString*)kDADiskDescriptionMediaUUIDKey];
+    if (mediaUUID) {
+      event.mediaUUID = CFBridgingRelease(CFUUIDCreateString(NULL, mediaUUID));
+    }
 
     SNTStoredUSBMountEvent* storedEvent = [[SNTStoredUSBMountEvent alloc]
         initWithDeviceModel:model

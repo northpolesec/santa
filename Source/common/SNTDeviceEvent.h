@@ -24,6 +24,21 @@
 @property NSArray<NSString*>* remountArgs;
 @property BOOL isEncrypted;
 
+// The device's model name, as reported by DiskArbitration.
+@property NSString* deviceModel;
+
+// The DiskArbitration media UUID, formatted as a string.
+//
+// Not a hardware serial number: it is derived from filesystem metadata, so
+// it is stable across unmount/remount and mount-path changes for the same
+// partition, but is reset if the volume is reformatted. The true USB serial
+// number is only reachable via IOKit (kUSBSerialNumberString); we use the
+// media UUID instead because it is cheap to obtain from the existing
+// DiskArbitration disk description and is "stable enough" for matching the
+// same physical media across mount cycles (its intended use as a silence
+// key for repeat-block notifications).
+@property NSString* mediaUUID;
+
 - (NSString*)readableRemountArgs;
 
 @end

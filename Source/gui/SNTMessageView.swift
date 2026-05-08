@@ -14,8 +14,21 @@
 
 import SwiftUI
 
+import santa_common_SNTConfigBundle
 import santa_common_SNTConfigurator
 import santa_gui_SNTAuthorizationHelper
+
+extension SNTConfigBundle {
+  // The value of `enableNotificationSilences`, defaulting to true when the
+  // bundle did not carry an explicit value.
+  public func notificationSilencesEnabled() -> Bool {
+    var enabled = true
+    self.enableNotificationSilences { val in
+      enabled = val
+    }
+    return enabled
+  }
+}
 
 public let MAX_OUTER_VIEW_WIDTH = 560.0
 public let MAX_OUTER_VIEW_HEIGHT = 340.0
@@ -168,6 +181,8 @@ public let NotificationSilencePeriods: [TimeInterval] = [86400, 604800, 2_678_40
 public struct SNTNotificationSilenceView: View {
   @Binding var silence: Bool
   @Binding var period: TimeInterval
+  let labelBefore: LocalizedStringKey
+  let labelAfter: LocalizedStringKey
 
   let dateFormatter: DateComponentsFormatter = {
     let df = DateComponentsFormatter()
@@ -176,9 +191,16 @@ public struct SNTNotificationSilenceView: View {
     return df
   }()
 
-  public init(silence: Binding<Bool>, period: Binding<TimeInterval>) {
+  public init(
+    silence: Binding<Bool>,
+    period: Binding<TimeInterval>,
+    labelBefore: LocalizedStringKey = "Label before time period picker (application)",
+    labelAfter: LocalizedStringKey = "Label after time period picker (application)"
+  ) {
     _silence = silence
     _period = period
+    self.labelBefore = labelBefore
+    self.labelAfter = labelAfter
   }
 
   public var body: some View {
@@ -194,14 +216,14 @@ public struct SNTNotificationSilenceView: View {
 
     Toggle(isOn: $silence) {
       HStack(spacing: 5.0) {
-        Text("Label before time period picker").font(Font.system(size: 11.0))
+        Text(labelBefore).font(Font.system(size: 11.0))
         Picker("", selection: pi) {
           ForEach(NotificationSilencePeriods, id: \.self) { period in
             let text = dateFormatter.string(from: period) ?? "unknown"
             Text(text).font(Font.system(size: 11.0))
           }
         }.fixedSize()
-        Text("Label after time period picker").font(Font.system(size: 11.0))
+        Text(labelAfter).font(Font.system(size: 11.0))
       }
     }
   }

@@ -46,7 +46,10 @@
 }
 
 - (NSString*)messageHash {
-  return self.event.mountFromName;
+  // Use the full remote host/path with any credentials stripped — same
+  // server/share silence regardless of which user supplied the credentials.
+  NSString* sanitized = [self.event sanitizedMountFromRemovingCredentials];
+  return [@"netmount:" stringByAppendingString:sanitized ?: @""];
 }
 
 @end
