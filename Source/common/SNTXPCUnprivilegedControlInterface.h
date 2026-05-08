@@ -22,6 +22,7 @@
 #import "Source/common/faa/WatchItems.h"
 
 @class SNTRule;
+@class SNTSandboxExecRequest;
 @class SNTStoredExecutionEvent;
 @class MOLXPCConnection;
 
@@ -136,6 +137,12 @@ struct RuleCounts {
 - (void)networkExtensionLoadedBundleVersionInfo:(void (^)(NSDictionary* bundleInfo))reply;
 /// Returns whether the network extension is currently loaded and connected.
 - (void)networkExtensionLoaded:(void (^)(BOOL loaded))reply;
+
+///
+/// Sandbox ops
+///
+- (void)prepareSandboxExec:(SNTSandboxExecRequest*)request
+                     reply:(void (^)(NSString* profile, NSError* error))reply;
 
 @end
 

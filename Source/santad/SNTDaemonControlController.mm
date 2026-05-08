@@ -997,7 +997,7 @@ double watchdogRAMPeak = 0;
     return;
   }
 
-  if (rule.state != SNTRuleStateSeatbelt || rule.seatbeltPolicy.length == 0) {
+  if (rule.seatbeltPolicy.length == 0) {
     reply(nil, [SNTError createErrorWithCode:SNTErrorCodeSandboxRuleNotSeatbelt
                                       format:@"Rule is not a seatbelt rule"]);
     return;

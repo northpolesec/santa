@@ -22,7 +22,6 @@
 #import "Source/common/ne/SNTNetworkExtensionSettings.h"
 
 @class SNDProcessFlows;
-@class SNTSandboxExecRequest;
 @class SNTStoredEvent;
 
 ///
@@ -76,12 +75,6 @@ typedef NS_ENUM(NSInteger, SNTRuleAddSource) {
 /// Control Ops
 ///
 - (void)installSantaApp:(NSString*)appPath reply:(void (^)(BOOL))reply;
-
-///
-/// Sandbox ops
-///
-- (void)prepareSandboxExec:(SNTSandboxExecRequest*)request
-                     reply:(void (^)(NSString* profile, NSError* error))reply;
 
 ///
 /// Network Extension Ops
