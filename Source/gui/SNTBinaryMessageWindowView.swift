@@ -333,7 +333,6 @@ struct SNTBinaryMessageWindowView: View {
         DismissButton(
           customText: getDismissText(),
           silence: preventFutureNotifications,
-          window: window,
           action: dismissButton
         )
       }

@@ -258,11 +258,7 @@ struct SNTFileAccessMessageWindowView: View {
           if effectiveURL != nil {
             OpenEventButton(customText: effectiveText, action: openButton)
           }
-          DismissButton(
-            silence: preventFutureNotifications,
-            window: window,
-            action: dismissButton
-          )
+          DismissButton(silence: preventFutureNotifications, action: dismissButton)
         }
         Spacer()
       }

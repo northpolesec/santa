@@ -22,7 +22,6 @@ import santa_common_SNTStoredExecutionEvent
 import Source_gui_SNTDeviceMessageWindowView
 import Source_gui_SNTBinaryMessageWindowView
 import Source_gui_SNTAboutWindowView
-import santa_gui_SNTMessageView
 
 func ShowWindow(_ vc: NSViewController, _ window: NSWindow, appearance: AppearanceMode = .system) {
   window.contentRect(forFrameRect: NSMakeRect(0, 0, 0, 0))
@@ -275,7 +274,7 @@ struct BinaryView: View {
         // config so the Open Event button appears in the harness.
         let effectiveURL = customURL.isEmpty ? eventDetailURL : customURL
 
-        let window = SNTNotificationWindow()
+        let window = NSWindow()
         ShowWindow(
           SNTBinaryMessageWindowViewFactory.createWith(
             window: window,
@@ -372,7 +371,7 @@ struct DeviceView: View {
         }
         SNTConfigurator.overrideConfig(configMap)
 
-        let window = SNTNotificationWindow()
+        let window = NSWindow()
         ShowWindow(
           SNTDeviceMessageWindowViewFactory.createWith(window: window, event: event),
           window,
@@ -432,7 +431,7 @@ struct AboutView: View {
           SNTConfigurator.overrideConfig(configMap)
         }
 
-        let window = SNTNotificationWindow()
+        let window = NSWindow()
         ShowWindow(SNTAboutWindowViewFactory.createWith(window: window), window, appearance: appearanceMode)
       }
     }
