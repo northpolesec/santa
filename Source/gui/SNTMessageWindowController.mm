@@ -23,7 +23,11 @@
 @implementation SNTMessageWindowController
 
 + (NSWindow*)defaultWindow {
-  NSWindow* window = [[SNTNotificationWindow alloc]
+  // Cast alloc's result to NSWindow* so clang resolves the inherited typed
+  // initWithContentRect:styleMask:backing:defer:; the generated -Swift.h header for
+  // SNTNotificationWindow doesn't redeclare it, and older SDKs fall back to id-typed
+  // params otherwise. Runtime class remains SNTNotificationWindow.
+  NSWindow* window = [(NSWindow*)[SNTNotificationWindow alloc]
       initWithContentRect:NSMakeRect(0, 0, 0, 0)
                 styleMask:NSWindowStyleMaskClosable | NSWindowStyleMaskResizable |
                           NSWindowStyleMaskTitled
