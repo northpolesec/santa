@@ -259,7 +259,10 @@ struct SNTFileAccessMessageWindowView: View {
             OpenEventButton(customText: effectiveText, action: openButton)
           }
           DismissButton(
-            silence: preventFutureNotifications, window: window, action: dismissButton)
+            silence: preventFutureNotifications,
+            window: window,
+            action: dismissButton
+          )
         }
         Spacer()
       }

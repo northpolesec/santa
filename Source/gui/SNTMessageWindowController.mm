@@ -23,13 +23,12 @@
 @implementation SNTMessageWindowController
 
 + (NSWindow*)defaultWindow {
-  NSWindow* window =
-      [[SNTNotificationWindow alloc] initWithContentRect:NSMakeRect(0, 0, 0, 0)
-                                               styleMask:NSWindowStyleMaskClosable |
-                                                         NSWindowStyleMaskResizable |
-                                                         NSWindowStyleMaskTitled
-                                                 backing:NSBackingStoreBuffered
-                                                   defer:NO];
+  NSWindow* window = [[SNTNotificationWindow alloc]
+      initWithContentRect:NSMakeRect(0, 0, 0, 0)
+                styleMask:NSWindowStyleMaskClosable | NSWindowStyleMaskResizable |
+                          NSWindowStyleMaskTitled
+                  backing:NSBackingStoreBuffered
+                    defer:NO];
 
   window.titlebarAppearsTransparent = YES;
   window.movableByWindowBackground = YES;

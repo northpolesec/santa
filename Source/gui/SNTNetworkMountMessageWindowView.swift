@@ -224,8 +224,11 @@ struct SNTNetworkMountMessageWindowView: View {
 
       HStack(spacing: 15.0) {
         DismissButton(
-          customText: nil, silence: preventFutureNotifications, window: window,
-          action: dismissButton)
+          customText: nil,
+          silence: preventFutureNotifications,
+          window: window,
+          action: dismissButton
+        )
       }
 
       Spacer()
