@@ -67,7 +67,9 @@ static inline NSString* StringTokenToNSString(es_string_token_t es_str) {
   if (es_str.length == 0) {
     return nil;
   }
-  return StringToNSString(es_str.data);
+  return [[NSString alloc] initWithBytes:es_str.data
+                                  length:es_str.length
+                                encoding:NSUTF8StringEncoding];
 }
 
 static inline std::string BufToHexString(const uint8_t* buf, size_t bufsize) {
