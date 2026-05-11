@@ -73,8 +73,8 @@ struct SNTDeviceMessageWindowView: View {
         SNTNotificationSilenceView(
           silence: $preventFutureNotifications,
           period: $preventFutureNotificationPeriod,
-          labelBefore: "Label before time period picker (mount)",
-          labelAfter: "Label after time period picker (mount)"
+          labelBefore: Text("Label before time period picker (mount)"),
+          labelAfter: Text("Label after time period picker (mount)")
         )
       }
 

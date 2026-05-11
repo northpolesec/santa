@@ -181,8 +181,12 @@ public let NotificationSilencePeriods: [TimeInterval] = [86400, 604800, 2_678_40
 public struct SNTNotificationSilenceView: View {
   @Binding var silence: Bool
   @Binding var period: TimeInterval
-  let labelBefore: LocalizedStringKey
-  let labelAfter: LocalizedStringKey
+  // Accept fully-built Text views so callers retain control over the literal
+  // string passed to Text(_:) — that's what `genstrings -SwiftUI` extracts for
+  // Localizable.strings. Passing a LocalizedStringKey through a parameter
+  // hides the literal from genstrings and produces "extraneous" keys.
+  let labelBefore: Text
+  let labelAfter: Text
 
   let dateFormatter: DateComponentsFormatter = {
     let df = DateComponentsFormatter()
@@ -194,8 +198,8 @@ public struct SNTNotificationSilenceView: View {
   public init(
     silence: Binding<Bool>,
     period: Binding<TimeInterval>,
-    labelBefore: LocalizedStringKey = "Label before time period picker (application)",
-    labelAfter: LocalizedStringKey = "Label after time period picker (application)"
+    labelBefore: Text = Text("Label before time period picker (application)"),
+    labelAfter: Text = Text("Label after time period picker (application)")
   ) {
     _silence = silence
     _period = period
@@ -216,14 +220,14 @@ public struct SNTNotificationSilenceView: View {
 
     Toggle(isOn: $silence) {
       HStack(spacing: 5.0) {
-        Text(labelBefore).font(Font.system(size: 11.0))
+        labelBefore.font(Font.system(size: 11.0))
         Picker("", selection: pi) {
           ForEach(NotificationSilencePeriods, id: \.self) { period in
             let text = dateFormatter.string(from: period) ?? "unknown"
             Text(text).font(Font.system(size: 11.0))
           }
         }.fixedSize()
-        Text(labelAfter).font(Font.system(size: 11.0))
+        labelAfter.font(Font.system(size: 11.0))
       }
     }
   }

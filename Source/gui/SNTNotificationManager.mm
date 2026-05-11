@@ -435,7 +435,11 @@ static NSString* const silencedNotificationsKey = @"SilencedNotifications";
   SNTDeviceMessageWindowController* pendingMsg =
       [[SNTDeviceMessageWindowController alloc] initWithEvent:event configBundle:configBundle];
 
-  [self queueMessage:pendingMsg enableSilences:YES];
+  __block BOOL enableSilences = YES;
+  [configBundle enableNotificationSilences:^(BOOL val) {
+    enableSilences = val;
+  }];
+  [self queueMessage:pendingMsg enableSilences:enableSilences];
 }
 
 - (void)postNetworkMountNotification:(SNTStoredNetworkMountEvent*)event
@@ -449,7 +453,11 @@ static NSString* const silencedNotificationsKey = @"SilencedNotifications";
       [[SNTNetworkMountMessageWindowController alloc] initWithEvent:event
                                                        configBundle:configBundle];
 
-  [self queueMessage:pendingMsg enableSilences:YES];
+  __block BOOL enableSilences = YES;
+  [configBundle enableNotificationSilences:^(BOOL val) {
+    enableSilences = val;
+  }];
+  [self queueMessage:pendingMsg enableSilences:enableSilences];
 }
 
 - (void)postFileAccessBlockNotification:(SNTStoredFileAccessEvent*)event
