@@ -283,9 +283,15 @@ using santa::Processor;
 
 - (void)processEnrichedMessage:(std::unique_ptr<EnrichedMessage>)msg
                        handler:(void (^)(std::unique_ptr<EnrichedMessage>))messageHandler {
-  __block std::unique_ptr<EnrichedMessage> msgTmp = std::move(msg);
+  // Ownership is handed off to the dispatched block via a raw pointer and
+  // re-wrapped on the worker thread. The obvious `__block std::unique_ptr<>`
+  // pattern is avoided because it shares the captured object across threads
+  // and TSAN flags the byref destructor racing with the move-out on the
+  // worker. The release() and the dispatch_async must remain paired: any
+  // path that releases but does not reach the dispatch_async leaks.
+  EnrichedMessage* rawMsg = msg.release();
   dispatch_async(_notifyQueue, ^{
-    messageHandler(std::move(msgTmp));
+    messageHandler(std::unique_ptr<EnrichedMessage>(rawMsg));
   });
 }
 
