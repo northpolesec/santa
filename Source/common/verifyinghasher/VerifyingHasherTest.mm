@@ -343,8 +343,7 @@ std::vector<uint8_t> Slurp(const char* path) {
   // mkstemp-backed temp file, unlinked at creation. VerifyingHasher::Run
   // takes the fd, so no on-disk path is needed past the write.
   auto file = santa::ScopedFile::CreateTemporary();
-  XCTAssertTrue(file.ok(), @"CreateTemporary failed: %s",
-                file.status().ToString().c_str());
+  XCTAssertTrue(file.ok(), @"CreateTemporary failed: %s", file.status().ToString().c_str());
 
   // 16 bytes of garbage (no Mach-O magic).
   const uint8_t garbage[] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
@@ -352,8 +351,8 @@ std::vector<uint8_t> Slurp(const char* path) {
   NSData* data = [NSData dataWithBytes:garbage length:sizeof(garbage)];
   NSFileHandle* writer = file->Writer();
   NSError* writeErr = nil;
-  XCTAssertTrue([writer writeData:data error:&writeErr],
-                @"Failed to write non-Mach-O fixture: %@", writeErr);
+  XCTAssertTrue([writer writeData:data error:&writeErr], @"Failed to write non-Mach-O fixture: %@",
+                writeErr);
 
   std::vector<uint8_t> dummy_cdhash(CS_CDHASH_LEN, 0x00);
   VerifyingHasher::Expected exp{
