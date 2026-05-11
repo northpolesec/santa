@@ -79,7 +79,9 @@
   "packageManager": "pnpm@10.24.0+sha512.01ff8ae71b4419903b65c60fb2dc9d34cf8bb6e06d03bde112ef38f7a34d6904c424ba66bea5cdcf12890230bf39f9580473140ed9c946fef328b6e5238a345a",
   "pnpm": {
     "overrides": {
+      "@babel/plugin-transform-modules-systemjs@<7.29.4": "7.29.4",
       "dompurify@>=3.0.0 <=3.3.3": "3.4.0",
+      "fast-uri@<3.1.2": "3.1.2",
       "lodash-es@<=4.17.23": "4.18.1",
       "serialize-javascript@<7.0.5": "7.0.5",
       "uuid@<14.0.0": "14.0.0"
