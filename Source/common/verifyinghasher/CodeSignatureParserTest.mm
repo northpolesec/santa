@@ -161,7 +161,6 @@ std::vector<uint8_t> ExtractCsBlob(const char* path, uint64_t* out_slice_size) {
   bool ok = ParseCodeSignature(blob, /*slice_size=*/4096, parsed, err);
   XCTAssertTrue(ok, @"ParseCodeSignature: %s", err.c_str());
   XCTAssertEqual(parsed.hash_type, CS_HASHTYPE_SHA256);
-  XCTAssertEqual(parsed.compare_size, 32u);
   XCTAssertEqual(parsed.page_count, 1u);
 
   // The SHA-256 alternate (cd2) was picked over the SHA-1 canonical (cd1).

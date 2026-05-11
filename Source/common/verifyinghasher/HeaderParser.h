@@ -15,6 +15,7 @@
 #ifndef SANTA_COMMON_VERIFYINGHASHER_HEADERPARSER_H
 #define SANTA_COMMON_VERIFYINGHASHER_HEADERPARSER_H
 
+#include <libkern/OSByteOrder.h>
 #include <mach/machine.h>
 
 #include <cstddef>
@@ -101,6 +102,17 @@ class HeaderParser {
   bool mh_swap_ = false;
   uint32_t mh_ncmds_ = 0;
   uint32_t mh_sizeofcmds_ = 0;
+
+  // Returns OSSwapInt32(value) when mh_swap_ is set, value unchanged
+  // otherwise. Centralizes the conditional byteswap consulted at every
+  // site that consumes a Mach-O header field whose endianness depends
+  // on the slice magic.
+  template <typename T>
+  T SwapIfNeeded(T value) const {
+    static_assert(sizeof(T) == 4, "SwapIfNeeded: only 32-bit values supported");
+    if (!mh_swap_) return value;
+    return static_cast<T>(OSSwapInt32(static_cast<uint32_t>(value)));
+  }
 
   // State-handling helpers.
   Status SetError(std::string msg);

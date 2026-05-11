@@ -479,4 +479,26 @@ std::vector<uint8_t> MakeThin64WithCsBlob(uint32_t cs_dataoff, uint32_t cs_datas
   XCTAssertEqual(info.arch_name, "x86_64");
 }
 
+// LE-on-disk fat headers — magic bytes serialized in little-endian
+// order such that an LE host reads them back as FAT_MAGIC /
+// FAT_MAGIC_64 — must be rejected at the magic dispatch. Apple's
+// tools and dyld produce only BE-on-disk fat (FAT_CIGAM /
+// FAT_CIGAM_64 in host order on LE macOS), and xnu rejects anything
+// else via OSSwapBigToHostInt32(magic) == FAT_MAGIC. ProcessFatHeader
+// and ProcessFatArchTable both assume BE-on-disk and unconditionally
+// OSSwap-from-BE, so accepting an LE form here would silently corrupt
+// every field downstream.
+- (void)testRejectsLittleEndianFatMagic {
+  for (uint32_t magic : {FAT_MAGIC, FAT_MAGIC_64}) {
+    std::vector<uint8_t> data(1024, 0);
+    std::memcpy(data.data(), &magic, sizeof(magic));
+    std::string err;
+    auto s = FeedChunked(data, kHostArch, /*chunk=*/4096, nullptr, &err);
+    XCTAssertEqual(s, HeaderParser::Status::kError);
+    XCTAssertTrue(err.find("not a Mach-O") != std::string::npos,
+                  @"LE-on-disk fat magic=0x%08x expected 'not a Mach-O', got: %s", magic,
+                  err.c_str());
+  }
+}
+
 @end

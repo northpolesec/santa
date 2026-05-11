@@ -35,9 +35,8 @@ namespace santa {
 // owned and self-contained. VerifyingHasherCore holds parsed_cd_ alongside the
 // cs_blob_buf_ that backs the view, so they share the verifier's lifetime.
 struct ParsedCodeDirectory {
-  uint8_t hash_type = 0;     // CS_HASHTYPE_*
-  uint8_t hash_size = 0;     // 20, 32, or 48
-  uint8_t compare_size = 0;  // hash_size, except 20 for SHA-256-TRUNCATED
+  uint8_t hash_type = 0;  // CS_HASHTYPE_*
+  uint8_t hash_size = 0;  // 20, 32, or 48
   uint32_t page_size = 0;
   uint64_t code_limit = 0;
   uint32_t page_count = 0;

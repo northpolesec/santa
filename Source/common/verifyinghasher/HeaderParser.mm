@@ -27,9 +27,10 @@ namespace santa {
 namespace {
 
 // Cap on LC_CODE_SIGNATURE.datasize. xnu has no explicit cap, but its
-// load_code_signature (mach_loader.c:3861) routes the allocation through
-// ubc_cs_blob_allocate which uses kernel memory (kalloc/kmem_alloc) —
-// kernel memory pressure is xnu's implicit cap. Userspace heap is much
+// load_code_signature routes the allocation through ubc_cs_blob_allocate,
+// which uses kernel memory (kalloc/kmem_alloc):
+//   https://github.com/apple-oss-distributions/xnu/blob/xnu-12377.101.15/bsd/kern/mach_loader.c#L3861
+// Kernel memory pressure is xnu's implicit cap. Userspace heap is much
 // larger, so without a cap a malicious datasize would drive a multi-GB
 // cs_blob_buf_ allocation that xnu would have rejected at the allocator.
 // 64 MiB is Santa's userspace equivalent of xnu's implicit kernel-memory
@@ -39,10 +40,12 @@ namespace {
 constexpr uint32_t kMaxCsBlobSize = 64u * 1024 * 1024;
 
 // Cap on the load-commands region (mach_header.sizeofcmds). xnu has a
-// structural cap (parse_machfile in mach_loader.c:1373-1377 rejects when
-// page-rounded `mach_header_sz + sizeofcmds > INT_MAX`, ~2 GiB), then
-// allocates kernel memory via kalloc_data which is bounded implicitly by
-// kernel-memory pressure. Userspace heap is much larger, so without our
+// structural cap: parse_machfile rejects when page-rounded
+// `mach_header_sz + sizeofcmds > INT_MAX` (~2 GiB):
+//   https://github.com/apple-oss-distributions/xnu/blob/xnu-12377.101.15/bsd/kern/mach_loader.c#L1373-L1377
+// then allocates kernel memory via kalloc_data which is bounded
+// implicitly by kernel-memory pressure. Userspace heap is much
+// larger, so without our
 // own cap a malicious slice can declare sizeofcmds up to slice_size and
 // force multi-MB-to-GB allocations in HeaderParser::scratch_ and
 // VerifyingHasherCore::header_phase_buf_ on Santa's ES_AUTH_EXEC hot path.
@@ -169,19 +172,31 @@ HeaderParser::Status HeaderParser::ProcessMagic() {
                                  /*next_off=*/4, sizeof(struct mach_header));
     return Status::kNeedMore;
   }
-  if (magic == FAT_MAGIC || magic == FAT_CIGAM) {
+  // We accept only FAT_CIGAM / FAT_CIGAM_64 — the host-order reading
+  // of a big-endian-on-disk fat header on LE macOS, which is the only
+  // form Apple's tools and dyld produce. The host-order constants
+  // FAT_MAGIC / FAT_MAGIC_64 would represent an LE-on-disk fat header,
+  // which neither xnu nor dyld accepts; ProcessFatHeader and
+  // ProcessFatArchTable also assume BE-on-disk and would silently
+  // corrupt fields if fed LE. Reject LE-on-disk fat as "not a Mach-O"
+  // via the fall-through below.
+  if (magic == FAT_CIGAM) {
     fat64_ = false;
     AdvanceToPhaseKeepingScratch(Phase::kNeedFatHeader,
                                  /*next_off=*/4, sizeof(struct fat_header));
     return Status::kNeedMore;
   }
-  if (magic == FAT_MAGIC_64 || magic == FAT_CIGAM_64) {
+  if (magic == FAT_CIGAM_64) {
     // xnu's exec path doesn't handle fat64 — mach_loader.c's fat
-    // dispatch and fatfile_validate_fatarches both only recognize
-    // FAT_MAGIC. dyld in userspace does load fat64 dylibs, so we
-    // accept it here for dylib verification. For exec, the gap is
-    // benign: a fat64 binary we accept but xnu rejects simply fails
-    // LOAD_BADMACHO at exec time (Santa-permissive, no execution gained).
+    // dispatch only recognizes FAT_MAGIC after BE-to-host swap (i.e.,
+    // BE-on-disk fat32) and routes anything else (including any fat64)
+    // to LOAD_BADMACHO:
+    //   https://github.com/apple-oss-distributions/xnu/blob/xnu-12377.101.15/bsd/kern/mach_loader.c#L4189-L4197
+    // dyld in userspace does load fat64 dylibs (BE-on-disk), so we
+    // accept FAT_CIGAM_64 for dylib verification. For exec, the gap
+    // is benign: a fat64 binary we accept but xnu rejects simply
+    // fails LOAD_BADMACHO at exec time (Santa-permissive, no
+    // execution gained).
     fat64_ = true;
     AdvanceToPhaseKeepingScratch(Phase::kNeedFatHeader,
                                  /*next_off=*/4, sizeof(struct fat_header));
@@ -283,18 +298,16 @@ HeaderParser::Status HeaderParser::ProcessSliceMachHeader() {
   // false-positive direction — if a binary slipped past us with mismatched
   // inner metadata, xnu's EBADARCH still blocks exec, so nothing runs.
   if (slice_.arch_name == "thin") {
-    cpu_type_t ct = static_cast<cpu_type_t>(
-        mh_swap_ ? OSSwapInt32(static_cast<uint32_t>(mh.cputype)) : mh.cputype);
-    cpu_subtype_t st = static_cast<cpu_subtype_t>(
-        mh_swap_ ? OSSwapInt32(static_cast<uint32_t>(mh.cpusubtype)) : mh.cpusubtype);
+    cpu_type_t ct = SwapIfNeeded(mh.cputype);
+    cpu_subtype_t st = SwapIfNeeded(mh.cpusubtype);
     if (ct != want_.cputype || MaskSubtype(st) != MaskSubtype(want_.cpusubtype)) {
       return SetError("thin slice arch mismatch");
     }
     slice_.arch_name = ArchName(ct);
   }
 
-  mh_ncmds_ = mh_swap_ ? OSSwapInt32(mh.ncmds) : mh.ncmds;
-  mh_sizeofcmds_ = mh_swap_ ? OSSwapInt32(mh.sizeofcmds) : mh.sizeofcmds;
+  mh_ncmds_ = SwapIfNeeded(mh.ncmds);
+  mh_sizeofcmds_ = SwapIfNeeded(mh.sizeofcmds);
 
   const uint64_t hdr_sz = mh_is_64_ ? sizeof(struct mach_header_64) : sizeof(struct mach_header);
   if (hdr_sz + mh_sizeofcmds_ > slice_.slice_size) {
@@ -324,43 +337,43 @@ HeaderParser::Status HeaderParser::ProcessLoadCommands() {
     }
     struct load_command lc;
     std::memcpy(&lc, p, sizeof(lc));
-    if (mh_swap_) {
-      lc.cmd = OSSwapInt32(lc.cmd);
-      lc.cmdsize = OSSwapInt32(lc.cmdsize);
-    }
+    lc.cmd = SwapIfNeeded(lc.cmd);
+    lc.cmdsize = SwapIfNeeded(lc.cmdsize);
     if (lc.cmdsize < sizeof(struct load_command) || lc.cmdsize > static_cast<size_t>(end - p)) {
       return SetError("malformed load command size");
     }
     // Intentionally NOT enforcing cmdsize alignment. Apple's spec says
     // it must be a multiple of 4 (32-bit) or 8 (64-bit), but xnu doesn't
-    // enforce it either (bsd/kern/mach_loader.c parse_machfile validates
-    // cmdsize >= sizeof(load_command) + bounds, then walks via
-    // p += cmdsize regardless of alignment). Adding the check here would
-    // reject binaries xnu happily loads — a Santa false-positive — without
-    // closing any attack, since our iteration matches xnu's exactly.
+    // enforce it either: parse_machfile validates cmdsize >=
+    // sizeof(load_command) + bounds, then walks via p += cmdsize
+    // regardless of alignment:
+    //   https://github.com/apple-oss-distributions/xnu/blob/xnu-12377.101.15/bsd/kern/mach_loader.c#L1547-L1552
+    // Adding the check here would reject binaries xnu happily loads — a
+    // Santa false-positive — without closing any attack, since our
+    // iteration matches xnu's exactly.
     // xnu silently uses the first LC_CODE_SIGNATURE via its per-vnode
-    // CS blob cache (load_code_signature in mach_loader.c:3765 hits
-    // the cache after the first add and never re-reads dataoff/datasize
-    // of duplicates). Match that behavior — skip subsequent entries
-    // rather than rejecting, since rejecting would be a Santa-only
-    // false-positive on binaries xnu accepts.
+    // CS blob cache (load_code_signature hits the cache after the first
+    // add and never re-reads dataoff/datasize of duplicates):
+    //   https://github.com/apple-oss-distributions/xnu/blob/xnu-12377.101.15/bsd/kern/mach_loader.c#L3765
+    // Match that behavior — skip subsequent entries rather than
+    // rejecting, since rejecting would be a Santa-only false-positive
+    // on binaries xnu accepts.
     if (lc.cmd == LC_CODE_SIGNATURE && !found_cs) {
-      // xnu requires exact equality (load_code_signature in
-      // mach_loader.c: cmdsize != sizeof(linkedit_data_command) =>
-      // LOAD_BADMACHO). Match that. Padding bytes wouldn't be read
-      // anyway, but rejecting here keeps our verdict in lockstep
-      // with xnu's, and any hypothetical future LC_CODE_SIGNATURE
-      // extension would require coordinated changes here and in
-      // xnu — so accepting `>` doesn't actually buy forward-compat.
+      // xnu requires exact equality in load_code_signature:
+      // cmdsize != sizeof(linkedit_data_command) => LOAD_BADMACHO:
+      //   https://github.com/apple-oss-distributions/xnu/blob/xnu-12377.101.15/bsd/kern/mach_loader.c#L3849
+      // Match that. Padding bytes wouldn't be read anyway, but
+      // rejecting here keeps our verdict in lockstep with xnu's, and
+      // any hypothetical future LC_CODE_SIGNATURE extension would
+      // require coordinated changes here and in xnu — so accepting
+      // `>` doesn't actually buy forward-compat.
       if (lc.cmdsize != sizeof(struct linkedit_data_command)) {
         return SetError("LC_CODE_SIGNATURE has wrong cmdsize");
       }
       struct linkedit_data_command led;
       std::memcpy(&led, p, sizeof(led));
-      if (mh_swap_) {
-        led.dataoff = OSSwapInt32(led.dataoff);
-        led.datasize = OSSwapInt32(led.datasize);
-      }
+      led.dataoff = SwapIfNeeded(led.dataoff);
+      led.datasize = SwapIfNeeded(led.datasize);
       // Bound the CS-blob region inside the slice (overflow-safe), and
       // cap its size at a sane upper bound. Without these checks a
       // malicious Mach-O could request a multi-GB allocation in

@@ -5,7 +5,7 @@ load("//:helper.bzl", "santa_unit_test")
 #   - this subpackage's own tests
 #   - the CLI in Testing/OneOffs
 #   - the fuzz harnesses in Testing/Fuzzing
-# The public facade target (:VerifyingHasher, added in Task 13) gets
+# The public facade target (:VerifyingHasher, defined below) gets
 # an explicit per-target visibility list that includes
 # //Source/santad:__subpackages__. Internal targets remain
 # package-private to santad to enforce that only the facade is consumed

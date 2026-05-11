@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Utilities for fuzzing VerifyingHasher in Santa."""
+"""Utilities for fuzzing in Santa."""
 
 load("@rules_cc//cc:objc_library.bzl", "objc_library")
 load("@rules_fuzzing//fuzzing:cc_defs.bzl", "cc_fuzz_test")

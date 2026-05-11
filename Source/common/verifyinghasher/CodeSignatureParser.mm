@@ -57,12 +57,13 @@ constexpr size_t kMinCdBlobLen = 64;
 static_assert(offsetof(CS_CodeDirectory, codeLimit64) + sizeof(uint64_t) <= kMinCdBlobLen,
               "kMinCdBlobLen must cover the bytes we read");
 
-// Hash-type rank, mirroring xnu's hashPriorities order in
-// bsd/kern/ubc_subr.c:226-231. Returns 1..4 for supported types
-// (higher = stronger), 0 for unsupported. Used by the CD picker to
-// (a) select the strongest candidate and (b) detect duplicate
-// hashTypes (xnu rejects same-rank duplicates as "illegal and
-// suspicious"; cs_validate_csblob ubc_subr.c:593-597).
+// Hash-type rank, mirroring xnu's hashPriorities order:
+//   https://github.com/apple-oss-distributions/xnu/blob/xnu-12377.101.15/bsd/kern/ubc_subr.c#L226-L231
+// Returns 1..4 for supported types (higher = stronger), 0 for unsupported.
+// Used by the CD picker to (a) select the strongest candidate and
+// (b) detect duplicate hashTypes (xnu rejects same-rank duplicates as
+// "illegal and suspicious"; cs_validate_csblob):
+//   https://github.com/apple-oss-distributions/xnu/blob/xnu-12377.101.15/bsd/kern/ubc_subr.c#L593-L597
 unsigned int HashRank(uint8_t hash_type) {
   switch (hash_type) {
     case CS_HASHTYPE_SHA1: return 1;
@@ -81,12 +82,6 @@ uint8_t HashSizeFor(uint8_t hash_type) {
     case CS_HASHTYPE_SHA1: return CS_SHA1_LEN;
     default: return 0;
   }
-}
-
-uint8_t CompareSizeFor(uint8_t hash_type) {
-  // SHA-256-TRUNCATED computes 32 but compares 20.
-  return (hash_type == CS_HASHTYPE_SHA256_TRUNCATED) ? CS_SHA256_TRUNCATED_LEN
-                                                     : HashSizeFor(hash_type);
 }
 
 }  // namespace
@@ -166,9 +161,10 @@ bool ParseCodeSignature(std::span<const uint8_t> blob, uint64_t slice_size,
   }
 
   // Walk candidates in BlobIndex order and pick highest rank, mirroring
-  // xnu's cs_validate_csblob (bsd/kern/ubc_subr.c:585-597). xnu rejects
-  // same-rank duplicates ("illegal and suspicious"); we match that
-  // behavior exactly, including its order-dependent quirk where a
+  // xnu's cs_validate_csblob:
+  //   https://github.com/apple-oss-distributions/xnu/blob/xnu-12377.101.15/bsd/kern/ubc_subr.c#L585-L597
+  // xnu rejects same-rank duplicates ("illegal and suspicious"); we match
+  // that behavior exactly, including its order-dependent quirk where a
   // lower-rank duplicate after a higher-rank candidate is silently
   // ignored (the higher-rank one is already the chosen best).
   const CDCandidate* picked = nullptr;
@@ -208,7 +204,6 @@ bool ParseCodeSignature(std::span<const uint8_t> blob, uint64_t slice_size,
   const CS_CodeDirectory* cd = picked->cd;
   out.hash_type = cd->hashType;
   out.hash_size = HashSizeFor(cd->hashType);
-  out.compare_size = CompareSizeFor(cd->hashType);
   if (out.hash_size == 0) {
     err = "CodeDirectory unsupported hashType slipped through";
     return false;
@@ -270,13 +265,16 @@ bool ParseCodeSignature(std::span<const uint8_t> blob, uint64_t slice_size,
     return false;
   }
   // Note: codeLimit == 0 is intentionally accepted. xnu's
-  // cs_validate_codedirectory (bsd/kern/ubc_subr.c:359) doesn't reject
-  // it. Pages outside [0, codeLimit) are treated as "no hash to
-  // validate" at runtime (ubc_subr.c:5849), and xnu's VM fault handler
-  // refuses to map them executable when cs_enforcement_enabled is set
-  // (vm_fault.c:2911-2921, default for most processes). Rejecting
-  // codeLimit==0 here would be a Santa-only false-positive vs xnu's
-  // blob-validation behavior.
+  // cs_validate_codedirectory doesn't reject it:
+  //   https://github.com/apple-oss-distributions/xnu/blob/xnu-12377.101.15/bsd/kern/ubc_subr.c#L359
+  // Pages outside [0, codeLimit) are treated as "no hash to validate"
+  // at runtime in cs_validate_hash:
+  //   https://github.com/apple-oss-distributions/xnu/blob/xnu-12377.101.15/bsd/kern/ubc_subr.c#L5922-L5928
+  // and xnu's VM fault handler refuses to map them executable when
+  // cs_enforcement_enabled is set (default for most processes):
+  //   https://github.com/apple-oss-distributions/xnu/blob/xnu-12377.101.15/osfmk/vm/vm_fault.c#L2911-L2921
+  // Rejecting codeLimit==0 here would be a Santa-only false-positive
+  // vs xnu's blob-validation behavior.
 
   const uint32_t n_code_slots = OSSwapBigToHostInt32(cd->nCodeSlots);
   const uint32_t hash_offset = OSSwapBigToHostInt32(cd->hashOffset);
@@ -333,14 +331,15 @@ bool ParseCodeSignature(std::span<const uint8_t> blob, uint64_t slice_size,
 
   const size_t slots_bytes = static_cast<size_t>(out.page_count) * out.hash_size;
   // Note: hashOffset < sizeof(CS_CodeDirectory) is intentionally accepted.
-  // xnu's cs_validate_codedirectory (bsd/kern/ubc_subr.c:382) only checks
-  // `length < hashOffset`, not against the CD header size. A CD with
-  // hashOffset=0 (slot table overlapping the CD header) is structurally
-  // weird but xnu's runtime page validator and our PageVerifier both
-  // correctly fail it via slot-hash mismatch — the "slot 0" bytes would
-  // be CD header fields, never matching a real page hash. Rejecting here
-  // would be a Santa-only false-positive vs xnu's blob-validation
-  // behavior. The upper bound is enforced below.
+  // xnu's cs_validate_codedirectory only checks `length < hashOffset`,
+  // not against the CD header size:
+  //   https://github.com/apple-oss-distributions/xnu/blob/xnu-12377.101.15/bsd/kern/ubc_subr.c#L382
+  // A CD with hashOffset=0 (slot table overlapping the CD header) is
+  // structurally weird but xnu's runtime page validator and our
+  // PageVerifier both correctly fail it via slot-hash mismatch — the
+  // "slot 0" bytes would be CD header fields, never matching a real
+  // page hash. Rejecting here would be a Santa-only false-positive vs
+  // xnu's blob-validation behavior. The upper bound is enforced below.
   if (hash_offset + slots_bytes > picked->blob_len) {
     err = "CodeDirectory slot hashes out of bounds";
     return false;
@@ -401,9 +400,8 @@ bool ParseCodeSignature(std::span<const uint8_t> blob, uint64_t slice_size,
   // teamOffset is only valid in CodeDirectory version >= CS_SUPPORTSTEAMID.
   // If the CD version predates that, or teamOffset is zero, leave team_id empty.
   {
-    const uint32_t cd_version = OSSwapBigToHostInt32(cd->version);
     const uint32_t team_off = OSSwapBigToHostInt32(cd->teamOffset);
-    if (cd_version >= CS_SUPPORTSTEAMID && team_off != 0 && team_off < picked->blob_len) {
+    if (version >= CS_SUPPORTSTEAMID && team_off != 0 && team_off < picked->blob_len) {
       const uint8_t* p = picked->blob_base + team_off;
       size_t max_len = picked->blob_len - team_off;
       size_t actual_len = strnlen(reinterpret_cast<const char*>(p), max_len);
