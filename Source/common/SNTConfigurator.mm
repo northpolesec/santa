@@ -2093,6 +2093,9 @@ static SNTConfigurator* sharedConfigurator = nil;
 
 - (void)clearSyncState {
   void (^block)(void) = ^{
+    if (!self.syncStateAccessAuthorizerBlock()) {
+      return;
+    }
     if (self.batchedSyncState) {
       [self.batchedSyncState removeAllObjects];
       return;
