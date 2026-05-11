@@ -343,8 +343,8 @@ public func DismissButton(
       Text(t).frame(maxWidth: 200.0)
     }
   )
-  .keyboardShortcut(.escape, modifiers: .command)
-  .help("⌘ Esc")
+  .keyboardShortcut("w", modifiers: .command)
+  .help("⌘ W")
 }
 
 // TextWithLimit is like Text() but it supports a limit on the number of characters in the

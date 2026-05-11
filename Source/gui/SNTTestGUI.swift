@@ -270,13 +270,17 @@ struct BinaryView: View {
         case .Nov25: Date.overrideDate = Date(timeIntervalSince1970: 1732544115)
         }
 
+        // Mirror SNTExecutionController.mm: customURL falls back to the EventDetailURL
+        // config so the Open Event button appears in the harness.
+        let effectiveURL = customURL.isEmpty ? eventDetailURL : customURL
+
         let window = NSWindow()
         ShowWindow(
           SNTBinaryMessageWindowViewFactory.createWith(
             window: window,
             event: event,
             customMsg: customMsg as NSString?,
-            customURL: customURL as NSString?,
+            customURL: effectiveURL.isEmpty ? nil : (effectiveURL as NSString),
             configState: SNTConfigState(config: SNTConfigurator.configurator()),
             bundleProgress: SNTBundleProgress(),
             uiStateCallback: { interval in print("Silence interval was set to \(interval)") },
