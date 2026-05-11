@@ -1991,10 +1991,13 @@ static SNTConfigurator* sharedConfigurator = nil;
       return;
     }
     self.batchedSyncState = self.syncState.mutableCopy;
-    block();
-    self.syncState = self.batchedSyncState;
-    self.batchedSyncState = nil;
-    [self saveSyncStateToDisk];
+    @try {
+      block();
+      self.syncState = self.batchedSyncState;
+      [self saveSyncStateToDisk];
+    } @finally {
+      self.batchedSyncState = nil;
+    }
   };
   if ([NSThread isMainThread]) {
     run();
