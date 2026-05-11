@@ -143,7 +143,7 @@ export const SantaConfigKeyGroups: SantaConfigGroups = {
     {
       key: "AllowedSantaCommands",
       description:
-        `Array of allowed Santa Commands. If the key \`AllowedSantaCommands\` is unset (nil), all commands are allowed. 
+        `Array of allowed Santa Commands. If the key \`AllowedSantaCommands\` is unset (nil), all commands are allowed.
         If \`AllowedSantaCommands\` is an empty array, none of the commands are allowed.`,
       type: "string",
       syncConfigurable: false,
