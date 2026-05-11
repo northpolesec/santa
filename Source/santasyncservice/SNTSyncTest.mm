@@ -1165,6 +1165,69 @@
   OCMVerify([self.daemonConnRop updateSyncSettings:OCMOCK_ANY reply:OCMOCK_ANY]);
 }
 
+- (SNTConfigBundle*)runPostflightAndCaptureBundleWithInflightSyncType:(SNTSyncType)inflight {
+  [self setupDefaultDaemonConnResponses];
+  self.syncState.syncType = inflight;
+
+  __block SNTConfigBundle* captured = nil;
+  OCMStub([self.daemonConnRop updateSyncSettings:[OCMArg any] reply:[OCMArg any]])
+      .andDo(^(NSInvocation* inv) {
+        SNTConfigBundle* __unsafe_unretained bundle = nil;
+        [inv getArgument:&bundle atIndex:2];
+        captured = bundle;
+        void (^__unsafe_unretained replyBlock)(void) = nil;
+        [inv getArgument:&replyBlock atIndex:3];
+        if (replyBlock) replyBlock();
+      });
+
+  SNTSyncPostflight* sut = [[SNTSyncPostflight alloc] initWithState:self.syncState];
+  [self stubRequestBody:nil response:nil error:nil validateBlock:nil];
+  XCTAssertTrue([sut sync]);
+  XCTAssertNotNil(captured, @"postflight must ship a bundle via updateSyncSettings:");
+  return captured;
+}
+
+- (void)testPostflightOnCleanSyncShipsBundleWithClearSyncStateBeforeApply {
+  SNTConfigBundle* bundle =
+      [self runPostflightAndCaptureBundleWithInflightSyncType:SNTSyncTypeClean];
+
+  __block BOOL fired = NO;
+  __block BOOL value = NO;
+  [bundle clearSyncStateBeforeApply:^(BOOL v) {
+    fired = YES;
+    value = v;
+  }];
+  XCTAssertTrue(fired, @"Postflight bundle must carry clearSyncStateBeforeApply on a Clean sync");
+  XCTAssertEqual(value, YES);
+}
+
+- (void)testPostflightOnCleanAllSyncShipsBundleWithClearSyncStateBeforeApply {
+  SNTConfigBundle* bundle =
+      [self runPostflightAndCaptureBundleWithInflightSyncType:SNTSyncTypeCleanAll];
+
+  __block BOOL fired = NO;
+  __block BOOL value = NO;
+  [bundle clearSyncStateBeforeApply:^(BOOL v) {
+    fired = YES;
+    value = v;
+  }];
+  XCTAssertTrue(fired,
+                @"Postflight bundle must carry clearSyncStateBeforeApply on a CleanAll sync");
+  XCTAssertEqual(value, YES);
+}
+
+- (void)testPostflightOnNormalSyncShipsBundleWithoutClearSyncStateBeforeApply {
+  SNTConfigBundle* bundle =
+      [self runPostflightAndCaptureBundleWithInflightSyncType:SNTSyncTypeNormal];
+
+  __block BOOL fired = NO;
+  [bundle clearSyncStateBeforeApply:^(BOOL v) {
+    fired = YES;
+  }];
+  XCTAssertFalse(fired,
+                 @"Postflight bundle must NOT carry clearSyncStateBeforeApply on a Normal sync");
+}
+
 #pragma mark - Dynamic NATS Push Client Lifecycle Tests
 
 - (void)testPreflightCreatesNATSWhenSyncV2 {

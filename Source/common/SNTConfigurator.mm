@@ -82,6 +82,11 @@ static SNTRemovableMediaAction ActionFromString(NSString* action) {
 @property(atomic) NSMutableDictionary* configState;
 @property(atomic) NSDictionary* state;
 
+/// Working dictionary for an in-progress `performSyncStateBatch:` transaction.
+/// Non-nil only while inside the batch's block. Always accessed on the main
+/// thread, matching the convention enforced by `updateSyncStateForKey:value:`.
+@property(nonatomic) NSMutableDictionary* batchedSyncState;
+
 @property(readonly, nonatomic) NSString* syncStateFilePath;
 @property(readonly, nonatomic) NSString* stateFilePath;
 
@@ -1960,6 +1965,10 @@ static SNTConfigurator* sharedConfigurator = nil;
 ///
 - (void)updateSyncStateForKey:(NSString*)key value:(id)value {
   void (^block)(void) = ^{
+    if (self.batchedSyncState) {
+      self.batchedSyncState[key] = value;
+      return;
+    }
     NSMutableDictionary* syncState = self.syncState.mutableCopy;
     syncState[key] = value;
     self.syncState = syncState;
@@ -1971,6 +1980,26 @@ static SNTConfigurator* sharedConfigurator = nil;
     block();
   } else {
     dispatch_sync(dispatch_get_main_queue(), block);
+  }
+}
+
+- (void)performSyncStateBatch:(void(NS_NOESCAPE ^)(void))block {
+  void (^run)(void) = ^{
+    if (self.batchedSyncState != nil) {
+      NSAssert(NO, @"Sync-state batches do not nest");
+      LOGE(@"Sync-state batches do not nest; skipping nested batch");
+      return;
+    }
+    self.batchedSyncState = self.syncState.mutableCopy;
+    block();
+    self.syncState = self.batchedSyncState;
+    self.batchedSyncState = nil;
+    [self saveSyncStateToDisk];
+  };
+  if ([NSThread isMainThread]) {
+    run();
+  } else {
+    dispatch_sync(dispatch_get_main_queue(), run);
   }
 }
 
@@ -2060,10 +2089,19 @@ static SNTConfigurator* sharedConfigurator = nil;
 }
 
 - (void)clearSyncState {
-  self.syncState = [NSMutableDictionary dictionary];
-  // TODO: Start a timer to flush the state to disk. On startup, Santa should
-  // check for the presence of the state file and, if no SyncBaseURL is
-  // configured, start the timer to clear sync state and flush to disk.
+  void (^block)(void) = ^{
+    if (self.batchedSyncState) {
+      [self.batchedSyncState removeAllObjects];
+      return;
+    }
+    self.syncState = [NSMutableDictionary dictionary];
+    [[NSFileManager defaultManager] removeItemAtPath:self.syncStateFilePath error:NULL];
+  };
+  if ([NSThread isMainThread]) {
+    block();
+  } else {
+    dispatch_sync(dispatch_get_main_queue(), block);
+  }
 }
 
 - (NSArray*)entitlementsPrefixFilter {

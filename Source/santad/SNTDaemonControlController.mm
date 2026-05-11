@@ -473,138 +473,158 @@ double watchdogRAMPeak = 0;
 - (void)updateSyncSettings:(SNTConfigBundle*)result reply:(void (^)(void))reply {
   SNTConfigurator* configurator = [SNTConfigurator configurator];
 
-  [result clientMode:^(SNTClientMode m) {
-    [configurator setSyncServerClientMode:m];
+  // Snapshot CEL state to detect changes across the commit, including the
+  // "rules disappeared from the server's config on a clean sync" case where
+  // the bundle has no celFallbackRules slot but the wipe removed pre-existing
+  // rules. The post-batch read catches this uniformly with the rules-changed
+  // and rules-newly-added cases.
+  NSData* oldCELData = [SNTCELFallbackRule serializeArray:[configurator celFallbackRules]];
+
+  [configurator performSyncStateBatch:^{
+    [result clearSyncStateBeforeApply:^(BOOL clear) {
+      if (clear) {
+        [configurator clearSyncState];
+      }
+    }];
+
+    [result clientMode:^(SNTClientMode m) {
+      [configurator setSyncServerClientMode:m];
+    }];
+
+    [result syncType:^(SNTSyncType val) {
+      [configurator setSyncTypeRequired:val];
+    }];
+
+    [result allowlistRegex:^(NSString* val) {
+      [configurator
+          setSyncServerAllowedPathRegex:[NSRegularExpression regularExpressionWithPattern:val
+                                                                                  options:0
+                                                                                    error:NULL]];
+    }];
+
+    [result blocklistRegex:^(NSString* val) {
+      [configurator
+          setSyncServerBlockedPathRegex:[NSRegularExpression regularExpressionWithPattern:val
+                                                                                  options:0
+                                                                                    error:NULL]];
+    }];
+
+    [result removableMediaAction:^(NSString* val) {
+      [configurator setSyncServerRemovableMediaAction:val];
+    }];
+
+    [result removableMediaRemountFlags:^(NSArray<NSString*>* val) {
+      [configurator setSyncServerRemovableMediaRemountFlags:val];
+    }];
+
+    [result encryptedRemovableMediaAction:^(NSString* val) {
+      [configurator setSyncServerEncryptedRemovableMediaAction:val];
+    }];
+
+    [result encryptedRemovableMediaRemountFlags:^(NSArray<NSString*>* val) {
+      [configurator setSyncServerEncryptedRemovableMediaRemountFlags:val];
+    }];
+
+    [result blockNetworkMount:^(BOOL val) {
+      [configurator setSyncServerBlockNetworkMount:val];
+    }];
+
+    [result bannedNetworkMountBlockMessage:^(NSString* val) {
+      [configurator setSyncServerBannedNetworkMountBlockMessage:val];
+    }];
+
+    [result allowedNetworkMountHosts:^(NSArray<NSString*>* val) {
+      [configurator setSyncServerAllowedNetworkMountHosts:val];
+    }];
+
+    [result enableBundles:^(BOOL val) {
+      [configurator setEnableBundles:val];
+    }];
+
+    [result enableTransitiveRules:^(BOOL val) {
+      [configurator setEnableTransitiveRules:val];
+    }];
+
+    [result enableAllEventUpload:^(BOOL val) {
+      [configurator setEnableAllEventUpload:val];
+    }];
+
+    [result disableUnknownEventUpload:^(BOOL val) {
+      [configurator setDisableUnknownEventUpload:val];
+    }];
+
+    [result overrideFileAccessAction:^(NSString* val) {
+      [configurator setSyncServerOverrideFileAccessAction:val];
+    }];
+
+    [result exportConfiguration:^(SNTExportConfiguration* val) {
+      LOGD(@"Received export configuration: %@", val);
+      [configurator setSyncServerExportConfig:val];
+    }];
+
+    [result fullSyncLastSuccess:^(NSDate* val) {
+      [configurator setFullSyncLastSuccess:val];
+    }];
+
+    [result ruleSyncLastSuccess:^(NSDate* val) {
+      [configurator setRuleSyncLastSuccess:val];
+    }];
+
+    [result networkExtensionSettings:^(SNTSyncNetworkExtensionSettings* val) {
+      [configurator setSyncServerSyncNetworkExtensionSettings:val];
+    }];
+
+    [result pushTokenChain:^(NSArray<NSString*>* val) {
+      [configurator setSyncServerPushTokenChain:val];
+    }];
+
+    [result telemetryFilterExpressions:^(NSArray<NSString*>* val) {
+      [configurator setSyncServerTelemetryFilterExpressions:val];
+    }];
+
+    [result celFallbackRules:^(NSArray<SNTCELFallbackRule*>* val) {
+      [configurator setSyncServerCELFallbackRules:val];
+    }];
+
+    [result eventDetailURL:^(NSString* val) {
+      [configurator setSyncServerEventDetailURL:val];
+    }];
+
+    [result eventDetailText:^(NSString* val) {
+      [configurator setSyncServerEventDetailText:val];
+    }];
+
+    [result fileAccessEventDetailURL:^(NSString* val) {
+      [configurator setSyncServerFileAccessEventDetailURL:val];
+    }];
+
+    [result fileAccessEventDetailText:^(NSString* val) {
+      [configurator setSyncServerFileAccessEventDetailText:val];
+    }];
+
+    [result fullSyncInterval:^(NSUInteger val) {
+      [configurator setSyncServerFullSyncInterval:val];
+    }];
+
+    [result pushNotificationsFullSyncInterval:^(NSUInteger val) {
+      [configurator setSyncServerPushNotificationsFullSyncInterval:val];
+    }];
   }];
 
-  [result syncType:^(SNTSyncType val) {
-    [configurator setSyncTypeRequired:val];
-  }];
-
-  [result allowlistRegex:^(NSString* val) {
-    [configurator
-        setSyncServerAllowedPathRegex:[NSRegularExpression regularExpressionWithPattern:val
-                                                                                options:0
-                                                                                  error:NULL]];
-  }];
-
-  [result blocklistRegex:^(NSString* val) {
-    [configurator
-        setSyncServerBlockedPathRegex:[NSRegularExpression regularExpressionWithPattern:val
-                                                                                options:0
-                                                                                  error:NULL]];
-  }];
-
-  [result removableMediaAction:^(NSString* val) {
-    [configurator setSyncServerRemovableMediaAction:val];
-  }];
-
-  [result removableMediaRemountFlags:^(NSArray<NSString*>* val) {
-    [configurator setSyncServerRemovableMediaRemountFlags:val];
-  }];
-
-  [result encryptedRemovableMediaAction:^(NSString* val) {
-    [configurator setSyncServerEncryptedRemovableMediaAction:val];
-  }];
-
-  [result encryptedRemovableMediaRemountFlags:^(NSArray<NSString*>* val) {
-    [configurator setSyncServerEncryptedRemovableMediaRemountFlags:val];
-  }];
-
-  [result blockNetworkMount:^(BOOL val) {
-    [configurator setSyncServerBlockNetworkMount:val];
-  }];
-
-  [result bannedNetworkMountBlockMessage:^(NSString* val) {
-    [configurator setSyncServerBannedNetworkMountBlockMessage:val];
-  }];
-
-  [result allowedNetworkMountHosts:^(NSArray<NSString*>* val) {
-    [configurator setSyncServerAllowedNetworkMountHosts:val];
-  }];
-
-  [result enableBundles:^(BOOL val) {
-    [configurator setEnableBundles:val];
-  }];
-
-  [result enableTransitiveRules:^(BOOL val) {
-    [configurator setEnableTransitiveRules:val];
-  }];
-
-  [result enableAllEventUpload:^(BOOL val) {
-    [configurator setEnableAllEventUpload:val];
-  }];
-
-  [result disableUnknownEventUpload:^(BOOL val) {
-    [configurator setDisableUnknownEventUpload:val];
-  }];
-
-  [result overrideFileAccessAction:^(NSString* val) {
-    [configurator setSyncServerOverrideFileAccessAction:val];
-  }];
-
-  [result exportConfiguration:^(SNTExportConfiguration* val) {
-    LOGD(@"Received export configuration: %@", val);
-    [configurator setSyncServerExportConfig:val];
-  }];
-
-  [result fullSyncLastSuccess:^(NSDate* val) {
-    [configurator setFullSyncLastSuccess:val];
-  }];
-
-  [result ruleSyncLastSuccess:^(NSDate* val) {
-    [configurator setFullSyncLastSuccess:val];
-  }];
-
+  // Mode-transition handler runs post-commit so the GUI notification its
+  // internal Available(nil) computes reads from the just-committed state
+  // rather than from the batch's pre-commit snapshot. TMM's combined
+  // persistence-and-side-effects contract stays as-is — accommodated by
+  // call ordering rather than refactored.
   [result modeTransition:^(SNTModeTransition* val) {
     // The _temporaryMonitorMode object is responsible for updating configurator as appropriate
     _temporaryMonitorMode->NewModeTransitionReceived(val);
   }];
 
-  [result networkExtensionSettings:^(SNTSyncNetworkExtensionSettings* val) {
-    [configurator setSyncServerSyncNetworkExtensionSettings:val];
-  }];
-
-  [result pushTokenChain:^(NSArray<NSString*>* val) {
-    [configurator setSyncServerPushTokenChain:val];
-  }];
-
-  [result telemetryFilterExpressions:^(NSArray<NSString*>* val) {
-    [configurator setSyncServerTelemetryFilterExpressions:val];
-  }];
-
-  [result celFallbackRules:^(NSArray<SNTCELFallbackRule*>* val) {
-    NSData* oldData = [SNTCELFallbackRule serializeArray:[configurator celFallbackRules]];
-    NSData* newData = [SNTCELFallbackRule serializeArray:val];
-    [configurator setSyncServerCELFallbackRules:val];
-    if (oldData != newData && ![oldData isEqualToData:newData] && self.flushCacheBlock) {
-      self.flushCacheBlock(FlushCacheMode::kAllCaches, FlushCacheReason::kCELFallbackRulesChanged);
-    }
-  }];
-
-  [result eventDetailURL:^(NSString* val) {
-    [configurator setSyncServerEventDetailURL:val];
-  }];
-
-  [result eventDetailText:^(NSString* val) {
-    [configurator setSyncServerEventDetailText:val];
-  }];
-
-  [result fileAccessEventDetailURL:^(NSString* val) {
-    [configurator setSyncServerFileAccessEventDetailURL:val];
-  }];
-
-  [result fileAccessEventDetailText:^(NSString* val) {
-    [configurator setSyncServerFileAccessEventDetailText:val];
-  }];
-
-  [result fullSyncInterval:^(NSUInteger val) {
-    [configurator setSyncServerFullSyncInterval:val];
-  }];
-
-  [result pushNotificationsFullSyncInterval:^(NSUInteger val) {
-    [configurator setSyncServerPushNotificationsFullSyncInterval:val];
-  }];
+  NSData* newCELData = [SNTCELFallbackRule serializeArray:[configurator celFallbackRules]];
+  if (![oldCELData isEqualToData:newCELData] && self.flushCacheBlock) {
+    self.flushCacheBlock(FlushCacheMode::kAllCaches, FlushCacheReason::kCELFallbackRulesChanged);
+  }
 
   reply();
 }

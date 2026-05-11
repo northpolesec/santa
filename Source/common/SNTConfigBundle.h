@@ -56,4 +56,11 @@
 - (void)fullSyncInterval:(void (^)(NSUInteger))block;
 - (void)pushNotificationsFullSyncInterval:(void (^)(NSUInteger))block;
 
+///
+///  When set, signals the daemon to clear persisted sync state before
+///  applying the rest of the bundle. Set only by PostflightConfigBundle
+///  when the in-flight sync was Clean or CleanAll.
+///
+- (void)clearSyncStateBeforeApply:(void (^)(BOOL))block;
+
 @end

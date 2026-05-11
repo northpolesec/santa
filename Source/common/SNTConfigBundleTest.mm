@@ -53,6 +53,7 @@
 @property NSArray<SNTCELFallbackRule*>* celFallbackRules;
 @property NSNumber* fullSyncInterval;
 @property NSNumber* pushNotificationsFullSyncInterval;
+@property NSNumber* clearSyncStateBeforeApply;
 @end
 
 @interface SNTConfigBundleTest : XCTestCase
@@ -370,6 +371,48 @@
   [bundle pushNotificationsFullSyncInterval:^(NSUInteger val) {
     XCTFail(@"This shouldn't be called");
   }];
+}
+
+- (void)testClearSyncStateBeforeApplyRoundTrips {
+  // When set to YES, the round-trip preserves the value and the accessor block fires with YES.
+  SNTConfigBundle* set = [[SNTConfigBundle alloc] init];
+  set.clearSyncStateBeforeApply = @(YES);
+
+  NSError* error = nil;
+  NSData* setData = [NSKeyedArchiver archivedDataWithRootObject:set
+                                          requiringSecureCoding:YES
+                                                          error:&error];
+  XCTAssertNil(error);
+  SNTConfigBundle* setDecoded = [NSKeyedUnarchiver unarchivedObjectOfClass:[SNTConfigBundle class]
+                                                                  fromData:setData
+                                                                     error:&error];
+  XCTAssertNil(error);
+
+  __block BOOL setFired = NO;
+  __block BOOL setValue = NO;
+  [setDecoded clearSyncStateBeforeApply:^(BOOL v) {
+    setFired = YES;
+    setValue = v;
+  }];
+  XCTAssertTrue(setFired);
+  XCTAssertEqual(setValue, YES);
+
+  // When left unset, the round-trip preserves the unset state and the accessor block does not fire.
+  SNTConfigBundle* unset = [[SNTConfigBundle alloc] init];
+  NSData* unsetData = [NSKeyedArchiver archivedDataWithRootObject:unset
+                                            requiringSecureCoding:YES
+                                                            error:&error];
+  XCTAssertNil(error);
+  SNTConfigBundle* unsetDecoded = [NSKeyedUnarchiver unarchivedObjectOfClass:[SNTConfigBundle class]
+                                                                    fromData:unsetData
+                                                                       error:&error];
+  XCTAssertNil(error);
+
+  __block BOOL unsetFired = NO;
+  [unsetDecoded clearSyncStateBeforeApply:^(BOOL v) {
+    unsetFired = YES;
+  }];
+  XCTAssertFalse(unsetFired);
 }
 
 @end
