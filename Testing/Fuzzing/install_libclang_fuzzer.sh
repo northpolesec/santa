@@ -43,15 +43,17 @@ TARBALL_URL="https://github.com/llvm/llvm-project/releases/download/llvmorg-${LL
 # Major version only (e.g. "22" from "22.1.4") — matches the lib path inside the tarball.
 TARBALL_CLANG_MAJOR="${LLVM_VERSION%%.*}"
 
-# DST_PATH uses Apple Clang's version string (from `clang --version`) because
-# the Xcode toolchain directory layout follows Apple's numbering, not LLVM's.
-# Only the download URL needs the upstream LLVM version.
-CLANG_VERSION=$(clang --version | head -n 1 | cut -d' ' -f 4)
-if [[ -z "${CLANG_VERSION}" ]]; then
-  echo "ERROR: failed to parse Apple Clang version from 'clang --version'" >&2
+# Ask clang directly for its resource directory. On Apple toolchains this
+# resolves to .../Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/<apple-version>,
+# so we avoid parsing `clang --version` — whose human-facing format Apple has
+# changed in the past — and we avoid hand-concatenating the Xcode prefix.
+# Only the download URL still needs the upstream LLVM version (used above).
+RESOURCE_DIR=$(clang -print-resource-dir)
+if [[ -z "${RESOURCE_DIR}" ]]; then
+  echo "ERROR: 'clang -print-resource-dir' returned no output" >&2
   exit 1
 fi
-DST_PATH="$(xcode-select -p)/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/${CLANG_VERSION}/lib/darwin/libclang_rt.fuzzer_osx.a"
+DST_PATH="${RESOURCE_DIR}/lib/darwin/libclang_rt.fuzzer_osx.a"
 
 if [ -f "${DST_PATH}" ]; then
   echo "libclang_rt.fuzzer_osx.a already present at ${DST_PATH}, nothing to do."

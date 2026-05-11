@@ -48,19 +48,19 @@ namespace detail {
 // silently truncate, corrupting the digest. Wrap the underlying CC call in
 // a loop that splits inputs into UINT32_MAX-sized chunks. Returns 1 on
 // success, 0 on the first underlying failure (matching CC convention).
-#define VERIFYINGHASHER_CC_UPDATE_LOOP(cc_update_fn, ctx, data, len) \
-  do {                                                               \
-    const auto* _p = static_cast<const uint8_t*>(data);              \
-    size_t _n = (len);                                               \
-    while (_n > 0) {                                                 \
-      const size_t _step_sz = (_n > UINT32_MAX) ? UINT32_MAX : _n;   \
-      const CC_LONG _step = static_cast<CC_LONG>(_step_sz);          \
-      const int _rc = cc_update_fn((ctx), _p, _step);                \
-      if (_rc != 1) return _rc;                                      \
-      _p += _step;                                                   \
-      _n -= _step_sz;                                                \
-    }                                                                \
-    return 1;                                                        \
+#define VERIFYINGHASHER_CC_UPDATE_LOOP(cc_update_fn, ctx, data, len)        \
+  do {                                                                      \
+    const auto* vh_p = static_cast<const uint8_t*>(data);                   \
+    size_t vh_n = (len);                                                    \
+    while (vh_n > 0) {                                                      \
+      const size_t vh_step_sz = (vh_n > UINT32_MAX) ? UINT32_MAX : vh_n;    \
+      const CC_LONG vh_step = static_cast<CC_LONG>(vh_step_sz);             \
+      const int vh_rc = cc_update_fn((ctx), vh_p, vh_step);                 \
+      if (vh_rc != 1) return vh_rc;                                         \
+      vh_p += vh_step;                                                      \
+      vh_n -= vh_step_sz;                                                   \
+    }                                                                       \
+    return 1;                                                               \
   } while (0)
 
 struct Sha256Algo {

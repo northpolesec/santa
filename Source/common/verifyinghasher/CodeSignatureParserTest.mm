@@ -69,13 +69,22 @@ std::vector<uint8_t> ExtractCsBlob(const char* path, uint64_t* out_slice_size) {
 #else
     cpu_type_t want = CPU_TYPE_X86_64;
 #endif
+    bool matched = false;
     for (auto& a : archs) {
       cpu_type_t ct = static_cast<cpu_type_t>(OSSwapBigToHostInt32(a.cputype));
       if (ct == want) {
         slice_off = OSSwapBigToHostInt32(a.offset);
         slice_size = OSSwapBigToHostInt32(a.size);
+        matched = true;
         break;
       }
+    }
+    // Fast-fail: without this, slice_off stays 0 and the load-command
+    // walk below reads the fat header bytes as a mach_header_64 and
+    // allocates std::vector<uint8_t> for an arbitrary mh.sizeofcmds.
+    if (!matched) {
+      ::close(fd);
+      return {};
     }
   }
   // Walk the slice's load commands to find LC_CODE_SIGNATURE.

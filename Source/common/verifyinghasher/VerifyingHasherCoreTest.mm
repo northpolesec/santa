@@ -205,6 +205,32 @@ std::vector<uint8_t> ExtractCsBlobBytes(std::span<const uint8_t> bytes, cpu_type
   return std::vector<uint8_t>(bytes.data() + sig_off, bytes.data() + sig_off + sig_size);
 }
 
+// Simulates a file truncated between fstat() and a later pread(): Size()
+// reports a larger value than the data actually contains, so a read past
+// data_.size() returns 0 (EOF) while the verifier still believes there
+// are more bytes to consume.
+class TruncatedMemoryFileReader : public santa::FileReader {
+ public:
+  TruncatedMemoryFileReader(std::vector<uint8_t> data, off_t claimed_size)
+      : data_(std::move(data)), claimed_size_(claimed_size) {}
+  ssize_t Pread(void* buf, size_t len, off_t off) override {
+    if (off < 0) {
+      errno = EINVAL;
+      return -1;
+    }
+    if (static_cast<size_t>(off) >= data_.size()) return 0;
+    size_t available = data_.size() - static_cast<size_t>(off);
+    size_t n = std::min(len, available);
+    std::memcpy(buf, data_.data() + off, n);
+    return static_cast<ssize_t>(n);
+  }
+  off_t Size() const override { return claimed_size_; }
+
+ private:
+  std::vector<uint8_t> data_;
+  off_t claimed_size_;
+};
+
 }  // namespace
 
 @interface VerifyingHasherCoreTest : XCTestCase
@@ -280,6 +306,26 @@ std::vector<uint8_t> ExtractCsBlobBytes(std::span<const uint8_t> bytes, cpu_type
   // F8: digest must be empty on kIoError (not 32 zero bytes), so a caller
   // that ignores Status can't silently consume an unfinalized digest.
   XCTAssertTrue(v.FullFileDigest().empty());
+}
+
+// Phase 5 (tail) used to silently `break` when pread returned 0 with
+// cursor_ < total, finalizing the digest over only a prefix of the
+// file. The fix classifies that as kIoError, matching phases 1 and 3.
+// We simulate the trigger with a reader that claims a larger Size()
+// than its actual data — the verifier completes header / cs-blob /
+// signed-region phases normally, then the tail drain hits EOF early.
+- (void)testTailEofClassifiedAsIoError {
+  auto bytes = Slurp("/usr/bin/yes");
+  XCTAssertFalse(bytes.empty());
+  const off_t real_size = static_cast<off_t>(bytes.size());
+  TruncatedMemoryFileReader r(std::move(bytes), real_size + 1024 * 1024);
+  VerifyingHasherCore v(r, kHostArch);
+  auto s = v.Run();
+  XCTAssertEqual(s, VerifyingHasherCore::Status::kIoError);
+  XCTAssertTrue(v.FullFileDigest().empty());
+  XCTAssertNotEqual(std::string(v.LastError()).find("tail"), std::string::npos,
+                    @"LastError should point at the tail phase: %s",
+                    std::string(v.LastError()).c_str());
 }
 
 - (void)testSinglePassInvariant {

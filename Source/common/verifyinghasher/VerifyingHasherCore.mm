@@ -216,7 +216,15 @@ VerifyingHasherCore::Status VerifyingHasherCore::RunStreamingPhases() {
       last_error_ = "pread failed in tail phase";
       return Status::kIoError;
     }
-    if (n == 0) break;
+    // n == 0 with cursor_ < total means the underlying source returned
+    // EOF before we hit the size fstat reported at Run() entry (e.g.,
+    // the file was truncated mid-verification). Treat as kIoError —
+    // same as phase 3 — so the partial digest doesn't get finalized
+    // and returned as if it covered the full file.
+    if (n == 0) {
+      last_error_ = "unexpected EOF in tail phase";
+      return Status::kIoError;
+    }
     Sha256Traits::Update(&full_ctx_, chunk_buf_.data(), static_cast<size_t>(n));
     cursor_ += static_cast<uint64_t>(n);
   }

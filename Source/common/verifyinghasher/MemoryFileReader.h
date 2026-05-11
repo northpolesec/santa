@@ -16,6 +16,7 @@
 #define SANTA_COMMON_VERIFYINGHASHER_MEMORYFILEREADER_H
 
 #include <algorithm>
+#include <cerrno>
 #include <cstdint>
 #include <cstring>
 #include <vector>
@@ -33,9 +34,13 @@ class MemoryFileReader : public FileReader {
   ssize_t Pread(void* buf, size_t len, off_t off) override {
     if (fail_next_) {
       fail_next_ = false;
+      errno = EIO;
       return -1;
     }
-    if (off < 0) return -1;
+    if (off < 0) {
+      errno = EINVAL;
+      return -1;
+    }
     if (static_cast<size_t>(off) >= data_.size()) return 0;
     size_t available = data_.size() - static_cast<size_t>(off);
     size_t n = std::min(len, available);

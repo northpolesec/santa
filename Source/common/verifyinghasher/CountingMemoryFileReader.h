@@ -16,6 +16,7 @@
 #define SANTA_COMMON_VERIFYINGHASHER_COUNTINGMEMORYFILEREADER_H
 
 #include <algorithm>
+#include <cerrno>
 #include <cstdint>
 #include <cstring>
 #include <vector>
@@ -34,7 +35,10 @@ class CountingMemoryFileReader : public FileReader {
   explicit CountingMemoryFileReader(std::vector<uint8_t> data)
       : data_(std::move(data)), reads_(data_.size(), 0) {}
   ssize_t Pread(void* buf, size_t len, off_t off) override {
-    if (off < 0) return -1;
+    if (off < 0) {
+      errno = EINVAL;
+      return -1;
+    }
     if (static_cast<size_t>(off) >= data_.size()) return 0;
     size_t n = std::min(len, data_.size() - static_cast<size_t>(off));
     std::memcpy(buf, data_.data() + off, n);
