@@ -44,6 +44,7 @@ santa_unit_test(
     deps = [
         ":FileReader",
         ":MemoryFileReader",
+        "//Source/common:ScopedFile",
     ],
 )
 
@@ -82,6 +83,7 @@ santa_unit_test(
         ":FileReader",
         ":HeaderParser",
         ":MemoryFileReader",
+        "//Source/common:ScopedFile",
     ],
 )
 
@@ -95,7 +97,10 @@ objc_library(
 santa_unit_test(
     name = "CodeSignatureParserTest",
     srcs = ["CodeSignatureParserTest.mm"],
-    deps = [":CodeSignatureParser"],
+    deps = [
+        ":CodeSignatureParser",
+        "//Source/common:ScopedFile",
+    ],
 )
 
 objc_library(
@@ -156,6 +161,7 @@ santa_unit_test(
         ":CountingMemoryFileReader",
         ":MemoryFileReader",
         ":VerifyingHasherCore",
+        "//Source/common:ScopedFile",
     ],
 )
 
@@ -183,7 +189,10 @@ santa_unit_test(
         ":hw_team_signed_fixture",
         ":hw_universal_fixture",
     ],
-    deps = [":VerifyingHasher"],
+    deps = [
+        ":VerifyingHasher",
+        "//Source/common:ScopedFile",
+    ],
 )
 
 test_suite(

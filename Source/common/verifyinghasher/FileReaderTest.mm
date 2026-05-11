@@ -23,6 +23,7 @@
 #include <cstdint>
 #include <vector>
 
+#include "Source/common/ScopedFile.h"
 #include "Source/common/verifyinghasher/MemoryFileReader.h"
 
 using santa::FdFileReader;
@@ -46,32 +47,30 @@ using santa::MemoryFileReader;
 }
 
 - (void)testFdReaderPreadsRealFile {
-  int fd = ::open("/etc/hosts", O_RDONLY | O_CLOEXEC);
-  XCTAssertGreaterThanOrEqual(fd, 0);
+  santa::ScopedFile sf(::open("/etc/hosts", O_RDONLY | O_CLOEXEC));
+  XCTAssertGreaterThanOrEqual(sf.UnsafeFD(), 0);
   struct stat st{};
-  XCTAssertEqual(::fstat(fd, &st), 0);
-  FdFileReader r(fd, st.st_size);
+  XCTAssertEqual(::fstat(sf.UnsafeFD(), &st), 0);
+  FdFileReader r(sf.UnsafeFD(), st.st_size);
   uint8_t buf[16] = {};
   ssize_t n = r.Pread(buf, sizeof(buf), 0);
   XCTAssertGreaterThan(n, 0);
   XCTAssertLessThanOrEqual(n, static_cast<ssize_t>(sizeof(buf)));
   // /etc/hosts is ASCII; first byte should be printable.
   XCTAssertTrue(buf[0] >= 0x20 || buf[0] == '\n' || buf[0] == '#');
-  ::close(fd);
 }
 
 - (void)testFdReaderHandlesShortRead {
-  int fd = ::open("/etc/hosts", O_RDONLY | O_CLOEXEC);
-  XCTAssertGreaterThanOrEqual(fd, 0);
+  santa::ScopedFile sf(::open("/etc/hosts", O_RDONLY | O_CLOEXEC));
+  XCTAssertGreaterThanOrEqual(sf.UnsafeFD(), 0);
   struct stat st{};
-  XCTAssertEqual(::fstat(fd, &st), 0);
-  FdFileReader r(fd, st.st_size);
+  XCTAssertEqual(::fstat(sf.UnsafeFD(), &st), 0);
+  FdFileReader r(sf.UnsafeFD(), st.st_size);
   // Read past EOF — should return only what's available.
   uint8_t buf[8] = {};
   ssize_t n = r.Pread(buf, sizeof(buf), st.st_size - 4);
   XCTAssertEqual(n, 4);
   XCTAssertEqual(r.Pread(buf, sizeof(buf), st.st_size + 100), 0);
-  ::close(fd);
 }
 
 @end

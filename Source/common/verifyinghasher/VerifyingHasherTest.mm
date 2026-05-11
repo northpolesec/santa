@@ -40,6 +40,8 @@ __END_DECLS
 #include <string>
 #include <vector>
 
+#include "Source/common/ScopedFile.h"
+
 using santa::VerifyingHasher;
 
 namespace {
@@ -175,16 +177,12 @@ std::vector<uint8_t> ExtractCsBlobBytes(std::span<const uint8_t> bytes, cpu_type
 
 // Slurp a file into a vector. Returns empty on error.
 std::vector<uint8_t> Slurp(const char* path) {
-  int fd = ::open(path, O_RDONLY | O_CLOEXEC);
-  if (fd < 0) return {};
+  santa::ScopedFile sf(::open(path, O_RDONLY | O_CLOEXEC));
+  if (sf.UnsafeFD() < 0) return {};
   struct stat st{};
-  if (::fstat(fd, &st) != 0) {
-    ::close(fd);
-    return {};
-  }
+  if (::fstat(sf.UnsafeFD(), &st) != 0) return {};
   std::vector<uint8_t> v(static_cast<size_t>(st.st_size));
-  ssize_t n = ::pread(fd, v.data(), v.size(), 0);
-  ::close(fd);
+  ssize_t n = ::pread(sf.UnsafeFD(), v.data(), v.size(), 0);
   if (n != static_cast<ssize_t>(v.size())) return {};
   return v;
 }
@@ -238,7 +236,7 @@ std::vector<uint8_t> Slurp(const char* path) {
 
 - (void)testMatchCDHashOnExactExpected {
   auto cdhash = [self hwUniversalArm64CdHash];
-  int fd = [self openHwUniversalFd];
+  santa::ScopedFile sf([self openHwUniversalFd]);
 
   VerifyingHasher::Expected exp{
       .cdhash = std::span<const uint8_t>(cdhash.data(), cdhash.size()),
@@ -246,8 +244,7 @@ std::vector<uint8_t> Slurp(const char* path) {
       .team_id = kHwUniversalTeamID,
   };
 
-  auto r = VerifyingHasher::Run(fd, CPU_TYPE_ARM64, CPU_SUBTYPE_ARM64_ALL, exp);
-  ::close(fd);
+  auto r = VerifyingHasher::Run(sf.UnsafeFD(), CPU_TYPE_ARM64, CPU_SUBTYPE_ARM64_ALL, exp);
 
   XCTAssertEqual(r.status, VerifyingHasher::Status::kMatchCDHash, @"Expected kMatchCDHash");
 
@@ -268,7 +265,7 @@ std::vector<uint8_t> Slurp(const char* path) {
   // hw_universal is ad-hoc-signed, so kHwUniversalTeamID is "".
   // Expected: kNoMatch (drift guard rejects empty team_id).
   std::vector<uint8_t> wrong_cdhash(CS_CDHASH_LEN, 0xFF);
-  int fd = [self openHwUniversalFd];
+  santa::ScopedFile sf([self openHwUniversalFd]);
 
   VerifyingHasher::Expected exp{
       .cdhash = std::span<const uint8_t>(wrong_cdhash.data(), wrong_cdhash.size()),
@@ -276,8 +273,7 @@ std::vector<uint8_t> Slurp(const char* path) {
       .team_id = kHwUniversalTeamID,  // empty (ad-hoc)
   };
 
-  auto r = VerifyingHasher::Run(fd, CPU_TYPE_ARM64, CPU_SUBTYPE_ARM64_ALL, exp);
-  ::close(fd);
+  auto r = VerifyingHasher::Run(sf.UnsafeFD(), CPU_TYPE_ARM64, CPU_SUBTYPE_ARM64_ALL, exp);
 
   XCTAssertEqual(r.status, VerifyingHasher::Status::kNoMatch,
                  @"Drift must not fire for ad-hoc binaries (empty team_id)");
@@ -289,7 +285,7 @@ std::vector<uint8_t> Slurp(const char* path) {
   // Wrong cdhash (all 0xFF), correct signing_id, correct (non-empty) team_id.
   // Both Expected fields populated and matching the parsed CD → drift fires.
   std::vector<uint8_t> wrong_cdhash(CS_CDHASH_LEN, 0xFF);
-  int fd = [self openHwTeamSignedFd];
+  santa::ScopedFile sf([self openHwTeamSignedFd]);
 
   VerifyingHasher::Expected exp{
       .cdhash = std::span<const uint8_t>(wrong_cdhash.data(), wrong_cdhash.size()),
@@ -297,8 +293,7 @@ std::vector<uint8_t> Slurp(const char* path) {
       .team_id = kHwTeamSignedTeamID,
   };
 
-  auto r = VerifyingHasher::Run(fd, CPU_TYPE_ARM64, CPU_SUBTYPE_ARM64_ALL, exp);
-  ::close(fd);
+  auto r = VerifyingHasher::Run(sf.UnsafeFD(), CPU_TYPE_ARM64, CPU_SUBTYPE_ARM64_ALL, exp);
 
   XCTAssertEqual(r.status, VerifyingHasher::Status::kMatchSidTidDrift,
                  @"Drift must fire on team-signed binary with matching sid+tid");
@@ -308,7 +303,7 @@ std::vector<uint8_t> Slurp(const char* path) {
 
 - (void)testNoMatchWhenAllExpectedDiffer {
   std::vector<uint8_t> wrong_cdhash(CS_CDHASH_LEN, 0xAA);
-  int fd = [self openHwUniversalFd];
+  santa::ScopedFile sf([self openHwUniversalFd]);
 
   VerifyingHasher::Expected exp{
       .cdhash = std::span<const uint8_t>(wrong_cdhash.data(), wrong_cdhash.size()),
@@ -316,8 +311,7 @@ std::vector<uint8_t> Slurp(const char* path) {
       .team_id = "WRONGTEAM",
   };
 
-  auto r = VerifyingHasher::Run(fd, CPU_TYPE_ARM64, CPU_SUBTYPE_ARM64_ALL, exp);
-  ::close(fd);
+  auto r = VerifyingHasher::Run(sf.UnsafeFD(), CPU_TYPE_ARM64, CPU_SUBTYPE_ARM64_ALL, exp);
 
   XCTAssertEqual(r.status, VerifyingHasher::Status::kNoMatch,
                  @"Expected kNoMatch when all expected values differ");
@@ -346,19 +340,20 @@ std::vector<uint8_t> Slurp(const char* path) {
 // ---- Test 5: non-Mach-O file -> kError ----------------------------------
 
 - (void)testErrorOnNonMachOFile {
-  // Write a tiny non-Mach-O file to NSTemporaryDirectory() (NOT bare /tmp).
-  NSString* tmpDir = NSTemporaryDirectory();
-  NSString* tmpPath = [tmpDir stringByAppendingPathComponent:@"VerifyingHasherTest_nonmacho.bin"];
+  // mkstemp-backed temp file, unlinked at creation. VerifyingHasher::Run
+  // takes the fd, so no on-disk path is needed past the write.
+  auto file = santa::ScopedFile::CreateTemporary();
+  XCTAssertTrue(file.ok(), @"CreateTemporary failed: %s",
+                file.status().ToString().c_str());
 
   // 16 bytes of garbage (no Mach-O magic).
   const uint8_t garbage[] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
                              0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10};
   NSData* data = [NSData dataWithBytes:garbage length:sizeof(garbage)];
-  BOOL wrote = [data writeToFile:tmpPath atomically:YES];
-  XCTAssertTrue(wrote, @"Failed to write non-Mach-O fixture to %@", tmpPath);
-
-  int fd = ::open(tmpPath.UTF8String, O_RDONLY | O_CLOEXEC);
-  XCTAssertGreaterThanOrEqual(fd, 0, @"Failed to open non-Mach-O fixture");
+  NSFileHandle* writer = file->Writer();
+  NSError* writeErr = nil;
+  XCTAssertTrue([writer writeData:data error:&writeErr],
+                @"Failed to write non-Mach-O fixture: %@", writeErr);
 
   std::vector<uint8_t> dummy_cdhash(CS_CDHASH_LEN, 0x00);
   VerifyingHasher::Expected exp{
@@ -367,9 +362,7 @@ std::vector<uint8_t> Slurp(const char* path) {
       .team_id = "SOMETEAM",
   };
 
-  auto r = VerifyingHasher::Run(fd, CPU_TYPE_ARM64, CPU_SUBTYPE_ARM64_ALL, exp);
-  ::close(fd);
-  ::unlink(tmpPath.UTF8String);
+  auto r = VerifyingHasher::Run(file->UnsafeFD(), CPU_TYPE_ARM64, CPU_SUBTYPE_ARM64_ALL, exp);
 
   XCTAssertEqual(r.status, VerifyingHasher::Status::kError, @"Expected kError for non-Mach-O file");
   // Non-Mach-O is a kError path that DID reach EOF — the file was read in
@@ -387,7 +380,7 @@ std::vector<uint8_t> Slurp(const char* path) {
   // Use all-zero cdhash (wrong) + wrong signing_id + wrong team_id to force
   // kNoMatch while guaranteeing a successful full-file read.
   std::vector<uint8_t> zero_cdhash(CS_CDHASH_LEN, 0x00);
-  int fd = [self openHwUniversalFd];
+  santa::ScopedFile sf([self openHwUniversalFd]);
 
   VerifyingHasher::Expected exp{
       .cdhash = std::span<const uint8_t>(zero_cdhash.data(), zero_cdhash.size()),
@@ -395,8 +388,7 @@ std::vector<uint8_t> Slurp(const char* path) {
       .team_id = "WRONGTEAM",
   };
 
-  auto r = VerifyingHasher::Run(fd, CPU_TYPE_ARM64, CPU_SUBTYPE_ARM64_ALL, exp);
-  ::close(fd);
+  auto r = VerifyingHasher::Run(sf.UnsafeFD(), CPU_TYPE_ARM64, CPU_SUBTYPE_ARM64_ALL, exp);
 
   // kNoMatch means the file was read successfully; sha256 must be engaged.
   XCTAssertEqual(r.status, VerifyingHasher::Status::kNoMatch,
@@ -407,14 +399,13 @@ std::vector<uint8_t> Slurp(const char* path) {
   // reads the same file. Run a second call with exact cdhash and assert the
   // sha256 bytes are identical.
   auto cdhash = [self hwUniversalArm64CdHash];
-  int fd2 = [self openHwUniversalFd];
+  santa::ScopedFile sf2([self openHwUniversalFd]);
   VerifyingHasher::Expected exp2{
       .cdhash = std::span<const uint8_t>(cdhash.data(), cdhash.size()),
       .signing_id = kHwUniversalSigningID,
       .team_id = kHwUniversalTeamID,
   };
-  auto r2 = VerifyingHasher::Run(fd2, CPU_TYPE_ARM64, CPU_SUBTYPE_ARM64_ALL, exp2);
-  ::close(fd2);
+  auto r2 = VerifyingHasher::Run(sf2.UnsafeFD(), CPU_TYPE_ARM64, CPU_SUBTYPE_ARM64_ALL, exp2);
 
   XCTAssertTrue(r2.sha256.has_value());
   XCTAssertEqual(*r.sha256, *r2.sha256,

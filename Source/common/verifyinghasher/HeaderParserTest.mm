@@ -29,6 +29,7 @@
 #include <string>
 #include <vector>
 
+#include "Source/common/ScopedFile.h"
 #include "Source/common/verifyinghasher/MemoryFileReader.h"
 
 using santa::ArchSelector;
@@ -46,16 +47,12 @@ constexpr ArchSelector kHostArch = {CPU_TYPE_X86_64, CPU_SUBTYPE_X86_64_ALL};
 
 // Read entire file into a vector for synthetic feed.
 std::vector<uint8_t> Slurp(const char* path) {
-  int fd = ::open(path, O_RDONLY | O_CLOEXEC);
-  if (fd < 0) return {};
+  santa::ScopedFile sf(::open(path, O_RDONLY | O_CLOEXEC));
+  if (sf.UnsafeFD() < 0) return {};
   struct stat st{};
-  if (::fstat(fd, &st) != 0) {
-    ::close(fd);
-    return {};
-  }
+  if (::fstat(sf.UnsafeFD(), &st) != 0) return {};
   std::vector<uint8_t> v(st.st_size);
-  ssize_t n = ::pread(fd, v.data(), v.size(), 0);
-  ::close(fd);
+  ssize_t n = ::pread(sf.UnsafeFD(), v.data(), v.size(), 0);
   if (n != static_cast<ssize_t>(v.size())) return {};
   return v;
 }

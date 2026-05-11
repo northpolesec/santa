@@ -35,6 +35,8 @@ __END_DECLS
 #include <string>
 #include <vector>
 
+#include "Source/common/ScopedFile.h"
+
 using santa::ParseCodeSignature;
 using santa::ParsedCodeDirectory;
 
@@ -44,18 +46,13 @@ namespace {
 // parsing logic in HeaderParser but is intentionally separate so this
 // test doesn't depend on HeaderParser.
 std::vector<uint8_t> ExtractCsBlob(const char* path, uint64_t* out_slice_size) {
-  int fd = ::open(path, O_RDONLY | O_CLOEXEC);
-  if (fd < 0) return {};
+  santa::ScopedFile sf(::open(path, O_RDONLY | O_CLOEXEC));
+  if (sf.UnsafeFD() < 0) return {};
+  const int fd = sf.UnsafeFD();
   struct stat st{};
-  if (::fstat(fd, &st) != 0) {
-    ::close(fd);
-    return {};
-  }
+  if (::fstat(fd, &st) != 0) return {};
   uint32_t magic = 0;
-  if (::pread(fd, &magic, 4, 0) != 4) {
-    ::close(fd);
-    return {};
-  }
+  if (::pread(fd, &magic, 4, 0) != 4) return {};
 
   uint64_t slice_off = 0, slice_size = static_cast<uint64_t>(st.st_size);
   if (magic == FAT_MAGIC || magic == FAT_CIGAM) {
@@ -82,10 +79,7 @@ std::vector<uint8_t> ExtractCsBlob(const char* path, uint64_t* out_slice_size) {
     // Fast-fail: without this, slice_off stays 0 and the load-command
     // walk below reads the fat header bytes as a mach_header_64 and
     // allocates std::vector<uint8_t> for an arbitrary mh.sizeofcmds.
-    if (!matched) {
-      ::close(fd);
-      return {};
-    }
+    if (!matched) return {};
   }
   // Walk the slice's load commands to find LC_CODE_SIGNATURE.
   struct mach_header_64 mh{};
@@ -109,13 +103,9 @@ std::vector<uint8_t> ExtractCsBlob(const char* path, uint64_t* out_slice_size) {
     }
     p += lcmd.cmdsize;
   }
-  if (sig_size == 0) {
-    ::close(fd);
-    return {};
-  }
+  if (sig_size == 0) return {};
   std::vector<uint8_t> blob(sig_size);
   ::pread(fd, blob.data(), sig_size, sig_off);
-  ::close(fd);
   if (out_slice_size) *out_slice_size = slice_size;
   return blob;
 }
