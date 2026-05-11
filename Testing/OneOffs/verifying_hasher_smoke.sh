@@ -64,25 +64,36 @@ echo "Case 3: tampered copy"
 TAMP="$TMP/yes_tampered"
 cp /usr/bin/yes "$TAMP"
 chmod u+w "$TAMP"
-# Flip a byte at offset 49152 + 1024 (well inside the signed region for any reasonable binary).
-python3 -c "
+# Derive the tamper offset from Case 1's verifier output so the smoke test
+# stays valid across /usr/bin/yes layout changes (size shrink, arch
+# reorder, thin-vs-fat). The signed region for the host slice is
+# [slice_off, slice_off + codeLimit); the midpoint is guaranteed inside.
+slice_off=$(grep -E '^slice: ' "$TMP/case1.out" | sed -E 's/.* at offset ([0-9]+).*/\1/')
+code_limit=$(grep -E '^codedir: ' "$TMP/case1.out" | sed -E 's/.*codeLimit=([0-9]+).*/\1/')
+if [ -z "$slice_off" ] || [ -z "$code_limit" ]; then
+    echo "FAIL: could not parse slice_off/code_limit from Case 1 output" >&2
+    failures=$((failures + 1))
+else
+    tamper_off=$(( slice_off + code_limit / 2 ))
+    python3 -c "
 import sys
-p = sys.argv[1]
+p, off = sys.argv[1], int(sys.argv[2])
 with open(p, 'r+b') as f:
-    f.seek(49152 + 1024)
+    f.seek(off)
     b = f.read(1)
-    f.seek(49152 + 1024)
+    f.seek(off)
     f.write(bytes([b[0] ^ 0xFF]))
-" "$TAMP"
-"$BIN" "$TAMP" >"$TMP/case3.out" 2>"$TMP/case3.err" || {
-    rc=$?
-    echo "FAIL: tampered run exited with $rc (expected 0)" >&2
-    failures=$((failures + 1))
-}
-if ! grep -E "page mismatches: [1-9]" "$TMP/case3.out" >/dev/null; then
-    echo "FAIL: expected nonzero page mismatches in tampered run" >&2
-    sed 's/^/  /' "$TMP/case3.out" >&2
-    failures=$((failures + 1))
+" "$TAMP" "$tamper_off"
+    "$BIN" "$TAMP" >"$TMP/case3.out" 2>"$TMP/case3.err" || {
+        rc=$?
+        echo "FAIL: tampered run exited with $rc (expected 0)" >&2
+        failures=$((failures + 1))
+    }
+    if ! grep -E "page mismatches: [1-9]" "$TMP/case3.out" >/dev/null; then
+        echo "FAIL: expected nonzero page mismatches in tampered run" >&2
+        sed 's/^/  /' "$TMP/case3.out" >&2
+        failures=$((failures + 1))
+    fi
 fi
 
 # Case 4: non-Mach-O file.

@@ -63,7 +63,8 @@ std::span<const uint32_t> VerifyingHasherCore::MismatchedSlots() const {
 }
 
 VerifyingHasherCore::Status VerifyingHasherCore::RunHeaderPhase() {
-  HeaderParser hp(want_, static_cast<uint64_t>(reader_.Size()));
+  const uint64_t total = static_cast<uint64_t>(reader_.Size());
+  HeaderParser hp(want_, total);
   while (hp.status() == HeaderParser::Status::kNeedMore) {
     const uint64_t chunk_off = cursor_;
     ssize_t n = reader_.Pread(chunk_buf_.data(), chunk_buf_.size(), static_cast<off_t>(chunk_off));
@@ -71,11 +72,33 @@ VerifyingHasherCore::Status VerifyingHasherCore::RunHeaderPhase() {
       last_error_ = "pread failed in header phase";
       return Status::kIoError;
     }
+    if (n > 0 && static_cast<uint64_t>(n) > total - chunk_off) {
+      // Reader returned more bytes than its Size() declared remained.
+      // For an fd-backed reader this is the kernel reporting a file
+      // larger than fstat captured at Run() entry — the file grew mid-
+      // verification, and continuing would silently hash the over-served
+      // bytes. Surface as kIoError so the caller can act on the race.
+      // For non-fd readers it's a contract violation. Either way, refuse
+      // to publish a digest over content the reader hasn't accounted for.
+      last_error_ = "reader served past reported size in header phase";
+      return Status::kIoError;
+    }
     if (n == 0) {
-      // EOF before parser was ready. A file too short to even contain
-      // the Mach-O magic is "not a Mach-O", not an I/O error — falling
-      // back to kIoError here would deny the caller a populated
-      // digest (per spec, kIoError is the only status without one).
+      // n == 0 with cursor_ < total means the reader returned EOF before
+      // we hit the size fstat reported at Run() entry (file truncated
+      // mid-verification, or a reader that misreports Size()). Mirror
+      // phases 3 and 5: classify as kIoError so the partial digest
+      // doesn't get finalized and returned as if it covered the full file.
+      if (cursor_ < total) {
+        last_error_ = "unexpected EOF in header phase";
+        return Status::kIoError;
+      }
+      // Genuine EOF at the reader-reported size. A file too short to even
+      // contain the Mach-O magic is "not a Mach-O", not an I/O error —
+      // falling back to kIoError here would deny the caller a populated
+      // digest (per spec, kIoError is the only status without one). The
+      // "digest covers the full file" contract is preserved because cursor_
+      // has reached total above.
       if (cursor_ < 4) {
         last_error_ = "file too short to be a Mach-O";
         return Status::kNotMachO;
@@ -191,6 +214,13 @@ VerifyingHasherCore::Status VerifyingHasherCore::RunStreamingPhases() {
       last_error_ = "unexpected EOF in streaming phase";
       return Status::kIoError;
     }
+    if (static_cast<size_t>(n) > want) {
+      // Reader violated its len contract — pread(2) caps at len, so this
+      // can only happen with a misbehaving custom FileReader. Defense-
+      // in-depth against silently feeding bytes past cs_lo into pv.
+      last_error_ = "reader served past requested length in streaming phase";
+      return Status::kIoError;
+    }
     Sha256Traits::Update(&full_ctx_, chunk_buf_.data(), static_cast<size_t>(n));
     pv.Update(chunk_buf_.data(), static_cast<size_t>(n), cursor_);
     cursor_ += static_cast<uint64_t>(n);
@@ -223,6 +253,13 @@ VerifyingHasherCore::Status VerifyingHasherCore::RunStreamingPhases() {
     // and returned as if it covered the full file.
     if (n == 0) {
       last_error_ = "unexpected EOF in tail phase";
+      return Status::kIoError;
+    }
+    if (static_cast<size_t>(n) > want) {
+      // Defense-in-depth against a misbehaving custom FileReader serving
+      // past its declared len. For fd-backed readers pread(2) caps at
+      // len so this is unreachable in production.
+      last_error_ = "reader served past requested length in tail phase";
       return Status::kIoError;
     }
     Sha256Traits::Update(&full_ctx_, chunk_buf_.data(), static_cast<size_t>(n));

@@ -28,7 +28,7 @@ Apple Clang doesn't ship the libFuzzer runtime (`libclang_rt.fuzzer_osx.a`).
 Before the first `--config=fuzz` build on a workstation, run the install
 helper:
 
-```
+```bash
 ./Testing/Fuzzing/install_libclang_fuzzer.sh
 ```
 
@@ -44,7 +44,7 @@ the comment in the script).
 
 ### Replay corpus (regression mode — fast, suitable for CI)
 
-```
+```bash
 bazel test --config=fuzz \
     //Testing/Fuzzing:VerifyingHasherFuzzer \
     //Testing/Fuzzing:HeaderParserFuzzer
@@ -55,7 +55,7 @@ finding, or single-observation oracle trip.
 
 ### Active fuzz with mutation (time-bounded)
 
-```
+```bash
 bazel run --config=fuzz //Testing/Fuzzing:VerifyingHasherFuzzer_run \
     -- --timeout_secs=120
 bazel run --config=fuzz //Testing/Fuzzing:HeaderParserFuzzer_run \
@@ -78,7 +78,7 @@ alongside the fix.
 Required only after Mach-O / CS-blob format changes that materially
 affect the corpus shape (rare).
 
-```
+```bash
 ./Testing/Fuzzing/regenerate_corpus.sh
 ```
 
@@ -105,7 +105,7 @@ Requirements: macOS + Apple Clang (`arm64e` target is Apple-only) plus
 The `objc_fuzz_test` macro in `fuzzing.bzl` wraps `cc_fuzz_test` from
 `rules_fuzzing`. Pattern:
 
-```
+```starlark
 objc_fuzz_test(
     name = "MyNewFuzzer",
     srcs = ["MyNewFuzzer.mm"],

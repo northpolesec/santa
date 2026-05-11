@@ -228,6 +228,33 @@ class TruncatedMemoryFileReader : public santa::FileReader {
   off_t claimed_size_;
 };
 
+// Mirror of TruncatedMemoryFileReader in the opposite direction: the
+// reader holds `data` bytes but reports Size() < data.size(). Pread
+// still honors `len`, so over-serving manifests via `n > claimed_size_
+// - off` rather than `n > len`. Models the production scenario where
+// the file has grown between fstat (at Run() entry) and a later pread.
+class OverservingMemoryFileReader : public santa::FileReader {
+ public:
+  OverservingMemoryFileReader(std::vector<uint8_t> data, off_t claimed_size)
+      : data_(std::move(data)), claimed_size_(claimed_size) {}
+  ssize_t Pread(void* buf, size_t len, off_t off) override {
+    if (off < 0) {
+      errno = EINVAL;
+      return -1;
+    }
+    if (static_cast<size_t>(off) >= data_.size()) return 0;
+    size_t available = data_.size() - static_cast<size_t>(off);
+    size_t n = std::min(len, available);
+    std::memcpy(buf, data_.data() + off, n);
+    return static_cast<ssize_t>(n);
+  }
+  off_t Size() const override { return claimed_size_; }
+
+ private:
+  std::vector<uint8_t> data_;
+  off_t claimed_size_;
+};
+
 }  // namespace
 
 @interface VerifyingHasherCoreTest : XCTestCase
@@ -261,6 +288,11 @@ class TruncatedMemoryFileReader : public santa::FileReader {
   // fat binary with x86_64 in the lower half and arm64e in the upper
   // half, so this reliably lands inside the arm64e signed region.
   auto bytes = Slurp(tampered.c_str());
+  if (bytes.empty()) {
+    XCTFail(@"Slurp returned empty bytes for %s", tampered.c_str());
+    std::remove(tampered.c_str());
+    return;
+  }
   bytes[3 * bytes.size() / 4] ^= 0xFF;
 
   MemoryFileReader r(bytes);
@@ -325,6 +357,51 @@ class TruncatedMemoryFileReader : public santa::FileReader {
                     std::string(v.LastError()).c_str());
 }
 
+// Header-phase analog of testTailEofClassifiedAsIoError. A reader that
+// claims a larger Size() than its data can serve must trigger kIoError
+// (not kNotMachO / kNoSignature) if Pread returns 0 while cursor_ <
+// total — otherwise FinalizeDigestDrainingToEof would publish a digest
+// over only a prefix of the file. Truncating /usr/bin/yes to ~100 bytes
+// (fat header + arch table + partial slice load commands) is mid-header:
+// HeaderParser stays in kNeedMore after the first Pread, then the next
+// Pread hits EOF early.
+- (void)testHeaderEofClassifiedAsIoError {
+  auto bytes = Slurp("/usr/bin/yes");
+  XCTAssertFalse(bytes.empty());
+  const off_t real_size = static_cast<off_t>(bytes.size());
+  bytes.resize(100);
+  TruncatedMemoryFileReader r(std::move(bytes), real_size);
+  VerifyingHasherCore v(r, kHostArch);
+  auto s = v.Run();
+  XCTAssertEqual(s, VerifyingHasherCore::Status::kIoError);
+  XCTAssertTrue(v.FullFileDigest().empty());
+  XCTAssertNotEqual(std::string(v.LastError()).find("header"), std::string::npos,
+                    @"LastError should point at the header phase: %s",
+                    std::string(v.LastError()).c_str());
+}
+
+// Symmetric to testHeaderEofClassifiedAsIoError: a reader that holds more
+// bytes than its Size() declares (modeling fstat / pread divergence when
+// the file grows mid-verification) must trip kIoError in the header
+// phase rather than silently hashing the over-served bytes. The fix
+// closes a soundness gap that would otherwise produce kOk with a
+// SHA-256 over more bytes than Size() reported.
+- (void)testHeaderOverservingClassifiedAsIoError {
+  auto bytes = Slurp("/usr/bin/yes");
+  XCTAssertFalse(bytes.empty());
+  // Claim one fewer byte than we hold. The first Pread will serve the
+  // full buffer (claimed_size + 1 bytes), tripping the over-serve check.
+  const off_t claimed = static_cast<off_t>(bytes.size() - 1);
+  OverservingMemoryFileReader r(std::move(bytes), claimed);
+  VerifyingHasherCore v(r, kHostArch);
+  auto s = v.Run();
+  XCTAssertEqual(s, VerifyingHasherCore::Status::kIoError);
+  XCTAssertTrue(v.FullFileDigest().empty());
+  XCTAssertNotEqual(std::string(v.LastError()).find("header"), std::string::npos,
+                    @"LastError should point at the header phase: %s",
+                    std::string(v.LastError()).c_str());
+}
+
 - (void)testSinglePassInvariant {
   auto bytes = Slurp("/usr/bin/yes");
   XCTAssertFalse(bytes.empty());
@@ -348,7 +425,10 @@ class TruncatedMemoryFileReader : public santa::FileReader {
   // can't access internal state. Instead, just zero the last 4 KB of
   // the file, which lands in or near the CS blob for /usr/bin/yes.)
   auto bytes = Slurp("/usr/bin/yes");
-  XCTAssertGreaterThanOrEqual(bytes.size(), 32768u);
+  if (bytes.size() < 32768u) {
+    XCTFail(@"Slurp returned %zu bytes; need >= 32768", bytes.size());
+    return;
+  }
   // Zero the last 32 KB to corrupt the CS blob (which sits at the end
   // of the host slice; arm64e CS blob is ~18 KB, so 32 KB is enough to
   // wipe the SuperBlob/CodeDirectory magic regardless of selected slice).
@@ -396,7 +476,10 @@ class TruncatedMemoryFileReader : public santa::FileReader {
 // FinalizeDigestDrainingToEof must NOT re-read [cs_lo, cs_hi)).
 - (void)testSinglePassOnMalformedCsSmallBuffer {
   auto bytes = Slurp("/usr/bin/file");
-  XCTAssertGreaterThanOrEqual(bytes.size(), 32u * 1024u);
+  if (bytes.size() < 32u * 1024u) {
+    XCTFail(@"Slurp returned %zu bytes; need >= %u", bytes.size(), 32u * 1024u);
+    return;
+  }
   // Corrupt the trailing 32 KB to break the CS blob (sits near end).
   std::memset(bytes.data() + bytes.size() - 32 * 1024, 0, 32 * 1024);
 
@@ -498,30 +581,48 @@ class TruncatedMemoryFileReader : public santa::FileReader {
   // a property of the parsed CD and remains the correct identifier.
   uint8_t expected_full[CC_SHA256_DIGEST_LENGTH];
   CC_SHA256(sb_base + cd_off, static_cast<CC_LONG>(cd_sz), expected_full);
-  XCTAssertEqual(v.CDHash().size(), static_cast<size_t>(CS_CDHASH_LEN));
+  if (v.CDHash().size() != static_cast<size_t>(CS_CDHASH_LEN)) {
+    XCTFail(@"CDHash size = %zu; expected %d", v.CDHash().size(), CS_CDHASH_LEN);
+    return;
+  }
   XCTAssertEqual(0, std::memcmp(v.CDHash().data(), expected_full, CS_CDHASH_LEN));
 }
 
 - (void)testCdHashMatchesIndependentReference {
   auto bytes = Slurp("/usr/bin/yes");
-  XCTAssertFalse(bytes.empty());
+  if (bytes.empty()) {
+    XCTFail(@"Slurp returned empty");
+    return;
+  }
   auto cs_blob = ExtractCsBlobBytes(bytes, kHostArch.cputype);
-  XCTAssertFalse(cs_blob.empty());
+  if (cs_blob.empty()) {
+    XCTFail(@"ExtractCsBlobBytes returned empty");
+    return;
+  }
   auto expected = ReferenceCdHash(cs_blob);
-  XCTAssertEqual(expected.size(), static_cast<size_t>(CS_CDHASH_LEN));
+  if (expected.size() != static_cast<size_t>(CS_CDHASH_LEN)) {
+    XCTFail(@"ReferenceCdHash returned size %zu; expected %d", expected.size(), CS_CDHASH_LEN);
+    return;
+  }
 
   MemoryFileReader r(bytes);
   VerifyingHasherCore v(r, kHostArch);
   XCTAssertEqual(v.Run(), VerifyingHasherCore::Status::kOk, @"Run: %s",
                  std::string(v.LastError()).c_str());
   auto got = v.CDHash();
-  XCTAssertEqual(got.size(), static_cast<size_t>(CS_CDHASH_LEN));
+  if (got.size() != static_cast<size_t>(CS_CDHASH_LEN)) {
+    XCTFail(@"CDHash size = %zu; expected %d", got.size(), CS_CDHASH_LEN);
+    return;
+  }
   XCTAssertEqual(0, std::memcmp(got.data(), expected.data(), CS_CDHASH_LEN));
 }
 
 - (void)testCdHashEmptyOnMalformedSignature {
   auto bytes = Slurp("/usr/bin/yes");
-  XCTAssertGreaterThanOrEqual(bytes.size(), 32u * 1024u);
+  if (bytes.size() < 32u * 1024u) {
+    XCTFail(@"Slurp returned %zu bytes; need >= %u", bytes.size(), 32u * 1024u);
+    return;
+  }
   std::memset(bytes.data() + bytes.size() - 32 * 1024, 0, 32 * 1024);
 
   MemoryFileReader r(bytes);
@@ -539,14 +640,20 @@ class TruncatedMemoryFileReader : public santa::FileReader {
   // overlap, where the parser sees the same byte sequence but assembled
   // from different sources. cdhash must be byte-identical across all paths.
   auto bytes = Slurp("/usr/bin/file");  // fat binary, multi-slice
-  XCTAssertFalse(bytes.empty());
+  if (bytes.empty()) {
+    XCTFail(@"Slurp returned empty");
+    return;
+  }
 
   MemoryFileReader r1(bytes);
   VerifyingHasherCore v1(r1, kHostArch);  // default buf_size = 1 MiB
   XCTAssertEqual(v1.Run(), VerifyingHasherCore::Status::kOk, @"Run(default): %s",
                  std::string(v1.LastError()).c_str());
   auto cdhash_default = v1.CDHash();
-  XCTAssertEqual(cdhash_default.size(), static_cast<size_t>(CS_CDHASH_LEN));
+  if (cdhash_default.size() != static_cast<size_t>(CS_CDHASH_LEN)) {
+    XCTFail(@"cdhash_default size = %zu; expected %d", cdhash_default.size(), CS_CDHASH_LEN);
+    return;
+  }
 
   MemoryFileReader r2(bytes);
   VerifyingHasherCore::Options small;
@@ -555,7 +662,10 @@ class TruncatedMemoryFileReader : public santa::FileReader {
   XCTAssertEqual(v2.Run(), VerifyingHasherCore::Status::kOk, @"Run(small): %s",
                  std::string(v2.LastError()).c_str());
   auto cdhash_small = v2.CDHash();
-  XCTAssertEqual(cdhash_small.size(), static_cast<size_t>(CS_CDHASH_LEN));
+  if (cdhash_small.size() != static_cast<size_t>(CS_CDHASH_LEN)) {
+    XCTFail(@"cdhash_small size = %zu; expected %d", cdhash_small.size(), CS_CDHASH_LEN);
+    return;
+  }
 
   XCTAssertEqual(0, std::memcmp(cdhash_default.data(), cdhash_small.data(), CS_CDHASH_LEN));
 }
@@ -575,12 +685,21 @@ class TruncatedMemoryFileReader : public santa::FileReader {
   NSBundle* bundle = [NSBundle bundleForClass:[self class]];
   NSString* path = [bundle.resourcePath stringByAppendingPathComponent:@"testdata/hw_universal"];
   auto bytes = Slurp(path.UTF8String);
-  XCTAssertFalse(bytes.empty(), @"hw_universal not bundled at %@", path);
+  if (bytes.empty()) {
+    XCTFail(@"hw_universal not bundled at %@", path);
+    return;
+  }
 
   auto cs_blob = ExtractCsBlobBytes(bytes, cputype);
-  XCTAssertFalse(cs_blob.empty());
+  if (cs_blob.empty()) {
+    XCTFail(@"ExtractCsBlobBytes returned empty");
+    return;
+  }
   auto expected = ReferenceCdHash(cs_blob);
-  XCTAssertEqual(expected.size(), static_cast<size_t>(CS_CDHASH_LEN));
+  if (expected.size() != static_cast<size_t>(CS_CDHASH_LEN)) {
+    XCTFail(@"ReferenceCdHash returned size %zu; expected %d", expected.size(), CS_CDHASH_LEN);
+    return;
+  }
 
   MemoryFileReader r(bytes);
   VerifyingHasherCore v(r, ArchSelector{cputype, cpusubtype});
@@ -591,7 +710,10 @@ class TruncatedMemoryFileReader : public santa::FileReader {
   XCTAssertEqual(v.ParsedCD().hash_type, CS_HASHTYPE_SHA384);
 
   auto got = v.CDHash();
-  XCTAssertEqual(got.size(), static_cast<size_t>(CS_CDHASH_LEN));
+  if (got.size() != static_cast<size_t>(CS_CDHASH_LEN)) {
+    XCTFail(@"CDHash size = %zu; expected %d", got.size(), CS_CDHASH_LEN);
+    return;
+  }
   XCTAssertEqual(0, std::memcmp(got.data(), expected.data(), CS_CDHASH_LEN));
 }
 
