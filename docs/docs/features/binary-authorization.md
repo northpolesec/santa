@@ -339,13 +339,24 @@ The following additional fields are available in the execution context:
 | `envs` | `map<string, string>` | Environment variables available to the process |
 | `euid` | `int` | Effective user ID (0 for root, etc.) |
 | `cwd` | `string` | Current working directory of the process |
+| `ancestors` | `list<Ancestor>` | Ancestor processes, ordered from the immediate parent at index `0` up to `launchd` at the end of the list. Only populated for [Workshop](https://northpole.security/) customers. Requires Santa 2026.2+ |
+
+Each entry in `ancestors` has the following fields:
+
+| Field | Type | Description |
+| ----- | ---- | ----------- |
+| `path` | `string` | File path of the ancestor's executable |
+| `signing_id` | `string` | Signing ID of the ancestor, prefixed with Team ID or `platform` (e.g. `EQHXZ8M8AV:com.google.Chrome` or `platform:com.apple.bash`) |
+| `team_id` | `string` | Team ID from the ancestor's code signature |
+| `cdhash` | `string` | Code directory hash of the ancestor |
+| `args` | `list<string>` | Command-line arguments the ancestor was launched with. Requires Santa 2026.3+ |
 
 :::note
 
 Fields accessed from `target.*` are **cacheable** — their result is cached so
 subsequent executions are faster. All other fields (`path`, `args`, `envs`,
-`euid`, `cwd`) are **not cacheable** and may impact performance if used in
-rules for frequently-executed binaries.
+`euid`, `cwd`, `ancestors`) are **not cacheable** and may impact performance
+if used in rules for frequently-executed binaries.
 
 :::
 
@@ -378,6 +389,10 @@ cwd != '/Library/LaunchDaemons'
 // Only allow platform binaries from a specific path.
 // This expression will NOT be cacheable.
 target.is_platform_binary && path.startsWith('/usr/bin/')
+
+// Block executions whose immediate parent is Terminal. Requires Santa 2026.2+
+// ancestors[0] is the immediate parent; the last entry is launchd.
+size(ancestors) > 0 && ancestors[0].path.endsWith('/Terminal') ? BLOCKLIST : ALLOWLIST
 ```
 
 ### Rule Dictionary Format
