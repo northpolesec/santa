@@ -79,6 +79,7 @@ objc_library(
 santa_unit_test(
     name = "HeaderParserTest",
     srcs = ["HeaderParserTest.mm"],
+    structured_resources = [":hw_universal_fixture"],
     deps = [
         ":FileReader",
         ":HeaderParser",

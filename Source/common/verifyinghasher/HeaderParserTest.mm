@@ -45,6 +45,15 @@ constexpr ArchSelector kHostArch = {CPU_TYPE_ARM64, CPU_SUBTYPE_ARM64E};
 constexpr ArchSelector kHostArch = {CPU_TYPE_X86_64, CPU_SUBTYPE_X86_64_ALL};
 #endif
 
+// hw_universal carries arm64 + x86_64 slices (no arm64e). Fat tests
+// that drive the parser with the checked-in fixture must pick the
+// slice actually present for the running host, not kHostArch.
+#if defined(__arm64__) || defined(__aarch64__)
+constexpr ArchSelector kHwUniversalArch = {CPU_TYPE_ARM64, CPU_SUBTYPE_ARM64_ALL};
+#else
+constexpr ArchSelector kHwUniversalArch = {CPU_TYPE_X86_64, CPU_SUBTYPE_X86_64_ALL};
+#endif
+
 // Read entire file into a vector for synthetic feed.
 std::vector<uint8_t> Slurp(const char* path) {
   santa::ScopedFile sf(::open(path, O_RDONLY | O_CLOEXEC));
@@ -113,6 +122,11 @@ std::vector<uint8_t> MakeThin64WithCsBlob(uint32_t cs_dataoff, uint32_t cs_datas
 
 @implementation HeaderParserTest
 
+- (NSString*)hwUniversalFixturePath {
+  NSBundle* bundle = [NSBundle bundleForClass:[self class]];
+  return [bundle.resourcePath stringByAppendingPathComponent:@"testdata/hw_universal"];
+}
+
 - (void)testParsesThinBinary {
   auto data = Slurp("/usr/bin/yes");
   XCTAssertGreaterThanOrEqual(data.size(), 4u);
@@ -125,22 +139,25 @@ std::vector<uint8_t> MakeThin64WithCsBlob(uint32_t cs_dataoff, uint32_t cs_datas
 }
 
 - (void)testParsesFatBinary {
-  auto data = Slurp("/usr/bin/file");
+  auto data = Slurp([self hwUniversalFixturePath].UTF8String);
   santa::SliceInfo slice{};
   std::string err;
-  auto s = FeedChunked(data, kHostArch, 1u << 20, &slice, &err);
+  auto s = FeedChunked(data, kHwUniversalArch, 1u << 20, &slice, &err);
   XCTAssertEqual(s, HeaderParser::Status::kReady, @"FeedChunked: %s", err.c_str());
   XCTAssertGreaterThan(slice.slice_offset, 0u);  // fat: slice not at offset 0
   XCTAssertGreaterThan(slice.cs_blob_size, 0u);
 }
 
 - (void)testChunkSizeInvariance {
-  auto data = Slurp("/usr/bin/file");
+  auto data = Slurp([self hwUniversalFixturePath].UTF8String);
   santa::SliceInfo big{}, small{}, byteByByte{};
   std::string err;
-  XCTAssertEqual(FeedChunked(data, kHostArch, 1u << 20, &big, &err), HeaderParser::Status::kReady);
-  XCTAssertEqual(FeedChunked(data, kHostArch, 17, &small, &err), HeaderParser::Status::kReady);
-  XCTAssertEqual(FeedChunked(data, kHostArch, 1, &byteByByte, &err), HeaderParser::Status::kReady);
+  XCTAssertEqual(FeedChunked(data, kHwUniversalArch, 1u << 20, &big, &err),
+                 HeaderParser::Status::kReady);
+  XCTAssertEqual(FeedChunked(data, kHwUniversalArch, 17, &small, &err),
+                 HeaderParser::Status::kReady);
+  XCTAssertEqual(FeedChunked(data, kHwUniversalArch, 1, &byteByByte, &err),
+                 HeaderParser::Status::kReady);
   XCTAssertEqual(big.cs_blob_offset, small.cs_blob_offset);
   XCTAssertEqual(big.cs_blob_offset, byteByByte.cs_blob_offset);
   XCTAssertEqual(big.cs_blob_size, small.cs_blob_size);
@@ -240,23 +257,30 @@ std::vector<uint8_t> MakeThin64WithCsBlob(uint32_t cs_dataoff, uint32_t cs_datas
 // rejected by the size cap before it can drive a giant cs_blob_buf_ alloc.
 // We need a slice large enough that the size check trips, not the slice
 // bounds — pick datasize > kMaxCsBlobSize (64 MiB) and slice_size larger.
+//
+// The parser rejects on the LC_CODE_SIGNATURE entry before reading the
+// declared CS region, so we feed only the header + LC prefix and tell
+// the parser the logical file size separately via kTotal. Avoids
+// allocating a 256 MiB zero-filled buffer per test run.
 - (void)testRejectsImplausibleCsBlobSize {
-  constexpr uint64_t kTotal = 256ull * 1024 * 1024;  // 256 MiB
+  constexpr uint64_t kTotal = 256ull * 1024 * 1024;  // logical file size
+  constexpr size_t kPrefix = sizeof(struct mach_header_64) + sizeof(struct linkedit_data_command);
   // dataoff = 0x1000, datasize = 128 MiB → exceeds the 64 MiB cap.
-  auto data = MakeThin64WithCsBlob(0x1000, 128u * 1024 * 1024, kTotal);
-  ArchSelector want{CPU_TYPE_X86_64, CPU_SUBTYPE_X86_64_ALL};
-  std::string err;
-  auto s = FeedChunked(data, want, /*chunk=*/65536, nullptr, &err);
+  auto data = MakeThin64WithCsBlob(/*cs_dataoff=*/0x1000,
+                                   /*cs_datasize=*/128u * 1024 * 1024,
+                                   /*total_size=*/kPrefix);
+  HeaderParser p({CPU_TYPE_X86_64, CPU_SUBTYPE_X86_64_ALL}, kTotal);
+  auto s = p.Update(data.data(), data.size(), /*chunk_off=*/0);
   XCTAssertEqual(s, HeaderParser::Status::kError);
-  XCTAssertTrue(err.find("implausibly large") != std::string::npos);
+  XCTAssertTrue(std::string(p.LastError()).find("implausibly large") != std::string::npos);
 }
 
 // H1 regression: SliceOffsetIfKnown must report nullopt until the parser has
 // resolved the slice (post-magic for thin, post-fat-arch-table for fat) and
 // then return the same offset that ends up on Slice() at kReady.
 - (void)testSliceOffsetIfKnown {
-  auto data = Slurp("/usr/bin/file");  // fat binary
-  HeaderParser p(kHostArch, data.size());
+  auto data = Slurp([self hwUniversalFixturePath].UTF8String);  // fat binary
+  HeaderParser p(kHwUniversalArch, data.size());
   // Before any bytes: definitely unknown.
   XCTAssertFalse(p.SliceOffsetIfKnown().has_value());
 
