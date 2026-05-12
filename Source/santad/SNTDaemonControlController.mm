@@ -859,7 +859,7 @@ static const char* const kAllowedCanonicalBundlePaths[] = {
   NSURL* appURL = [NSURL fileURLWithPath:@(kSantaAppPath)];
   NSURL* backupURL = [NSURL fileURLWithPath:@(kSantaAppBackupPath)];
 
-  // Step 1: Clear any leftover staging dir from a previously crashed install.
+  // Clear any leftover staging dir
   if ([fm fileExistsAtPath:stagingDirURL.path]) {
     if (![fm removeItemAtURL:stagingDirURL error:&error]) {
       LOGE(@"Failed to remove leftover staging dir: %@", error);
@@ -868,7 +868,7 @@ static const char* const kAllowedCanonicalBundlePaths[] = {
     }
   }
 
-  // Step 2: Create fresh staging dir owned by root:wheel, mode 0700.
+  // Create fresh staging dir owned by root:wheel, mode 0700.
   NSDictionary* dirAttrs = @{
     NSFilePosixPermissions : @0700,
     NSFileOwnerAccountID : @0,
@@ -883,9 +883,7 @@ static const char* const kAllowedCanonicalBundlePaths[] = {
     return;
   }
 
-  // Step 3: Trust transfer. Move bundle from writable /migration into
-  // santad-exclusive /staging. Single rename(2), atomic on the same APFS volume.
-  // All filesystem mutations after this point must remain in-process so that
+  // Move bundle from /migration into santad tamper protected /staging.
   // santad's ES client self-mute keeps the tamper handler from denying our
   // own ops. Do not shell out to NSTask for any of these steps.
   if (![fm moveItemAtURL:migrationAppURL toURL:stagingAppURL error:&error]) {
@@ -895,11 +893,7 @@ static const char* const kAllowedCanonicalBundlePaths[] = {
     return;
   }
 
-  // Step 4: Pre-swap codesign verify on the staged bundle. The pkg installer
-  // and santactl's Layer-1 preliminary checks already require root:wheel
-  // ownership before reaching this RPC, so we do not run
-  // setAppOwnershipAndPermissions: on /staging here — the ownership check
-  // inside verifyPathIsSanta: is the contract for what's acceptable.
+  // Verify on the staged bundle.
   if (![self verifyPathIsSanta:stagingAppURL.path]) {
     LOGE(@"Pre-swap verify failed for %@", stagingAppURL.path);
     [fm removeItemAtURL:stagingDirURL error:nil];
@@ -907,7 +901,7 @@ static const char* const kAllowedCanonicalBundlePaths[] = {
     return;
   }
 
-  // Step 5: Atomic install via replaceItemAtURL. End state:
+  // Atomic install via replaceItemAtURL. End state:
   //   /Applications/Santa.app          = new bundle
   //   /Applications/Santa.app.previous = previous-good bundle (auto-protected
   //                                      by the existing /Applications/Santa.app
@@ -926,15 +920,14 @@ static const char* const kAllowedCanonicalBundlePaths[] = {
     return;
   }
 
-  // Step 6: Force root:wheel ownership/permissions on the installed bundle.
   [self setAppOwnershipAndPermissions:appURL.path];
 
-  // Step 7: Post-swap codesign verify. Load-bearing TOCTOU defense.
+  // post move verify
   if (![self verifyPathIsSanta:appURL.path]) {
     LOGE(@"Post-swap verify failed for /Applications/Santa.app; rolling back");
 
-    // Step 8b: Atomic rollback. Restore the previous-good bundle and discard
-    // the rejected bundle in a single replaceItemAtURL call.
+    // Atomic rollback on failure.
+    // Restore the previous-good bundle and discard the rejected bundle.
     NSError* rollbackErr = nil;
     if (![fm replaceItemAtURL:appURL
                 withItemAtURL:backupURL
@@ -943,9 +936,7 @@ static const char* const kAllowedCanonicalBundlePaths[] = {
              resultingItemURL:nil
                         error:&rollbackErr]) {
       LOGE(@"CRITICAL: rollback failed: %@. /Applications/Santa.app may be "
-           @"inconsistent. Currently-loaded sysex continues to run; admin "
-           @"recovery required.",
-           rollbackErr);
+           @"inconsistent. Currently-loaded sysex continues to run." rollbackErr);
     }
 
     [fm removeItemAtURL:stagingDirURL error:nil];
@@ -953,13 +944,13 @@ static const char* const kAllowedCanonicalBundlePaths[] = {
     return;
   }
 
-  // Step 8a: Success. Clean up the backup.
+  // Success. Clean up the backup.
   NSError* backupRmErr = nil;
   if (![fm removeItemAtURL:backupURL error:&backupRmErr]) {
     LOGW(@"Failed to remove backup at %@: %@", backupURL.path, backupRmErr);
   }
 
-  // Step 9: Final cleanup of the now-empty staging dir.
+  // Cleanup the now-empty staging dir.
   NSError* stagingRmErr = nil;
   if (![fm removeItemAtURL:stagingDirURL error:&stagingRmErr]) {
     LOGW(@"Failed to remove staging dir: %@", stagingRmErr);
