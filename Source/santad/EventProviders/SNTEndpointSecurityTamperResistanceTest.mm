@@ -25,6 +25,7 @@
 #include <memory>
 #include <set>
 
+#import "Source/common/Platform.h"
 #import "Source/common/SNTConfigurator.h"
 #include "Source/common/TestUtils.h"
 #include "Source/common/es/Client.h"
@@ -90,7 +91,8 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
       [[SNTEndpointSecurityTamperResistance alloc] initWithESAPI:mockESApi
                                                          metrics:nullptr
                                                           logger:nullptr
-                                           antiSuspendSigningIDs:nil];
+                                           antiSuspendSigningIDs:nil
+                                           allowDelegatedSignals:NO];
   id mockTamperClient = OCMPartialMock(tamperClient);
 
   [mockTamperClient enable];
@@ -136,7 +138,8 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
               initWithESAPI:mockESApi
                     metrics:nullptr
                      logger:nullptr
-      antiSuspendSigningIDs:@[ @"ABCDE12345:com.example.protected" ]];
+      antiSuspendSigningIDs:@[ @"ABCDE12345:com.example.protected" ]
+      allowDelegatedSignals:NO];
   id mockTamperClient = OCMPartialMock(tamperClient);
 
   [mockTamperClient enable];
@@ -178,7 +181,8 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
       [[SNTEndpointSecurityTamperResistance alloc] initWithESAPI:mockESApi
                                                          metrics:nullptr
                                                           logger:nullptr
-                                           antiSuspendSigningIDs:nil];
+                                           antiSuspendSigningIDs:nil
+                                           allowDelegatedSignals:NO];
   id mockTamperClient = OCMPartialMock(tamperClient);
 
   [mockTamperClient enable];
@@ -237,7 +241,8 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
       [[SNTEndpointSecurityTamperResistance alloc] initWithESAPI:mockESApi
                                                          metrics:nullptr
                                                           logger:nullptr
-                                           antiSuspendSigningIDs:nil];
+                                           antiSuspendSigningIDs:nil
+                                           allowDelegatedSignals:NO];
 
   id mockTamperClient = OCMPartialMock(tamperClient);
 
@@ -528,9 +533,80 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
 
       XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
       XCTAssertEqual(gotAuthResult, kv.second);
-      XCTAssertEqual(gotCachable, kv.second == ES_AUTH_RESULT_ALLOW);
+      XCTAssertFalse(gotCachable);
     }
   }
+
+  // Check SIGNAL tamper events with v9 instigator field
+#if HAVE_MACOS_15_5
+  {
+    esMsg.event_type = ES_EVENT_TYPE_AUTH_SIGNAL;
+    esMsg.version = 9;
+
+    struct InstigatorCase {
+      const char* desc;
+      bool allowDelegatedSignals;
+      bool hasInstigator;
+      bool instigatorIsPlatform;
+      const char* instigatorTeamID;
+      const char* instigatorSigningID;
+      es_auth_result_t expected;
+    };
+
+    static const InstigatorCase cases[] = {
+        // Direct signal from launchd (no instigator) -> ALLOW (shutdown path).
+        {"direct from launchd", /*allow=*/false, /*hasInst=*/false,
+         /*plat=*/false, "", "", ES_AUTH_RESULT_ALLOW},
+        // Delegated by launchd itself -> ALLOW (baseline).
+        {"baseline launchd", false, true, true, "", "com.apple.xpc.launchd", ES_AUTH_RESULT_ALLOW},
+        // Delegated by smd -> ALLOW (baseline).
+        {"baseline smd", false, true, true, "", "com.apple.xpc.smd", ES_AUTH_RESULT_ALLOW},
+        // Unlisted platform binary with AllowDelegatedSignals=NO -> DENY.
+        {"unlisted platform, AllowDelegatedSignals=NO", false, true, true, "", "com.apple.unknown",
+         ES_AUTH_RESULT_DENY},
+        // Same instigator with AllowDelegatedSignals=YES -> ALLOW.
+        {"unlisted platform, AllowDelegatedSignals=YES", true, true, true, "", "com.apple.unknown",
+         ES_AUTH_RESULT_ALLOW},
+        // Third-party-signed instigator with AllowDelegatedSignals=YES -> DENY
+        // (the config only relaxes when is_platform_binary == true).
+        {"third party, AllowDelegatedSignals=YES", true, true, false, "ABCDE12345", "com.evil.app",
+         ES_AUTH_RESULT_DENY},
+    };
+
+    for (const auto& c : cases) {
+      [tamperClient setAllowDelegatedSignals:c.allowDelegatedSignals];
+      Message msg(mockESApi, &esMsg);
+
+      es_process_t target_proc = MakeESProcess(&file);
+      target_proc.audit_token = MakeAuditToken(getpid(), 42);
+      esMsg.event.signal.target = &target_proc;
+      esMsg.process->audit_token = MakeAuditToken(1, 42);  // sender = launchd
+
+      es_file_t instigatorFile = MakeESFile("/usr/libexec/instigator");
+      es_process_t instigator_proc = MakeESProcess(&instigatorFile);
+      instigator_proc.team_id = MakeESStringToken(c.instigatorTeamID);
+      instigator_proc.signing_id = MakeESStringToken(c.instigatorSigningID);
+      instigator_proc.is_platform_binary = c.instigatorIsPlatform;
+      esMsg.event.signal.instigator = c.hasInstigator ? &instigator_proc : NULL;
+
+      [mockTamperClient handleMessage:std::move(msg)
+                   recordEventMetrics:^(EventDisposition d) {
+                     XCTAssertEqual(d,
+                                    c.expected == ES_AUTH_RESULT_DENY ? EventDisposition::kProcessed
+                                                                      : EventDisposition::kDropped,
+                                    @"%s", c.desc);
+                     dispatch_semaphore_signal(semaMetrics);
+                   }];
+
+      XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
+      XCTAssertEqual(gotAuthResult, c.expected, @"%s", c.desc);
+    }
+
+    // Reset shared state for downstream test blocks.
+    esMsg.event.signal.instigator = NULL;
+    esMsg.version = MaxSupportedESMessageVersionForCurrentOS();
+  }
+#endif  // HAVE_MACOS_15_5
 
   // Check PROC_SUSPEND_RESUME tamper events - EnableAntiTamperProcessSuspendResume = NO
   {
@@ -742,7 +818,8 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
       [[SNTEndpointSecurityTamperResistance alloc] initWithESAPI:mockESApi
                                                          metrics:nullptr
                                                           logger:nullptr
-                                           antiSuspendSigningIDs:nil];
+                                           antiSuspendSigningIDs:nil
+                                           allowDelegatedSignals:NO];
 
   id mockTamperClient = OCMPartialMock(tamperClient);
 

@@ -470,9 +470,12 @@ FileAccessPolicyDecision FAAPolicyProcessor::ProcessTargetAndPolicy(
     event.decision = decision;
     event.process.fileSHA256 = cd.sha256 ?: @"<unknown sha>";
     event.process.filePath = StringToNSString(msg->process->executable->path.data);
-    event.process.teamID = cd.teamID ?: @"<unknown team id>";
-    event.process.signingID = cd.signingID ?: @"<unknown signing id>";
-    event.process.cdhash = cd.cdhash ?: @"<unknown CDHash>";
+    event.process.teamID = StringTokenToNSString(msg->process->team_id);
+    event.process.signingID = StringTokenToNSString(msg->process->signing_id);
+    event.process.cdhash =
+        (msg->process->codesigning_flags & CS_SIGNED)
+            ? StringToNSString(BufToHexString(msg->process->cdhash, sizeof(msg->process->cdhash)))
+            : nil;
     event.process.pid = @(audit_token_to_pid(msg->process->audit_token));
     event.process.signingChain = cd.certChain;
     struct passwd* user = getpwuid(audit_token_to_ruid(msg->process->audit_token));

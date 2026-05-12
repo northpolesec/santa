@@ -1162,6 +1162,7 @@ test_suite(
         "//Source/common/cel:CELTest",
         "//Source/common/faa:unit_tests",
         "//Source/common/ne:unit_tests",
+        "//Source/common/verifyinghasher:unit_tests",
     ],
     visibility = ["//:santa_package_group"],
 )

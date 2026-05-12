@@ -143,7 +143,7 @@ export const SantaConfigKeyGroups: SantaConfigGroups = {
     {
       key: "AllowedSantaCommands",
       description:
-        `Array of allowed Santa Commands. If the key \`AllowedSantaCommands\` is unset (nil), all commands are allowed. 
+        `Array of allowed Santa Commands. If the key \`AllowedSantaCommands\` is unset (nil), all commands are allowed.
         If \`AllowedSantaCommands\` is an empty array, none of the commands are allowed.`,
       type: "string",
       syncConfigurable: false,
@@ -154,6 +154,16 @@ export const SantaConfigKeyGroups: SantaConfigGroups = {
         { value: "eventupload" },
       ],
       versionAdded: "2026.3",
+    },
+    {
+      key: "AllowDelegatedSignals",
+      description:
+        `If true, signals delegated by \'launchd\' on behalf of any Apple platform binary targeting \'santad\'
+        are allowed.`,
+      type: "bool",
+      defaultValue: false,
+      syncConfigurable: false,
+      versionAdded: "2026.4",
     },
   ],
   gui: [

@@ -437,12 +437,13 @@ using santa::WatchItemPathType;
 
     [client processEnrichedMessage:std::move(enrichedMsg)
                            handler:^(std::unique_ptr<EnrichedMessage> msg) {
-                             // reset the shared_ptr to drop the held message.
-                             // This is a workaround for a TSAN only false positive
-                             // which happens if we switch back to the sem wait
-                             // after signaling, but _before_ the implicit release
-                             // of msg. In that case, the mock verify and the
-                             // call of the mock's Release method can data race.
+                             // Force ~EnrichedMessage (which calls
+                             // mockESApi->ReleaseMessage) to run before the
+                             // signal so the mock call happens-before the
+                             // verify read on the main thread. Otherwise the
+                             // gmock counter is written here while being read
+                             // by VerifyAndClearExpectations -- a real (though
+                             // benign) data race.
                              msg.reset();
                              dispatch_semaphore_signal(sema);
                            }];

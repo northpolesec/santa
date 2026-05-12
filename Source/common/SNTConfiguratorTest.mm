@@ -269,4 +269,20 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
   }
 }
 
+- (void)testAllowDelegatedSignalsDefault {
+  SNTConfigurator* sut = [[SNTConfigurator alloc] init];
+  // Default must be NO
+  XCTAssertFalse(sut.allowDelegatedSignals);
+}
+
+- (void)testAllowDelegatedSignalsOverride {
+  SNTConfigurator* sut = [[SNTConfigurator alloc] init];
+
+  sut.configState[@"AllowDelegatedSignals"] = @YES;
+  XCTAssertTrue(sut.allowDelegatedSignals);
+
+  sut.configState[@"AllowDelegatedSignals"] = @NO;
+  XCTAssertFalse(sut.allowDelegatedSignals);
+}
+
 @end

@@ -161,8 +161,8 @@ struct MoreDetailsView: View {
             }
           }
           .buttonStyle(ScalingButtonStyle())
-          .keyboardShortcut(.escape, modifiers: .command)
-          .help("⌘ Esc")
+          .keyboardShortcut(.cancelAction)
+          .help("Esc")
         }
 
         Spacer()
