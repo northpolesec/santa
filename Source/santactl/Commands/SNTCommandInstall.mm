@@ -129,7 +129,7 @@ REGISTER_COMMAND_NAME(@"install")
 
   char resolved[PATH_MAX];
   if (realpath(installFromPath.UTF8String, resolved) == NULL ||
-      strcmp(resolved, "/private/var/db/santa/migration/Santa.app") != 0) {
+      strcmp(resolved, kSantaMigrationAppCanonicalPath) != 0) {
     TEE_LOGE(@"Staged bundle does not canonicalize to expected path: %s", resolved);
     exit(EXIT_FAILURE);
   }

@@ -742,8 +742,8 @@ double watchdogRAMPeak = 0;
 #pragma mark Control Ops
 
 static const char* const kAllowedCanonicalBundlePaths[] = {
-    "/private/var/db/santa/staging/Santa.app",
-    "/Applications/Santa.app",
+    kSantaStagingAppCanonicalPath,
+    kSantaAppPath,
 };
 
 - (BOOL)verifyPathIsSanta:(NSString*)path {

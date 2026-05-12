@@ -247,5 +247,10 @@ static const char* kSantaAppPath = "/Applications/Santa.app";
 static const char* kSleighPath = "/Applications/Santa.app/Contents/MacOS/sleigh";
 static const char* kSantaAppBackupPath = "/Applications/Santa.app.previous";
 static const char* kSantaMigrationAppPath = "/var/db/santa/migration/Santa.app";
+// macOS resolves /var as a symlink to /private/var. The *CanonicalPath constants
+// are the realpath(3) output for the corresponding *Path constants and are used
+// as the comparison target for path-canonicalization checks.
+static const char* kSantaMigrationAppCanonicalPath = "/private/var/db/santa/migration/Santa.app";
 static const char* kSantaStagingDir = "/var/db/santa/staging";
 static const char* kSantaStagingAppPath = "/var/db/santa/staging/Santa.app";
+static const char* kSantaStagingAppCanonicalPath = "/private/var/db/santa/staging/Santa.app";
