@@ -284,6 +284,7 @@ struct BinaryView: View {
             customURL: effectiveURL.isEmpty ? nil : (effectiveURL as NSString),
             configState: SNTConfigState(config: SNTConfigurator.configurator()),
             bundleProgress: SNTBundleProgress(),
+            silenceable: true,
             uiStateCallback: { interval in print("Silence interval was set to \(interval)") },
             replyCallback: { approved in print("Did user approve execution: \(approved)") }
           ),
@@ -387,6 +388,7 @@ struct DeviceView: View {
             window: window,
             event: event,
             configBundle: bundle,
+            silenceable: true,
             uiStateCallback: { interval in print("Silence interval was set to \(interval)") }
           ),
           window,

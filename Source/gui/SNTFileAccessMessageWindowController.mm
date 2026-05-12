@@ -61,6 +61,7 @@
              customURL:self.customURL
             customText:self.customText
            configState:self.configState
+           silenceable:([self messageHash] != nil)
        uiStateCallback:^(NSTimeInterval preventNotificationsPeriod) {
          self.silenceFutureNotificationsPeriod = preventNotificationsPeriod;
        }];

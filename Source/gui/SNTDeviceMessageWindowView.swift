@@ -25,6 +25,7 @@ import santa_gui_SNTMessageView
     window: NSWindow,
     event: SNTDeviceEvent,
     configBundle: SNTConfigBundle,
+    silenceable: Bool,
     uiStateCallback: ((TimeInterval) -> Void)?
   ) -> NSViewController {
     return NSHostingController(
@@ -32,6 +33,7 @@ import santa_gui_SNTMessageView
         window: window,
         event: event,
         configBundle: configBundle,
+        silenceable: silenceable,
         uiStateCallback: uiStateCallback
       ).fixedSize()
     )
@@ -42,6 +44,7 @@ struct SNTDeviceMessageWindowView: View {
   let window: NSWindow?
   let event: SNTDeviceEvent
   let configBundle: SNTConfigBundle
+  let silenceable: Bool
   let uiStateCallback: ((TimeInterval) -> Void)?
 
   @State public var preventFutureNotifications = false
@@ -69,7 +72,7 @@ struct SNTDeviceMessageWindowView: View {
         }
       }
 
-      if configBundle.notificationSilencesEnabled() {
+      if configBundle.notificationSilencesEnabled() && silenceable {
         SNTNotificationSilenceView(
           silence: $preventFutureNotifications,
           period: $preventFutureNotificationPeriod,

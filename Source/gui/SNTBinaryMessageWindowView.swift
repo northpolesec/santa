@@ -38,6 +38,7 @@ import santa_gui_SNTMessageView
     customURL: NSString?,
     configState: SNTConfigState,
     bundleProgress: SNTBundleProgress,
+    silenceable: Bool,
     uiStateCallback: ((TimeInterval) -> Void)?,
     replyCallback: ((Bool) -> Void)?
   ) -> NSViewController {
@@ -49,6 +50,7 @@ import santa_gui_SNTMessageView
         customURL: customURL,
         configState: configState,
         bundleProgress: bundleProgress,
+        silenceable: silenceable,
         uiStateCallback: uiStateCallback,
         replyCallback: replyCallback
       )
@@ -251,6 +253,7 @@ struct SNTBinaryMessageWindowView: View {
   let customURL: NSString?
   let configState: SNTConfigState
   @StateObject var bundleProgress: SNTBundleProgress
+  let silenceable: Bool
   let uiStateCallback: ((TimeInterval) -> Void)?
   let replyCallback: ((Bool) -> Void)?
 
@@ -283,7 +286,7 @@ struct SNTBinaryMessageWindowView: View {
     ) {
       SNTBinaryMessageEventView(e: event!, customURL: customURL)
 
-      if configState.enableNotificationSilences {
+      if configState.enableNotificationSilences && silenceable {
         SNTNotificationSilenceView(silence: $preventFutureNotifications, period: $preventFutureNotificationPeriod)
       }
 

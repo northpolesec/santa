@@ -25,6 +25,7 @@ import santa_gui_SNTMessageView
     window: NSWindow,
     event: SNTStoredNetworkMountEvent,
     configBundle: SNTConfigBundle,
+    silenceable: Bool,
     uiStateCallback: ((TimeInterval) -> Void)?
   ) -> NSViewController {
     return NSHostingController(
@@ -32,6 +33,7 @@ import santa_gui_SNTMessageView
         window: window,
         event: event,
         configBundle: configBundle,
+        silenceable: silenceable,
         uiStateCallback: uiStateCallback
       ).fixedSize()
     )
@@ -207,6 +209,7 @@ struct SNTNetworkMountMessageWindowView: View {
   let window: NSWindow?
   let event: SNTStoredNetworkMountEvent?
   let configBundle: SNTConfigBundle
+  let silenceable: Bool
   let uiStateCallback: ((TimeInterval) -> Void)?
 
   @State public var preventFutureNotifications = false
@@ -216,7 +219,7 @@ struct SNTNetworkMountMessageWindowView: View {
     SNTMessageView(getBlockMessage()) {
       Event(e: event, window: window)
 
-      if configBundle.notificationSilencesEnabled() {
+      if configBundle.notificationSilencesEnabled() && silenceable {
         SNTNotificationSilenceView(
           silence: $preventFutureNotifications,
           period: $preventFutureNotificationPeriod,

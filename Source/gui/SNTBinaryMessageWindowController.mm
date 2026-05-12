@@ -95,6 +95,7 @@
              customURL:self.customURL
            configState:self.configState
         bundleProgress:self.bundleProgress
+           silenceable:([self messageHash] != nil)
        uiStateCallback:^(NSTimeInterval preventNotificationsPeriod) {
          self.silenceFutureNotificationsPeriod = preventNotificationsPeriod;
        }
