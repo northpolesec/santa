@@ -37,7 +37,7 @@
       createWithWindow:self.window
                  event:self.event
           configBundle:self.configBundle
-            silenceable:([self messageHash] != nil)
+           silenceable:([self messageHash] != nil)
        uiStateCallback:^(NSTimeInterval preventNotificationsPeriod) {
          self.silenceFutureNotificationsPeriod = preventNotificationsPeriod;
        }];
