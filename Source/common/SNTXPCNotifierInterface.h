@@ -32,7 +32,7 @@
                     customURL:(NSString*)url
                   configState:(SNTConfigState*)configState
                      andReply:(void (^)(BOOL authenticated))reply;
-- (void)postUSBBlockNotification:(SNTDeviceEvent*)event;
+- (void)postUSBBlockNotification:(SNTDeviceEvent*)event configBundle:(SNTConfigBundle*)configBundle;
 - (void)postNetworkMountNotification:(SNTStoredNetworkMountEvent*)event
                         configBundle:(SNTConfigBundle*)configBundle;
 - (void)postFileAccessBlockNotification:(SNTStoredFileAccessEvent*)event

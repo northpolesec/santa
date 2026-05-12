@@ -15,6 +15,7 @@
 
 #import <Cocoa/Cocoa.h>
 
+#import "Source/common/SNTConfigBundle.h"
 #import "Source/common/SNTDeviceEvent.h"
 #import "Source/gui/SNTMessageWindowController.h"
 
@@ -27,8 +28,9 @@ NS_ASSUME_NONNULL_BEGIN
 
 // The device event this window is for.
 @property(readonly) SNTDeviceEvent* event;
+@property(readonly) SNTConfigBundle* configBundle;
 
-- (instancetype)initWithEvent:(SNTDeviceEvent*)event;
+- (instancetype)initWithEvent:(SNTDeviceEvent*)event configBundle:(SNTConfigBundle*)configBundle;
 
 @end
 

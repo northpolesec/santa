@@ -25,6 +25,7 @@ import santa_gui_SNTMessageView
     window: NSWindow,
     event: SNTStoredNetworkMountEvent,
     configBundle: SNTConfigBundle,
+    silenceable: Bool,
     uiStateCallback: ((TimeInterval) -> Void)?
   ) -> NSViewController {
     return NSHostingController(
@@ -32,6 +33,7 @@ import santa_gui_SNTMessageView
         window: window,
         event: event,
         configBundle: configBundle,
+        silenceable: silenceable,
         uiStateCallback: uiStateCallback
       ).fixedSize()
     )
@@ -207,6 +209,7 @@ struct SNTNetworkMountMessageWindowView: View {
   let window: NSWindow?
   let event: SNTStoredNetworkMountEvent?
   let configBundle: SNTConfigBundle
+  let silenceable: Bool
   let uiStateCallback: ((TimeInterval) -> Void)?
 
   @State public var preventFutureNotifications = false
@@ -216,8 +219,13 @@ struct SNTNetworkMountMessageWindowView: View {
     SNTMessageView(getBlockMessage()) {
       Event(e: event, window: window)
 
-      if getEnableNotificationSilences() {
-        SNTNotificationSilenceView(silence: $preventFutureNotifications, period: $preventFutureNotificationPeriod)
+      if configBundle.notificationSilencesEnabled() && silenceable {
+        SNTNotificationSilenceView(
+          silence: $preventFutureNotifications,
+          period: $preventFutureNotificationPeriod,
+          labelBefore: Text("Label before time period picker (mount)"),
+          labelAfter: Text("Label after time period picker (mount)")
+        )
       }
 
       Spacer()
@@ -236,14 +244,6 @@ struct SNTNetworkMountMessageWindowView: View {
       customMessage = message
     }
     return SNTBlockMessage.attributedBlockMessageForNetworkMountEvent(withCustomMessage: customMessage)
-  }
-
-  func getEnableNotificationSilences() -> Bool {
-    var silencesEnabled: Bool = true
-    configBundle.enableNotificationSilences { val in
-      silencesEnabled = val
-    }
-    return silencesEnabled
   }
 
   func dismissButton() {

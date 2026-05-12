@@ -37,6 +37,7 @@ swift_library(
     module_name = "santa_gui_SNTMessageView",
     deps = [
         ":SNTAuthorizationHelper",
+        "//Source/common:SNTConfigBundle",
         "//Source/common:SNTConfigurator",
     ],
 )
@@ -94,6 +95,7 @@ swift_library(
     deps = [
         ":SNTMessageView",
         "//Source/common:SNTBlockMessage_SantaGUI",
+        "//Source/common:SNTConfigBundle",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTDeviceEvent",
     ],
@@ -259,6 +261,7 @@ swift_library(
         ":SNTDeviceMessageWindowView",
         ":SNTFileAccessMessageWindowView",
         ":SNTMessageView",
+        "//Source/common:SNTConfigBundle",
         "//Source/common:SNTDeviceEvent",
     ],
 )

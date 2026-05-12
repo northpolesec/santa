@@ -23,6 +23,9 @@ namespace santa {
 // Create a config bundle for use by the blocked network share UI
 SNTConfigBundle* NetworkMountConfigBundle(SNTConfigurator* configurator);
 
+// Create a config bundle for use by the blocked USB mount UI
+SNTConfigBundle* USBMountConfigBundle(SNTConfigurator* configurator);
+
 }  // namespace santa
 
 #endif  // SANTA_SANTAD_DAEMONCONFIGBUNDLE_H
