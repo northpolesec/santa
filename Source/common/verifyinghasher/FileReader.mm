@@ -1,0 +1,44 @@
+/// Copyright 2026 North Pole Security, Inc.
+///
+/// Licensed under the Apache License, Version 2.0 (the "License");
+/// you may not use this file except in compliance with the License.
+/// You may obtain a copy of the License at
+///
+///     http://www.apache.org/licenses/LICENSE-2.0
+///
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
+
+#include "Source/common/verifyinghasher/FileReader.h"
+
+#include <unistd.h>
+
+#include <cerrno>
+
+namespace santa {
+
+FdFileReader::FdFileReader(int fd, off_t size) : fd_(fd), size_(size) {}
+
+ssize_t FdFileReader::Pread(void* buf, size_t len, off_t off) {
+  auto* p = static_cast<unsigned char*>(buf);
+  size_t remaining = len;
+  ssize_t total = 0;
+  while (remaining > 0) {
+    ssize_t r = pread(fd_, p, remaining, off);
+    if (r < 0) {
+      if (errno == EINTR) continue;
+      return -1;
+    }
+    if (r == 0) break;  // EOF
+    p += r;
+    off += r;
+    total += r;
+    remaining -= static_cast<size_t>(r);
+  }
+  return total;
+}
+
+}  // namespace santa
