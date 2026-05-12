@@ -245,3 +245,7 @@ static const char* kSantaNetdPath =
     "com.northpolesec.santa.netd.systemextension/Contents/MacOS/com.northpolesec.santa.netd";
 static const char* kSantaAppPath = "/Applications/Santa.app";
 static const char* kSleighPath = "/Applications/Santa.app/Contents/MacOS/sleigh";
+static const char* kSantaAppBackupPath = "/Applications/Santa.app.previous";
+static const char* kSantaMigrationAppPath = "/var/db/santa/migration/Santa.app";
+static const char* kSantaStagingDir = "/var/db/santa/staging";
+static const char* kSantaStagingAppPath = "/var/db/santa/staging/Santa.app";

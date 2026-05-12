@@ -14,6 +14,10 @@
 /// limitations under the License.
 
 #import "Source/santad/SNTDaemonControlController.h"
+#include <limits.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
 
 #import <Foundation/Foundation.h>
 #include <sys/qos.h>
@@ -737,32 +741,63 @@ double watchdogRAMPeak = 0;
 
 #pragma mark Control Ops
 
+static const char* const kAllowedCanonicalBundlePaths[] = {
+    "/private/var/db/santa/staging/Santa.app",
+    "/Applications/Santa.app",
+};
+
 - (BOOL)verifyPathIsSanta:(NSString*)path {
   if (path.length == 0) {
     LOGE(@"No path provided");
     return NO;
   }
 
-  BOOL isDir;
-  if (![[NSFileManager defaultManager] fileExistsAtPath:path isDirectory:&isDir] || !isDir) {
-    LOGE(@"Installation path is not a directory: %@", path);
+  struct stat lst;
+  if (lstat(path.UTF8String, &lst) != 0) {
+    LOGE(@"lstat failed for %@: %d", path, errno);
+    return NO;
+  }
+  if (S_ISLNK(lst.st_mode)) {
+    LOGE(@"Bundle root is a symlink: %@", path);
+    return NO;
+  }
+  if (!S_ISDIR(lst.st_mode)) {
+    LOGE(@"Bundle root is not a directory: %@", path);
+    return NO;
+  }
+  if (lst.st_uid != 0 || lst.st_gid != 0) {
+    LOGE(@"Bundle root not owned by root:wheel: %@ (uid=%u gid=%u)", path, lst.st_uid, lst.st_gid);
+    return NO;
+  }
+
+  char resolved[PATH_MAX];
+  if (realpath(path.UTF8String, resolved) == NULL) {
+    LOGE(@"realpath failed for %@: %d", path, errno);
+    return NO;
+  }
+  BOOL canonicalAllowed = NO;
+  for (const char* allowed : kAllowedCanonicalBundlePaths) {
+    if (strcmp(resolved, allowed) == 0) {
+      canonicalAllowed = YES;
+      break;
+    }
+  }
+  if (!canonicalAllowed) {
+    LOGE(@"Resolved path %s is not a permitted install location", resolved);
     return NO;
   }
 
   NSError* err;
   MOLCodesignChecker* cc = [[MOLCodesignChecker alloc] initWithBinaryPath:path error:&err];
-
   if (err) {
     LOGE(@"Failed to validate install path: %@", err);
     return NO;
   }
-
   if (![cc.teamID isEqualToString:@"ZMCG7MLDV9"] ||
       ![cc.signingID isEqualToString:@"com.northpolesec.santa"]) {
     LOGE(@"Unexpected application: %@:%@", cc.teamID, cc.signingID);
     return NO;
   }
-
   return YES;
 }
 
@@ -801,40 +836,136 @@ double watchdogRAMPeak = 0;
 }
 
 - (void)installSantaApp:(NSString*)tempPath reply:(void (^)(BOOL))reply {
-  LOGI(@"Trigger Santa installation from: %@", tempPath);
+  LOGI(@"Trigger Santa installation; caller-supplied path: %@", tempPath);
 
-  if ([[SNTConfigurator configurator] isSyncV2Enabled] && santa::SNTIsLiteAppBundle(tempPath)) {
+  if (![tempPath isEqualToString:@(kSantaMigrationAppPath)]) {
+    LOGW(@"Caller-supplied path %@ differs from expected %s; proceeding with expected path",
+         tempPath, kSantaMigrationAppPath);
+  }
+
+  if ([[SNTConfigurator configurator] isSyncV2Enabled] &&
+      santa::SNTIsLiteAppBundle(@(kSantaMigrationAppPath))) {
     LOGE(@"Refusing to install Lite version while SyncV2 is enabled");
     reply(NO);
     return;
   }
 
-  if (![self verifyPathIsSanta:tempPath]) {
-    LOGE(@"Unable to verify Santa for installation: %@", tempPath);
-    reply(NO);
-    return;
-  }
-
-  [self setAppOwnershipAndPermissions:tempPath];
-
-  NSString* installPath = @(kSantaAppPath);
   NSFileManager* fm = [NSFileManager defaultManager];
-  NSError* error;
+  NSError* error = nil;
 
-  if (![fm removeItemAtPath:installPath error:&error]) {
-    LOGE(@"Failed to remove %@: %@", installPath, error);
+  NSURL* migrationAppURL = [NSURL fileURLWithPath:@(kSantaMigrationAppPath)];
+  NSURL* stagingDirURL = [NSURL fileURLWithPath:@(kSantaStagingDir)];
+  NSURL* stagingAppURL = [NSURL fileURLWithPath:@(kSantaStagingAppPath)];
+  NSURL* appURL = [NSURL fileURLWithPath:@(kSantaAppPath)];
+  NSURL* backupURL = [NSURL fileURLWithPath:@(kSantaAppBackupPath)];
+
+  // Step 1: Clear any leftover staging dir from a previously crashed install.
+  if ([fm fileExistsAtPath:stagingDirURL.path]) {
+    if (![fm removeItemAtURL:stagingDirURL error:&error]) {
+      LOGE(@"Failed to remove leftover staging dir: %@", error);
+      reply(NO);
+      return;
+    }
+  }
+
+  // Step 2: Create fresh staging dir owned by root:wheel, mode 0700.
+  NSDictionary* dirAttrs = @{
+    NSFilePosixPermissions : @0700,
+    NSFileOwnerAccountID : @0,
+    NSFileGroupOwnerAccountID : @0,
+  };
+  if (![fm createDirectoryAtURL:stagingDirURL
+          withIntermediateDirectories:NO
+                           attributes:dirAttrs
+                                error:&error]) {
+    LOGE(@"Failed to create staging dir: %@", error);
     reply(NO);
     return;
   }
 
-  if (![fm moveItemAtPath:tempPath toPath:installPath error:&error]) {
-    LOGE(@"Failed to remove %@: %@", installPath, error);
+  // Step 3: Trust transfer. Move bundle from writable /migration into
+  // santad-exclusive /staging. Single rename(2), atomic on the same APFS volume.
+  // All filesystem mutations after this point must remain in-process so that
+  // santad's ES client self-mute keeps the tamper handler from denying our
+  // own ops. Do not shell out to NSTask for any of these steps.
+  if (![fm moveItemAtURL:migrationAppURL toURL:stagingAppURL error:&error]) {
+    LOGE(@"Failed to move bundle from migration to staging: %@", error);
+    [fm removeItemAtURL:stagingDirURL error:nil];
     reply(NO);
     return;
+  }
+
+  // Step 4: Pre-swap codesign verify on the staged bundle. The pkg installer
+  // and santactl's Layer-1 preliminary checks already require root:wheel
+  // ownership before reaching this RPC, so we do not run
+  // setAppOwnershipAndPermissions: on /staging here — the ownership check
+  // inside verifyPathIsSanta: is the contract for what's acceptable.
+  if (![self verifyPathIsSanta:stagingAppURL.path]) {
+    LOGE(@"Pre-swap verify failed for %@", stagingAppURL.path);
+    [fm removeItemAtURL:stagingDirURL error:nil];
+    reply(NO);
+    return;
+  }
+
+  // Step 5: Atomic install via replaceItemAtURL. End state:
+  //   /Applications/Santa.app          = new bundle
+  //   /Applications/Santa.app.previous = previous-good bundle (auto-protected
+  //                                      by the existing /Applications/Santa.app
+  //                                      kPrefix tamper rule)
+  //   /var/db/santa/staging/Santa.app  = gone (moved out)
+  //   /var/db/santa/staging/           = empty directory
+  if (![fm replaceItemAtURL:appURL
+              withItemAtURL:stagingAppURL
+             backupItemName:@"Santa.app.previous"
+                    options:NSFileManagerItemReplacementWithoutDeletingBackupItem
+           resultingItemURL:nil
+                      error:&error]) {
+    LOGE(@"Failed to replace /Applications/Santa.app: %@", error);
+    [fm removeItemAtURL:stagingDirURL error:nil];
+    reply(NO);
+    return;
+  }
+
+  // Step 6: Force root:wheel ownership/permissions on the installed bundle.
+  [self setAppOwnershipAndPermissions:appURL.path];
+
+  // Step 7: Post-swap codesign verify. Load-bearing TOCTOU defense.
+  if (![self verifyPathIsSanta:appURL.path]) {
+    LOGE(@"Post-swap verify failed for /Applications/Santa.app; rolling back");
+
+    // Step 8b: Atomic rollback. Restore the previous-good bundle and discard
+    // the rejected bundle in a single replaceItemAtURL call.
+    NSError* rollbackErr = nil;
+    if (![fm replaceItemAtURL:appURL
+                withItemAtURL:backupURL
+               backupItemName:nil
+                      options:0
+             resultingItemURL:nil
+                        error:&rollbackErr]) {
+      LOGE(@"CRITICAL: rollback failed: %@. /Applications/Santa.app may be "
+           @"inconsistent. Currently-loaded sysex continues to run; admin "
+           @"recovery required.",
+           rollbackErr);
+    }
+
+    [fm removeItemAtURL:stagingDirURL error:nil];
+    reply(NO);
+    return;
+  }
+
+  // Step 8a: Success. Clean up the backup.
+  NSError* backupRmErr = nil;
+  if (![fm removeItemAtURL:backupURL error:&backupRmErr]) {
+    LOGW(@"Failed to remove backup at %@: %@", backupURL.path, backupRmErr);
+  }
+
+  // Step 9: Final cleanup of the now-empty staging dir.
+  NSError* stagingRmErr = nil;
+  if (![fm removeItemAtURL:stagingDirURL error:&stagingRmErr]) {
+    LOGW(@"Failed to remove staging dir: %@", stagingRmErr);
   }
 
   reply(YES);
-
   [self reloadSystemExtension];
 }
 
