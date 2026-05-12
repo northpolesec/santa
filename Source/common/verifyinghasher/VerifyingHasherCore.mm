@@ -62,6 +62,11 @@ std::span<const uint32_t> VerifyingHasherCore::MismatchedSlots() const {
   return mismatched_slots_;
 }
 
+std::optional<uint32_t> VerifyingHasherCore::Mismatches() const {
+  if (opts_.skip_page_hash) return std::nullopt;
+  return mismatches_;
+}
+
 VerifyingHasherCore::Status VerifyingHasherCore::RunHeaderPhase() {
   const uint64_t total = static_cast<uint64_t>(reader_.Size());
   HeaderParser hp(want_, total);
@@ -359,6 +364,12 @@ VerifyingHasherCore::Status VerifyingHasherCore::Run() {
     return Status::kMalformedSignature;
   }
 
+  if (opts_.skip_page_hash) {
+    // Substitute NoopHashTraits so the existing PageVerifierT<>
+    // streaming machinery runs without crypto work. Status::kPagesMismatched
+    // is structurally unreachable under this dispatch.
+    return RunStreamingPhases<NoopHashTraits>();
+  }
   switch (parsed_cd_.hash_type) {
     case CS_HASHTYPE_SHA1: return RunStreamingPhases<Sha1Traits>();
     case CS_HASHTYPE_SHA256: return RunStreamingPhases<Sha256Traits>();

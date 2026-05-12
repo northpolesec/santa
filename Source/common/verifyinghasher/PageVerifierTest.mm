@@ -25,6 +25,7 @@
 
 #include "Source/common/verifyinghasher/HashTraits.h"
 
+using santa::NoopHashTraits;
 using santa::PageVerifierT;
 using santa::Sha1Traits;
 using santa::Sha256Traits;
@@ -157,6 +158,82 @@ bool RunOneTraitsBody() {
   XCTAssertFalse(pv.StreamCorrupt());
   pv.Update(bytes.data() + 8192, 4096, 8192);  // gap: missing [4096, 8192)
   XCTAssertTrue(pv.StreamCorrupt());
+}
+
+// Under NoopHashTraits, PageVerifier replaces the per-page hashing loop
+// with an O(1) bulk advance of cur_slot_/cur_page_bytes_. Verify the end
+// state is observationally equivalent to the iterative path: Complete()
+// returns true once the full signed region has been streamed, even when
+// the last page is partial (code_len not page-aligned).
+- (void)testNoopBulkAdvanceCompletePartialLastPage {
+  // 123 KiB, page size 4096 -> 30 full pages + one 3072-byte partial page.
+  std::vector<uint8_t> bytes(123 * 1024);
+  PageVerifierT<NoopHashTraits> pv(/*lo=*/1024, /*hi=*/bytes.size(), /*page=*/4096, /*slots=*/{});
+  // Mixed-size chunks straddle page boundaries and exercise the bulk path
+  // across multiple Update() calls.
+  for (uint64_t off = 0; off < bytes.size(); off += 13) {
+    size_t n = std::min<size_t>(13, bytes.size() - off);
+    pv.Update(bytes.data() + off, n, off);
+  }
+  XCTAssertFalse(pv.StreamCorrupt());
+  XCTAssertTrue(pv.Complete());
+  XCTAssertEqual(pv.Mismatches(), 0u);
+  XCTAssertTrue(pv.MismatchedSlots().empty());
+}
+
+// Same shape as above but with a page-aligned signed region (code_len
+// exactly divisible by page_size). Exercises the bulk-advance corner
+// where the iterative loop would have finalized the last page exactly.
+- (void)testNoopBulkAdvanceCompleteAlignedLastPage {
+  std::vector<uint8_t> bytes(8 * 4096);
+  PageVerifierT<NoopHashTraits> pv(0, bytes.size(), 4096, {});
+  pv.Update(bytes.data(), bytes.size(), 0);
+  XCTAssertFalse(pv.StreamCorrupt());
+  XCTAssertTrue(pv.Complete());
+  XCTAssertEqual(pv.Mismatches(), 0u);
+}
+
+// The bulk-advance path must preserve gap-detect — a contract violation
+// must trip StreamCorrupt() even when no hashing is happening.
+- (void)testNoopBulkAdvanceGapDetected {
+  std::vector<uint8_t> bytes(8 * 4096);
+  PageVerifierT<NoopHashTraits> pv(0, bytes.size(), 4096, {});
+  pv.Update(bytes.data(), 4096, 0);
+  XCTAssertFalse(pv.StreamCorrupt());
+  pv.Update(bytes.data() + 8192, 4096, 8192);  // gap: missing [4096, 8192)
+  XCTAssertTrue(pv.StreamCorrupt());
+}
+
+// A short stream under NoopHashTraits must NOT report Complete(): the
+// bulk advance only credits bytes actually fed, so an early-terminating
+// stream is still detectable. This is the symmetric counterpart to
+// VerifyingHasherCore's pv.Complete() defense-in-depth check.
+- (void)testNoopBulkAdvanceIncompleteStreamFlagged {
+  std::vector<uint8_t> bytes(8 * 4096);
+  PageVerifierT<NoopHashTraits> pv(0, bytes.size(), 4096, {});
+  // Feed only the first 5 pages.
+  pv.Update(bytes.data(), 5 * 4096, 0);
+  XCTAssertFalse(pv.StreamCorrupt());
+  XCTAssertFalse(pv.Complete());
+}
+
+// Non-power-of-two page size exercises the UDIV/UREM fallback in the
+// bulk-advance path. Apple CodeDirectory always uses pow2 sizes (4096,
+// 16384) in production, but the fallback must remain correct so a
+// future kernel/Apple change doesn't silently break.
+- (void)testNoopBulkAdvanceNonPow2PageSize {
+  // 3000-byte page, 7 full pages + one 1000-byte partial = 22000 bytes.
+  constexpr uint32_t kOddPage = 3000;
+  std::vector<uint8_t> bytes(7 * kOddPage + 1000);
+  PageVerifierT<NoopHashTraits> pv(0, bytes.size(), kOddPage, {});
+  // Feed in 17-byte chunks to exercise mid-page boundaries on the
+  // non-pow2 path.
+  for (uint64_t off = 0; off < bytes.size(); off += 17) {
+    size_t n = std::min<size_t>(17, bytes.size() - off);
+    pv.Update(bytes.data() + off, n, off);
+  }
+  XCTAssertFalse(pv.StreamCorrupt());
+  XCTAssertTrue(pv.Complete());
 }
 
 @end

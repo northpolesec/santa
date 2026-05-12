@@ -45,14 +45,17 @@ struct Args {
   std::string path;
   ArchSelector arch = kHostDefaultArch;
   size_t buf_size = 1u << 20;
+  bool skip_page_hash = false;
 };
 
 void PrintUsage(FILE* f) {
   std::fprintf(f,
-               "Usage: VerifyingHasher [-a ARCH] [-b BYTES] <path>\n"
+               "Usage: VerifyingHasher [-a ARCH] [-b BYTES] [-s] <path>\n"
                "  -a ARCH   architecture: arm64 | arm64e | x86_64\n"
                "            (default: host preferred — arm64e on Apple Silicon, x86_64 on Intel)\n"
                "  -b N      pread chunk size in bytes (default 1048576, minimum 512)\n"
+               "  -s        skip per-page CodeDirectory verification\n"
+               "            (cdhash and full-file SHA-256 still computed)\n"
                "  -h        show this help\n");
 }
 
@@ -81,7 +84,7 @@ const char* ArchName(const ArchSelector& a) {
 
 bool ParseArgs(int argc, char** argv, Args& out) {
   int opt;
-  while ((opt = getopt(argc, argv, "a:b:h")) != -1) {
+  while ((opt = getopt(argc, argv, "a:b:hs")) != -1) {
     switch (opt) {
       case 'a':
         if (!ParseArch(optarg, out.arch)) {
@@ -99,6 +102,7 @@ bool ParseArgs(int argc, char** argv, Args& out) {
         out.buf_size = static_cast<size_t>(v);
         break;
       }
+      case 's': out.skip_page_hash = true; break;
       case 'h': PrintUsage(stdout); std::exit(0);
       default: return false;
     }
@@ -145,6 +149,7 @@ int main(int argc, char** argv) {
   FdFileReader reader(fd, st.st_size);
   VerifyingHasherCore::Options opts;
   opts.buf_size = args.buf_size;
+  opts.skip_page_hash = args.skip_page_hash;
   VerifyingHasherCore v(reader, args.arch, opts);
   auto status = v.Run();
   ::close(fd);
@@ -177,7 +182,11 @@ int main(int argc, char** argv) {
   std::printf("full-file digest: %s\n", HexLower(digest.data(), digest.size()).c_str());
   auto cdhash = v.CDHash();
   std::printf("cdhash: %s\n", HexLower(cdhash.data(), cdhash.size()).c_str());
-  std::printf("page mismatches: %u\n", v.Mismatches());
+  if (v.PageHashSkipped()) {
+    std::printf("page mismatches: (skipped)\n");
+  } else {
+    std::printf("page mismatches: %u\n", *v.Mismatches());
+  }
 
   auto bad = v.MismatchedSlots();
   if (!bad.empty()) {

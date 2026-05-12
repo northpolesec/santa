@@ -19,6 +19,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -46,6 +47,12 @@ class VerifyingHasherCore {
   struct Options {
     size_t buf_size = 1u << 20;  // pread chunk size; 1 MiB default.
                                  // Any positive value is valid.
+    // If true, skip per-page CodeDirectory verification while still
+    // computing the full-file SHA-256, cdhash, and signing-id/team-id
+    // extraction. Mismatches() returns std::nullopt under skip;
+    // Status::kPagesMismatched is structurally unreachable. See
+    // HashTraits.h::NoopHashTraits and PageHashSkipped() below.
+    bool skip_page_hash = false;
   };
 
   VerifyingHasherCore(FileReader& reader, ArchSelector want);
@@ -68,10 +75,15 @@ class VerifyingHasherCore {
   // Valid for kOk / kPagesMismatched:
   const ParsedCodeDirectory& ParsedCD() const { return parsed_cd_; }
   const SliceInfo& Slice() const { return slice_; }
-  bool PagesMatched() const { return mismatches_ == 0; }
-  // Total page-hash mismatch count (uncapped). Useful for telemetry.
-  uint32_t Mismatches() const { return mismatches_; }
+  // Total page-hash mismatch count (uncapped). std::nullopt iff
+  // Options.skip_page_hash was set on this run — reflects caller intent
+  // even on a Run() that errored in phase 1 before any page-hash work
+  // would have executed.
+  std::optional<uint32_t> Mismatches() const;
+  // Returns Options.skip_page_hash. Reflects caller intent, not outcome.
+  bool PageHashSkipped() const { return opts_.skip_page_hash; }
   // Up to kMaxRecordedMismatches slot indices, for diagnostic logging.
+  // Empty span under Options.skip_page_hash (no per-page work is performed).
   std::span<const uint32_t> MismatchedSlots() const;
 
   std::string_view LastError() const { return last_error_; }

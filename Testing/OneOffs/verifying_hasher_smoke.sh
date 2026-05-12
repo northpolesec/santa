@@ -104,6 +104,26 @@ if "$BIN" /etc/hosts >"$TMP/case4.out" 2>"$TMP/case4.err"; then
 fi
 assert_grep "not a Mach-O" "$TMP/case4.err"
 
+# Case 5: -s flag — same digest + cdhash as Case 1, plus the skip marker.
+echo "Case 5: -s flag on /usr/bin/yes"
+"$BIN" -s /usr/bin/yes >"$TMP/case5.out" 2>"$TMP/case5.err" || {
+    echo "FAIL: -s /usr/bin/yes returned non-zero" >&2
+    failures=$((failures + 1))
+}
+case1_digest=$(grep -E '^full-file digest:' "$TMP/case1.out" | awk '{print $3}')
+case5_digest=$(grep -E '^full-file digest:' "$TMP/case5.out" | awk '{print $3}')
+case1_cdhash=$(grep -E '^cdhash:' "$TMP/case1.out" | awk '{print $2}')
+case5_cdhash=$(grep -E '^cdhash:' "$TMP/case5.out" | awk '{print $2}')
+if [ -z "$case5_digest" ] || [ "$case1_digest" != "$case5_digest" ]; then
+    echo "FAIL: -s digest ($case5_digest) differs from no-flag digest ($case1_digest)" >&2
+    failures=$((failures + 1))
+fi
+if [ -z "$case5_cdhash" ] || [ "$case1_cdhash" != "$case5_cdhash" ]; then
+    echo "FAIL: -s cdhash ($case5_cdhash) differs from no-flag cdhash ($case1_cdhash)" >&2
+    failures=$((failures + 1))
+fi
+assert_grep "page mismatches: (skipped)" "$TMP/case5.out"
+
 if [ "$failures" -ne 0 ]; then
     echo "smoke: $failures FAILURES" >&2
     exit 1

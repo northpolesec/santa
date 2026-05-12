@@ -411,4 +411,94 @@ std::vector<uint8_t> Slurp(const char* path) {
                  @"sha256 must be deterministic across two reads of the same file");
 }
 
+- (void)testFacadeSkipPageHashCleanBinary {
+  // skip_page_hash via RunOptions on a clean binary still drives
+  // kMatchCDHash, with an engaged sha256 that matches the non-skip run.
+  auto cdhash = [self hwUniversalArm64CdHash];
+
+  // Reference sha256 from the non-skip path.
+  std::array<uint8_t, 32> reference_sha;
+  {
+    santa::ScopedFile sf([self openHwUniversalFd]);
+    VerifyingHasher::Expected exp{
+        .cdhash = std::span<const uint8_t>(cdhash.data(), cdhash.size()),
+        .signing_id = kHwUniversalSigningID,
+        .team_id = kHwUniversalTeamID,
+    };
+    auto r = VerifyingHasher::Run(sf.UnsafeFD(), CPU_TYPE_ARM64, CPU_SUBTYPE_ARM64_ALL, exp);
+    XCTAssertEqual(r.status, VerifyingHasher::Status::kMatchCDHash);
+    XCTAssertTrue(r.sha256.has_value());
+    reference_sha = *r.sha256;
+  }
+
+  santa::ScopedFile sf([self openHwUniversalFd]);
+  VerifyingHasher::Expected exp{
+      .cdhash = std::span<const uint8_t>(cdhash.data(), cdhash.size()),
+      .signing_id = kHwUniversalSigningID,
+      .team_id = kHwUniversalTeamID,
+  };
+  auto r = VerifyingHasher::Run(sf.UnsafeFD(), CPU_TYPE_ARM64, CPU_SUBTYPE_ARM64_ALL, exp,
+                                VerifyingHasher::RunOptions{.skip_page_hash = true});
+  XCTAssertEqual(r.status, VerifyingHasher::Status::kMatchCDHash);
+  XCTAssertTrue(r.sha256.has_value());
+  XCTAssertEqual(0, std::memcmp(r.sha256->data(), reference_sha.data(), 32));
+}
+
+- (void)testFacadeSkipPageHashBypassesTampered {
+  // Write a tampered hw_universal into a temp file (mkstemp-backed,
+  // unlinked at creation), open it, and exercise the facade with skip
+  // on/off. Without skip the tamper drives kError (kPagesMismatched at
+  // the Core level); with skip it drives kMatchCDHash because the
+  // cdhash is computed from the unmodified CS blob and the tampered
+  // text bytes are no longer checked.
+  auto bytes = Slurp([[self fixturePath] UTF8String]);
+  XCTAssertFalse(bytes.empty(), @"Failed to slurp hw_universal fixture");
+
+  // Flip a byte 3/4 of the way through. hw_universal is a fat binary
+  // with x86_64 in the lower half and arm64 in the upper half; 3/4
+  // reliably lands inside the arm64 slice's signed region (before the
+  // CS blob at the slice's end). If hw_universal is regenerated with a
+  // different layout, this offset may need to be recomputed — symptom
+  // would be kMalformedSignature from either test branch.
+  bytes[3 * bytes.size() / 4] ^= 0xFF;
+
+  auto file = santa::ScopedFile::CreateTemporary();
+  XCTAssertTrue(file.ok(), @"CreateTemporary failed: %s", file.status().ToString().c_str());
+
+  NSData* data = [NSData dataWithBytes:bytes.data() length:bytes.size()];
+  NSFileHandle* writer = file->Writer();
+  NSError* writeErr = nil;
+  XCTAssertTrue([writer writeData:data error:&writeErr], @"Failed to write tampered fixture: %@",
+                writeErr);
+
+  auto cdhash = [self hwUniversalArm64CdHash];
+  VerifyingHasher::Expected exp{
+      .cdhash = std::span<const uint8_t>(cdhash.data(), cdhash.size()),
+      .signing_id = kHwUniversalSigningID,
+      .team_id = kHwUniversalTeamID,
+  };
+
+  // VerifyingHasher::Run uses pread internally (offset-explicit), so the
+  // same fd can be passed to both calls without rewind.
+
+  // Without skip: kError (Core returns kPagesMismatched).
+  {
+    auto r = VerifyingHasher::Run(file->UnsafeFD(), CPU_TYPE_ARM64, CPU_SUBTYPE_ARM64_ALL, exp);
+    XCTAssertEqual(r.status, VerifyingHasher::Status::kError,
+                   @"tampered binary without skip must surface as kError");
+  }
+
+  // With skip: kMatchCDHash.
+  {
+    auto r = VerifyingHasher::Run(file->UnsafeFD(), CPU_TYPE_ARM64, CPU_SUBTYPE_ARM64_ALL, exp,
+                                  VerifyingHasher::RunOptions{.skip_page_hash = true});
+    XCTAssertEqual(r.status, VerifyingHasher::Status::kMatchCDHash,
+                   @"tampered binary with skip must drive kMatchCDHash");
+    XCTAssertTrue(r.sha256.has_value());
+  }
+
+  // ScopedFile destructor closes the fd; mkstemp file was unlinked at
+  // creation. No explicit cleanup needed.
+}
+
 @end

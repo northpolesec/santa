@@ -120,6 +120,32 @@ struct Sha384Traits {
   static constexpr uint8_t kCsHashType = CS_HASHTYPE_SHA384;
 };
 
+// NoopHashTraits substitutes into PageVerifierT<> to make the per-page
+// hashing work disappear. Used when
+// VerifyingHasherCore::Options::skip_page_hash is set — e.g., when the caller
+// has independent assurance that the kernel will enforce page hashes (CS_HARD /
+// CS_KILL on AUTH EXEC), or via a future configuration escape hatch.
+// PageVerifierT<>::Update has an if-constexpr branch for this trait that
+// bulk-advances cur_slot_/cur_page_bytes_ in O(1) per chunk instead of running
+// the iterative per-page hashing loop; the iterative branch is the if-constexpr
+// discarded statement for this trait and is never instantiated, which is why
+// kDigestSize can be zero.
+//
+// Trait constants satisfy PageVerifierT's static_asserts trivially:
+//   kCompareSize (0) <= kSlotStride (0) <= kDigestSize (0).
+// Init/Update/Final are kept (rather than removed) only to model the trait
+// concept symmetrically with the real hash traits; the discarded-statement
+// rule means they're never called.
+struct NoopHashTraits {
+  struct Ctx {};
+  static constexpr size_t kDigestSize = 0;
+  static constexpr size_t kSlotStride = 0;
+  static constexpr size_t kCompareSize = 0;
+  static void Init(Ctx*) {}
+  static void Update(Ctx*, const void*, size_t) {}
+  static void Final(unsigned char*, Ctx*) {}
+};
+
 #undef VERIFYINGHASHER_CC_UPDATE_LOOP
 
 }  // namespace santa
