@@ -139,21 +139,40 @@ bool ParseCodeSignature(std::span<const uint8_t> blob, uint64_t slice_size,
     const bool is_alternate = (slot_type >= CSSLOT_ALTERNATE_CODEDIRECTORIES &&
                                slot_type < CSSLOT_ALTERNATE_CODEDIRECTORY_LIMIT);
     if (!is_canonical && !is_alternate) continue;
-    if (is_canonical) saw_canonical = true;
 
+    // Structural floor enforced on every CD candidate, canonical and
+    // alternate alike. Matches the preamble of xnu's
+    // cs_validate_codedirectory (length >= sizeof(*cd), magic ==
+    // CSMAGIC_CODEDIRECTORY) — xnu rejects the whole superblob on any
+    // CD failing this, and so do we. Silently skipping a malformed
+    // alternate (the prior shape of this loop) lets an attacker steer
+    // the picker to a weaker valid CD by malforming higher-rank
+    // entries, which can swap the (cdhash, identifier, team_id)
+    // triple Santa publishes downstream. The flag and push_back are
+    // deferred until after validation passes so saw_canonical only
+    // flips on a structurally-valid slot-0 entry — mirrors xnu's
+    // primary_cd_exists semantics.
     const uint8_t* p = blob.data() + blob_off;
     uint32_t raw_magic = 0, raw_len = 0;
     std::memcpy(&raw_magic, p, sizeof(raw_magic));
     std::memcpy(&raw_len, p + 4, sizeof(raw_len));
     const uint32_t blob_magic = OSSwapBigToHostInt32(raw_magic);
-    if (blob_magic != CSMAGIC_CODEDIRECTORY) continue;
     const uint32_t blob_len = OSSwapBigToHostInt32(raw_len);
+
+    if (blob_magic != CSMAGIC_CODEDIRECTORY) {
+      err = "malformed code signature (CD blob has wrong magic)";
+      return false;
+    }
     if (static_cast<uint64_t>(blob_off) + blob_len > sb_len) {
       err = "malformed code signature (CD blob length out of range)";
       return false;
     }
-    if (blob_len < kMinCdBlobLen) continue;  // forward-compat skip; see kMinCdBlobLen
+    if (blob_len < kMinCdBlobLen) {
+      err = "malformed code signature (CD blob too small)";
+      return false;
+    }
 
+    if (is_canonical) saw_canonical = true;
     candidates.push_back({reinterpret_cast<const CS_CodeDirectory*>(p), blob_len, p});
   }
 
@@ -199,15 +218,14 @@ bool ParseCodeSignature(std::span<const uint8_t> blob, uint64_t slice_size,
     return false;
   }
 
-  // Only the picked CD is structurally validated below. xnu's
-  // cs_validate_csblob runs cs_validate_codedirectory on every candidate
-  // and rejects the whole superblob if any is malformed. We don't: the
-  // only field we read from non-picked candidates is hashType, which sits
-  // within the kMinCdBlobLen-byte minimum we already enforced during
-  // candidate collection, so a malformed alternate can't drive OOB or
-  // skew the picked CD's verification. Net: we accept some superblobs
-  // xnu rejects (Santa-permissive direction), which is benign — xnu's
-  // reject blocks load.
+  // The picked CD gets full structural validation below (page count,
+  // hashOffset bounds, codeLimit, etc.). Non-picked candidates only
+  // get the magic + length floor enforced during candidate collection
+  // — the same preamble xnu's cs_validate_codedirectory applies
+  // before its deeper checks. Skipping the deeper checks on non-picked
+  // candidates is benign: they can't affect the picker (the floor
+  // gates entry into the candidates vector) and we only hash the
+  // picked CD's bytes.
 
   const CS_CodeDirectory* cd = picked->cd;
   out.hash_type = cd->hashType;

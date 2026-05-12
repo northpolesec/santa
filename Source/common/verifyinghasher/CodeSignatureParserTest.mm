@@ -647,9 +647,9 @@ std::vector<uint8_t> ExtractCsBlob(const char* path, uint64_t* out_slice_size) {
 
 // L3 regression: a CD whose `length` field is shorter than the smallest
 // header we can read (kMinCdBlobLen = 64 bytes, covering through codeLimit64)
-// must be skipped during candidate collection. With only that one (canonical)
-// CD in the SuperBlob, the parser reports "no CodeDirectory blobs found"
-// because candidates is empty after the skip.
+// must cause the whole superblob to be rejected. Matches xnu's
+// cs_validate_codedirectory which rejects on `length < sizeof(*cd)` for any
+// CD candidate.
 - (void)testRejectsTinyCdBlobLen {
   constexpr uint32_t kCdLen = 60;  // intentionally < kMinCdBlobLen (64)
   const size_t cd_off = sizeof(CS_SuperBlob) + sizeof(CS_BlobIndex);
@@ -672,7 +672,8 @@ std::vector<uint8_t> ExtractCsBlob(const char* path, uint64_t* out_slice_size) {
   ParsedCodeDirectory parsed;
   std::string err;
   XCTAssertFalse(ParseCodeSignature(blob, /*slice_size=*/0, parsed, err));
-  XCTAssertTrue(err.find("no CodeDirectory blobs found") != std::string::npos);
+  XCTAssertTrue(err.find("CD blob too small") != std::string::npos,
+                @"expected 'CD blob too small' error, got: %s", err.c_str());
 }
 
 // L3 regression: a CD whose `length` is in [kMinCdBlobLen,
@@ -1099,6 +1100,153 @@ std::vector<uint8_t> ExtractCsBlob(const char* path, uint64_t* out_slice_size) {
   XCTAssertTrue(ok, @"ParseCodeSignature: %s", err.c_str());
   XCTAssertTrue(parsed.team_id.empty(),
                 @"team_id must be empty for pre-CS_SUPPORTSTEAMID CD version");
+}
+
+// Picker-steering regression: a malformed canonical CD (wrong magic) plus a
+// well-formed alternate would, under the prior permissive shape, silently
+// skip the canonical, fall back on a saw_canonical flag already flipped by
+// the index entry's type alone, pick the alternate, and return success. xnu
+// rejects the whole superblob via cs_validate_codedirectory; the parser
+// must do the same so we don't publish (cdhash, identifier, team_id) for
+// a binary the kernel won't run.
+- (void)testRejectsMalformedCanonicalWithValidAlternate {
+  const size_t bidx_off = sizeof(CS_SuperBlob);
+  const size_t cd1_off = bidx_off + 2 * sizeof(CS_BlobIndex);
+  const size_t cd1_sz = 64;  // garbage payload, but at least kMinCdBlobLen wide
+  const size_t cd2_off = cd1_off + cd1_sz;
+  const size_t cd2_sz = sizeof(CS_CodeDirectory) + 32;  // 1 SHA-256 slot
+  const size_t total = cd2_off + cd2_sz;
+  std::vector<uint8_t> blob(total, 0);
+
+  auto* sb = reinterpret_cast<CS_SuperBlob*>(blob.data());
+  sb->magic = OSSwapHostToBigInt32(CSMAGIC_EMBEDDED_SIGNATURE);
+  sb->length = OSSwapHostToBigInt32(static_cast<uint32_t>(total));
+  sb->count = OSSwapHostToBigInt32(2);
+
+  auto* idxs = reinterpret_cast<CS_BlobIndex*>(blob.data() + bidx_off);
+  idxs[0].type = OSSwapHostToBigInt32(CSSLOT_CODEDIRECTORY);
+  idxs[0].offset = OSSwapHostToBigInt32(static_cast<uint32_t>(cd1_off));
+  idxs[1].type = OSSwapHostToBigInt32(CSSLOT_ALTERNATE_CODEDIRECTORIES);
+  idxs[1].offset = OSSwapHostToBigInt32(static_cast<uint32_t>(cd2_off));
+
+  // Canonical: bytes-as-blob with the wrong magic (CSMAGIC_REQUIREMENT is a
+  // real CS magic, just not what slot 0 claims to carry).
+  uint32_t bad_magic = OSSwapHostToBigInt32(CSMAGIC_REQUIREMENT);
+  uint32_t fake_len = OSSwapHostToBigInt32(static_cast<uint32_t>(cd1_sz));
+  std::memcpy(blob.data() + cd1_off, &bad_magic, sizeof(bad_magic));
+  std::memcpy(blob.data() + cd1_off + 4, &fake_len, sizeof(fake_len));
+
+  auto* cd2 = reinterpret_cast<CS_CodeDirectory*>(blob.data() + cd2_off);
+  cd2->magic = OSSwapHostToBigInt32(CSMAGIC_CODEDIRECTORY);
+  cd2->length = OSSwapHostToBigInt32(static_cast<uint32_t>(cd2_sz));
+  cd2->hashOffset = OSSwapHostToBigInt32(sizeof(CS_CodeDirectory));
+  cd2->codeLimit = OSSwapHostToBigInt32(4096);
+  cd2->nCodeSlots = OSSwapHostToBigInt32(1);
+  cd2->hashSize = 32;
+  cd2->hashType = CS_HASHTYPE_SHA256;
+  cd2->pageSize = 12;
+
+  ParsedCodeDirectory parsed;
+  std::string err;
+  XCTAssertFalse(ParseCodeSignature(blob, /*slice_size=*/4096, parsed, err));
+  XCTAssertTrue(err.find("wrong magic") != std::string::npos,
+                @"expected 'wrong magic' error, got: %s", err.c_str());
+}
+
+// Picker-steering regression (mirror of the above for the
+// length-too-small failure mode on the canonical CD).
+- (void)testRejectsUndersizedCanonicalWithValidAlternate {
+  const size_t bidx_off = sizeof(CS_SuperBlob);
+  const size_t cd1_off = bidx_off + 2 * sizeof(CS_BlobIndex);
+  const size_t cd1_sz = 32;  // < kMinCdBlobLen (64)
+  const size_t cd2_off = cd1_off + cd1_sz;
+  const size_t cd2_sz = sizeof(CS_CodeDirectory) + 32;
+  const size_t total = cd2_off + cd2_sz;
+  std::vector<uint8_t> blob(total, 0);
+
+  auto* sb = reinterpret_cast<CS_SuperBlob*>(blob.data());
+  sb->magic = OSSwapHostToBigInt32(CSMAGIC_EMBEDDED_SIGNATURE);
+  sb->length = OSSwapHostToBigInt32(static_cast<uint32_t>(total));
+  sb->count = OSSwapHostToBigInt32(2);
+
+  auto* idxs = reinterpret_cast<CS_BlobIndex*>(blob.data() + bidx_off);
+  idxs[0].type = OSSwapHostToBigInt32(CSSLOT_CODEDIRECTORY);
+  idxs[0].offset = OSSwapHostToBigInt32(static_cast<uint32_t>(cd1_off));
+  idxs[1].type = OSSwapHostToBigInt32(CSSLOT_ALTERNATE_CODEDIRECTORIES);
+  idxs[1].offset = OSSwapHostToBigInt32(static_cast<uint32_t>(cd2_off));
+
+  // Canonical: right magic, too-short length.
+  auto* cd1 = reinterpret_cast<CS_CodeDirectory*>(blob.data() + cd1_off);
+  cd1->magic = OSSwapHostToBigInt32(CSMAGIC_CODEDIRECTORY);
+  cd1->length = OSSwapHostToBigInt32(static_cast<uint32_t>(cd1_sz));
+
+  auto* cd2 = reinterpret_cast<CS_CodeDirectory*>(blob.data() + cd2_off);
+  cd2->magic = OSSwapHostToBigInt32(CSMAGIC_CODEDIRECTORY);
+  cd2->length = OSSwapHostToBigInt32(static_cast<uint32_t>(cd2_sz));
+  cd2->hashOffset = OSSwapHostToBigInt32(sizeof(CS_CodeDirectory));
+  cd2->codeLimit = OSSwapHostToBigInt32(4096);
+  cd2->nCodeSlots = OSSwapHostToBigInt32(1);
+  cd2->hashSize = 32;
+  cd2->hashType = CS_HASHTYPE_SHA256;
+  cd2->pageSize = 12;
+
+  ParsedCodeDirectory parsed;
+  std::string err;
+  XCTAssertFalse(ParseCodeSignature(blob, /*slice_size=*/4096, parsed, err));
+  XCTAssertTrue(err.find("CD blob too small") != std::string::npos,
+                @"expected 'CD blob too small' error, got: %s", err.c_str());
+}
+
+// Picker-steering regression: malformed *alternate* (wrong magic) combined
+// with a valid canonical. Under the prior permissive shape, the malformed
+// alternate would silently `continue` and parsing would succeed with the
+// canonical as the picked CD. xnu rejects via cs_validate_codedirectory on
+// every CD candidate; we now do the same. Without this check, an attacker
+// could malform a high-rank alternate to force the picker down to a
+// weaker, attacker-chosen valid CD whose (identifier, team_id) might
+// differ.
+- (void)testRejectsMalformedAlternateWithValidCanonical {
+  const size_t bidx_off = sizeof(CS_SuperBlob);
+  const size_t cd1_off = bidx_off + 2 * sizeof(CS_BlobIndex);
+  const size_t cd1_sz = sizeof(CS_CodeDirectory) + 20;  // 1 SHA-1 slot
+  const size_t cd2_off = cd1_off + cd1_sz;
+  const size_t cd2_sz = 64;
+  const size_t total = cd2_off + cd2_sz;
+  std::vector<uint8_t> blob(total, 0);
+
+  auto* sb = reinterpret_cast<CS_SuperBlob*>(blob.data());
+  sb->magic = OSSwapHostToBigInt32(CSMAGIC_EMBEDDED_SIGNATURE);
+  sb->length = OSSwapHostToBigInt32(static_cast<uint32_t>(total));
+  sb->count = OSSwapHostToBigInt32(2);
+
+  auto* idxs = reinterpret_cast<CS_BlobIndex*>(blob.data() + bidx_off);
+  idxs[0].type = OSSwapHostToBigInt32(CSSLOT_CODEDIRECTORY);
+  idxs[0].offset = OSSwapHostToBigInt32(static_cast<uint32_t>(cd1_off));
+  idxs[1].type = OSSwapHostToBigInt32(CSSLOT_ALTERNATE_CODEDIRECTORIES);
+  idxs[1].offset = OSSwapHostToBigInt32(static_cast<uint32_t>(cd2_off));
+
+  // Valid SHA-1 canonical.
+  auto* cd1 = reinterpret_cast<CS_CodeDirectory*>(blob.data() + cd1_off);
+  cd1->magic = OSSwapHostToBigInt32(CSMAGIC_CODEDIRECTORY);
+  cd1->length = OSSwapHostToBigInt32(static_cast<uint32_t>(cd1_sz));
+  cd1->hashOffset = OSSwapHostToBigInt32(sizeof(CS_CodeDirectory));
+  cd1->codeLimit = OSSwapHostToBigInt32(4096);
+  cd1->nCodeSlots = OSSwapHostToBigInt32(1);
+  cd1->hashSize = 20;
+  cd1->hashType = CS_HASHTYPE_SHA1;
+  cd1->pageSize = 12;
+
+  // Malformed "alternate": wrong magic.
+  uint32_t bad_magic = OSSwapHostToBigInt32(CSMAGIC_REQUIREMENT);
+  uint32_t fake_len = OSSwapHostToBigInt32(static_cast<uint32_t>(cd2_sz));
+  std::memcpy(blob.data() + cd2_off, &bad_magic, sizeof(bad_magic));
+  std::memcpy(blob.data() + cd2_off + 4, &fake_len, sizeof(fake_len));
+
+  ParsedCodeDirectory parsed;
+  std::string err;
+  XCTAssertFalse(ParseCodeSignature(blob, /*slice_size=*/4096, parsed, err));
+  XCTAssertTrue(err.find("wrong magic") != std::string::npos,
+                @"expected 'wrong magic' error, got: %s", err.c_str());
 }
 
 @end
