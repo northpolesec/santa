@@ -936,7 +936,8 @@ static const char* const kAllowedCanonicalBundlePaths[] = {
              resultingItemURL:nil
                         error:&rollbackErr]) {
       LOGE(@"CRITICAL: rollback failed: %@. /Applications/Santa.app may be "
-           @"inconsistent. Currently-loaded sysex continues to run." rollbackErr);
+           @"inconsistent. Currently-loaded sysex continues to run.",
+           rollbackErr);
     }
 
     [fm removeItemAtURL:stagingDirURL error:nil];
