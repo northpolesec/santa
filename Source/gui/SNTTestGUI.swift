@@ -14,6 +14,7 @@
 
 import SwiftUI
 
+import santa_common_SNTConfigBundle
 import santa_common_SNTConfigState
 import santa_common_SNTConfigurator
 import santa_common_SNTCommonEnums
@@ -283,6 +284,7 @@ struct BinaryView: View {
             customURL: effectiveURL.isEmpty ? nil : (effectiveURL as NSString),
             configState: SNTConfigState(config: SNTConfigurator.configurator()),
             bundleProgress: SNTBundleProgress(),
+            silenceable: true,
             uiStateCallback: { interval in print("Silence interval was set to \(interval)") },
             replyCallback: { approved in print("Did user approve execution: \(approved)") }
           ),
@@ -325,6 +327,7 @@ struct DeviceView: View {
   @State private var remountUSBMode: String = "rdonly,noexec"
   @State private var remountUSBBlockMessage: String = ""
   @State private var bannedUSBBlockMessage: String = ""
+  @State private var allowNotificationSilence: Bool = true
   @State private var brandingCompanyName: String = ""
   @State private var brandingCompanyLogo: String = ""
   @State private var brandingCompanyLogoDark: String = ""
@@ -342,6 +345,11 @@ struct DeviceView: View {
           TextField(text: $remountUSBMode, label: { Text("RemountUSBMode (comma-separated)") })
           TextField(text: $remountUSBBlockMessage, label: { Text("RemountUSB Block Message") })
           TextField(text: $bannedUSBBlockMessage, label: { Text("Banned Block Message") })
+          HStack {
+            Toggle(isOn: $allowNotificationSilence) {
+              Text(verbatim: "Allow notification silences")
+            }
+          }
           CommonPropertiesView(
             brandingCompanyName: $brandingCompanyName,
             brandingCompanyLogo: $brandingCompanyLogo,
@@ -371,9 +379,18 @@ struct DeviceView: View {
         }
         SNTConfigurator.overrideConfig(configMap)
 
+        let bundle = SNTConfigBundle()
+        bundle.setValue(NSNumber(value: allowNotificationSilence), forKey: "enableNotificationSilences")
+
         let window = NSWindow()
         ShowWindow(
-          SNTDeviceMessageWindowViewFactory.createWith(window: window, event: event),
+          SNTDeviceMessageWindowViewFactory.createWith(
+            window: window,
+            event: event,
+            configBundle: bundle,
+            silenceable: true,
+            uiStateCallback: { interval in print("Silence interval was set to \(interval)") }
+          ),
           window,
           appearance: appearanceMode
         )

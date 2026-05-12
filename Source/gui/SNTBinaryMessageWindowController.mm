@@ -95,6 +95,7 @@
              customURL:self.customURL
            configState:self.configState
         bundleProgress:self.bundleProgress
+           silenceable:([self messageHash] != nil)
        uiStateCallback:^(NSTimeInterval preventNotificationsPeriod) {
          self.silenceFutureNotificationsPeriod = preventNotificationsPeriod;
        }
@@ -106,7 +107,10 @@
 }
 
 - (NSString*)messageHash {
-  return self.event.fileSHA256;
+  // Don't return a bare "binary:" prefix when fileSHA256 is missing —
+  // that would silence every hash-less event under one shared key.
+  if (!self.event.fileSHA256.length) return nil;
+  return [@"binary:" stringByAppendingString:self.event.fileSHA256];
 }
 
 - (void)performSilentTouchIDAuthorization {

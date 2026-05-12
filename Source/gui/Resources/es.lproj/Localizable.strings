@@ -104,10 +104,16 @@
 "FS Type" = "Tipo FS";
 
 /* No comment provided by engineer. */
-"Label after time period picker" = "\U2800";
+"Label after time period picker (application)" = "\U2800";
 
 /* No comment provided by engineer. */
-"Label before time period picker" = "Evitar notificaciones futuras para esta aplicación durante";
+"Label after time period picker (mount)" = "\U2800";
+
+/* No comment provided by engineer. */
+"Label before time period picker (application)" = "Evitar notificaciones futuras para esta aplicación durante";
+
+/* No comment provided by engineer. */
+"Label before time period picker (mount)" = "Evitar notificaciones futuras para este montaje durante";
 
 /* Label shown before company branding */
 "Managed by:" = "Administrado por:";

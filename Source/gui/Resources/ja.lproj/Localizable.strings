@@ -104,10 +104,16 @@
 "FS Type" = "ファイルシステム種別";
 
 /* No comment provided by engineer. */
-"Label after time period picker" = "停止します";
+"Label after time period picker (application)" = "停止します";
 
 /* No comment provided by engineer. */
-"Label before time period picker" = "このアプリケーションからの通知を";
+"Label after time period picker (mount)" = "停止します";
+
+/* No comment provided by engineer. */
+"Label before time period picker (application)" = "このアプリケーションからの通知を";
+
+/* No comment provided by engineer. */
+"Label before time period picker (mount)" = "このマウントからの通知を";
 
 /* Label shown before company branding */
 "Managed by:" = "管理者:";

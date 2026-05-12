@@ -16,13 +16,26 @@
 import SwiftUI
 
 import santa_common_SNTBlockMessage
+import santa_common_SNTConfigBundle
 import santa_common_SNTDeviceEvent
 import santa_gui_SNTMessageView
 
 @objc public class SNTDeviceMessageWindowViewFactory: NSObject {
-  @objc public static func createWith(window: NSWindow, event: SNTDeviceEvent) -> NSViewController {
+  @objc public static func createWith(
+    window: NSWindow,
+    event: SNTDeviceEvent,
+    configBundle: SNTConfigBundle,
+    silenceable: Bool,
+    uiStateCallback: ((TimeInterval) -> Void)?
+  ) -> NSViewController {
     return NSHostingController(
-      rootView: SNTDeviceMessageWindowView(window: window, event: event).fixedSize()
+      rootView: SNTDeviceMessageWindowView(
+        window: window,
+        event: event,
+        configBundle: configBundle,
+        silenceable: silenceable,
+        uiStateCallback: uiStateCallback
+      ).fixedSize()
     )
   }
 }
@@ -30,6 +43,12 @@ import santa_gui_SNTMessageView
 struct SNTDeviceMessageWindowView: View {
   let window: NSWindow?
   let event: SNTDeviceEvent
+  let configBundle: SNTConfigBundle
+  let silenceable: Bool
+  let uiStateCallback: ((TimeInterval) -> Void)?
+
+  @State public var preventFutureNotifications = false
+  @State public var preventFutureNotificationPeriod: TimeInterval = NotificationSilencePeriods[0]
 
   var body: some View {
     SNTMessageView(SNTBlockMessage.attributedBlockMessage(for: event)) {
@@ -53,10 +72,19 @@ struct SNTDeviceMessageWindowView: View {
         }
       }
 
+      if configBundle.notificationSilencesEnabled() && silenceable {
+        SNTNotificationSilenceView(
+          silence: $preventFutureNotifications,
+          period: $preventFutureNotificationPeriod,
+          labelBefore: Text("Label before time period picker (mount)"),
+          labelAfter: Text("Label after time period picker (mount)")
+        )
+      }
+
       Spacer()
 
       HStack(spacing: 15.0) {
-        DismissButton(customText: nil, silence: nil, action: dismissButton)
+        DismissButton(customText: nil, silence: preventFutureNotifications, action: dismissButton)
       }
 
       Spacer()
@@ -64,6 +92,13 @@ struct SNTDeviceMessageWindowView: View {
   }
 
   func dismissButton() {
+    if let callback = uiStateCallback {
+      if self.preventFutureNotifications {
+        callback(self.preventFutureNotificationPeriod)
+      } else {
+        callback(0)
+      }
+    }
     window?.close()
   }
 }

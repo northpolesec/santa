@@ -31,4 +31,12 @@ SNTConfigBundle* NetworkMountConfigBundle(SNTConfigurator* configurator) {
   return bundle;
 }
 
+SNTConfigBundle* USBMountConfigBundle(SNTConfigurator* configurator) {
+  SNTConfigBundle* bundle = [[SNTConfigBundle alloc] init];
+
+  bundle.enableNotificationSilences = @(configurator.enableNotificationSilences);
+
+  return bundle;
+}
+
 }  // namespace santa
