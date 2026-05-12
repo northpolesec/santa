@@ -88,6 +88,14 @@ uint8_t HashSizeFor(uint8_t hash_type) {
 
 bool ParseCodeSignature(std::span<const uint8_t> blob, uint64_t slice_size,
                         ParsedCodeDirectory& out, std::string& err) {
+  // Reset output up front so callers reusing a ParsedCodeDirectory across
+  // parses don't leak stale strings/spans/hashes from a prior successful
+  // call through the conditionally-overwritten fields (identifier,
+  // team_id) on the next parse, and so every early-return path leaves
+  // a clean output.
+  out = ParsedCodeDirectory{};
+  err.clear();
+
   if (blob.size() < sizeof(CS_SuperBlob)) {
     err = "code signature blob too small for SuperBlob";
     return false;

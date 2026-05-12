@@ -16,6 +16,7 @@
 
 #import <XCTest/XCTest.h>
 
+#include <errno.h>
 #include <fcntl.h>
 #include <libkern/OSByteOrder.h>
 #include <mach-o/fat.h>
@@ -54,15 +55,25 @@ constexpr ArchSelector kHwUniversalArch = {CPU_TYPE_ARM64, CPU_SUBTYPE_ARM64_ALL
 constexpr ArchSelector kHwUniversalArch = {CPU_TYPE_X86_64, CPU_SUBTYPE_X86_64_ALL};
 #endif
 
-// Read entire file into a vector for synthetic feed.
+// Read entire file into a vector for synthetic feed. Loops on pread so a
+// short read or EINTR doesn't silently truncate to {} and surface as an
+// opaque assertion failure later.
 std::vector<uint8_t> Slurp(const char* path) {
   santa::ScopedFile sf(::open(path, O_RDONLY | O_CLOEXEC));
   if (sf.UnsafeFD() < 0) return {};
   struct stat st{};
   if (::fstat(sf.UnsafeFD(), &st) != 0) return {};
   std::vector<uint8_t> v(st.st_size);
-  ssize_t n = ::pread(sf.UnsafeFD(), v.data(), v.size(), 0);
-  if (n != static_cast<ssize_t>(v.size())) return {};
+  size_t off = 0;
+  while (off < v.size()) {
+    ssize_t n = ::pread(sf.UnsafeFD(), v.data() + off, v.size() - off, off);
+    if (n < 0) {
+      if (errno == EINTR) continue;
+      return {};
+    }
+    if (n == 0) return {};  // unexpected EOF before fstat-reported size
+    off += static_cast<size_t>(n);
+  }
   return v;
 }
 
