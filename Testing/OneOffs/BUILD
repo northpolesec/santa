@@ -1,5 +1,6 @@
 load("@rules_apple//apple:macos.bzl", "macos_command_line_application")
 load("@rules_cc//cc:defs.bzl", "objc_library")
+load("@rules_shell//shell:sh_test.bzl", "sh_test")
 load("//:helper.bzl", "SANTA_MINIMUM_OS_VERSION", "santa_unit_test")
 
 package(
@@ -97,4 +98,28 @@ macos_command_line_application(
     version = "//:version",
     visibility = ["//:santa_package_group"],
     deps = [":SNTFileAccessRuleArchiveGenerator"],
+)
+
+objc_library(
+    name = "VerifyingHasherCLI_lib",
+    srcs = ["VerifyingHasher.mm"],
+    deps = [
+        "//Source/common/verifyinghasher:FileReader",
+        "//Source/common/verifyinghasher:VerifyingHasherCore",
+    ],
+)
+
+macos_command_line_application(
+    name = "VerifyingHasher",
+    bundle_id = "com.northpolesec.santa.testing.VerifyingHasher",
+    minimum_os_version = SANTA_MINIMUM_OS_VERSION,
+    deps = [":VerifyingHasherCLI_lib"],
+)
+
+sh_test(
+    name = "verifying_hasher_smoke",
+    srcs = ["verifying_hasher_smoke.sh"],
+    args = ["$(rootpath :VerifyingHasher)"],
+    data = [":VerifyingHasher"],
+    env = {"BIN": "$(rootpath :VerifyingHasher)"},
 )
