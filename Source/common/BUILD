@@ -980,7 +980,6 @@ objc_library(
         ":SNTKillCommand",
         ":SNTRule",
         ":SNTRuleIdentifiers",
-        ":SNTSandboxExecRequest",
         ":SNTStoredEvent",
         ":SNTStoredExecutionEvent",
         ":SNTXPCUnprivilegedControlInterface",
