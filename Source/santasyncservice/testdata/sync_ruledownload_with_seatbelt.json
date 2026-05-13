@@ -1,0 +1,10 @@
+{
+  "rules": [
+    {
+      "rule_type": "SIGNINGID",
+      "policy": "SEATBELT",
+      "identifier": "ABCDE12345:com.example.seatbeltapp",
+      "seatbelt_policy": "(version 1)(deny default)"
+    }
+  ]
+}

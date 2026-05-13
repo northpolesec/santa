@@ -64,6 +64,7 @@
 @property NSString* customMsg;
 @property NSString* customURL;
 @property BOOL silentBlock;
+@property BOOL seatbeltRequired;
 
 @property BOOL staticRule;
 

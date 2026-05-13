@@ -64,9 +64,10 @@ NS_ASSUME_NONNULL_BEGIN
                                           customURL:(nullable NSString*)url;
 
 ///
-///  Returns a human-readable string describing the block reason for the given event state.
+///  Returns a human-readable string describing the block reason for the given event, including
+///  event-specific suffixes (e.g. the sandbox requirement) when applicable.
 ///
-+ (NSString*)blockReasonForEventState:(SNTEventState)decision;
++ (NSString*)blockReasonForEvent:(nullable SNTStoredExecutionEvent*)event;
 
 ///
 ///  Strip HTML from a string, replacing <br /> with newline.

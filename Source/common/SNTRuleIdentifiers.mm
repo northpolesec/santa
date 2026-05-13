@@ -15,7 +15,12 @@
 
 #import "Source/common/SNTRuleIdentifiers.h"
 
+#include <Kernel/kern/cs_blobs.h>
+
+#include <vector>
+
 #import "Source/common/CoderMacros.h"
+#include "Source/common/String.h"
 
 @implementation SNTRuleIdentifiers
 
@@ -77,6 +82,13 @@
                                            .certificateSHA256 = certificateSHA256,
                                            .teamID = teamID,
                                        }];
+}
+
+- (NSData*)cdhashBytes {
+  if (self.cdhash.length != CS_CDHASH_LEN * 2) return nil;
+  std::vector<uint8_t> buf = santa::HexStringToBuf(self.cdhash);
+  if (buf.size() != CS_CDHASH_LEN) return nil;
+  return [NSData dataWithBytes:buf.data() length:buf.size()];
 }
 
 - (struct RuleIdentifiers)toStruct {

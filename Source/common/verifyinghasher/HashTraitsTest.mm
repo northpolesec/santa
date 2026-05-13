@@ -21,6 +21,7 @@
 #include <cstring>
 #include <vector>
 
+using santa::NoopHashTraits;
 using santa::Sha1Traits;
 using santa::Sha256Traits;
 using santa::Sha256TruncatedTraits;
@@ -146,6 +147,21 @@ bool RunChunkedEquivalence() {
 
 - (void)testChunkedEquivalenceSha384 {
   XCTAssertTrue(RunChunkedEquivalence<Sha384Traits>());
+}
+
+- (void)testNoopHashTraitsSizesValid {
+  // PageVerifierT static_asserts enforce:
+  //   kCompareSize <= kSlotStride <= kDigestSize
+  // All three are zero for NoopHashTraits — no per-page hashing, no slot
+  // comparison, no digest produced. The iterative branch of
+  // PageVerifierT::Update that would otherwise need kDigestSize > 0 (to
+  // declare `unsigned char digest[kDigestSize]`) is the if-constexpr
+  // discarded statement under this trait and is never instantiated.
+  XCTAssertEqual(NoopHashTraits::kCompareSize, 0u);
+  XCTAssertEqual(NoopHashTraits::kSlotStride, 0u);
+  XCTAssertEqual(NoopHashTraits::kDigestSize, 0u);
+  XCTAssertLessThanOrEqual(NoopHashTraits::kCompareSize, NoopHashTraits::kSlotStride);
+  XCTAssertLessThanOrEqual(NoopHashTraits::kSlotStride, NoopHashTraits::kDigestSize);
 }
 
 @end

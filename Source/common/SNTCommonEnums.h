@@ -79,6 +79,8 @@ typedef NS_ENUM(NSInteger, SNTRuleState) {
 
   SNTRuleStateCEL = 9,
   SNTRuleStateCELv2 = 10,
+
+  SNTRuleStateSeatbelt = 11,
 };
 
 typedef NS_ENUM(NSInteger, SNTClientMode) {

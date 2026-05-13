@@ -1080,6 +1080,7 @@
                  customMsg:@"Hi There"
                  customURL:@"http://northpole.security"
                    celExpr:nil
+            seatbeltPolicy:nil
                     ruleId:0],
     [[SNTRule alloc] initWithIdentifier:@"AAAAAAAAAA"
                                   state:SNTRuleStateBlock
@@ -1087,6 +1088,7 @@
                               customMsg:@"Banned team ID"
                               customURL:@"http://northpole.security"
                                 celExpr:nil
+                         seatbeltPolicy:nil
                                  ruleId:0],
   ];
 
@@ -1126,6 +1128,7 @@
                               customMsg:nil
                               customURL:nil
                                 celExpr:@"target.signing_time >= timestamp('2025-05-31T00:00:00Z')"
+                         seatbeltPolicy:nil
                                  ruleId:0],
     [[SNTRule alloc] initWithIdentifier:@"BBBBBBBBBB"
                                   state:state
@@ -1133,6 +1136,46 @@
                               customMsg:nil
                               customURL:nil
                                 celExpr:@"this is an invalid expression"
+                         seatbeltPolicy:nil
+                                 ruleId:0],
+  ];
+
+  OCMVerify([self.daemonConnRop databaseRuleAddExecutionRules:rules
+                                              fileAccessRules:OCMOCK_ANY
+                                                  ruleCleanup:SNTRuleCleanupNone
+                                                       source:SNTRuleAddSourceSyncService
+                                                        reply:OCMOCK_ANY]);
+}
+
+- (void)testRuleDownloadSeatbelt {
+  // SEATBELT is only defined in syncv2; v1 reserves the value and parsing it
+  // would either fail or drop the rule. Only exercise the v2 code path.
+  if (!self.syncState.isSyncV2) return;
+
+  SNTSyncRuleDownload* sut = [[SNTSyncRuleDownload alloc] initWithState:self.syncState];
+
+  NSData* respData = [self dataFromFixture:@"sync_ruledownload_with_seatbelt.json"];
+  [self stubRequestBody:respData response:nil error:nil validateBlock:nil];
+
+  OCMStub([self.daemonConnRop
+      databaseRuleAddExecutionRules:OCMOCK_ANY
+                    fileAccessRules:OCMOCK_ANY
+                        ruleCleanup:SNTRuleCleanupNone
+                             source:SNTRuleAddSourceSyncService
+                              reply:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(YES), [NSNull null],
+                                                                 nil])]);
+  OCMStub([self.daemonConnRop postRuleSyncNotificationForApplication:[OCMArg any]
+                                                               reply:([OCMArg invokeBlock])]);
+  [sut sync];
+
+  NSArray* rules = @[
+    [[SNTRule alloc] initWithIdentifier:@"ABCDE12345:com.example.seatbeltapp"
+                                  state:SNTRuleStateSeatbelt
+                                   type:SNTRuleTypeSigningID
+                              customMsg:nil
+                              customURL:nil
+                                celExpr:nil
+                         seatbeltPolicy:@"(version 1)(deny default)"
                                  ruleId:0],
   ];
 

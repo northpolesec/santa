@@ -10,7 +10,7 @@ monitor and control network traffic. It provides two capabilities: a content
 filter for monitoring network flows and a DNS proxy for intercepting DNS queries.
 :::info
 
-The network extension requires a [Workshop](https://northpole.dev/) subscription
+The network extension requires a [Workshop](https://northpole.security/) subscription
 and will not activate without one.
 
 :::

@@ -320,7 +320,15 @@ SNTRule* RuleFromProtoRule(const typename santa::ProtoTraits<IsV2>::RuleT& rule)
     case Traits::SILENT_BLOCKLIST: state = SNTRuleStateSilentBlock; break;
     case Traits::REMOVE: state = SNTRuleStateRemove; break;
     case Traits::CEL: state = (IsV2) ? SNTRuleStateCELv2 : SNTRuleStateCEL; break;
-    default: LOGE(@"Failed to process rule with unknown policy: %d", rule.policy()); return nil;
+    default:
+      if constexpr (IsV2) {
+        if (rule.policy() == Traits::SEATBELT) {
+          state = SNTRuleStateSeatbelt;
+          break;
+        }
+      }
+      LOGE(@"Failed to process rule with unknown policy: %d", rule.policy());
+      return nil;
   }
 
   SNTRuleType type;
@@ -343,8 +351,13 @@ SNTRule* RuleFromProtoRule(const typename santa::ProtoTraits<IsV2>::RuleT& rule)
   NSString* celExpr = (!cel_expr.empty()) ? StringToNSString(cel_expr) : nil;
 
   int64_t ruleId = 0;
+  NSString* seatbeltPolicy = nil;
   if constexpr (IsV2) {
     ruleId = rule.rule_id();
+    const std::string& sb_policy = rule.seatbelt_policy();
+    if (!sb_policy.empty()) {
+      seatbeltPolicy = StringToNSString(sb_policy);
+    }
   }
   return [[SNTRule alloc] initWithIdentifier:identifier
                                        state:state
@@ -352,6 +365,7 @@ SNTRule* RuleFromProtoRule(const typename santa::ProtoTraits<IsV2>::RuleT& rule)
                                    customMsg:customMsg
                                    customURL:customURL
                                      celExpr:celExpr
+                              seatbeltPolicy:seatbeltPolicy
                                       ruleId:ruleId];
 }
 

@@ -62,8 +62,25 @@ class VerifyingHasher {
     std::optional<std::array<uint8_t, CC_SHA256_DIGEST_LENGTH>> sha256;
   };
 
+  struct RunOptions {
+    // Skip per-page CodeDirectory verification while still computing the
+    // full-file SHA-256, cdhash, and signing-id/team-id extraction.
+    // Threaded through to VerifyingHasherCore::Options::skip_page_hash;
+    // see Core's documentation for the full contract.
+    bool skip_page_hash = false;
+  };
+
   static Result Run(int fd, cpu_type_t cputype, cpu_subtype_t cpusubtype,
-                    const Expected& expected);
+                    const Expected& expected, const RunOptions& opts);
+  // No-options overload. (We avoid `const RunOptions& opts = {}` directly
+  // on the primary declaration: brace-initializing the nested aggregate as
+  // a default argument inside the enclosing class definition trips the
+  // "default member initializer needed within definition of enclosing
+  // class outside of member functions" rule on clang.)
+  static Result Run(int fd, cpu_type_t cputype, cpu_subtype_t cpusubtype,
+                    const Expected& expected) {
+    return Run(fd, cputype, cpusubtype, expected, RunOptions{});
+  }
 };
 
 }  // namespace santa
