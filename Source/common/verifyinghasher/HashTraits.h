@@ -134,8 +134,11 @@ struct Sha384Traits {
 // Trait constants satisfy PageVerifierT's static_asserts trivially:
 //   kCompareSize (0) <= kSlotStride (0) <= kDigestSize (0).
 // Init/Update/Final are kept (rather than removed) only to model the trait
-// concept symmetrically with the real hash traits; the discarded-statement
-// rule means they're never called.
+// concept symmetrically with the real hash traits. Init is called once
+// unconditionally by PageVerifierT's constructor (no-op body). Update and
+// Final live in the iterative loop, which is the if-constexpr discarded
+// substatement under NoopHashTraits and is not instantiated, so those two
+// are never called.
 struct NoopHashTraits {
   struct Ctx {};
   static constexpr size_t kDigestSize = 0;

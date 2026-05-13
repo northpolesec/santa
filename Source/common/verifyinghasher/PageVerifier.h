@@ -205,8 +205,9 @@ class PageVerifierT {
 
   // Pow2 page-size hints set in the constructor. shift_ == -1 means
   // page_size_ is not a power of two; the bulk-advance falls back to UDIV.
-  // In production, Apple's CodeDirectory always uses pow2 page sizes
-  // (kSecCodeMagicEmbeddedSignature.pageSize == 4096 or 16384).
+  // In production, Apple's CodeDirectory's pageSize field (which the
+  // parser resolves to 1 << pageSize before passing it here) is always
+  // either 4096 or 16384, so the fast path is always taken.
   int8_t page_size_shift_ = -1;
   uint32_t page_size_mask_ = 0;
 

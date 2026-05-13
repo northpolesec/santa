@@ -166,7 +166,8 @@ bool RunOneTraitsBody() {
 // returns true once the full signed region has been streamed, even when
 // the last page is partial (code_len not page-aligned).
 - (void)testNoopBulkAdvanceCompletePartialLastPage {
-  // 123 KiB, page size 4096 -> 30 full pages + one 3072-byte partial page.
+  // 123 KiB total - signed_lo=1024 = 124,928 bytes in signed region.
+  // 124,928 / 4096 = 30 full pages + one 2048-byte partial last page.
   std::vector<uint8_t> bytes(123 * 1024);
   PageVerifierT<NoopHashTraits> pv(/*lo=*/1024, /*hi=*/bytes.size(), /*page=*/4096, /*slots=*/{});
   // Mixed-size chunks straddle page boundaries and exercise the bulk path
