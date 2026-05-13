@@ -14,7 +14,13 @@
 
 #import <Foundation/Foundation.h>
 
+#include <limits.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+
 #import "Source/common/MOLXPCConnection.h"
+#import "Source/common/SNTCommonEnums.h"
 #include "Source/common/SNTLogging.h"
 #import "Source/common/SNTXPCControlInterface.h"
 #import "Source/santactl/SNTCommand.h"
@@ -101,7 +107,36 @@ REGISTER_COMMAND_NAME(@"install")
 }
 
 - (void)installSantaApp {
-  NSString* installFromPath = @"/var/db/santa/migration/Santa.app";
+  NSString* installFromPath = @(kSantaMigrationAppPath);
+
+  struct stat lst;
+  if (lstat(installFromPath.UTF8String, &lst) != 0) {
+    TEE_LOGE(@"Cannot stat staged bundle at %@: %d", installFromPath, errno);
+    exit(EXIT_FAILURE);
+  }
+  if (S_ISLNK(lst.st_mode)) {
+    TEE_LOGE(@"Staged bundle root is a symlink: %@", installFromPath);
+    exit(EXIT_FAILURE);
+  }
+  if (!S_ISDIR(lst.st_mode)) {
+    TEE_LOGE(@"Staged bundle root is not a directory: %@", installFromPath);
+    exit(EXIT_FAILURE);
+  }
+  if (lst.st_uid != 0 || lst.st_gid != 0) {
+    TEE_LOGE(@"Staged bundle not owned by root:wheel: uid=%u gid=%u", lst.st_uid, lst.st_gid);
+    exit(EXIT_FAILURE);
+  }
+
+  char resolved[PATH_MAX];
+  if (realpath(installFromPath.UTF8String, resolved) == NULL) {
+    TEE_LOGE(@"realpath failed for %@: %d", installFromPath, errno);
+    exit(EXIT_FAILURE);
+  }
+  if (strcmp(resolved, kSantaMigrationAppPath) != 0) {
+    TEE_LOGE(@"Staged bundle does not canonicalize to expected path: %s", resolved);
+    exit(EXIT_FAILURE);
+  }
+
   int64_t secondsToWait = 15;
 
   TEE_LOGI(@"Asking daemon to install: %@", installFromPath);

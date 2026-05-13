@@ -245,3 +245,10 @@ static const char* kSantaNetdPath =
     "com.northpolesec.santa.netd.systemextension/Contents/MacOS/com.northpolesec.santa.netd";
 static const char* kSantaAppPath = "/Applications/Santa.app";
 static const char* kSleighPath = "/Applications/Santa.app/Contents/MacOS/sleigh";
+static const char* kSantaAppBackupPath = "/Applications/Santa.app.previous";
+// /private/var is the canonical (realpath-resolved) form of /var on macOS. These
+// constants use the canonical form so the same string can be used both as a
+// filesystem-operation argument and as a comparison target for realpath(3) output.
+static const char* kSantaMigrationAppPath = "/private/var/db/santa/migration/Santa.app";
+static const char* kSantaStagingDir = "/private/var/db/santa/staging";
+static const char* kSantaStagingAppPath = "/private/var/db/santa/staging/Santa.app";
