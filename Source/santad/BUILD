@@ -233,6 +233,7 @@ objc_library(
         ":EntitlementsFilter",
         ":SNTRuleTable",
         "//Source/common:CertificateHelpers",
+        "//Source/common:CodeSigningIdentifierUtils",
         "//Source/common:MOLCertificate",
         "//Source/common:MOLCodesignChecker",
         "//Source/common:MOLXPCConnection",
@@ -398,8 +399,10 @@ objc_library(
         ":SNTPolicyProcessor",
         ":SNTRuleTable",
         ":SNTSyncdQueue",
+        ":SandboxExpectations",
         ":TTYWriter",
         "//Source/common:BranchPrediction",
+        "//Source/common:CodeSigningIdentifierUtils",
         "//Source/common:MOLCodesignChecker",
         "//Source/common:PrefixTree",
         "//Source/common:SNTBlockMessage",
@@ -889,6 +892,47 @@ objc_library(
     ],
 )
 
+objc_library(
+    name = "SandboxExpectations",
+    srcs = ["SandboxExpectations.mm"],
+    hdrs = ["SandboxExpectations.h"],
+    deps = [
+        "//Source/common:AuditUtilities",
+        "//Source/common:SNTSandboxExecRequest",
+        "//Source/common:String",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/synchronization",
+    ],
+)
+
+santa_unit_test(
+    name = "SandboxExpectationsTest",
+    srcs = ["SandboxExpectationsTest.mm"],
+    deps = [
+        ":SandboxExpectations",
+        "//Source/common:AuditUtilities",
+        "//Source/common:SNTSandboxExecRequest",
+    ],
+)
+
+santa_unit_test(
+    name = "SNTDaemonControlControllerTest",
+    srcs = ["SNTDaemonControlControllerTest.mm"],
+    deps = [
+        ":SNTDaemonControlController",
+        ":SNTDatabaseController",
+        ":SNTRuleTable",
+        ":SandboxExpectations",
+        "//Source/common:AuditUtilities",
+        "//Source/common:MOLXPCConnection",
+        "//Source/common:SNTError",
+        "//Source/common:SNTRule",
+        "//Source/common:SNTRuleIdentifiers",
+        "//Source/common:SNTSandboxExecRequest",
+        "@OCMock",
+    ],
+)
+
 santa_unit_test(
     name = "KillingMachineTest",
     srcs = [
@@ -921,6 +965,7 @@ objc_library(
         ":SNTNotificationQueue",
         ":SNTRuleTable",
         ":SNTSyncdQueue",
+        ":SandboxExpectations",
         ":TemporaryMonitorMode",
         "//Source/common:MOLCodesignChecker",
         "//Source/common:MOLXPCConnection",
@@ -937,6 +982,7 @@ objc_library(
         "//Source/common:SNTModeTransition",
         "//Source/common:SNTRule",
         "//Source/common:SNTRuleIdentifiers",
+        "//Source/common:SNTSandboxExecRequest",
         "//Source/common:SNTStoredExecutionEvent",
         "//Source/common:SNTStrengthify",
         "//Source/common:SNTTimer",
@@ -992,6 +1038,7 @@ objc_library(
         ":SNTNotificationQueue",
         ":SNTRuleTable",
         ":SNTSyncdQueue",
+        ":SandboxExpectations",
         ":TTYWriter",
         "//Source/common:MOLXPCConnection",
         "//Source/common:PowerMonitor",
@@ -1034,6 +1081,7 @@ objc_library(
         ":SNTNotificationQueue",
         ":SNTRuleTable",
         ":SNTSyncdQueue",
+        ":SandboxExpectations",
         ":SleighLauncher",
         ":TTYWriter",
         "//Source/common:MOLXPCConnection",
@@ -1481,6 +1529,8 @@ santa_unit_test(
         ":SNTExecutionController",
         ":SNTPolicyProcessor",
         ":SNTRuleTable",
+        ":SandboxExpectations",
+        "//Source/common:AuditUtilities",
         "//Source/common:MOLCertificate",
         "//Source/common:MOLCodesignChecker",
         "//Source/common:SNTCachedDecision",
@@ -1691,6 +1741,7 @@ test_suite(
         ":RateLimiterTest",
         ":SNTApplicationCoreMetricsTest",
         ":SNTCompilerControllerTest",
+        ":SNTDaemonControlControllerTest",
         ":SNTDecisionCacheTest",
         ":SNTEndpointSecurityAuthorizerTest",
         ":SNTEndpointSecurityDataFileAccessAuthorizerTest",
@@ -1705,6 +1756,7 @@ test_suite(
         ":SNTPolicyProcessorTest",
         ":SNTRuleTableTest",
         ":SNTSyncdQueueTest",
+        ":SandboxExpectationsTest",
         ":SantadTest",
         ":TemporaryMonitorModeTest",
         "//Source/common/es:EndpointSecurityClientTest",

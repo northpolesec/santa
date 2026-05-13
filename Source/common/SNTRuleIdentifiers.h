@@ -44,6 +44,12 @@ struct RuleIdentifiers {
 @property(readonly) NSString* certificateSHA256;
 @property(readonly) NSString* teamID;
 
+/// Raw CS_CDHASH_LEN (20) bytes decoded from the hex `cdhash`. Returns nil
+/// if `cdhash` is nil or not a well-formed 40-char hex string. Callers use
+/// this when they need the raw bytes for memcmp-style comparisons without
+/// re-parsing hex on the hot path.
+@property(readonly) NSData* cdhashBytes;
+
 /// Please use `initWithRuleIdentifiers:` or `initWithRuleIdentifiers:andSigningStatus:`
 - (instancetype)init NS_UNAVAILABLE;
 

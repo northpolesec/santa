@@ -196,6 +196,7 @@ struct ProtoTraits<true> {
   static constexpr Policy SILENT_BLOCKLIST = ::santa::sync::v2::SILENT_BLOCKLIST;
   static constexpr Policy REMOVE = ::santa::sync::v2::REMOVE;
   static constexpr Policy CEL = ::santa::sync::v2::CEL;
+  static constexpr Policy SEATBELT = ::santa::sync::v2::SEATBELT;
 
   using RuleType = ::santa::sync::v2::RuleType;
   static constexpr RuleType RULETYPE_UNKNOWN = ::santa::sync::v2::RULETYPE_UNKNOWN;

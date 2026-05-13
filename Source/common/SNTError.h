@@ -60,6 +60,14 @@ typedef NS_ENUM(NSInteger, SNTErrorCode) {
   SNTErrorCodeNetworkExtensionProtocolVersionInvalid = 711,
   SNTErrorCodeNetworkExtensionProtocolVersionBad = 712,
   SNTErrorCodeNetworkExtensionAlreadyConnected = 713,
+
+  // Sandbox errors
+  SNTErrorCodeSandboxInvalidRequest = 810,
+  SNTErrorCodeSandboxRuleNotFound = 811,
+  SNTErrorCodeSandboxRuleNotSeatbelt = 812,
+  SNTErrorCodeSandboxAlreadyPending = 813,
+  SNTErrorCodeSandboxInternal = 814,
+  SNTErrorCodeSandboxCapacityExceeded = 815,
 };
 
 @interface SNTError : NSObject

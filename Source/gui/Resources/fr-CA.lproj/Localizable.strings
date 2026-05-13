@@ -1,6 +1,9 @@
 /* Quebec Canadian French (fr-CA) — complete localization.
    Strings that differ from France French (fr) are marked with [QC]. */
 
+/* Block reason suffix for rules that require a seatbelt sandbox ancestor */
+" (requires running under santactl sandbox)" = " (nécessite une exécution sous santactl sandbox)";
+
 /* Notification message shown when a known app has been unblocked */
 "%@ can now be run" = "%@ peut maintenant être exécuté";
 

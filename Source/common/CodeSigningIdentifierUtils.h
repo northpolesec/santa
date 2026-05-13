@@ -16,10 +16,20 @@
 #define SANTA_COMMON_CODESIGNINGIDENTIFIERUTILS_H
 
 #import <Foundation/Foundation.h>
+#include <Kernel/kern/cs_blobs.h>
 
+#include <cstdint>
 #include <utility>
 
 namespace santa {
+
+// The kernel refuses to load, or kills the process on, any page whose
+// content does not match its CodeDirectory slot hash when CS_VALID is
+// set and CS_HARD or CS_KILL is in effect. Callers use this to decide
+// whether the reported cdhash is a strong binding to executed content.
+static inline bool CdhashStrictlyEnforced(uint32_t csFlags) {
+  return (csFlags & CS_VALID) && (csFlags & (CS_HARD | CS_KILL));
+}
 
 extern const NSUInteger kTeamIDLength;
 extern NSString* const kPlatformTeamID;

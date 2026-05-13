@@ -21,7 +21,8 @@
 #include "Source/common/SantaVnode.h"
 #include "Source/common/faa/WatchItems.h"
 #include "Source/santad/EventProviders/AuthResultCache.h"
-#import "Source/santad/Logs/EndpointSecurity/Logger.h"
+#include "Source/santad/Logs/EndpointSecurity/Logger.h"
+#include "Source/santad/SandboxExpectations.h"
 
 @class SNTNotificationQueue;
 @class SNTSyncdQueue;
@@ -37,6 +38,8 @@
                         netExtensionQueue:(SNTNetworkExtensionQueue*)netExtQueue
                                    logger:(std::shared_ptr<santa::Logger>)logger
                                watchItems:(std::shared_ptr<santa::WatchItems>)watchItems
+                      sandboxExpectations:
+                          (std::shared_ptr<santa::SandboxExpectations>)sandboxExpectations
                           flushCacheBlock:(void (^)(santa::FlushCacheMode,
                                                     santa::FlushCacheReason))flushCacheBlock
                           cacheCountBlock:(NSArray<NSNumber*>* (^)(void))cacheCountBlock

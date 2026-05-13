@@ -39,6 +39,7 @@
 #import "Source/santad/SNTNetworkExtensionQueue.h"
 #import "Source/santad/SNTNotificationQueue.h"
 #import "Source/santad/SNTSyncdQueue.h"
+#include "Source/santad/SandboxExpectations.h"
 #include "Source/santad/TTYWriter.h"
 
 namespace santa {
@@ -63,7 +64,8 @@ class SantadDeps {
       std::shared_ptr<santa::PrefixTree<santa::Unit>> prefix_tree,
       std::shared_ptr<santa::TTYWriter> tty_writer,
       std::shared_ptr<santa::santad::process_tree::ProcessTree> process_tree,
-      std::shared_ptr<santa::EntitlementsFilter> entitlements_filter);
+      std::shared_ptr<santa::EntitlementsFilter> entitlements_filter,
+      std::shared_ptr<santa::SandboxExpectations> sandbox_expectations);
 
   std::shared_ptr<santa::AuthResultCache> AuthResultCache();
   std::shared_ptr<santa::Enricher> Enricher();
@@ -81,6 +83,7 @@ class SantadDeps {
   std::shared_ptr<santa::TTYWriter> TTYWriter();
   std::shared_ptr<santa::santad::process_tree::ProcessTree> ProcessTree();
   std::shared_ptr<santa::EntitlementsFilter> EntitlementsFilter();
+  std::shared_ptr<santa::SandboxExpectations> SandboxExpectations();
 
  private:
   std::shared_ptr<santa::EndpointSecurityAPI> esapi_;
@@ -99,6 +102,7 @@ class SantadDeps {
   std::shared_ptr<santa::TTYWriter> tty_writer_;
   std::shared_ptr<santa::santad::process_tree::ProcessTree> process_tree_;
   std::shared_ptr<santa::EntitlementsFilter> entitlements_filter_;
+  std::shared_ptr<santa::SandboxExpectations> sandbox_expectations_;
 };
 
 }  // namespace santa

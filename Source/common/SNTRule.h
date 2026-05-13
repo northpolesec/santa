@@ -64,6 +64,11 @@
 @property(readonly, copy) NSString* celExpr;
 
 ///
+///  A seatbelt (SBPL) sandbox policy for this rule.
+///
+@property(readonly, copy) NSString* seatbeltPolicy;
+
+///
 ///  Whether this rule is a static rule.
 ///
 @property(readonly) BOOL staticRule;
@@ -84,6 +89,7 @@
                          timestamp:(NSUInteger)timestamp
                            comment:(NSString*)comment
                            celExpr:(NSString*)celExpr
+                    seatbeltPolicy:(NSString*)seatbeltPolicy
                             ruleId:(int64_t)ruleId
                              error:(NSError**)error;
 
@@ -96,6 +102,7 @@
                          customMsg:(NSString*)customMsg
                          customURL:(NSString*)customURL
                            celExpr:(NSString*)celExpr
+                    seatbeltPolicy:(NSString*)seatbeltPolicy
                             ruleId:(int64_t)ruleId;
 
 ///
