@@ -132,7 +132,7 @@ REGISTER_COMMAND_NAME(@"install")
     TEE_LOGE(@"realpath failed for %@: %d", installFromPath, errno);
     exit(EXIT_FAILURE);
   }
-  if (strcmp(resolved, kSantaMigrationAppCanonicalPath) != 0) {
+  if (strcmp(resolved, kSantaMigrationAppPath) != 0) {
     TEE_LOGE(@"Staged bundle does not canonicalize to expected path: %s", resolved);
     exit(EXIT_FAILURE);
   }

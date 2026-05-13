@@ -742,7 +742,7 @@ double watchdogRAMPeak = 0;
 #pragma mark Control Ops
 
 static const char* const kAllowedCanonicalBundlePaths[] = {
-    kSantaStagingAppCanonicalPath,
+    kSantaStagingAppPath,
     kSantaAppPath,
 };
 
