@@ -39,7 +39,7 @@ bool BytesEqual(std::span<const uint8_t> a, std::span<const uint8_t> b) {
 }  // namespace
 
 VerifyingHasher::Result VerifyingHasher::Run(int fd, cpu_type_t cputype, cpu_subtype_t cpusubtype,
-                                             const Expected& exp) {
+                                             const Expected& exp, const RunOptions& opts) {
   Result r{};
 
   struct stat st;
@@ -50,7 +50,9 @@ VerifyingHasher::Result VerifyingHasher::Run(int fd, cpu_type_t cputype, cpu_sub
 
   FdFileReader reader(fd, st.st_size);
   ArchSelector want{cputype, cpusubtype};
-  VerifyingHasherCore core(reader, want);
+  VerifyingHasherCore::Options core_opts;
+  core_opts.skip_page_hash = opts.skip_page_hash;
+  VerifyingHasherCore core(reader, want, core_opts);
 
   auto core_status = core.Run();
 

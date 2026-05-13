@@ -270,7 +270,6 @@ class OverservingMemoryFileReader : public santa::FileReader {
   auto s = v.Run();
   XCTAssertEqual(s, VerifyingHasherCore::Status::kOk, @"Run: %s",
                  std::string(v.LastError()).c_str());
-  XCTAssertTrue(v.PagesMatched());
 
   std::string mine = HexLower(v.FullFileDigest());
   std::string sha = ShasumOf("/usr/bin/yes");
@@ -299,8 +298,8 @@ class OverservingMemoryFileReader : public santa::FileReader {
   VerifyingHasherCore v(r, kHostArch);
   auto s = v.Run();
   XCTAssertEqual(s, VerifyingHasherCore::Status::kPagesMismatched);
-  XCTAssertFalse(v.PagesMatched());
-  XCTAssertGreaterThanOrEqual(v.Mismatches(), 1u);
+  XCTAssertTrue(v.Mismatches().has_value());
+  XCTAssertGreaterThanOrEqual(*v.Mismatches(), 1u);
   XCTAssertGreaterThanOrEqual(v.MismatchedSlots().size(), 1u);
   std::remove(tampered.c_str());
 }
@@ -705,7 +704,6 @@ class OverservingMemoryFileReader : public santa::FileReader {
   VerifyingHasherCore v(r, ArchSelector{cputype, cpusubtype});
   XCTAssertEqual(v.Run(), VerifyingHasherCore::Status::kOk, @"Run: %s",
                  std::string(v.LastError()).c_str());
-  XCTAssertTrue(v.PagesMatched());
   // Picks the strongest CD: SHA-384 wins over SHA-256, SHA-256-TRUNCATED, SHA-1.
   XCTAssertEqual(v.ParsedCD().hash_type, CS_HASHTYPE_SHA384);
 
@@ -723,6 +721,129 @@ class OverservingMemoryFileReader : public santa::FileReader {
 
 - (void)testHwUniversalX86_64 {
   [self checkHwUniversalForArch:CPU_TYPE_X86_64 subtype:CPU_SUBTYPE_X86_64_ALL];
+}
+
+- (void)testPageHashSkippedReflectsOption {
+  auto bytes = Slurp("/usr/bin/yes");
+  XCTAssertFalse(bytes.empty());
+
+  {
+    MemoryFileReader r(bytes);
+    VerifyingHasherCore v(r, kHostArch, VerifyingHasherCore::Options{});
+    XCTAssertFalse(v.PageHashSkipped(), @"default Options should leave skip off");
+  }
+  {
+    MemoryFileReader r(bytes);
+    VerifyingHasherCore v(r, kHostArch, VerifyingHasherCore::Options{.skip_page_hash = true});
+    XCTAssertTrue(v.PageHashSkipped(), @"Options.skip_page_hash should be reflected");
+  }
+}
+
+- (void)testSkipPageHashBypassesTampered {
+  // Mirrors testDetectsTamperOnCopy but with skip_page_hash = true. The
+  // tamper that would normally drive kPagesMismatched is silently absorbed.
+  const char* tmp = std::getenv("TMPDIR");
+  if (!tmp) tmp = "/tmp";
+  std::string tampered = std::string(tmp) + "/yes_skip_bypass_cdverifier";
+  std::string cp = "cp /usr/bin/yes " + tampered;
+  XCTAssertEqual(std::system(cp.c_str()), 0);
+
+  auto bytes = Slurp(tampered.c_str());
+  if (bytes.empty()) {
+    XCTFail(@"Slurp returned empty bytes for %s", tampered.c_str());
+    std::remove(tampered.c_str());
+    return;
+  }
+  bytes[3 * bytes.size() / 4] ^= 0xFF;
+
+  MemoryFileReader r(bytes);
+  VerifyingHasherCore v(r, kHostArch, VerifyingHasherCore::Options{.skip_page_hash = true});
+  auto s = v.Run();
+  XCTAssertEqual(s, VerifyingHasherCore::Status::kOk,
+                 @"skip should bypass page-hash tamper detection; got %s",
+                 std::string(v.LastError()).c_str());
+  XCTAssertTrue(v.PageHashSkipped());
+  XCTAssertFalse(v.Mismatches().has_value(), @"Mismatches() must be nullopt under skip");
+  XCTAssertEqual(v.MismatchedSlots().size(), 0u);
+  // Digest and cdhash still get populated — the bytes were fully read.
+  XCTAssertEqual(v.FullFileDigest().size(), 32u);
+  XCTAssertEqual(v.CDHash().size(), (size_t)CS_CDHASH_LEN);
+  std::remove(tampered.c_str());
+}
+
+- (void)testSkipPageHashCleanBinaryProducesIdenticalDigests {
+  // skip=true and skip=false must produce byte-equal FullFileDigest and
+  // byte-equal CDHash on a clean binary. Locks in that the skip path
+  // doesn't perturb the shared digest pipeline (full_ctx_ feeds +
+  // ParseCodeSignature).
+  auto bytes = Slurp("/usr/bin/yes");
+  XCTAssertFalse(bytes.empty());
+
+  std::vector<uint8_t> normal_sha;
+  std::vector<uint8_t> normal_cdhash;
+  {
+    MemoryFileReader r(bytes);
+    VerifyingHasherCore v(r, kHostArch);
+    XCTAssertEqual(v.Run(), VerifyingHasherCore::Status::kOk);
+    auto d = v.FullFileDigest();
+    normal_sha.assign(d.begin(), d.end());
+    auto c = v.CDHash();
+    normal_cdhash.assign(c.begin(), c.end());
+  }
+
+  MemoryFileReader r(bytes);
+  VerifyingHasherCore v(r, kHostArch, VerifyingHasherCore::Options{.skip_page_hash = true});
+  XCTAssertEqual(v.Run(), VerifyingHasherCore::Status::kOk);
+  auto skip_sha = v.FullFileDigest();
+  auto skip_cdhash = v.CDHash();
+  XCTAssertEqual(skip_sha.size(), normal_sha.size());
+  XCTAssertEqual(skip_cdhash.size(), normal_cdhash.size());
+  XCTAssertEqual(0, std::memcmp(skip_sha.data(), normal_sha.data(), normal_sha.size()));
+  XCTAssertEqual(0, std::memcmp(skip_cdhash.data(), normal_cdhash.data(), normal_cdhash.size()));
+}
+
+- (void)testSkipPageHashPreservesIoError {
+  // TruncatedMemoryFileReader claims a larger size than data backs.
+  // Phase 1's "n == 0 with cursor_ < total" path classifies as kIoError.
+  // Skip must not paper over phase-1 I/O errors.
+  auto bytes = Slurp("/usr/bin/yes");
+  XCTAssertFalse(bytes.empty());
+  const off_t real_size = static_cast<off_t>(bytes.size());
+
+  TruncatedMemoryFileReader r(std::move(bytes), real_size + 1024 * 1024);
+  VerifyingHasherCore v(r, kHostArch, VerifyingHasherCore::Options{.skip_page_hash = true});
+  auto s = v.Run();
+  XCTAssertEqual(s, VerifyingHasherCore::Status::kIoError);
+  XCTAssertTrue(v.PageHashSkipped());
+  XCTAssertFalse(v.Mismatches().has_value());
+  // Spec contract: digest is empty on kIoError (the only status without a
+  // populated digest).
+  XCTAssertTrue(v.FullFileDigest().empty());
+}
+
+- (void)testSkipPageHashPreservesPhaseOneError {
+  // /etc/hosts is not a Mach-O. Skip option must not bypass phase-1 errors.
+  auto bytes = Slurp("/etc/hosts");
+  MemoryFileReader r(bytes);
+  VerifyingHasherCore v(r, kHostArch, VerifyingHasherCore::Options{.skip_page_hash = true});
+  auto s = v.Run();
+  XCTAssertEqual(s, VerifyingHasherCore::Status::kNotMachO);
+  XCTAssertTrue(v.PageHashSkipped());
+  // Digest is still finalized on non-IoError failure
+  // (FinalizeDigestDrainingToEof).
+  XCTAssertEqual(v.FullFileDigest().size(), 32u);
+}
+
+- (void)testPageHashSkippedReflectsIntentEvenOnPhaseOneError {
+  // PageHashSkipped() returns Options.skip_page_hash unconditionally —
+  // true even when Run() never reaches the streaming phases.
+  auto bytes = Slurp("/etc/hosts");
+  MemoryFileReader r(bytes);
+  VerifyingHasherCore v(r, kHostArch, VerifyingHasherCore::Options{.skip_page_hash = true});
+  XCTAssertTrue(v.PageHashSkipped(), @"PageHashSkipped() should reflect Options pre-Run()");
+  (void)v.Run();
+  XCTAssertTrue(v.PageHashSkipped(), @"PageHashSkipped() should still reflect Options post-Run()");
+  XCTAssertFalse(v.Mismatches().has_value());
 }
 
 @end
