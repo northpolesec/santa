@@ -2293,6 +2293,7 @@ static SNTConfigurator* sharedConfigurator = nil;
     return;
   }
 
+#ifdef DEBUG
   NSDictionary* overrides = [NSDictionary dictionaryWithContentsOfFile:kConfigOverrideFilePath];
   for (NSString* key in overrides) {
     id obj = overrides[key];
@@ -2309,6 +2310,7 @@ static SNTConfigurator* sharedConfigurator = nil;
       forcedConfig[key] = [self expressionForPattern:pattern];
     }
   }
+#endif
 }
 
 - (id)overriderValue:(id)value forKey:(NSString*)key {

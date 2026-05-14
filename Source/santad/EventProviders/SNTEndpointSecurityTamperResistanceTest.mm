@@ -864,4 +864,19 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
   XCTAssertFalse([SNTEndpointSecurityTamperResistance isProtectedPath:"/not/a/db/path"]);
 }
 
+- (void)testStagingDirectoryIsProtected {
+  // /staging itself and any path beneath it must match the kPrefix entry.
+  XCTAssertTrue(
+      [SNTEndpointSecurityTamperResistance isProtectedPath:"/private/var/db/santa/staging"]);
+  XCTAssertTrue([SNTEndpointSecurityTamperResistance
+      isProtectedPath:"/private/var/db/santa/staging/Santa.app"]);
+  XCTAssertTrue([SNTEndpointSecurityTamperResistance
+      isProtectedPath:"/private/var/db/santa/staging/Santa.app/Contents/MacOS/Santa"]);
+  // /migration is intentionally NOT protected in v2.
+  XCTAssertFalse(
+      [SNTEndpointSecurityTamperResistance isProtectedPath:"/private/var/db/santa/migration"]);
+  XCTAssertFalse([SNTEndpointSecurityTamperResistance
+      isProtectedPath:"/private/var/db/santa/migration/Santa.app"]);
+}
+
 @end

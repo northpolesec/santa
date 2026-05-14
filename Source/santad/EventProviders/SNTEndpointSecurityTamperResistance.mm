@@ -57,6 +57,7 @@ constexpr std::pair<std::string_view, WatchItemPathType> kProtectedFiles[] = {
     {"/Applications/Santa.app", WatchItemPathType::kPrefix},
     {"/Library/LaunchAgents/com.northpolesec.santa.", WatchItemPathType::kPrefix},
     {"/Library/LaunchDaemons/com.northpolesec.santa.", WatchItemPathType::kPrefix},
+    {"/private/var/db/santa/staging", WatchItemPathType::kPrefix},
 };
 
 #if HAVE_MACOS_15_5
