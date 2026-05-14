@@ -240,16 +240,29 @@ REGISTER_COMMAND_NAME(@"sandbox")
   }
   argv[argc] = nullptr;
 
-  NSString* cwd = [NSFileManager defaultManager].currentDirectoryPath ?: @"";
-  const char* params[] = {
-      "CWD", cwd.fileSystemRepresentation, "HOME", getenv("HOME") ?: "",
-      "TMP", getenv("TMPDIR") ?: "",       NULL,
-  };
+  // Only pass parameters whose values are actually defined; substituting empty
+  // strings for unset env vars would silently alter profile semantics (e.g. a
+  // path like (param "HOME") becoming "").  sandbox_init_with_parameters will
+  // surface a clear error if the profile references an undefined parameter.
+  std::vector<const char*> params;
+  if (NSString* cwd = [NSFileManager defaultManager].currentDirectoryPath) {
+    params.push_back("CWD");
+    params.push_back(cwd.fileSystemRepresentation);
+  }
+  if (const char* home = getenv("HOME")) {
+    params.push_back("HOME");
+    params.push_back(home);
+  }
+  if (const char* tmp = getenv("TMPDIR")) {
+    params.push_back("TMP");
+    params.push_back(tmp);
+  }
+  params.push_back(nullptr);
 
   char* errorbuf = NULL;
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-  if (sandbox_init_with_parameters(policyCStr, 0, params, &errorbuf) != 0) {
+  if (sandbox_init_with_parameters(policyCStr, 0, params.data(), &errorbuf) != 0) {
     fprintf(stderr, "sandbox_init failed: %s\n", errorbuf ? errorbuf : "unknown error");
     sandbox_free_error(errorbuf);
     exit(EXIT_FAILURE);
