@@ -105,6 +105,7 @@ objc_library(
     srcs = ["VerifyingHasher.mm"],
     deps = [
         "//Source/common/verifyinghasher:FileReader",
+        "//Source/common/verifyinghasher:VerifyingHasher",
         "//Source/common/verifyinghasher:VerifyingHasherCore",
     ],
 )
