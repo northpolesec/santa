@@ -149,15 +149,17 @@ uint64_t TemporaryMonitorMode::GetSecondsRemainingFromInitialStateLocked(
 }
 
 void TemporaryMonitorMode::NewModeTransitionReceived(SNTModeTransition* mode_transition) {
+  // Persistence of the received mode_transition is the caller's responsibility
+  // (the daemon controller writes it inside a sync-state batch so that all
+  // sync-derived state lands in a single commit). This method handles
+  // enforcement side effects for Revoke and the GUI availability notification,
+  // both of which must run regardless of how persistence was sequenced.
   if (mode_transition.type == SNTModeTransitionTypeRevoke) {
     if (Revoke(SNTTemporaryMonitorModeLeaveReasonRevoked)) {
       LOGI(@"Temporary Monitor Mode session revoked due to policy change.");
     }
-  } else {
-    [configurator_ setSyncServerModeTransition:mode_transition];
   }
 
-  // Notify the GUI about policy availability
   [[notification_queue_.notifierConnection remoteObjectProxy]
       temporaryMonitorModePolicyAvailable:Available(nil)];
 }
@@ -287,7 +289,14 @@ bool TemporaryMonitorMode::Revoke(SNTTemporaryMonitorModeLeaveReason reason) {
 }
 
 bool TemporaryMonitorMode::RevokeLocked(SNTTemporaryMonitorModeLeaveReason reason) {
-  [configurator_ setSyncServerModeTransition:[[SNTModeTransition alloc] initRevocation]];
+  // Skip the persistence write if the current effective transition is already
+  // a revoke. On the sync-update path the daemon controller writes the revoke
+  // inside its batch, so this would otherwise produce a second `syncState`
+  // KVO fire. On all other Revoke entry points (sync URL change, etc.) the
+  // current transition will not be a revoke and this writes as before.
+  if ([configurator_ modeTransition].type != SNTModeTransitionTypeRevoke) {
+    [configurator_ setSyncServerModeTransition:[[SNTModeTransition alloc] initRevocation]];
+  }
   if (EndLocked()) {
     handle_audit_event_block_([[SNTStoredTemporaryMonitorModeLeaveAuditEvent alloc]
         initWithUUID:[current_uuid_ UUIDString]

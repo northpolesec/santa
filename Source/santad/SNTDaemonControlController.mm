@@ -485,11 +485,19 @@ double watchdogRAMPeak = 0;
   // and rules-newly-added cases.
   NSData* oldCELData = [SNTCELFallbackRule serializeArray:[configurator celFallbackRules]];
 
-  [configurator performSyncStateBatch:^{
+  BOOL committed = [configurator performSyncStateBatch:^{
     [result clearSyncStateBeforeApply:^(BOOL clear) {
       if (clear) {
         [configurator clearSyncState];
       }
+    }];
+
+    // Persist the mode transition inside the batch so it commits atomically
+    // with the rest of sync-derived state. TMM's enforcement side effects
+    // (Revoke + GUI notify) run after the batch via NewModeTransitionReceived
+    // so that `Available(nil)` reads consistent post-commit state.
+    [result modeTransition:^(SNTModeTransition* val) {
+      [configurator setSyncServerModeTransition:val];
     }];
 
     [result clientMode:^(SNTClientMode m) {
@@ -616,19 +624,20 @@ double watchdogRAMPeak = 0;
     }];
   }];
 
-  // Mode-transition handler runs post-commit so the GUI notification its
-  // internal Available(nil) computes reads from the just-committed state
-  // rather than from the batch's pre-commit snapshot. TMM's combined
-  // persistence-and-side-effects contract stays as-is — accommodated by
-  // call ordering rather than refactored.
+  // Mode-transition enforcement and GUI notification run after the batch so
+  // Available(nil) reads from the just-committed state. Bundle accessors are
+  // pure synchronous reads (see SNTConfigBundle.mm), so re-invoking the same
+  // callback shape is safe and short-circuits when the bundle carries no
+  // modeTransition.
   [result modeTransition:^(SNTModeTransition* val) {
-    // The _temporaryMonitorMode object is responsible for updating configurator as appropriate
     _temporaryMonitorMode->NewModeTransitionReceived(val);
   }];
 
-  NSData* newCELData = [SNTCELFallbackRule serializeArray:[configurator celFallbackRules]];
-  if (![oldCELData isEqualToData:newCELData] && self.flushCacheBlock) {
-    self.flushCacheBlock(FlushCacheMode::kAllCaches, FlushCacheReason::kCELFallbackRulesChanged);
+  if (committed) {
+    NSData* newCELData = [SNTCELFallbackRule serializeArray:[configurator celFallbackRules]];
+    if (![oldCELData isEqualToData:newCELData] && self.flushCacheBlock) {
+      self.flushCacheBlock(FlushCacheMode::kAllCaches, FlushCacheReason::kCELFallbackRulesChanged);
+    }
   }
 
   reply();
