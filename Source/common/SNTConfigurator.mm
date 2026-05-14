@@ -1983,7 +1983,8 @@ static SNTConfigurator* sharedConfigurator = nil;
   }
 }
 
-- (void)performSyncStateBatch:(void(NS_NOESCAPE ^)(void))block {
+- (BOOL)performSyncStateBatch:(void(NS_NOESCAPE ^)(void))block {
+  __block BOOL committed = NO;
   void (^run)(void) = ^{
     if (self.batchedSyncState != nil) {
       NSAssert(NO, @"Sync-state batches do not nest");
@@ -1991,19 +1992,17 @@ static SNTConfigurator* sharedConfigurator = nil;
       return;
     }
     self.batchedSyncState = self.syncState.mutableCopy;
-    @try {
-      block();
-      self.syncState = self.batchedSyncState;
-      [self saveSyncStateToDisk];
-    } @finally {
-      self.batchedSyncState = nil;
-    }
+    block();
+    self.syncState = self.batchedSyncState;
+    self.batchedSyncState = nil;
+    committed = [self saveSyncStateToDisk];
   };
   if ([NSThread isMainThread]) {
     run();
   } else {
     dispatch_sync(dispatch_get_main_queue(), run);
   }
+  return committed;
 }
 
 ///
@@ -2075,27 +2074,35 @@ static SNTConfigurator* sharedConfigurator = nil;
 }
 
 ///
-///  Saves the current effective syncState to disk.
+///  Saves the current effective syncState to disk. Returns YES if the write
+///  succeeded; NO if the authorizer denied the operation or the underlying
+///  file write failed.
 ///
-- (void)saveSyncStateToDisk {
+- (BOOL)saveSyncStateToDisk {
   if (!self.syncStateAccessAuthorizerBlock()) {
-    return;
+    return NO;
   }
 
   NSMutableDictionary* syncState = self.syncState.mutableCopy;
   syncState[kAllowedPathRegexKey] = [syncState[kAllowedPathRegexKey] pattern];
   syncState[kBlockedPathRegexKey] = [syncState[kBlockedPathRegexKey] pattern];
-  [syncState writeToFile:self.syncStateFilePath atomically:YES];
+  if (![syncState writeToFile:self.syncStateFilePath atomically:YES]) {
+    LOGE(@"Failed to write sync state to %@", self.syncStateFilePath);
+    return NO;
+  }
   [[NSFileManager defaultManager] setAttributes:@{NSFilePosixPermissions : @0600}
                                    ofItemAtPath:self.syncStateFilePath
                                           error:NULL];
+  return YES;
 }
 
 - (void)clearSyncState {
+  // Intentionally not gated on `syncStateAccessAuthorizerBlock`: the authorizer
+  // requires `syncBaseURL != nil`, but the SNTSyncdQueue caller invokes this
+  // method precisely *because* `syncBaseURL` went to nil. Gating here would
+  // make the cleanup unreachable in production. Disk removal still requires
+  // root, which santad already has.
   void (^block)(void) = ^{
-    if (!self.syncStateAccessAuthorizerBlock()) {
-      return;
-    }
     if (self.batchedSyncState) {
       [self.batchedSyncState removeAllObjects];
       return;
