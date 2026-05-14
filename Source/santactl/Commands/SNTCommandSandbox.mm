@@ -21,6 +21,11 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+// Not declared in the public <sandbox.h> but exported by libSystem.
+// Profile authors reference parameters as (param "NAME").
+extern "C" int sandbox_init_with_parameters(const char* profile, uint64_t flags,
+                                            const char* const parameters[], char** errorbuf);
+
 #include <atomic>
 #include <memory>
 #include <vector>
@@ -235,10 +240,16 @@ REGISTER_COMMAND_NAME(@"sandbox")
   }
   argv[argc] = nullptr;
 
+  NSString* cwd = [NSFileManager defaultManager].currentDirectoryPath ?: @"";
+  const char* params[] = {
+      "CWD", cwd.fileSystemRepresentation, "HOME", getenv("HOME") ?: "",
+      "TMP", getenv("TMPDIR") ?: "",       NULL,
+  };
+
   char* errorbuf = NULL;
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-  if (sandbox_init(policyCStr, 0, &errorbuf) != 0) {
+  if (sandbox_init_with_parameters(policyCStr, 0, params, &errorbuf) != 0) {
     fprintf(stderr, "sandbox_init failed: %s\n", errorbuf ? errorbuf : "unknown error");
     sandbox_free_error(errorbuf);
     exit(EXIT_FAILURE);
