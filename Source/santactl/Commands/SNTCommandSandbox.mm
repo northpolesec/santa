@@ -16,6 +16,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <pwd.h>
 #include <sandbox.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -249,14 +250,25 @@ REGISTER_COMMAND_NAME(@"sandbox")
     params.push_back("CWD");
     params.push_back(cwd.fileSystemRepresentation);
   }
-  if (const char* home = getenv("HOME")) {
+  // Look up HOME from the password database rather than $HOME so the placeholder
+  // resolves to the calling uid's canonical home (e.g. /var/root under sudo)
+  // instead of whatever the shell happened to inherit.
+  if (struct passwd* pw = getpwuid(getuid()); pw && pw->pw_dir) {
     params.push_back("HOME");
-    params.push_back(home);
+    params.push_back(pw->pw_dir);
   }
-  if (const char* tmp = getenv("TMPDIR")) {
-    params.push_back("TMP");
-    params.push_back(tmp);
+  // Read the per-user darwin temp dir directly rather than $TMPDIR so the
+  // placeholder is consistent under sudo / inherited environments.
+  char tmpdirBuf[PATH_MAX];
+  size_t tmpdirLen = confstr(_CS_DARWIN_USER_TEMP_DIR, tmpdirBuf, sizeof(tmpdirBuf));
+  if (tmpdirLen > 0 && tmpdirLen <= sizeof(tmpdirBuf)) {
+    params.push_back("TMPDIR");
+    params.push_back(tmpdirBuf);
   }
+  char uidBuf[16];
+  snprintf(uidBuf, sizeof(uidBuf), "%u", getuid());
+  params.push_back("UID");
+  params.push_back(uidBuf);
   params.push_back(nullptr);
 
   char* errorbuf = NULL;
