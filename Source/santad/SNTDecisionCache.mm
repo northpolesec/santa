@@ -17,9 +17,11 @@
 
 #include <dispatch/dispatch.h>
 #include <libproc.h>
+#include <os/lock.h>
 #include <sys/param.h>
 #include <sys/qos.h>
 
+#include <cassert>
 #include <optional>
 
 #include "Source/common/AuditUtilities.h"
@@ -37,16 +39,35 @@
 #include "Source/common/SystemResources.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
 #import "Source/santad/SNTDatabaseController.h"
+#include "absl/container/flat_hash_set.h"
 
 @interface SNTDecisionCache ()
 // Cache for sha256 -> date of last timestamp reset.
 @property NSCache<NSString*, NSDate*>* timestampResetMap;
-@property dispatch_queue_t backfillQ;
+@property dispatch_queue_t cachePopulateQ;
 @end
 
 @implementation SNTDecisionCache {
   SantaCache<SantaVnode, SNTCachedDecision*> _decisionCache;
+  absl::flat_hash_set<SantaVnode> _pendingRehydrates;
+  os_unfair_lock _pendingLock;
+  std::shared_ptr<santa::EntitlementsFilter> _entitlementsFilter;
 }
+
+- (void)setEntitlementsFilter:(std::shared_ptr<santa::EntitlementsFilter>)filter {
+  // Programming error to set twice: the filter is not safe to swap at runtime.
+  // Reads on other threads are unsynchronized and rely on this set-once
+  // invariant plus the happens-before edges established at daemon init. Tests
+  // that need to restore singleton state use -resetEntitlementsFilterForTesting.
+  assert(!_entitlementsFilter);
+  _entitlementsFilter = std::move(filter);
+}
+
+#ifdef DEBUG
+- (void)resetEntitlementsFilterForTesting {
+  _entitlementsFilter.reset();
+}
+#endif
 
 + (instancetype)sharedCache {
   static SNTDecisionCache* cache;
@@ -63,11 +84,16 @@
     _timestampResetMap = [[NSCache alloc] init];
     _timestampResetMap.countLimit = 100;
 
-    // NB: On an active system, with ~1K processes, there is an almost 4x second
-    // delta in time to complete the backfill between UTILITY and BACKGROUND QoS.
-    // Using UTILITY QoS here to balance CPU and completion time.
-    _backfillQ = dispatch_queue_create("com.northpolesec.santa.backfillq", DISPATCH_QUEUE_SERIAL);
-    dispatch_set_target_queue(_backfillQ, dispatch_get_global_queue(QOS_CLASS_UTILITY, 0));
+    // Single serial queue shared by the one-shot startup backfill and the
+    // on-demand FAA rehydrate path. NB: On an active system, with ~1K
+    // processes, there is an almost 4x second delta in time to complete the
+    // backfill between UTILITY and BACKGROUND QoS. Using UTILITY QoS here to
+    // balance CPU and completion time.
+    _cachePopulateQ = dispatch_queue_create_with_target(
+        "com.northpolesec.santa.cache-populate-q", DISPATCH_QUEUE_SERIAL,
+        dispatch_get_global_queue(QOS_CLASS_UTILITY, 0));
+
+    _pendingLock = OS_UNFAIR_LOCK_INIT;
   }
   return self;
 }
@@ -113,19 +139,121 @@
   return cd;
 }
 
+- (nullable SNTCachedDecision*)buildDecisionForFileInfo:(SNTFileInfo*)fi {
+  if (!fi || !fi.SHA256) {
+    return nil;
+  }
+
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] initWithVnode:fi.vnode];
+
+  cd.decision = SNTEventStateUnknown;
+  cd.decisionClientMode = SNTClientModeUnknown;
+  cd.cacheable = NO;
+  cd.holdAndAsk = NO;
+  cd.sha256 = fi.SHA256;
+
+  NSError* err;
+  MOLCodesignChecker* csc = [fi codesignCheckerWithError:&err];
+  if (csc && !err) {
+    cd.certSHA256 = csc.leafCertificate.SHA256;
+    cd.certCommonName = csc.leafCertificate.commonName;
+    cd.certChain = csc.certificates;
+
+    cd.teamID = csc.teamID;
+    cd.signingID = FormatSigningID(csc);
+
+    // Ensure that if no teamID exists but a signingID does exist, that the binary
+    // is a platform binary. If not, remove the signingID.
+    if (!cd.teamID && cd.signingID) {
+      if (!csc.platformBinary) {
+        cd.signingID = nil;
+      }
+    }
+
+    cd.cdhash = csc.cdhash;
+
+    cd.rawEntitlements = csc.entitlements;
+    // In production the filter is set during daemon init via
+    // [SNTDecisionCache setEntitlementsFilter:] before any rehydrate or
+    // backfill caller can run. The guard protects unit tests and any
+    // future caller that hasn't completed the setup.
+    if (_entitlementsFilter) {
+      cd.entitlements = _entitlementsFilter->Filter(
+          csc.platformBinary ? santa::kPlatformTeamID.UTF8String : csc.teamID.UTF8String,
+          csc.entitlements);
+      cd.entitlementsFiltered = (cd.entitlements.count != csc.entitlements.count);
+    }
+
+    // NB: These are static flags, not runtime flags
+    cd.codesigningFlags = csc.signatureFlags;
+    cd.secureSigningTime = csc.secureSigningTime;
+    cd.signingTime = csc.signingTime;
+  }
+
+  return cd;
+}
+
+- (nullable SNTCachedDecision*)rehydrateAndCacheDecisionForFileInfo:(SNTFileInfo*)fi {
+  SNTCachedDecision* cd = [self buildDecisionForFileInfo:fi];
+  if (!cd) return nil;
+  if ([self cacheDecisionIfNotSet:cd]) return cd;
+  // Lost the race; another caller's cd is the canonical one. Re-read so
+  // callers always observe what's in the cache.
+  return [self cachedDecisionForVnode:fi.vnode];
+}
+
+- (void)asyncRehydrateAndCacheDecisionForFileInfo:(SNTFileInfo*)fi {
+  if (!fi) return;
+
+  SantaVnode v = fi.vnode;
+
+  os_unfair_lock_lock(&_pendingLock);
+  bool inserted = _pendingRehydrates.insert(v).second;
+  os_unfair_lock_unlock(&_pendingLock);
+  if (!inserted) return;
+
+  dispatch_async(self.cachePopulateQ, ^{
+    SNTCachedDecision* cd = [self buildDecisionForFileInfo:fi];
+    if (cd) {
+      [self cacheDecisionIfNotSet:cd];
+    }
+
+    // Unconditional erase — no negative caching. If the build failed (e.g.,
+    // transient I/O, file gone), the next event for this vnode is allowed to
+    // retry. Permanent failures (non-regular file, etc.) simply re-enqueue
+    // on each event; the cost is bounded by the cache-populate queue's
+    // serial execution.
+    os_unfair_lock_lock(&self->_pendingLock);
+    self->_pendingRehydrates.erase(v);
+    os_unfair_lock_unlock(&self->_pendingLock);
+  });
+}
+
+#ifdef DEBUG
+- (void)waitForCachePopulateQueueForTesting {
+  dispatch_sync(self.cachePopulateQ, ^{
+                });
+}
+
+- (NSUInteger)pendingRehydrateCountForTesting {
+  os_unfair_lock_lock(&_pendingLock);
+  NSUInteger n = _pendingRehydrates.size();
+  os_unfair_lock_unlock(&_pendingLock);
+  return n;
+}
+#endif
+
 // Backfill the decision cache with pseudo SNTCachedDecision entries. This is done
 // by getting a snapshot of PIDs and populating as much information as possible.
 // IMPORTANT: Because the processes were not actually evaluated, some bits of
 // information are left in an "unknown" state, such as the client mode and decision.
-- (void)backfillDecisionCacheAsyncWithEntitlementsFilter:
-    (std::shared_ptr<santa::EntitlementsFilter>)entitlementsFilter {
-  dispatch_async(self.backfillQ, ^{
-    [self backfillDecisionCacheWithEntitlementsFilterSerialized:entitlementsFilter];
+- (void)backfillDecisionCacheAsync {
+  dispatch_async(self.cachePopulateQ, ^{
+    [self backfillDecisionCacheSerialized];
   });
 }
 
-- (void)backfillDecisionCacheWithEntitlementsFilterSerialized:
-    (std::shared_ptr<santa::EntitlementsFilter>)entitlementsFilter {
+- (void)backfillDecisionCacheSerialized {
   std::optional<std::vector<pid_t>> pids = GetPidList();
   if (!pids) {
     LOGW(@"Unable to backfill data for running processes");
@@ -153,54 +281,18 @@
     }
 
     if ([self cachedDecisionForVnode:fi.vnode]) {
-      // Already in the cache, move along
       already_cached++;
       continue;
     }
 
-    SNTCachedDecision* cd = [[SNTCachedDecision alloc] initWithVnode:fi.vnode];
-
-    cd.decision = SNTEventStateUnknown;
-    cd.decisionClientMode = SNTClientModeUnknown;
-    cd.cacheable = NO;
-    cd.holdAndAsk = NO;
-
-    cd.sha256 = fi.SHA256;
-
-    NSError* err;
-    MOLCodesignChecker* csc = [fi codesignCheckerWithError:&err];
-    if (csc && !err) {
-      cd.certSHA256 = csc.leafCertificate.SHA256;
-      cd.certCommonName = csc.leafCertificate.commonName;
-      cd.certChain = csc.certificates;
-
-      cd.teamID = csc.teamID;
-      cd.signingID = FormatSigningID(csc);
-
-      // Ensure that if no teamID exists but a signingID does exist, that the binary
-      // is a platform binary. If not, remove the signingID.
-      if (!cd.teamID && cd.signingID) {
-        if (!csc.platformBinary) {
-          cd.signingID = nil;
-        }
-      }
-
-      cd.cdhash = csc.cdhash;
-
-      cd.rawEntitlements = csc.entitlements;
-      cd.entitlements = entitlementsFilter->Filter(
-          csc.platformBinary ? santa::kPlatformTeamID.UTF8String : csc.teamID.UTF8String,
-          csc.entitlements);
-      cd.entitlementsFiltered = (cd.entitlements.count != csc.entitlements.count);
-
-      // NB: These are static flags, not runtime flags
-      cd.codesigningFlags = csc.signatureFlags;
-      cd.secureSigningTime = csc.secureSigningTime;
-      cd.signingTime = csc.signingTime;
+    SNTCachedDecision* cd = [self buildDecisionForFileInfo:fi];
+    if (!cd) {
+      continue;
     }
 
-    // Only add the value to the cache if something else didn't come along
-    // and add it via a normal route.
+    // cacheDecisionIfNotSet: is a first-writer-wins insert; a false return
+    // means another caller already populated this vnode, so it's effectively
+    // already cached.
     if ([self cacheDecisionIfNotSet:cd]) {
       backfilled++;
     } else {

@@ -857,8 +857,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
   // Kickoff pre-populating the decision cache. This is done after the Authorizer ES client
   // is enabled to ensure that there is no gap between getting the list of processes to
   // backill and the authorizer handling new execs.
-  [[SNTDecisionCache sharedCache]
-      backfillDecisionCacheAsyncWithEntitlementsFilter:entitlements_filter];
+  [[SNTDecisionCache sharedCache] backfillDecisionCacheAsync];
 
   // Start monitoring any watched items
   watch_items->StartTimer();
