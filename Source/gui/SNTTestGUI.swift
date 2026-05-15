@@ -142,6 +142,7 @@ struct BinaryView: View {
   @State var teamID: String = "9X9633G7QW"
   @State var path: String = "/Applications/Malware.app/Contents/MacOS"
   @State var parent: String = "launchd"
+  @State var executingUser: String = NSUserName()
 
   @State var unknownBlockMessage: String = ""
   @State var eventDetailURL: String = "http://sync-server-hostname/blockables/%bundle_or_file_identifier%"
@@ -167,6 +168,7 @@ struct BinaryView: View {
           TextField(text: $teamID, label: { Text(verbatim: "TeamID") })
           TextField(text: $path, label: { Text(verbatim: "Path") })
           TextField(text: $parent, label: { Text(verbatim: "Parent") })
+          TextField(text: $executingUser, label: { Text(verbatim: "Executing User") })
         }
       }
 
@@ -262,7 +264,7 @@ struct BinaryView: View {
         event.parentName = parent
         event.pid = 12345
         event.ppid = 2511
-        event.executingUser = NSUserName()
+        event.executingUser = executingUser
 
         switch dateOverride {
         case .Apr1: Date.overrideDate = Date(timeIntervalSince1970: 1711980915)
