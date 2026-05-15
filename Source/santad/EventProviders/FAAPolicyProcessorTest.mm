@@ -26,6 +26,7 @@
 #import "Source/common/MOLCertificate.h"
 #import "Source/common/MOLCodesignChecker.h"
 #import "Source/common/SNTCachedDecision.h"
+#import "Source/common/SNTFileInfo.h"
 #include "Source/common/TestUtils.h"
 #include "Source/common/es/Message.h"
 #include "Source/common/es/MockEndpointSecurityAPI.h"
@@ -79,7 +80,8 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess& proc) {
 }
 
 - (void)tearDown {
-  [self.dcMock stopMocking];
+  [self.mockConfigurator stopMocking];
+  [self.cscMock stopMocking];
   [self.dcMock stopMocking];
 
   [super tearDown];
@@ -547,6 +549,10 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess& proc) {
 }
 
 - (void)testGetCertificateHash {
+  // Note: MakeStat() produces a non-regular-file mode, so SNTFileInfo init
+  // fails for these fixtures and step 3 (sync/async rehydrate) is bypassed.
+  // This test exercises the decision-cache hit (step 2) and codesign-fallback
+  // (step 4) paths in isolation.
   es_file_t esFile1 = MakeESFile("foo", MakeStat(100));
   es_file_t esFile2 = MakeESFile("foo", MakeStat(200));
   es_file_t esFile3 = MakeESFile("foo", MakeStat(300));
@@ -625,6 +631,35 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess& proc) {
   got = faaPolicyProcessor.GetCertificateHash(&esFile3);
 
   [certMock stopMocking];
+}
+
+- (void)testGetCertificateHashDecisionCacheHitPrimesLocalCache {
+  es_file_t esFile = MakeESFile("foo", MakeStat(100));
+  NSString* certHash = @"deadbeef";
+
+  MockFAAPolicyProcessor faaPolicyProcessor(self.dcMock, nullptr, nullptr, nullptr, nullptr, 0, 0,
+                                            nil, nil);
+
+  EXPECT_CALL(faaPolicyProcessor, GetCertificateHash)
+      .WillRepeatedly([&faaPolicyProcessor](const es_file_t* es_file) {
+        return faaPolicyProcessor.GetCertificateHashWrapper(es_file);
+      });
+
+  // Decision cache returns a cd with certSHA256 already populated.
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+  cd.certSHA256 = certHash;
+  OCMExpect([self.dcMock cachedDecisionForFile:esFile.stat]).ignoringNonObjectArgs().andReturn(cd);
+
+  // MOLCodesignChecker must NOT be allocated — the decision-cache hit
+  // should short-circuit the lookup.
+  OCMReject([self.cscMock initWithBinaryPath:OCMOCK_ANY]);
+
+  XCTAssertEqualObjects(faaPolicyProcessor.GetCertificateHash(&esFile), certHash);
+
+  // Second call should hit cert_hash_cache_ — no second decision-cache lookup
+  // (we did not add another OCMExpect for cachedDecisionForFile:).
+  XCTAssertEqualObjects(faaPolicyProcessor.GetCertificateHash(&esFile), certHash);
+  XCTAssertTrue(OCMVerifyAll(self.dcMock));
 }
 
 - (void)testPolicyMatchesProcess {
@@ -804,6 +839,238 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess& proc) {
     policyProc.team_id = "myvalidtid";
     XCTAssertFalse(faaPolicyProcessor.PolicyMatchesProcess(policyProc, &esProc));
   }
+}
+
+- (void)testProcessTargetAndPolicyTriggersRehydrateOnCacheMiss {
+  es_file_t esFile = MakeESFile("/proc/instigator");
+  esFile.stat = MakeStat();
+  esFile.stat.st_size = 1024;
+  es_process_t esProc = MakeESProcess(&esFile);
+  esProc.codesigning_flags = CS_SIGNED | CS_VALID;
+  // Provide non-null string tokens to avoid null-cstring crashes in StringTokenToNSString.
+  esProc.team_id = MakeESStringToken("");
+  esProc.signing_id = MakeESStringToken("");
+
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_OPEN, &esProc);
+  es_file_t targetFile = MakeESFile("/etc/hosts");
+  esMsg.event.open.file = &targetFile;
+  esMsg.event.open.fflag = FWRITE;
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+  Message msg(mockESApi, &esMsg);
+
+  // Populate path_targets_ so PathTargetAtIndex(0) is valid.
+  std::vector<Message::PathTarget> targets = msg.PathTargets();
+  XCTAssertEqual(targets.size(), 1);
+
+  // Rehydrate produces a known cd.
+  SNTCachedDecision* fakeCd = [[SNTCachedDecision alloc] init];
+  fakeCd.sha256 = @"abc123";
+  OCMExpect([self.dcMock rehydrateAndCacheDecisionForFileInfo:OCMOCK_ANY]).andReturn(fakeCd);
+
+  // Class-mock SNTFileInfo so initWithEndpointSecurityFile:error: returns a
+  // stub with a known fileSize, avoiding any real file I/O. Register the
+  // deswizzle in a teardown block so it runs even if an assertion below bails
+  // mid-test — otherwise the swizzle leaks into subsequent tests.
+  id sntFileInfoMock = OCMClassMock([SNTFileInfo class]);
+  [self addTeardownBlock:^{
+    [sntFileInfoMock stopMocking];
+  }];
+  OCMStub([sntFileInfoMock alloc]).andReturn(sntFileInfoMock);
+  OCMStub([sntFileInfoMock initWithEndpointSecurityFile:(const es_file_t*)[OCMArg anyPointer]
+                                                  error:[OCMArg anyObjectRef]])
+      .andReturn(sntFileInfoMock);
+  OCMStub([sntFileInfoMock fileSize]).andReturn((NSUInteger)1024);
+
+  __block SNTStoredFileAccessEvent* observedEvent;
+  FAAPolicyProcessor::StoreAccessEventBlock storeBlock = ^(SNTStoredFileAccessEvent* event, bool) {
+    observedEvent = event;
+  };
+
+  MockFAAPolicyProcessor faaPolicyProcessor(self.dcMock, nullptr, nullptr, nullptr, nullptr, 0, 0,
+                                            nil, storeBlock);
+
+  // Cache miss: GetCachedDecision returns nil so cd.sha256 is nil, triggering rehydrate.
+  EXPECT_CALL(faaPolicyProcessor, GetCachedDecision).WillOnce(testing::Return(nil));
+
+  // ApplyPolicy returns kAllowedAuditOnly so ShouldLogDecision is true and we
+  // enter the block where GetCachedDecision and rehydrate are called.
+  EXPECT_CALL(faaPolicyProcessor, ApplyPolicy)
+      .WillOnce(testing::Return(FileAccessPolicyDecision::kAllowedAuditOnly));
+
+  auto matcher =
+      ^bool(const santa::WatchItemPolicyBase&, const Message::PathTarget&, const Message&) {
+        return true;
+      };
+  SNTFileAccessDeniedBlock deniedBlock =
+      ^(SNTStoredFileAccessEvent*, NSString*, NSString*, NSString*) {
+      };
+
+  auto policy = std::make_shared<santa::WatchItemPolicyBase>("test-policy", "v1");
+  policy->audit_only = true;
+  FAAPolicyProcessor::TargetPolicyPair pair{0, policy};
+
+  faaPolicyProcessor.ProcessTargetAndPolicyWrapper(msg, pair, matcher, deniedBlock,
+                                                   SNTOverrideFileAccessActionNone);
+
+  XCTAssertNotNil(observedEvent);
+  XCTAssertEqualObjects(observedEvent.process.fileSHA256, @"abc123");
+  XCTAssertTrue(OCMVerifyAll(self.dcMock));
+
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+}
+
+- (void)testProcessTargetAndPolicySkipsRehydrateOnCacheHit {
+  es_file_t esFile = MakeESFile("/proc/instigator");
+  esFile.stat = MakeStat();
+  esFile.stat.st_size = 1024;
+  es_process_t esProc = MakeESProcess(&esFile);
+  esProc.codesigning_flags = CS_SIGNED | CS_VALID;
+  // Provide non-null string tokens to avoid null-cstring crashes in StringTokenToNSString.
+  esProc.team_id = MakeESStringToken("");
+  esProc.signing_id = MakeESStringToken("");
+
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_OPEN, &esProc);
+  es_file_t targetFile = MakeESFile("/etc/hosts");
+  esMsg.event.open.file = &targetFile;
+  esMsg.event.open.fflag = FWRITE;
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+  Message msg(mockESApi, &esMsg);
+
+  // Populate path_targets_ so PathTargetAtIndex(0) is valid.
+  std::vector<Message::PathTarget> targets = msg.PathTargets();
+  XCTAssertEqual(targets.size(), 1);
+
+  // Cache hit: cachedDecisionForFile: returns a cd with sha256 already populated.
+  SNTCachedDecision* existingCd = [[SNTCachedDecision alloc] init];
+  existingCd.sha256 = @"existing-sha256";
+
+  __block SNTStoredFileAccessEvent* observedEvent;
+  FAAPolicyProcessor::StoreAccessEventBlock storeBlock = ^(SNTStoredFileAccessEvent* event, bool) {
+    observedEvent = event;
+  };
+
+  MockFAAPolicyProcessor faaPolicyProcessor(self.dcMock, nullptr, nullptr, nullptr, nullptr, 0, 0,
+                                            nil, storeBlock);
+
+  // Stub GetCachedDecision (the FAA-side wrapper) to return our existing cd.
+  EXPECT_CALL(faaPolicyProcessor, GetCachedDecision(testing::_))
+      .WillOnce(testing::Return(existingCd));
+
+  // ApplyPolicy returns kAllowedAuditOnly so ShouldLogDecision is true.
+  EXPECT_CALL(faaPolicyProcessor, ApplyPolicy)
+      .WillOnce(testing::Return(FileAccessPolicyDecision::kAllowedAuditOnly));
+
+  // Crucial: rehydrateAndCacheDecisionForFileInfo: must NEVER be called on cache hit.
+  // OCMStrictClassMock on self.dcMock ensures any unexpected call fails verification.
+  // We do NOT add an OCMExpect for rehydrateAndCacheDecisionForFileInfo:.
+
+  auto matcher =
+      ^bool(const santa::WatchItemPolicyBase&, const Message::PathTarget&, const Message&) {
+        return true;
+      };
+  SNTFileAccessDeniedBlock deniedBlock =
+      ^(SNTStoredFileAccessEvent*, NSString*, NSString*, NSString*) {
+      };
+
+  auto policy = std::make_shared<santa::WatchItemPolicyBase>("test-policy", "v1");
+  policy->audit_only = true;
+  FAAPolicyProcessor::TargetPolicyPair pair{0, policy};
+
+  faaPolicyProcessor.ProcessTargetAndPolicyWrapper(msg, pair, matcher, deniedBlock,
+                                                   SNTOverrideFileAccessActionNone);
+
+  XCTAssertNotNil(observedEvent);
+  XCTAssertEqualObjects(observedEvent.process.fileSHA256, @"existing-sha256");
+  XCTAssertTrue(OCMVerifyAll(self.dcMock));
+
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+}
+
+// Covers the FAA-side async branch: when the executing binary is larger than
+// kMaxSyncRehydrateBytes we dispatch asyncRehydrateAndCacheDecisionForFileInfo:
+// instead of the sync version, and the current event still emits the
+// "<unknown sha>" placeholder. The sync method isolating this path
+// (testAsyncRehydrateAndCacheDecisionForFileInfo) lives in
+// SNTDecisionCacheTest; this test confirms the FAA wiring picks the right
+// branch.
+- (void)testProcessTargetAndPolicyAsyncRehydrateForLargeBinary {
+  es_file_t esFile = MakeESFile("/proc/instigator");
+  esFile.stat = MakeStat();
+  esFile.stat.st_size = 1024;  // The stat size is irrelevant; SNTFileInfo is stubbed.
+  es_process_t esProc = MakeESProcess(&esFile);
+  esProc.codesigning_flags = CS_SIGNED | CS_VALID;
+  esProc.team_id = MakeESStringToken("");
+  esProc.signing_id = MakeESStringToken("");
+
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_OPEN, &esProc);
+  es_file_t targetFile = MakeESFile("/etc/hosts");
+  esMsg.event.open.file = &targetFile;
+  esMsg.event.open.fflag = FWRITE;
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+  Message msg(mockESApi, &esMsg);
+
+  // Populate path_targets_ so PathTargetAtIndex(0) is valid.
+  std::vector<Message::PathTarget> targets = msg.PathTargets();
+  XCTAssertEqual(targets.size(), 1);
+
+  // Async path must fire; sync path must NOT.
+  OCMExpect([self.dcMock asyncRehydrateAndCacheDecisionForFileInfo:OCMOCK_ANY]);
+  OCMReject([self.dcMock rehydrateAndCacheDecisionForFileInfo:OCMOCK_ANY]);
+
+  // Stub SNTFileInfo with a fileSize > kMaxSyncRehydrateBytes (32 MiB) so the
+  // async branch is taken. Register the deswizzle in a teardown block so it
+  // runs even if an assertion below bails mid-test — otherwise the swizzle
+  // leaks into subsequent tests.
+  id sntFileInfoMock = OCMClassMock([SNTFileInfo class]);
+  [self addTeardownBlock:^{
+    [sntFileInfoMock stopMocking];
+  }];
+  OCMStub([sntFileInfoMock alloc]).andReturn(sntFileInfoMock);
+  OCMStub([sntFileInfoMock initWithEndpointSecurityFile:(const es_file_t*)[OCMArg anyPointer]
+                                                  error:[OCMArg anyObjectRef]])
+      .andReturn(sntFileInfoMock);
+  OCMStub([sntFileInfoMock fileSize]).andReturn((NSUInteger)(64 * 1024 * 1024));
+
+  __block SNTStoredFileAccessEvent* observedEvent;
+  FAAPolicyProcessor::StoreAccessEventBlock storeBlock = ^(SNTStoredFileAccessEvent* event, bool) {
+    observedEvent = event;
+  };
+
+  MockFAAPolicyProcessor faaPolicyProcessor(self.dcMock, nullptr, nullptr, nullptr, nullptr, 0, 0,
+                                            nil, storeBlock);
+
+  EXPECT_CALL(faaPolicyProcessor, GetCachedDecision).WillOnce(testing::Return(nil));
+  EXPECT_CALL(faaPolicyProcessor, ApplyPolicy)
+      .WillOnce(testing::Return(FileAccessPolicyDecision::kAllowedAuditOnly));
+
+  auto matcher =
+      ^bool(const santa::WatchItemPolicyBase&, const Message::PathTarget&, const Message&) {
+        return true;
+      };
+  SNTFileAccessDeniedBlock deniedBlock =
+      ^(SNTStoredFileAccessEvent*, NSString*, NSString*, NSString*) {
+      };
+
+  auto policy = std::make_shared<santa::WatchItemPolicyBase>("test-policy", "v1");
+  policy->audit_only = true;
+  FAAPolicyProcessor::TargetPolicyPair pair{0, policy};
+
+  faaPolicyProcessor.ProcessTargetAndPolicyWrapper(msg, pair, matcher, deniedBlock,
+                                                   SNTOverrideFileAccessActionNone);
+
+  // Event still emits the placeholder for this event; the async rehydrate
+  // only warms the cache for future events.
+  XCTAssertNotNil(observedEvent);
+  XCTAssertEqualObjects(observedEvent.process.fileSHA256, @"<unknown sha>");
+  XCTAssertTrue(OCMVerifyAll(self.dcMock));
+
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
 }
 
 @end
