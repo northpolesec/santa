@@ -52,6 +52,7 @@
 @property NSArray<SNTCELFallbackRule*>* celFallbackRules;
 @property NSNumber* fullSyncInterval;
 @property NSNumber* pushNotificationsFullSyncInterval;
+@property NSNumber* clearSyncStateBeforeApply;
 @end
 
 @implementation SNTConfigBundle
@@ -92,6 +93,7 @@
   ENCODE(coder, celFallbackRules);
   ENCODE(coder, fullSyncInterval);
   ENCODE(coder, pushNotificationsFullSyncInterval);
+  ENCODE(coder, clearSyncStateBeforeApply);
 }
 
 - (instancetype)initWithCoder:(NSCoder*)decoder {
@@ -128,6 +130,7 @@
     DECODE_ARRAY(decoder, celFallbackRules, SNTCELFallbackRule);
     DECODE(decoder, fullSyncInterval, NSNumber);
     DECODE(decoder, pushNotificationsFullSyncInterval, NSNumber);
+    DECODE(decoder, clearSyncStateBeforeApply, NSNumber);
   }
   return self;
 }
@@ -314,6 +317,12 @@
 - (void)pushNotificationsFullSyncInterval:(void (^)(NSUInteger))block {
   if (self.pushNotificationsFullSyncInterval) {
     block([self.pushNotificationsFullSyncInterval unsignedIntegerValue]);
+  }
+}
+
+- (void)clearSyncStateBeforeApply:(void (^)(BOOL))block {
+  if (self.clearSyncStateBeforeApply) {
+    block([self.clearSyncStateBeforeApply boolValue]);
   }
 }
 

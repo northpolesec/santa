@@ -1153,6 +1153,24 @@ extern NSString* _Nonnull const kEnableMenuItemUserOverride;
 - (void)clearSyncState;
 
 ///
+///  Buffer a series of sync-state mutations into a single atomic commit.
+///
+///  Inside the block, calls to `updateSyncStateForKey:value:` and
+///  `clearSyncState` write only to an in-memory working dictionary —
+///  they do not fire KVO and do not write to disk. When the block
+///  returns, the working dictionary is assigned to `syncState` (single
+///  KVO fire) and saved to disk (single `writeToFile:atomically:YES`).
+///
+///  Returns `YES` when both the in-memory commit and the disk write
+///  succeed. Returns `NO` when nested inside another batch (asserts in
+///  debug, logs and skips in release) or when the disk write fails. The
+///  block is not expected to raise exceptions; if one escapes it will
+///  crash the daemon, by design. Callers should gate any post-commit
+///  work that depends on durable state on the return value.
+///
+- (BOOL)performSyncStateBatch:(nonnull void(NS_NOESCAPE ^)(void))block;
+
+///
 ///  Validate the configuration profile.
 ///
 - (nullable NSArray*)validateConfiguration;

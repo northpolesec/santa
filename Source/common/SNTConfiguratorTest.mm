@@ -285,4 +285,172 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
   XCTAssertFalse(sut.allowDelegatedSignals);
 }
 
+#pragma mark - performSyncStateBatch: and clearSyncState tests
+
+- (SNTConfigurator*)configuratorWithEmptySyncStateAtPath:(NSString*)plistPath {
+  return [[SNTConfigurator alloc] initWithSyncStateFile:plistPath
+      stateFile:@"/does/not/need/to/exist"
+      oldStateFile:@"/does/not/need/to/exist"
+      syncStateAccessAuthorizer:^{
+        return YES;
+      }
+      stateAccessAuthorizer:^BOOL {
+        return NO;
+      }];
+}
+
+- (void)observeValueForKeyPath:(NSString*)keyPath
+                      ofObject:(id)object
+                        change:(NSDictionary*)change
+                       context:(void*)context {
+  if (context != NULL) {
+    NSUInteger* count = (NSUInteger*)context;
+    (*count)++;
+  }
+}
+
+- (void)testPerformSyncStateBatchCommitsAsSingleKVOFire {
+  NSString* plistPath = [NSString stringWithFormat:@"%@/batch-kvo.plist", self.testDir];
+  SNTConfigurator* cfg = [self configuratorWithEmptySyncStateAtPath:plistPath];
+
+  __block NSUInteger kvoCount = 0;
+  [cfg addObserver:self
+        forKeyPath:@"syncState"
+           options:NSKeyValueObservingOptionNew
+           context:&kvoCount];
+
+  BOOL committed = [cfg performSyncStateBatch:^{
+    [cfg setSyncServerClientMode:SNTClientModeLockdown];
+    [cfg setEnableBundles:YES];
+    [cfg setEnableTransitiveRules:YES];
+  }];
+
+  [cfg removeObserver:self forKeyPath:@"syncState" context:&kvoCount];
+
+  XCTAssertTrue(committed, @"A successful batch must report committed=YES");
+  XCTAssertEqual(kvoCount, (NSUInteger)1,
+                 @"Expected exactly one KVO fire on syncState across the batch; got %lu",
+                 (unsigned long)kvoCount);
+  XCTAssertEqual(cfg.clientMode, SNTClientModeLockdown);
+  XCTAssertTrue(cfg.enableBundles);
+  XCTAssertTrue(cfg.enableTransitiveRules);
+
+  XCTAssertTrue([self.fileMgr removeItemAtPath:plistPath error:nil]);
+}
+
+- (void)testPerformSyncStateBatchReturnsNoWhenDiskWriteFails {
+  // Pointing the configurator at an unwritable path forces saveSyncStateToDisk
+  // to fail. The in-memory commit still happens (KVO still fires) but the
+  // BOOL return signals that durability was not achieved.
+  NSString* plistPath = @"/this/directory/definitely/does/not/exist/batch.plist";
+  SNTConfigurator* cfg = [self configuratorWithEmptySyncStateAtPath:plistPath];
+
+  __block NSUInteger kvoCount = 0;
+  [cfg addObserver:self
+        forKeyPath:@"syncState"
+           options:NSKeyValueObservingOptionNew
+           context:&kvoCount];
+
+  BOOL committed = [cfg performSyncStateBatch:^{
+    [cfg setSyncServerClientMode:SNTClientModeLockdown];
+  }];
+
+  [cfg removeObserver:self forKeyPath:@"syncState" context:&kvoCount];
+
+  XCTAssertFalse(committed, @"Batch must report committed=NO when the disk write fails");
+  XCTAssertEqual(kvoCount, (NSUInteger)1,
+                 @"In-memory state still commits before the disk write is attempted");
+  XCTAssertEqual(cfg.clientMode, SNTClientModeLockdown);
+}
+
+- (void)testPerformSyncStateBatchWithClearAndWritesPersistsOnlyPostClearWrites {
+  NSString* plistPath = [NSString stringWithFormat:@"%@/batch-clear.plist", self.testDir];
+  SNTConfigurator* cfg = [self configuratorWithEmptySyncStateAtPath:plistPath];
+
+  // Pre-populate stale state via the one-shot path.
+  [cfg setSyncServerClientMode:SNTClientModeLockdown];
+  [cfg setEnableBundles:YES];
+  XCTAssertEqual(cfg.clientMode, SNTClientModeLockdown);
+  XCTAssertTrue(cfg.enableBundles);
+
+  // Inside the batch: clear, then write only one new key.
+  [cfg performSyncStateBatch:^{
+    [cfg clearSyncState];
+    [cfg setSyncServerClientMode:SNTClientModeMonitor];
+  }];
+
+  // ClientMode set to the new value; EnableBundles was cleared and not rewritten.
+  XCTAssertEqual(cfg.clientMode, SNTClientModeMonitor);
+  XCTAssertFalse(cfg.enableBundles, @"EnableBundles should be cleared (default NO) after batch");
+
+  // On disk: matches in-memory state, no stale keys.
+  NSDictionary* onDisk = [NSDictionary dictionaryWithContentsOfFile:plistPath];
+  XCTAssertEqualObjects(onDisk[@"ClientMode"], @(SNTClientModeMonitor));
+  XCTAssertNil(onDisk[@"EnableBundles"], @"Stale EnableBundles key should be absent from disk");
+
+  XCTAssertTrue([self.fileMgr removeItemAtPath:plistPath error:nil]);
+}
+
+- (void)testClearSyncStateRemovesDiskFileWhenOutsideBatch {
+  NSString* plistPath = [NSString stringWithFormat:@"%@/clear-remove.plist", self.testDir];
+  SNTConfigurator* cfg = [self configuratorWithEmptySyncStateAtPath:plistPath];
+
+  // Force a disk write so the file exists.
+  [cfg setSyncServerClientMode:SNTClientModeLockdown];
+  XCTAssertTrue([self.fileMgr fileExistsAtPath:plistPath]);
+
+  [cfg clearSyncState];
+
+  XCTAssertFalse([self.fileMgr fileExistsAtPath:plistPath],
+                 @"clearSyncState must remove sync-state.plist from disk");
+  XCTAssertEqual(cfg.syncState.count, (NSUInteger)0);
+}
+
+- (void)testClearSyncStateIsIdempotentOnMissingFile {
+  NSString* plistPath = [NSString stringWithFormat:@"%@/clear-missing.plist", self.testDir];
+  SNTConfigurator* cfg = [self configuratorWithEmptySyncStateAtPath:plistPath];
+
+  XCTAssertFalse([self.fileMgr fileExistsAtPath:plistPath]);
+
+  // Should be a no-op, no exception, no error.
+  XCTAssertNoThrow([cfg clearSyncState]);
+  XCTAssertFalse([self.fileMgr fileExistsAtPath:plistPath]);
+
+  // A second call is also a no-op.
+  XCTAssertNoThrow([cfg clearSyncState]);
+}
+
+- (void)testClearSyncStateBypassesSyncStateAccessAuthorizer {
+  // The production authorizer requires `syncBaseURL != nil`, but the
+  // SNTSyncdQueue caller invokes clearSyncState precisely when SyncBaseURL
+  // went to nil. Gating cleanup on the authorizer would make this caller a
+  // no-op. Lock the bypass in with a configurator whose authorizer always
+  // denies — clearSyncState must still drop in-memory state and the plist.
+  NSString* plistPath = [NSString stringWithFormat:@"%@/clear-authdenied.plist", self.testDir];
+
+  // Force a state file to exist on disk using a permissive configurator.
+  SNTConfigurator* writer = [self configuratorWithEmptySyncStateAtPath:plistPath];
+  [writer setSyncServerClientMode:SNTClientModeLockdown];
+  XCTAssertTrue([self.fileMgr fileExistsAtPath:plistPath]);
+
+  // Now construct a new configurator over the same path with a denying
+  // authorizer and verify clearSyncState still cleans up.
+  SNTConfigurator* cfg = [[SNTConfigurator alloc] initWithSyncStateFile:plistPath
+      stateFile:@"/does/not/need/to/exist"
+      oldStateFile:@"/does/not/need/to/exist"
+      syncStateAccessAuthorizer:^BOOL {
+        return NO;
+      }
+      stateAccessAuthorizer:^BOOL {
+        return NO;
+      }];
+
+  [cfg clearSyncState];
+
+  XCTAssertEqual(cfg.syncState.count, (NSUInteger)0,
+                 @"clearSyncState must reset in-memory state even when authorizer denies");
+  XCTAssertFalse([self.fileMgr fileExistsAtPath:plistPath],
+                 @"clearSyncState must remove the plist even when authorizer denies");
+}
+
 @end

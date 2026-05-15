@@ -82,6 +82,11 @@ static SNTRemovableMediaAction ActionFromString(NSString* action) {
 @property(atomic) NSMutableDictionary* configState;
 @property(atomic) NSDictionary* state;
 
+/// Working dictionary for an in-progress `performSyncStateBatch:` transaction.
+/// Non-nil only while inside the batch's block. Always accessed on the main
+/// thread, matching the convention enforced by `updateSyncStateForKey:value:`.
+@property(nonatomic) NSMutableDictionary* batchedSyncState;
+
 @property(readonly, nonatomic) NSString* syncStateFilePath;
 @property(readonly, nonatomic) NSString* stateFilePath;
 
@@ -1960,6 +1965,10 @@ static SNTConfigurator* sharedConfigurator = nil;
 ///
 - (void)updateSyncStateForKey:(NSString*)key value:(id)value {
   void (^block)(void) = ^{
+    if (self.batchedSyncState) {
+      self.batchedSyncState[key] = value;
+      return;
+    }
     NSMutableDictionary* syncState = self.syncState.mutableCopy;
     syncState[key] = value;
     self.syncState = syncState;
@@ -1972,6 +1981,28 @@ static SNTConfigurator* sharedConfigurator = nil;
   } else {
     dispatch_sync(dispatch_get_main_queue(), block);
   }
+}
+
+- (BOOL)performSyncStateBatch:(void(NS_NOESCAPE ^)(void))block {
+  __block BOOL committed = NO;
+  void (^run)(void) = ^{
+    if (self.batchedSyncState != nil) {
+      NSAssert(NO, @"Sync-state batches do not nest");
+      LOGE(@"Sync-state batches do not nest; skipping nested batch");
+      return;
+    }
+    self.batchedSyncState = self.syncState.mutableCopy;
+    block();
+    self.syncState = self.batchedSyncState;
+    self.batchedSyncState = nil;
+    committed = [self saveSyncStateToDisk];
+  };
+  if ([NSThread isMainThread]) {
+    run();
+  } else {
+    dispatch_sync(dispatch_get_main_queue(), run);
+  }
+  return committed;
 }
 
 ///
@@ -2043,27 +2074,47 @@ static SNTConfigurator* sharedConfigurator = nil;
 }
 
 ///
-///  Saves the current effective syncState to disk.
+///  Saves the current effective syncState to disk. Returns YES if the write
+///  succeeded; NO if the authorizer denied the operation or the underlying
+///  file write failed.
 ///
-- (void)saveSyncStateToDisk {
+- (BOOL)saveSyncStateToDisk {
   if (!self.syncStateAccessAuthorizerBlock()) {
-    return;
+    return NO;
   }
 
   NSMutableDictionary* syncState = self.syncState.mutableCopy;
   syncState[kAllowedPathRegexKey] = [syncState[kAllowedPathRegexKey] pattern];
   syncState[kBlockedPathRegexKey] = [syncState[kBlockedPathRegexKey] pattern];
-  [syncState writeToFile:self.syncStateFilePath atomically:YES];
+  if (![syncState writeToFile:self.syncStateFilePath atomically:YES]) {
+    LOGE(@"Failed to write sync state to %@", self.syncStateFilePath);
+    return NO;
+  }
   [[NSFileManager defaultManager] setAttributes:@{NSFilePosixPermissions : @0600}
                                    ofItemAtPath:self.syncStateFilePath
                                           error:NULL];
+  return YES;
 }
 
 - (void)clearSyncState {
-  self.syncState = [NSMutableDictionary dictionary];
-  // TODO: Start a timer to flush the state to disk. On startup, Santa should
-  // check for the presence of the state file and, if no SyncBaseURL is
-  // configured, start the timer to clear sync state and flush to disk.
+  // Intentionally not gated on `syncStateAccessAuthorizerBlock`: the authorizer
+  // requires `syncBaseURL != nil`, but the SNTSyncdQueue caller invokes this
+  // method precisely *because* `syncBaseURL` went to nil. Gating here would
+  // make the cleanup unreachable in production. Disk removal still requires
+  // root, which santad already has.
+  void (^block)(void) = ^{
+    if (self.batchedSyncState) {
+      [self.batchedSyncState removeAllObjects];
+      return;
+    }
+    self.syncState = [NSMutableDictionary dictionary];
+    [[NSFileManager defaultManager] removeItemAtPath:self.syncStateFilePath error:NULL];
+  };
+  if ([NSThread isMainThread]) {
+    block();
+  } else {
+    dispatch_sync(dispatch_get_main_queue(), block);
+  }
 }
 
 - (NSArray*)entitlementsPrefixFilter {

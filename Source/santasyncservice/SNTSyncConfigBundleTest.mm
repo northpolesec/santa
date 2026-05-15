@@ -55,6 +55,7 @@
 @property NSArray<SNTCELFallbackRule*>* celFallbackRules;
 @property NSNumber* fullSyncInterval;
 @property NSNumber* pushNotificationsFullSyncInterval;
+@property NSNumber* clearSyncStateBeforeApply;
 @end
 
 @interface SNTSyncConfigBundleTest : XCTestCase
@@ -256,6 +257,91 @@
   XCTAssertNil(bundle.pushTokenChain);
   XCTAssertNil(bundle.telemetryFilterExpressions);
   XCTAssertNil(bundle.celFallbackRules);
+}
+
+- (void)testPostflightConfigBundleSetsClearSyncStateBeforeApplyByInflightSyncType {
+  struct {
+    SNTSyncType inflight;
+    BOOL expectFlagFires;
+  } cases[] = {
+      {SNTSyncTypeNormal, NO},
+      {SNTSyncTypeClean, YES},
+      {SNTSyncTypeCleanAll, YES},
+  };
+
+  for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+    SNTSyncState* state = [[SNTSyncState alloc] init];
+    state.syncType = cases[i].inflight;
+    SNTConfigBundle* bundle = PostflightConfigBundle(state);
+
+    __block BOOL fired = NO;
+    __block BOOL value = NO;
+    [bundle clearSyncStateBeforeApply:^(BOOL v) {
+      fired = YES;
+      value = v;
+    }];
+
+    if (cases[i].expectFlagFires) {
+      XCTAssertTrue(fired,
+                    @"PostflightConfigBundle must set clearSyncStateBeforeApply for syncType=%lu",
+                    (unsigned long)cases[i].inflight);
+      XCTAssertEqual(value, YES);
+    } else {
+      XCTAssertFalse(
+          fired, @"PostflightConfigBundle must NOT set clearSyncStateBeforeApply for Normal sync");
+    }
+  }
+}
+
+- (void)testPostflightConfigBundleForwardsPushTokenChainWhenBothJWTsPresent {
+  SNTSyncState* state = [[SNTSyncState alloc] init];
+  state.pushIssuerJWT = @"issuerToken";
+  state.pushJWT = @"userToken";
+
+  SNTConfigBundle* bundle = PostflightConfigBundle(state);
+  XCTAssertEqualObjects(bundle.pushTokenChain, (@[ @"issuerToken", @"userToken" ]));
+}
+
+- (void)testPostflightConfigBundleOmitsPushTokenChainWhenEitherJWTMissing {
+  // Both missing
+  {
+    SNTSyncState* state = [[SNTSyncState alloc] init];
+    SNTConfigBundle* bundle = PostflightConfigBundle(state);
+    XCTAssertNil(bundle.pushTokenChain);
+  }
+  // Only issuer present
+  {
+    SNTSyncState* state = [[SNTSyncState alloc] init];
+    state.pushIssuerJWT = @"issuerToken";
+    SNTConfigBundle* bundle = PostflightConfigBundle(state);
+    XCTAssertNil(bundle.pushTokenChain);
+  }
+  // Only user present
+  {
+    SNTSyncState* state = [[SNTSyncState alloc] init];
+    state.pushJWT = @"userToken";
+    SNTConfigBundle* bundle = PostflightConfigBundle(state);
+    XCTAssertNil(bundle.pushTokenChain);
+  }
+}
+
+- (void)testNonPostflightFactoriesNeverSetClearSyncStateBeforeApply {
+  SNTSyncState* state = [[SNTSyncState alloc] init];
+
+  SNTConfigBundle* bundles[] = {
+      PreflightConfigBundle(state),
+      RuleSyncConfigBundle(),
+      SyncTypeConfigBundle(SNTSyncTypeClean),
+  };
+  NSString* names[] = {@"PreflightConfigBundle", @"RuleSyncConfigBundle", @"SyncTypeConfigBundle"};
+
+  for (size_t i = 0; i < sizeof(bundles) / sizeof(bundles[0]); ++i) {
+    __block BOOL fired = NO;
+    [bundles[i] clearSyncStateBeforeApply:^(BOOL v) {
+      fired = YES;
+    }];
+    XCTAssertFalse(fired, @"%@ must not set clearSyncStateBeforeApply", names[i]);
+  }
 }
 
 @end
