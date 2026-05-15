@@ -16,10 +16,16 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <pwd.h>
 #include <sandbox.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
+// Not declared in the public <sandbox.h> but exported by libSystem.
+// Profile authors reference parameters as (param "NAME").
+extern "C" int sandbox_init_with_parameters(const char* profile, uint64_t flags,
+                                            const char* const parameters[], char** errorbuf);
 
 #include <atomic>
 #include <memory>
@@ -235,10 +241,40 @@ REGISTER_COMMAND_NAME(@"sandbox")
   }
   argv[argc] = nullptr;
 
+  // Only pass parameters whose values are actually defined; substituting empty
+  // strings for unset env vars would silently alter profile semantics (e.g. a
+  // path like (param "HOME") becoming "").  sandbox_init_with_parameters will
+  // surface a clear error if the profile references an undefined parameter.
+  std::vector<const char*> params;
+  if (NSString* cwd = [NSFileManager defaultManager].currentDirectoryPath) {
+    params.push_back("CWD");
+    params.push_back(cwd.fileSystemRepresentation);
+  }
+  // Look up HOME from the password database rather than $HOME so the placeholder
+  // resolves to the calling uid's canonical home (e.g. /var/root under sudo)
+  // instead of whatever the shell happened to inherit.
+  if (struct passwd* pw = getpwuid(getuid()); pw && pw->pw_dir) {
+    params.push_back("HOME");
+    params.push_back(pw->pw_dir);
+  }
+  // Read the per-user darwin temp dir directly rather than $TMPDIR so the
+  // placeholder is consistent under sudo / inherited environments.
+  char tmpdirBuf[PATH_MAX];
+  size_t tmpdirLen = confstr(_CS_DARWIN_USER_TEMP_DIR, tmpdirBuf, sizeof(tmpdirBuf));
+  if (tmpdirLen > 0 && tmpdirLen <= sizeof(tmpdirBuf)) {
+    params.push_back("TMPDIR");
+    params.push_back(tmpdirBuf);
+  }
+  char uidBuf[16];
+  snprintf(uidBuf, sizeof(uidBuf), "%u", getuid());
+  params.push_back("UID");
+  params.push_back(uidBuf);
+  params.push_back(nullptr);
+
   char* errorbuf = NULL;
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-  if (sandbox_init(policyCStr, 0, &errorbuf) != 0) {
+  if (sandbox_init_with_parameters(policyCStr, 0, params.data(), &errorbuf) != 0) {
     fprintf(stderr, "sandbox_init failed: %s\n", errorbuf ? errorbuf : "unknown error");
     sandbox_free_error(errorbuf);
     exit(EXIT_FAILURE);
