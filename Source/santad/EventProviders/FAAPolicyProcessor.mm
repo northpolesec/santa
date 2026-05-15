@@ -18,9 +18,11 @@
 #include <pwd.h>
 
 #include "Source/common/AuditUtilities.h"
+#include "Source/common/BranchPrediction.h"
 #import "Source/common/MOLCertificate.h"
 #import "Source/common/MOLCodesignChecker.h"
 #import "Source/common/SNTBlockMessage.h"
+#import "Source/common/SNTFileInfo.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTStoredFileAccessEvent.h"
 #include "Source/common/String.h"
@@ -38,6 +40,13 @@ namespace santa {
 // reads or deduplicate TTY messages.
 static constexpr size_t kNumProcesses = 2048;
 static constexpr size_t kPerProcessSetCapacity = 128;
+
+// Files larger than this threshold are not hashed on the AUTH path; the
+// rehydrate is dispatched async so future events pick up the populated
+// decision cache entry. SHA-256 throughput on Apple silicon is roughly
+// 500 MiB/s, so 32 MiB hashes in ~60-70ms — comfortably within the ES
+// auth-deadline budget.
+static constexpr off_t kMaxSyncRehydrateBytes = 32 * 1024 * 1024;
 
 static constexpr uint32_t kOpenFlagsIndicatingWrite = FWRITE | O_APPEND | O_TRUNC;
 
@@ -146,33 +155,64 @@ void FAAPolicyProcessor::ModifyRateLimiterSettings(uint32_t logs_per_sec,
 }
 
 NSString* FAAPolicyProcessor::GetCertificateHash(const es_file_t* es_file) {
-  // First see if we've already cached this value
   SantaVnode vnodeID = SantaVnode::VnodeForFile(es_file);
-  NSString* result = cert_hash_cache_.get(vnodeID);
-  if (result) {
-    return result;
+
+  // 1. FAA-local cache is the fastest path. Earns its keep when SNTDecisionCache
+  //    was wiped between events but cert_hash_cache_ persists, and as a
+  //    short-circuit guard that avoids any cache lookup after the first.
+  NSString* cached = cert_hash_cache_.get(vnodeID);
+  if (cached) return cached;
+
+  // 2. Decision cache is canonical. Prime cert_hash_cache_ on hit so the
+  //    next event for this vnode goes straight to step 1 above.
+  SNTCachedDecision* cd = [decision_cache_ cachedDecisionForFile:es_file->stat];
+  if (cd.certSHA256.length) {
+    cert_hash_cache_.set(vnodeID, cd.certSHA256);
+    return cd.certSHA256;
   }
 
-  // If this wasn't already cached, try finding a cached SNTCachedDecision
-  SNTCachedDecision* cd = [decision_cache_ cachedDecisionForFile:es_file->stat];
-  if (cd) {
-    // There was an existing cached decision, use its cert hash
-    result = cd.certSHA256;
+  // 3. Rehydrate (subject to size cap). Populates SNTDecisionCache so the
+  //    log-path lookup can hit without redoing the work.
+  NSError* err;
+  SNTFileInfo* fi = [[SNTFileInfo alloc] initWithEndpointSecurityFile:es_file error:&err];
+  if (fi) {
+    if (fi.fileSize <= kMaxSyncRehydrateBytes) {
+      SNTCachedDecision* rehydrated = [decision_cache_ rehydrateAndCacheDecisionForFileInfo:fi];
+      if (rehydrated.certSHA256.length) {
+        cert_hash_cache_.set(vnodeID, rehydrated.certSHA256);
+        return rehydrated.certSHA256;
+      }
+      if (rehydrated) {
+        // Rehydrate succeeded but produced no cert info — the binary is
+        // unsigned (or has broken codesigning). A fresh MOLCodesignChecker
+        // on the same file would return the same empty answer, so short-
+        // circuit with the terminal sentinel.
+        cert_hash_cache_.set(vnodeID, kBadCertHash);
+        return kBadCertHash;
+      }
+    } else {
+      // File is too large to hash synchronously; kick off async rehydrate
+      // to warm SNTDecisionCache for future events. We still need the cert
+      // hash right now, so fall through to step 4 for a MOLCodesignChecker
+      // lookup on this thread.
+      [decision_cache_ asyncRehydrateAndCacheDecisionForFileInfo:fi];
+    }
   } else {
-    // If the cached decision didn't exist, try a manual lookup
-    MOLCodesignChecker* csInfo =
-        [[MOLCodesignChecker alloc] initWithBinaryPath:@(es_file->path.data)];
-    result = csInfo.leafCertificate.SHA256;
+    LOGD(@"FAA GetCertificateHash: SNTFileInfo init failed for %s: %@", es_file->path.data,
+         err.localizedDescription);
   }
+
+  // 4. Fallback: fresh codesign. Reached when: file is too big to sync-rehydrate
+  //    (async path), or SNTFileInfo init failed (bad path / non-regular file).
+  //    The "rehydrate produced no cert info" case is handled above to avoid a
+  //    redundant codesign trip.
+  MOLCodesignChecker* csInfo =
+      [[MOLCodesignChecker alloc] initWithBinaryPath:@(es_file->path.data)];
+  NSString* result = csInfo.leafCertificate.SHA256;
   if (!result.length) {
-    // If result is still nil, there isn't much recourse... We will
-    // assume that this error isn't transient and set a terminal value
-    // in the cache to prevent continuous attempts to lookup cert hash.
     result = kBadCertHash;
   }
-  // Finally, add the result to the cache to prevent future lookups
   cert_hash_cache_.set(vnodeID, result);
-
   return result;
 }
 
@@ -366,13 +406,21 @@ FileAccessPolicyDecision FAAPolicyProcessor::ApplyPolicy(
 void FAAPolicyProcessor::LogTelemetry(const WatchItemPolicyBase& policy, const Message& msg,
                                       size_t target_index, FileAccessPolicyDecision decision) {
   RateLimiter::Decision rate_limit_decision = rate_limiter_.Decide(msg->mach_time);
-  metrics_->SetFileAccessEventMetrics(policy.version, policy.name,
-                                      (rate_limit_decision == RateLimiter::Decision::kAllowed)
-                                          ? FileAccessMetricStatus::kOK
-                                          : FileAccessMetricStatus::kBlockedUser,
-                                      msg->event_type, decision);
+  if (likely(metrics_)) {
+    metrics_->SetFileAccessEventMetrics(policy.version, policy.name,
+                                        (rate_limit_decision == RateLimiter::Decision::kAllowed)
+                                            ? FileAccessMetricStatus::kOK
+                                            : FileAccessMetricStatus::kBlockedUser,
+                                        msg->event_type, decision);
+  }
 
   if (rate_limit_decision != RateLimiter::Decision::kAllowed) {
+    return;
+  }
+
+  // enricher_ and logger_ are null only in unit tests; skip telemetry rather
+  // than crash. Production callers always inject both.
+  if (unlikely(!enricher_ || !logger_)) {
     return;
   }
 
@@ -461,6 +509,22 @@ FileAccessPolicyDecision FAAPolicyProcessor::ProcessTargetAndPolicy(
     LogTelemetry(*policy, msg, target_policy_pair.first, decision);
 
     SNTCachedDecision* cd = GetCachedDecision(msg->process->executable->stat);
+    if (unlikely(!cd.sha256)) {
+      NSError* err;
+      SNTFileInfo* fi = [[SNTFileInfo alloc] initWithEndpointSecurityFile:msg->process->executable
+                                                                    error:&err];
+      if (fi) {
+        if (fi.fileSize <= kMaxSyncRehydrateBytes) {
+          SNTCachedDecision* rehydrated = [decision_cache_ rehydrateAndCacheDecisionForFileInfo:fi];
+          if (rehydrated) cd = rehydrated;
+        } else {
+          [decision_cache_ asyncRehydrateAndCacheDecisionForFileInfo:fi];
+        }
+      } else {
+        LOGD(@"FAA rehydrate: SNTFileInfo init failed for %s: %@",
+             msg->process->executable->path.data, err.localizedDescription);
+      }
+    }
     SNTStoredFileAccessEvent* event = [[SNTStoredFileAccessEvent alloc] init];
 
     event.accessedPath = StringToNSString(target.Path());

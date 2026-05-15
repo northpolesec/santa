@@ -107,6 +107,7 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator* configurator,
 
   std::shared_ptr<santa::EntitlementsFilter> entitlements_filter = EntitlementsFilter::Create(
       configurator.entitlementsTeamIDFilter, configurator.entitlementsPrefixFilter);
+  [[SNTDecisionCache sharedCache] setEntitlementsFilter:entitlements_filter];
 
   // Create ProcessTree early so it can be passed to policy processor and exec controller
   std::shared_ptr<santa::santad::process_tree::ProcessTree> process_tree;
