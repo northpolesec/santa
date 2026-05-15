@@ -124,6 +124,23 @@ if [ -z "$case5_cdhash" ] || [ "$case1_cdhash" != "$case5_cdhash" ]; then
 fi
 assert_grep "page mismatches: (skipped)" "$TMP/case5.out"
 
+# Case 6: -u flag — codesign-strip a copy of /usr/bin/yes and verify the
+# facade reports kMatchUnsigned with a full-file digest matching shasum.
+echo "Case 6: -u flag on codesign-stripped /usr/bin/yes"
+UNSIGNED="$TMP/yes_unsigned"
+cp /usr/bin/yes "$UNSIGNED"
+chmod u+w "$UNSIGNED"
+codesign --remove-signature "$UNSIGNED"
+"$BIN" -u "$UNSIGNED" >"$TMP/case6.out" 2>"$TMP/case6.err" || {
+    echo "FAIL: -u on $UNSIGNED returned non-zero" >&2
+    sed 's/^/  /' "$TMP/case6.err" >&2
+    failures=$((failures + 1))
+}
+assert_grep "status: kMatchUnsigned" "$TMP/case6.out"
+assert_grep "mode: unsigned" "$TMP/case6.out"
+expected_sha=$(shasum -a 256 "$UNSIGNED" | awk '{print $1}')
+assert_grep "$expected_sha" "$TMP/case6.out"
+
 if [ "$failures" -ne 0 ]; then
     echo "smoke: $failures FAILURES" >&2
     exit 1

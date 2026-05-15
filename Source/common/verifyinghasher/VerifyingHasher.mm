@@ -36,19 +36,30 @@ bool BytesEqual(std::span<const uint8_t> a, std::span<const uint8_t> b) {
   return std::memcmp(a.data(), b.data(), a.size()) == 0;
 }
 
+bool StatMatches(const struct stat& st, const VerifyingHasher::StatTuple& exp) {
+  return st.st_dev == exp.dev && st.st_ino == exp.ino && st.st_size == exp.size &&
+         st.st_mtimespec.tv_sec == exp.mtime.tv_sec && st.st_mtimespec.tv_nsec == exp.mtime.tv_nsec;
+}
+
 }  // namespace
 
 VerifyingHasher::Result VerifyingHasher::Run(int fd, cpu_type_t cputype, cpu_subtype_t cpusubtype,
                                              const Expected& exp, const RunOptions& opts) {
   Result r{};
 
-  struct stat st;
-  if (fstat(fd, &st) != 0) {
-    r.status = Status::kError;
-    return r;
+  // Unsigned path: fstat and verify the stat tuple matches ES's capture
+  // before reading anything. A mismatch means the file has been replaced
+  // or modified between AUTH EXEC and now — return kError immediately,
+  // leaving sha256 nullopt. No point computing a digest of the wrong file.
+  if (!exp.signed_check.has_value()) {
+    struct stat st;
+    if (fstat(fd, &st) != 0 || !StatMatches(st, exp.stat)) {
+      r.status = Status::kError;
+      return r;
+    }
   }
 
-  FdFileReader reader(fd, st.st_size);
+  FdFileReader reader(fd, exp.stat.size);
   ArchSelector want{cputype, cpusubtype};
   VerifyingHasherCore::Options core_opts;
   core_opts.skip_page_hash = opts.skip_page_hash;
@@ -62,23 +73,37 @@ VerifyingHasher::Result VerifyingHasher::Run(int fd, cpu_type_t cputype, cpu_sub
     r.sha256 = buf;
   }
 
+  // Unsigned path. The stat tuple was already verified at facade entry;
+  // here we additionally require Core to confirm the slice has no embedded
+  // code signature. Both conditions are independently load-bearing; do
+  // not drop the kNoSignature check on the assumption that "stat already
+  // verified the file."
+  if (!exp.signed_check.has_value()) {
+    if (core_status == VerifyingHasherCore::Status::kNoSignature) {
+      r.status = Status::kMatchUnsigned;
+    } else {
+      r.status = Status::kError;
+    }
+    return r;
+  }
+
+  // Signed path.
+  const auto& sig = *exp.signed_check;
   if (core_status != VerifyingHasherCore::Status::kOk) {
-    // Includes kPagesMismatched: a page-hash mismatch is a tamper signal
-    // and supersedes any cdhash equality. kIoError, kMalformedSignature,
-    // kSliceNotFound, kNotMachO, kNoSignature all also surface as kError.
+    // Includes kPagesMismatched, kNoSignature, kIoError, kMalformedSignature,
+    // kSliceNotFound, kNotMachO — all collapse to kError on the Signed path.
     r.status = Status::kError;
     return r;
   }
 
-  // core_status == kOk: do match logic
   auto computed_cdhash = core.CDHash();
   const auto& parsed = core.ParsedCD();
 
-  if (BytesEqual(computed_cdhash, exp.cdhash)) {
+  if (BytesEqual(computed_cdhash, sig.cdhash)) {
     r.status = Status::kMatchCDHash;
-  } else if (!exp.signing_id.empty() && !exp.team_id.empty() &&
-             parsed.identifier == exp.signing_id && parsed.team_id == exp.team_id) {
-    // Drift detection requires a non-empty Expected.team_id; ad-hoc
+  } else if (!sig.signing_id.empty() && !sig.team_id.empty() &&
+             parsed.identifier == sig.signing_id && parsed.team_id == sig.team_id) {
+    // Drift detection requires a non-empty signed_check->team_id; ad-hoc
     // binaries (empty team_id) carry weaker identity than the team-signed
     // model the drift fallback assumes and fall through to kNoMatch on
     // any cdhash mismatch.

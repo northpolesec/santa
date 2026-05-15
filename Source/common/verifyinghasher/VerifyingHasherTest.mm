@@ -64,6 +64,13 @@ const char* kHwUniversalTeamID = "";  // adhoc: no team id
 const char* kHwTeamSignedSigningID = "hw_team_signed";
 const char* kHwTeamSignedTeamID = "ZMCG7MLDV9";
 
+// hw_unsigned facts:
+//   Format: thin Mach-O arm64, NO LC_CODE_SIGNATURE / no CS blob.
+//   Source / regeneration recipe: see BUILD's hw_unsigned_fixture comment.
+// REGENERATE-AND-UPDATE: kHwUnsignedSha256 must match the new fixture's
+// `shasum -a 256` output whenever the fixture is rebuilt.
+const char* kHwUnsignedSha256 = "b5e8abf61b453927b7bb6309bd9954a39f9b008102ee829260e45f82f8493c7f";
+
 // ---- Reference helpers (mirrored from VerifyingHasherCoreTest) --
 
 // Walks a CS SuperBlob, finds the picked CodeDirectory (highest hashRank),
@@ -232,6 +239,43 @@ std::vector<uint8_t> Slurp(const char* path) {
   return fd;
 }
 
+- (NSString*)unsignedFixturePath {
+  NSBundle* bundle = [NSBundle bundleForClass:[self class]];
+  return [bundle.resourcePath stringByAppendingPathComponent:@"testdata/hw_unsigned"];
+}
+
+- (int)openHwUnsignedFd {
+  NSString* path = [self unsignedFixturePath];
+  int fd = ::open(path.UTF8String, O_RDONLY | O_CLOEXEC);
+  XCTAssertGreaterThanOrEqual(fd, 0, @"Failed to open hw_unsigned at %@", path);
+  return fd;
+}
+
+// Returns the stat tuple for an open fd. Used to populate Expected.stat in
+// tests, mirroring the production code path (the facade fstat's the same fd
+// on the Unsigned path; santad will derive stat from the ES message in the
+// wiring PR).
+- (VerifyingHasher::StatTuple)actualStatForFd:(int)fd {
+  struct stat st;
+  int rc = ::fstat(fd, &st);
+  XCTAssertEqual(rc, 0, @"fstat failed");
+  return VerifyingHasher::StatTuple{
+      .dev = st.st_dev,
+      .ino = st.st_ino,
+      .size = st.st_size,
+      .mtime = st.st_mtimespec,
+  };
+}
+
+// Convert a 32-byte sha256 array to lowercase hex for comparison against
+// kHwUnsignedSha256.
+- (NSString*)hexLowerOfSha256:(const std::array<uint8_t, 32>&)bytes {
+  NSMutableString* s = [NSMutableString stringWithCapacity:64];
+  for (uint8_t b : bytes)
+    [s appendFormat:@"%02x", b];
+  return s;
+}
+
 // ---- Test 1: exact cdhash match -> kMatchCDHash -------------------------
 
 - (void)testMatchCDHashOnExactExpected {
@@ -239,9 +283,13 @@ std::vector<uint8_t> Slurp(const char* path) {
   santa::ScopedFile sf([self openHwUniversalFd]);
 
   VerifyingHasher::Expected exp{
-      .cdhash = std::span<const uint8_t>(cdhash.data(), cdhash.size()),
-      .signing_id = kHwUniversalSigningID,
-      .team_id = kHwUniversalTeamID,
+      .stat = [self actualStatForFd:sf.UnsafeFD()],
+      .signed_check =
+          VerifyingHasher::Expected::Signed{
+              .cdhash = std::span<const uint8_t>(cdhash.data(), cdhash.size()),
+              .signing_id = kHwUniversalSigningID,
+              .team_id = kHwUniversalTeamID,
+          },
   };
 
   auto r = VerifyingHasher::Run(sf.UnsafeFD(), CPU_TYPE_ARM64, CPU_SUBTYPE_ARM64_ALL, exp);
@@ -268,9 +316,13 @@ std::vector<uint8_t> Slurp(const char* path) {
   santa::ScopedFile sf([self openHwUniversalFd]);
 
   VerifyingHasher::Expected exp{
-      .cdhash = std::span<const uint8_t>(wrong_cdhash.data(), wrong_cdhash.size()),
-      .signing_id = kHwUniversalSigningID,
-      .team_id = kHwUniversalTeamID,  // empty (ad-hoc)
+      .stat = [self actualStatForFd:sf.UnsafeFD()],
+      .signed_check =
+          VerifyingHasher::Expected::Signed{
+              .cdhash = std::span<const uint8_t>(wrong_cdhash.data(), wrong_cdhash.size()),
+              .signing_id = kHwUniversalSigningID,
+              .team_id = kHwUniversalTeamID,  // empty (ad-hoc)
+          },
   };
 
   auto r = VerifyingHasher::Run(sf.UnsafeFD(), CPU_TYPE_ARM64, CPU_SUBTYPE_ARM64_ALL, exp);
@@ -288,9 +340,13 @@ std::vector<uint8_t> Slurp(const char* path) {
   santa::ScopedFile sf([self openHwTeamSignedFd]);
 
   VerifyingHasher::Expected exp{
-      .cdhash = std::span<const uint8_t>(wrong_cdhash.data(), wrong_cdhash.size()),
-      .signing_id = kHwTeamSignedSigningID,
-      .team_id = kHwTeamSignedTeamID,
+      .stat = [self actualStatForFd:sf.UnsafeFD()],
+      .signed_check =
+          VerifyingHasher::Expected::Signed{
+              .cdhash = std::span<const uint8_t>(wrong_cdhash.data(), wrong_cdhash.size()),
+              .signing_id = kHwTeamSignedSigningID,
+              .team_id = kHwTeamSignedTeamID,
+          },
   };
 
   auto r = VerifyingHasher::Run(sf.UnsafeFD(), CPU_TYPE_ARM64, CPU_SUBTYPE_ARM64_ALL, exp);
@@ -306,9 +362,13 @@ std::vector<uint8_t> Slurp(const char* path) {
   santa::ScopedFile sf([self openHwUniversalFd]);
 
   VerifyingHasher::Expected exp{
-      .cdhash = std::span<const uint8_t>(wrong_cdhash.data(), wrong_cdhash.size()),
-      .signing_id = "com.wrong.signing.id",
-      .team_id = "WRONGTEAM",
+      .stat = [self actualStatForFd:sf.UnsafeFD()],
+      .signed_check =
+          VerifyingHasher::Expected::Signed{
+              .cdhash = std::span<const uint8_t>(wrong_cdhash.data(), wrong_cdhash.size()),
+              .signing_id = "com.wrong.signing.id",
+              .team_id = "WRONGTEAM",
+          },
   };
 
   auto r = VerifyingHasher::Run(sf.UnsafeFD(), CPU_TYPE_ARM64, CPU_SUBTYPE_ARM64_ALL, exp);
@@ -323,9 +383,13 @@ std::vector<uint8_t> Slurp(const char* path) {
   std::vector<uint8_t> dummy_cdhash(CS_CDHASH_LEN, 0x00);
 
   VerifyingHasher::Expected exp{
-      .cdhash = std::span<const uint8_t>(dummy_cdhash.data(), dummy_cdhash.size()),
-      .signing_id = "com.some.app",
-      .team_id = "SOMETEAM",
+      .stat = {},  // no valid fd; size=0 hint is fine — FdFileReader fails on the bad fd.
+      .signed_check =
+          VerifyingHasher::Expected::Signed{
+              .cdhash = std::span<const uint8_t>(dummy_cdhash.data(), dummy_cdhash.size()),
+              .signing_id = "com.some.app",
+              .team_id = "SOMETEAM",
+          },
   };
 
   auto r = VerifyingHasher::Run(-1, CPU_TYPE_ARM64, CPU_SUBTYPE_ARM64_ALL, exp);
@@ -334,7 +398,25 @@ std::vector<uint8_t> Slurp(const char* path) {
   // I/O failure path: digest could not be finalized, so sha256 must be nullopt.
   // Distinguishes this from non-IoError kError paths (e.g., non-Mach-O) where
   // the file was read to EOF and sha256 is engaged.
-  XCTAssertFalse(r.sha256.has_value(), @"sha256 must be nullopt on fstat-failure kError");
+  XCTAssertFalse(r.sha256.has_value(), @"sha256 must be nullopt on I/O-failure kError");
+}
+
+- (void)testUnsignedPathFstatFailureReturnsError {
+  // fd=-1 with signed_check=nullopt: the Unsigned-path early-bail invokes
+  // fstat at facade entry, which fails with EBADF. Expected: kError without
+  // ever reading the file (sha256 nullopt). Distinct from the Signed-path
+  // invalid-fd test above, which fails inside FdFileReader after the facade
+  // has already constructed it.
+  VerifyingHasher::Expected exp{
+      .stat = {},
+      // signed_check defaults to nullopt → Unsigned path
+  };
+
+  auto r = VerifyingHasher::Run(-1, CPU_TYPE_ARM64, CPU_SUBTYPE_ARM64_ALL, exp);
+
+  XCTAssertEqual(r.status, VerifyingHasher::Status::kError,
+                 @"Expected kError on fstat failure for the Unsigned path");
+  XCTAssertFalse(r.sha256.has_value(), @"sha256 must be nullopt — facade bailed before reading");
 }
 
 // ---- Test 5: non-Mach-O file -> kError ----------------------------------
@@ -356,9 +438,13 @@ std::vector<uint8_t> Slurp(const char* path) {
 
   std::vector<uint8_t> dummy_cdhash(CS_CDHASH_LEN, 0x00);
   VerifyingHasher::Expected exp{
-      .cdhash = std::span<const uint8_t>(dummy_cdhash.data(), dummy_cdhash.size()),
-      .signing_id = "com.some.app",
-      .team_id = "SOMETEAM",
+      .stat = [self actualStatForFd:file->UnsafeFD()],
+      .signed_check =
+          VerifyingHasher::Expected::Signed{
+              .cdhash = std::span<const uint8_t>(dummy_cdhash.data(), dummy_cdhash.size()),
+              .signing_id = "com.some.app",
+              .team_id = "SOMETEAM",
+          },
   };
 
   auto r = VerifyingHasher::Run(file->UnsafeFD(), CPU_TYPE_ARM64, CPU_SUBTYPE_ARM64_ALL, exp);
@@ -382,9 +468,13 @@ std::vector<uint8_t> Slurp(const char* path) {
   santa::ScopedFile sf([self openHwUniversalFd]);
 
   VerifyingHasher::Expected exp{
-      .cdhash = std::span<const uint8_t>(zero_cdhash.data(), zero_cdhash.size()),
-      .signing_id = "com.wrong.id",
-      .team_id = "WRONGTEAM",
+      .stat = [self actualStatForFd:sf.UnsafeFD()],
+      .signed_check =
+          VerifyingHasher::Expected::Signed{
+              .cdhash = std::span<const uint8_t>(zero_cdhash.data(), zero_cdhash.size()),
+              .signing_id = "com.wrong.id",
+              .team_id = "WRONGTEAM",
+          },
   };
 
   auto r = VerifyingHasher::Run(sf.UnsafeFD(), CPU_TYPE_ARM64, CPU_SUBTYPE_ARM64_ALL, exp);
@@ -400,9 +490,13 @@ std::vector<uint8_t> Slurp(const char* path) {
   auto cdhash = [self hwUniversalArm64CdHash];
   santa::ScopedFile sf2([self openHwUniversalFd]);
   VerifyingHasher::Expected exp2{
-      .cdhash = std::span<const uint8_t>(cdhash.data(), cdhash.size()),
-      .signing_id = kHwUniversalSigningID,
-      .team_id = kHwUniversalTeamID,
+      .stat = [self actualStatForFd:sf2.UnsafeFD()],
+      .signed_check =
+          VerifyingHasher::Expected::Signed{
+              .cdhash = std::span<const uint8_t>(cdhash.data(), cdhash.size()),
+              .signing_id = kHwUniversalSigningID,
+              .team_id = kHwUniversalTeamID,
+          },
   };
   auto r2 = VerifyingHasher::Run(sf2.UnsafeFD(), CPU_TYPE_ARM64, CPU_SUBTYPE_ARM64_ALL, exp2);
 
@@ -421,9 +515,13 @@ std::vector<uint8_t> Slurp(const char* path) {
   {
     santa::ScopedFile sf([self openHwUniversalFd]);
     VerifyingHasher::Expected exp{
-        .cdhash = std::span<const uint8_t>(cdhash.data(), cdhash.size()),
-        .signing_id = kHwUniversalSigningID,
-        .team_id = kHwUniversalTeamID,
+        .stat = [self actualStatForFd:sf.UnsafeFD()],
+        .signed_check =
+            VerifyingHasher::Expected::Signed{
+                .cdhash = std::span<const uint8_t>(cdhash.data(), cdhash.size()),
+                .signing_id = kHwUniversalSigningID,
+                .team_id = kHwUniversalTeamID,
+            },
     };
     auto r = VerifyingHasher::Run(sf.UnsafeFD(), CPU_TYPE_ARM64, CPU_SUBTYPE_ARM64_ALL, exp);
     XCTAssertEqual(r.status, VerifyingHasher::Status::kMatchCDHash);
@@ -433,9 +531,13 @@ std::vector<uint8_t> Slurp(const char* path) {
 
   santa::ScopedFile sf([self openHwUniversalFd]);
   VerifyingHasher::Expected exp{
-      .cdhash = std::span<const uint8_t>(cdhash.data(), cdhash.size()),
-      .signing_id = kHwUniversalSigningID,
-      .team_id = kHwUniversalTeamID,
+      .stat = [self actualStatForFd:sf.UnsafeFD()],
+      .signed_check =
+          VerifyingHasher::Expected::Signed{
+              .cdhash = std::span<const uint8_t>(cdhash.data(), cdhash.size()),
+              .signing_id = kHwUniversalSigningID,
+              .team_id = kHwUniversalTeamID,
+          },
   };
   auto r = VerifyingHasher::Run(sf.UnsafeFD(), CPU_TYPE_ARM64, CPU_SUBTYPE_ARM64_ALL, exp,
                                 VerifyingHasher::RunOptions{.skip_page_hash = true});
@@ -473,9 +575,13 @@ std::vector<uint8_t> Slurp(const char* path) {
 
   auto cdhash = [self hwUniversalArm64CdHash];
   VerifyingHasher::Expected exp{
-      .cdhash = std::span<const uint8_t>(cdhash.data(), cdhash.size()),
-      .signing_id = kHwUniversalSigningID,
-      .team_id = kHwUniversalTeamID,
+      .stat = [self actualStatForFd:file->UnsafeFD()],
+      .signed_check =
+          VerifyingHasher::Expected::Signed{
+              .cdhash = std::span<const uint8_t>(cdhash.data(), cdhash.size()),
+              .signing_id = kHwUniversalSigningID,
+              .team_id = kHwUniversalTeamID,
+          },
   };
 
   // VerifyingHasher::Run uses pread internally (offset-explicit), so the
@@ -499,6 +605,174 @@ std::vector<uint8_t> Slurp(const char* path) {
 
   // ScopedFile destructor closes the fd; mkstemp file was unlinked at
   // creation. No explicit cleanup needed.
+}
+
+- (void)testUnsignedMatchAllStatFieldsCorrect {
+  santa::ScopedFile sf([self openHwUnsignedFd]);
+  VerifyingHasher::Expected exp{
+      .stat = [self actualStatForFd:sf.UnsafeFD()],
+  };
+  auto r = VerifyingHasher::Run(sf.UnsafeFD(), CPU_TYPE_ARM64, CPU_SUBTYPE_ARM64_ALL, exp);
+  XCTAssertEqual(r.status, VerifyingHasher::Status::kMatchUnsigned);
+  XCTAssertTrue(r.sha256.has_value());
+  XCTAssertEqualObjects([self hexLowerOfSha256:*r.sha256], @(kHwUnsignedSha256));
+}
+
+- (void)testUnsignedMismatchDev {
+  santa::ScopedFile sf([self openHwUnsignedFd]);
+  auto stat_tuple = [self actualStatForFd:sf.UnsafeFD()];
+  stat_tuple.dev = stat_tuple.dev + 1;  // flip dev — guaranteed mismatch
+  VerifyingHasher::Expected exp{
+      .stat = stat_tuple,
+  };
+  auto r = VerifyingHasher::Run(sf.UnsafeFD(), CPU_TYPE_ARM64, CPU_SUBTYPE_ARM64_ALL, exp);
+  XCTAssertEqual(r.status, VerifyingHasher::Status::kError);
+  XCTAssertFalse(r.sha256.has_value(), @"sha256 must be nullopt on stat-mismatch — the facade "
+                                       @"bails before reading, so no digest is computed");
+}
+
+- (void)testUnsignedMismatchIno {
+  santa::ScopedFile sf([self openHwUnsignedFd]);
+  auto stat_tuple = [self actualStatForFd:sf.UnsafeFD()];
+  stat_tuple.ino = stat_tuple.ino + 1;
+  VerifyingHasher::Expected exp{
+      .stat = stat_tuple,
+  };
+  auto r = VerifyingHasher::Run(sf.UnsafeFD(), CPU_TYPE_ARM64, CPU_SUBTYPE_ARM64_ALL, exp);
+  XCTAssertEqual(r.status, VerifyingHasher::Status::kError);
+  XCTAssertFalse(r.sha256.has_value());
+}
+
+- (void)testUnsignedMismatchSize {
+  santa::ScopedFile sf([self openHwUnsignedFd]);
+  auto stat_tuple = [self actualStatForFd:sf.UnsafeFD()];
+  stat_tuple.size = stat_tuple.size + 1;
+  VerifyingHasher::Expected exp{
+      .stat = stat_tuple,
+  };
+  auto r = VerifyingHasher::Run(sf.UnsafeFD(), CPU_TYPE_ARM64, CPU_SUBTYPE_ARM64_ALL, exp);
+  XCTAssertEqual(r.status, VerifyingHasher::Status::kError);
+  XCTAssertFalse(r.sha256.has_value());
+}
+
+- (void)testUnsignedMismatchMtimeSec {
+  santa::ScopedFile sf([self openHwUnsignedFd]);
+  auto stat_tuple = [self actualStatForFd:sf.UnsafeFD()];
+  stat_tuple.mtime.tv_sec = stat_tuple.mtime.tv_sec + 1;
+  VerifyingHasher::Expected exp{
+      .stat = stat_tuple,
+  };
+  auto r = VerifyingHasher::Run(sf.UnsafeFD(), CPU_TYPE_ARM64, CPU_SUBTYPE_ARM64_ALL, exp);
+  XCTAssertEqual(r.status, VerifyingHasher::Status::kError);
+  XCTAssertFalse(r.sha256.has_value());
+}
+
+- (void)testUnsignedMismatchMtimeNsec {
+  santa::ScopedFile sf([self openHwUnsignedFd]);
+  auto stat_tuple = [self actualStatForFd:sf.UnsafeFD()];
+  // Bump tv_nsec by 1 while keeping tv_sec identical; ensures the test
+  // is exercising sub-second precision specifically. Wrap around 1e9 if
+  // unlucky to land at the boundary (extremely unlikely for a freshly-
+  // staged fixture but defensive).
+  stat_tuple.mtime.tv_nsec =
+      (stat_tuple.mtime.tv_nsec == 999999999) ? 0 : (stat_tuple.mtime.tv_nsec + 1);
+  VerifyingHasher::Expected exp{
+      .stat = stat_tuple,
+  };
+  auto r = VerifyingHasher::Run(sf.UnsafeFD(), CPU_TYPE_ARM64, CPU_SUBTYPE_ARM64_ALL, exp);
+  XCTAssertEqual(r.status, VerifyingHasher::Status::kError);
+  XCTAssertFalse(r.sha256.has_value());
+}
+
+- (void)testSignedExpectedButFileUnsigned {
+  // Caller declared Expected::Signed against an unsigned file. Core returns
+  // kNoSignature; the Signed path collapses to kError. sha256 is populated
+  // because Core drained to EOF. Even with stat matching (which it does here),
+  // kNoSignature on the Signed path always drives kError.
+  santa::ScopedFile sf([self openHwUnsignedFd]);
+  std::vector<uint8_t> dummy_cdhash(CS_CDHASH_LEN, 0xAA);
+  VerifyingHasher::Expected exp{
+      .stat = [self actualStatForFd:sf.UnsafeFD()],
+      .signed_check =
+          VerifyingHasher::Expected::Signed{
+              .cdhash = std::span<const uint8_t>(dummy_cdhash.data(), dummy_cdhash.size()),
+              .signing_id = "some.expected.id",
+              .team_id = "TEAMIDABCD",
+          },
+  };
+  auto r = VerifyingHasher::Run(sf.UnsafeFD(), CPU_TYPE_ARM64, CPU_SUBTYPE_ARM64_ALL, exp);
+  XCTAssertEqual(r.status, VerifyingHasher::Status::kError);
+  XCTAssertTrue(r.sha256.has_value());
+}
+
+- (void)testUnsignedExpectedButFileSigned {
+  // Caller declared Unsigned path (signed_check = nullopt) against the signed
+  // hw_universal fixture. Core returns kOk; the Unsigned path only honors
+  // kNoSignature → kError. sha256 is populated.
+  //
+  // The stat tuple below comes from fstat(fd) on the same fd Run() will
+  // use, so the tuples DO match. The kError outcome is driven by the
+  // kNoSignature gating, not by the stat compare — by spec the stat
+  // compare is not consulted on this row of the composition table. This
+  // test alone does not exercise the stat-compare side of the Unsigned
+  // path; pair with the per-field mismatch tests above.
+  santa::ScopedFile sf([self openHwUniversalFd]);
+  struct stat st;
+  XCTAssertEqual(::fstat(sf.UnsafeFD(), &st), 0);
+  VerifyingHasher::StatTuple stat_tuple{
+      .dev = st.st_dev,
+      .ino = st.st_ino,
+      .size = st.st_size,
+      .mtime = st.st_mtimespec,
+  };
+  VerifyingHasher::Expected exp{
+      .stat = stat_tuple,
+  };
+  auto r = VerifyingHasher::Run(sf.UnsafeFD(), CPU_TYPE_ARM64, CPU_SUBTYPE_ARM64_ALL, exp);
+  XCTAssertEqual(r.status, VerifyingHasher::Status::kError);
+  XCTAssertTrue(r.sha256.has_value());
+}
+
+- (void)testUnsignedKindOnNonMachOIsError {
+  // /etc/hosts is not a Mach-O. Core returns kNotMachO (after draining
+  // to EOF for the sha256). Even though the Unsigned path has a matching
+  // stat tuple, kMatchUnsigned is kNoSignature-gated and does NOT
+  // upgrade kNotMachO. Result: kError.
+  int fd = ::open("/etc/hosts", O_RDONLY | O_CLOEXEC);
+  XCTAssertGreaterThanOrEqual(fd, 0);
+  santa::ScopedFile sf(fd);
+  struct stat st;
+  XCTAssertEqual(::fstat(fd, &st), 0);
+  VerifyingHasher::StatTuple stat_tuple{
+      .dev = st.st_dev,
+      .ino = st.st_ino,
+      .size = st.st_size,
+      .mtime = st.st_mtimespec,
+  };
+  VerifyingHasher::Expected exp{
+      .stat = stat_tuple,
+  };
+  auto r = VerifyingHasher::Run(sf.UnsafeFD(), CPU_TYPE_ARM64, CPU_SUBTYPE_ARM64_ALL, exp);
+  XCTAssertEqual(r.status, VerifyingHasher::Status::kError);
+  XCTAssertTrue(r.sha256.has_value());
+}
+
+- (void)testEmptySignedExpectationOnUnsignedFile {
+  // Today's path: caller is in Signed mode (signed_check engaged) with no
+  // actual expected values (empty cdhash, empty sid, empty tid). Run against
+  // an unsigned binary. Core returns kNoSignature; Signed path collapses to
+  // kError; sha256 is populated. Verifies the pre-existing kError-for-unsigned
+  // behavior survives the flat-Expected refactor.
+  santa::ScopedFile sf([self openHwUnsignedFd]);
+  VerifyingHasher::Expected exp{
+      // stat is populated so FdFileReader gets a valid size hint.
+      .stat = [self actualStatForFd:sf.UnsafeFD()],
+      .signed_check = VerifyingHasher::Expected::Signed{},  // all fields empty
+  };
+  auto r = VerifyingHasher::Run(sf.UnsafeFD(), CPU_TYPE_ARM64, CPU_SUBTYPE_ARM64_ALL, exp);
+  XCTAssertEqual(r.status, VerifyingHasher::Status::kError);
+  XCTAssertTrue(r.sha256.has_value());
+  XCTAssertEqualObjects([self hexLowerOfSha256:*r.sha256], @(kHwUnsignedSha256));
 }
 
 @end

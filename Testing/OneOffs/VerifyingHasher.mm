@@ -25,10 +25,12 @@
 #include <string>
 
 #include "Source/common/verifyinghasher/FileReader.h"
+#include "Source/common/verifyinghasher/VerifyingHasher.h"
 #include "Source/common/verifyinghasher/VerifyingHasherCore.h"
 
 using santa::ArchSelector;
 using santa::FdFileReader;
+using santa::VerifyingHasher;
 using santa::VerifyingHasherCore;
 
 namespace {
@@ -46,16 +48,19 @@ struct Args {
   ArchSelector arch = kHostDefaultArch;
   size_t buf_size = 1u << 20;
   bool skip_page_hash = false;
+  bool unsigned_mode = false;
 };
 
 void PrintUsage(FILE* f) {
   std::fprintf(f,
-               "Usage: VerifyingHasher [-a ARCH] [-b BYTES] [-s] <path>\n"
+               "Usage: VerifyingHasher [-a ARCH] [-b BYTES] [-s] [-u] <path>\n"
                "  -a ARCH   architecture: arm64 | arm64e | x86_64\n"
                "            (default: host preferred — arm64e on Apple Silicon, x86_64 on Intel)\n"
                "  -b N      pread chunk size in bytes (default 1048576, minimum 512)\n"
                "  -s        skip per-page CodeDirectory verification\n"
                "            (cdhash and full-file SHA-256 still computed)\n"
+               "  -u        unsigned mode: invoke the facade with nullopt signed_check\n"
+               "            (stat tuple sourced from this tool's own fstat)\n"
                "  -h        show this help\n");
 }
 
@@ -84,7 +89,7 @@ const char* ArchName(const ArchSelector& a) {
 
 bool ParseArgs(int argc, char** argv, Args& out) {
   int opt;
-  while ((opt = getopt(argc, argv, "a:b:hs")) != -1) {
+  while ((opt = getopt(argc, argv, "a:b:hsu")) != -1) {
     switch (opt) {
       case 'a':
         if (!ParseArch(optarg, out.arch)) {
@@ -103,6 +108,7 @@ bool ParseArgs(int argc, char** argv, Args& out) {
         break;
       }
       case 's': out.skip_page_hash = true; break;
+      case 'u': out.unsigned_mode = true; break;
       case 'h': PrintUsage(stdout); std::exit(0);
       default: return false;
     }
@@ -144,6 +150,39 @@ int main(int argc, char** argv) {
     std::fprintf(stderr, "fstat %s: %s\n", args.path.c_str(), std::strerror(errno));
     ::close(fd);
     return 1;
+  }
+
+  if (args.unsigned_mode) {
+    VerifyingHasher::Expected exp{
+        .stat =
+            VerifyingHasher::StatTuple{
+                .dev = st.st_dev,
+                .ino = st.st_ino,
+                .size = st.st_size,
+                .mtime = st.st_mtimespec,
+            },
+        // signed_check defaults to nullopt → Unsigned path
+    };
+    auto r = VerifyingHasher::Run(fd, args.arch.cputype, args.arch.cpusubtype, exp);
+    ::close(fd);
+
+    const char* status_name = nullptr;
+    switch (r.status) {
+      case VerifyingHasher::Status::kMatchUnsigned: status_name = "kMatchUnsigned"; break;
+      case VerifyingHasher::Status::kMatchCDHash: status_name = "kMatchCDHash"; break;
+      case VerifyingHasher::Status::kMatchSidTidDrift: status_name = "kMatchSidTidDrift"; break;
+      case VerifyingHasher::Status::kNoMatch: status_name = "kNoMatch"; break;
+      case VerifyingHasher::Status::kError: status_name = "kError"; break;
+    }
+    std::printf("path: %s\n", args.path.c_str());
+    std::printf("mode: unsigned\n");
+    std::printf("status: %s\n", status_name);
+    if (r.sha256.has_value()) {
+      std::printf("full-file digest: %s\n", HexLower(r.sha256->data(), r.sha256->size()).c_str());
+    } else {
+      std::printf("full-file digest: (absent)\n");
+    }
+    return r.status == VerifyingHasher::Status::kMatchUnsigned ? 0 : 1;
   }
 
   FdFileReader reader(fd, st.st_size);

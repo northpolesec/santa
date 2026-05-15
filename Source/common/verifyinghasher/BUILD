@@ -154,6 +154,23 @@ filegroup(
     visibility = ["//Source/common/verifyinghasher:__pkg__"],
 )
 
+# Single source of truth for the unsigned Mach-O test fixture used to
+# exercise Expected::Unsigned semantics. Generated via:
+#   cat > /tmp/hw_unsigned_build/main.c <<'EOF'
+#   int main(void) { return 0; }
+#   EOF
+#   clang -arch arm64 -Wl,-no_adhoc_codesign -o hw_unsigned /tmp/hw_unsigned_build/main.c
+# `-Wl,-no_adhoc_codesign` suppresses the linker's default ad-hoc signing
+# so the produced Mach-O has no LC_CODE_SIGNATURE / no CS blob.
+# DO NOT regenerate without also updating kHwUnsignedSha256 in
+# VerifyingHasherTest.mm — the hash changes whenever the toolchain or
+# the source byte sequence changes.
+filegroup(
+    name = "hw_unsigned_fixture",
+    srcs = ["testdata/hw_unsigned"],
+    visibility = ["//Source/common/verifyinghasher:__pkg__"],
+)
+
 santa_unit_test(
     name = "VerifyingHasherCoreTest",
     srcs = ["VerifyingHasherCoreTest.mm"],
@@ -189,6 +206,7 @@ santa_unit_test(
     structured_resources = [
         ":hw_team_signed_fixture",
         ":hw_universal_fixture",
+        ":hw_unsigned_fixture",
     ],
     deps = [
         ":VerifyingHasher",
