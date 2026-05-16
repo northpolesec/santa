@@ -350,6 +350,13 @@ message Execution {
 
   // The server-assigned rule ID that was used to make the decision
   optional int64 rule_id = 18;
+
+  // True if the matching rule returned AUDIT from a CEL expression. The
+  // execution was allowed (as if the rule had returned ALLOWLIST), but the
+  // event is logged with this flag set so audit matches can be distinguished
+  // from regular allow decisions. The `decision` and `reason` fields still
+  // report the underlying allow decision (e.g. DECISION_ALLOW / REASON_BINARY).
+  optional bool audit_return = 19;
 }
 
 // Information about a fork event

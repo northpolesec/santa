@@ -291,6 +291,13 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
       case ReturnValue::ALLOWLIST_COMPILER: resultState = SNTRuleStateAllowCompiler; break;
       case ReturnValue::BLOCKLIST: resultState = SNTRuleStateBlock; break;
       case ReturnValue::SILENT_BLOCKLIST: resultState = SNTRuleStateSilentBlock; break;
+      case ReturnValue::AUDIT:
+        // AUDIT is identical to ALLOWLIST on the client; the only difference
+        // is that the resulting event is flagged so the sync server can
+        // distinguish audit-only matches.
+        cd.auditReturn = YES;
+        resultState = SNTRuleStateAllow;
+        break;
       case ReturnValue::REQUIRE_TOUCHID_ONLY:
         // REQUIRE_TOUCHID_ONLY is like REQUIRE_TOUCHID but it skips the Santa dialog
         cd.silentTouchID = YES;

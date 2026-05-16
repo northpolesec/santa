@@ -388,12 +388,13 @@ static SNTEventState BlockToAllowDecision(SNTEventState blockDecision) {
   // Log to database if necessary.
   if (config.enableAllEventUpload ||
       (cd.decision == SNTEventStateAllowUnknown && !config.disableUnknownEventUpload) ||
-      (cd.decision & SNTEventStateAllow) == 0) {
+      cd.auditReturn || (cd.decision & SNTEventStateAllow) == 0) {
     SNTStoredExecutionEvent* se = [[SNTStoredExecutionEvent alloc] init];
     se.occurrenceDate = [[NSDate alloc] init];
     se.fileSHA256 = cd.sha256;
     se.filePath = binInfo.path;
     se.decision = cd.decision;
+    se.auditReturn = cd.auditReturn;
     se.holdAndAsk = cd.holdAndAsk;
     se.silentTouchID = cd.silentTouchID;
     se.seatbeltRequired = cd.seatbeltRequired;

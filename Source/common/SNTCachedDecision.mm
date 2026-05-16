@@ -87,6 +87,7 @@
   copy.holdAndAsk = _holdAndAsk;
   copy.silentTouchID = _silentTouchID;
   copy.touchIDCooldownMinutes = _touchIDCooldownMinutes;
+  copy.auditReturn = _auditReturn;
   return copy;
 }
 
