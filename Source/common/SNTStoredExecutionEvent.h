@@ -89,6 +89,11 @@
 /// The decision santad returned.
 @property SNTEventState decision;
 
+/// YES if the matching CEL rule returned AUDIT. The decision itself is an
+/// allow decision; this flag indicates the rule was audit-only and the event
+/// is uploaded so audit matches can be distinguished on the sync server.
+@property BOOL auditReturn;
+
 /// The decision depends on the user approving execution.
 @property BOOL holdAndAsk;
 

@@ -270,6 +270,66 @@
   }
 }
 
+- (void)testAuditReturnValue {
+  using ReturnValue = santa::cel::CELProtoTraits<true>::ReturnValue;
+  using ExecutableFileT = santa::cel::CELProtoTraits<true>::ExecutableFileT;
+  using AncestorT = santa::cel::CELProtoTraits<true>::AncestorT;
+  using FileDescriptorT = santa::cel::CELProtoTraits<true>::FileDescriptorT;
+
+  XCTAssertEqual(santa::cel::CELProtoTraits<true>::AUDIT, ::santa::cel::v2::AUDIT);
+
+  auto f = std::make_unique<ExecutableFileT>();
+  f->set_team_id("EQHXZ8M8AV");
+  santa::cel::Activation<true> activation(
+      std::move(f),
+      ^std::vector<std::string>() {
+        return {"hello", "world"};
+      },
+      ^std::map<std::string, std::string>() {
+        return {};
+      },
+      ^uid_t() {
+        return 0;
+      },
+      ^std::string() {
+        return "/";
+      },
+      ^std::string() {
+        return "/usr/bin/test";
+      },
+      ^std::vector<AncestorT>() {
+        return {};
+      },
+      ^std::vector<FileDescriptorT>() {
+        return {};
+      });
+
+  auto sut = santa::cel::Evaluator<true>::Create();
+  XCTAssertTrue(sut.ok());
+
+  {
+    // Static - AUDIT returned when team_id matches
+    auto result = sut.value()->CompileAndEvaluate(
+        "target.team_id == 'EQHXZ8M8AV' ? AUDIT : ALLOWLIST", activation);
+    if (!result.ok()) {
+      XCTFail("Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::AUDIT);
+      XCTAssertEqual(result.value().cacheable, true);
+    }
+  }
+  {
+    // Dynamic - AUDIT returned when args non-empty
+    auto result = sut.value()->CompileAndEvaluate("size(args) > 0 ? AUDIT : ALLOWLIST", activation);
+    if (!result.ok()) {
+      XCTFail("Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::AUDIT);
+      XCTAssertEqual(result.value().cacheable, false);
+    }
+  }
+}
+
 - (void)testV2Only {
   auto argsFn = ^std::vector<std::string>() {
     return {"hello", "world"};

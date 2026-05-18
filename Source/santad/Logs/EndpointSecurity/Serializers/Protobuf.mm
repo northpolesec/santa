@@ -604,6 +604,10 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedExec& msg, SNTCach
     pb_exec->set_rule_id(cd.ruleId);
   }
 
+  if (cd.auditReturn) {
+    pb_exec->set_audit_return(true);
+  }
+
   return FinalizeProto(santa_msg);
 }
 
