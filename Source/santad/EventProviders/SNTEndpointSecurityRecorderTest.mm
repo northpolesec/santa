@@ -219,7 +219,8 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
                                       compilerController:mockCC
                                          authResultCache:mockAuthCache
                                               prefixTree:prefixTree
-                                             processTree:nullptr];
+                                             processTree:nullptr
+                                        sandboxedLineage:nullptr];
 
   testBlock(&esMsg, mockESApi, mockCC, recorderClient, prefixTree, &sema, &semaMetrics);
 
@@ -623,7 +624,8 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
                                       compilerController:mockCC
                                          authResultCache:mockAuthCache
                                               prefixTree:prefixTree
-                                             processTree:nullptr];
+                                             processTree:nullptr
+                                        sandboxedLineage:nullptr];
 
   __block BOOL metricsRecorded = NO;
   [recorderClient handleMessage:Message(mockESApi, &esMsg)
@@ -696,7 +698,8 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
                                       compilerController:mockCC
                                          authResultCache:mockAuthCache
                                               prefixTree:prefixTree
-                                             processTree:nullptr];
+                                             processTree:nullptr
+                                        sandboxedLineage:nullptr];
 
   dispatch_semaphore_t semaMetrics = dispatch_semaphore_create(0);
   [recorderClient handleMessage:Message(mockESApi, &esMsg)
@@ -768,7 +771,8 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
                                       compilerController:mockCC
                                          authResultCache:mockAuthCache
                                               prefixTree:prefixTree
-                                             processTree:nullptr];
+                                             processTree:nullptr
+                                        sandboxedLineage:nullptr];
 
   dispatch_semaphore_t semaMetrics = dispatch_semaphore_create(0);
   [recorderClient handleMessage:Message(mockESApi, &esMsg)

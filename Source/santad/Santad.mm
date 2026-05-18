@@ -84,7 +84,8 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                 std::shared_ptr<TTYWriter> tty_writer,
                 std::shared_ptr<santa::santad::process_tree::ProcessTree> process_tree,
                 std::shared_ptr<santa::EntitlementsFilter> entitlements_filter,
-                std::shared_ptr<santa::SandboxExpectations> sandbox_expectations) {
+                std::shared_ptr<santa::SandboxExpectations> sandbox_expectations,
+                std::shared_ptr<santa::SandboxedLineage> sandboxed_lineage) {
   SNTConfigurator* configurator = [SNTConfigurator configurator];
 
   std::weak_ptr<Metrics> weak_metrics(metrics);
@@ -155,7 +156,8 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                       compilerController:compiler_controller
                                          authResultCache:auth_result_cache
                                               prefixTree:prefix_tree
-                                             processTree:process_tree];
+                                             processTree:process_tree
+                                        sandboxedLineage:sandboxed_lineage];
 
   SNTEndpointSecurityAuthorizer* authorizer_client =
       [[SNTEndpointSecurityAuthorizer alloc] initWithESAPI:esapi

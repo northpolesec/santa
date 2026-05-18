@@ -21,6 +21,7 @@
 #include "Source/santad/ProcessControl.h"
 #import "Source/santad/SNTPolicyProcessor.h"
 #include "Source/santad/SandboxExpectations.h"
+#include "Source/santad/SandboxedLineage.h"
 #include "Source/santad/TTYWriter.h"
 
 const static NSString* kBlockBinary = @"BlockBinary";
@@ -78,7 +79,8 @@ using LogExecutionBlock = void (^)(santa::Message esMsg);
               processControlBlock:(santa::ProcessControlBlock)processControlBlock
                       processTree:
                           (std::shared_ptr<santa::santad::process_tree::ProcessTree>)processTree
-              sandboxExpectations:(std::shared_ptr<santa::SandboxExpectations>)sandboxExpectations;
+              sandboxExpectations:(std::shared_ptr<santa::SandboxExpectations>)sandboxExpectations
+                 sandboxedLineage:(std::shared_ptr<santa::SandboxedLineage>)sandboxedLineage;
 
 ///
 ///  Handles the logic of deciding whether to allow the binary to run or not, sends the response to

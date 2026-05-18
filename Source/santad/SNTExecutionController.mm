@@ -105,6 +105,7 @@ static SNTEventState BlockToAllowDecision(SNTEventState blockDecision) {
 
   std::shared_ptr<santa::santad::process_tree::ProcessTree> _processTree;
   std::shared_ptr<santa::SandboxExpectations> _sandboxExpectations;
+  std::shared_ptr<santa::SandboxedLineage> _sandboxedLineage;
 }
 
 #pragma mark Initializers
@@ -119,7 +120,8 @@ static SNTEventState BlockToAllowDecision(SNTEventState blockDecision) {
               processControlBlock:(santa::ProcessControlBlock)processControlBlock
                       processTree:
                           (std::shared_ptr<santa::santad::process_tree::ProcessTree>)processTree
-              sandboxExpectations:(std::shared_ptr<santa::SandboxExpectations>)sandboxExpectations {
+              sandboxExpectations:(std::shared_ptr<santa::SandboxExpectations>)sandboxExpectations
+                 sandboxedLineage:(std::shared_ptr<santa::SandboxedLineage>)sandboxedLineage {
   self = [super init];
   if (self) {
     _ruleTable = ruleTable;
@@ -134,6 +136,7 @@ static SNTEventState BlockToAllowDecision(SNTEventState blockDecision) {
     _processControlBlock = processControlBlock;
     _processTree = std::move(processTree);
     _sandboxExpectations = std::move(sandboxExpectations);
+    _sandboxedLineage = std::move(sandboxedLineage);
 
     _eventQueue =
         dispatch_queue_create("com.northpolesec.santa.daemon.event_upload", DISPATCH_QUEUE_SERIAL);
@@ -277,31 +280,44 @@ static SNTEventState BlockToAllowDecision(SNTEventState blockDecision) {
   cd.codesigningFlags = targetProc->codesigning_flags;
   cd.vnodeId = SantaVnode::VnodeForFile(targetProc->executable);
 
-  // Seatbelt expectation check: the sandboxed exec is authorized iff
-  // santactl pre-registered an expectation for the caller's audit token,
-  // and the expectation matches the exec target under one of two modes:
-  //   * Strict (CS_VALID & (CS_HARD|CS_KILL)): the kernel refuses or kills
-  //     on any page-hash mismatch (verified against XNU cs_invalid_page),
-  //     so cdhash is a strong binding to executed content.
-  //   * Fallback: the kernel does not enforce page integrity, so binary
-  //     identity is verified via (dev, ino, sha256). `(dev, ino)` binds
-  //     the exec'd vnode to the inode santactl pinned; sha256 binds
-  //     content at santad's read time to santactl's hash. This matches
-  //     Santa's posture for every other rule state (see SNTPolicyProcessor).
-  // No expectation -> deny.
+  // Seatbelt expectation check: the sandboxed exec is authorized iff one of
+  // the following holds:
+  //   1. santactl pre-registered an expectation for the caller's audit
+  //      token and the expectation matches the exec target. Verification
+  //      uses one of two modes:
+  //        * Strict (CS_VALID & (CS_HARD|CS_KILL)): the kernel refuses or
+  //          kills on any page-hash mismatch (verified against XNU
+  //          cs_invalid_page), so cdhash is a strong binding to executed
+  //          content.
+  //        * Fallback: the kernel does not enforce page integrity, so
+  //          binary identity is verified via (dev, ino, sha256). (dev, ino)
+  //          binds the exec'd vnode to the inode santactl pinned; sha256
+  //          binds content at santad's read time to santactl's hash. This
+  //          matches Santa's posture for every other rule state (see
+  //          SNTPolicyProcessor).
+  //   2. The exec'ing parent is already inside a santad-issued seatbelt
+  //      sandbox (tracked in SandboxedLineage). The kernel-enforced
+  //      seatbelt is inherited transitively, so the child runs under the
+  //      same profile without a fresh `santactl sandbox` invocation. Entry
+  //      to the lineage set requires a prior successful expectation match,
+  //      so this path cannot be reached without an authorized ancestor.
+  // No expectation and not in a sandboxed lineage -> deny.
+  //
+  // On any allow, the target's post-exec audit token is recorded in the
+  // lineage tracker so its own descendants can be authorized via path (2).
   //
   // Cache safety: flipping the decision here must not let a later exec of
-  // the same vnode be auto-allowed without re-checking its expectation.
-  // SNTPolicyProcessor sets cd.cacheable=NO for every SEATBELT rule hit,
-  // so the action below becomes SNTActionRespondAllowNoCache rather than
-  // SNTActionRespondAllow.
+  // the same vnode be auto-allowed without re-checking. Authorization
+  // depends on the caller's identity (expectation token or lineage
+  // membership), not just the target binary, so SNTPolicyProcessor sets
+  // cd.cacheable=NO for every SEATBELT rule hit. The action below becomes
+  // SNTActionRespondAllowNoCache rather than SNTActionRespondAllow.
   if (cd.seatbeltRequired) {
     auto maybeExp = _sandboxExpectations->Consume(esMsg->process->audit_token);
     bool authorized = false;
+    bool viaLineage = false;
 
-    if (!maybeExp) {
-      cd.decisionExtra = @"Binary requires seatbelt sandbox but no expectation was registered";
-    } else {
+    if (maybeExp) {
       if (santa::CdhashStrictlyEnforced(targetProc->codesigning_flags)) {
         authorized = memcmp(maybeExp->cdhash.data(), targetProc->cdhash, CS_CDHASH_LEN) == 0;
       } else {
@@ -316,10 +332,25 @@ static SNTEventState BlockToAllowDecision(SNTEventState blockDecision) {
         // would give an attacker a tuning signal.
         cd.decisionExtra = @"Seatbelt expectation verification failed";
       }
+    } else if (_sandboxedLineage && _sandboxedLineage->Contains(esMsg->process->audit_token)) {
+      authorized = true;
+      viaLineage = true;
+    } else {
+      cd.decisionExtra = @"Binary requires seatbelt sandbox but no expectation was registered";
     }
 
     if (authorized) {
       cd.decision = BlockToAllowDecision(cd.decision);
+      // Record the target so descendants can be authorized via the lineage
+      // path. The target audit token reflects the post-exec identity
+      // (incremented pidversion), which is the identity ES will report as
+      // `process` on the descendants' own AUTH_EXEC messages.
+      if (_sandboxedLineage) {
+        _sandboxedLineage->Mark(targetProc->audit_token);
+      }
+      if (viaLineage) {
+        cd.decisionExtra = @"Allowed via sandboxed lineage";
+      }
     }
   }
 

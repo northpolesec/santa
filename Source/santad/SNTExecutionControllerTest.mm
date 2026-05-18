@@ -96,6 +96,7 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
 
 @implementation SNTExecutionControllerTest {
   std::shared_ptr<santa::SandboxExpectations> _sandboxExpectations;
+  std::shared_ptr<santa::SandboxedLineage> _sandboxedLineage;
 }
 
 - (void)setUp {
@@ -135,6 +136,7 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
                                  entitlementsFilter:entitlementsFilter];
 
   _sandboxExpectations = std::make_shared<santa::SandboxExpectations>();
+  _sandboxedLineage = std::make_shared<santa::SandboxedLineage>();
   self.sut = [[SNTExecutionController alloc] initWithRuleTable:self.mockRuleDatabase
                                                     eventTable:self.mockEventDatabase
                                                  notifierQueue:nil
@@ -144,7 +146,8 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
                                                policyProcessor:policyProcessor
                                            processControlBlock:santa::ProdSuspendResumeBlock()
                                                    processTree:nullptr
-                                           sandboxExpectations:_sandboxExpectations];
+                                           sandboxExpectations:_sandboxExpectations
+                                              sandboxedLineage:_sandboxedLineage];
 }
 
 - (void)tearDown {
@@ -854,7 +857,8 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
           policyProcessor:mockPolicyProcessor
       processControlBlock:processControl
               processTree:processTree
-      sandboxExpectations:std::make_shared<santa::SandboxExpectations>()];
+      sandboxExpectations:std::make_shared<santa::SandboxExpectations>()
+         sandboxedLineage:std::make_shared<santa::SandboxedLineage>()];
 
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   mockESApi->SetExpectationsRetainReleaseMessage();
@@ -966,7 +970,8 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
           policyProcessor:mockPolicyProcessor
       processControlBlock:processControl
               processTree:processTree
-      sandboxExpectations:std::make_shared<santa::SandboxExpectations>()];
+      sandboxExpectations:std::make_shared<santa::SandboxExpectations>()
+         sandboxedLineage:std::make_shared<santa::SandboxedLineage>()];
 
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   mockESApi->SetExpectationsRetainReleaseMessage();
@@ -1062,7 +1067,8 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
           policyProcessor:nil
       processControlBlock:santa::ProdSuspendResumeBlock()
               processTree:nullptr
-      sandboxExpectations:std::make_shared<santa::SandboxExpectations>()];
+      sandboxExpectations:std::make_shared<santa::SandboxExpectations>()
+         sandboxedLineage:std::make_shared<santa::SandboxedLineage>()];
 
   // Just verify that flush doesn't crash - the cache internals are private
   XCTAssertNoThrow([controller flushTouchIDApprovalCache]);
@@ -1338,6 +1344,110 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
                const uint8_t cdhash[20] = {0};
                _sandboxExpectations->Register(other, MakeSandboxRequest(0, 0, cdhash, nil));
              }];
+}
+
+// ---------------- Sandboxed lineage ----------------
+
+- (void)testSeatbeltRuleAllowsWhenParentInSandboxedLineage {
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateSeatbelt;
+  rule.type = SNTRuleTypeBinary;
+  [self stubRule:rule forIdentifiers:{.binarySHA256 = @"a"}];
+
+  audit_token_t parent = santa::MakeStubAuditToken(400, 1);
+  audit_token_t target = santa::MakeStubAuditToken(400, 2);
+
+  // No expectation registered — but the exec'ing process is already in a
+  // santad-issued sandboxed lineage, so the exec is authorized.
+  _sandboxedLineage->Mark(parent);
+
+  [self validateExecEvent:SNTActionRespondAllowNoCache
+             messageSetup:^(es_message_t* msg) {
+               msg->process->audit_token = parent;
+               msg->event.exec.target->audit_token = target;
+             }];
+
+  // The target should now be in the lineage so its own descendants can be
+  // authorized.
+  XCTAssertTrue(_sandboxedLineage->Contains(target));
+}
+
+- (void)testSeatbeltRuleDeniesWhenNoExpectationAndNoLineage {
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateSeatbelt;
+  rule.type = SNTRuleTypeBinary;
+  [self stubRule:rule forIdentifiers:{.binarySHA256 = @"a"}];
+
+  [self validateExecEvent:SNTActionRespondDeny
+             messageSetup:^(es_message_t* msg) {
+               msg->process->audit_token = santa::MakeStubAuditToken(401, 1);
+               // No Mark, no Register: should deny.
+             }];
+}
+
+- (void)testSeatbeltRuleSuccessfulExpectationMarksTargetInLineage {
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"cafebabe");
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateSeatbelt;
+  rule.type = SNTRuleTypeBinary;
+  [self stubRule:rule forIdentifiers:{.binarySHA256 = @"cafebabe"}];
+
+  audit_token_t target = santa::MakeStubAuditToken(402, 2);
+
+  [self validateExecEvent:SNTActionRespondAllowNoCache
+             messageSetup:^(es_message_t* msg) {
+               msg->process->audit_token = santa::MakeStubAuditToken(402, 1);
+               msg->event.exec.target->audit_token = target;
+               msg->event.exec.target->codesigning_flags = 0;
+               msg->event.exec.target->executable->stat.st_dev = 17;
+               msg->event.exec.target->executable->stat.st_ino = 42;
+
+               const uint8_t cdhash[20] = {0};
+               _sandboxExpectations->Register(msg->process->audit_token,
+                                              MakeSandboxRequest(17, 42, cdhash, @"cafebabe"));
+             }];
+
+  // First successful expectation-based exec seeds the lineage with the
+  // target's post-exec identity, so children can authorize without a fresh
+  // round-trip through santactl.
+  XCTAssertTrue(_sandboxedLineage->Contains(target));
+}
+
+- (void)testSeatbeltRuleFailedExpectationDoesNotMarkLineage {
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"cafebabe");
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateSeatbelt;
+  rule.type = SNTRuleTypeBinary;
+  [self stubRule:rule forIdentifiers:{.binarySHA256 = @"cafebabe"}];
+
+  audit_token_t target = santa::MakeStubAuditToken(403, 2);
+
+  [self validateExecEvent:SNTActionRespondDeny
+             messageSetup:^(es_message_t* msg) {
+               msg->process->audit_token = santa::MakeStubAuditToken(403, 1);
+               msg->event.exec.target->audit_token = target;
+               msg->event.exec.target->codesigning_flags = 0;
+               msg->event.exec.target->executable->stat.st_dev = 17;
+               msg->event.exec.target->executable->stat.st_ino = 42;
+
+               const uint8_t cdhash[20] = {0};
+               // Expectation registered with a mismatched sha256: verification
+               // fails, exec is denied, lineage must not be marked.
+               _sandboxExpectations->Register(msg->process->audit_token,
+                                              MakeSandboxRequest(17, 42, cdhash, @"deadbeef"));
+             }];
+
+  XCTAssertFalse(_sandboxedLineage->Contains(target));
 }
 
 @end

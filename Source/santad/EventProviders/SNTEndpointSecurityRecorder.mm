@@ -38,6 +38,7 @@ using santa::EventDisposition;
 using santa::Logger;
 using santa::Message;
 using santa::PrefixTree;
+using santa::SandboxedLineage;
 using santa::Unit;
 using santa::santad::process_tree::ProcessTree;
 
@@ -64,6 +65,7 @@ es_file_t* GetTargetFileForPrefixTree(const es_message_t* msg) {
   std::shared_ptr<Enricher> _enricher;
   std::shared_ptr<Logger> _logger;
   std::shared_ptr<PrefixTree<Unit>> _prefixTree;
+  std::shared_ptr<SandboxedLineage> _sandboxedLineage;
 }
 
 - (instancetype)initWithESAPI:(std::shared_ptr<EndpointSecurityAPI>)esApi
@@ -73,7 +75,8 @@ es_file_t* GetTargetFileForPrefixTree(const es_message_t* msg) {
            compilerController:(SNTCompilerController*)compilerController
               authResultCache:(std::shared_ptr<AuthResultCache>)authResultCache
                    prefixTree:(std::shared_ptr<PrefixTree<Unit>>)prefixTree
-                  processTree:(std::shared_ptr<ProcessTree>)processTree {
+                  processTree:(std::shared_ptr<ProcessTree>)processTree
+             sandboxedLineage:(std::shared_ptr<SandboxedLineage>)sandboxedLineage {
   self = [super initWithESAPI:std::move(esApi)
                       metrics:std::move(metrics)
                     processor:santa::Processor::kRecorder
@@ -84,6 +87,7 @@ es_file_t* GetTargetFileForPrefixTree(const es_message_t* msg) {
     _compilerController = compilerController;
     _authResultCache = authResultCache;
     _prefixTree = prefixTree;
+    _sandboxedLineage = std::move(sandboxedLineage);
     _configurator = [SNTConfigurator configurator];
 
     [self establishClientOrDie];
@@ -114,6 +118,36 @@ es_file_t* GetTargetFileForPrefixTree(const es_message_t* msg) {
 
       self->_authResultCache->RemoveFromCache(esMsg->event.close.target);
 
+      break;
+    }
+
+    case ES_EVENT_TYPE_NOTIFY_FORK: {
+      // The kernel-enforced seatbelt is inherited by forked children. Mirror
+      // that in the lineage tracker so an exec by the child can authorize
+      // via the lineage path without a fresh expectation.
+      if (self->_sandboxedLineage) {
+        self->_sandboxedLineage->PropagateOnFork(esMsg->process->audit_token,
+                                                 esMsg->event.fork.child->audit_token);
+      }
+      break;
+    }
+
+    case ES_EVENT_TYPE_NOTIFY_EXEC: {
+      // Replace the pre-exec (pid, pidversion) entry with the post-exec one,
+      // and propagate lineage across exec of non-SEATBELT-ruled binaries by
+      // a sandboxed process (the kernel-enforced seatbelt follows the
+      // process regardless of which Santa rule governed the exec).
+      if (self->_sandboxedLineage) {
+        self->_sandboxedLineage->OnExec(esMsg->process->audit_token,
+                                        esMsg->event.exec.target->audit_token);
+      }
+      break;
+    }
+
+    case ES_EVENT_TYPE_NOTIFY_EXIT: {
+      if (self->_sandboxedLineage) {
+        self->_sandboxedLineage->Forget(esMsg->process->audit_token);
+      }
       break;
     }
 

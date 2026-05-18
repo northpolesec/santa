@@ -402,6 +402,7 @@ objc_library(
         ":SNTRuleTable",
         ":SNTSyncdQueue",
         ":SandboxExpectations",
+        ":SandboxedLineage",
         ":TTYWriter",
         "//Source/common:BranchPrediction",
         "//Source/common:CodeSigningIdentifierUtils",
@@ -468,6 +469,7 @@ objc_library(
         ":EndpointSecurityLogger",
         ":SNTCompilerController",
         ":SNTEndpointSecurityTreeAwareClient",
+        ":SandboxedLineage",
         "//Source/common:Platform",
         "//Source/common:PrefixTree",
         "//Source/common:SNTConfigurator",
@@ -919,6 +921,25 @@ santa_unit_test(
     ],
 )
 
+objc_library(
+    name = "SandboxedLineage",
+    srcs = ["SandboxedLineage.mm"],
+    hdrs = ["SandboxedLineage.h"],
+    deps = [
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/synchronization",
+    ],
+)
+
+santa_unit_test(
+    name = "SandboxedLineageTest",
+    srcs = ["SandboxedLineageTest.mm"],
+    deps = [
+        ":SandboxedLineage",
+        "//Source/common:AuditUtilities",
+    ],
+)
+
 santa_unit_test(
     name = "SNTDaemonControlControllerTest",
     srcs = ["SNTDaemonControlControllerTest.mm"],
@@ -1043,6 +1064,7 @@ objc_library(
         ":SNTRuleTable",
         ":SNTSyncdQueue",
         ":SandboxExpectations",
+        ":SandboxedLineage",
         ":TTYWriter",
         "//Source/common:MOLXPCConnection",
         "//Source/common:PowerMonitor",
@@ -1086,6 +1108,7 @@ objc_library(
         ":SNTRuleTable",
         ":SNTSyncdQueue",
         ":SandboxExpectations",
+        ":SandboxedLineage",
         ":SleighLauncher",
         ":TTYWriter",
         "//Source/common:MOLXPCConnection",
@@ -1536,6 +1559,7 @@ santa_unit_test(
         ":SNTPolicyProcessor",
         ":SNTRuleTable",
         ":SandboxExpectations",
+        ":SandboxedLineage",
         "//Source/common:AuditUtilities",
         "//Source/common:MOLCertificate",
         "//Source/common:MOLCodesignChecker",
@@ -1764,6 +1788,7 @@ test_suite(
         ":SNTRuleTableTest",
         ":SNTSyncdQueueTest",
         ":SandboxExpectationsTest",
+        ":SandboxedLineageTest",
         ":SantadTest",
         ":TemporaryMonitorModeTest",
         "//Source/common/es:EndpointSecurityClientTest",
