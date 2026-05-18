@@ -59,10 +59,6 @@ const config: Config = {
             ],
           },
           {
-            to: "/features/stats",
-            from: "/deployment/stats.html",
-          },
-          {
             to: "/features/faa",
             from: "/deployment/file-access-auth.html",
           },

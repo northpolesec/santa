@@ -306,36 +306,6 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
 
                 [syncd_queue reassessSyncServiceConnection];
               }],
-    [[SNTKVOManager alloc] initWithObject:configurator
-                                 selector:@selector(enableStatsCollection)
-                                     type:[NSNumber class]
-                                 callback:^(NSNumber* oldValue, NSNumber* newValue) {
-                                   BOOL oldBool = [oldValue boolValue];
-                                   BOOL newBool = [newValue boolValue];
-                                   if (oldBool != newBool) {
-                                     LOGI(@"EnableStatsCollection changed: %d -> %d", oldBool,
-                                          newBool);
-                                     [syncd_queue reassessSyncServiceConnection];
-                                   }
-                                 }],
-    [[SNTKVOManager alloc]
-        initWithObject:configurator
-              selector:@selector(statsOrganizationID)
-                  type:[NSString class]
-              callback:^(NSString* oldValue, NSString* newValue) {
-                if ((!newValue && !oldValue) || ([newValue isEqualToString:oldValue])) {
-                  return;
-                } else {
-                  LOGI(@"StatsOrganizationID changed: %@ -> %@", oldValue, newValue);
-                  // If either the new or old value was missing, we must
-                  // reassess the connection. If they both exist, it means the
-                  // value changed, but the sync service should already be
-                  // running and there is nothing to do.
-                  if (!oldValue || !newValue) {
-                    [syncd_queue reassessSyncServiceConnection];
-                  }
-                }
-              }],
     [[SNTKVOManager alloc]
         initWithObject:configurator
               selector:@selector(exportMetrics)

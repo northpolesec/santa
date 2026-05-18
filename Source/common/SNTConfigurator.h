@@ -803,22 +803,6 @@ extern NSString* _Nonnull const kEnableMenuItemUserOverride;
 - (void)setSyncServerPushNotificationsFullSyncInterval:(NSUInteger)interval;
 
 ///
-///  Enable statistics uploading to polaris.northpole.security.
-///  See https://northpole.dev/deployment/stats for more info.
-///
-@property(readonly, nonatomic) BOOL enableStatsCollection;
-
-///
-///  Specifies an organization ID to send with collected statistics.
-///  Setting this to anything other than a blank string will enable
-///  statistics collection, regardless of the EnableStatsCollection key.
-///
-///  Only populate this field with a value provided to you by
-///  North Pole Security, Inc.
-///
-@property(nullable, readonly, nonatomic) NSString* statsOrganizationID;
-
-///
 ///  If YES, enables bundle detection for blocked events.
 ///  Its value is set by a sync server that supports bundles. Defaults to NO.
 ///
@@ -1174,24 +1158,6 @@ extern NSString* _Nonnull const kEnableMenuItemUserOverride;
 ///  Validate the configuration profile.
 ///
 - (nullable NSArray*)validateConfiguration;
-
-#pragma mark Stats Submission State
-
-///
-/// Timestamp of the last time a stats submission was attempted
-///
-@property(nullable, readonly, nonatomic) NSDate* lastStatsSubmissionTimestamp;
-
-///
-/// Santa version information from the last time a stats submission was attempted
-///
-@property(nullable, readonly, nonatomic) NSString* lastStatsSubmissionVersion;
-
-///
-/// Update the stats state file
-///
-- (void)saveStatsSubmissionAttemptTime:(nullable NSDate*)timestamp
-                               version:(nullable NSString*)version;
 
 ///
 /// Returns true if the system has rebooted since the last time santad was run.
