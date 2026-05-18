@@ -1295,7 +1295,7 @@
 
   OCMStub([self.configMock enablePushNotifications]).andReturn(YES);
 
-  [sm preflightWithSyncState:ss];
+  XCTAssertEqual([sm preflightWithSyncState:ss], SNTSyncStatusTypeSuccess);
 
   XCTAssertEqualObjects(ss.pushIssuerJWT, @"issuer-jwt");
   XCTAssertEqualObjects(ss.pushJWT, @"user-jwt");
