@@ -32,7 +32,10 @@ objc_library(
 
 swift_library(
     name = "SNTMessageView",
-    srcs = ["SNTMessageView.swift"],
+    srcs = [
+        "MoonLandingIcon.swift",
+        "SNTMessageView.swift",
+    ],
     generates_header = 1,
     module_name = "santa_gui_SNTMessageView",
     deps = [

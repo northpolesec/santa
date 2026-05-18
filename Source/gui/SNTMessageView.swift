@@ -41,20 +41,18 @@ extension Date {
   }
 }
 
+public func IsSpecialDate(month: Int, day: Int) -> Bool {
+  return SNTConfigurator.configurator().funFontsOnSpecificDays
+    && Calendar.current.dateComponents([.month, .day], from: Date.now()) == DateComponents(month: month, day: day)
+}
+
 public struct SNTMessageView<Content: View>: View {
   let blockMessage: NSAttributedString?
   @ViewBuilder let content: Content
 
-  let enableFunFonts: Bool = SNTConfigurator.configurator().funFontsOnSpecificDays
-
   public init(_ blockMessage: NSAttributedString? = nil, @ViewBuilder content: () -> Content) {
     self.content = content()
     self.blockMessage = blockMessage
-  }
-
-  func SpecialDateIs(month: Int, day: Int) -> Bool {
-    return enableFunFonts
-      && Calendar.current.dateComponents([.month, .day], from: Date.now()) == DateComponents(month: month, day: day)
   }
 
   public var body: some View {
@@ -66,14 +64,18 @@ public struct SNTMessageView<Content: View>: View {
           .frame(width: 32, height: 32)
           .saturation(0.9)
 
-        if SpecialDateIs(month: 4, day: 1) {
+        if IsSpecialDate(month: 4, day: 1) {
           image
           Text(verbatim: " Santa ").font(Font.custom("ComicSansMS", size: 34.0))
           image.hidden()
-        } else if SpecialDateIs(month: 5, day: 4) {
+        } else if IsSpecialDate(month: 5, day: 4) {
           // $ is the Rebel Alliance logo in the StarJedi font.
           Text(verbatim: "$  Santa   ").font(Font.custom("StarJedi", size: 34.0))
-        } else if SpecialDateIs(month: 10, day: 31) {
+        } else if IsSpecialDate(month: 7, day: 20) {
+          MoonLandingIcon()
+          Text(verbatim: " Santa ").font(Font.custom("HelveticaNeue-UltraLight", size: 34.0))
+          image.hidden()
+        } else if IsSpecialDate(month: 10, day: 31) {
           Text(verbatim: "🎃 Santa   ").font(Font.custom("HelveticaNeue-UltraLight", size: 34.0))
         } else {
           image
@@ -344,7 +346,8 @@ public func StandaloneButton(action: @escaping () -> Void) -> some View {
   Button(
     action: action,
     label: {
-      Text(NSLocalizedString("Approve", comment: "Default text for Approve")).frame(maxWidth: 200.0)
+      let t = NSLocalizedString("Approve", comment: "Default text for Approve")
+      Text(t).frame(maxWidth: 200.0)
     }
   )
   .keyboardShortcut(.return, modifiers: .command)
@@ -363,7 +366,7 @@ public func DismissButton(
     label: {
       let t =
         customText
-        ?? (silence ?? false
+        ?? ((silence ?? false)
           ? NSLocalizedString("Dismiss & Silence", comment: "")
           : NSLocalizedString("Dismiss", comment: ""))
       Text(t).frame(maxWidth: 200.0)
