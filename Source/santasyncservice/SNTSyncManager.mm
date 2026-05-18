@@ -572,11 +572,10 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
       NSUInteger oldInterval = self.pushNotifications.fullSyncInterval;
       [self.pushNotifications handlePreflightSyncState:syncState];
 
-      // Clear all push credentials from syncState after handoff to push client.
-      // These are no longer needed and should not be accessible to other sync stages.
+      // Clear NATS connection secrets from syncState now that the push client
+      // has captured them. pushJWT and pushIssuerJWT are kept so postflight
+      // can include them in pushTokenChain for the daemon to persist.
       syncState.pushNKey = nil;
-      syncState.pushJWT = nil;
-      syncState.pushIssuerJWT = nil;
       syncState.pushHMACKey = nil;
 
       if (oldInterval != self.pushNotifications.fullSyncInterval) {
