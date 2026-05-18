@@ -1273,6 +1273,36 @@
 
 #pragma mark - Dynamic NATS Push Client Lifecycle Tests
 
+- (void)testPreflightPreservesPushCredentialsForPostflight {
+  // PostflightConfigBundle reads pushIssuerJWT and pushJWT from syncState to
+  // populate pushTokenChain. The daemon wipes existing sync state before
+  // applying the postflight bundle on a clean sync, so these fields must
+  // survive preflight for the chain to be restored.
+
+  id mockPreflight = OCMClassMock([SNTSyncPreflight class]);
+  OCMStub([mockPreflight alloc]).andReturn(mockPreflight);
+  OCMStub([mockPreflight initWithState:OCMOCK_ANY]).andReturn(mockPreflight);
+  OCMStub([(SNTSyncPreflight*)mockPreflight sync]).andReturn(YES);
+
+  SNTSyncState* ss = [[SNTSyncState alloc] init];
+  ss.isSyncV2 = YES;
+  ss.fullSyncInterval = @(600);
+  ss.preflightOnly = YES;
+  ss.pushIssuerJWT = @"issuer-jwt";
+  ss.pushJWT = @"user-jwt";
+
+  SNTSyncManager* sm = [[SNTSyncManager alloc] initWithDaemonConnection:nil];
+
+  OCMStub([self.configMock enablePushNotifications]).andReturn(YES);
+
+  XCTAssertEqual([sm preflightWithSyncState:ss], SNTSyncStatusTypeSuccess);
+
+  XCTAssertEqualObjects(ss.pushIssuerJWT, @"issuer-jwt");
+  XCTAssertEqualObjects(ss.pushJWT, @"user-jwt");
+
+  [mockPreflight stopMocking];
+}
+
 - (void)testPreflightCreatesNATSWhenSyncV2 {
   id mockPreflight = OCMClassMock([SNTSyncPreflight class]);
   OCMStub([mockPreflight alloc]).andReturn(mockPreflight);
