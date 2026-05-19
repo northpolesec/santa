@@ -214,8 +214,23 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message& esMsg) {
   return @"Tamper Resistance";
 }
 
+- (BOOL)shouldHandleMessage:(const Message&)esMsg {
+  return YES;
+}
+
 - (void)handleMessage:(Message&&)esMsg
     recordEventMetrics:(void (^)(EventDisposition))recordEventMetrics {
+  [self processMessage:std::move(esMsg)
+               handler:^(Message msg) {
+                 es_auth_result_t result = [self processAuthMessage:std::move(msg)];
+                 // For this client, a processed event is one that was found
+                 // to be violating anti-tamper policy.
+                 recordEventMetrics(result == ES_AUTH_RESULT_DENY ? EventDisposition::kProcessed
+                                                                  : EventDisposition::kDropped);
+               }];
+}
+
+- (es_auth_result_t)processAuthMessage:(Message)esMsg {
   es_auth_result_t result = ES_AUTH_RESULT_ALLOW;
   bool cacheable = true;
   switch (esMsg->event_type) {
@@ -356,9 +371,7 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message& esMsg) {
           withAuthResult:result
                cacheable:(cacheable && result == ES_AUTH_RESULT_ALLOW)];
 
-  // For this client, a processed event is one that was found to be violating anti-tamper policy
-  recordEventMetrics(result == ES_AUTH_RESULT_DENY ? EventDisposition::kProcessed
-                                                   : EventDisposition::kDropped);
+  return result;
 }
 
 - (void)enable {

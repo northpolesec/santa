@@ -47,6 +47,7 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
 
 @interface SNTEndpointSecurityTamperResistance (Testing)
 + (bool)isProtectedPath:(std::string_view)path;
+- (es_auth_result_t)processAuthMessage:(santa::Message)esMsg;
 @end
 
 @interface SNTEndpointSecurityTamperResistanceTest : XCTestCase
@@ -261,14 +262,11 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
         [inv getArgument:&gotCachable atIndex:4];
       });
 
-  // First check unhandled event types will crash
-  {
-    Message msg(mockESApi, &esMsg);
-    XCTAssertThrows([tamperClient handleMessage:Message(mockESApi, &esMsg)
-                             recordEventMetrics:^(EventDisposition d) {
-                               XCTFail("Unhandled event types shouldn't call metrics recorder");
-                             }]);
-  }
+  // First check unhandled event types will crash. Test against
+  // `processAuthMessage:` directly: the dispatched switch lives there, so the
+  // synchronous throw cannot be observed through `handleMessage:` after the
+  // work moved to the auth queue.
+  XCTAssertThrows([tamperClient processAuthMessage:Message(mockESApi, &esMsg)]);
 
   // Check UNLINK tamper events
   {
