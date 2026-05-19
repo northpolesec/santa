@@ -46,6 +46,25 @@ using santa::Message;
 using santa::SetPairPathAndType;
 using santa::WatchItemPathType;
 
+namespace {
+// Return value from the per-event tamper-policy switch. `denyLog`, when
+// non-nil, is the message that the caller should emit off the ES reader
+// thread. Keeping logging out of the response path avoids stalling the
+// handler past the ES auth deadline when os_log's streaming delivery
+// synchronously waits on diagnosticd / launchd IPC.
+struct TamperAuthResult {
+  es_auth_result_t result = ES_AUTH_RESULT_ALLOW;
+  bool cacheable = true;
+  NSString* denyLog = nil;
+
+  static TamperAuthResult AllowCacheable() { return {}; }
+  static TamperAuthResult AllowNotCacheable() { return {.cacheable = false}; }
+  static TamperAuthResult Deny(NSString* log) {
+    return {.result = ES_AUTH_RESULT_DENY, .cacheable = false, .denyLog = log};
+  }
+};
+}  // namespace
+
 // The ES client process (com.northpolesec.santa.daemon) will be the only process allowed to
 // modify these file paths.
 constexpr std::pair<std::string_view, WatchItemPathType> kProtectedFiles[] = {
@@ -113,20 +132,20 @@ static NSString* TamperEventName(es_event_type_t type) {
   }
 }
 
-/// Return a pair of whether or not to allow the exec and whether or not the ES response should be
-/// cached. If the exec is not launchctl, the response can be cached, otherwise the response should
-/// not be cached.
-std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message& esMsg) {
+/// Return the tamper-policy decision for an AUTH_EXEC event. If the exec is not launchctl, the
+/// response can be cached; otherwise the response should not be cached because per-invocation
+/// argument inspection drives the outcome.
+TamperAuthResult ValidateLaunchctlExec(const Message& esMsg) {
   es_string_token_t exec_path = esMsg->event.exec.target->executable->path;
   if (strncmp(exec_path.data, "/bin/launchctl", exec_path.length) != 0) {
-    return {ES_AUTH_RESULT_ALLOW, true};
+    return TamperAuthResult::AllowCacheable();
   }
 
   // Ensure there are at least 2 arguments after the command
   std::shared_ptr<EndpointSecurityAPI> esApi = esMsg.ESAPI();
   uint32_t argCount = esApi->ExecArgCount(&esMsg->event.exec);
   if (argCount < 2) {
-    return {ES_AUTH_RESULT_ALLOW, false};
+    return TamperAuthResult::AllowNotCacheable();
   }
 
   // Check for some allowed subcommands
@@ -135,28 +154,28 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message& esMsg) {
       "blame", "help", "hostinfo", "list", "plist", "print", "procinfo",
   };
   if (safe_commands.find(std::string(arg.data, arg.length)) != safe_commands.end()) {
-    return {ES_AUTH_RESULT_ALLOW, false};
+    return TamperAuthResult::AllowNotCacheable();
   }
 
   for (int i = 2; i < argCount; i++) {
     es_string_token_t arg = esApi->ExecArg(&esMsg->event.exec, i);
 
     if (strnstr(arg.data, "com.northpolesec.santa.daemon", arg.length) != NULL) {
-      LOGW(@"Preventing attempt to kill Santa daemon by launchctl");
-      return {ES_AUTH_RESULT_DENY, false};
+      return TamperAuthResult::Deny(@"Preventing attempt to kill Santa daemon by launchctl");
     }
 
     // If legacy plists paths are found, assume a load is being attempted. Block the exec and
-    // delete all of the plists.
+    // delete all of the plists off the ES reader thread.
     if (strnstr(arg.data, "/Library/LaunchDaemons/com.google.santa", arg.length) != NULL ||
         strnstr(arg.data, "/Library/LaunchAgents/com.google.santa.plist", arg.length) != NULL) {
-      LOGW(@"Preventing load of legacy Santa component");
-      RemoveLegacyLaunchdPlists();
-      return {ES_AUTH_RESULT_DENY, false};
+      dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+        RemoveLegacyLaunchdPlists();
+      });
+      return TamperAuthResult::Deny(@"Preventing load of legacy Santa component");
     }
   }
 
-  return {ES_AUTH_RESULT_ALLOW, false};
+  return TamperAuthResult::AllowNotCacheable();
 }
 
 @interface SNTEndpointSecurityTamperResistance ()
@@ -220,19 +239,26 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message& esMsg) {
 
 - (void)handleMessage:(Message&&)esMsg
     recordEventMetrics:(void (^)(EventDisposition))recordEventMetrics {
-  [self processMessage:std::move(esMsg)
-               handler:^(Message msg) {
-                 es_auth_result_t result = [self processAuthMessage:std::move(msg)];
-                 // For this client, a processed event is one that was found
-                 // to be violating anti-tamper policy.
-                 recordEventMetrics(result == ES_AUTH_RESULT_DENY ? EventDisposition::kProcessed
-                                                                  : EventDisposition::kDropped);
-               }];
+  TamperAuthResult r = [self processAuthMessage:esMsg];
+
+  // Emit denial logs off the ES reader thread to prevent a rare deadlock.
+  if (r.denyLog) {
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+      LOGW(@"%@", r.denyLog);
+    });
+  }
+
+  // Do not cache denied operations so that each tamper attempt is logged.
+  [self respondToMessage:esMsg
+          withAuthResult:r.result
+               cacheable:(r.cacheable && r.result == ES_AUTH_RESULT_ALLOW)];
+
+  // For this client, a processed event is one that was found to be violating anti-tamper policy.
+  recordEventMetrics(r.result == ES_AUTH_RESULT_DENY ? EventDisposition::kProcessed
+                                                     : EventDisposition::kDropped);
 }
 
-- (es_auth_result_t)processAuthMessage:(Message)esMsg {
-  es_auth_result_t result = ES_AUTH_RESULT_ALLOW;
-  bool cacheable = true;
+- (TamperAuthResult)processAuthMessage:(Message)esMsg {
   switch (esMsg->event_type) {
     case ES_EVENT_TYPE_AUTH_UNLINK:
     case ES_EVENT_TYPE_AUTH_TRUNCATE:
@@ -240,34 +266,32 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message& esMsg) {
     case ES_EVENT_TYPE_AUTH_LINK:
     case ES_EVENT_TYPE_AUTH_RENAME:
     case ES_EVENT_TYPE_AUTH_OPEN: {
+      for (const auto& target : esMsg.PathTargets()) {
+        if (target.truncated) {
+          return TamperAuthResult::Deny([NSString
+              stringWithFormat:@"Denying %@ event with truncated path target (PID %d, %@)",
+                               TamperEventName(esMsg->event_type),
+                               audit_token_to_pid(esMsg->process->audit_token),
+                               santa::StringTokenToNSString(esMsg->process->executable->path)]);
+        }
+        if ([SNTEndpointSecurityTamperResistance isTamperedPath:target.Path() forMessage:esMsg]) {
+          return TamperAuthResult::Deny(
+              [NSString stringWithFormat:
+                            @"Preventing tamper attempt (%@ by PID %d, %@) on protected path: %.*s",
+                            TamperEventName(esMsg->event_type),
+                            audit_token_to_pid(esMsg->process->audit_token),
+                            santa::StringTokenToNSString(esMsg->process->executable->path),
+                            (int)target.Path().size(), target.Path().data()]);
+        }
+      }
       // CREATE destinations may not exist yet, so caching an ALLOW by vnode has no effect.
       // OPEN responses cannot currently convey a subset of allowed flags, so they can't be cached
       // either without risking later opens of different flag combinations being incorrectly
       // allowed.
-      if (esMsg->event_type == ES_EVENT_TYPE_AUTH_CREATE ||
-          esMsg->event_type == ES_EVENT_TYPE_AUTH_OPEN) {
-        cacheable = false;
-      }
-
-      for (const auto& target : esMsg.PathTargets()) {
-        if (target.truncated) {
-          LOGW(@"Denying %@ event with truncated path target (PID %d, %@)",
-               TamperEventName(esMsg->event_type), audit_token_to_pid(esMsg->process->audit_token),
-               santa::StringTokenToNSString(esMsg->process->executable->path));
-          result = ES_AUTH_RESULT_DENY;
-          cacheable = false;
-          break;
-        }
-        if ([SNTEndpointSecurityTamperResistance isTamperedPath:target.Path() forMessage:esMsg]) {
-          result = ES_AUTH_RESULT_DENY;
-          LOGW(@"Preventing tamper attempt (%@ by PID %d, %@) on protected path: %.*s",
-               TamperEventName(esMsg->event_type), audit_token_to_pid(esMsg->process->audit_token),
-               santa::StringTokenToNSString(esMsg->process->executable->path),
-               (int)target.Path().size(), target.Path().data());
-          break;
-        }
-      }
-      break;
+      return (esMsg->event_type == ES_EVENT_TYPE_AUTH_OPEN ||
+              esMsg->event_type == ES_EVENT_TYPE_AUTH_CREATE)
+                 ? TamperAuthResult::AllowNotCacheable()
+                 : TamperAuthResult::AllowCacheable();
     }
 
     case ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME: {
@@ -275,11 +299,12 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message& esMsg) {
 
       if ([[SNTConfigurator configurator] enableAntiTamperProcessSuspendResume] &&
           audit_token_to_pid(target->audit_token) == getpid()) {
-        LOGE(@"Preventing attempt to suspend/resume Santa (type: %d. from PID %d, %s)",
-             esMsg->event.proc_suspend_resume.type, audit_token_to_pid(esMsg->process->audit_token),
-             esMsg->process->executable->path.data);
-        result = ES_AUTH_RESULT_DENY;
-        break;
+        return TamperAuthResult::Deny([NSString
+            stringWithFormat:@"Preventing attempt to suspend/resume Santa (type: %d. from "
+                             @"PID %d, %s)",
+                             esMsg->event.proc_suspend_resume.type,
+                             audit_token_to_pid(esMsg->process->audit_token),
+                             esMsg->process->executable->path.data]);
       }
 
       {
@@ -290,41 +315,40 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message& esMsg) {
               santa::StringTokenToNSString(target->team_id), target->is_platform_binary);
           if (targetSigningID &&
               _antiSuspendSigningIDs.contains(santa::NSStringToUTF8String(targetSigningID))) {
-            LOGE(@"Preventing attempt to suspend/resume %@ (type: %d. from PID %d, %s)",
-                 targetSigningID, esMsg->event.proc_suspend_resume.type,
-                 audit_token_to_pid(esMsg->process->audit_token),
-                 esMsg->process->executable->path.data);
-            result = ES_AUTH_RESULT_DENY;
+            return TamperAuthResult::Deny([NSString
+                stringWithFormat:@"Preventing attempt to suspend/resume %@ (type: %d. from "
+                                 @"PID %d, %s)",
+                                 targetSigningID, esMsg->event.proc_suspend_resume.type,
+                                 audit_token_to_pid(esMsg->process->audit_token),
+                                 esMsg->process->executable->path.data]);
           }
         }
       }
-      break;
+      return TamperAuthResult::AllowCacheable();
     }
 
     case ES_EVENT_TYPE_AUTH_SIGNAL: {
-      // signal event type in ES does not support caching
-      cacheable = false;
+      // Signal event type in ES does not support caching.
       if (esMsg->event.signal.sig == 0) {
         // Signal 0 doesn't actually get sent to the process, it is only used to
         // check if the process exists. Because of this, we don't need to block it.
-        break;
+        return TamperAuthResult::AllowNotCacheable();
       }
 
       pid_t sourcePid = audit_token_to_pid(esMsg->process->audit_token);
       pid_t targetPid = audit_token_to_pid(esMsg->event.signal.target->audit_token);
 
       if (targetPid != getpid()) {
-        break;
+        return TamperAuthResult::AllowNotCacheable();
       }
 
       // Only launchd may deliver signals to santad.
       if (sourcePid != 1) {
-        LOGW(@"Preventing attempt to signal Santa daemon: signal %d, sending pid: %d, sending "
-             @"process: %@",
-             esMsg->event.signal.sig, sourcePid,
-             santa::StringTokenToNSString(esMsg->process->executable->path));
-        result = ES_AUTH_RESULT_DENY;
-        break;
+        return TamperAuthResult::Deny([NSString
+            stringWithFormat:@"Preventing attempt to signal Santa daemon: signal %d, sending "
+                             @"pid: %d, sending process: %@",
+                             esMsg->event.signal.sig, sourcePid,
+                             santa::StringTokenToNSString(esMsg->process->executable->path)]);
       }
 
       // When launchd delivers a signal on behalf of another process (msg
@@ -343,35 +367,27 @@ std::pair<es_auth_result_t, bool> ValidateLaunchctlExec(const Message& esMsg) {
           bool isPermittedPlatformBinary =
               self.allowDelegatedSignals && instigator->is_platform_binary;
           if (!isAllowlisted && !isPermittedPlatformBinary) {
-            LOGW(@"Preventing delegated signal to Santa daemon: signal %d, "
-                 @"instigator pid: %d, instigator process: %@",
-                 esMsg->event.signal.sig, audit_token_to_pid(instigator->audit_token),
-                 santa::StringTokenToNSString(instigator->executable->path));
-            result = ES_AUTH_RESULT_DENY;
+            return TamperAuthResult::Deny([NSString
+                stringWithFormat:@"Preventing delegated signal to Santa daemon: signal %d, "
+                                 @"instigator pid: %d, instigator process: %@",
+                                 esMsg->event.signal.sig,
+                                 audit_token_to_pid(instigator->audit_token),
+                                 santa::StringTokenToNSString(instigator->executable->path)]);
           }
         }
       }
 #endif  // HAVE_MACOS_15_5
-      break;
+      return TamperAuthResult::AllowNotCacheable();
     }
 
-    case ES_EVENT_TYPE_AUTH_EXEC: {
-      std::tie(result, cacheable) = ValidateLaunchctlExec(esMsg);
-      break;
-    }
+    case ES_EVENT_TYPE_AUTH_EXEC: return ValidateLaunchctlExec(esMsg);
 
     default:
       // Unexpected event type, this is a programming error
       [NSException raise:@"Invalid event type"
                   format:@"Invalid tamper resistance event type: %d", esMsg->event_type];
+      return TamperAuthResult::AllowCacheable();  // unreachable
   }
-
-  // Do not cache denied operations so that each tamper attempt is logged.
-  [self respondToMessage:esMsg
-          withAuthResult:result
-               cacheable:(cacheable && result == ES_AUTH_RESULT_ALLOW)];
-
-  return result;
 }
 
 - (void)enable {
