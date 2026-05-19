@@ -273,12 +273,13 @@ TamperAuthResult ValidateLaunchctlExec(const Message& esMsg) {
                                santa::StringTokenToNSString(esMsg->process->executable->path)]);
         }
         if ([SNTEndpointSecurityTamperResistance isTamperedPath:target.Path() forMessage:esMsg]) {
-          return TamperAuthResult::Deny([NSString
-              stringWithFormat:@"Preventing tamper attempt (%@ by PID %d, %@) on protected path: %.*s",
-                               TamperEventName(esMsg->event_type),
-                               audit_token_to_pid(esMsg->process->audit_token),
-                               santa::StringTokenToNSString(esMsg->process->executable->path),
-                               (int)target.Path().size(), target.Path().data()]);
+          return TamperAuthResult::Deny(
+              [NSString stringWithFormat:
+                            @"Preventing tamper attempt (%@ by PID %d, %@) on protected path: %.*s",
+                            TamperEventName(esMsg->event_type),
+                            audit_token_to_pid(esMsg->process->audit_token),
+                            santa::StringTokenToNSString(esMsg->process->executable->path),
+                            (int)target.Path().size(), target.Path().data()]);
         }
       }
       // CREATE destinations may not exist yet, so caching an ALLOW by vnode has no effect.
