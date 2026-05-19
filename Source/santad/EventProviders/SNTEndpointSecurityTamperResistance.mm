@@ -165,10 +165,12 @@ TamperAuthResult ValidateLaunchctlExec(const Message& esMsg) {
     }
 
     // If legacy plists paths are found, assume a load is being attempted. Block the exec and
-    // delete all of the plists.
+    // delete all of the plists off the ES reader thread.
     if (strnstr(arg.data, "/Library/LaunchDaemons/com.google.santa", arg.length) != NULL ||
         strnstr(arg.data, "/Library/LaunchAgents/com.google.santa.plist", arg.length) != NULL) {
-      RemoveLegacyLaunchdPlists();
+      dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+        RemoveLegacyLaunchdPlists();
+      });
       return TamperAuthResult::Deny(@"Preventing load of legacy Santa component");
     }
   }
