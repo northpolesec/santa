@@ -15,16 +15,24 @@
 
 #import "Source/santad/SNTPolicyProcessor.h"
 
+#import <EndpointSecurity/EndpointSecurity.h>
 #import <Foundation/Foundation.h>
+#include <Kernel/kern/cs_blobs.h>
+#import <OCMock/OCMock.h>
 #import <XCTest/XCTest.h>
 
 #import "Source/common/SNTCELFallbackRule.h"
 #import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTCommonEnums.h"
+#import "Source/common/SNTConfigState.h"
 #import "Source/common/SNTConfigurator.h"
+#import "Source/common/SNTFileInfo.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTRuleIdentifiers.h"
+#import "Source/common/TestUtils.h"
 #import "Source/common/cel/Activation.h"
+#import "Source/santad/DataLayer/SNTRuleTable.h"
+#include "Source/santad/EntitlementsFilter.h"
 
 #include "cel/v1.pb.h"
 
@@ -1329,6 +1337,45 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   [self.processor decision:cd forRule:rule withTransitiveRules:YES andCELActivationCallback:nil];
   XCTAssertEqual(cd.decision, SNTEventStateAllowBinary);
   XCTAssertEqual(cd.ruleId, 0LL);
+}
+
+- (SNTCachedDecision*)decisionForPlatformBinary:(BOOL)isPlatformBinary {
+  // Class-mock the rule table so it returns nil for every lookup, leaving
+  // the platform-binary case as the only decision path that can fire.
+  id mockRuleTable = OCMClassMock([SNTRuleTable class]);
+  SNTPolicyProcessor* processor =
+      [[SNTPolicyProcessor alloc] initWithRuleTable:mockRuleTable
+                                 entitlementsFilter:santa::EntitlementsFilter::Create(@[], @[])];
+
+  // /bin/ls is an Apple-signed platform binary present on every macOS host.
+  SNTFileInfo* fi = [[SNTFileInfo alloc] initWithPath:@"/bin/ls"];
+  XCTAssertNotNil(fi);
+
+  es_file_t file = MakeESFile("/bin/ls");
+  es_process_t proc = MakeESProcess(&file);
+  proc.is_platform_binary = isPlatformBinary;
+  proc.codesigning_flags = CS_SIGNED | CS_VALID;
+
+  SNTConfigState* configState =
+      [[SNTConfigState alloc] initWithConfig:[SNTConfigurator configurator]];
+
+  return [processor decisionForFileInfo:fi
+                          targetProcess:&proc
+                            configState:configState
+                     activationCallback:nil
+                         cachedDecision:nil];
+}
+
+- (void)testDecisionAllowsPlatformBinaryViaScope {
+  SNTCachedDecision* cd = [self decisionForPlatformBinary:YES];
+  XCTAssertEqual(cd.decision, SNTEventStateAllowScope);
+  XCTAssertEqualObjects(cd.decisionExtra, @"Platform Binary");
+}
+
+- (void)testDecisionDoesNotApplyPlatformBinaryToNonPlatformBinaries {
+  SNTCachedDecision* cd = [self decisionForPlatformBinary:NO];
+  XCTAssertNotEqual(cd.decision, SNTEventStateAllowScope);
+  XCTAssertNotEqualObjects(cd.decisionExtra, @"Platform Binary");
 }
 
 @end

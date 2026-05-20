@@ -507,7 +507,10 @@ static void ResumeDaemonConnection(SNTCommandFileInfo* cmd) {
             : [[SNTRuleIdentifiers alloc] initWithRuleIdentifiers:identifiers
                                                  andSigningStatus:signingStatus];
 
-    __block NSString* output = @"None";
+    __block NSString* output =
+        csc.platformBinary
+            ? (cmd.prettyOutput ? @"\033[32mPlatform Binary\033[0m" : @"Platform Binary")
+            : @"None";
     id<SNTDaemonControlXPC> rop = [cmd.daemonConn remoteObjectProxy];
     [rop databaseRuleForIdentifiers:lookupIdentifiers
                               reply:^(SNTRule* r) {

@@ -644,6 +644,12 @@ static void UpdateCachedDecisionSigningInfo(
     return cd;
   }
 
+  if (platformBinaryState == PlatformBinaryState::kRuntimeTrue) {
+    cd.decisionExtra = @"Platform Binary";
+    cd.decision = SNTEventStateAllowScope;
+    return cd;
+  }
+
   switch (configState.clientMode) {
     case SNTClientModeMonitor: cd.decision = SNTEventStateAllowUnknown; return cd;
     case SNTClientModeStandalone: cd.holdAndAsk = YES; [[fallthrough]];
