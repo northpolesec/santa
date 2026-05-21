@@ -1366,15 +1366,15 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
                          cachedDecision:nil];
 }
 
-- (void)testDecisionAllowsPlatformBinaryViaScope {
+- (void)testDecisionAllowsPlatformBinary {
   SNTCachedDecision* cd = [self decisionForPlatformBinary:YES];
-  XCTAssertEqual(cd.decision, SNTEventStateAllowScope);
+  XCTAssertEqual(cd.decision, SNTEventStateAllowPlatform);
   XCTAssertEqualObjects(cd.decisionExtra, @"Platform Binary");
 }
 
 - (void)testDecisionDoesNotApplyPlatformBinaryToNonPlatformBinaries {
   SNTCachedDecision* cd = [self decisionForPlatformBinary:NO];
-  XCTAssertNotEqual(cd.decision, SNTEventStateAllowScope);
+  XCTAssertNotEqual(cd.decision, SNTEventStateAllowPlatform);
   XCTAssertNotEqualObjects(cd.decisionExtra, @"Platform Binary");
 }
 

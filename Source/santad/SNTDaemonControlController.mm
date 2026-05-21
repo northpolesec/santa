@@ -299,6 +299,14 @@ double watchdogRAMPeak = 0;
     return;
   }
 
+  // Platform binaries are allowlisted ahead of the scope checks and client
+  // mode default (mirrors the corresponding check in SNTPolicyProcessor).
+  MOLCodesignChecker* csc = [[MOLCodesignChecker alloc] initWithBinaryPath:filePath error:nil];
+  if (csc.platformBinary) {
+    reply(nil, @"Allowlist");
+    return;
+  }
+
   // Check blocked path regex (mirrors SNTPolicyProcessor.fileIsScopeBlocked:)
   NSRegularExpression* blockedRe = config.blockedPathRegex;
   if (blockedRe && [blockedRe numberOfMatchesInString:filePath
@@ -326,14 +334,6 @@ double watchdogRAMPeak = 0;
   // for non-Mach-O files, effectively allowing them. This check requires an
   // SNTFileInfo object (not just a path). The fileinfo "Type" key already
   // shows whether the file is a Mach-O, so users can cross-reference.
-
-  // Platform binaries are allowlisted ahead of the client mode default
-  // (mirrors the corresponding check in SNTPolicyProcessor).
-  MOLCodesignChecker* csc = [[MOLCodesignChecker alloc] initWithBinaryPath:filePath error:nil];
-  if (csc.platformBinary) {
-    reply(nil, @"Allowlist");
-    return;
-  }
 
   // Default based on client mode
   switch (config.clientMode) {

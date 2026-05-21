@@ -49,6 +49,7 @@ const static NSString* kDenyNoFileInfo = @"DenyNoFileInfo";
 const static NSString* kBlockLongPath = @"BlockLongPath";
 const static NSString* kBlockCELFallback = @"BlockCELFallback";
 const static NSString* kAllowCELFallback = @"AllowCELFallback";
+const static NSString* kAllowPlatform = @"AllowPlatform";
 
 @class SNTCachedDecision;
 @class SNTEventTable;

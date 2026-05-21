@@ -176,6 +176,7 @@ static SNTEventState BlockToAllowDecision(SNTEventState blockDecision) {
     case SNTEventStateBlockLongPath: eventTypeStr = kBlockLongPath; break;
     case SNTEventStateBlockCELFallback: eventTypeStr = kBlockCELFallback; break;
     case SNTEventStateAllowCELFallback: eventTypeStr = kAllowCELFallback; break;
+    case SNTEventStateAllowPlatform: eventTypeStr = kAllowPlatform; break;
     default: eventTypeStr = kUnknownEventState; break;
   }
 

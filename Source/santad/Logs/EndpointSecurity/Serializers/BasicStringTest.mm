@@ -1450,6 +1450,7 @@ std::string BasicStringSerializeMessage(es_message_t* esMsg) {
       {SNTEventStateAllowPendingTransitive, "ALLOW"},
       {SNTEventStateAllowTeamID, "ALLOW"},
       {SNTEventStateAllowCELFallback, "ALLOW"},
+      {SNTEventStateAllowPlatform, "ALLOW"},
   };
 
   for (const auto& kv : stateToDecision) {
@@ -1489,6 +1490,7 @@ std::string BasicStringSerializeMessage(es_message_t* esMsg) {
       case SNTEventStateAllowCompilerSigningID: want = "SIGNINGID"; break;
       case SNTEventStateAllowCompilerCDHash: want = "CDHASH"; break;
       case SNTEventStateAllowCELFallback: want = "CEL_FALLBACK"; break;
+      case SNTEventStateAllowPlatform: want = "PLATFORM"; break;
       case SNTEventStateBlock: want = "UNKNOWN"; break;
       case SNTEventStateAllow: want = "UNKNOWN"; break;
     }

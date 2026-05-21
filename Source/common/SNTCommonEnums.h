@@ -122,6 +122,7 @@ typedef NS_ENUM(uint64_t, SNTEventState) {
   SNTEventStateAllowCompilerSigningID = 1ULL << 52,
   SNTEventStateAllowCompilerCDHash = 1ULL << 53,
   SNTEventStateAllowCELFallback = 1ULL << 54,
+  SNTEventStateAllowPlatform = 1ULL << 55,
 
   // Block and Allow masks
   SNTEventStateBlock = 0xFFFFFFULL << 16,

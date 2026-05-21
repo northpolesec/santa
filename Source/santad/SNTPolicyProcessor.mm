@@ -630,6 +630,12 @@ static void UpdateCachedDecisionSigningInfo(
     return cd;
   }
 
+  if (platformBinaryState == PlatformBinaryState::kRuntimeTrue) {
+    cd.decisionExtra = @"Platform Binary";
+    cd.decision = SNTEventStateAllowPlatform;
+    return cd;
+  }
+
   NSString* msg = [self fileIsScopeBlocked:fileInfo];
   if (msg) {
     cd.decisionExtra = msg;
@@ -640,12 +646,6 @@ static void UpdateCachedDecisionSigningInfo(
   msg = [self fileIsScopeAllowed:fileInfo];
   if (msg) {
     cd.decisionExtra = msg;
-    cd.decision = SNTEventStateAllowScope;
-    return cd;
-  }
-
-  if (platformBinaryState == PlatformBinaryState::kRuntimeTrue) {
-    cd.decisionExtra = @"Platform Binary";
     cd.decision = SNTEventStateAllowScope;
     return cd;
   }

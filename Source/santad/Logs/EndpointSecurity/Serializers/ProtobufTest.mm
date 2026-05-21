@@ -532,6 +532,7 @@ void SerializeAndCheckNonESEvents(
       {SNTEventStateAllowPendingTransitive, ::pbv1::Execution::DECISION_ALLOW},
       {SNTEventStateAllowTeamID, ::pbv1::Execution::DECISION_ALLOW},
       {SNTEventStateAllowCELFallback, ::pbv1::Execution::DECISION_ALLOW},
+      {SNTEventStateAllowPlatform, ::pbv1::Execution::DECISION_ALLOW},
   };
 
   for (const auto& kv : stateToDecision) {
@@ -573,6 +574,7 @@ void SerializeAndCheckNonESEvents(
       case SNTEventStateAllowCompilerSigningID: want = ::pbv1::Execution::REASON_SIGNING_ID; break;
       case SNTEventStateAllowCompilerCDHash: want = ::pbv1::Execution::REASON_CDHASH; break;
       case SNTEventStateAllowCELFallback: want = ::pbv1::Execution::REASON_CEL_FALLBACK; break;
+      case SNTEventStateAllowPlatform: want = ::pbv1::Execution::REASON_PLATFORM; break;
       case SNTEventStateBlock: want = ::pbv1::Execution::REASON_UNKNOWN; break;
       case SNTEventStateAllow: want = ::pbv1::Execution::REASON_UNKNOWN; break;
     }
