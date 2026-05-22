@@ -630,6 +630,12 @@ static void UpdateCachedDecisionSigningInfo(
     return cd;
   }
 
+  if (platformBinaryState == PlatformBinaryState::kRuntimeTrue) {
+    cd.decisionExtra = @"Platform Binary";
+    cd.decision = SNTEventStateAllowPlatform;
+    return cd;
+  }
+
   NSString* msg = [self fileIsScopeBlocked:fileInfo];
   if (msg) {
     cd.decisionExtra = msg;

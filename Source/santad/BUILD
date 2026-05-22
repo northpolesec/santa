@@ -264,12 +264,17 @@ santa_unit_test(
     name = "SNTPolicyProcessorTest",
     srcs = ["SNTPolicyProcessorTest.mm"],
     deps = [
+        ":EntitlementsFilter",
         ":SNTPolicyProcessor",
+        ":SNTRuleTable",
         "//Source/common:SNTCELFallbackRule",
         "//Source/common:SNTCachedDecision",
+        "//Source/common:SNTConfigState",
         "//Source/common:SNTConfigurator",
+        "//Source/common:SNTFileInfo",
         "//Source/common:SNTRule",
         "//Source/common:TestUtils",
+        "@OCMock",
     ],
 )
 

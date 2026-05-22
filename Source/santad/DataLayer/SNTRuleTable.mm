@@ -513,14 +513,6 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
     [rs close];
   }];
 
-  // Allow binaries signed by the "Software Signing" cert used to sign launchd
-  // if no existing rule has matched.
-  if (!rule && [identifiers.certificateSHA256 isEqual:self.launchdCSInfo.leafCertificate.SHA256]) {
-    rule = [[SNTRule alloc] initWithIdentifier:identifiers.certificateSHA256
-                                         state:SNTRuleStateAllow
-                                          type:SNTRuleTypeCertificate];
-  }
-
   return rule;
 }
 

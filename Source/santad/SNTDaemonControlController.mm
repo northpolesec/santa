@@ -299,6 +299,14 @@ double watchdogRAMPeak = 0;
     return;
   }
 
+  // Platform binaries are allowlisted ahead of the scope checks and client
+  // mode default (mirrors the corresponding check in SNTPolicyProcessor).
+  MOLCodesignChecker* csc = [[MOLCodesignChecker alloc] initWithBinaryPath:filePath error:nil];
+  if (csc.platformBinary) {
+    reply(nil, @"Allowlist");
+    return;
+  }
+
   // Check blocked path regex (mirrors SNTPolicyProcessor.fileIsScopeBlocked:)
   NSRegularExpression* blockedRe = config.blockedPathRegex;
   if (blockedRe && [blockedRe numberOfMatchesInString:filePath

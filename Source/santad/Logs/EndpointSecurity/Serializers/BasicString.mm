@@ -95,6 +95,7 @@ std::string GetReasonString(SNTEventState event_state) {
     case SNTEventStateAllowCDHash: return "CDHASH";
     case SNTEventStateAllowCompilerCDHash: return "CDHASH";
     case SNTEventStateAllowCELFallback: return "CEL_FALLBACK";
+    case SNTEventStateAllowPlatform: return "PLATFORM";
     case SNTEventStateAllowUnknown: return "UNKNOWN";
     case SNTEventStateBlockBinary: return "BINARY";
     case SNTEventStateBlockCertificate: return "CERT";
