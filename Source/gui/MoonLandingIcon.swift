@@ -126,6 +126,7 @@ struct MoonLandingIcon: View {
   @State private var rotation: Double = 0
   @State private var showMoon: Bool = false
   @State private var landerY: CGFloat = -50
+  @State private var sequenceTask: Task<Void, Never>?
 
   var body: some View {
     ZStack {
@@ -151,13 +152,27 @@ struct MoonLandingIcon: View {
     .help("Anniversary of the Apollo 11 moon landing")
     .contentShape(Rectangle())
     .onTapGesture {
-      Task { await runSequence(initialDelayNanos: 100_000_000) }
+      startSequence(initialDelayNanos: 100_000_000)
     }
     .task {
-      await runSequence(initialDelayNanos: 400_000_000)
+      startSequence(initialDelayNanos: 400_000_000)
+    }
+    .onDisappear {
+      sequenceTask?.cancel()
     }
   }
 
+  // Cancels any in-flight sequence and starts a fresh one. Without this,
+  // rapid taps would spawn overlapping tasks that interleave writes to
+  // rotation/showMoon/landerY and fire competing withAnimation blocks.
+  private func startSequence(initialDelayNanos: UInt64) {
+    sequenceTask?.cancel()
+    sequenceTask = Task { @MainActor in
+      await runSequence(initialDelayNanos: initialDelayNanos)
+    }
+  }
+
+  @MainActor
   private func runSequence(initialDelayNanos: UInt64) async {
     // Snap state back to the start without animating, so a replay doesn't
     // unwind the rotation or float the lander back up.
@@ -169,17 +184,21 @@ struct MoonLandingIcon: View {
       landerY = -50
     }
 
-    try? await Task.sleep(nanoseconds: initialDelayNanos)
-    withAnimation(.linear(duration: 2.5)) {
-      rotation = 1440
-    }
-    try? await Task.sleep(nanoseconds: 1_400_000_000)
-    withAnimation(.easeInOut(duration: 0.7)) {
-      showMoon = true
-    }
-    try? await Task.sleep(nanoseconds: 500_000_000)
-    withAnimation(.easeIn(duration: 1.3)) {
-      landerY = -22
+    do {
+      try await Task.sleep(nanoseconds: initialDelayNanos)
+      withAnimation(.linear(duration: 2.5)) {
+        rotation = 1440
+      }
+      try await Task.sleep(nanoseconds: 1_400_000_000)
+      withAnimation(.easeInOut(duration: 0.7)) {
+        showMoon = true
+      }
+      try await Task.sleep(nanoseconds: 500_000_000)
+      withAnimation(.easeIn(duration: 1.3)) {
+        landerY = -22
+      }
+    } catch {
+      // Cancelled mid-sequence; the next sequence will reset state.
     }
   }
 }
