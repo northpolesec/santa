@@ -39,3 +39,20 @@ NSString* _Nullable FormatSigningID(MOLCodesignChecker* _Nullable csc);
 */
 NSString* _Nullable FormatSigningID(NSString* _Nullable signingID, NSString* _Nullable teamID,
                                     BOOL isPlatformBinary);
+
+/**
+  Return a string representing the composite BundleID rule key
+  (`<TeamID>:<CFBundleIdentifier>` or `platform:<CFBundleIdentifier>`),
+  matching the format SNTRuleTypeBundleID rules are stored under.
+
+  Returns nil when there is no CFBundleIdentifier, or when the binary lacks
+  both a TeamID and the platform-binary marker — bare bundle IDs are
+  intentionally not looked up because CFBundleIdentifier is attacker-
+  controlled.
+
+  @param bundleID The CFBundleIdentifier read from the enclosing bundle.
+  @param teamID The team ID (may be nil).
+  @param isPlatformBinary Whether the binary is a platform binary.
+*/
+NSString* _Nullable FormatBundleID(NSString* _Nullable bundleID, NSString* _Nullable teamID,
+                                   BOOL isPlatformBinary);

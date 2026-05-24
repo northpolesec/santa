@@ -497,6 +497,7 @@ static void ResumeDaemonConnection(SNTCommandFileInfo* cmd) {
         .signingID = FormatSigningID(csc),
         .certificateSHA256 = err ? nil : csc.leafCertificate.SHA256,
         .teamID = csc.teamID,
+        .bundleID = FormatBundleID(fileInfo.bundleIdentifier, csc.teamID, csc.platformBinary),
     };
 
     // If the binary is signed with a dev cert, see if a rule would've
@@ -552,6 +553,7 @@ static void ResumeDaemonConnection(SNTCommandFileInfo* cmd) {
         .signingID = FormatSigningID(csc),
         .certificateSHA256 = err ? nil : csc.leafCertificate.SHA256,
         .teamID = csc.teamID,
+        .bundleID = FormatBundleID(fileInfo.bundleIdentifier, csc.teamID, csc.platformBinary),
     };
 
     SNTRuleIdentifiers* lookupIdentifiers =

@@ -52,20 +52,6 @@ struct CELEvaluationResult {
   SNTRuleState resultState;  // If succeeded, the resulting state
 };
 
-// Composes the BundleID rule lookup key from a cached decision. Returns nil
-// unless we have both a CFBundleIdentifier and an authenticated signer prefix
-// (a real TeamID, or "platform" for Apple platform binaries). Bare bundle IDs
-// are intentionally not looked up — see SNTRuleTypeBundleID in
-// SNTCommonEnums.h.
-static NSString* BundleIDLookupKey(SNTCachedDecision* cd) {
-  if (cd.bundleIdentifier.length == 0) return nil;
-  if (cd.platformBinary) {
-    return [NSString stringWithFormat:@"platform:%@", cd.bundleIdentifier];
-  }
-  if (cd.teamID.length == 0) return nil;
-  return [NSString stringWithFormat:@"%@:%@", cd.teamID, cd.bundleIdentifier];
-}
-
 struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
   SNTRuleIdentifiers* ri =
       [[SNTRuleIdentifiers alloc] initWithRuleIdentifiers:{
@@ -74,7 +60,9 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
                                                               .signingID = cd.signingID,
                                                               .certificateSHA256 = cd.certSHA256,
                                                               .teamID = cd.teamID,
-                                                              .bundleID = BundleIDLookupKey(cd),
+                                                              .bundleID = FormatBundleID(
+                                                                  cd.bundleIdentifier, cd.teamID,
+                                                                  cd.platformBinary),
                                                           }
                                          andSigningStatus:cd.signingStatus];
 

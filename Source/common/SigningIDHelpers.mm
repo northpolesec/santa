@@ -36,3 +36,10 @@ NSString* FormatSigningID(NSString* signingID, NSString* teamID, BOOL isPlatform
 NSString* FormatSigningID(MOLCodesignChecker* csc) {
   return FormatSigningID(csc.signingID, csc.teamID, csc.platformBinary);
 }
+
+NSString* FormatBundleID(NSString* bundleID, NSString* teamID, BOOL isPlatformBinary) {
+  if (!bundleID.length) return nil;
+  if (isPlatformBinary) return [NSString stringWithFormat:@"platform:%@", bundleID];
+  if (!teamID.length) return nil;
+  return [NSString stringWithFormat:@"%@:%@", teamID, bundleID];
+}
