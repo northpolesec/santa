@@ -103,6 +103,8 @@ std::string GetReasonString(SNTEventState event_state) {
     case SNTEventStateBlockTeamID: return "TEAMID";
     case SNTEventStateBlockSigningID: return "SIGNINGID";
     case SNTEventStateBlockCDHash: return "CDHASH";
+    case SNTEventStateAllowBundleID: return "BUNDLE_ID";
+    case SNTEventStateBlockBundleID: return "BUNDLE_ID";
     case SNTEventStateBlockCELFallback: return "CEL_FALLBACK";
     case SNTEventStateBlockLongPath: return "LONG_PATH";
     case SNTEventStateBlockUnknown: return "UNKNOWN";

@@ -169,6 +169,9 @@ static id EncodedValueOrNull(id value) {
     case SNTEventStateBlockCDHash:
       reason = NSLocalizedString(@"CDHash rule", @"Block reason for CDHash rule match");
       break;
+    case SNTEventStateBlockBundleID:
+      reason = NSLocalizedString(@"Bundle ID rule", @"Block reason for Bundle ID rule match");
+      break;
     case SNTEventStateBlockScope:
       reason =
           NSLocalizedString(@"Blocked path regex", @"Block reason for blocked path regex match");

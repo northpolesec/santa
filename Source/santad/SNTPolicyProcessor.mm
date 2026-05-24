@@ -52,6 +52,20 @@ struct CELEvaluationResult {
   SNTRuleState resultState;  // If succeeded, the resulting state
 };
 
+// Composes the BundleID rule lookup key from a cached decision. Returns nil
+// unless we have both a CFBundleIdentifier and an authenticated signer prefix
+// (a real TeamID, or "platform" for Apple platform binaries). Bare bundle IDs
+// are intentionally not looked up — see SNTRuleTypeBundleID in
+// SNTCommonEnums.h.
+static NSString* BundleIDLookupKey(SNTCachedDecision* cd) {
+  if (cd.bundleIdentifier.length == 0) return nil;
+  if (cd.platformBinary) {
+    return [NSString stringWithFormat:@"platform:%@", cd.bundleIdentifier];
+  }
+  if (cd.teamID.length == 0) return nil;
+  return [NSString stringWithFormat:@"%@:%@", cd.teamID, cd.bundleIdentifier];
+}
+
 struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
   SNTRuleIdentifiers* ri =
       [[SNTRuleIdentifiers alloc] initWithRuleIdentifiers:{
@@ -60,6 +74,7 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
                                                               .signingID = cd.signingID,
                                                               .certificateSHA256 = cd.certSHA256,
                                                               .teamID = cd.teamID,
+                                                              .bundleID = BundleIDLookupKey(cd),
                                                           }
                                          andSigningStatus:cd.signingStatus];
 
@@ -444,6 +459,9 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
           {{SNTRuleTypeTeamID, SNTRuleStateAllow}, SNTEventStateAllowTeamID},
           {{SNTRuleTypeTeamID, SNTRuleStateSilentBlock}, SNTEventStateBlockTeamID},
           {{SNTRuleTypeTeamID, SNTRuleStateBlock}, SNTEventStateBlockTeamID},
+          {{SNTRuleTypeBundleID, SNTRuleStateAllow}, SNTEventStateAllowBundleID},
+          {{SNTRuleTypeBundleID, SNTRuleStateSilentBlock}, SNTEventStateBlockBundleID},
+          {{SNTRuleTypeBundleID, SNTRuleStateBlock}, SNTEventStateBlockBundleID},
           // Seatbelt rules start out as a block of the rule's type. If the
           // ancestor/sandbox check succeeds in the execution controller, the
           // decision is flipped to the matching allow state via
@@ -454,6 +472,7 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
           {{SNTRuleTypeSigningID, SNTRuleStateSeatbelt}, SNTEventStateBlockSigningID},
           {{SNTRuleTypeCertificate, SNTRuleStateSeatbelt}, SNTEventStateBlockCertificate},
           {{SNTRuleTypeTeamID, SNTRuleStateSeatbelt}, SNTEventStateBlockTeamID},
+          {{SNTRuleTypeBundleID, SNTRuleStateSeatbelt}, SNTEventStateBlockBundleID},
       };
 
   auto iterator = decisions.find(std::pair<SNTRuleType, SNTRuleState>{type, state});
@@ -587,6 +606,11 @@ static void UpdateCachedDecisionSigningInfo(
   cd.platformBinary = (platformBinaryState == PlatformBinaryState::kRuntimeTrue);
   cd.decisionClientMode = configState.clientMode;
   cd.quarantineURL = fileInfo.quarantineDataURL;
+  // CFBundleIdentifier is needed for BundleID rule lookup. SNTFileInfo
+  // memoizes the Info.plist parse, so this is cheap on repeat reads.
+  if (!cd.bundleIdentifier.length) {
+    cd.bundleIdentifier = fileInfo.bundleIdentifier;
+  }
 
   NSError* csInfoError;
   if (!cd.certSHA256.length) {

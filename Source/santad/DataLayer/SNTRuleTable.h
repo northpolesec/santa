@@ -81,6 +81,11 @@
 - (int64_t)cdhashRuleCount;
 
 ///
+/// @return Number of bundle ID rules in the database
+///
+- (int64_t)bundleIDRuleCount;
+
+///
 ///  @return Rule for given identifiers.
 ///          Currently: binary, signingID, certificate or teamID (in that order).
 ///          The first matching rule found is returned.

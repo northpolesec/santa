@@ -401,6 +401,10 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
   return [self ruleCountForRuleType:SNTRuleTypeCDHash];
 }
 
+- (int64_t)bundleIDRuleCount {
+  return [self ruleCountForRuleType:SNTRuleTypeBundleID];
+}
+
 - (int64_t)fileAccessRuleCountSerialized:(FMDatabase*)db {
   return [db longForQuery:@"SELECT COUNT(*) FROM file_access_rules"];
 }
@@ -481,11 +485,17 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
     if (rule.type == SNTRuleTypeTeamID) {
       return rule;
     }
+
+    rule = staticRules[identifiers.bundleID];
+    if (rule.type == SNTRuleTypeBundleID) {
+      return rule;
+    }
   }
 
   // Now query the database.
   //
-  // The intended order of precedence is CDHash > Binaries > Signing IDs > Certificates > Team IDs.
+  // The intended order of precedence is
+  // CDHash > Binaries > Signing IDs > Certificates > Team IDs > Bundle IDs.
   // The UNION ALL structure lets SQLite evaluate each sub-select independently (potentially
   // short-circuiting via LIMIT 1), while ORDER BY type ASC guarantees the highest-priority
   // rule is returned regardless of query planner behavior.
@@ -503,10 +513,12 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
                          @"  UNION ALL "
                          @"  SELECT * FROM execution_rules WHERE identifier=? AND type=3000 "
                          @"  UNION ALL "
-                         @"  SELECT * FROM execution_rules WHERE identifier=? AND type=4000"
+                         @"  SELECT * FROM execution_rules WHERE identifier=? AND type=4000 "
+                         @"  UNION ALL "
+                         @"  SELECT * FROM execution_rules WHERE identifier=? AND type=5000"
                          @") ORDER BY type ASC LIMIT 1",
                          identifiers.cdhash, identifiers.binarySHA256, identifiers.signingID,
-                         identifiers.certificateSHA256, identifiers.teamID];
+                         identifiers.certificateSHA256, identifiers.teamID, identifiers.bundleID];
     if ([rs next]) {
       rule = [self executionRuleFromResultSet:rs];
     }

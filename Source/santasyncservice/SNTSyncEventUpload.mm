@@ -235,6 +235,11 @@ typename santa::ProtoTraits<IsV2>::EventT* MessageForExecutionEvent(
     case SNTEventStateAllowLocalSigningID: return nullptr;
     case SNTEventStateAllowPendingTransitive: return nullptr;
     case SNTEventStateBlockLongPath: return nullptr;
+    // BundleID rule decisions don't have a dedicated wire enum yet — the
+    // sync proto (northpolesec/protos) doesn't know about BUNDLE_ID. Skip the
+    // upload until the proto is extended.
+    case SNTEventStateAllowBundleID: return nullptr;
+    case SNTEventStateBlockBundleID: return nullptr;
     case SNTEventStateAllow: return nullptr;
     case SNTEventStateBlock: return nullptr;
     case SNTEventStateUnknown: return nullptr;

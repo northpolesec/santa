@@ -48,6 +48,9 @@
 @property NSArray<MOLCertificate*>* certChain;
 @property NSString* teamID;
 @property NSString* signingID;
+/// CFBundleIdentifier read from the enclosing .app's Info.plist, if any.
+/// Used to construct the BundleID rule lookup key in CreateRuleIDs.
+@property NSString* bundleIdentifier;
 @property NSString* rawSigningID;
 @property NSString* cdhash;
 @property NSDictionary* entitlements;

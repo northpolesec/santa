@@ -34,6 +34,10 @@ struct RuleIdentifiers {
   NSString* signingID;
   NSString* certificateSHA256;
   NSString* teamID;
+  /// "<TEAMID>:<CFBundleIdentifier>" or "platform:<CFBundleIdentifier>" for
+  /// Apple platform binaries. nil when the executable is not part of a bundle
+  /// or has no CFBundleIdentifier.
+  NSString* bundleID;
 };
 
 @interface SNTRuleIdentifiers : NSObject <NSSecureCoding>
@@ -43,6 +47,7 @@ struct RuleIdentifiers {
 @property(readonly) NSString* signingID;
 @property(readonly) NSString* certificateSHA256;
 @property(readonly) NSString* teamID;
+@property(readonly) NSString* bundleID;
 
 /// Raw CS_CDHASH_LEN (20) bytes decoded from the hex `cdhash`. Returns nil
 /// if `cdhash` is nil or not a well-formed 40-char hex string. Callers use

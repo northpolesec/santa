@@ -556,6 +556,8 @@ void SerializeAndCheckNonESEvents(
       case SNTEventStateBlockLongPath: want = ::pbv1::Execution::REASON_LONG_PATH; break;
       case SNTEventStateBlockSigningID: want = ::pbv1::Execution::REASON_SIGNING_ID; break;
       case SNTEventStateBlockCDHash: want = ::pbv1::Execution::REASON_CDHASH; break;
+      case SNTEventStateBlockBundleID: want = ::pbv1::Execution::REASON_UNKNOWN; break;
+      case SNTEventStateAllowBundleID: want = ::pbv1::Execution::REASON_UNKNOWN; break;
       case SNTEventStateBlockCELFallback: want = ::pbv1::Execution::REASON_CEL_FALLBACK; break;
       case SNTEventStateAllowUnknown: want = ::pbv1::Execution::REASON_UNKNOWN; break;
       case SNTEventStateAllowBinary: want = ::pbv1::Execution::REASON_BINARY; break;

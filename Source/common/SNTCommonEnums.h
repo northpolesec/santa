@@ -62,6 +62,10 @@ typedef NS_ENUM(NSInteger, SNTRuleType) {
   SNTRuleTypeSigningID = 2000,
   SNTRuleTypeCertificate = 3000,
   SNTRuleTypeTeamID = 4000,
+  // BundleID rules are keyed on "<TEAMID>:<CFBundleIdentifier>" (or
+  // "platform:<CFBundleIdentifier>" for Apple platform binaries). CFBundleIdentifier
+  // alone is attacker-controlled, so a TeamID prefix is required at insert time.
+  SNTRuleTypeBundleID = 5000,
 };
 
 typedef NS_ENUM(NSInteger, SNTRuleState) {
@@ -105,6 +109,7 @@ typedef NS_ENUM(uint64_t, SNTEventState) {
   SNTEventStateBlockSigningID = 1ULL << 22,
   SNTEventStateBlockCDHash = 1ULL << 23,
   SNTEventStateBlockCELFallback = 1ULL << 24,
+  SNTEventStateBlockBundleID = 1ULL << 25,
 
   // Bits 40-63 store allow decision types
   SNTEventStateAllowUnknown = 1ULL << 40,
@@ -123,6 +128,7 @@ typedef NS_ENUM(uint64_t, SNTEventState) {
   SNTEventStateAllowCompilerCDHash = 1ULL << 53,
   SNTEventStateAllowCELFallback = 1ULL << 54,
   SNTEventStateAllowPlatform = 1ULL << 55,
+  SNTEventStateAllowBundleID = 1ULL << 56,
 
   // Block and Allow masks
   SNTEventStateBlock = 0xFFFFFFULL << 16,

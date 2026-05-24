@@ -1474,6 +1474,8 @@ std::string BasicStringSerializeMessage(es_message_t* esMsg) {
       case SNTEventStateBlockLongPath: want = "LONG_PATH"; break;
       case SNTEventStateBlockSigningID: want = "SIGNINGID"; break;
       case SNTEventStateBlockCDHash: want = "CDHASH"; break;
+      case SNTEventStateBlockBundleID: want = "BUNDLE_ID"; break;
+      case SNTEventStateAllowBundleID: want = "BUNDLE_ID"; break;
       case SNTEventStateBlockCELFallback: want = "CEL_FALLBACK"; break;
       case SNTEventStateAllowUnknown: want = "UNKNOWN"; break;
       case SNTEventStateAllowBinary: want = "BINARY"; break;

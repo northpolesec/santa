@@ -121,6 +121,15 @@
   return r;
 }
 
+- (SNTRule*)_exampleBundleIDRule {
+  SNTRule* r = [[SNTRule alloc] init];
+  r.identifier = @"ABCDEFGHIJ:com.example.app";
+  r.state = SNTRuleStateBlock;
+  r.type = SNTRuleTypeBundleID;
+  r.customMsg = @"A bundle ID rule";
+  return r;
+}
+
 - (SNTFileAccessRule*)_exampleFileAccessAddRuleWithName:(NSString*)name {
   return [[SNTFileAccessRule alloc]
       initAddRuleWithName:name
@@ -574,6 +583,55 @@
   XCTAssertNotNil(r);
   XCTAssertEqualObjects(r.identifier, @"ABCDEFGHIJ");
   XCTAssertEqual(r.type, SNTRuleTypeTeamID, @"Implicit rule ordering failed (TeamID)");
+}
+
+- (void)testFetchBundleIDRule {
+  [self.sut addExecutionRules:@[ [self _exampleBinaryRule], [self _exampleBundleIDRule] ]
+                  ruleCleanup:SNTRuleCleanupNone
+                       errors:nil];
+
+  XCTAssertEqual([self.sut bundleIDRuleCount], 1);
+
+  SNTRule* r = [self.sut executionRuleForIdentifiers:(struct RuleIdentifiers){
+                                                         .bundleID = @"ABCDEFGHIJ:com.example.app",
+                                                     }];
+  XCTAssertNotNil(r);
+  XCTAssertEqualObjects(r.identifier, @"ABCDEFGHIJ:com.example.app");
+  XCTAssertEqual(r.type, SNTRuleTypeBundleID);
+
+  // A bundle ID rule for one team must NOT match the same CFBundleIdentifier
+  // shipped under a different team's signature.
+  r = [self.sut executionRuleForIdentifiers:(struct RuleIdentifiers){
+                                                .bundleID = @"ZZZZZZZZZZ:com.example.app",
+                                            }];
+  XCTAssertNil(r);
+
+  // Same TeamID, different bundle id must also miss.
+  r = [self.sut executionRuleForIdentifiers:(struct RuleIdentifiers){
+                                                .bundleID = @"ABCDEFGHIJ:com.example.other",
+                                            }];
+  XCTAssertNil(r);
+}
+
+- (void)testBundleIDLowerPrecedenceThanBinary {
+  // A Binary ALLOW rule must override a BundleID BLOCK rule when both match.
+  SNTRule* binAllow = [[SNTRule alloc] init];
+  binAllow.identifier = @"b7c1e3fd640c5f211c89b02c2c6122f78ce322aa5c56eb0bb54bc422a8f8b670";
+  binAllow.state = SNTRuleStateAllow;
+  binAllow.type = SNTRuleTypeBinary;
+
+  [self.sut addExecutionRules:@[ binAllow, [self _exampleBundleIDRule] ]
+                  ruleCleanup:SNTRuleCleanupNone
+                       errors:nil];
+
+  SNTRule* r = [self.sut
+      executionRuleForIdentifiers:(struct RuleIdentifiers){
+                                      .binarySHA256 = binAllow.identifier,
+                                      .bundleID = @"ABCDEFGHIJ:com.example.app",
+                                  }];
+  XCTAssertNotNil(r);
+  XCTAssertEqual(r.type, SNTRuleTypeBinary);
+  XCTAssertEqual(r.state, SNTRuleStateAllow);
 }
 
 - (void)testBadDatabase {

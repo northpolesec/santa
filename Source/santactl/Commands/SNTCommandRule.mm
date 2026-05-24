@@ -81,6 +81,7 @@ REGISTER_COMMAND_NAME(@"rule")
           @"    --signingid: add or check a signing ID rule instead of binary (see notes)\n"
           @"    --certificate: add or check a certificate sha256 rule instead of binary\n"
           @"    --cdhash: add or check a cdhash rule instead of binary\n"
+          @"    --bundle-id: add or check a bundle ID rule instead of binary (see notes)\n"
           @"    --file-access: Check a path for associated File Access rules. Requires --path.\n"
 #ifdef DEBUG
           @"    --force: allow manual changes even when SyncBaseUrl is set\n"
@@ -102,6 +103,11 @@ REGISTER_COMMAND_NAME(@"rule")
           @"    case of platform binaries, `TeamID` should be replaced with the string\n"
           @"    \"platform\" (e.g. `platform:SigningID`). This allows for rules\n"
           @"    targeting Apple-signed binaries that do not have a team ID.\n"
+          @"\n"
+          @"    Bundle ID rules use the same `TeamID:identifier` (or "
+          @"`platform:identifier`) composite format. The TeamID prefix is "
+          @"mandatory: CFBundleIdentifier is attacker-controlled, so a rule "
+          @"keyed on the bundle ID alone would be unsafe.\n"
           @"\n"
           @"  Importing / Exporting Rules:\n"
           @"    If santa is not configured to use a sync server one can export\n"
@@ -183,6 +189,9 @@ REGISTER_COMMAND_NAME(@"rule")
       type = SNTRuleTypeSigningID;
     } else if ([arg caseInsensitiveCompare:@"--cdhash"] == NSOrderedSame) {
       type = SNTRuleTypeCDHash;
+    } else if ([arg caseInsensitiveCompare:@"--bundleid"] == NSOrderedSame ||
+               [arg caseInsensitiveCompare:@"--bundle-id"] == NSOrderedSame) {
+      type = SNTRuleTypeBundleID;
     } else if ([arg caseInsensitiveCompare:@"--file-access"] == NSOrderedSame) {
       faaLookup = YES;
     } else if ([arg caseInsensitiveCompare:@"--path"] == NSOrderedSame) {
@@ -358,6 +367,26 @@ REGISTER_COMMAND_NAME(@"rule")
       } else if (cs.platformBinary) {
         identifier = [NSString stringWithFormat:@"platform:%@", cs.signingID];
       }
+    } else if (type == SNTRuleTypeBundleID) {
+      // BundleID rules require an authenticated TeamID prefix to be meaningful
+      // (CFBundleIdentifier alone is attacker-controlled). When the user
+      // points us at a path we derive the prefix from the binary's code
+      // signature so they don't have to type it out.
+      NSString* bundleID = fi.bundleIdentifier;
+      if (!bundleID.length) {
+        [self printErrorUsageAndExit:
+                  @"Provided path has no CFBundleIdentifier; --bundle-id rules require a bundle"];
+      }
+      MOLCodesignChecker* cs = [fi codesignCheckerWithError:NULL];
+      if (cs.teamID.length) {
+        identifier = [NSString stringWithFormat:@"%@:%@", cs.teamID, bundleID];
+      } else if (cs.platformBinary) {
+        identifier = [NSString stringWithFormat:@"platform:%@", bundleID];
+      } else {
+        [self printErrorUsageAndExit:
+                  @"Binary at path is unsigned or has no TeamID; --bundle-id rules require an "
+                  @"authenticated signer"];
+      }
     }
 
     if (!comment) {
@@ -435,6 +464,7 @@ REGISTER_COMMAND_NAME(@"rule")
                                   case SNTRuleTypeTeamID: ruleType = @"Team ID"; break;
                                   case SNTRuleTypeSigningID: ruleType = @"Signing ID"; break;
                                   case SNTRuleTypeCDHash: ruleType = @"CDHash"; break;
+                                  case SNTRuleTypeBundleID: ruleType = @"Bundle ID"; break;
                                   default: ruleType = @"(Unknown type)"; break;
                                 }
                                 if (newRule.state == SNTRuleStateRemove) {
@@ -458,6 +488,7 @@ REGISTER_COMMAND_NAME(@"rule")
       .signingID = (rule.type == SNTRuleTypeSigningID) ? rule.identifier : nil,
       .certificateSHA256 = (rule.type == SNTRuleTypeCertificate) ? rule.identifier : nil,
       .teamID = (rule.type == SNTRuleTypeTeamID) ? rule.identifier : nil,
+      .bundleID = (rule.type == SNTRuleTypeBundleID) ? rule.identifier : nil,
   };
 
   [rop databaseRuleForIdentifiers:[[SNTRuleIdentifiers alloc] initWithRuleIdentifiers:identifiers]

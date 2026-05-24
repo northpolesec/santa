@@ -231,6 +231,58 @@
   XCTAssertNotNil(sut);
   XCTAssertEqualObjects(sut.identifier, @"ABCDEFGHIJ");
   XCTAssertEqualObjects(sut.comment, @"ThIs iS Only A Comment!");
+
+  // BundleID tests
+  sut = [[SNTRule alloc] initWithDictionary:@{
+    @"identifier" : @"ABCDEFGHIJ:com.example.app",
+    @"policy" : @"BLOCKLIST",
+    @"rule_type" : @"BUNDLE_ID",
+  }
+                                      error:nil];
+  XCTAssertNotNil(sut);
+  XCTAssertEqualObjects(sut.identifier, @"ABCDEFGHIJ:com.example.app");
+  XCTAssertEqual(sut.type, SNTRuleTypeBundleID);
+  XCTAssertEqual(sut.state, SNTRuleStateBlock);
+
+  // BundleID lowercase TeamID is normalised to uppercase, bundle id kept as-is.
+  sut = [[SNTRule alloc] initWithDictionary:@{
+    @"identifier" : @"abcdefghij:com.Example.App",
+    @"policy" : @"BLOCKLIST",
+    @"rule_type" : @"BUNDLE_ID",
+  }
+                                      error:nil];
+  XCTAssertNotNil(sut);
+  XCTAssertEqualObjects(sut.identifier, @"ABCDEFGHIJ:com.Example.App");
+
+  // BundleID with platform prefix is left lowercase.
+  sut = [[SNTRule alloc] initWithDictionary:@{
+    @"identifier" : @"platform:com.apple.Safari",
+    @"policy" : @"BLOCKLIST",
+    @"rule_type" : @"BUNDLE_ID",
+  }
+                                      error:nil];
+  XCTAssertNotNil(sut);
+  XCTAssertEqualObjects(sut.identifier, @"platform:com.apple.Safari");
+
+  // Bare bundle id (no TeamID prefix) must be rejected — CFBundleIdentifier
+  // alone is attacker-controlled.
+  for (NSString* ident in @[
+         @"com.example.app",  // no prefix
+         @":com.example",     // missing team id
+         @"ABCDEFGHIJ:",      // missing bundle id
+         @"ABC:com.example",  // bad team id length
+         @"",                 // empty
+       ]) {
+    NSError* err;
+    sut = [[SNTRule alloc] initWithDictionary:@{
+      @"identifier" : ident,
+      @"policy" : @"BLOCKLIST",
+      @"rule_type" : @"BUNDLE_ID",
+    }
+                                        error:&err];
+    XCTAssertNil(sut, @"Expected nil for invalid BundleID identifier %@", ident);
+    XCTAssertNotNil(err);
+  }
 }
 
 - (void)testInitWithDictionaryInvalid {

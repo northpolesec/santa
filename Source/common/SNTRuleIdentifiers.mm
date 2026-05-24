@@ -32,6 +32,7 @@
     _signingID = identifiers.signingID;
     _certificateSHA256 = identifiers.certificateSHA256;
     _teamID = identifiers.teamID;
+    _bundleID = identifiers.bundleID;
   }
   return self;
 }
@@ -43,6 +44,7 @@
   NSString* signingID;
   NSString* certificateSHA256;
   NSString* teamID;
+  NSString* bundleID;
 
   // Waterfall thru the signing status in order of most-to-least permissive
   // in terms of identifiers allowed for policy match search. Fields from
@@ -60,6 +62,11 @@
     case SNTSigningStatusProduction:
       signingID = ri.signingID;
       teamID = ri.teamID;
+      // BundleID rules are only honored for production-signed code. The
+      // CFBundleIdentifier itself is attacker-controlled, but the composite
+      // key requires a real TeamID prefix, so a fake bundle.id from a
+      // different team will not match a rule for the real team.
+      bundleID = ri.bundleID;
       OS_FALLTHROUGH;
     case SNTSigningStatusDevelopment:
       certificateSHA256 = ri.certificateSHA256;
@@ -81,6 +88,7 @@
                                            .signingID = signingID,
                                            .certificateSHA256 = certificateSHA256,
                                            .teamID = teamID,
+                                           .bundleID = bundleID,
                                        }];
 }
 
@@ -96,7 +104,8 @@
                                   .binarySHA256 = self.binarySHA256,
                                   .signingID = self.signingID,
                                   .certificateSHA256 = self.certificateSHA256,
-                                  .teamID = self.teamID};
+                                  .teamID = self.teamID,
+                                  .bundleID = self.bundleID};
 }
 
 #pragma mark NSSecureCoding
@@ -113,6 +122,7 @@
     DECODE(decoder, signingID, NSString);
     DECODE(decoder, certificateSHA256, NSString);
     DECODE(decoder, teamID, NSString);
+    DECODE(decoder, bundleID, NSString);
   }
   return self;
 }
@@ -123,6 +133,7 @@
   ENCODE(coder, signingID);
   ENCODE(coder, certificateSHA256);
   ENCODE(coder, teamID);
+  ENCODE(coder, bundleID);
 }
 
 @end

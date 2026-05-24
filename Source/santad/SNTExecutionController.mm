@@ -87,6 +87,7 @@ static SNTEventState BlockToAllowDecision(SNTEventState blockDecision) {
     case SNTEventStateBlockTeamID: return SNTEventStateAllowTeamID;
     case SNTEventStateBlockSigningID: return SNTEventStateAllowSigningID;
     case SNTEventStateBlockCDHash: return SNTEventStateAllowCDHash;
+    case SNTEventStateBlockBundleID: return SNTEventStateAllowBundleID;
     case SNTEventStateBlockCELFallback: return SNTEventStateAllowCELFallback;
     case SNTEventStateBlockLongPath: return SNTEventStateAllowUnknown;  // No direct equivalent
     default: return SNTEventStateAllowUnknown;
@@ -165,6 +166,8 @@ static SNTEventState BlockToAllowDecision(SNTEventState blockDecision) {
     case SNTEventStateAllowSigningID: eventTypeStr = kAllowSigningID; break;
     case SNTEventStateBlockCDHash: eventTypeStr = kBlockCDHash; break;
     case SNTEventStateAllowCDHash: eventTypeStr = kAllowCDHash; break;
+    case SNTEventStateBlockBundleID: eventTypeStr = kBlockBundleID; break;
+    case SNTEventStateAllowBundleID: eventTypeStr = kAllowBundleID; break;
     case SNTEventStateBlockScope: eventTypeStr = kBlockScope; break;
     case SNTEventStateAllowScope: eventTypeStr = kAllowScope; break;
     case SNTEventStateBlockUnknown: eventTypeStr = kBlockUnknown; break;

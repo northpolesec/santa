@@ -133,6 +133,7 @@ extern NSString* const kRuleTypeCertificate;
 extern NSString* const kRuleTypeTeamID;
 extern NSString* const kRuleTypeSigningID;
 extern NSString* const kRuleTypeCDHash;
+extern NSString* const kRuleTypeBundleID;
 extern NSString* const kRuleCustomMsg;
 extern NSString* const kRuleCustomURL;
 extern NSString* const kRuleComment;

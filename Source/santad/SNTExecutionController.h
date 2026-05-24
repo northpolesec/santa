@@ -50,6 +50,8 @@ const static NSString* kBlockLongPath = @"BlockLongPath";
 const static NSString* kBlockCELFallback = @"BlockCELFallback";
 const static NSString* kAllowCELFallback = @"AllowCELFallback";
 const static NSString* kAllowPlatform = @"AllowPlatform";
+const static NSString* kBlockBundleID = @"BlockBundleID";
+const static NSString* kAllowBundleID = @"AllowBundleID";
 
 @class SNTCachedDecision;
 @class SNTEventTable;

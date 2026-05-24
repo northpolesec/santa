@@ -151,6 +151,50 @@ static const NSUInteger kExpectedTeamIDLength = 10;
         break;
       }
 
+      case SNTRuleTypeBundleID: {
+        // BundleID rules are keyed on `<TEAMID>:<CFBundleIdentifier>` (or
+        // `platform:<CFBundleIdentifier>` for Apple platform binaries). Because
+        // CFBundleIdentifier alone is attacker-controlled (anyone can ship a
+        // bundle with a chosen identifier), we require pairing with an
+        // authenticated TeamID prefix at insert time.
+        NSArray* bidComponents = [identifier componentsSeparatedByString:@":"];
+        if (!bidComponents || bidComponents.count < 2) {
+          [SNTError populateError:error
+                         withCode:SNTErrorCodeRuleInvalidIdentifier
+                           format:@"Rule received with invalid identifier for its type %@",
+                                  [self invalidIdentifier:identifier forType:type]];
+          return nil;
+        }
+
+        NSString* teamID = bidComponents[0];
+        BOOL isPlatform = [[teamID lowercaseString] isEqualToString:@"platform"];
+        if (!isPlatform) {
+          if (teamID.length != kExpectedTeamIDLength ||
+              [teamID rangeOfCharacterFromSet:nonAlnum].location != NSNotFound) {
+            [SNTError populateError:error
+                           withCode:SNTErrorCodeRuleInvalidIdentifier
+                             format:@"Rule received with invalid identifier for its type %@",
+                                    [self invalidIdentifier:identifier forType:type]];
+            return nil;
+          }
+        }
+
+        NSString* bundleID =
+            [[bidComponents subarrayWithRange:NSMakeRange(1, bidComponents.count - 1)]
+                componentsJoinedByString:@":"];
+        if (bundleID.length == 0) {
+          [SNTError populateError:error
+                         withCode:SNTErrorCodeRuleInvalidIdentifier
+                           format:@"Rule received with invalid identifier for its type %@",
+                                  [self invalidIdentifier:identifier forType:type]];
+          return nil;
+        }
+
+        teamID = isPlatform ? [teamID lowercaseString] : [teamID uppercaseString];
+        identifier = [NSString stringWithFormat:@"%@:%@", teamID, bundleID];
+        break;
+      }
+
       case SNTRuleTypeCDHash: {
         if (identifier.length != CS_CDHASH_LEN * 2 ||
             [identifier rangeOfCharacterFromSet:nonHex].location != NSNotFound) {
@@ -247,6 +291,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     @(SNTRuleTypeSigningID) : kRuleTypeSigningID,
     @(SNTRuleTypeCertificate) : kRuleTypeCertificate,
     @(SNTRuleTypeTeamID) : kRuleTypeTeamID,
+    @(SNTRuleTypeBundleID) : kRuleTypeBundleID,
   };
 
   return [NSString stringWithFormat:@"(rule type: %@, identifier: %@)",
@@ -345,6 +390,8 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     type = SNTRuleTypeSigningID;
   } else if ([ruleTypeString isEqual:kRuleTypeCDHash]) {
     type = SNTRuleTypeCDHash;
+  } else if ([ruleTypeString isEqual:kRuleTypeBundleID]) {
+    type = SNTRuleTypeBundleID;
   } else {
     [SNTError populateError:error
                    withCode:SNTErrorCodeRuleInvalidRuleType
@@ -454,6 +501,8 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     case SNTRuleTypeCertificate: return kRuleTypeCertificate;
     case SNTRuleTypeTeamID: return kRuleTypeTeamID;
     case SNTRuleTypeSigningID: return kRuleTypeSigningID;
+    case SNTRuleTypeCDHash: return kRuleTypeCDHash;
+    case SNTRuleTypeBundleID: return kRuleTypeBundleID;
     // This should never be hit. If we have rule types of Unknown then there's a
     // coding error somewhere.
     default: return @"Unknown";
@@ -537,6 +586,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     case SNTRuleTypeSigningID: [output appendString:@"SigningID"]; break;
     case SNTRuleTypeCertificate: [output appendString:@"Certificate"]; break;
     case SNTRuleTypeTeamID: [output appendString:@"TeamID"]; break;
+    case SNTRuleTypeBundleID: [output appendString:@"BundleID"]; break;
     default:
       output = [NSMutableString stringWithFormat:@"Unexpected rule type: %ld", self.type];
       break;
