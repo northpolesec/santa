@@ -88,6 +88,13 @@ static inline void SafeCallBlock(void (^_Nullable block)(void)) {
 using santa::ScopedCFTypeRef;
 
 static NSString* CopyDefaultCodeSigningRequirement(void) {
+#ifdef SANTAADHOC
+  // Adhoc-signed builds have no team identifier, so the production
+  // requirement (which pins the OU to ZMCG7MLDV9) can never match. Return
+  // nil to skip the requirement entirely — only safe because adhoc builds
+  // are intended for SIP-disabled dev/test machines.
+  return nil;
+#else
   ScopedCFTypeRef<SecCodeRef> code;
   OSStatus status = SecCodeCopySelf(kSecCSDefaultFlags, code.InitializeInto());
   if (status != errSecSuccess) return kDefaultCodeSigningRequirement;
@@ -116,6 +123,7 @@ static NSString* CopyDefaultCodeSigningRequirement(void) {
                                                 withTemplate:@""];
   if ([result isEqualToString:reqStr] || result.length == 0) return kDefaultCodeSigningRequirement;
   return result;
+#endif
 }
 
 - (instancetype)initServerWithListener:(NSXPCListener*)listener {

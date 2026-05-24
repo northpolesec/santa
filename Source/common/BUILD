@@ -1249,6 +1249,10 @@ objc_library(
     name = "MOLXPCConnection",
     srcs = ["MOLXPCConnection.mm"],
     hdrs = ["MOLXPCConnection.h"],
+    defines = select({
+        "//:adhoc_build": ["SANTAADHOC"],
+        "//conditions:default": [],
+    }),
     module_name = "santa_common_MOLXPCConnection",
     sdk_frameworks = ["Security"],
     deps = [
