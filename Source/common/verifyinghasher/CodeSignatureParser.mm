@@ -88,13 +88,14 @@ uint8_t HashSizeFor(uint8_t hash_type) {
 
 bool ParseCodeSignature(std::span<const uint8_t> blob, uint64_t slice_size,
                         ParsedCodeDirectory& out, std::string& err) {
-  // Reset output up front so callers reusing a ParsedCodeDirectory across
-  // parses don't leak stale strings/spans/hashes from a prior successful
-  // call through the conditionally-overwritten fields (identifier,
-  // team_id) on the next parse, and so every early-return path leaves
-  // a clean output.
+  // All-or-nothing semantics: accumulate every field into `tmp`, commit
+  // to `out` only when every check has passed. `out` is reset on entry
+  // so failure paths leave the caller's struct in a clean default state
+  // — never a partially-populated one — regardless of where validation
+  // bailed.
   out = ParsedCodeDirectory{};
   err.clear();
+  ParsedCodeDirectory tmp;
 
   if (blob.size() < sizeof(CS_SuperBlob)) {
     err = "code signature blob too small for SuperBlob";
@@ -228,13 +229,14 @@ bool ParseCodeSignature(std::span<const uint8_t> blob, uint64_t slice_size,
   // picked CD's bytes.
 
   const CS_CodeDirectory* cd = picked->cd;
-  out.hash_type = cd->hashType;
-  out.hash_size = HashSizeFor(cd->hashType);
-  if (out.hash_size == 0) {
+  tmp.hash_type = cd->hashType;
+  tmp.cd_bytes = std::span<const uint8_t>(picked->blob_base, picked->blob_len);
+  tmp.hash_size = HashSizeFor(cd->hashType);
+  if (tmp.hash_size == 0) {
     err = "CodeDirectory unsupported hashType slipped through";
     return false;
   }
-  if (cd->hashSize != out.hash_size) {
+  if (cd->hashSize != tmp.hash_size) {
     err = "CodeDirectory hashSize mismatch";
     return false;
   }
@@ -259,7 +261,7 @@ bool ParseCodeSignature(std::span<const uint8_t> blob, uint64_t slice_size,
     err = "CodeDirectory pageSize unsupported (must be 12..18)";
     return false;
   }
-  out.page_size = 1u << cd->pageSize;
+  tmp.page_size = 1u << cd->pageSize;
 
   const uint32_t version = OSSwapBigToHostInt32(cd->version);
 
@@ -282,11 +284,11 @@ bool ParseCodeSignature(std::span<const uint8_t> blob, uint64_t slice_size,
 
   const uint32_t cl32 = OSSwapBigToHostInt32(cd->codeLimit);
   if (version >= CS_SUPPORTSCODELIMIT64 && cd->codeLimit64 != 0) {
-    out.code_limit = OSSwapBigToHostInt64(cd->codeLimit64);
+    tmp.code_limit = OSSwapBigToHostInt64(cd->codeLimit64);
   } else {
-    out.code_limit = cl32;
+    tmp.code_limit = cl32;
   }
-  if (out.code_limit > slice_size) {
+  if (tmp.code_limit > slice_size) {
     err = "CodeDirectory codeLimit exceeds slice size";
     return false;
   }
@@ -309,11 +311,11 @@ bool ParseCodeSignature(std::span<const uint8_t> blob, uint64_t slice_size,
   // (large codeLimit, small page_size) lets nCodeSlots match a truncated
   // value and PageVerifier walks past the slot table at runtime.
   uint64_t numerator;
-  if (os_add_overflow(out.code_limit, static_cast<uint64_t>(out.page_size) - 1, &numerator)) {
+  if (os_add_overflow(tmp.code_limit, static_cast<uint64_t>(tmp.page_size) - 1, &numerator)) {
     err = "CodeDirectory codeLimit + page_size overflows";
     return false;
   }
-  const uint64_t expected_pages_u64 = numerator / out.page_size;
+  const uint64_t expected_pages_u64 = numerator / tmp.page_size;
   if (expected_pages_u64 > UINT32_MAX) {
     err = "CodeDirectory page count exceeds UINT32_MAX";
     return false;
@@ -325,7 +327,7 @@ bool ParseCodeSignature(std::span<const uint8_t> blob, uint64_t slice_size,
   // the xnu invariant on the full claim so a CD that overstates nCodeSlots
   // beyond what fits gets rejected with the same verdict xnu would give.
   if (hash_offset > picked->blob_len ||
-      (picked->blob_len - hash_offset) / out.hash_size < n_code_slots) {
+      (picked->blob_len - hash_offset) / tmp.hash_size < n_code_slots) {
     err = "CodeDirectory nCodeSlots does not fit in blob";
     return false;
   }
@@ -353,9 +355,9 @@ bool ParseCodeSignature(std::span<const uint8_t> blob, uint64_t slice_size,
     err = "CodeDirectory has fewer slot hashes than codeLimit/pageSize requires";
     return false;
   }
-  out.page_count = expected_pages;
+  tmp.page_count = expected_pages;
 
-  const size_t slots_bytes = static_cast<size_t>(out.page_count) * out.hash_size;
+  const size_t slots_bytes = static_cast<size_t>(tmp.page_count) * tmp.hash_size;
   // Note: hashOffset < sizeof(CS_CodeDirectory) is intentionally accepted.
   // xnu's cs_validate_codedirectory only checks `length < hashOffset`,
   // not against the CD header size:
@@ -370,13 +372,13 @@ bool ParseCodeSignature(std::span<const uint8_t> blob, uint64_t slice_size,
     err = "CodeDirectory slot hashes out of bounds";
     return false;
   }
-  out.slot_hashes = std::span<const uint8_t>(picked->blob_base + hash_offset, slots_bytes);
+  tmp.slot_hashes = std::span<const uint8_t>(picked->blob_base + hash_offset, slots_bytes);
 
   // Compute the cdhash of the picked CD: H_picked(cd_blob[0, blob_len)),
   // truncated to CS_CDHASH_LEN. Matches xnu's cs_cd_hash.
   {
     uint8_t full[CC_SHA384_DIGEST_LENGTH];  // largest supported
-    switch (out.hash_type) {
+    switch (tmp.hash_type) {
       case CS_HASHTYPE_SHA1: {
         Sha1Traits::Ctx c;
         Sha1Traits::Init(&c);
@@ -408,7 +410,7 @@ bool ParseCodeSignature(std::span<const uint8_t> blob, uint64_t slice_size,
     }
     static_assert(CS_CDHASH_LEN <= CC_SHA1_DIGEST_LENGTH,
                   "all supported hash digests must be at least CS_CDHASH_LEN");
-    std::memcpy(out.cdhash, full, CS_CDHASH_LEN);
+    std::memcpy(tmp.cdhash, full, CS_CDHASH_LEN);
   }
 
   // Read the null-terminated identifier string at cd_blob_base + identOffset.
@@ -419,7 +421,7 @@ bool ParseCodeSignature(std::span<const uint8_t> blob, uint64_t slice_size,
       const uint8_t* p = picked->blob_base + ident_off;
       size_t max_len = picked->blob_len - ident_off;
       size_t actual_len = strnlen(reinterpret_cast<const char*>(p), max_len);
-      out.identifier.assign(reinterpret_cast<const char*>(p), actual_len);
+      tmp.identifier.assign(reinterpret_cast<const char*>(p), actual_len);
     }
   }
 
@@ -431,10 +433,12 @@ bool ParseCodeSignature(std::span<const uint8_t> blob, uint64_t slice_size,
       const uint8_t* p = picked->blob_base + team_off;
       size_t max_len = picked->blob_len - team_off;
       size_t actual_len = strnlen(reinterpret_cast<const char*>(p), max_len);
-      out.team_id.assign(reinterpret_cast<const char*>(p), actual_len);
+      tmp.team_id.assign(reinterpret_cast<const char*>(p), actual_len);
     }
   }
 
+  // All checks passed. Commit the fully-populated tmp to out in one move.
+  out = std::move(tmp);
   return true;
 }
 
