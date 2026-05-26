@@ -14,7 +14,7 @@ overrides:
   serialize-javascript@<7.0.5: 7.0.5
   uuid@<14.0.0: 14.0.0
   webpack-dev-server@<=5.2.3: 5.2.4
-  ws@>=8.0.0 <8.20.1: 8.21.0
+  ws@>=8.0.0 <8.21.0: 8.21.0
 
 importers:
 
