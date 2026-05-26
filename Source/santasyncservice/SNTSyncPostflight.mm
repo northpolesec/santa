@@ -49,7 +49,7 @@ BOOL Postflight(SNTSyncPostflight* self) {
   }
 
   id<SNTDaemonControlXPC> rop = [self.daemonConn synchronousRemoteObjectProxy];
-  [rop databaseRulesHash:^(NSString* execRulesHash, NSString* faaRulesHash) {
+  [rop databaseRulesHash:^(NSString* execRulesHash, NSString* faaRulesHash, NSString* nfRulesHash) {
     req->set_rules_hash(santa::NSStringToUTF8String(execRulesHash));
     if constexpr (IsV2) {
       req->set_file_access_rules_hash(santa::NSStringToUTF8String(faaRulesHash));

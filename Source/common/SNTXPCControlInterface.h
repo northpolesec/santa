@@ -16,6 +16,7 @@
 #import "Source/common/SNTConfigBundle.h"
 #import "Source/common/SNTFileAccessRule.h"
 #import "Source/common/SNTKillCommand.h"
+#import "Source/common/SNTNetworkFlowRule.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTRuleIdentifiers.h"
 #import "Source/common/SNTXPCUnprivilegedControlInterface.h"
@@ -43,6 +44,7 @@ typedef NS_ENUM(NSInteger, SNTRuleAddSource) {
 };
 - (void)databaseRuleAddExecutionRules:(NSArray<SNTRule*>*)executionRules
                       fileAccessRules:(NSArray<SNTFileAccessRule*>*)fileAccessRules
+                     networkFlowRules:(NSArray<SNTNetworkFlowRule*>*)networkFlowRules
                           ruleCleanup:(SNTRuleCleanup)cleanupType
                                source:(SNTRuleAddSource)source
                                 reply:(void (^)(BOOL, NSArray<NSError*>* error))reply;

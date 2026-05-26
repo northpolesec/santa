@@ -128,7 +128,7 @@ BOOL Preflight(SNTSyncPreflight* self, google::protobuf::Arena* arena,
     }
   }];
 
-  [rop databaseRulesHash:^(NSString* execRulesHash, NSString* faaRulesHash) {
+  [rop databaseRulesHash:^(NSString* execRulesHash, NSString* faaRulesHash, NSString* nfRulesHash) {
     req->set_rules_hash(NSStringToUTF8String(execRulesHash));
     if constexpr (IsV2) {
       req->set_file_access_rules_hash(NSStringToUTF8String(faaRulesHash));

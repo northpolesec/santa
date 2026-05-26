@@ -136,6 +136,7 @@ REGISTER_COMMAND_NAME(@"status")
       .signingID = -1,
       .cdhash = -1,
       .fileAccess = -1,
+      .networkFlow = -1,
   };
   [rop databaseRuleCounts:^(struct RuleCounts counts) {
     ruleCounts = counts;
@@ -155,9 +156,11 @@ REGISTER_COMMAND_NAME(@"status")
   // Rules hash
   __block NSString* executionRulesHash;
   __block NSString* fileAccessRulesHash;
-  [rop databaseRulesHash:^(NSString* execRulesHash, NSString* faaRulesHash) {
+  __block NSString* networkFlowRulesHash;
+  [rop databaseRulesHash:^(NSString* execRulesHash, NSString* faaRulesHash, NSString* nfRulesHash) {
     executionRulesHash = execRulesHash;
     fileAccessRulesHash = faaRulesHash;
+    networkFlowRulesHash = nfRulesHash;
   }];
 
   // Sync status
@@ -373,6 +376,7 @@ REGISTER_COMMAND_NAME(@"status")
       stats[@"network_extension"] = @{
         @"enabled" : @(networkExtensionEnabled),
         @"loaded" : @(networkExtensionLoaded),
+        @"rule_count" : @(ruleCounts.networkFlow),
       };
 
       if (allowedCommands) {
@@ -405,6 +409,9 @@ REGISTER_COMMAND_NAME(@"status")
 
       if (watchItemsDataSource == santa::WatchItems::DataSource::kDatabase) {
         stats[@"sync"][@"file_access_rules_hash"] = (fileAccessRulesHash ?: @"null");
+      }
+      if (isSyncV2Enabled) {
+        stats[@"sync"][@"network_flow_rules_hash"] = (networkFlowRulesHash ?: @"null");
       }
     } else {
       stats[@"sync"] = @{
@@ -498,6 +505,7 @@ REGISTER_COMMAND_NAME(@"status")
       printf(">>> Network Extension\n");
       printf("  %-40s | %s\n", "Enabled", (networkExtensionEnabled ? "Yes" : "No"));
       printf("  %-40s | %s\n", "Loaded", (networkExtensionLoaded ? "Yes" : "No"));
+      printf("  %-40s | %lld\n", "Network Flow Rules", ruleCounts.networkFlow);
     }
 
     printf(">>> Rule Types\n");
@@ -554,6 +562,10 @@ REGISTER_COMMAND_NAME(@"status")
       if (watchItemsDataSource == santa::WatchItems::DataSource::kDatabase) {
         printf("  %-40s | %s\n", "File Access Rules Hash",
                [(fileAccessRulesHash ?: @"null") UTF8String]);
+      }
+      if (isSyncV2Enabled) {
+        printf("  %-40s | %s\n", "Network Flow Rules Hash",
+               [(networkFlowRulesHash ?: @"null") UTF8String]);
       }
     }
 

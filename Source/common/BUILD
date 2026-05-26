@@ -995,6 +995,7 @@ objc_library(
         ":SNTConfigurator",
         ":SNTFileAccessRule",
         ":SNTKillCommand",
+        ":SNTNetworkFlowRule",
         ":SNTRule",
         ":SNTRuleIdentifiers",
         ":SNTStoredEvent",

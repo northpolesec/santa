@@ -24,6 +24,7 @@
 #import "Source/common/AuditUtilities.h"
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTError.h"
+#import "Source/common/SNTNetworkFlowRule.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTRuleIdentifiers.h"
 #import "Source/common/SNTSandboxExecRequest.h"
@@ -288,6 +289,78 @@ static NSString* const kBinarySHA256 =
 
   // Original entry survives the duplicate rejection.
   XCTAssertEqual(_sandboxExpectations->CountForTesting(), 1u);
+}
+
+// ---- Rule add: network flow rules pass-through -----------------------
+
+- (void)testRuleAddForwardsNetworkFlowRules {
+  NSData* blob = [@"blob" dataUsingEncoding:NSUTF8StringEncoding];
+  SNTNetworkFlowRule* nfRule = [[SNTNetworkFlowRule alloc] initAddRuleWithId:101 protoBlob:blob];
+
+  __block NSArray<SNTNetworkFlowRule*>* forwarded = nil;
+  OCMStub([self.mockRuleTable addExecutionRules:OCMOCK_ANY
+                                fileAccessRules:OCMOCK_ANY
+                               networkFlowRules:OCMOCK_ANY
+                                    ruleCleanup:SNTRuleCleanupNone
+                                         errors:[OCMArg anyObjectRef]])
+      .andDo(^(NSInvocation* inv) {
+        __unsafe_unretained NSArray<SNTNetworkFlowRule*>* captured = nil;
+        [inv getArgument:&captured atIndex:4];  // NSInvocation index for the networkFlowRules arg
+        forwarded = captured;
+      })
+      .andReturn(YES);
+
+  __block BOOL replySuccess = NO;
+  [self.sut databaseRuleAddExecutionRules:@[]
+                          fileAccessRules:@[]
+                         networkFlowRules:@[ nfRule ]
+                              ruleCleanup:SNTRuleCleanupNone
+                                   source:SNTRuleAddSourceSyncService
+                                    reply:^(BOOL success, NSArray<NSError*>* errors) {
+                                      replySuccess = success;
+                                    }];
+
+  XCTAssertTrue(replySuccess);
+  XCTAssertEqual(forwarded.count, 1u);
+  XCTAssertEqual(forwarded.firstObject.ruleId, 101);
+}
+
+// ---- databaseRulesHash: returns three hashes -------------------------
+
+- (void)testDatabaseRulesHashReturnsThreeHashes {
+  id mockHash = OCMClassMock([SNTRuleTableRulesHash class]);
+  OCMStub([mockHash executionRulesHash]).andReturn(@"exec-hash");
+  OCMStub([mockHash fileAccessRulesHash]).andReturn(@"faa-hash");
+  OCMStub([mockHash networkFlowRulesHash]).andReturn(@"nf-hash");
+  OCMStub([self.mockRuleTable hashOfHashes]).andReturn(mockHash);
+
+  __block NSString* gotExec = nil;
+  __block NSString* gotFAA = nil;
+  __block NSString* gotNF = nil;
+  [self.sut databaseRulesHash:^(NSString* exec, NSString* faa, NSString* nf) {
+    gotExec = exec;
+    gotFAA = faa;
+    gotNF = nf;
+  }];
+
+  XCTAssertEqualObjects(gotExec, @"exec-hash");
+  XCTAssertEqualObjects(gotFAA, @"faa-hash");
+  XCTAssertEqualObjects(gotNF, @"nf-hash");
+  [mockHash stopMocking];
+}
+
+// ---- databaseRuleCounts: includes networkFlow ------------------------
+
+- (void)testDatabaseRuleCountsIncludesNetworkFlow {
+  OCMStub([self.mockRuleTable networkFlowRuleCount]).andReturn(7);
+  OCMStub([self.mockRuleTable cachedStaticRules]).andReturn(@{});
+
+  __block struct RuleCounts got = {};
+  [self.sut databaseRuleCounts:^(struct RuleCounts counts) {
+    got = counts;
+  }];
+
+  XCTAssertEqual(got.networkFlow, 7);
 }
 
 @end

@@ -447,6 +447,7 @@ void ProcessDeprecatedBundleNotificationsForRule(
   [[self.daemonConn remoteObjectProxy]
       databaseRuleAddExecutionRules:newRules.executionRules
                     fileAccessRules:newRules.fileAccessRules
+                   networkFlowRules:nil
                         ruleCleanup:SyncTypeToRuleCleanup(self.syncState.syncType)
                              source:SNTRuleAddSourceSyncService
                               reply:^(BOOL didSucceed, NSArray<NSError*>* e) {

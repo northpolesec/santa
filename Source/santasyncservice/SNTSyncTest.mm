@@ -213,7 +213,8 @@
   OCMStub([self.daemonConnRop
       clientMode:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(SNTClientModeMonitor), nil])]);
   OCMStub([self.daemonConnRop
-      databaseRulesHash:([OCMArg invokeBlockWithArgs:@"the-hash", @"the-faa-hash", nil])]);
+      databaseRulesHash:([OCMArg invokeBlockWithArgs:@"the-hash", @"the-faa-hash", @"the-nf-hash",
+                                                     nil])]);
 }
 
 #pragma mark - SNTSyncStage Tests
@@ -1053,6 +1054,7 @@
   OCMStub([self.daemonConnRop
       databaseRuleAddExecutionRules:OCMOCK_ANY
                     fileAccessRules:OCMOCK_ANY
+                   networkFlowRules:OCMOCK_ANY
                         ruleCleanup:SNTRuleCleanupNone
                              source:SNTRuleAddSourceSyncService
                               reply:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(YES), [NSNull null],
@@ -1094,6 +1096,7 @@
 
   OCMVerify([self.daemonConnRop databaseRuleAddExecutionRules:rules
                                               fileAccessRules:OCMOCK_ANY
+                                             networkFlowRules:OCMOCK_ANY
                                                   ruleCleanup:SNTRuleCleanupNone
                                                        source:SNTRuleAddSourceSyncService
                                                         reply:OCMOCK_ANY]);
@@ -1110,6 +1113,7 @@
   OCMStub([self.daemonConnRop
       databaseRuleAddExecutionRules:OCMOCK_ANY
                     fileAccessRules:OCMOCK_ANY
+                   networkFlowRules:OCMOCK_ANY
                         ruleCleanup:SNTRuleCleanupNone
                              source:SNTRuleAddSourceSyncService
                               reply:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(YES), [NSNull null],
@@ -1142,6 +1146,7 @@
 
   OCMVerify([self.daemonConnRop databaseRuleAddExecutionRules:rules
                                               fileAccessRules:OCMOCK_ANY
+                                             networkFlowRules:OCMOCK_ANY
                                                   ruleCleanup:SNTRuleCleanupNone
                                                        source:SNTRuleAddSourceSyncService
                                                         reply:OCMOCK_ANY]);
@@ -1160,6 +1165,7 @@
   OCMStub([self.daemonConnRop
       databaseRuleAddExecutionRules:OCMOCK_ANY
                     fileAccessRules:OCMOCK_ANY
+                   networkFlowRules:OCMOCK_ANY
                         ruleCleanup:SNTRuleCleanupNone
                              source:SNTRuleAddSourceSyncService
                               reply:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(YES), [NSNull null],
@@ -1181,6 +1187,7 @@
 
   OCMVerify([self.daemonConnRop databaseRuleAddExecutionRules:rules
                                               fileAccessRules:OCMOCK_ANY
+                                             networkFlowRules:OCMOCK_ANY
                                                   ruleCleanup:SNTRuleCleanupNone
                                                        source:SNTRuleAddSourceSyncService
                                                         reply:OCMOCK_ANY]);
