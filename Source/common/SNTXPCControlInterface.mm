@@ -59,20 +59,26 @@ static NSString* const kSantanetdExtensionBundleID = @"com.northpolesec.santa.ne
             ofReply:YES];
 
   [r setClasses:[NSSet setWithObjects:[NSArray class], [SNTRule class], nil]
-        forSelector:@selector(databaseRuleAddExecutionRules:
-                                            fileAccessRules:ruleCleanup:source:reply:)
+        forSelector:@selector
+        (databaseRuleAddExecutionRules:fileAccessRules:networkFlowRules:ruleCleanup:source:reply:)
       argumentIndex:0
             ofReply:NO];
 
   [r setClasses:[NSSet setWithObjects:[NSArray class], [SNTFileAccessRule class], nil]
-        forSelector:@selector(databaseRuleAddExecutionRules:
-                                            fileAccessRules:ruleCleanup:source:reply:)
+        forSelector:@selector
+        (databaseRuleAddExecutionRules:fileAccessRules:networkFlowRules:ruleCleanup:source:reply:)
       argumentIndex:1
             ofReply:NO];
 
+  [r setClasses:[NSSet setWithObjects:[NSArray class], [SNTNetworkFlowRule class], nil]
+        forSelector:@selector
+        (databaseRuleAddExecutionRules:fileAccessRules:networkFlowRules:ruleCleanup:source:reply:)
+      argumentIndex:2
+            ofReply:NO];
+
   [r setClasses:[NSSet setWithObjects:[NSArray class], [NSError class], nil]
-        forSelector:@selector(databaseRuleAddExecutionRules:
-                                            fileAccessRules:ruleCleanup:source:reply:)
+        forSelector:@selector
+        (databaseRuleAddExecutionRules:fileAccessRules:networkFlowRules:ruleCleanup:source:reply:)
       argumentIndex:1
             ofReply:YES];
 

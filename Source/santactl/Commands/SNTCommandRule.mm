@@ -289,6 +289,7 @@ REGISTER_COMMAND_NAME(@"rule")
     [[self.daemonConn remoteObjectProxy]
         databaseRuleAddExecutionRules:@[]
                       fileAccessRules:nil
+                     networkFlowRules:nil
                           ruleCleanup:cleanupType
                                source:SNTRuleAddSourceSantactl
                                 reply:^(BOOL success, NSArray<NSError*>* errors) {
@@ -408,6 +409,7 @@ REGISTER_COMMAND_NAME(@"rule")
   [[self.daemonConn remoteObjectProxy]
       databaseRuleAddExecutionRules:@[ newRule ]
                     fileAccessRules:nil
+                   networkFlowRules:nil
                         ruleCleanup:SNTRuleCleanupNone
                              source:SNTRuleAddSourceSantactl
                               reply:^(BOOL success, NSArray<NSError*>* errors) {
@@ -509,6 +511,7 @@ REGISTER_COMMAND_NAME(@"rule")
   [[self.daemonConn remoteObjectProxy]
       databaseRuleAddExecutionRules:parsedRules
                     fileAccessRules:nil
+                   networkFlowRules:nil
                         ruleCleanup:cleanupType
                              source:SNTRuleAddSourceSantactl
                               reply:^(BOOL success, NSArray<NSError*>* errors) {
