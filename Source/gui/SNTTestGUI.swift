@@ -72,6 +72,7 @@ class SNTDebugStoredEvent: SNTStoredExecutionEvent {
 enum SpecialDates {
   case Apr1
   case May4
+  case Jul20
   case Oct31
   case Nov25
 }
@@ -206,6 +207,7 @@ struct BinaryView: View {
               Text(verbatim: "Nov 25").tag(SpecialDates.Nov25)
               Text(verbatim: "Apr 1").tag(SpecialDates.Apr1)
               Text(verbatim: "May 4").tag(SpecialDates.May4)
+              Text(verbatim: "Jul 20").tag(SpecialDates.Jul20)
               Text(verbatim: "Oct 31").tag(SpecialDates.Oct31)
             }.pickerStyle(.segmented)
           }
@@ -269,6 +271,7 @@ struct BinaryView: View {
         switch dateOverride {
         case .Apr1: Date.overrideDate = Date(timeIntervalSince1970: 1711980915)
         case .May4: Date.overrideDate = Date(timeIntervalSince1970: 1714832115)
+        case .Jul20: Date.overrideDate = Date(timeIntervalSince1970: 1721497515)
         case .Oct31: Date.overrideDate = Date(timeIntervalSince1970: 1730384115)
         case .Nov25: Date.overrideDate = Date(timeIntervalSince1970: 1732544115)
         }
@@ -417,6 +420,7 @@ struct AboutView: View {
               Text(verbatim: "Nov 25").tag(SpecialDates.Nov25)
               Text(verbatim: "Apr 1").tag(SpecialDates.Apr1)
               Text(verbatim: "May 4").tag(SpecialDates.May4)
+              Text(verbatim: "Jul 20").tag(SpecialDates.Jul20)
               Text(verbatim: "Oct 31").tag(SpecialDates.Oct31)
             }.pickerStyle(.segmented)
           }
@@ -432,6 +436,7 @@ struct AboutView: View {
         switch dateOverride {
         case .Apr1: Date.overrideDate = Date(timeIntervalSince1970: 1711980915)
         case .May4: Date.overrideDate = Date(timeIntervalSince1970: 1714832115)
+        case .Jul20: Date.overrideDate = Date(timeIntervalSince1970: 1721497515)
         case .Oct31: Date.overrideDate = Date(timeIntervalSince1970: 1730384115)
         case .Nov25: Date.overrideDate = Date(timeIntervalSince1970: 1732544115)
         }
