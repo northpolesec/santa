@@ -28,11 +28,13 @@ typedef NS_ENUM(NSInteger, SNTNetworkFlowRuleState) {
 @property(readonly) int64_t ruleId;
 @property(readonly) SNTNetworkFlowRuleState state;
 
-/// Serialized NetworkFlowRule.Add proto bytes. Nil for Remove.
+/// Serialized NetworkFlowRule.Add proto bytes. Nil for Remove rules.
 @property(readonly, copy) NSData* protoBlob;
 
-- (instancetype)initWithRuleId:(int64_t)ruleId
-                         state:(SNTNetworkFlowRuleState)state
-                     protoBlob:(NSData*)protoBlob;
+/// Construct an Add rule. Returns nil if protoBlob is nil.
+- (instancetype)initAddRuleWithId:(int64_t)ruleId protoBlob:(NSData*)protoBlob;
+
+/// Construct a Remove rule.
+- (instancetype)initRemoveRuleWithId:(int64_t)ruleId;
 
 @end

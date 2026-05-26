@@ -24,16 +24,30 @@
 
 @implementation SNTNetworkFlowRule
 
-- (instancetype)initWithRuleId:(int64_t)ruleId
-                         state:(SNTNetworkFlowRuleState)state
-                     protoBlob:(NSData*)protoBlob {
+- (instancetype)initWithState:(SNTNetworkFlowRuleState)state
+                       ruleId:(int64_t)ruleId
+                    protoBlob:(NSData*)protoBlob {
+  if (state != SNTNetworkFlowRuleStateAdd && state != SNTNetworkFlowRuleStateRemove) {
+    return nil;
+  }
   self = [super init];
   if (self) {
-    _ruleId = ruleId;
     _state = state;
+    _ruleId = ruleId;
     _protoBlob = [protoBlob copy];
   }
   return self;
+}
+
+- (instancetype)initAddRuleWithId:(int64_t)ruleId protoBlob:(NSData*)protoBlob {
+  if (!protoBlob) {
+    return nil;
+  }
+  return [self initWithState:SNTNetworkFlowRuleStateAdd ruleId:ruleId protoBlob:protoBlob];
+}
+
+- (instancetype)initRemoveRuleWithId:(int64_t)ruleId {
+  return [self initWithState:SNTNetworkFlowRuleStateRemove ruleId:ruleId protoBlob:nil];
 }
 
 + (BOOL)supportsSecureCoding {
@@ -52,6 +66,10 @@
     DECODE_SELECTOR(decoder, ruleId, NSNumber, longLongValue);
     DECODE_SELECTOR(decoder, state, NSNumber, integerValue);
     DECODE(decoder, protoBlob, NSData);
+
+    if (_state != SNTNetworkFlowRuleStateAdd && _state != SNTNetworkFlowRuleStateRemove) {
+      return nil;
+    }
   }
   return self;
 }

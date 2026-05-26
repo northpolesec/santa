@@ -17,6 +17,12 @@
 #import <Foundation/Foundation.h>
 #import <XCTest/XCTest.h>
 
+@interface SNTNetworkFlowRule (Testing)
+@property(readwrite) int64_t ruleId;
+@property(readwrite) SNTNetworkFlowRuleState state;
+@property(readwrite, copy) NSData* protoBlob;
+@end
+
 @interface SNTNetworkFlowRuleTest : XCTestCase
 @end
 
@@ -24,19 +30,21 @@
 
 - (void)testAddRuleCarriesBlob {
   NSData* blob = [@"fake-proto-bytes" dataUsingEncoding:NSUTF8StringEncoding];
-  SNTNetworkFlowRule* rule = [[SNTNetworkFlowRule alloc] initWithRuleId:42
-                                                                  state:SNTNetworkFlowRuleStateAdd
-                                                              protoBlob:blob];
+  SNTNetworkFlowRule* rule = [[SNTNetworkFlowRule alloc] initAddRuleWithId:42 protoBlob:blob];
+  XCTAssertNotNil(rule);
   XCTAssertEqual(rule.ruleId, 42);
   XCTAssertEqual(rule.state, SNTNetworkFlowRuleStateAdd);
   XCTAssertEqualObjects(rule.protoBlob, blob);
 }
 
+- (void)testAddRuleRejectsNilBlob {
+  SNTNetworkFlowRule* rule = [[SNTNetworkFlowRule alloc] initAddRuleWithId:42 protoBlob:nil];
+  XCTAssertNil(rule);
+}
+
 - (void)testRemoveRuleHasNilBlob {
-  SNTNetworkFlowRule* rule =
-      [[SNTNetworkFlowRule alloc] initWithRuleId:99
-                                           state:SNTNetworkFlowRuleStateRemove
-                                       protoBlob:nil];
+  SNTNetworkFlowRule* rule = [[SNTNetworkFlowRule alloc] initRemoveRuleWithId:99];
+  XCTAssertNotNil(rule);
   XCTAssertEqual(rule.ruleId, 99);
   XCTAssertEqual(rule.state, SNTNetworkFlowRuleStateRemove);
   XCTAssertNil(rule.protoBlob);
@@ -44,9 +52,7 @@
 
 - (void)testNSSecureCodingRoundTripAdd {
   NSData* blob = [@"abc" dataUsingEncoding:NSUTF8StringEncoding];
-  SNTNetworkFlowRule* orig = [[SNTNetworkFlowRule alloc] initWithRuleId:7
-                                                                  state:SNTNetworkFlowRuleStateAdd
-                                                              protoBlob:blob];
+  SNTNetworkFlowRule* orig = [[SNTNetworkFlowRule alloc] initAddRuleWithId:7 protoBlob:blob];
   NSError* err = nil;
   NSData* archived = [NSKeyedArchiver archivedDataWithRootObject:orig
                                            requiringSecureCoding:YES
@@ -65,10 +71,7 @@
 }
 
 - (void)testNSSecureCodingRoundTripRemove {
-  SNTNetworkFlowRule* orig =
-      [[SNTNetworkFlowRule alloc] initWithRuleId:INT64_MAX
-                                           state:SNTNetworkFlowRuleStateRemove
-                                       protoBlob:nil];
+  SNTNetworkFlowRule* orig = [[SNTNetworkFlowRule alloc] initRemoveRuleWithId:INT64_MAX];
   NSError* err = nil;
   NSData* archived = [NSKeyedArchiver archivedDataWithRootObject:orig
                                            requiringSecureCoding:YES
@@ -88,11 +91,28 @@
 
 - (void)testProtoBlobIsCopied {
   NSMutableData* blob = [[@"abc" dataUsingEncoding:NSUTF8StringEncoding] mutableCopy];
-  SNTNetworkFlowRule* rule = [[SNTNetworkFlowRule alloc] initWithRuleId:1
-                                                                  state:SNTNetworkFlowRuleStateAdd
-                                                              protoBlob:blob];
+  SNTNetworkFlowRule* rule = [[SNTNetworkFlowRule alloc] initAddRuleWithId:1 protoBlob:blob];
   [blob appendBytes:"xyz" length:3];
   XCTAssertEqual(rule.protoBlob.length, 3u);
+}
+
+- (void)testDecodeRejectsUnspecifiedState {
+  // Build a valid rule, stomp its state to Unspecified, archive, and verify
+  // that decode refuses to reconstruct it.
+  SNTNetworkFlowRule* corrupt = [[SNTNetworkFlowRule alloc] initRemoveRuleWithId:1];
+  corrupt.state = SNTNetworkFlowRuleStateUnspecified;
+  NSError* err = nil;
+  NSData* archived = [NSKeyedArchiver archivedDataWithRootObject:corrupt
+                                           requiringSecureCoding:YES
+                                                           error:&err];
+  XCTAssertNil(err);
+  XCTAssertNotNil(archived);
+
+  SNTNetworkFlowRule* decoded =
+      [NSKeyedUnarchiver unarchivedObjectOfClass:[SNTNetworkFlowRule class]
+                                        fromData:archived
+                                           error:&err];
+  XCTAssertNil(decoded);
 }
 
 @end
