@@ -239,6 +239,18 @@ std::vector<uint8_t> Slurp(const char* path) {
   return fd;
 }
 
+- (std::vector<uint8_t>)hwTeamSignedArm64CdHash {
+  NSString* path = [self teamSignedFixturePath];
+  auto bytes = Slurp(path.UTF8String);
+  XCTAssertFalse(bytes.empty(), @"Failed to slurp hw_team_signed at %@", path);
+  auto cs_blob = ExtractCsBlobBytes(bytes, CPU_TYPE_ARM64);
+  XCTAssertFalse(cs_blob.empty(), @"Failed to extract CS blob for arm64");
+  auto cdhash = ReferenceCdHash(cs_blob);
+  XCTAssertEqual(cdhash.size(), static_cast<size_t>(CS_CDHASH_LEN),
+                 @"ReferenceCdHash returned unexpected size");
+  return cdhash;
+}
+
 - (NSString*)unsignedFixturePath {
   NSBundle* bundle = [NSBundle bundleForClass:[self class]];
   return [bundle.resourcePath stringByAppendingPathComponent:@"testdata/hw_unsigned"];
@@ -773,6 +785,136 @@ std::vector<uint8_t> Slurp(const char* path) {
   XCTAssertEqual(r.status, VerifyingHasher::Status::kError);
   XCTAssertTrue(r.sha256.has_value());
   XCTAssertEqualObjects([self hexLowerOfSha256:*r.sha256], @(kHwUnsignedSha256));
+}
+
+// VH surfaces CD-resident fields (cdhash, signing_id, team_id, cd_bytes,
+// cs_blob_size) on a verified signed match. Downstream BinaryAttestation
+// reads these to drive KernelCsBlob without re-parsing the CS blob.
+- (void)testRunPopulatesExtendedResultFields {
+  santa::ScopedFile sf([self openHwTeamSignedFd]);
+  auto cdhash = [self hwTeamSignedArm64CdHash];
+
+  VerifyingHasher::Expected exp{
+      .stat = [self actualStatForFd:sf.UnsafeFD()],
+      .signed_check =
+          VerifyingHasher::Expected::Signed{
+              .cdhash = std::span<const uint8_t>(cdhash.data(), cdhash.size()),
+              .signing_id = kHwTeamSignedSigningID,
+              .team_id = kHwTeamSignedTeamID,
+          },
+  };
+
+  auto r = VerifyingHasher::Run(sf.UnsafeFD(), CPU_TYPE_ARM64, CPU_SUBTYPE_ARM64_ALL, exp);
+
+  XCTAssertEqual(r.status, VerifyingHasher::Status::kMatchCDHash);
+  XCTAssertTrue(r.sha256.has_value());
+
+  XCTAssertTrue(r.cdhash.has_value());
+  XCTAssertEqual(0, std::memcmp(r.cdhash->data(), cdhash.data(), CS_CDHASH_LEN));
+
+  XCTAssertTrue(r.signing_id.has_value());
+  XCTAssertEqual(*r.signing_id, std::string(kHwTeamSignedSigningID));
+
+  XCTAssertTrue(r.team_id.has_value());
+  XCTAssertEqual(*r.team_id, std::string(kHwTeamSignedTeamID));
+
+  XCTAssertTrue(r.cd_bytes.has_value());
+  XCTAssertFalse(r.cd_bytes->empty());
+
+  XCTAssertTrue(r.cs_blob_size.has_value());
+  XCTAssertGreaterThan(*r.cs_blob_size, 0u);
+}
+
+// Drift path populates the same fields as kMatchCDHash. We supply a wrong
+// cdhash but matching signing_id + team_id; status flips to drift while
+// the CD-resident identity (real cdhash, parsed sid/tid, real cd_bytes)
+// surfaces normally — BinaryAttestation downstream must see the actual
+// CD identity, not the (incorrect) expected one.
+- (void)testRunPopulatesExtendedResultFieldsOnDrift {
+  santa::ScopedFile sf([self openHwTeamSignedFd]);
+  auto real_cdhash = [self hwTeamSignedArm64CdHash];
+  std::vector<uint8_t> wrong_cdhash(CS_CDHASH_LEN, 0xFF);
+
+  VerifyingHasher::Expected exp{
+      .stat = [self actualStatForFd:sf.UnsafeFD()],
+      .signed_check =
+          VerifyingHasher::Expected::Signed{
+              .cdhash = std::span<const uint8_t>(wrong_cdhash.data(), wrong_cdhash.size()),
+              .signing_id = kHwTeamSignedSigningID,
+              .team_id = kHwTeamSignedTeamID,
+          },
+  };
+
+  auto r = VerifyingHasher::Run(sf.UnsafeFD(), CPU_TYPE_ARM64, CPU_SUBTYPE_ARM64_ALL, exp);
+
+  XCTAssertEqual(r.status, VerifyingHasher::Status::kMatchSidTidDrift);
+  XCTAssertTrue(r.cdhash.has_value());
+  // r.cdhash must be the *real* CD's cdhash, not the wrong one the caller passed.
+  XCTAssertEqual(0, std::memcmp(r.cdhash->data(), real_cdhash.data(), CS_CDHASH_LEN));
+  XCTAssertNotEqual(0, std::memcmp(r.cdhash->data(), wrong_cdhash.data(), CS_CDHASH_LEN));
+  XCTAssertTrue(r.signing_id.has_value());
+  XCTAssertTrue(r.team_id.has_value());
+  XCTAssertTrue(r.cd_bytes.has_value());
+  XCTAssertFalse(r.cd_bytes->empty());
+  XCTAssertTrue(r.cs_blob_size.has_value());
+}
+
+// Regression guard: extended Result fields must stay nullopt on every
+// non-positive status. Default-on-construction is the in-class guarantee;
+// this test fails loud if anyone ever moves the population block above
+// the status decision or onto an unverified branch.
+- (void)testExtendedFieldsNulloptOnNonMatchingStatuses {
+  // kNoMatch: signed mode, everything wrong against hw_universal.
+  {
+    std::vector<uint8_t> wrong_cdhash(CS_CDHASH_LEN, 0xAA);
+    santa::ScopedFile sf([self openHwUniversalFd]);
+    VerifyingHasher::Expected exp{
+        .stat = [self actualStatForFd:sf.UnsafeFD()],
+        .signed_check =
+            VerifyingHasher::Expected::Signed{
+                .cdhash = std::span<const uint8_t>(wrong_cdhash.data(), wrong_cdhash.size()),
+                .signing_id = "com.wrong.id",
+                .team_id = "WRONGTEAM",
+            },
+    };
+    auto r = VerifyingHasher::Run(sf.UnsafeFD(), CPU_TYPE_ARM64, CPU_SUBTYPE_ARM64_ALL, exp);
+    XCTAssertEqual(r.status, VerifyingHasher::Status::kNoMatch);
+    XCTAssertFalse(r.cdhash.has_value());
+    XCTAssertFalse(r.signing_id.has_value());
+    XCTAssertFalse(r.team_id.has_value());
+    XCTAssertFalse(r.cd_bytes.has_value());
+    XCTAssertFalse(r.cs_blob_size.has_value());
+  }
+  // kError: signed_check engaged, file is actually unsigned.
+  {
+    santa::ScopedFile sf([self openHwUnsignedFd]);
+    VerifyingHasher::Expected exp{
+        .stat = [self actualStatForFd:sf.UnsafeFD()],
+        .signed_check = VerifyingHasher::Expected::Signed{},
+    };
+    auto r = VerifyingHasher::Run(sf.UnsafeFD(), CPU_TYPE_ARM64, CPU_SUBTYPE_ARM64_ALL, exp);
+    XCTAssertEqual(r.status, VerifyingHasher::Status::kError);
+    XCTAssertFalse(r.cdhash.has_value());
+    XCTAssertFalse(r.signing_id.has_value());
+    XCTAssertFalse(r.team_id.has_value());
+    XCTAssertFalse(r.cd_bytes.has_value());
+    XCTAssertFalse(r.cs_blob_size.has_value());
+  }
+  // kMatchUnsigned: unsigned-path success — fields stay nullopt because
+  // there's no CD to surface.
+  {
+    santa::ScopedFile sf([self openHwUnsignedFd]);
+    VerifyingHasher::Expected exp{
+        .stat = [self actualStatForFd:sf.UnsafeFD()],
+    };
+    auto r = VerifyingHasher::Run(sf.UnsafeFD(), CPU_TYPE_ARM64, CPU_SUBTYPE_ARM64_ALL, exp);
+    XCTAssertEqual(r.status, VerifyingHasher::Status::kMatchUnsigned);
+    XCTAssertFalse(r.cdhash.has_value());
+    XCTAssertFalse(r.signing_id.has_value());
+    XCTAssertFalse(r.team_id.has_value());
+    XCTAssertFalse(r.cd_bytes.has_value());
+    XCTAssertFalse(r.cs_blob_size.has_value());
+  }
 }
 
 @end

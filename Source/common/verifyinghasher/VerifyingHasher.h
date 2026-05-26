@@ -17,14 +17,22 @@
 
 #include <CommonCrypto/CommonDigest.h>
 #include <mach/machine.h>
+#include <sys/cdefs.h>
 #include <sys/types.h>
 
+__BEGIN_DECLS
+#include <Kernel/kern/cs_blobs.h>  // CS_CDHASH_LEN
+__END_DECLS
+
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <ctime>
 #include <optional>
 #include <span>
+#include <string>
 #include <string_view>
+#include <vector>
 
 namespace santa {
 
@@ -91,6 +99,24 @@ class VerifyingHasher {
     // (no .value()) instead of silently consuming an unverified or
     // unfinalized digest.
     std::optional<std::array<uint8_t, CC_SHA256_DIGEST_LENGTH>> sha256;
+
+    // CD-resident fields surfaced from the parsed CodeDirectory for
+    // BinaryAttestation consumption. Populated only when Run() reaches
+    // a verified signed-path outcome — i.e., kMatchCDHash or
+    // kMatchSidTidDrift. nullopt on every other status, including
+    // kNoMatch (we parsed a CD but the caller asked for one we didn't
+    // ultimately accept).
+    std::optional<std::array<uint8_t, CS_CDHASH_LEN>> cdhash;
+    std::optional<std::string> signing_id;
+    std::optional<std::string> team_id;
+    // Owning copy of the picked CodeDirectory blob bytes (header + ids +
+    // slot hash table). Used by BinaryAttestation as CMSDecoder's
+    // detached content. Owning rather than view because Core's
+    // cs_blob_buf_ does not outlive Run().
+    std::optional<std::vector<uint8_t>> cd_bytes;
+    // Total embedded code-signature blob size (LC_CODE_SIGNATURE.datasize).
+    // Used by KernelCsBlob::Fetch as a one-syscall sizing hint.
+    std::optional<size_t> cs_blob_size;
   };
 
   struct RunOptions {

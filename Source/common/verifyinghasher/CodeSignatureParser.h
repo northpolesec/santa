@@ -41,6 +41,11 @@ struct ParsedCodeDirectory {
   uint64_t code_limit = 0;
   uint32_t page_count = 0;
   std::span<const uint8_t> slot_hashes;  // page_count * hash_size bytes
+  // Full CodeDirectory blob bytes (header + identifier + team_id + slot
+  // hash table). H_hashType(cd_bytes) truncated to CS_CDHASH_LEN equals
+  // cdhash. Non-owning view into the blob passed to ParseCodeSignature();
+  // shares its lifetime. Populated on every successful parse.
+  std::span<const uint8_t> cd_bytes;
   // 20-byte truncated cdhash of this CodeDirectory blob, computed using
   // its own hashType (matches xnu's cs_cd_hash and es_cdhash_t).
   uint8_t cdhash[CS_CDHASH_LEN] = {};

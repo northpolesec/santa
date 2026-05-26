@@ -398,6 +398,71 @@ std::vector<uint8_t> ExtractCsBlob(const char* path, uint64_t* out_slice_size) {
   XCTAssertEqual(0, std::memcmp(parsed.cdhash, zero, CS_CDHASH_LEN));
 }
 
+// All-or-nothing contract: on `false` return, every parsed-out field
+// must be in its default-initialized state — never a mix of stale
+// caller data and partial parser writes. Builds a CD that passes the
+// early candidate-selection structural checks but fails a later gate
+// (insufficient nCodeSlots). Pre-populates `parsed` with sentinel
+// values to prove both halves of the contract: reset-on-entry wipes
+// caller state, and no field gets re-written before the all-checks-pass
+// commit at the bottom of the parser.
+- (void)testAllOrNothingOutputOnLateFailure {
+  constexpr uint32_t kCodeLimit = 8192;  // 2 pages at 4 KiB
+  constexpr uint32_t kHashSize = 32;
+  constexpr uint32_t kClaimed = 1;  // underclaim — fails fewer-slot-hashes gate
+  const size_t cd_off = sizeof(CS_SuperBlob) + sizeof(CS_BlobIndex);
+  const size_t cd_sz = sizeof(CS_CodeDirectory) + kClaimed * kHashSize;
+  const size_t total = cd_off + cd_sz;
+  std::vector<uint8_t> blob(total, 0);
+
+  auto* sb = reinterpret_cast<CS_SuperBlob*>(blob.data());
+  sb->magic = OSSwapHostToBigInt32(CSMAGIC_EMBEDDED_SIGNATURE);
+  sb->length = OSSwapHostToBigInt32(static_cast<uint32_t>(total));
+  sb->count = OSSwapHostToBigInt32(1);
+
+  auto* idx = reinterpret_cast<CS_BlobIndex*>(blob.data() + sizeof(CS_SuperBlob));
+  idx->type = OSSwapHostToBigInt32(CSSLOT_CODEDIRECTORY);
+  idx->offset = OSSwapHostToBigInt32(static_cast<uint32_t>(cd_off));
+
+  auto* cd = reinterpret_cast<CS_CodeDirectory*>(blob.data() + cd_off);
+  cd->magic = OSSwapHostToBigInt32(CSMAGIC_CODEDIRECTORY);
+  cd->length = OSSwapHostToBigInt32(static_cast<uint32_t>(cd_sz));
+  cd->version = 0;
+  cd->hashOffset = OSSwapHostToBigInt32(static_cast<uint32_t>(sizeof(CS_CodeDirectory)));
+  cd->codeLimit = OSSwapHostToBigInt32(kCodeLimit);
+  cd->nCodeSlots = OSSwapHostToBigInt32(kClaimed);
+  cd->hashSize = kHashSize;
+  cd->hashType = CS_HASHTYPE_SHA256;
+  cd->pageSize = 12;
+
+  // Pre-populate with sentinels so a regression that skips the reset
+  // or leaks partial writes is observable.
+  ParsedCodeDirectory parsed;
+  parsed.hash_type = 0xAB;
+  parsed.hash_size = 0xCD;
+  parsed.page_size = 0xEF;
+  parsed.code_limit = 0x1234;
+  parsed.page_count = 0x5678;
+  parsed.identifier = "stale";
+  parsed.team_id = "stale";
+  std::memset(parsed.cdhash, 0xFF, CS_CDHASH_LEN);
+
+  std::string err;
+  XCTAssertFalse(ParseCodeSignature(blob, /*slice_size=*/kCodeLimit, parsed, err));
+
+  ParsedCodeDirectory fresh;
+  XCTAssertEqual(parsed.hash_type, fresh.hash_type);
+  XCTAssertEqual(parsed.hash_size, fresh.hash_size);
+  XCTAssertEqual(parsed.page_size, fresh.page_size);
+  XCTAssertEqual(parsed.code_limit, fresh.code_limit);
+  XCTAssertEqual(parsed.page_count, fresh.page_count);
+  XCTAssertTrue(parsed.slot_hashes.empty());
+  XCTAssertTrue(parsed.cd_bytes.empty());
+  XCTAssertEqual(0, std::memcmp(parsed.cdhash, fresh.cdhash, CS_CDHASH_LEN));
+  XCTAssertTrue(parsed.identifier.empty());
+  XCTAssertTrue(parsed.team_id.empty());
+}
+
 - (void)testParsesRealCsBlob {
   uint64_t slice_size = 0;
   auto blob = ExtractCsBlob("/usr/bin/yes", &slice_size);
@@ -1247,6 +1312,41 @@ std::vector<uint8_t> ExtractCsBlob(const char* path, uint64_t* out_slice_size) {
   XCTAssertFalse(ParseCodeSignature(blob, /*slice_size=*/4096, parsed, err));
   XCTAssertTrue(err.find("wrong magic") != std::string::npos,
                 @"expected 'wrong magic' error, got: %s", err.c_str());
+}
+
+// cd_bytes contract: must be a non-empty view inside the input blob, and
+// H_hashType(cd_bytes) truncated to CS_CDHASH_LEN must equal parsed.cdhash.
+// Exercised on a real signed binary to cover the integration path.
+- (void)testParseCodeSignaturePopulatesCdBytes {
+  uint64_t slice_size = 0;
+  auto blob = ExtractCsBlob("/usr/bin/yes", &slice_size);
+  XCTAssertFalse(blob.empty());
+
+  ParsedCodeDirectory parsed;
+  std::string err;
+  XCTAssertTrue(ParseCodeSignature(blob, slice_size, parsed, err), @"ParseCodeSignature: %s",
+                err.c_str());
+
+  XCTAssertFalse(parsed.cd_bytes.empty());
+  XCTAssertGreaterThanOrEqual(parsed.cd_bytes.data(), blob.data());
+  XCTAssertLessThanOrEqual(parsed.cd_bytes.data() + parsed.cd_bytes.size(),
+                           blob.data() + blob.size());
+
+  uint8_t digest[CC_SHA384_DIGEST_LENGTH];
+  switch (parsed.hash_type) {
+    case CS_HASHTYPE_SHA256:
+    case CS_HASHTYPE_SHA256_TRUNCATED:
+      CC_SHA256(parsed.cd_bytes.data(), static_cast<CC_LONG>(parsed.cd_bytes.size()), digest);
+      break;
+    case CS_HASHTYPE_SHA1:
+      CC_SHA1(parsed.cd_bytes.data(), static_cast<CC_LONG>(parsed.cd_bytes.size()), digest);
+      break;
+    case CS_HASHTYPE_SHA384:
+      CC_SHA384(parsed.cd_bytes.data(), static_cast<CC_LONG>(parsed.cd_bytes.size()), digest);
+      break;
+    default: XCTFail(@"unexpected hash_type %u", parsed.hash_type); return;
+  }
+  XCTAssertEqual(0, std::memcmp(digest, parsed.cdhash, CS_CDHASH_LEN));
 }
 
 @end

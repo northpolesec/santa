@@ -111,6 +111,22 @@ VerifyingHasher::Result VerifyingHasher::Run(int fd, cpu_type_t cputype, cpu_sub
   } else {
     r.status = Status::kNoMatch;
   }
+
+  // Surface VH-side fields for downstream BinaryAttestation consumption.
+  // Populated only when we actually accepted a CD as a verified match.
+  if (r.status == Status::kMatchCDHash || r.status == Status::kMatchSidTidDrift) {
+    if (computed_cdhash.size() == CS_CDHASH_LEN) {
+      std::array<uint8_t, CS_CDHASH_LEN> arr;
+      std::copy(computed_cdhash.begin(), computed_cdhash.end(), arr.begin());
+      r.cdhash = arr;
+    }
+    if (!parsed.identifier.empty()) r.signing_id = parsed.identifier;
+    if (!parsed.team_id.empty()) r.team_id = parsed.team_id;
+    if (!parsed.cd_bytes.empty()) {
+      r.cd_bytes = std::vector<uint8_t>(parsed.cd_bytes.begin(), parsed.cd_bytes.end());
+    }
+    r.cs_blob_size = static_cast<size_t>(core.Slice().cs_blob_size);
+  }
   return r;
 }
 

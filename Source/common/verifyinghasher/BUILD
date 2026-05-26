@@ -130,9 +130,8 @@ objc_library(
     ],
 )
 
-# Single source of truth for the multi-CD ad-hoc-signed test fixture.
-# Testing/Fuzzing references this via cross-package filegroup rather than
-# holding its own copy.
+# Mach-O test fixtures. Regeneration procedures: testdata/README.md.
+
 filegroup(
     name = "hw_universal_fixture",
     srcs = ["testdata/hw_universal"],
@@ -142,32 +141,21 @@ filegroup(
     ],
 )
 
-# Team-signed counterpart used to exercise positive drift detection
-# (kMatchSidTidDrift requires a non-empty team_id). Generated via:
-#   cp testdata/hw_universal testdata/hw_team_signed
-#   codesign --force --sign <ApplicationDevelopmentIdentity> testdata/hw_team_signed
-# Update kHwTeamSignedSigningID + kHwTeamSignedTeamID in VerifyingHasherTest.mm
-# if regenerated with a different identity.
 filegroup(
     name = "hw_team_signed_fixture",
     srcs = ["testdata/hw_team_signed"],
     visibility = ["//Source/common/verifyinghasher:__pkg__"],
 )
 
-# Single source of truth for the unsigned Mach-O test fixture used to
-# exercise Expected::Unsigned semantics. Generated via:
-#   cat > /tmp/hw_unsigned_build/main.c <<'EOF'
-#   int main(void) { return 0; }
-#   EOF
-#   clang -arch arm64 -Wl,-no_adhoc_codesign -o hw_unsigned /tmp/hw_unsigned_build/main.c
-# `-Wl,-no_adhoc_codesign` suppresses the linker's default ad-hoc signing
-# so the produced Mach-O has no LC_CODE_SIGNATURE / no CS blob.
-# DO NOT regenerate without also updating kHwUnsignedSha256 in
-# VerifyingHasherTest.mm — the hash changes whenever the toolchain or
-# the source byte sequence changes.
 filegroup(
     name = "hw_unsigned_fixture",
     srcs = ["testdata/hw_unsigned"],
+    visibility = ["//Source/common/verifyinghasher:__pkg__"],
+)
+
+filegroup(
+    name = "hw_entitled_fixture",
+    srcs = ["testdata/hw_entitled"],
     visibility = ["//Source/common/verifyinghasher:__pkg__"],
 )
 
