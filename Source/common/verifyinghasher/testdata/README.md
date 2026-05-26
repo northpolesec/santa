@@ -38,7 +38,8 @@ cat > /tmp/hw_unsigned_build/main.c <<'EOF'
 int main(void) { return 0; }
 EOF
 clang -arch arm64 -Wl,-no_adhoc_codesign \
-  -o hw_unsigned /tmp/hw_unsigned_build/main.c
+  -o /tmp/hw_unsigned_build/hw_unsigned /tmp/hw_unsigned_build/main.c
+cp /tmp/hw_unsigned_build/hw_unsigned testdata/hw_unsigned
 ```
 
 `-Wl,-no_adhoc_codesign` suppresses the linker's default ad-hoc signing
