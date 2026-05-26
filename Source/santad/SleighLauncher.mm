@@ -195,14 +195,16 @@ absl::StatusOr<std::string> SleighLauncher::SerializeConfig(const std::vector<in
   std::string host_name = hostName ? [hostName UTF8String] : "";
   config.set_host_name(host_name);
 
+  auto* export_telemetry = config.mutable_export_telemetry();
+
   for (int fd : input_fds) {
-    config.add_input_fds(fd);
+    export_telemetry->add_input_fds(fd);
   }
 
   NSArray<NSString*>* filterExpressions =
       [[SNTConfigurator configurator] telemetryFilterExpressions];
   for (NSString* expr in filterExpressions) {
-    config.add_filter_expressions([expr UTF8String]);
+    export_telemetry->add_filter_expressions([expr UTF8String]);
   }
 
   // Convert export config to parameters for sleigh
@@ -211,8 +213,7 @@ absl::StatusOr<std::string> SleighLauncher::SerializeConfig(const std::vector<in
     return absl::InvalidArgumentError("Export configuration is nil");
   }
 
-  auto* export_config = config.mutable_export_config();
-  auto* signed_post = export_config->mutable_signed_post();
+  auto* signed_post = export_telemetry->mutable_signed_post();
   signed_post->set_url([[exportConfig.url absoluteString] UTF8String]);
   [exportConfig.formValues
       enumerateKeysAndObjectsUsingBlock:^(NSString* key, id value, BOOL* stop) {
