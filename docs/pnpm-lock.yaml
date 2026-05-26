@@ -14,6 +14,7 @@ overrides:
   serialize-javascript@<7.0.5: 7.0.5
   uuid@<14.0.0: 14.0.0
   webpack-dev-server@<=5.2.3: 5.2.4
+  ws@>=8.0.0 <8.21.0: 8.21.0
 
 importers:
 
@@ -6999,8 +7000,8 @@ packages:
       utf-8-validate:
         optional: true
 
-  ws@8.18.3:
-    resolution: {integrity: sha512-PEIGCY5tSlUt50cqyMXfCzX+oOPqN0vuGqWzbcJ2xvnkzkq46oOpz7dQaTDBdfICb4N14+GARUDw2XV2N4tvzg==}
+  ws@8.21.0:
+    resolution: {integrity: sha512-Vsp28b7DRcimFQvrqu2Wek3z1iYxDCWqHYB8Qsnk/S4RfaCQzPGPyBNuVjJV3cd6UiKtUtp6sNM77gWvzcCH+g==}
     engines: {node: '>=10.0.0'}
     peerDependencies:
       bufferutil: ^4.0.1
@@ -15254,7 +15255,7 @@ snapshots:
       sockjs: 0.3.24
       spdy: 4.0.2
       webpack-dev-middleware: 7.4.5(webpack@5.104.1(@swc/core@1.15.8))
-      ws: 8.18.3
+      ws: 8.21.0
     optionalDependencies:
       webpack: 5.104.1(@swc/core@1.15.8)
     transitivePeerDependencies:
@@ -15365,7 +15366,7 @@ snapshots:
 
   ws@7.5.10: {}
 
-  ws@8.18.3: {}
+  ws@8.21.0: {}
 
   wsl-utils@0.1.0:
     dependencies:
