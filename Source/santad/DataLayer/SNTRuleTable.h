@@ -17,6 +17,7 @@
 
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTFileAccessRule.h"
+#import "Source/common/SNTNetworkFlowRule.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTRuleIdentifiers.h"
 #import "Source/santad/DataLayer/SNTDatabaseTable.h"
@@ -28,6 +29,7 @@
 @interface SNTRuleTableRulesHash : NSObject
 @property(readonly) NSString* executionRulesHash;
 @property(readonly) NSString* fileAccessRulesHash;
+@property(readonly) NSString* networkFlowRulesHash;
 @end
 
 ///
@@ -81,6 +83,11 @@
 - (int64_t)cdhashRuleCount;
 
 ///
+/// @return Number of network flow rules in the database
+///
+- (int64_t)networkFlowRuleCount;
+
+///
 ///  @return Rule for given identifiers.
 ///          Currently: binary, signingID, certificate or teamID (in that order).
 ///          The first matching rule found is returned.
@@ -88,23 +95,27 @@
 - (SNTRule*)executionRuleForIdentifiers:(struct RuleIdentifiers)identifiers;
 
 ///
-///  Add an array of execution rules and file access rules to the database. The rules will be added
-///  within a transaction and the transaction will abort if any rule fails to add.
+///  Add an array of execution rules, file access rules, and network flow rules to the database.
+///  All rules across all three types are applied within a single transaction; the transaction
+///  is aborted if any rule fails to apply.
 ///
 ///  @param executionRules Array of SNTRule objects to add.
 ///  @param fileAccessRules Array of SNTFileAccessRule objects to add.
+///  @param networkFlowRules Array of SNTNetworkFlowRule objects to add.
 ///  @param ruleCleanup Rule cleanup type to perform (e.g. all, none, non-transitive).
 ///  @param errors When returning NO, will be filled with an array of errors.
 ///  @return YES if adding all rules passed, NO if any were rejected.
 ///
 - (BOOL)addExecutionRules:(NSArray<SNTRule*>*)executionRules
           fileAccessRules:(NSArray<SNTFileAccessRule*>*)fileAccessRules
+         networkFlowRules:(NSArray<SNTNetworkFlowRule*>*)networkFlowRules
               ruleCleanup:(SNTRuleCleanup)cleanupType
                    errors:(NSArray<NSError*>**)errors;
 
 ///
-/// Wrapper for `addExecutionRules:fileAccessRules:ruleCleanup:errors:` when there are no
-/// file access rules to add.
+/// Wrapper for `addExecutionRules:fileAccessRules:networkFlowRules:ruleCleanup:errors:` when
+/// there are no file access or network flow rules to add. Used by legacy code paths that only
+/// produce execution rules.
 ///
 - (BOOL)addExecutionRules:(NSArray<SNTRule*>*)rules
               ruleCleanup:(SNTRuleCleanup)cleanupType
@@ -139,6 +150,12 @@
 ///  Retrieve all file access rules from the database for export.
 ///
 - (NSDictionary<NSString*, NSDictionary*>*)retrieveAllFileAccessRules;
+
+///
+///  Retrieve all stored network flow rules as Add rules, ordered by rule_id ASC.
+///  Intended for export and for assembling the full-set XPC push to santanetd.
+///
+- (NSArray<SNTNetworkFlowRule*>*)retrieveAllNetworkFlowRules;
 
 ///
 ///  Update the static rules from the configuration.

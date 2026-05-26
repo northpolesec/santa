@@ -26,6 +26,7 @@
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTFileAccessRule.h"
 #import "Source/common/SNTFileInfo.h"
+#import "Source/common/SNTNetworkFlowRule.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTRuleIdentifiers.h"
 #import "Source/common/SigningIDHelpers.h"
@@ -213,6 +214,7 @@
   NSArray<NSError*>* errors;
   XCTAssertFalse([self.sut addExecutionRules:@[]
                              fileAccessRules:@[]
+                            networkFlowRules:@[]
                                  ruleCleanup:SNTRuleCleanupNone
                                       errors:&errors]);
   XCTAssertEqual(errors.count, 1);
@@ -268,6 +270,7 @@
   SNTFileAccessRule* r2 = [self _exampleFileAccessAddRuleWithName:@"my_second_rule"];
   [self.sut addExecutionRules:@[]
               fileAccessRules:@[ r1 ]
+             networkFlowRules:nil
                   ruleCleanup:SNTRuleCleanupNone
                        errors:&errors];
   XCTAssertNil(errors);
@@ -276,6 +279,7 @@
 
   [self.sut addExecutionRules:@[]
               fileAccessRules:@[ r2 ]
+             networkFlowRules:nil
                   ruleCleanup:SNTRuleCleanupNone
                        errors:&errors];
   XCTAssertNil(errors);
@@ -292,6 +296,7 @@
   SNTFileAccessRule* r3 = [self _exampleFileAccessRemoveRuleWithName:r1.name];
   [self.sut addExecutionRules:@[]
               fileAccessRules:@[ r3 ]
+             networkFlowRules:nil
                   ruleCleanup:SNTRuleCleanupNone
                        errors:&errors];
   XCTAssertNil(errors);
@@ -320,6 +325,7 @@
 
   [self.sut addExecutionRules:@[ execRule ]
               fileAccessRules:@[ faaRule ]
+             networkFlowRules:nil
                   ruleCleanup:SNTRuleCleanupNone
                        errors:&errors];
 
@@ -332,6 +338,7 @@
   // Re-add an exec rule that shouldn't trigger file access rule changed callback
   [self.sut addExecutionRules:@[ execRule ]
               fileAccessRules:@[]
+             networkFlowRules:nil
                   ruleCleanup:SNTRuleCleanupNone
                        errors:&errors];
   XCTAssertSemaFalse(sema, "Rules changed callback was unexpectedly called");
@@ -344,6 +351,7 @@
   faaRule = [self _exampleFileAccessRemoveRuleWithName:faaRule.name];
   [self.sut addExecutionRules:@[ execRule ]
               fileAccessRules:@[ faaRule ]
+             networkFlowRules:nil
                   ruleCleanup:SNTRuleCleanupNone
                        errors:&errors];
 
@@ -761,14 +769,21 @@
     [self _exampleFileAccessAddRuleWithName:@"MyFirstRule"],
     [self _exampleFileAccessAddRuleWithName:@"AnotherRule"],
   ];
+  NSArray<SNTNetworkFlowRule*>* nfRules = @[
+    [self _exampleNetworkFlowAddRuleWithId:1 blob:@"net-rule-1"],
+    [self _exampleNetworkFlowAddRuleWithId:2 blob:@"net-rule-2"],
+  ];
 
   [self.sut addExecutionRules:rules
               fileAccessRules:faaRules
+             networkFlowRules:nfRules
                   ruleCleanup:SNTRuleCleanupAll
                        errors:nil];
   SNTRuleTableRulesHash* rulesHash = [self.sut hashOfHashes];
   XCTAssertEqualObjects(rulesHash.executionRulesHash, @"a6cb5171bbb8895820d61e395592b293");
   XCTAssertEqualObjects(rulesHash.fileAccessRulesHash, @"010a7393bae8f2e97c296063dd2f39cf");
+  NSString* nfHashWithRules = rulesHash.networkFlowRulesHash;
+  XCTAssertEqual(nfHashWithRules.length, 32u);
 
   // Add a transitive rule. The hashes should not change.
   SNTRule* transitiveRule = [self _exampleTransitiveRule];
@@ -776,19 +791,219 @@
   rulesHash = [self.sut hashOfHashes];
   XCTAssertEqualObjects(rulesHash.executionRulesHash, @"a6cb5171bbb8895820d61e395592b293");
   XCTAssertEqualObjects(rulesHash.fileAccessRulesHash, @"010a7393bae8f2e97c296063dd2f39cf");
+  XCTAssertEqualObjects(rulesHash.networkFlowRulesHash, nfHashWithRules);
 
   // Add remove rules. The hashes should change.
   SNTRule* removeRule = self._exampleBinaryRule;
   removeRule.state = SNTRuleStateRemove;
   SNTFileAccessRule* faaRemoveRule =
       [[SNTFileAccessRule alloc] initRemoveRuleWithName:@"AnotherRule"];
+  SNTNetworkFlowRule* nfRemoveRule = [[SNTNetworkFlowRule alloc] initRemoveRuleWithId:2];
   [self.sut addExecutionRules:@[ removeRule ]
               fileAccessRules:@[ faaRemoveRule ]
+             networkFlowRules:@[ nfRemoveRule ]
                   ruleCleanup:SNTRuleCleanupNone
                        errors:nil];
   rulesHash = [self.sut hashOfHashes];
   XCTAssertEqualObjects(rulesHash.executionRulesHash, @"d4dd223bafbdda2c36bb0513dfabb38b");
   XCTAssertEqualObjects(rulesHash.fileAccessRulesHash, @"146f85d95d0d21d5c04d048b2b69f908");
+  XCTAssertNotEqualObjects(rulesHash.networkFlowRulesHash, nfHashWithRules);
+}
+
+#pragma mark Network Flow Rules
+
+- (void)testNetworkFlowRulesTableCreated {
+  __block BOOL tableExists = NO;
+  [self.sut inDatabase:^(FMDatabase* db) {
+    FMResultSet* rs = [db executeQuery:@"SELECT name FROM sqlite_master "
+                                       @"WHERE type='table' AND name='network_flow_rules'"];
+    tableExists = [rs next];
+    [rs close];
+  }];
+  XCTAssertTrue(tableExists, @"network_flow_rules table should be created on initialization");
+}
+
+- (SNTNetworkFlowRule*)_exampleNetworkFlowAddRuleWithId:(int64_t)ruleId blob:(NSString*)blob {
+  return
+      [[SNTNetworkFlowRule alloc] initAddRuleWithId:ruleId
+                                          protoBlob:[blob dataUsingEncoding:NSUTF8StringEncoding]];
+}
+
+- (BOOL)_addNetworkFlowRules:(NSArray<SNTNetworkFlowRule*>*)rules
+                 ruleCleanup:(SNTRuleCleanup)cleanup
+                      errors:(NSArray<NSError*>**)errors {
+  return [self.sut addExecutionRules:nil
+                     fileAccessRules:nil
+                    networkFlowRules:rules
+                         ruleCleanup:cleanup
+                              errors:errors];
+}
+
+- (void)testAddNetworkFlowRulesPersists {
+  SNTNetworkFlowRule* rule = [self _exampleNetworkFlowAddRuleWithId:101 blob:@"rule-blob-bytes"];
+  NSArray<NSError*>* errors;
+  XCTAssertTrue([self _addNetworkFlowRules:@[ rule ]
+                               ruleCleanup:SNTRuleCleanupNone
+                                    errors:&errors]);
+  XCTAssertNil(errors);
+  XCTAssertEqual(self.sut.networkFlowRuleCount, 1);
+
+  NSArray<SNTNetworkFlowRule*>* all = [self.sut retrieveAllNetworkFlowRules];
+  XCTAssertEqual(all.count, 1u);
+  XCTAssertEqual(all.firstObject.ruleId, 101);
+  XCTAssertEqual(all.firstObject.state, SNTNetworkFlowRuleStateAdd);
+  XCTAssertEqualObjects(all.firstObject.protoBlob,
+                        [@"rule-blob-bytes" dataUsingEncoding:NSUTF8StringEncoding]);
+}
+
+- (void)testAddNetworkFlowRulesUpsertReplacesBlob {
+  SNTNetworkFlowRule* v1 = [self _exampleNetworkFlowAddRuleWithId:42 blob:@"v1"];
+  XCTAssertTrue([self _addNetworkFlowRules:@[ v1 ] ruleCleanup:SNTRuleCleanupNone errors:nil]);
+  XCTAssertEqual(self.sut.networkFlowRuleCount, 1);
+
+  SNTNetworkFlowRule* v2 = [self _exampleNetworkFlowAddRuleWithId:42 blob:@"v2"];
+  XCTAssertTrue([self _addNetworkFlowRules:@[ v2 ] ruleCleanup:SNTRuleCleanupNone errors:nil]);
+  XCTAssertEqual(self.sut.networkFlowRuleCount, 1);
+  NSArray<SNTNetworkFlowRule*>* all = [self.sut retrieveAllNetworkFlowRules];
+  XCTAssertEqualObjects(all.firstObject.protoBlob, [@"v2" dataUsingEncoding:NSUTF8StringEncoding]);
+}
+
+- (void)testRemoveNetworkFlowRule {
+  SNTNetworkFlowRule* add = [self _exampleNetworkFlowAddRuleWithId:7 blob:@"x"];
+  SNTNetworkFlowRule* remove = [[SNTNetworkFlowRule alloc] initRemoveRuleWithId:7];
+  XCTAssertTrue([self _addNetworkFlowRules:@[ add ] ruleCleanup:SNTRuleCleanupNone errors:nil]);
+  XCTAssertEqual(self.sut.networkFlowRuleCount, 1);
+  XCTAssertTrue([self _addNetworkFlowRules:@[ remove ] ruleCleanup:SNTRuleCleanupNone errors:nil]);
+  XCTAssertEqual(self.sut.networkFlowRuleCount, 0);
+}
+
+- (void)testRemoveNetworkFlowRuleNonexistentIsNotAnError {
+  SNTNetworkFlowRule* remove = [[SNTNetworkFlowRule alloc] initRemoveRuleWithId:999];
+  NSArray<NSError*>* errors;
+  XCTAssertTrue([self _addNetworkFlowRules:@[ remove ]
+                               ruleCleanup:SNTRuleCleanupNone
+                                    errors:&errors]);
+  XCTAssertNil(errors);
+  XCTAssertEqual(self.sut.networkFlowRuleCount, 0);
+}
+
+- (void)testCleanAllTruncatesNetworkFlowRules {
+  SNTNetworkFlowRule* r1 = [self _exampleNetworkFlowAddRuleWithId:1 blob:@"x"];
+  SNTNetworkFlowRule* r2 = [self _exampleNetworkFlowAddRuleWithId:2 blob:@"x"];
+  XCTAssertTrue(([self _addNetworkFlowRules:@[ r1, r2 ]
+                                ruleCleanup:SNTRuleCleanupNone
+                                     errors:nil]));
+  XCTAssertEqual(self.sut.networkFlowRuleCount, 2);
+
+  SNTNetworkFlowRule* r3 = [self _exampleNetworkFlowAddRuleWithId:3 blob:@"x"];
+  XCTAssertTrue([self _addNetworkFlowRules:@[ r3 ] ruleCleanup:SNTRuleCleanupAll errors:nil]);
+  XCTAssertEqual(self.sut.networkFlowRuleCount, 1);
+}
+
+- (void)testCleanNonTransitiveTruncatesNetworkFlowRules {
+  // Mirrors the FAA behavior: CLEAN sync (NonTransitive) also wipes network rules.
+  SNTNetworkFlowRule* r1 = [self _exampleNetworkFlowAddRuleWithId:1 blob:@"x"];
+  XCTAssertTrue([self _addNetworkFlowRules:@[ r1 ] ruleCleanup:SNTRuleCleanupNone errors:nil]);
+  XCTAssertEqual(self.sut.networkFlowRuleCount, 1);
+
+  XCTAssertTrue([self.sut addExecutionRules:@[ [self _exampleBinaryRule] ]
+                            fileAccessRules:nil
+                           networkFlowRules:nil
+                                ruleCleanup:SNTRuleCleanupNonTransitive
+                                     errors:nil]);
+  XCTAssertEqual(self.sut.networkFlowRuleCount, 0);
+}
+
+- (void)testCleanupExecutionRulesPreservesNetworkFlowRules {
+  // ExecutionRules-only cleanup should not touch network_flow_rules.
+  SNTNetworkFlowRule* r = [self _exampleNetworkFlowAddRuleWithId:1 blob:@"x"];
+  XCTAssertTrue([self _addNetworkFlowRules:@[ r ] ruleCleanup:SNTRuleCleanupNone errors:nil]);
+  XCTAssertEqual(self.sut.networkFlowRuleCount, 1);
+
+  XCTAssertTrue([self.sut addExecutionRules:@[ [self _exampleBinaryRule] ]
+                            fileAccessRules:nil
+                           networkFlowRules:nil
+                                ruleCleanup:SNTRuleCleanupExecutionRules
+                                     errors:nil]);
+  XCTAssertEqual(self.sut.networkFlowRuleCount, 1);
+}
+
+- (void)testAddAllEmptyArraysWithoutCleanupFails {
+  NSArray<NSError*>* errors;
+  XCTAssertFalse([self.sut addExecutionRules:@[]
+                             fileAccessRules:@[]
+                            networkFlowRules:@[]
+                                 ruleCleanup:SNTRuleCleanupNone
+                                      errors:&errors]);
+  XCTAssertEqual(errors.count, 1);
+  XCTAssertEqual(errors.firstObject.code, SNTErrorCodeEmptyRuleArray);
+}
+
+- (void)testAddNetworkFlowRulesAloneSatisfiesNonEmptyCheck {
+  // A non-empty network rule array is enough to pass the non-empty guard even when
+  // execution and FAA arrays are empty.
+  SNTNetworkFlowRule* r = [self _exampleNetworkFlowAddRuleWithId:1 blob:@"x"];
+  NSArray<NSError*>* errors;
+  XCTAssertTrue([self.sut addExecutionRules:@[]
+                            fileAccessRules:@[]
+                           networkFlowRules:@[ r ]
+                                ruleCleanup:SNTRuleCleanupNone
+                                     errors:&errors]);
+  XCTAssertNil(errors);
+  XCTAssertEqual(self.sut.networkFlowRuleCount, 1);
+}
+
+- (void)testAddNetworkFlowRulesEmptyWithCleanupAllSucceeds {
+  SNTNetworkFlowRule* r = [self _exampleNetworkFlowAddRuleWithId:1 blob:@"x"];
+  XCTAssertTrue([self _addNetworkFlowRules:@[ r ] ruleCleanup:SNTRuleCleanupNone errors:nil]);
+  XCTAssertEqual(self.sut.networkFlowRuleCount, 1);
+
+  NSArray<NSError*>* errors;
+  XCTAssertTrue([self _addNetworkFlowRules:@[] ruleCleanup:SNTRuleCleanupAll errors:&errors]);
+  XCTAssertNil(errors);
+  XCTAssertEqual(self.sut.networkFlowRuleCount, 0);
+}
+
+- (void)testNetworkFlowRulesHashIsStableAndHex {
+  SNTNetworkFlowRule* r = [self _exampleNetworkFlowAddRuleWithId:1 blob:@"x"];
+  [self _addNetworkFlowRules:@[ r ] ruleCleanup:SNTRuleCleanupNone errors:nil];
+  NSString* h1 = [self.sut hashOfHashes].networkFlowRulesHash;
+  NSString* h2 = [self.sut hashOfHashes].networkFlowRulesHash;
+  XCTAssertEqualObjects(h1, h2);
+  XCTAssertEqual(h1.length, 32u);  // Xxhash128 hex
+}
+
+- (void)testNetworkFlowRulesHashChangesWhenBlobChanges {
+  SNTNetworkFlowRule* r1 = [self _exampleNetworkFlowAddRuleWithId:1 blob:@"a"];
+  [self _addNetworkFlowRules:@[ r1 ] ruleCleanup:SNTRuleCleanupNone errors:nil];
+  NSString* h1 = [self.sut hashOfHashes].networkFlowRulesHash;
+
+  SNTNetworkFlowRule* r2 = [self _exampleNetworkFlowAddRuleWithId:1 blob:@"b"];
+  [self _addNetworkFlowRules:@[ r2 ] ruleCleanup:SNTRuleCleanupNone errors:nil];
+  NSString* h2 = [self.sut hashOfHashes].networkFlowRulesHash;
+
+  XCTAssertNotEqualObjects(h1, h2);
+}
+
+- (void)testNetworkFlowRulesHashIsOrderIndependent {
+  // Inserting the same two rules in different orders yields the same hash, since
+  // the hash sorts by rule_id ASC.
+  SNTNetworkFlowRule* a = [self _exampleNetworkFlowAddRuleWithId:1 blob:@"a"];
+  SNTNetworkFlowRule* b = [self _exampleNetworkFlowAddRuleWithId:2 blob:@"b"];
+
+  [self _addNetworkFlowRules:@[ a, b ] ruleCleanup:SNTRuleCleanupAll errors:nil];
+  NSString* h1 = [self.sut hashOfHashes].networkFlowRulesHash;
+
+  [self _addNetworkFlowRules:@[ b, a ] ruleCleanup:SNTRuleCleanupAll errors:nil];
+  NSString* h2 = [self.sut hashOfHashes].networkFlowRulesHash;
+
+  XCTAssertEqualObjects(h1, h2);
+}
+
+- (void)testNetworkFlowRulesHashOnEmptyTable {
+  // Sanity: empty table still produces a stable 32-char Xxhash128 hex.
+  NSString* h = [self.sut hashOfHashes].networkFlowRulesHash;
+  XCTAssertEqual(h.length, 32u);
 }
 
 @end

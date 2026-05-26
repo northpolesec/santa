@@ -34,7 +34,7 @@
 #include "Source/common/String.h"
 #include "Source/common/cel/Evaluator.h"
 
-static const uint32_t kRuleTableCurrentVersion = 12;
+static const uint32_t kRuleTableCurrentVersion = 13;
 
 // How many rules must be in database before we start trying to remove transitive rules.
 static const int64_t kTransitiveRuleCullingThreshold = 500000;
@@ -84,15 +84,18 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
 @property(readwrite) NSDictionary<NSString*, SNTRule*>* cachedStaticRules;
 @property(atomic) NSString* executionRulesHash;
 @property(atomic) NSString* fileAccessRulesHash;
+@property(atomic) NSString* networkFlowRulesHash;
 @end
 
 @implementation SNTRuleTableRulesHash
 - (instancetype)initWithExecutionRulesHash:(NSString*)executionRulesHash
-                       fileAccessRulesHash:(NSString*)fileAccessRulesHash {
+                       fileAccessRulesHash:(NSString*)fileAccessRulesHash
+                      networkFlowRulesHash:(NSString*)networkFlowRulesHash {
   self = [super init];
   if (self) {
     _executionRulesHash = executionRulesHash;
     _fileAccessRulesHash = fileAccessRulesHash;
+    _networkFlowRulesHash = networkFlowRulesHash;
   }
   return self;
 }
@@ -318,6 +321,14 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
     newVersion = 12;
   }
 
+  if (version < 13) {
+    [db executeUpdate:@"CREATE TABLE 'network_flow_rules' ("
+                      @"'rule_id' INTEGER PRIMARY KEY, "
+                      @"'rule_blob' BLOB NOT NULL"
+                      @")"];
+    newVersion = 13;
+  }
+
   // Save signing info for launchd and santad. Used to ensure they are always allowed.
   self.santadCSInfo = [[MOLCodesignChecker alloc] initWithSelf];
   self.launchdCSInfo = [[MOLCodesignChecker alloc] initWithPID:1];
@@ -409,6 +420,14 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
   __block NSUInteger count = 0;
   [self inDatabase:^(FMDatabase* db) {
     count = [self fileAccessRuleCountSerialized:db];
+  }];
+  return count;
+}
+
+- (int64_t)networkFlowRuleCount {
+  __block NSUInteger count = 0;
+  [self inDatabase:^(FMDatabase* db) {
+    count = [db longForQuery:@"SELECT COUNT(*) FROM network_flow_rules"];
   }];
   return count;
 }
@@ -560,6 +579,48 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
   return YES;
 }
 
+- (BOOL)addNetworkFlowRules:(NSArray<SNTNetworkFlowRule*>*)networkFlowRules
+                       toDB:(FMDatabase*)db
+                     errors:(NSMutableArray<NSError*>*)errors {
+  for (SNTNetworkFlowRule* rule in networkFlowRules) {
+    // Network flow rules must:
+    // 1. Be the right type
+    // 2. Carry a defined Add/Remove state
+    // 3. If an Add rule, must have a non-empty blob (init enforces this on the model side too)
+    if (![rule isKindOfClass:[SNTNetworkFlowRule class]] ||
+        (rule.state != SNTNetworkFlowRuleStateAdd && rule.state != SNTNetworkFlowRuleStateRemove) ||
+        (rule.state == SNTNetworkFlowRuleStateAdd && rule.protoBlob.length == 0)) {
+      [errors
+          addObject:[SNTError createErrorWithCode:SNTErrorCodeRuleInvalid
+                                          message:@"Network flow rule array contained invalid entry"
+                                           detail:rule.description]];
+      return NO;
+    }
+
+    if (rule.state == SNTNetworkFlowRuleStateRemove) {
+      if (![db executeUpdate:@"DELETE FROM network_flow_rules WHERE rule_id=?", @(rule.ruleId)]) {
+        [errors addObject:[SNTError createErrorWithCode:SNTErrorCodeRemoveRuleFailed
+                                                message:@"A database error occurred while deleting "
+                                                        @"a network flow rule"
+                                                 detail:[db lastErrorMessage]]];
+        return NO;
+      }
+    } else {
+      if (![db executeUpdate:@"INSERT OR REPLACE INTO network_flow_rules (rule_id, rule_blob) "
+                             @"VALUES (?, ?)",
+                             @(rule.ruleId), rule.protoBlob]) {
+        [errors addObject:[SNTError createErrorWithCode:SNTErrorCodeInsertOrReplaceRuleFailed
+                                                message:@"A database error occurred while "
+                                                        @"inserting/replacing a network flow rule"
+                                                 detail:[db lastErrorMessage]]];
+        return NO;
+      }
+    }
+  }
+
+  return YES;
+}
+
 - (BOOL)addExecutionRules:(NSArray<SNTRule*>*)executionRules
                      toDB:(FMDatabase*)db
                    errors:(NSMutableArray<NSError*>*)errors {
@@ -626,20 +687,23 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
                    errors:(NSArray<NSError*>**)errors {
   return [self addExecutionRules:executionRules
                  fileAccessRules:nil
+                networkFlowRules:nil
                      ruleCleanup:cleanupType
                           errors:errors];
 }
 
 - (BOOL)addExecutionRules:(NSArray<SNTRule*>*)executionRules
           fileAccessRules:(NSArray<SNTFileAccessRule*>*)fileAccessRules
+         networkFlowRules:(NSArray<SNTNetworkFlowRule*>*)networkFlowRules
               ruleCleanup:(SNTRuleCleanup)cleanupType
                    errors:(NSArray<NSError*>**)errors {
-  // Only accept an empty rules array if the cleanup-type is not none.
-  if (executionRules.count == 0 && fileAccessRules.count == 0 &&
+  // Only accept all-empty rule arrays if the cleanup-type is not none.
+  if (executionRules.count == 0 && fileAccessRules.count == 0 && networkFlowRules.count == 0 &&
       cleanupType == SNTRuleCleanupNone) {
     if (errors) {
       *errors = @[ [SNTError createErrorWithCode:SNTErrorCodeEmptyRuleArray
-                                          format:@"Empty execution and file access rule arrays"] ];
+                                          format:@"Empty execution, file access, and network "
+                                                 @"flow rule arrays"] ];
     }
     return NO;
   }
@@ -656,11 +720,13 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
       case SNTRuleCleanupAll:
         [db executeUpdate:@"DELETE FROM execution_rules"];
         [db executeUpdate:@"DELETE FROM file_access_rules"];
+        [db executeUpdate:@"DELETE FROM network_flow_rules"];
         break;
       case SNTRuleCleanupNonTransitive:
         [db executeUpdate:@"DELETE FROM execution_rules WHERE state != ?",
                           @(SNTRuleStateAllowTransitive)];
         [db executeUpdate:@"DELETE FROM file_access_rules"];
+        [db executeUpdate:@"DELETE FROM network_flow_rules"];
         break;
       case SNTRuleCleanupExecutionRules:
         [db executeUpdate:@"DELETE FROM execution_rules WHERE state != ?",
@@ -685,9 +751,15 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
       return;
     }
 
-    // Clear the rules hash
+    if (![self addNetworkFlowRules:networkFlowRules toDB:db errors:blockErrors]) {
+      *rollback = failed = YES;
+      return;
+    }
+
+    // Clear the rules hashes
     self.executionRulesHash = nil;
     self.fileAccessRulesHash = nil;
+    self.networkFlowRulesHash = nil;
 
     faaRulesHashAfter = [self fileAccessRulesHashSerialized:db];
     faaRuleCount = [self fileAccessRuleCountSerialized:db];
@@ -834,6 +906,28 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
   return faaRules;
 }
 
+- (NSArray<SNTNetworkFlowRule*>*)retrieveAllNetworkFlowRules {
+  NSMutableArray<SNTNetworkFlowRule*>* rules = [NSMutableArray array];
+  [self inDatabase:^(FMDatabase* db) {
+    // Indexed-column access (rather than named) to keep this loop cheap when the
+    // network ruleset is large. Column order: 0=rule_id, 1=rule_blob.
+    FMResultSet* rs = [db executeQuery:@"SELECT rule_id, rule_blob FROM network_flow_rules "
+                                       @"ORDER BY rule_id ASC"];
+    while ([rs next]) {
+      int64_t ruleId = [rs longLongIntForColumnIndex:0];
+      NSData* blob = [rs dataNoCopyForColumnIndex:1];
+      if (!blob) continue;
+      SNTNetworkFlowRule* rule = [[SNTNetworkFlowRule alloc] initAddRuleWithId:ruleId
+                                                                     protoBlob:blob];
+      if (rule) {
+        [rules addObject:rule];
+      }
+    }
+    [rs close];
+  }];
+  return rules;
+}
+
 #pragma mark Caching Static Rules
 
 - (void)updateStaticRules:(NSArray<NSDictionary*>*)staticRules {
@@ -928,12 +1022,38 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
   return digest;
 }
 
+- (NSString*)networkFlowRulesHashSerialized:(FMDatabase*)db {
+  if (self.networkFlowRulesHash.length) {
+    return self.networkFlowRulesHash;
+  }
+
+  santa::Xxhash128 hash;
+
+  // rule_id is field 1 of the NetworkFlowRule.Add proto and is therefore already
+  // part of rule_blob; no need to feed it into the hash separately. Ordering by
+  // rule_id ASC gives a deterministic update order. Indexed-column access (rather
+  // than named) keeps this loop cheap when the network ruleset is large
+  // (enterprise blocklists are expected to reach 100k+ rules).
+  FMResultSet* rs =
+      [db executeQuery:@"SELECT rule_blob FROM network_flow_rules ORDER BY rule_id ASC"];
+  while ([rs next]) {
+    NSData* blob = [rs dataNoCopyForColumnIndex:0];
+    hash.Update(blob.bytes, blob.length);
+  }
+  [rs close];
+
+  NSString* digest = santa::StringToNSString(hash.HexDigest());
+  self.networkFlowRulesHash = digest;
+  return digest;
+}
+
 - (SNTRuleTableRulesHash*)hashOfHashes {
   __block SNTRuleTableRulesHash* hashes;
   [self inDatabase:^(FMDatabase* db) {
     hashes = [[SNTRuleTableRulesHash alloc]
         initWithExecutionRulesHash:[self executionRulesHashSerialized:db]
-               fileAccessRulesHash:[self fileAccessRulesHashSerialized:db]];
+               fileAccessRulesHash:[self fileAccessRulesHashSerialized:db]
+              networkFlowRulesHash:[self networkFlowRulesHashSerialized:db]];
   }];
   return hashes;
 }
