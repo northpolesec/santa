@@ -42,6 +42,7 @@
 #import "Source/santasyncservice/SNTSyncPublishMetrics.h"
 #import "Source/santasyncservice/SNTSyncRuleDownload.h"
 #import "Source/santasyncservice/SNTSyncState.h"
+#include "absl/cleanup/cleanup.h"
 
 static const uint8_t kMaxEnqueuedSyncs = 2;
 
@@ -283,15 +284,22 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
 
   SLOGD(@"Sending preflight request to %@", url.absoluteString);
 
-  __block BOOL timedOut = NO;
+  // Guard against reply() being called twice: the completion handler and the
+  // timeout path can race when the response arrives near the 30s deadline.
+  // reply is an XPC reply block; invoking it twice crashes the process.
+  auto replied = std::make_shared<std::atomic<bool>>(false);
+  void (^guardedReply)(NSInteger, NSString*) = ^(NSInteger code, NSString* desc) {
+    if (replied->exchange(true)) return;
+    reply(code, desc);
+  };
+
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
   NSURLSessionDataTask* task = [syncState.session
       dataTaskWithRequest:req
         completionHandler:^(NSData* data, NSURLResponse* response, NSError* error) {
-          if (timedOut) return;
           if (error) {
             SLOGE(@"Request error: %@", error.localizedDescription);
-            reply(0, error.localizedDescription);
+            guardedReply(0, error.localizedDescription);
             dispatch_semaphore_signal(sema);
             return;
           }
@@ -304,15 +312,14 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
           } else {
             desc = [NSHTTPURLResponse localizedStringForStatusCode:code];
           }
-          reply(code, desc);
+          guardedReply(code, desc);
           dispatch_semaphore_signal(sema);
         }];
   [task resume];
   if (dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 30 * NSEC_PER_SEC))) {
-    timedOut = YES;
     [task cancel];
     SLOGE(@"Request timed out after 30s");
-    reply(0, @"Request timed out");
+    guardedReply(0, @"Request timed out");
   }
 }
 
@@ -332,6 +339,9 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
     return;
   }
   dispatch_async(self.syncQueue, ^() {
+    absl::Cleanup signalLimiter = ^{
+      dispatch_semaphore_signal(self.syncLimiter);
+    };
     SLOGI(@"Starting sync...");
     if (syncType != SNTSyncTypeNormal) {
       dispatch_semaphore_t sema = dispatch_semaphore_create(0);
@@ -339,7 +349,7 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
                                                         reply:^() {
                                                           dispatch_semaphore_signal(sema);
                                                         }];
-      if (dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC))) {
+      if (dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_SEC))) {
         SLOGE(@"Timeout waiting for daemon");
         if (reply) reply(SNTSyncStatusTypeDaemonTimeout);
         return;
@@ -348,7 +358,6 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
     if (reply) reply(SNTSyncStatusTypeSyncStarted);
     SNTSyncStatusType status = [self preflight];
     if (reply) reply(status);
-    dispatch_semaphore_signal(self.syncLimiter);
   });
 }
 
@@ -686,7 +695,7 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   syncState.syncBaseURL = config.syncBaseURL;
   if (syncState.syncBaseURL.absoluteString.length == 0) {
     SLOGE(@"Missing SyncBaseURL. Can't sync without it.");
-    if (*status) *status = SNTSyncStatusTypeMissingSyncBaseURL;
+    if (status) *status = SNTSyncStatusTypeMissingSyncBaseURL;
     return nil;
   } else if (![syncState.syncBaseURL.scheme isEqual:@"https"]) {
     SLOGW(@"SyncBaseURL is not over HTTPS!");
@@ -695,7 +704,7 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   syncState.machineID = config.machineID;
   if (syncState.machineID.length == 0) {
     SLOGE(@"Missing Machine ID. Can't sync without it.");
-    if (*status) *status = SNTSyncStatusTypeMissingMachineID;
+    if (status) *status = SNTSyncStatusTypeMissingMachineID;
     return nil;
   }
 
@@ -807,27 +816,33 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
 // Start listening for network state changes.
 - (void)startReachability {
   if (self.pathMonitor) return;
+  // Reset so the first satisfied update from this monitor triggers a sync.
+  // Without this, a prior monitoring session may have left _reachable=YES,
+  // which would suppress the trigger when re-arming on an already-online host.
+  _reachable = NO;
   self.pathMonitor = nw_path_monitor_create();
   // Put the callback on the main thread to ensure serial access.
   nw_path_monitor_set_queue(self.pathMonitor, dispatch_get_main_queue());
   nw_path_monitor_set_update_handler(self.pathMonitor, ^(nw_path_t path) {
     // Only call the setter when there is a change. This will filter out the redundant calls to
     // this callback whenever the network interface states change.
-    int reachable = nw_path_get_status(path) == nw_path_status_satisfied;
+    BOOL reachable = nw_path_get_status(path) == nw_path_status_satisfied;
     if (self.reachable != reachable) {
       self.reachable = reachable;
     }
   });
-  nw_path_monitor_set_cancel_handler(self.pathMonitor, ^{
-    self.pathMonitor = nil;
-  });
   nw_path_monitor_start(self.pathMonitor);
 }
 
-// Stop listening for network state changes
+// Stop listening for network state changes.
+// Clear pathMonitor synchronously: nw_path_monitor_cancel is async and we
+// can't rely on a cancel handler to clear it later — a re-entrant
+// startReachability before the handler fires would see the stale pointer
+// and silently skip, and a late-firing handler could clobber a new monitor.
 - (void)stopReachability {
   if (!self.pathMonitor) return;
   nw_path_monitor_cancel(self.pathMonitor);
+  self.pathMonitor = nil;
 }
 
 @end
