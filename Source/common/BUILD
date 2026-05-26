@@ -684,6 +684,23 @@ objc_library(
     ],
 )
 
+objc_library(
+    name = "SNTNetworkFlowRule",
+    srcs = ["SNTNetworkFlowRule.mm"],
+    hdrs = ["SNTNetworkFlowRule.h"],
+    deps = [
+        ":CoderMacros",
+    ],
+)
+
+santa_unit_test(
+    name = "SNTNetworkFlowRuleTest",
+    srcs = ["SNTNetworkFlowRuleTest.mm"],
+    deps = [
+        ":SNTNetworkFlowRule",
+    ],
+)
+
 santa_unit_test(
     name = "SNTRuleTest",
     srcs = ["SNTRuleTest.mm"],
@@ -1141,6 +1158,7 @@ test_suite(
         ":SNTKillCommandTest",
         ":SNTMetricSetTest",
         ":SNTModeTransitionTest",
+        ":SNTNetworkFlowRuleTest",
         ":SNTProcessChainTest",
         ":SNTRuleTest",
         ":SNTSandboxExecRequestTest",
