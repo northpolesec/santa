@@ -513,8 +513,6 @@ void HandleV2Responses(const ::pbv2::PreflightResponse& resp, SNTSyncState* sync
       NSString* celExpr = StringToNSString(rule.cel_expr());
       NSString* customMsg = !rule.custom_msg().empty() ? StringToNSString(rule.custom_msg()) : nil;
       NSString* customURL = !rule.custom_url().empty() ? StringToNSString(rule.custom_url()) : nil;
-      SLOGD(@"CEL fallback rule %d: expr='%@' customMsg='%@' customURL='%@'", i, celExpr, customMsg,
-            customURL);
       [rules addObject:[[SNTCELFallbackRule alloc] initWithCELExpr:celExpr
                                                          customMsg:customMsg
                                                          customURL:customURL]];
