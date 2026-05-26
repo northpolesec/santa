@@ -237,6 +237,7 @@ double watchdogRAMPeak = 0;
   NSArray<NSError*>* errors;
   BOOL success = [ruleTable addExecutionRules:executionRules
                               fileAccessRules:fileAccessRules
+                             networkFlowRules:nil
                                   ruleCleanup:cleanupType
                                        errors:&errors];
 
