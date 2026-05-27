@@ -18,6 +18,7 @@
 #import <XCTest/XCTest.h>
 
 #import "Source/common/SNTFileAccessRule.h"
+#import "Source/common/SNTNetworkFlowRule.h"
 #include "Source/common/TestUtils.h"
 #include "Source/common/faa/WatchItemPolicy.h"
 #include "Source/common/faa/WatchItems.h"
@@ -32,6 +33,7 @@ extern NSDictionary* OptionsFromProtoFAARuleAdd(const ::pbv2::FileAccessRule::Ad
 extern NSArray* ProcessesFromProtoFAARuleProcesses(
     const google::protobuf::RepeatedPtrField<::pbv2::FileAccessRule::Process>& pbProcesses);
 extern SNTFileAccessRule* FAARuleFromProtoFileAccessRule(const ::pbv2::FileAccessRule& wi);
+extern SNTNetworkFlowRule* NetworkFlowRuleFromProto(const ::pbv2::NetworkFlowRule& nr);
 
 @interface SNTSyncRuleDownloadTest : XCTestCase
 @end
@@ -328,6 +330,42 @@ extern SNTFileAccessRule* FAARuleFromProtoFileAccessRule(const ::pbv2::FileAcces
     addRule->set_rule_type(::pbv2::FileAccessRule::RULE_TYPE_PROCESSES_WITH_DENIED_PATHS);
     XCTAssertNotNil(FAARuleFromProtoFileAccessRule(wi));
   }
+}
+
+- (void)testNetworkFlowRuleFromProtoAdd {
+  ::pbv2::NetworkFlowRule nr;
+  ::pbv2::NetworkFlowRule::Add* add = nr.mutable_add();
+  add->set_rule_id(42);
+  add->set_action(::pbv2::NetworkFlowRule::ACTION_DENY);
+  add->set_direction(::pbv2::NETWORK_FLOW_DIRECTION_OUTGOING);
+
+  SNTNetworkFlowRule* rule = NetworkFlowRuleFromProto(nr);
+  XCTAssertNotNil(rule);
+  XCTAssertEqual(rule.ruleId, 42);
+  XCTAssertEqual(rule.state, SNTNetworkFlowRuleStateAdd);
+  XCTAssertNotNil(rule.protoBlob);
+
+  // The blob round-trips back to the originating Add.
+  ::pbv2::NetworkFlowRule::Add parsed;
+  XCTAssertTrue(parsed.ParseFromArray(rule.protoBlob.bytes, (int)rule.protoBlob.length));
+  XCTAssertEqual(parsed.rule_id(), 42);
+  XCTAssertEqual(parsed.action(), ::pbv2::NetworkFlowRule::ACTION_DENY);
+}
+
+- (void)testNetworkFlowRuleFromProtoRemove {
+  ::pbv2::NetworkFlowRule nr;
+  nr.mutable_remove()->set_rule_id(99);
+
+  SNTNetworkFlowRule* rule = NetworkFlowRuleFromProto(nr);
+  XCTAssertNotNil(rule);
+  XCTAssertEqual(rule.ruleId, 99);
+  XCTAssertEqual(rule.state, SNTNetworkFlowRuleStateRemove);
+  XCTAssertNil(rule.protoBlob);
+}
+
+- (void)testNetworkFlowRuleFromProtoEmptyIsNil {
+  ::pbv2::NetworkFlowRule nr;
+  XCTAssertNil(NetworkFlowRuleFromProto(nr));
 }
 
 - (void)testFAARuleFromProtoFileAccessRuleRemove {

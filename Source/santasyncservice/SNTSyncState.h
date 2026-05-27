@@ -115,6 +115,8 @@
 @property NSUInteger rulesProcessed;
 @property NSUInteger fileAccessRulesReceived;
 @property NSUInteger fileAccessRulesProcessed;
+@property NSUInteger networkFlowRulesReceived;
+@property NSUInteger networkFlowRulesProcessed;
 
 @property BOOL preflightOnly;
 @property BOOL pushNotificationSync;

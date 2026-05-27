@@ -125,6 +125,7 @@ BOOL Preflight(SNTSyncPreflight* self, google::protobuf::Arena* arena,
     req->set_cdhash_rule_count(static_cast<uint32_t>(counts.cdhash));
     if constexpr (IsV2) {
       req->set_file_access_rule_count(static_cast<uint32_t>(counts.fileAccess));
+      req->set_network_flow_rule_count(static_cast<uint32_t>(counts.networkFlow));
     }
   }];
 
@@ -132,6 +133,7 @@ BOOL Preflight(SNTSyncPreflight* self, google::protobuf::Arena* arena,
     req->set_rules_hash(NSStringToUTF8String(execRulesHash));
     if constexpr (IsV2) {
       req->set_file_access_rules_hash(NSStringToUTF8String(faaRulesHash));
+      req->set_network_flow_rules_hash(NSStringToUTF8String(nfRulesHash));
     }
   }];
 
