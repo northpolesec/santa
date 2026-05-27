@@ -17,4 +17,4 @@
 /// Validates a serialized NetworkFlowRule.Add proto blob. Returns YES if valid;
 /// otherwise NO with a populated *error. This stub always returns YES; the real
 /// santanetd implementation performs full validation.
-BOOL SNDValidateNetworkFlowRule(NSData *blob, NSError **error);
+BOOL SNDValidateNetworkFlowRule(NSData* blob, NSError** error);

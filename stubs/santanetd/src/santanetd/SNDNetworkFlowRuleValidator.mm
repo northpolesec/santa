@@ -15,6 +15,6 @@
 #import "src/santanetd/SNDNetworkFlowRuleValidator.h"
 
 // Stub validator for santanetd-less santa builds; always accepts.
-BOOL SNDValidateNetworkFlowRule(NSData *blob, NSError **error) {
+BOOL SNDValidateNetworkFlowRule(NSData* blob, NSError** error) {
   return YES;
 }
