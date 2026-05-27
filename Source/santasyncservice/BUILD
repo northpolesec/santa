@@ -169,6 +169,7 @@ objc_library(
         ":SNTSyncState",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTFileAccessRule",
+        "//Source/common:SNTNetworkFlowRule",
         "//Source/common:SNTRule",
         "//Source/common:SNTSyncConstants",
         "//Source/common:SNTXPCControlInterface",
@@ -176,6 +177,7 @@ objc_library(
         "//Source/common/faa:WatchItemPolicy",
         "//Source/common/faa:WatchItems",
         "@northpolesec_protos//syncv2:v2_cc_proto",
+        "@santanetd//src/santanetd:SNDNetworkFlowRuleValidator",
     ],
 )
 
@@ -187,6 +189,7 @@ santa_unit_test(
     deps = [
         ":SNTSyncRuleDownload",
         "//Source/common:SNTFileAccessRule",
+        "//Source/common:SNTNetworkFlowRule",
         "//Source/common:TestUtils",
         "//Source/common/faa:WatchItemPolicy",
         "//Source/common/faa:WatchItems",
@@ -380,6 +383,7 @@ santa_unit_test(
         "//Source/common:SNTFileInfo",
         "//Source/common:SNTLogging",
         "//Source/common:SNTMetricSet",
+        "//Source/common:SNTNetworkFlowRule",
         "//Source/common:SNTRule",
         "//Source/common:SNTSIPStatus",
         "//Source/common:SNTStoredEvent",
@@ -400,6 +404,7 @@ santa_unit_test(
         "@northpolesec_protos//sync:v1_cc_proto",
         "@northpolesec_protos//syncv2:v2_cc_proto",
         "@protobuf//src/google/protobuf/json",
+        "@santanetd//src/santanetd:SNDNetworkFlowRuleValidator",
     ],
 )
 

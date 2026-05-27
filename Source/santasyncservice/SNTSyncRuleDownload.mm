@@ -20,6 +20,7 @@
 
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTFileAccessRule.h"
+#import "Source/common/SNTNetworkFlowRule.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTXPCControlInterface.h"
@@ -32,6 +33,7 @@
 #import "Source/santasyncservice/SNTSyncLogging.h"
 #import "Source/santasyncservice/SNTSyncState.h"
 #include "google/protobuf/arena.h"
+#import "src/santanetd/SNDNetworkFlowRuleValidator.h"
 #include "syncv2/v2.pb.h"
 
 namespace pbv2 = ::santa::sync::v2;
@@ -56,20 +58,24 @@ NSArray* PathsFromProtoFAARulePaths(
 NSDictionary* OptionsFromProtoFAARuleAdd(const ::pbv2::FileAccessRule::Add& pbAddRule);
 NSArray* ProcessesFromProtoFAARuleProcesses(
     const google::protobuf::RepeatedPtrField<::pbv2::FileAccessRule::Process>& pbProcesses);
+SNTNetworkFlowRule* NetworkFlowRuleFromProto(const ::pbv2::NetworkFlowRule& nr);
 
 // Small local object to more easily return the different sets of downloaded rules.
 @interface SNTDownloadedRuleSets : NSObject
 @property(readonly) NSArray<SNTRule*>* executionRules;
 @property(readonly) NSArray<SNTFileAccessRule*>* fileAccessRules;
+@property(readonly) NSArray<SNTNetworkFlowRule*>* networkRules;
 @end
 
 @implementation SNTDownloadedRuleSets
 - (instancetype)initWithExecutionRules:(NSArray<SNTRule*>*)executionRules
-                       fileAccessRules:(NSArray<SNTFileAccessRule*>*)fileAccessRules {
+                       fileAccessRules:(NSArray<SNTFileAccessRule*>*)fileAccessRules
+                          networkRules:(NSArray<SNTNetworkFlowRule*>*)networkRules {
   self = [super init];
   if (self) {
     _executionRules = executionRules;
     _fileAccessRules = fileAccessRules;
+    _networkRules = networkRules;
   }
   return self;
 }
@@ -94,8 +100,10 @@ SNTDownloadedRuleSets* DownloadNewRulesFromServer(SNTSyncRuleDownload* self) {
 
   self.syncState.rulesReceived = 0;
   self.syncState.fileAccessRulesReceived = 0;
+  self.syncState.networkFlowRulesReceived = 0;
   NSMutableArray<SNTRule*>* newRules = [NSMutableArray array];
   NSMutableArray<SNTFileAccessRule*>* newFileAccessRules = [NSMutableArray array];
+  NSMutableArray<SNTNetworkFlowRule*>* newNetworkRules = [NSMutableArray array];
   std::string cursor;
 
   do {
@@ -135,6 +143,15 @@ SNTDownloadedRuleSets* DownloadNewRulesFromServer(SNTSyncRuleDownload* self) {
           }
           [newFileAccessRules addObject:rule];
         }
+
+        for (const ::pbv2::NetworkFlowRule& networkRule : response.network_flow_rules()) {
+          SNTNetworkFlowRule* rule = NetworkFlowRuleFromProto(networkRule);
+          if (!rule) {
+            SLOGD(@"Ignoring bad network flow rule: %s", networkRule.Utf8DebugString().c_str());
+            continue;
+          }
+          [newNetworkRules addObject:rule];
+        }
       }
 
       cursor = response.cursor();
@@ -142,15 +159,18 @@ SNTDownloadedRuleSets* DownloadNewRulesFromServer(SNTSyncRuleDownload* self) {
       self.syncState.rulesReceived += response.rules_size();
       if constexpr (IsV2) {
         self.syncState.fileAccessRulesReceived += response.file_access_rules_size();
+        self.syncState.networkFlowRulesReceived += response.network_flow_rules_size();
       }
     }
   } while (!cursor.empty());
 
   self.syncState.rulesProcessed = newRules.count;
   self.syncState.fileAccessRulesProcessed = newFileAccessRules.count;
+  self.syncState.networkFlowRulesProcessed = newNetworkRules.count;
 
   return [[SNTDownloadedRuleSets alloc] initWithExecutionRules:newRules
-                                               fileAccessRules:newFileAccessRules];
+                                               fileAccessRules:newFileAccessRules
+                                                  networkRules:newNetworkRules];
 }
 
 NSArray* PathsFromProtoFAARulePaths(
@@ -299,6 +319,27 @@ SNTFileAccessRule* FAARuleFromProtoFileAccessRule(const ::pbv2::FileAccessRule& 
   }
 }
 
+SNTNetworkFlowRule* NetworkFlowRuleFromProto(const ::pbv2::NetworkFlowRule& nr) {
+  switch (nr.action_case()) {
+    case ::pbv2::NetworkFlowRule::kAdd: {
+      std::string serialized;
+      nr.add().SerializeToString(&serialized);
+      NSData* blob = [NSData dataWithBytes:serialized.data() length:serialized.size()];
+
+      NSError* err;
+      if (!SNDValidateNetworkFlowRule(blob, &err)) {
+        SLOGW(@"Dropping invalid network flow rule %lld: %@", (long long)nr.add().rule_id(),
+              err.localizedDescription);
+        return nil;
+      }
+      return [[SNTNetworkFlowRule alloc] initAddRuleWithId:nr.add().rule_id() protoBlob:blob];
+    }
+    case ::pbv2::NetworkFlowRule::kRemove:
+      return [[SNTNetworkFlowRule alloc] initRemoveRuleWithId:nr.remove().rule_id()];
+    default: return nil;
+  }
+}
+
 template <bool IsV2>
 SNTRule* RuleFromProtoRule(const typename santa::ProtoTraits<IsV2>::RuleT& rule) {
   using Traits = santa::ProtoTraits<IsV2>;
@@ -435,7 +476,8 @@ void ProcessDeprecatedBundleNotificationsForRule(
     return NO;
   }
   // If the request was successfully completed, but no new rules received, just return
-  if (!newRules.executionRules.count && !newRules.fileAccessRules.count) {
+  if (!newRules.executionRules.count && !newRules.fileAccessRules.count &&
+      !newRules.networkRules.count) {
     return YES;
   }
 
@@ -447,7 +489,7 @@ void ProcessDeprecatedBundleNotificationsForRule(
   [[self.daemonConn remoteObjectProxy]
       databaseRuleAddExecutionRules:newRules.executionRules
                     fileAccessRules:newRules.fileAccessRules
-                   networkFlowRules:nil
+                   networkFlowRules:newRules.networkRules
                         ruleCleanup:SyncTypeToRuleCleanup(self.syncState.syncType)
                              source:SNTRuleAddSourceSyncService
                               reply:^(BOOL didSucceed, NSArray<NSError*>* e) {
@@ -487,6 +529,10 @@ void ProcessDeprecatedBundleNotificationsForRule(
 
   if (newRules.fileAccessRules.count) {
     SLOGI(@"Processed %lu file access rules", newRules.fileAccessRules.count);
+  }
+
+  if (newRules.networkRules.count) {
+    SLOGI(@"Processed %lu network flow rules", newRules.networkRules.count);
   }
 
   // Send out push notifications about any newly allowed binaries

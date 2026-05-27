@@ -530,6 +530,7 @@
       .signingID = 123,
       .cdhash = 11,
       .fileAccess = 513,
+      .networkFlow = 77,
   };
 
   OCMStub([self.daemonConnRop
@@ -549,8 +550,33 @@
             XCTAssertEqualObjects(requestDict[kSigningIDRuleCount], @(ruleCounts.signingID));
             if (self.syncState.isSyncV2) {
               XCTAssertEqualObjects(requestDict[kFileAccessRuleCount], @(ruleCounts.fileAccess));
+              XCTAssertEqualObjects(requestDict[kNetworkFlowRuleCount], @(ruleCounts.networkFlow));
             } else {
               XCTAssertNil(requestDict[kFileAccessRuleCount]);
+              XCTAssertNil(requestDict[kNetworkFlowRuleCount]);
+            }
+            return YES;
+          }];
+
+  [sut sync];
+}
+
+- (void)testPreflightRulesHash {
+  [self setupDefaultDaemonConnResponses];
+  SNTSyncPreflight* sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
+
+  [self stubRequestBody:nil
+               response:nil
+                  error:nil
+          validateBlock:^BOOL(NSURLRequest* req) {
+            NSDictionary* requestDict = [self dictFromRequest:req];
+            XCTAssertEqualObjects(requestDict[@"rulesHash"], @"the-hash");
+            if (self.syncState.isSyncV2) {
+              XCTAssertEqualObjects(requestDict[@"fileAccessRulesHash"], @"the-faa-hash");
+              XCTAssertEqualObjects(requestDict[@"network_flow_rules_hash"], @"the-nf-hash");
+            } else {
+              XCTAssertNil(requestDict[@"fileAccessRulesHash"]);
+              XCTAssertNil(requestDict[@"network_flow_rules_hash"]);
             }
             return YES;
           }];
@@ -1207,12 +1233,45 @@
             XCTAssertEqualObjects(requestDict[@"rulesHash"], @"the-hash");
             if (self.syncState.isSyncV2) {
               XCTAssertEqualObjects(requestDict[@"fileAccessRulesHash"], @"the-faa-hash");
+              XCTAssertEqualObjects(requestDict[@"network_flow_rules_hash"], @"the-nf-hash");
             }
             return YES;
           }];
 
   XCTAssertTrue([sut sync]);
   OCMVerify([self.daemonConnRop updateSyncSettings:OCMOCK_ANY reply:OCMOCK_ANY]);
+}
+
+- (void)testPostflightReportsRuleCounts {
+  [self setupDefaultDaemonConnResponses];
+  self.syncState.rulesReceived = 10;
+  self.syncState.rulesProcessed = 9;
+  self.syncState.fileAccessRulesReceived = 4;
+  self.syncState.fileAccessRulesProcessed = 3;
+  self.syncState.networkFlowRulesReceived = 6;
+  self.syncState.networkFlowRulesProcessed = 5;
+  SNTSyncPostflight* sut = [[SNTSyncPostflight alloc] initWithState:self.syncState];
+
+  [self stubRequestBody:nil
+               response:nil
+                  error:nil
+          validateBlock:^BOOL(NSURLRequest* req) {
+            NSDictionary* requestDict = [self dictFromRequest:req];
+            XCTAssertEqualObjects(requestDict[@"rules_received"], @10);
+            XCTAssertEqualObjects(requestDict[@"rules_processed"], @9);
+            if (self.syncState.isSyncV2) {
+              XCTAssertEqualObjects(requestDict[@"file_access_rules_received"], @4);
+              XCTAssertEqualObjects(requestDict[@"file_access_rules_processed"], @3);
+              XCTAssertEqualObjects(requestDict[@"network_flow_rules_received"], @6);
+              XCTAssertEqualObjects(requestDict[@"network_flow_rules_processed"], @5);
+            } else {
+              XCTAssertNil(requestDict[@"network_flow_rules_received"]);
+              XCTAssertNil(requestDict[@"network_flow_rules_processed"]);
+            }
+            return YES;
+          }];
+
+  XCTAssertTrue([sut sync]);
 }
 
 - (SNTConfigBundle*)runPostflightAndCaptureBundleWithInflightSyncType:(SNTSyncType)inflight {

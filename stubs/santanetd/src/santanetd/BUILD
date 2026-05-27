@@ -10,6 +10,13 @@ objc_library(
     hdrs = ["SNDFilterConfigurationHelper.h"],
 )
 
+# Stub network flow rule validator (always accepts).
+objc_library(
+    name = "SNDNetworkFlowRuleValidator",
+    srcs = ["SNDNetworkFlowRuleValidator.mm"],
+    hdrs = ["SNDNetworkFlowRuleValidator.h"],
+)
+
 objc_library(
     name = "SNDFlowInfo",
     srcs = ["SNDFlowInfo.mm"],
