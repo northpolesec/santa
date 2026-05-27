@@ -329,7 +329,7 @@ SNTNetworkFlowRule* NetworkFlowRuleFromProto(const ::pbv2::NetworkFlowRule& nr) 
       NSError* err;
       if (!SNDValidateNetworkFlowRule(blob, &err)) {
         SLOGW(@"Dropping invalid network flow rule %lld: %@", (long long)nr.add().rule_id(),
-              err.localizedDescription);
+              err.localizedDescription ?: @"validation failed");
         return nil;
       }
       return [[SNTNetworkFlowRule alloc] initAddRuleWithId:nr.add().rule_id() protoBlob:blob];
