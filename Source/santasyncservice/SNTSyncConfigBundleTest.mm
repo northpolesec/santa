@@ -50,6 +50,7 @@
 @property NSString* fileAccessEventDetailURL;
 @property NSString* fileAccessEventDetailText;
 @property SNTSyncNetworkExtensionSettings* networkExtensionSettings;
+@property NSNumber* reconcileNetworkExtension;
 @property NSArray<NSString*>* pushTokenChain;
 @property NSArray<NSString*>* telemetryFilterExpressions;
 @property NSArray<SNTCELFallbackRule*>* celFallbackRules;
@@ -158,10 +159,18 @@
                         syncState.bannedNetworkMountBlockMessage);
   XCTAssertEqualObjects(bundle.allowedNetworkMountHosts, syncState.allowedNetworkMountHosts);
 
-  syncState.networkExtensionSettings = [[SNTSyncNetworkExtensionSettings alloc] initWithEnable:YES];
+  syncState.networkExtensionSettings =
+      [[SNTSyncNetworkExtensionSettings alloc] initWithEnable:YES
+                                            flowDefaultAction:SNTNetworkFlowDefaultActionDeny];
   bundle = PostflightConfigBundle(syncState);
   XCTAssertNotNil(bundle.networkExtensionSettings);
   XCTAssertTrue(bundle.networkExtensionSettings.enable);
+  XCTAssertEqual(bundle.networkExtensionSettings.flowDefaultAction,
+                 SNTNetworkFlowDefaultActionDeny);
+
+  // Postflight always sets the reconcile marker (the daemon's sync-boundary signal for
+  // reconciling santanetd).
+  XCTAssertEqualObjects(bundle.reconcileNetworkExtension, @(YES));
 
   syncState.telemetryFilterExpressions = @[ @"expr1", @"expr2" ];
   bundle = PostflightConfigBundle(syncState);

@@ -49,6 +49,7 @@
 @property NSString* fileAccessEventDetailText;
 @property NSNumber* enableNotificationSilences;
 @property SNTSyncNetworkExtensionSettings* networkExtensionSettings;
+@property NSNumber* reconcileNetworkExtension;
 @property NSArray<NSString*>* pushTokenChain;
 @property NSArray<SNTCELFallbackRule*>* celFallbackRules;
 @property NSNumber* fullSyncInterval;
@@ -63,7 +64,7 @@
 
 - (void)testGettersWithValues {
   __block XCTestExpectation* exp = [self expectationWithDescription:@"Result Blocks"];
-  exp.expectedFulfillmentCount = 29;
+  exp.expectedFulfillmentCount = 30;
   NSDate* nowDate = [NSDate now];
 
   SNTConfigBundle* bundle = [[SNTConfigBundle alloc] init];
@@ -94,7 +95,10 @@
   bundle.fileAccessEventDetailURL = @"https://example.com/faa-details";
   bundle.fileAccessEventDetailText = @"View FAA Details";
   bundle.enableNotificationSilences = @(YES);
-  bundle.networkExtensionSettings = [[SNTSyncNetworkExtensionSettings alloc] initWithEnable:YES];
+  bundle.networkExtensionSettings =
+      [[SNTSyncNetworkExtensionSettings alloc] initWithEnable:YES
+                                            flowDefaultAction:SNTNetworkFlowDefaultActionDeny];
+  bundle.reconcileNetworkExtension = @(YES);
   bundle.pushTokenChain = @[ @"issuerJWT", @"userJWT" ];
   bundle.fullSyncInterval = @(600);
   bundle.pushNotificationsFullSyncInterval = @(21600);
@@ -234,6 +238,11 @@
     [exp fulfill];
   }];
 
+  [bundle reconcileNetworkExtension:^(BOOL val) {
+    XCTAssertTrue(val);
+    [exp fulfill];
+  }];
+
   [bundle pushTokenChain:^(NSArray<NSString*>* val) {
     XCTAssertEqualObjects(val, (@[ @"issuerJWT", @"userJWT" ]));
     [exp fulfill];
@@ -360,6 +369,10 @@
     XCTFail(@"This shouldn't be called");
   }];
 
+  [bundle reconcileNetworkExtension:^(BOOL val) {
+    XCTFail(@"This shouldn't be called");
+  }];
+
   [bundle pushTokenChain:^(NSArray<NSString*>* val) {
     XCTFail(@"This shouldn't be called");
   }];
@@ -410,6 +423,47 @@
 
   __block BOOL unsetFired = NO;
   [unsetDecoded clearSyncStateBeforeApply:^(BOOL v) {
+    unsetFired = YES;
+  }];
+  XCTAssertFalse(unsetFired);
+}
+
+- (void)testReconcileNetworkExtensionRoundTrips {
+  SNTConfigBundle* set = [[SNTConfigBundle alloc] init];
+  set.reconcileNetworkExtension = @(YES);
+
+  NSError* error = nil;
+  NSData* setData = [NSKeyedArchiver archivedDataWithRootObject:set
+                                          requiringSecureCoding:YES
+                                                          error:&error];
+  XCTAssertNil(error);
+  SNTConfigBundle* setDecoded = [NSKeyedUnarchiver unarchivedObjectOfClass:[SNTConfigBundle class]
+                                                                  fromData:setData
+                                                                     error:&error];
+  XCTAssertNil(error);
+
+  __block BOOL setFired = NO;
+  __block BOOL setValue = NO;
+  [setDecoded reconcileNetworkExtension:^(BOOL v) {
+    setFired = YES;
+    setValue = v;
+  }];
+  XCTAssertTrue(setFired);
+  XCTAssertTrue(setValue);
+
+  // Unset: accessor block must not fire after a round-trip.
+  SNTConfigBundle* unset = [[SNTConfigBundle alloc] init];
+  NSData* unsetData = [NSKeyedArchiver archivedDataWithRootObject:unset
+                                            requiringSecureCoding:YES
+                                                            error:&error];
+  XCTAssertNil(error);
+  SNTConfigBundle* unsetDecoded = [NSKeyedUnarchiver unarchivedObjectOfClass:[SNTConfigBundle class]
+                                                                    fromData:unsetData
+                                                                       error:&error];
+  XCTAssertNil(error);
+
+  __block BOOL unsetFired = NO;
+  [unsetDecoded reconcileNetworkExtension:^(BOOL v) {
     unsetFired = YES;
   }];
   XCTAssertFalse(unsetFired);

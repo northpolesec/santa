@@ -18,16 +18,34 @@
 
 @interface SNTNetworkExtensionSettings ()
 @property(readwrite) BOOL enable;
+@property(readwrite) SNTNetworkFlowDefaultAction flowDefaultAction;
 @end
 
 @implementation SNTNetworkExtensionSettings
 
-- (instancetype)initWithEnable:(BOOL)enable {
+- (instancetype)initWithEnable:(BOOL)enable
+             flowDefaultAction:(SNTNetworkFlowDefaultAction)flowDefaultAction {
   self = [super init];
   if (self) {
     _enable = enable;
+    _flowDefaultAction = flowDefaultAction;
   }
   return self;
+}
+
+- (BOOL)isEqual:(id)other {
+  if (self == other) {
+    return YES;
+  }
+  if (![other isKindOfClass:[SNTNetworkExtensionSettings class]]) {
+    return NO;
+  }
+  SNTNetworkExtensionSettings* o = other;
+  return self.enable == o.enable && self.flowDefaultAction == o.flowDefaultAction;
+}
+
+- (NSUInteger)hash {
+  return (NSUInteger)self.enable * 31 + (NSUInteger)self.flowDefaultAction;
 }
 
 + (BOOL)supportsSecureCoding {
@@ -36,12 +54,14 @@
 
 - (void)encodeWithCoder:(NSCoder*)coder {
   ENCODE_BOXABLE(coder, enable);
+  ENCODE_BOXABLE(coder, flowDefaultAction);
 }
 
 - (instancetype)initWithCoder:(NSCoder*)decoder {
   self = [self init];
   if (self) {
     DECODE_SELECTOR(decoder, enable, NSNumber, boolValue);
+    DECODE_SELECTOR(decoder, flowDefaultAction, NSNumber, integerValue);
   }
   return self;
 }

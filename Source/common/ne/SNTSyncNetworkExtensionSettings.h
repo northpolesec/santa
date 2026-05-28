@@ -14,11 +14,15 @@
 
 #import <Foundation/Foundation.h>
 
+#import "Source/common/ne/SNTNetworkExtensionSettings.h"
+
 @interface SNTSyncNetworkExtensionSettings : NSObject <NSSecureCoding>
 
 @property(readonly) BOOL enable;
+@property(readonly) SNTNetworkFlowDefaultAction flowDefaultAction;
 
-- (instancetype)initWithEnable:(BOOL)enable;
+- (instancetype)initWithEnable:(BOOL)enable
+             flowDefaultAction:(SNTNetworkFlowDefaultAction)flowDefaultAction;
 
 - (NSData*)serialize;
 + (instancetype)deserialize:(NSData*)data;

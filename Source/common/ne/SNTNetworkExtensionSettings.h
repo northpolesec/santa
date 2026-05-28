@@ -14,6 +14,13 @@
 
 #import <Foundation/Foundation.h>
 
+/// Action applied to network flows that match no NetworkFlowRule.
+typedef NS_ENUM(NSInteger, SNTNetworkFlowDefaultAction) {
+  SNTNetworkFlowDefaultActionUnspecified = 0,  // treated as Allow
+  SNTNetworkFlowDefaultActionAllow = 1,
+  SNTNetworkFlowDefaultActionDeny = 2,
+};
+
 /// Settings passed from the daemon (santa) to the network extension (santanetd) over XPC.
 ///
 /// This class conforms to NSSecureCoding, allowing it to be passed directly as a typed
@@ -23,7 +30,9 @@
 @interface SNTNetworkExtensionSettings : NSObject <NSSecureCoding>
 
 @property(readonly) BOOL enable;
+@property(readonly) SNTNetworkFlowDefaultAction flowDefaultAction;
 
-- (instancetype)initWithEnable:(BOOL)enable;
+- (instancetype)initWithEnable:(BOOL)enable
+             flowDefaultAction:(SNTNetworkFlowDefaultAction)flowDefaultAction;
 
 @end

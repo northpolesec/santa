@@ -19,8 +19,10 @@
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
 
 @class SNDProcessFlows;
+@class SNTNetworkExtensionConfig;
 @class SNTNetworkExtensionSettings;
 @class SNTNotificationQueue;
+@class SNTRuleTable;
 @class SNTSyncdQueue;
 
 extern NSString* const kSantaNetworkExtensionProtocolVersion;
@@ -31,13 +33,22 @@ extern NSString* const kSantaNetworkExtensionProtocolVersion;
 
 - (instancetype)initWithNotifierQueue:(SNTNotificationQueue*)notifierQueue
                            syncdQueue:(SNTSyncdQueue*)syncdQueue
+                            ruleTable:(SNTRuleTable*)ruleTable
                                logger:(std::shared_ptr<santa::Logger>)logger
     NS_DESIGNATED_INITIALIZER;
 
 - (instancetype)init NS_UNAVAILABLE;
 
-- (SNTNetworkExtensionSettings*)handleRegistrationWithProtocolVersion:(NSString*)protocolVersion
-                                                                error:(NSError**)error;
+/// Reconcile santanetd with the current settings + network-flow ruleset, pushing only
+/// what changed since the last push (settings always, rules only if their hash moved,
+/// nothing if neither changed). Safe to call when santanetd is not connected (no-op).
+- (void)reconcileNetworkExtensionConfig;
+
+/// Handle a santanetd registration. Returns the config (settings + full current ruleset) to seed
+/// it with — the caller returns it in the registration reply so santanetd applies both atomically.
+/// Records it as the last-pushed state so the next reconcile only sends deltas.
+- (SNTNetworkExtensionConfig*)handleRegistrationWithProtocolVersion:(NSString*)protocolVersion
+                                                              error:(NSError**)error;
 
 - (void)handleNetworkFlows:(NSArray<SNDProcessFlows*>*)processFlows
                windowStart:(NSDate*)windowStart

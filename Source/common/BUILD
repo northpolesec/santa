@@ -1001,6 +1001,7 @@ objc_library(
         ":SNTStoredEvent",
         ":SNTStoredExecutionEvent",
         ":SNTXPCUnprivilegedControlInterface",
+        "//Source/common/ne:SNTNetworkExtensionConfig",
         "//Source/common/ne:SNTNetworkExtensionSettings",
         "@santanetd//src/santanetd:SNDFlowInfo",
         "@santanetd//src/santanetd:SNDProcessFlows",

@@ -848,7 +848,7 @@
   XCTAssertNil(errors);
   XCTAssertEqual(self.sut.networkFlowRuleCount, 1);
 
-  NSArray<SNTNetworkFlowRule*>* all = [self.sut retrieveAllNetworkFlowRules];
+  NSArray<SNTNetworkFlowRule*>* all = [self.sut retrieveAllNetworkFlowRulesSnapshot].rules;
   XCTAssertEqual(all.count, 1u);
   XCTAssertEqual(all.firstObject.ruleId, 101);
   XCTAssertEqual(all.firstObject.state, SNTNetworkFlowRuleStateAdd);
@@ -864,7 +864,7 @@
   SNTNetworkFlowRule* v2 = [self _exampleNetworkFlowAddRuleWithId:42 blob:@"v2"];
   XCTAssertTrue([self _addNetworkFlowRules:@[ v2 ] ruleCleanup:SNTRuleCleanupNone errors:nil]);
   XCTAssertEqual(self.sut.networkFlowRuleCount, 1);
-  NSArray<SNTNetworkFlowRule*>* all = [self.sut retrieveAllNetworkFlowRules];
+  NSArray<SNTNetworkFlowRule*>* all = [self.sut retrieveAllNetworkFlowRulesSnapshot].rules;
   XCTAssertEqualObjects(all.firstObject.protoBlob, [@"v2" dataUsingEncoding:NSUTF8StringEncoding]);
 }
 
@@ -1004,6 +1004,44 @@
   // Sanity: empty table still produces a stable 32-char Xxhash128 hex.
   NSString* h = [self.sut hashOfHashes].networkFlowRulesHash;
   XCTAssertEqual(h.length, 32u);
+}
+
+- (void)testRetrieveAllNetworkFlowRulesSnapshotReturnsConsistentRulesAndHash {
+  [self _addNetworkFlowRules:@[
+    [self _exampleNetworkFlowAddRuleWithId:1 blob:@"a"],
+    [self _exampleNetworkFlowAddRuleWithId:2 blob:@"b"],
+  ]
+                 ruleCleanup:SNTRuleCleanupNone
+                      errors:nil];
+
+  SNTNetworkFlowRulesSnapshot* snapshot = [self.sut retrieveAllNetworkFlowRulesSnapshot];
+  XCTAssertEqual(snapshot.rules.count, 2u);
+  XCTAssertEqual(snapshot.rules[0].ruleId, 1);
+  XCTAssertEqual(snapshot.rules[1].ruleId, 2);
+  // The snapshot's hash must match the hash hashOfHashes computes for the same state.
+  XCTAssertEqualObjects(snapshot.networkFlowRulesHash,
+                        [self.sut hashOfHashes].networkFlowRulesHash);
+}
+
+- (void)testRetrieveAllNetworkFlowRulesSnapshotEmptyTable {
+  SNTNetworkFlowRulesSnapshot* snapshot = [self.sut retrieveAllNetworkFlowRulesSnapshot];
+  XCTAssertEqual(snapshot.rules.count, 0u);
+  XCTAssertEqual(snapshot.networkFlowRulesHash.length, 32u);
+  XCTAssertEqualObjects(snapshot.networkFlowRulesHash,
+                        [self.sut hashOfHashes].networkFlowRulesHash);
+}
+
+- (void)testRetrieveAllNetworkFlowRulesSnapshotReflectsWrites {
+  SNTNetworkFlowRulesSnapshot* before = [self.sut retrieveAllNetworkFlowRulesSnapshot];
+
+  [self _addNetworkFlowRules:@[ [self _exampleNetworkFlowAddRuleWithId:42 blob:@"x"] ]
+                 ruleCleanup:SNTRuleCleanupNone
+                      errors:nil];
+
+  SNTNetworkFlowRulesSnapshot* after = [self.sut retrieveAllNetworkFlowRulesSnapshot];
+  XCTAssertEqual(after.rules.count, before.rules.count + 1);
+  XCTAssertNotEqualObjects(after.networkFlowRulesHash, before.networkFlowRulesHash);
+  XCTAssertEqualObjects(after.networkFlowRulesHash, [self.sut hashOfHashes].networkFlowRulesHash);
 }
 
 @end

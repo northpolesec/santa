@@ -29,20 +29,26 @@
 - (void)testInitialization {
   // Test initialization with enable=YES
   SNTSyncNetworkExtensionSettings* settings =
-      [[SNTSyncNetworkExtensionSettings alloc] initWithEnable:YES];
+      [[SNTSyncNetworkExtensionSettings alloc] initWithEnable:YES
+                                            flowDefaultAction:SNTNetworkFlowDefaultActionDeny];
   XCTAssertNotNil(settings);
   XCTAssertTrue(settings.enable);
+  XCTAssertEqual(settings.flowDefaultAction, SNTNetworkFlowDefaultActionDeny);
 
   // Test initialization with enable=NO
-  settings = [[SNTSyncNetworkExtensionSettings alloc] initWithEnable:NO];
+  settings =
+      [[SNTSyncNetworkExtensionSettings alloc] initWithEnable:NO
+                                            flowDefaultAction:SNTNetworkFlowDefaultActionAllow];
   XCTAssertNotNil(settings);
   XCTAssertFalse(settings.enable);
+  XCTAssertEqual(settings.flowDefaultAction, SNTNetworkFlowDefaultActionAllow);
 }
 
 - (void)testEncodeDecodeSecureCoding {
   // Test with enable=YES
   SNTSyncNetworkExtensionSettings* settings =
-      [[SNTSyncNetworkExtensionSettings alloc] initWithEnable:YES];
+      [[SNTSyncNetworkExtensionSettings alloc] initWithEnable:YES
+                                            flowDefaultAction:SNTNetworkFlowDefaultActionDeny];
   NSData* serialized = [settings serialize];
   XCTAssertNotNil(serialized);
 
@@ -51,9 +57,13 @@
   XCTAssertNotNil(deserialized);
   XCTAssertTrue(deserialized.enable);
   XCTAssertEqual(deserialized.enable, settings.enable);
+  XCTAssertEqual(deserialized.flowDefaultAction, SNTNetworkFlowDefaultActionDeny);
+  XCTAssertEqualObjects(deserialized, settings);
 
   // Test with enable=NO
-  settings = [[SNTSyncNetworkExtensionSettings alloc] initWithEnable:NO];
+  settings =
+      [[SNTSyncNetworkExtensionSettings alloc] initWithEnable:NO
+                                            flowDefaultAction:SNTNetworkFlowDefaultActionAllow];
   serialized = [settings serialize];
   XCTAssertNotNil(serialized);
 
@@ -61,6 +71,8 @@
   XCTAssertNotNil(deserialized);
   XCTAssertFalse(deserialized.enable);
   XCTAssertEqual(deserialized.enable, settings.enable);
+  XCTAssertEqual(deserialized.flowDefaultAction, SNTNetworkFlowDefaultActionAllow);
+  XCTAssertEqualObjects(deserialized, settings);
 }
 
 - (void)testDeserializeNilData {

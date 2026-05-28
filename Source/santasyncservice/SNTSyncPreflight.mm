@@ -84,6 +84,15 @@ namespace {
 
 void HandleV2Responses(const ::pbv2::PreflightResponse& resp, SNTSyncState* syncState);
 
+SNTNetworkFlowDefaultAction NetworkFlowDefaultActionFromProto(
+    ::pbv2::NetworkFlowDefaultAction action) {
+  switch (action) {
+    case ::pbv2::NETWORK_FLOW_DEFAULT_ACTION_ALLOW: return SNTNetworkFlowDefaultActionAllow;
+    case ::pbv2::NETWORK_FLOW_DEFAULT_ACTION_DENY: return SNTNetworkFlowDefaultActionDeny;
+    default: return SNTNetworkFlowDefaultActionUnspecified;
+  }
+}
+
 template <bool IsV2>
 BOOL Preflight(SNTSyncPreflight* self, google::protobuf::Arena* arena,
                SNTSyncType requestSyncType) {
@@ -478,8 +487,10 @@ void HandleV2Responses(const ::pbv2::PreflightResponse& resp, SNTSyncState* sync
   }
 
   if (resp.has_network_extension()) {
-    syncState.networkExtensionSettings =
-        [[SNTSyncNetworkExtensionSettings alloc] initWithEnable:resp.network_extension().enable()];
+    syncState.networkExtensionSettings = [[SNTSyncNetworkExtensionSettings alloc]
+           initWithEnable:resp.network_extension().enable()
+        flowDefaultAction:NetworkFlowDefaultActionFromProto(
+                              resp.network_extension().flow_default_action())];
   }
 
   if (resp.has_file_access_event_detail_url()) {

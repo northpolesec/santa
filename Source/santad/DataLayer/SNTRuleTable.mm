@@ -82,6 +82,11 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
 @property NSDictionary* criticalSystemBinaries;
 @property(readonly) NSArray* criticalSystemBinaryPaths;
 @property(readwrite) NSDictionary<NSString*, SNTRule*>* cachedStaticRules;
+// Cached digest of each rule sub-table. Read/write ONLY inside an inDatabase:/inTransaction:
+// block — FMDB's serial queue is what keeps the cache consistent with the DB. Clears must be
+// colocated with the rule write that invalidated them; recomputes must be colocated with the
+// DB read used to produce them. A non-nil cache at the start of a block therefore corresponds
+// to the current DB state by construction.
 @property(atomic) NSString* executionRulesHash;
 @property(atomic) NSString* fileAccessRulesHash;
 @property(atomic) NSString* networkFlowRulesHash;
@@ -96,6 +101,18 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
     _executionRulesHash = executionRulesHash;
     _fileAccessRulesHash = fileAccessRulesHash;
     _networkFlowRulesHash = networkFlowRulesHash;
+  }
+  return self;
+}
+@end
+
+@implementation SNTNetworkFlowRulesSnapshot
+- (instancetype)initWithRules:(NSArray<SNTNetworkFlowRule*>*)rules
+         networkFlowRulesHash:(NSString*)networkFlowRulesHash {
+  self = [super init];
+  if (self) {
+    _rules = [rules copy];
+    _networkFlowRulesHash = [networkFlowRulesHash copy];
   }
   return self;
 }
@@ -906,11 +923,15 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
   return faaRules;
 }
 
-- (NSArray<SNTNetworkFlowRule*>*)retrieveAllNetworkFlowRules {
+- (SNTNetworkFlowRulesSnapshot*)retrieveAllNetworkFlowRulesSnapshot {
   NSMutableArray<SNTNetworkFlowRule*>* rules = [NSMutableArray array];
+  __block NSString* digest;
   [self inDatabase:^(FMDatabase* db) {
-    // Indexed-column access (rather than named) to keep this loop cheap when the
-    // network ruleset is large. Column order: 0=rule_id, 1=rule_blob.
+    // Single iteration: build the rules array and compute the hash from the same blob
+    // bytes, so they correspond to the same DB state by construction. Indexed-column
+    // access keeps the loop cheap for large rulesets. Column order: 0=rule_id, 1=rule_blob.
+    BOOL haveCachedHash = self.networkFlowRulesHash.length > 0;
+    santa::Xxhash128 h;
     FMResultSet* rs = [db executeQuery:@"SELECT rule_id, rule_blob FROM network_flow_rules "
                                        @"ORDER BY rule_id ASC"];
     while ([rs next]) {
@@ -919,13 +940,22 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
       if (!blob) continue;
       SNTNetworkFlowRule* rule = [[SNTNetworkFlowRule alloc] initAddRuleWithId:ruleId
                                                                      protoBlob:blob];
-      if (rule) {
-        [rules addObject:rule];
+      if (!rule) continue;
+      [rules addObject:rule];
+      if (!haveCachedHash) {
+        h.Update(blob.bytes, blob.length);
       }
     }
     [rs close];
+
+    if (haveCachedHash) {
+      digest = self.networkFlowRulesHash;
+    } else {
+      digest = santa::StringToNSString(h.HexDigest());
+      self.networkFlowRulesHash = digest;
+    }
   }];
-  return rules;
+  return [[SNTNetworkFlowRulesSnapshot alloc] initWithRules:rules networkFlowRulesHash:digest];
 }
 
 #pragma mark Caching Static Rules
@@ -972,15 +1002,17 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
 
   santa::Xxhash128 hash;
 
+  // Indexed-column access keeps this loop cheap; column order matches the SELECT below.
+  // Columns: 0=identifier, 1=state, 2=type, 3=cel_expr, 4=seatbelt_policy.
   FMResultSet* rs = [db executeQuery:@"SELECT identifier, state, type, cel_expr, seatbelt_policy "
                                      @"FROM execution_rules WHERE state != ?",
                                      @(SNTRuleStateAllowTransitive)];
   while ([rs next]) {
-    NSString* identifier = [rs stringForColumn:@"identifier"];
-    NSString* cel = [rs stringForColumn:@"cel_expr"];
-    NSString* seatbeltPolicy = [rs stringForColumn:@"seatbelt_policy"];
-    int state = [rs intForColumn:@"state"];
-    int type = [rs intForColumn:@"type"];
+    NSString* identifier = [rs stringForColumnIndex:0];
+    int state = [rs intForColumnIndex:1];
+    int type = [rs intForColumnIndex:2];
+    NSString* cel = [rs stringForColumnIndex:3];
+    NSString* seatbeltPolicy = [rs stringForColumnIndex:4];
 
     hash.Update(identifier.UTF8String,
                 [identifier lengthOfBytesUsingEncoding:NSUTF8StringEncoding]);
@@ -1007,10 +1039,12 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
 
   santa::Xxhash128 hash;
 
+  // Indexed-column access keeps this loop cheap; column order matches the SELECT below.
+  // Columns: 0=name, 1=rule_data.
   FMResultSet* rs = [db executeQuery:@"SELECT name, rule_data FROM file_access_rules"];
   while ([rs next]) {
-    NSString* name = [rs stringForColumn:@"name"];
-    NSData* blob = [rs dataNoCopyForColumn:@"rule_data"];
+    NSString* name = [rs stringForColumnIndex:0];
+    NSData* blob = [rs dataNoCopyForColumnIndex:1];
 
     hash.Update(name.UTF8String, [name lengthOfBytesUsingEncoding:NSUTF8StringEncoding]);
     hash.Update(blob.bytes, blob.length);

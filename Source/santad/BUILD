@@ -211,6 +211,7 @@ objc_library(
     deps = [
         ":EndpointSecurityLogger",
         ":SNTNotificationQueue",
+        ":SNTRuleTable",
         ":SNTSyncdQueue",
         "//Source/common:MOLXPCConnection",
         "//Source/common:SNTCommonEnums",
@@ -219,12 +220,32 @@ objc_library(
         "//Source/common:SNTFileInfo",
         "//Source/common:SNTKVOManager",
         "//Source/common:SNTLogging",
+        "//Source/common:SNTNetworkFlowRule",
         "//Source/common:SNTStrengthify",
         "//Source/common:SNTXPCNotifierInterface",
+        "//Source/common/ne:SNDXPCNetworkExtensionInterface",
+        "//Source/common/ne:SNTNetworkExtensionConfig",
         "//Source/common/ne:SNTNetworkExtensionSettings",
         "//Source/common/ne:SNTSyncNetworkExtensionSettings",
         "//Source/common/ne:SNTXPCNetworkExtensionInterface",
         "@santanetd//src/santanetd:SNDProcessFlows",
+    ],
+)
+
+santa_unit_test(
+    name = "SNTNetworkExtensionQueueTest",
+    srcs = ["SNTNetworkExtensionQueueTest.mm"],
+    deps = [
+        ":SNTNetworkExtensionQueue",
+        ":SNTRuleTable",
+        "//Source/common:MOLXPCConnection",
+        "//Source/common:SNTConfigurator",
+        "//Source/common:SNTNetworkFlowRule",
+        "//Source/common/ne:SNDXPCNetworkExtensionInterface",
+        "//Source/common/ne:SNTNetworkExtensionConfig",
+        "//Source/common/ne:SNTNetworkExtensionSettings",
+        "//Source/common/ne:SNTSyncNetworkExtensionSettings",
+        "@OCMock",
     ],
 )
 
@@ -1768,6 +1789,7 @@ test_suite(
         ":SNTEndpointSecurityTreeAwareClientTest",
         ":SNTEventTableTest",
         ":SNTExecutionControllerTest",
+        ":SNTNetworkExtensionQueueTest",
         ":SNTNotificationQueueTest",
         ":SNTPolicyProcessorTest",
         ":SNTRuleTableTest",
