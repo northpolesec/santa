@@ -124,7 +124,9 @@
 
   OCMExpect([self.mockProxy
       updateNetworkExtensionConfig:[OCMArg checkWithBlock:^BOOL(SNTNetworkExtensionConfig* c) {
-        return c.settings.enable && c.networkFlowRules == nil;
+        return c.settings.enable &&
+               c.settings.flowDefaultAction == SNTNetworkFlowDefaultActionAllow &&
+               c.networkFlowRules == nil;
       }]
                              reply:[OCMArg invokeBlock]]);
   // Settings-only change must not materialize the ruleset.
@@ -144,7 +146,9 @@
 
   OCMExpect([self.mockProxy
       updateNetworkExtensionConfig:[OCMArg checkWithBlock:^BOOL(SNTNetworkExtensionConfig* c) {
-        return c.networkFlowRules.count == 1;
+        return c.settings.enable &&
+               c.settings.flowDefaultAction == SNTNetworkFlowDefaultActionDeny &&
+               c.networkFlowRules.count == 1;
       }]
                              reply:[OCMArg invokeBlock]]);
 
