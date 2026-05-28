@@ -105,6 +105,31 @@ santa_unit_test(
 )
 
 objc_library(
+    name = "KernelCsBlob",
+    srcs = ["KernelCsBlob.mm"],
+    hdrs = ["KernelCsBlob.h"],
+    sdk_dylibs = ["bsm"],
+    sdk_frameworks = ["Security"],
+    deps = ["//Source/common:ScopedCFTypeRef"],
+)
+
+santa_unit_test(
+    name = "KernelCsBlobTest",
+    srcs = ["KernelCsBlobTest.mm"],
+    structured_resources = [
+        ":hw_entitled_fixture",
+        ":hw_team_signed_fixture",
+        ":hw_universal_fixture",
+        ":santactl_2026_4_csblob_fixture",
+    ],
+    deps = [
+        ":CodeSignatureParser",
+        ":KernelCsBlob",
+        "//Source/common:ScopedFile",
+    ],
+)
+
+objc_library(
     name = "PageVerifier",
     hdrs = ["PageVerifier.h"],
     deps = [":HashTraits"],
@@ -159,6 +184,15 @@ filegroup(
     visibility = ["//Source/common/verifyinghasher:__pkg__"],
 )
 
+# Raw cs_blob (not a Mach-O) captured from the arm64 slice of santactl
+# shipped in NPS Santa 2026.4. Drives KCB's TSA / secure_signing_time
+# path. See testdata/README.md for regeneration instructions.
+filegroup(
+    name = "santactl_2026_4_csblob_fixture",
+    srcs = ["testdata/santactl_2026.4.csblob"],
+    visibility = ["//Source/common/verifyinghasher:__pkg__"],
+)
+
 santa_unit_test(
     name = "VerifyingHasherCoreTest",
     srcs = ["VerifyingHasherCoreTest.mm"],
@@ -209,6 +243,7 @@ test_suite(
         ":FileReaderTest",
         ":HashTraitsTest",
         ":HeaderParserTest",
+        ":KernelCsBlobTest",
         ":PageVerifierTest",
         ":UninitBufferTest",
         ":VerifyingHasherCoreTest",

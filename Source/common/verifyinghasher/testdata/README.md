@@ -1,7 +1,9 @@
 # Verifying-hasher test fixtures
 
-Mach-O binaries used by tests in `Source/common/verifyinghasher`. Each
-fixture is checked in; this file documents how to regenerate them.
+Test fixtures used by tests in `Source/common/verifyinghasher`. Most are
+Mach-O binaries; one (`santactl_2026.4.csblob`) is a captured raw
+`cs_blob`. Each fixture is checked in; this file documents how to
+regenerate them.
 
 ## `hw_universal`
 
@@ -90,3 +92,37 @@ Modern macOS codesign produces both XML and DER slots by default when
 given `--entitlements`. The specific signing identity does not matter
 — tests only assert that both entitlement slots are present and that
 the CMS signature parses.
+
+## `santactl_2026.4.csblob`
+
+Raw `cs_blob` (the embedded-signature SuperBlob) extracted from the
+arm64 slice of `santactl` shipped in NPS Santa **2026.4** — a
+Developer-ID-signed, TSA-timestamped (notarized-style) production
+binary. Mirrors exactly what `csops_audittoken(CS_OPS_BLOB)` would hand
+KCB at runtime, so KCB's `Fetch`-side parsing is exercised against a
+real notarized signature. Drives `KernelCsBlob`'s `secure_signing_time`
+/ TSA-timestamp path.
+
+Regeneration (any released Dev-ID-signed, timestamped binary works;
+keep the version in the filename to make the source visible):
+
+```bash
+# Locate the arm64 slice and its LC_CODE_SIGNATURE region:
+SRC=path/to/santactl
+SLICE_OFF=$(lipo -detailed_info "$SRC" \
+  | awk '/architecture arm64/{f=1} f&&/offset/{print $2; exit}')
+read DATA_OFF DATA_SIZE < <(otool -arch arm64 -l "$SRC" \
+  | awk '/LC_CODE_SIGNATURE/{f=1} f&&/dataoff/{o=$2} f&&/datasize/{print o, $2; exit}')
+
+# Extract the real SuperBlob (trim trailing padding to sb->length):
+python3 - <<EOF
+src = open("$SRC","rb").read()
+abs_off = $SLICE_OFF + $DATA_OFF
+sb_len = int.from_bytes(src[abs_off+4:abs_off+8], "big")
+open("testdata/santactl_2026.4.csblob","wb").write(src[abs_off:abs_off+sb_len])
+EOF
+```
+
+The file is the SuperBlob exactly — no Mach-O wrapper, no padding. Load
+it via `Slurp(...)` and pass directly to `KernelCsBlob::ParseBytes`
+(skip `ExtractCsBlobBytes`).
