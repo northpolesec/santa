@@ -14,7 +14,7 @@
 
 #import <Foundation/Foundation.h>
 
-#import "Source/common/ne/SNTNetworkExtensionConfig.h"
+@class SNTNetworkExtensionConfig;
 
 ///
 ///  Protocol implemented by the network extension (santanetd) and utilized by daemon
