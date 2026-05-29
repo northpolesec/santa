@@ -47,6 +47,7 @@
 @property NSString* fileAccessEventDetailText;
 @property NSNumber* enableNotificationSilences;
 @property SNTSyncNetworkExtensionSettings* networkExtensionSettings;
+@property NSNumber* reconcileNetworkExtension;
 @property NSArray<NSString*>* pushTokenChain;
 @property NSArray<NSString*>* telemetryFilterExpressions;
 @property NSArray<SNTCELFallbackRule*>* celFallbackRules;
@@ -88,6 +89,7 @@
   ENCODE(coder, fileAccessEventDetailText);
   ENCODE(coder, enableNotificationSilences);
   ENCODE(coder, networkExtensionSettings);
+  ENCODE(coder, reconcileNetworkExtension);
   ENCODE(coder, pushTokenChain);
   ENCODE(coder, telemetryFilterExpressions);
   ENCODE(coder, celFallbackRules);
@@ -125,6 +127,7 @@
     DECODE(decoder, fileAccessEventDetailText, NSString);
     DECODE(decoder, enableNotificationSilences, NSNumber);
     DECODE(decoder, networkExtensionSettings, SNTSyncNetworkExtensionSettings);
+    DECODE(decoder, reconcileNetworkExtension, NSNumber);
     DECODE_ARRAY(decoder, pushTokenChain, NSString);
     DECODE_ARRAY(decoder, telemetryFilterExpressions, NSString);
     DECODE_ARRAY(decoder, celFallbackRules, SNTCELFallbackRule);
@@ -287,6 +290,12 @@
 - (void)networkExtensionSettings:(void (^)(SNTSyncNetworkExtensionSettings*))block {
   if (self.networkExtensionSettings) {
     block(self.networkExtensionSettings);
+  }
+}
+
+- (void)reconcileNetworkExtension:(void (^)(BOOL))block {
+  if (self.reconcileNetworkExtension) {
+    block([self.reconcileNetworkExtension boolValue]);
   }
 }
 

@@ -47,6 +47,7 @@
 @property NSString* fileAccessEventDetailURL;
 @property NSString* fileAccessEventDetailText;
 @property SNTSyncNetworkExtensionSettings* networkExtensionSettings;
+@property NSNumber* reconcileNetworkExtension;
 @property NSArray<NSString*>* pushTokenChain;
 @property NSArray<NSString*>* telemetryFilterExpressions;
 @property NSArray<SNTCELFallbackRule*>* celFallbackRules;
@@ -91,6 +92,9 @@ SNTConfigBundle* PostflightConfigBundle(SNTSyncState* syncState) {
   bundle.fileAccessEventDetailURL = syncState.fileAccessEventDetailURL;
   bundle.fileAccessEventDetailText = syncState.fileAccessEventDetailText;
   bundle.networkExtensionSettings = syncState.networkExtensionSettings;
+  // Always set: marks the sync boundary so the daemon reconciles santanetd (settings +
+  // rules) once, after both have been applied. The daemon detects what actually changed.
+  bundle.reconcileNetworkExtension = @(YES);
   bundle.telemetryFilterExpressions = syncState.telemetryFilterExpressions;
   bundle.celFallbackRules = syncState.celFallbackRules;
   bundle.fullSyncInterval = syncState.fullSyncInterval;

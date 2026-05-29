@@ -25,12 +25,15 @@
 #import "Source/common/SNTFileInfo.h"
 #import "Source/common/SNTKVOManager.h"
 #import "Source/common/SNTLogging.h"
+#import "Source/common/SNTNetworkFlowRule.h"
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTXPCNotifierInterface.h"
 #import "Source/common/ne/SNDXPCNetworkExtensionInterface.h"
+#import "Source/common/ne/SNTNetworkExtensionConfig.h"
 #import "Source/common/ne/SNTNetworkExtensionSettings.h"
 #import "Source/common/ne/SNTSyncNetworkExtensionSettings.h"
 #import "Source/common/ne/SNTXPCNetworkExtensionInterface.h"
+#import "Source/santad/DataLayer/SNTRuleTable.h"
 #import "Source/santad/SNTNotificationQueue.h"
 #import "Source/santad/SNTSyncdQueue.h"
 #import "src/santanetd/SNDProcessFlows.h"
@@ -45,39 +48,34 @@ NSString* const kSantaNetworkExtensionProtocolVersion = @"1.0";
 @property NSArray<SNTKVOManager*>* kvoWatchers;
 @property(weak) SNTNotificationQueue* notifierQueue;
 @property(weak) SNTSyncdQueue* syncdQueue;
+@property SNTRuleTable* ruleTable;
+// What santanetd was last told. Reset when the connection drops so a fresh santanetd
+// (which persists nothing) is re-seeded with the full config on its next registration.
+@property SNTNetworkExtensionSettings* lastPushedSettings;
+@property NSString* lastPushedNetworkFlowRulesHash;
 @end
 
 @implementation SNTNetworkExtensionQueue
 
 - (instancetype)initWithNotifierQueue:(SNTNotificationQueue*)notifierQueue
                            syncdQueue:(SNTSyncdQueue*)syncdQueue
+                            ruleTable:(SNTRuleTable*)ruleTable
                                logger:(std::shared_ptr<santa::Logger>)logger {
   self = [super init];
   if (self) {
     _notifierQueue = notifierQueue;
     _syncdQueue = syncdQueue;
+    _ruleTable = ruleTable;
     _logger = std::move(logger);
 
     WEAKIFY(self);
 
+    // Sync-path settings changes reach santanetd via the postflight marker reconcile in
+    // SNTDaemonControlController.updateSyncSettings:, so we don't observe
+    // syncNetworkExtensionSettings directly — that would double-fire and race with the
+    // marker reconcile. The only non-sync mutation is the syncBaseURL-driven revoke below,
+    // which clears settings and triggers a reconcile explicitly.
     _kvoWatchers = @[
-      [[SNTKVOManager alloc] initWithObject:[SNTConfigurator configurator]
-                                   selector:@selector(syncNetworkExtensionSettings)
-                                       type:[SNTSyncNetworkExtensionSettings class]
-                                   callback:^(SNTSyncNetworkExtensionSettings* oldValue,
-                                              SNTSyncNetworkExtensionSettings* newValue) {
-                                     // Treat nil as equivalent to enable == NO (the default state).
-                                     if (oldValue.enable == newValue.enable) {
-                                       return;
-                                     }
-
-                                     STRONGIFY(self);
-
-                                     LOGI(@"SyncNetworkExtensionSettings changed: enable %d -> %d",
-                                          oldValue.enable, newValue.enable);
-
-                                     [self handleSettingsChanged:newValue];
-                                   }],
       [[SNTKVOManager alloc]
           initWithObject:[SNTConfigurator configurator]
                 selector:@selector(syncBaseURL)
@@ -94,43 +92,75 @@ NSString* const kSantaNetworkExtensionProtocolVersion = @"1.0";
                   }
 
                   [[SNTConfigurator configurator] setSyncServerSyncNetworkExtensionSettings:nil];
-                }],
 
+                  STRONGIFY(self);
+                  [self reconcileNetworkExtensionConfig];
+                }],
     ];
   }
   return self;
 }
 
-- (void)handleSettingsChanged:(SNTSyncNetworkExtensionSettings*)settings {
-  MOLXPCConnection* conn = self.netExtConnection;
-  if (!conn) {
-    LOGW(@"Network extension connection unavailable; skipping settings update");
-    return;
-  }
+- (void)reconcileNetworkExtensionConfig {
+  // Serialize the read-compare-dispatch-update sequence so concurrent triggers (e.g. the
+  // postflight marker on the controller's XPC thread vs. the syncBaseURL revoke on the
+  // configurator's KVO thread) don't see stale lastPushed and emit duplicate pushes.
+  @synchronized(self) {
+    MOLXPCConnection* conn = self.netExtConnection;
+    if (!conn) {
+      // santanetd isn't connected; it will be re-seeded in full when it next registers.
+      return;
+    }
 
-  SNTNetworkExtensionSettings* netExtSettings =
-      [self generateSettingsForProtocolVersion:self.connectedProtocolVersion];
-  if (!netExtSettings) {
-    LOGW(@"Failed to generate settings for protocol version %@", self.connectedProtocolVersion);
-    return;
-  }
+    SNTNetworkExtensionSettings* settings =
+        [self generateSettingsForProtocolVersion:self.connectedProtocolVersion];
+    if (!settings) {
+      LOGW(@"Failed to generate settings for protocol version %@", self.connectedProtocolVersion);
+      return;
+    }
 
-  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+    // Fast-path hash check: cheap (cached) and avoids materializing the ruleset when nothing
+    // changed. Uses the narrow network-flow getter rather than hashOfHashes so we don't
+    // recompute the execution + file-access digests we don't need here.
+    NSString* currentHash = [self.ruleTable networkFlowRulesHash];
+    BOOL settingsChanged = ![settings isEqual:self.lastPushedSettings];
+    BOOL rulesChanged = ![currentHash isEqualToString:self.lastPushedNetworkFlowRulesHash];
+    if (!settingsChanged && !rulesChanged) {
+      return;
+    }
 
-  [[conn remoteObjectProxy]
-      updateNetworkExtensionSettings:netExtSettings
+    // When rules changed, take an atomic snapshot so the array and the hash we record both
+    // correspond to the same DB state (a concurrent sync could commit between the fast-path
+    // read above and the materialization below). `nil` rules means "rules unchanged" to
+    // santanetd, so settings-only changes skip the snapshot allocation entirely.
+    NSArray<SNTNetworkFlowRule*>* rules = nil;
+    NSString* hashToRecord = currentHash;
+    if (rulesChanged) {
+      SNTNetworkFlowRulesSnapshot* snapshot = [self.ruleTable retrieveAllNetworkFlowRulesSnapshot];
+      rules = snapshot.rules;
+      hashToRecord = snapshot.networkFlowRulesHash;
+    }
+    SNTNetworkExtensionConfig* config = [[SNTNetworkExtensionConfig alloc] initWithSettings:settings
+                                                                           networkFlowRules:rules];
+
+    // Record lastPushed only on a successful reply, so a netd-side rejection leaves our
+    // recorded state matching netd's actual state and the next reconcile retries. The reply
+    // block fires asynchronously off this lock, so it re-enters @synchronized for the write;
+    // WEAKIFY/STRONGIFY breaks the transient self <-> connection <-> reply-block cycle.
+    WEAKIFY(self);
+    [(id<SNDNetworkExtensionXPC>)[conn remoteObjectProxy]
+        updateNetworkExtensionConfig:config
                                reply:^(BOOL success) {
-                                 if (success) {
-                                   LOGI(@"Successfully updated network extension settings");
-                                 } else {
-                                   LOGW(@"Failed to update network extension settings");
+                                 if (!success) {
+                                   LOGW(@"Failed to update network extension config");
+                                   return;
                                  }
-
-                                 dispatch_semaphore_signal(sema);
+                                 STRONGIFY(self);
+                                 @synchronized(self) {
+                                   self.lastPushedSettings = settings;
+                                   self.lastPushedNetworkFlowRulesHash = hashToRecord;
+                                 }
                                }];
-
-  if (dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC))) {
-    LOGW(@"Timeout when attempting to update network extension settings");
   }
 }
 
@@ -157,8 +187,8 @@ NSString* const kSantaNetworkExtensionProtocolVersion = @"1.0";
   }
 }
 
-- (SNTNetworkExtensionSettings*)handleRegistrationWithProtocolVersion:(NSString*)protocolVersion
-                                                                error:(NSError**)error {
+- (SNTNetworkExtensionConfig*)handleRegistrationWithProtocolVersion:(NSString*)protocolVersion
+                                                              error:(NSError**)error {
   if (self.netExtConnection) {
     LOGW(@"Network extension attempting to register but already connected, clearing stale "
          @"connection");
@@ -206,11 +236,30 @@ NSString* const kSantaNetworkExtensionProtocolVersion = @"1.0";
   }
 
   // At this point we've successfully validated the client. Store important information
-  // and go ahead and establish a connection back to the network extension daemon.
-  self.connectedProtocolVersion = protocolVersion;
-  [self establishNetworkExtensionConnection];
+  // and go ahead and establish a connection back to the network extension daemon (used for
+  // runtime config updates after registration).
+  //
+  // Same monitor as reconcileNetworkExtensionConfig: a concurrent reconcile must not see a
+  // half-set-up state (connection established but lastPushed not yet recorded), which would
+  // emit a redundant push of the values we're about to seed in the reply.
+  @synchronized(self) {
+    self.connectedProtocolVersion = protocolVersion;
+    [self establishNetworkExtensionConnection];
 
-  return [self generateSettingsForProtocolVersion:self.connectedProtocolVersion];
+    // santanetd persists nothing, so a registration means it just (re)started empty. Seed it
+    // with the full current settings + ruleset in the registration reply (returned here),
+    // letting it apply both atomically. The snapshot reads rules + hash in one DB transaction
+    // so a concurrent sync can't desync what we put in the reply from what we record as
+    // last-pushed.
+    SNTNetworkExtensionSettings* settings =
+        [self generateSettingsForProtocolVersion:self.connectedProtocolVersion];
+    SNTNetworkFlowRulesSnapshot* snapshot = [self.ruleTable retrieveAllNetworkFlowRulesSnapshot];
+    self.lastPushedSettings = settings;
+    self.lastPushedNetworkFlowRulesHash = snapshot.networkFlowRulesHash;
+
+    return [[SNTNetworkExtensionConfig alloc] initWithSettings:settings
+                                              networkFlowRules:snapshot.rules];
+  }
 }
 
 - (void)establishNetworkExtensionConnection {
@@ -230,10 +279,18 @@ NSString* const kSantaNetworkExtensionProtocolVersion = @"1.0";
 }
 
 - (void)clearNetworkExtensionConnection {
-  self.netExtConnection.invalidationHandler = nil;
-  [self.netExtConnection invalidate];
-  self.netExtConnection = nil;
-  self.connectedProtocolVersion = nil;
+  // Holds the same monitor as reconcileNetworkExtensionConfig so the {connection, lastPushed}
+  // pair stays consistent — reconcile never sees a non-nil connection paired with
+  // already-cleared lastPushed (or vice versa).
+  @synchronized(self) {
+    self.netExtConnection.invalidationHandler = nil;
+    [self.netExtConnection invalidate];
+    self.netExtConnection = nil;
+    self.connectedProtocolVersion = nil;
+    // Forget what we told the old santanetd; the next one starts empty and must be re-seeded.
+    self.lastPushedSettings = nil;
+    self.lastPushedNetworkFlowRulesHash = nil;
+  }
 }
 
 - (std::pair<int, int>)protocolVersionComponents:(NSString*)protocolVersion {
@@ -312,11 +369,14 @@ NSString* const kSantaNetworkExtensionProtocolVersion = @"1.0";
       [[SNTConfigurator configurator] syncNetworkExtensionSettings];
 
   BOOL enable = NO;
+  SNTNetworkFlowDefaultAction flowDefaultAction = SNTNetworkFlowDefaultActionUnspecified;
   if (majorVersion >= 1) {
     enable = syncSettings.enable;
+    flowDefaultAction = syncSettings.flowDefaultAction;
   }
 
-  return [[SNTNetworkExtensionSettings alloc] initWithEnable:enable];
+  return [[SNTNetworkExtensionSettings alloc] initWithEnable:enable
+                                           flowDefaultAction:flowDefaultAction];
 }
 
 @end

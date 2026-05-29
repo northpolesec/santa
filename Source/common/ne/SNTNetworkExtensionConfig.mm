@@ -1,0 +1,54 @@
+/// Copyright 2026 North Pole Security, Inc.
+///
+/// Licensed under the Apache License, Version 2.0 (the "License");
+/// you may not use this file except in compliance with the License.
+/// You may obtain a copy of the License at
+///
+///     http://www.apache.org/licenses/LICENSE-2.0
+///
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an "AS IS" BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
+
+#import "Source/common/ne/SNTNetworkExtensionConfig.h"
+
+#import "Source/common/CoderMacros.h"
+
+@interface SNTNetworkExtensionConfig ()
+@property(readwrite) SNTNetworkExtensionSettings* settings;
+@property(readwrite, copy) NSArray<SNTNetworkFlowRule*>* networkFlowRules;
+@end
+
+@implementation SNTNetworkExtensionConfig
+
+- (instancetype)initWithSettings:(SNTNetworkExtensionSettings*)settings
+                networkFlowRules:(NSArray<SNTNetworkFlowRule*>*)networkFlowRules {
+  self = [super init];
+  if (self) {
+    _settings = settings;
+    _networkFlowRules = [networkFlowRules copy];
+  }
+  return self;
+}
+
++ (BOOL)supportsSecureCoding {
+  return YES;
+}
+
+- (void)encodeWithCoder:(NSCoder*)coder {
+  ENCODE(coder, settings);
+  ENCODE(coder, networkFlowRules);
+}
+
+- (instancetype)initWithCoder:(NSCoder*)decoder {
+  self = [super init];
+  if (self) {
+    DECODE(decoder, settings, SNTNetworkExtensionSettings);
+    DECODE_ARRAY(decoder, networkFlowRules, SNTNetworkFlowRule);
+  }
+  return self;
+}
+
+@end

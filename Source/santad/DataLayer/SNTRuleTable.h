@@ -32,6 +32,16 @@
 @property(readonly) NSString* networkFlowRulesHash;
 @end
 
+/// Atomic point-in-time view of the network flow ruleset. Returned from
+/// `retrieveAllNetworkFlowRulesSnapshot`; `rules` and `networkFlowRulesHash` correspond to the
+/// same DB state.
+@interface SNTNetworkFlowRulesSnapshot : NSObject
+@property(readonly) NSArray<SNTNetworkFlowRule*>* rules;
+@property(readonly) NSString* networkFlowRulesHash;
+- (instancetype)initWithRules:(NSArray<SNTNetworkFlowRule*>*)rules
+         networkFlowRulesHash:(NSString*)networkFlowRulesHash;
+@end
+
 ///
 ///  Responsible for managing the rule tables.
 ///
@@ -152,10 +162,19 @@
 - (NSDictionary<NSString*, NSDictionary*>*)retrieveAllFileAccessRules;
 
 ///
-///  Retrieve all stored network flow rules as Add rules, ordered by rule_id ASC.
-///  Intended for export and for assembling the full-set XPC push to santanetd.
+///  Atomic snapshot of all stored network flow rules (as Add rules, ordered by rule_id ASC)
+///  and the hash that identifies them, read inside a single database transaction so the two
+///  correspond to the same state. Intended for assembling the full-set XPC push to santanetd.
 ///
-- (NSArray<SNTNetworkFlowRule*>*)retrieveAllNetworkFlowRules;
+- (SNTNetworkFlowRulesSnapshot*)retrieveAllNetworkFlowRulesSnapshot;
+
+///
+///  Hash identifying the current network-flow ruleset — the same value carried in
+///  `hashOfHashes.networkFlowRulesHash` and `retrieveAllNetworkFlowRulesSnapshot`, computed from
+///  a single DB read (and cached). Cheaper than `hashOfHashes` when only the network-flow ruleset
+///  matters, since it avoids recomputing the execution and file-access digests.
+///
+- (NSString*)networkFlowRulesHash;
 
 ///
 ///  Update the static rules from the configuration.

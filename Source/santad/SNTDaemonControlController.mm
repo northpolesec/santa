@@ -654,6 +654,15 @@ double watchdogRAMPeak = 0;
     if (![oldCELData isEqualToData:newCELData] && self.flushCacheBlock) {
       self.flushCacheBlock(FlushCacheMode::kAllCaches, FlushCacheReason::kCELFallbackRulesChanged);
     }
+
+    // Postflight marks the sync boundary. Now that settings and rules (committed earlier in
+    // the rule-download phase) are both final, reconcile santanetd once — the queue figures
+    // out what actually changed and pushes only that, or nothing.
+    [result reconcileNetworkExtension:^(BOOL reconcile) {
+      if (reconcile) {
+        [self.netExtQueue reconcileNetworkExtensionConfig];
+      }
+    }];
   }
 
   reply();
@@ -1059,7 +1068,7 @@ static const char* const kAllowedCanonicalBundlePaths[] = {
 }
 
 - (void)registerNetworkExtensionWithProtocolVersion:(NSString*)protocolVersion
-                                              reply:(void (^)(SNTNetworkExtensionSettings* settings,
+                                              reply:(void (^)(SNTNetworkExtensionConfig* config,
                                                               NSString* santaProtocolVersion,
                                                               NSError* error))reply {
   NSError* error;
@@ -1072,14 +1081,14 @@ static const char* const kAllowedCanonicalBundlePaths[] = {
     return;
   }
 
-  SNTNetworkExtensionSettings* settings =
+  SNTNetworkExtensionConfig* config =
       [self.netExtQueue handleRegistrationWithProtocolVersion:protocolVersion error:&error];
-  reply(settings, kSantaNetworkExtensionProtocolVersion, error);
+  reply(config, kSantaNetworkExtensionProtocolVersion, error);
 
   // When the network extension registers, it may have just been enabled which can
   // reset network connections. Trigger a NATS reconnect to ensure push notifications
   // are working immediately.
-  if (settings) {
+  if (config) {
     LOGI(@"Network extension registered, triggering push notification reconnect");
     [self.syncdQueue pushNotificationReconnect];
   }

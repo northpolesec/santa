@@ -50,6 +50,9 @@
 - (void)fileAccessEventDetailText:(void (^)(NSString*))block;
 - (void)enableNotificationSilences:(void (^)(BOOL))block;
 - (void)networkExtensionSettings:(void (^)(SNTSyncNetworkExtensionSettings*))block;
+/// Set only by PostflightConfigBundle. Signals the daemon that a sync just
+/// completed and it should reconcile santanetd's settings + rules.
+- (void)reconcileNetworkExtension:(void (^)(BOOL))block;
 - (void)pushTokenChain:(void (^)(NSArray<NSString*>*))block;
 - (void)telemetryFilterExpressions:(void (^)(NSArray<NSString*>*))block;
 - (void)celFallbackRules:(void (^)(NSArray<SNTCELFallbackRule*>*))block;

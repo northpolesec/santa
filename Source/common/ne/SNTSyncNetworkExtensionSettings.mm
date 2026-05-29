@@ -19,14 +19,17 @@
 
 @interface SNTSyncNetworkExtensionSettings ()
 @property(readwrite) BOOL enable;
+@property(readwrite) SNTNetworkFlowDefaultAction flowDefaultAction;
 @end
 
 @implementation SNTSyncNetworkExtensionSettings
 
-- (instancetype)initWithEnable:(BOOL)enable {
+- (instancetype)initWithEnable:(BOOL)enable
+             flowDefaultAction:(SNTNetworkFlowDefaultAction)flowDefaultAction {
   self = [super init];
   if (self) {
     _enable = enable;
+    _flowDefaultAction = flowDefaultAction;
   }
   return self;
 }
@@ -45,13 +48,15 @@
   }
 
   SNTSyncNetworkExtensionSettings* otherSettings = (SNTSyncNetworkExtensionSettings*)other;
-  return self.enable == otherSettings.enable;
+  return self.enable == otherSettings.enable &&
+         self.flowDefaultAction == otherSettings.flowDefaultAction;
 }
 
 - (NSUInteger)hash {
   NSUInteger prime = 31;
   NSUInteger result = 1;
   result = prime * result + self.enable;
+  result = prime * result + self.flowDefaultAction;
   return result;
 }
 
@@ -61,12 +66,14 @@
 
 - (void)encodeWithCoder:(NSCoder*)coder {
   ENCODE_BOXABLE(coder, enable);
+  ENCODE_BOXABLE(coder, flowDefaultAction);
 }
 
 - (instancetype)initWithCoder:(NSCoder*)decoder {
   self = [self init];
   if (self) {
     DECODE_SELECTOR(decoder, enable, NSNumber, boolValue);
+    DECODE_SELECTOR(decoder, flowDefaultAction, NSNumber, integerValue);
   }
   return self;
 }

@@ -14,7 +14,7 @@
 
 #import <Foundation/Foundation.h>
 
-@class SNTNetworkExtensionSettings;
+@class SNTNetworkExtensionConfig;
 
 ///
 ///  Protocol implemented by the network extension (santanetd) and utilized by daemon
@@ -22,8 +22,10 @@
 ///
 @protocol SNDNetworkExtensionXPC
 
-- (void)updateNetworkExtensionSettings:(SNTNetworkExtensionSettings*)settings
-                                 reply:(void (^)(BOOL))reply;
+/// Apply a network extension config. `config.settings` is always applied; `config.networkFlowRules`
+/// replaces the ruleset when non-nil, or leaves it untouched when nil (see
+/// SNTNetworkExtensionConfig).
+- (void)updateNetworkExtensionConfig:(SNTNetworkExtensionConfig*)config reply:(void (^)(BOOL))reply;
 
 - (void)bundleVersionInfo:(void (^)(NSDictionary* bundleInfo))reply;
 

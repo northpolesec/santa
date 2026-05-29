@@ -19,6 +19,7 @@
 
 @interface SNTNetworkExtensionSettings (Testing)
 @property(readwrite) BOOL enable;
+@property(readwrite) SNTNetworkFlowDefaultAction flowDefaultAction;
 @end
 
 // Simulates a future version of SNTNetworkExtensionSettings that encodes an additional
@@ -50,17 +51,24 @@
 @implementation SNTNetworkExtensionSettingsTest
 
 - (void)testInitialization {
-  SNTNetworkExtensionSettings* settings = [[SNTNetworkExtensionSettings alloc] initWithEnable:YES];
+  SNTNetworkExtensionSettings* settings =
+      [[SNTNetworkExtensionSettings alloc] initWithEnable:YES
+                                        flowDefaultAction:SNTNetworkFlowDefaultActionDeny];
   XCTAssertNotNil(settings);
   XCTAssertTrue(settings.enable);
+  XCTAssertEqual(settings.flowDefaultAction, SNTNetworkFlowDefaultActionDeny);
 
-  settings = [[SNTNetworkExtensionSettings alloc] initWithEnable:NO];
+  settings = [[SNTNetworkExtensionSettings alloc] initWithEnable:NO
+                                               flowDefaultAction:SNTNetworkFlowDefaultActionAllow];
   XCTAssertNotNil(settings);
   XCTAssertFalse(settings.enable);
+  XCTAssertEqual(settings.flowDefaultAction, SNTNetworkFlowDefaultActionAllow);
 }
 
 - (void)testRoundtripEncodeDecode {
-  SNTNetworkExtensionSettings* settings = [[SNTNetworkExtensionSettings alloc] initWithEnable:YES];
+  SNTNetworkExtensionSettings* settings =
+      [[SNTNetworkExtensionSettings alloc] initWithEnable:YES
+                                        flowDefaultAction:SNTNetworkFlowDefaultActionDeny];
   NSData* data = [NSKeyedArchiver archivedDataWithRootObject:settings
                                        requiringSecureCoding:YES
                                                        error:nil];
@@ -72,8 +80,10 @@
                                            error:nil];
   XCTAssertNotNil(deserialized);
   XCTAssertTrue(deserialized.enable);
+  XCTAssertEqual(deserialized.flowDefaultAction, SNTNetworkFlowDefaultActionDeny);
 
-  settings = [[SNTNetworkExtensionSettings alloc] initWithEnable:NO];
+  settings = [[SNTNetworkExtensionSettings alloc] initWithEnable:NO
+                                               flowDefaultAction:SNTNetworkFlowDefaultActionAllow];
   data = [NSKeyedArchiver archivedDataWithRootObject:settings requiringSecureCoding:YES error:nil];
   XCTAssertNotNil(data);
 
@@ -82,6 +92,7 @@
                                                       error:nil];
   XCTAssertNotNil(deserialized);
   XCTAssertFalse(deserialized.enable);
+  XCTAssertEqual(deserialized.flowDefaultAction, SNTNetworkFlowDefaultActionAllow);
 }
 
 - (void)testForwardCompatibility {
@@ -93,7 +104,8 @@
   // class name back to SNTNetworkExtensionSettings during decode to simulate an old receiver
   // processing data produced by a new sender.
   SNTNetworkExtensionSettingsFuture* future =
-      [[SNTNetworkExtensionSettingsFuture alloc] initWithEnable:YES];
+      [[SNTNetworkExtensionSettingsFuture alloc] initWithEnable:YES
+                                              flowDefaultAction:SNTNetworkFlowDefaultActionAllow];
 
   NSData* data = [NSKeyedArchiver archivedDataWithRootObject:future
                                        requiringSecureCoding:YES
