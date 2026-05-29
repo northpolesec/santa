@@ -540,6 +540,7 @@ objc_library(
     deps = [
         ":AuthResultCache",
         ":SNTCompilerController",
+        ":SNTEndpointSecurityTreeAwareClient",
         ":SNTExecutionController",
         ":TTYWriter",
         "//Source/common:BranchPrediction",
@@ -553,6 +554,7 @@ objc_library(
         "//Source/common/es:EndpointSecurityMessage",
         "//Source/common/es:SNTEndpointSecurityClient",
         "//Source/common/es:SNTEndpointSecurityEventHandler",
+        "//Source/common/processtree:process_tree",
     ],
 )
 
@@ -1579,6 +1581,9 @@ santa_unit_test(
         "//Source/common:TestUtils",
         "//Source/common/es:EndpointSecurityMessage",
         "//Source/common/es:MockEndpointSecurityAPI",
+        "//Source/common/processtree:process",
+        "//Source/common/processtree:process_tree",
+        "//Source/common/processtree:process_tree_test_helpers",
         "@OCMock",
     ],
 )
@@ -1602,6 +1607,7 @@ santa_unit_test(
         "//Source/common/es:EndpointSecurityClient",
         "//Source/common/es:EndpointSecurityMessage",
         "//Source/common/es:MockEndpointSecurityAPI",
+        "//Source/common/processtree:process_tree",
         "@OCMock",
         "@googletest//:gtest",
     ],
