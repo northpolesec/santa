@@ -17,18 +17,22 @@ objc_library(
 objc_library(
     name = "NATS_lib",
     srcs = [
+        "SNTBinaryUploader.mm",
         "SNTPushClientNATS.mm",
         "SNTPushClientNATS+Commands.mm",
     ],
     hdrs = [
+        "SNTBinaryUploader.h",
         "SNTPushClientNATS.h",
         "SNTPushClientNATS+Commands.h",
         "SNTPushNotifications.h",
     ],
     deps = [
         ":SNTSyncState",
+        "//Source/common:MOLAuthenticatingURLSession",
         "//Source/common:MOLXPCConnection",
         "//Source/common:SNTConfigurator",
+        "//Source/common:SNTFileInfo",
         "//Source/common:SNTKillCommand",
         "//Source/common:SNTLogging",
         "//Source/common:SNTSyncConstants",
@@ -465,6 +469,15 @@ santa_unit_test(
 )
 
 santa_unit_test(
+    name = "SNTBinaryUploaderTest",
+    srcs = ["SNTBinaryUploaderTest.mm"],
+    deps = [
+        ":NATS_lib",
+        "@northpolesec_protos//commands:v1_cc_proto",
+    ],
+)
+
+santa_unit_test(
     name = "SNTPushClientNATSCommandTest",
     srcs = ["SNTPushClientNATSCommandTest.mm"],
     deps = [
@@ -526,6 +539,7 @@ santa_unit_test(
 test_suite(
     name = "unit_tests",
     tests = [
+        ":SNTBinaryUploaderTest",
         ":SNTPushClientNATSCommandTest",
         ":SNTPushClientNATSConnectionTest",
         ":SNTPushClientNATSTest",

@@ -27,6 +27,7 @@
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTSystemInfo.h"
+#import "Source/santasyncservice/SNTBinaryUploader.h"
 #import "Source/santasyncservice/SNTSyncState.h"
 
 __BEGIN_DECLS
@@ -158,6 +159,10 @@ static int NATSSSLVerifyCallback(int preverifyOk, void* ctx) {
 @property(atomic) BOOL isRetrying;
 // Track the last error for better retry diagnostics
 @property(nonatomic, copy) NSString* lastConnectionError;
+// Per-instance uploader for SantaCommandRequest.binary_upload. Owns its own
+// serial dispatch queue, so a long upload cannot block Ping/Kill on
+// messageQueue.
+@property(nonatomic) SNTBinaryUploader* binaryUploader;
 @end
 
 @implementation SNTPushClientNATS
@@ -176,6 +181,12 @@ static int NATSSSLVerifyCallback(int preverifyOk, void* ctx) {
     _currentNonces = [NSMutableSet set];
     _previousNonces = [NSMutableSet set];
     _lastRotationTime = time(nullptr);
+
+    __weak SNTPushClientNATS* weakSelf = self;
+    _binaryUploader = [[SNTBinaryUploader alloc]
+        initWithPublishBlock:^(NSString* topic, const ::pbv1::SantaCommandResponse& response) {
+          [weakSelf publishResponse:response toReplyTopic:topic];
+        }];
 
     // Don't connect immediately - wait for preflight to provide configuration
     LOGI(@"NATS push client: Initialized, waiting for preflight configuration");
@@ -430,6 +441,13 @@ static int NATSSSLVerifyCallback(int preverifyOk, void* ctx) {
     // Connection options
     natsOptions_SetAllowReconnect(opts, true);
     natsOptions_SetMaxReconnect(opts, -1);  // Infinite reconnects
+
+    // Send a client-side PING every 30s and tolerate up to 2 missed PONGs
+    // before treating the TCP as dead. Without this, a stalled connection
+    // during a long binary_upload could sit idle for many minutes before
+    // the next write surfaced the failure.
+    natsOptions_SetPingInterval(opts, 30000);  // 30s in milliseconds
+    natsOptions_SetMaxPingsOut(opts, 2);
 
     // Set error callback to catch subscription violations and other errors
     natsOptions_SetErrorHandler(opts, &errorHandler, (__bridge void*)self);

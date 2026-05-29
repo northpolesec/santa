@@ -22,6 +22,8 @@
 #import "Source/santasyncservice/SNTPushClientNATS.h"
 #import "Source/santasyncservice/SNTPushNotifications.h"
 #include "commands/v1.pb.h"
+#include <google/protobuf/io/coded_stream.h>
+#include <google/protobuf/io/zero_copy_stream_impl_lite.h>
 
 __BEGIN_DECLS
 
@@ -61,6 +63,10 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
 - (::pbv1::SantaCommandResponse*)dispatchSantaCommandToHandler:
                                      (const ::pbv1::SantaCommandRequest&)command
                                                        onArena:(google::protobuf::Arena*)arena;
+- (::pbv1::SantaCommandResponse*)dispatchSantaCommandToHandler:
+                                     (const ::pbv1::SantaCommandRequest&)command
+                                                       onArena:(google::protobuf::Arena*)arena
+                                                    replyTopic:(NSString*)replyTopic;
 - (void)publishResponse:(const ::pbv1::SantaCommandResponse&)response
            toReplyTopic:(NSString*)replyTopic;
 @end
@@ -120,10 +126,18 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   command->set_issued_at(time(nullptr));
   command->clear_hmac();
 
+  // Sign deterministically so the bytes match what VerifyCommandRequestHMAC
+  // produces. Required for any command carrying a map field (e.g.
+  // BinaryUploadRequest.signed_post.form_values).
   std::string serialized;
-  if (!command->SerializeToString(&serialized)) {
-    XCTFail(@"Failed to serialize command for HMAC signing");
-    return;
+  {
+    google::protobuf::io::StringOutputStream stringStream(&serialized);
+    google::protobuf::io::CodedOutputStream codedStream(&stringStream);
+    codedStream.SetSerializationDeterministic(true);
+    if (!command->SerializeToCodedStream(&codedStream)) {
+      XCTFail(@"Failed to serialize command for HMAC signing");
+      return;
+    }
   }
 
   unsigned char hmac[CC_SHA256_DIGEST_LENGTH];
@@ -1078,6 +1092,105 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   XCTAssertTrue(response->event_upload().has_error(), @"EventUploadResponse should have error");
   XCTAssertEqual(response->event_upload().error(), ::pbv1::EventUploadResponse::ERROR_INVALID_PATH,
                  @"Should return ERROR_INVALID_PATH on empty path");
+}
+
+#pragma mark - Binary Upload Tests
+
+- (void)testDispatchBinaryUploadReturnsNullForAsyncReply {
+  // Given: a BinaryUploadRequest with a valid replyTopic. The path doesn't
+  // exist, so the uploader will eventually publish NOT_FOUND on its own
+  // queue — but the dispatch must return nullptr immediately so the
+  // messageQueue caller skips the central publish.
+  ::pbv1::SantaCommandRequest command;
+  command.set_uuid([[NSUUID UUID] UUIDString].UTF8String);
+  command.mutable_binary_upload()->set_path("/var/empty/does-not-exist.bin");
+  [self signCommandRequest:&command];
+
+  ::pbv1::SantaCommandResponse* response =
+      [self.client dispatchSantaCommandToHandler:command
+                                         onArena:self.arena
+                                      replyTopic:@"_INBOX.testtopic"];
+
+  XCTAssertEqual(response, nullptr);
+}
+
+- (void)testDispatchBinaryUploadWithoutReplyTopicReturnsInternalError {
+  // The 2-arg path (used by existing tests) forwards to the 3-arg method
+  // with replyTopic:nil. binary_upload has no way to publish asynchronously
+  // without a reply subject — so it returns a synchronous response with
+  // DISPOSITION_INTERNAL_ERROR. Tests can then assert on it.
+  ::pbv1::SantaCommandRequest command;
+  command.set_uuid([[NSUUID UUID] UUIDString].UTF8String);
+  command.mutable_binary_upload()->set_path("/tmp/foo");
+  [self signCommandRequest:&command];
+
+  ::pbv1::SantaCommandResponse* response = [self.client dispatchSantaCommandToHandler:command
+                                                                              onArena:self.arena];
+  XCTAssertNotEqual(response, nullptr);
+  XCTAssertEqual(response->result_case(), ::pbv1::SantaCommandResponse::kBinaryUpload);
+  XCTAssertEqual(response->binary_upload().disposition(),
+                 ::pbv1::BinaryUploadResponse::DISPOSITION_INTERNAL_ERROR);
+}
+
+- (void)testAllowedCommandsBinaryUploadBlocked {
+  OCMStub([self.mockConfigurator allowedSantaCommands]).andReturn(@[ @"ping" ]);
+
+  ::pbv1::SantaCommandRequest command;
+  command.set_uuid([[NSUUID UUID] UUIDString].UTF8String);
+  command.mutable_binary_upload()->set_path("/tmp/x");
+  [self signCommandRequest:&command];
+
+  ::pbv1::SantaCommandResponse* response = [self.client dispatchSantaCommandToHandler:command
+                                                                              onArena:self.arena
+                                                                           replyTopic:@"_INBOX.x"];
+  XCTAssertNotEqual(response, nullptr);
+  XCTAssertTrue(response->has_error());
+  XCTAssertEqual(response->error(), ::pbv1::SantaCommandResponse::ERROR_COMMAND_DISABLED);
+}
+
+- (void)testAllowedCommandsBinaryUploadAllowed {
+  OCMStub([self.mockConfigurator allowedSantaCommands])
+      .andReturn((@[ @"ping", @"binary_upload" ]));
+
+  ::pbv1::SantaCommandRequest command;
+  command.set_uuid([[NSUUID UUID] UUIDString].UTF8String);
+  command.mutable_binary_upload()->set_path("/var/empty/does-not-exist.bin");
+  [self signCommandRequest:&command];
+
+  ::pbv1::SantaCommandResponse* response = [self.client dispatchSantaCommandToHandler:command
+                                                                              onArena:self.arena
+                                                                           replyTopic:@"_INBOX.x"];
+  // With a non-nil replyTopic, the case hands off to the uploader and
+  // returns nullptr from dispatch.
+  XCTAssertEqual(response, nullptr);
+}
+
+- (void)testBinaryUploadHMACValidatesWithPopulatedFormValuesMap {
+  // Regression test for the map-serialization nondeterminism that caused
+  // workshop's binary_upload commands to be rejected with INVALID_DATA.
+  // The signer (test helper) and verifier (VerifyCommandRequestHMAC) must
+  // both serialize with deterministic mode so map keys sort lexicographically
+  // and produce identical bytes for HMAC.
+  ::pbv1::SantaCommandRequest command;
+  command.set_uuid([[NSUUID UUID] UUIDString].UTF8String);
+  auto* sp = command.mutable_binary_upload()->mutable_signed_post();
+  sp->set_url("https://example-bucket.s3.amazonaws.com/");
+  // Insert in non-sorted order so non-deterministic serialization would be
+  // sensitive to iteration order.
+  (*sp->mutable_form_values())["x-amz-signature"] = "deadbeef";
+  (*sp->mutable_form_values())["key"] = "uploads/abc";
+  (*sp->mutable_form_values())["policy"] = "eyJjb25kaXRpb25zIjpbXX0=";
+  (*sp->mutable_form_values())["x-amz-credential"] =
+      "AKIA.../20260522/us-east-1/s3/aws4_request";
+  [self signCommandRequest:&command];
+
+  ::pbv1::SantaCommandResponse* response = [self.client dispatchSantaCommandToHandler:command
+                                                                              onArena:self.arena
+                                                                           replyTopic:@"_INBOX.hm"];
+  // HMAC validates → handed off to uploader → nullptr return.
+  // If HMAC failed, response would be a non-null SantaCommandResponse with
+  // error = ERROR_INVALID_DATA.
+  XCTAssertEqual(response, nullptr);
 }
 
 @end
