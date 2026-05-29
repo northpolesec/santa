@@ -87,9 +87,9 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
 // colocated with the rule write that invalidated them; recomputes must be colocated with the
 // DB read used to produce them. A non-nil cache at the start of a block therefore corresponds
 // to the current DB state by construction.
-@property(atomic) NSString* executionRulesHash;
-@property(atomic) NSString* fileAccessRulesHash;
-@property(atomic) NSString* networkFlowRulesHash;
+@property(atomic) NSString* cachedExecutionRulesHash;
+@property(atomic) NSString* cachedFileAccessRulesHash;
+@property(atomic) NSString* cachedNetworkFlowRulesHash;
 @end
 
 @implementation SNTRuleTableRulesHash
@@ -774,9 +774,9 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
     }
 
     // Clear the rules hashes
-    self.executionRulesHash = nil;
-    self.fileAccessRulesHash = nil;
-    self.networkFlowRulesHash = nil;
+    self.cachedExecutionRulesHash = nil;
+    self.cachedFileAccessRulesHash = nil;
+    self.cachedNetworkFlowRulesHash = nil;
 
     faaRulesHashAfter = [self fileAccessRulesHashSerialized:db];
     faaRuleCount = [self fileAccessRuleCountSerialized:db];
@@ -923,39 +923,69 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
   return faaRules;
 }
 
+// Single source of truth for scanning network_flow_rules in rule_id order. On a cold cache
+// it computes and caches the digest; when `outRules` is non-nil it also materializes the Add
+// rules into it. The hash covers exactly the blobs of the rows added to `outRules`, so a
+// snapshot's `rules` and `networkFlowRulesHash` agree by construction, and the hash-only
+// callers (hashOfHashes) and the array caller (the snapshot) can never diverge.
+//
+// INVARIANT: a row is included iff its rule_blob is non-nil (the column is NOT NULL, so in
+// practice every row). SNTNetworkFlowRule.initAddRuleWithId: must keep rejecting ONLY nil
+// blobs.
+//
+// Must be called inside an inDatabase:/inTransaction: block.
+- (NSString*)networkFlowRulesHashSerializedInDB:(FMDatabase*)db
+                                    collectInto:(NSMutableArray<SNTNetworkFlowRule*>*)outRules {
+  BOOL haveCachedHash = self.cachedNetworkFlowRulesHash.length > 0;
+  if (haveCachedHash && !outRules) {
+    // Hash-only request and the cache is warm: no scan needed.
+    return self.cachedNetworkFlowRulesHash;
+  }
+
+  // Column order: 0=rule_id, 1=rule_blob. rule_id is field 1
+  // of the NetworkFlowRule.Add proto and is therefore already part of rule_blob, so the hash
+  // need only fold in the blob bytes; ordering by rule_id ASC makes it deterministic.
+  santa::Xxhash128 h;
+  FMResultSet* rs = [db executeQuery:@"SELECT rule_id, rule_blob FROM network_flow_rules "
+                                     @"ORDER BY rule_id ASC"];
+  while ([rs next]) {
+    NSData* blob = [rs dataNoCopyForColumnIndex:1];
+    if (!blob) continue;
+    if (!haveCachedHash) {
+      h.Update(blob.bytes, blob.length);
+    }
+    if (outRules) {
+      int64_t ruleId = [rs longLongIntForColumnIndex:0];
+      // `blob` is a no-copy view into SQLite's buffer (invalid after the next step), but
+      // SNTNetworkFlowRule's `protoBlob` is a `copy` property and -[NSData copy] of a no-copy
+      // NSData materializes an owned deep copy — so the rule safely outlives this result set
+      // and `[rs close]` (e.g. when later serialized over XPC to santanetd).
+      [outRules addObject:[[SNTNetworkFlowRule alloc] initAddRuleWithId:ruleId protoBlob:blob]];
+    }
+  }
+  [rs close];
+
+  if (!haveCachedHash) {
+    self.cachedNetworkFlowRulesHash = santa::StringToNSString(h.HexDigest());
+  }
+  return self.cachedNetworkFlowRulesHash;
+}
+
 - (SNTNetworkFlowRulesSnapshot*)retrieveAllNetworkFlowRulesSnapshot {
   NSMutableArray<SNTNetworkFlowRule*>* rules = [NSMutableArray array];
   __block NSString* digest;
   [self inDatabase:^(FMDatabase* db) {
-    // Single iteration: build the rules array and compute the hash from the same blob
-    // bytes, so they correspond to the same DB state by construction. Indexed-column
-    // access keeps the loop cheap for large rulesets. Column order: 0=rule_id, 1=rule_blob.
-    BOOL haveCachedHash = self.networkFlowRulesHash.length > 0;
-    santa::Xxhash128 h;
-    FMResultSet* rs = [db executeQuery:@"SELECT rule_id, rule_blob FROM network_flow_rules "
-                                       @"ORDER BY rule_id ASC"];
-    while ([rs next]) {
-      int64_t ruleId = [rs longLongIntForColumnIndex:0];
-      NSData* blob = [rs dataNoCopyForColumnIndex:1];
-      if (!blob) continue;
-      SNTNetworkFlowRule* rule = [[SNTNetworkFlowRule alloc] initAddRuleWithId:ruleId
-                                                                     protoBlob:blob];
-      if (!rule) continue;
-      [rules addObject:rule];
-      if (!haveCachedHash) {
-        h.Update(blob.bytes, blob.length);
-      }
-    }
-    [rs close];
-
-    if (haveCachedHash) {
-      digest = self.networkFlowRulesHash;
-    } else {
-      digest = santa::StringToNSString(h.HexDigest());
-      self.networkFlowRulesHash = digest;
-    }
+    digest = [self networkFlowRulesHashSerializedInDB:db collectInto:rules];
   }];
   return [[SNTNetworkFlowRulesSnapshot alloc] initWithRules:rules networkFlowRulesHash:digest];
+}
+
+- (NSString*)networkFlowRulesHash {
+  __block NSString* digest;
+  [self inDatabase:^(FMDatabase* db) {
+    digest = [self networkFlowRulesHashSerializedInDB:db collectInto:nil];
+  }];
+  return digest;
 }
 
 #pragma mark Caching Static Rules
@@ -996,8 +1026,8 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
   // If santad has previously computed the hash and stored it in memory, return it.
   // When a rule is added or removed the hash will be cleared so that the next
   // request for the hash will recompute it.
-  if (self.executionRulesHash.length) {
-    return self.executionRulesHash;
+  if (self.cachedExecutionRulesHash.length) {
+    return self.cachedExecutionRulesHash;
   }
 
   santa::Xxhash128 hash;
@@ -1025,7 +1055,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
   [rs close];
 
   NSString* digest = santa::StringToNSString(hash.HexDigest());
-  self.executionRulesHash = digest;
+  self.cachedExecutionRulesHash = digest;
   return digest;
 }
 
@@ -1033,8 +1063,8 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
   // If santad has previously computed the hash and stored it in memory, return it.
   // When a rule is added or removed the hash will be cleared so that the next
   // request for the hash will recompute it.
-  if (self.fileAccessRulesHash.length) {
-    return self.fileAccessRulesHash;
+  if (self.cachedFileAccessRulesHash.length) {
+    return self.cachedFileAccessRulesHash;
   }
 
   santa::Xxhash128 hash;
@@ -1052,33 +1082,14 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
   [rs close];
 
   NSString* digest = santa::StringToNSString(hash.HexDigest());
-  self.fileAccessRulesHash = digest;
+  self.cachedFileAccessRulesHash = digest;
   return digest;
 }
 
 - (NSString*)networkFlowRulesHashSerialized:(FMDatabase*)db {
-  if (self.networkFlowRulesHash.length) {
-    return self.networkFlowRulesHash;
-  }
-
-  santa::Xxhash128 hash;
-
-  // rule_id is field 1 of the NetworkFlowRule.Add proto and is therefore already
-  // part of rule_blob; no need to feed it into the hash separately. Ordering by
-  // rule_id ASC gives a deterministic update order. Indexed-column access (rather
-  // than named) keeps this loop cheap when the network ruleset is large
-  // (enterprise blocklists are expected to reach 100k+ rules).
-  FMResultSet* rs =
-      [db executeQuery:@"SELECT rule_blob FROM network_flow_rules ORDER BY rule_id ASC"];
-  while ([rs next]) {
-    NSData* blob = [rs dataNoCopyForColumnIndex:0];
-    hash.Update(blob.bytes, blob.length);
-  }
-  [rs close];
-
-  NSString* digest = santa::StringToNSString(hash.HexDigest());
-  self.networkFlowRulesHash = digest;
-  return digest;
+  // Shares the single scan/filter used to materialize the ruleset, so this hash and the
+  // snapshot's hash can never drift apart. See -networkFlowRulesHashSerializedInDB:collectInto:.
+  return [self networkFlowRulesHashSerializedInDB:db collectInto:nil];
 }
 
 - (SNTRuleTableRulesHash*)hashOfHashes {

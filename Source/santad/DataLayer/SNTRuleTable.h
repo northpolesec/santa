@@ -169,6 +169,14 @@
 - (SNTNetworkFlowRulesSnapshot*)retrieveAllNetworkFlowRulesSnapshot;
 
 ///
+///  Hash identifying the current network-flow ruleset — the same value carried in
+///  `hashOfHashes.networkFlowRulesHash` and `retrieveAllNetworkFlowRulesSnapshot`, computed from
+///  a single DB read (and cached). Cheaper than `hashOfHashes` when only the network-flow ruleset
+///  matters, since it avoids recomputing the execution and file-access digests.
+///
+- (NSString*)networkFlowRulesHash;
+
+///
 ///  Update the static rules from the configuration.
 ///
 - (void)updateStaticRules:(NSArray<NSDictionary*>*)staticRules;

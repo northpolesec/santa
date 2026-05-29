@@ -120,8 +120,9 @@ NSString* const kSantaNetworkExtensionProtocolVersion = @"1.0";
     }
 
     // Fast-path hash check: cheap (cached) and avoids materializing the ruleset when nothing
-    // changed.
-    NSString* currentHash = [[self.ruleTable hashOfHashes] networkFlowRulesHash];
+    // changed. Uses the narrow network-flow getter rather than hashOfHashes so we don't
+    // recompute the execution + file-access digests we don't need here.
+    NSString* currentHash = [self.ruleTable networkFlowRulesHash];
     BOOL settingsChanged = ![settings isEqual:self.lastPushedSettings];
     BOOL rulesChanged = ![currentHash isEqualToString:self.lastPushedNetworkFlowRulesHash];
     if (!settingsChanged && !rulesChanged) {

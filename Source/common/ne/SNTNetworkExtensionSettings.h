@@ -14,9 +14,10 @@
 
 #import <Foundation/Foundation.h>
 
-/// Action applied to network flows that match no NetworkFlowRule.
+/// Action applied to network flows that match no NetworkFlowRule. Values mirror
+/// pbv2::NetworkFlowDefaultAction (see NetworkFlowDefaultActionFromProto in SNTSyncPreflight).
 typedef NS_ENUM(NSInteger, SNTNetworkFlowDefaultAction) {
-  SNTNetworkFlowDefaultActionUnspecified = 0,  // treated as Allow
+  SNTNetworkFlowDefaultActionUnspecified = 0,
   SNTNetworkFlowDefaultActionAllow = 1,
   SNTNetworkFlowDefaultActionDeny = 2,
 };

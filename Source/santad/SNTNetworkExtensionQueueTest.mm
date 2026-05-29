@@ -83,9 +83,8 @@
 
 // Make the rule table report the given network flow rules hash + ruleset.
 - (void)stubRuleTableHash:(NSString*)hash rules:(NSArray<SNTNetworkFlowRule*>*)rules {
-  id mockHash = OCMClassMock([SNTRuleTableRulesHash class]);
-  OCMStub([mockHash networkFlowRulesHash]).andReturn(hash);
-  OCMStub([self.mockRuleTable hashOfHashes]).andReturn(mockHash);
+  // reconcile reads the hash via the narrow -networkFlowRulesHash getter.
+  OCMStub([self.mockRuleTable networkFlowRulesHash]).andReturn(hash);
   SNTNetworkFlowRulesSnapshot* snapshot = [[SNTNetworkFlowRulesSnapshot alloc] initWithRules:rules
                                                                         networkFlowRulesHash:hash];
   OCMStub([self.mockRuleTable retrieveAllNetworkFlowRulesSnapshot]).andReturn(snapshot);

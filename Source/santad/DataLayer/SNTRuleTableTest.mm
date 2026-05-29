@@ -1044,4 +1044,30 @@
   XCTAssertEqualObjects(after.networkFlowRulesHash, [self.sut hashOfHashes].networkFlowRulesHash);
 }
 
+// Guards the invariant that the network-flow hash and the materialized ruleset are derived
+// from the same set of rows: every stored (non-nil) blob both produces a rule in the snapshot
+// array and is folded into the hash. The hash-only path (-networkFlowRulesHash / hashOfHashes)
+// and the array path (the snapshot) share one scan, so if a future change ever dropped a row
+// from one but not the other (e.g. SNTNetworkFlowRule began rejecting a non-nil blob), the
+// counts or hashes below would disagree — catching it before it caused perpetual full
+// re-pushes to santanetd.
+- (void)testNetworkFlowRulesHashCoversEveryStoredBlob {
+  NSArray<SNTNetworkFlowRule*>* inserted = @[
+    [self _exampleNetworkFlowAddRuleWithId:1 blob:@"alpha"],
+    [self _exampleNetworkFlowAddRuleWithId:2 blob:@"beta"],
+    [self _exampleNetworkFlowAddRuleWithId:3 blob:@"alpha"],  // duplicate content, distinct id
+  ];
+  [self _addNetworkFlowRules:inserted ruleCleanup:SNTRuleCleanupNone errors:nil];
+
+  // Cold cache: the snapshot (array path) computes the hash. Every inserted row must be present.
+  SNTNetworkFlowRulesSnapshot* snapshot = [self.sut retrieveAllNetworkFlowRulesSnapshot];
+  XCTAssertEqual(snapshot.rules.count, inserted.count);
+
+  // Hash-only paths must agree with the array path's recorded hash — i.e. all cover exactly
+  // the same blobs.
+  XCTAssertEqualObjects(snapshot.networkFlowRulesHash, [self.sut networkFlowRulesHash]);
+  XCTAssertEqualObjects(snapshot.networkFlowRulesHash,
+                        [self.sut hashOfHashes].networkFlowRulesHash);
+}
+
 @end
