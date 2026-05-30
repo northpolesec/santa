@@ -15,6 +15,9 @@ objc_library(
     name = "SNDNetworkFlowRuleValidator",
     srcs = ["SNDNetworkFlowRuleValidator.mm"],
     hdrs = ["SNDNetworkFlowRuleValidator.h"],
+    deps = [
+        "@northpolesec_protos//syncv2:v2_cc_proto",
+    ],
 )
 
 objc_library(
