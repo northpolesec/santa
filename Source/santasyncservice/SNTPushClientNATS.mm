@@ -115,6 +115,12 @@ static int NATSSSLVerifyCallback(int preverifyOk, void* ctx) {
 
   bool ok = NATSLeafCertHasPushDomain(cert);
 #ifdef DEBUG
+  // DEBUG builds normally allow any otherwise-valid certificate so a local test
+  // server can be used. Setting SANTA_NATS_ENFORCE_PUSH_DOMAIN opts in to the
+  // production domain-pinning behavior, e.g. to test against the prod cluster.
+  if (getenv("SANTA_NATS_ENFORCE_PUSH_DOMAIN")) {
+    return ok ? 1 : 0;
+  }
   if (!ok) {
     LOGW(@"NATS: Leaf certificate SAN does not match *.push.northpole.security "
          @"(allowed in DEBUG build)");
@@ -401,6 +407,16 @@ static int NATSSSLVerifyCallback(int preverifyOk, void* ctx) {
     status = natsOptions_SetURL(opts, [serverURL UTF8String]);
     if (status != NATS_OK) {
       LOGE(@"NATS: Failed to set URL %@: %s", serverURL, natsStatus_GetText(status));
+      natsOptions_Destroy(opts);
+      return;
+    }
+
+    // Always require a TLS connection. Setting secure mode here ensures the
+    // client initiates TLS regardless of the URL scheme or build configuration,
+    // rather than relying on the server's INFO to upgrade the connection.
+    status = natsOptions_SetSecure(opts, true);
+    if (status != NATS_OK) {
+      LOGE(@"NATS: Failed to enable TLS: %s", natsStatus_GetText(status));
       natsOptions_Destroy(opts);
       return;
     }
