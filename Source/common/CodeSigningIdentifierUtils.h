@@ -19,6 +19,7 @@
 #include <Kernel/kern/cs_blobs.h>
 
 #include <cstdint>
+#include <string_view>
 #include <utility>
 
 namespace santa {
@@ -35,13 +36,20 @@ extern const NSUInteger kTeamIDLength;
 extern NSString* const kPlatformTeamID;
 extern NSString* const kPlatformTeamIDPrefix;
 
-// Validates that a Team ID is exactly 10 alphanumeric characters.
-bool IsValidTeamID(NSString* tid);
+// Whether the "platform" sentinel is accepted in place of a 10-char team ID.
+enum class PlatformSentinel { kDisallowed, kAllowed };
+
+// Validates that a Team ID is exactly 10 alphanumeric characters, or — when
+// platform is kAllowed — the literal "platform" sentinel.
+bool IsValidTeamID(std::string_view tid, PlatformSentinel platform = PlatformSentinel::kDisallowed);
+bool IsValidTeamID(NSString* tid, PlatformSentinel platform = PlatformSentinel::kDisallowed);
 
 // Validates a signing ID in the format "TeamID:SigningID" or "platform:SigningID".
+bool IsValidSigningID(std::string_view sid);
 bool IsValidSigningID(NSString* sid);
 
 // Validates a CDHash is a hex string with the correct length.
+bool IsValidCDHash(std::string_view cdhash);
 bool IsValidCDHash(NSString* cdhash);
 
 // Splits a signing ID into its TeamID and SigningID components.

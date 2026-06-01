@@ -16,35 +16,82 @@
 
 #include <Kernel/kern/cs_blobs.h>
 
+#include "Source/common/String.h"
+
 namespace santa {
 
 const NSUInteger kTeamIDLength = 10;
 NSString* const kPlatformTeamID = @"platform";
 NSString* const kPlatformTeamIDPrefix = @"platform:";
 
-bool IsValidTeamID(NSString* tid) {
-  static NSCharacterSet* nonAlnum = [[NSCharacterSet
-      characterSetWithCharactersInString:
-          @"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"] invertedSet];
-  return tid.length == kTeamIDLength &&
-         [tid rangeOfCharacterFromSet:nonAlnum].location == NSNotFound;
+namespace {
+
+bool IsAsciiAlnum(char c) {
+  return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9');
+}
+
+bool IsAsciiHexDigit(char c) {
+  return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+}
+
+}  // namespace
+
+bool IsValidTeamID(std::string_view tid, PlatformSentinel platform) {
+  if (platform == PlatformSentinel::kAllowed && tid == "platform") {
+    return true;
+  }
+  if (tid.size() != kTeamIDLength) {
+    return false;
+  }
+  for (char c : tid) {
+    if (!IsAsciiAlnum(c)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool IsValidTeamID(NSString* tid, PlatformSentinel platform) {
+  if (!tid) {
+    return false;
+  }
+  return IsValidTeamID(NSStringToUTF8StringView(tid), platform);
+}
+
+bool IsValidSigningID(std::string_view sid) {
+  // Split on the first ':'; the team token (kAllowed accepts "platform") must be
+  // valid and a non-empty signing-ID component must follow.
+  size_t colon = sid.find(':');
+  if (colon == std::string_view::npos) {
+    return false;
+  }
+  return colon + 1 < sid.size() && IsValidTeamID(sid.substr(0, colon), PlatformSentinel::kAllowed);
 }
 
 bool IsValidSigningID(NSString* sid) {
-  if (sid.length > kPlatformTeamIDPrefix.length && [sid hasPrefix:kPlatformTeamIDPrefix]) {
-    return true;
-  } else if (sid.length > kTeamIDLength + 1 && [sid characterAtIndex:kTeamIDLength] == ':') {
-    return IsValidTeamID([sid substringToIndex:kTeamIDLength]);
-  } else {
+  if (!sid) {
     return false;
   }
+  return IsValidSigningID(NSStringToUTF8StringView(sid));
+}
+
+bool IsValidCDHash(std::string_view cdhash) {
+  if (cdhash.size() != CS_CDHASH_LEN * 2) {
+    return false;
+  }
+  for (char c : cdhash) {
+    if (!IsAsciiHexDigit(c)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 bool IsValidCDHash(NSString* cdhash) {
-  static NSCharacterSet* nonHex =
-      [[NSCharacterSet characterSetWithCharactersInString:@"0123456789abcdefABCDEF"] invertedSet];
-  return cdhash.length == CS_CDHASH_LEN * 2 &&
-         [cdhash rangeOfCharacterFromSet:nonHex].location == NSNotFound;
+  if (!cdhash) {
+    return false;
+  }
+  return IsValidCDHash(NSStringToUTF8StringView(cdhash));
 }
 
 std::pair<NSString*, NSString*> SplitSigningID(NSString* sid) {

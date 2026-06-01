@@ -42,7 +42,7 @@
 #import "Source/santad/SNTDecisionCache.h"
 #include "absl/status/status.h"
 #include "google/protobuf/timestamp.pb.h"
-#import "src/santanetd/SNDNetworkFlowsSerializer.h"
+#import "src/santanetd/NetworkFlowsSerializer.h"
 
 using google::protobuf::Arena;
 using google::protobuf::Timestamp;

@@ -177,7 +177,7 @@ objc_library(
         "//Source/common/faa:WatchItemPolicy",
         "//Source/common/faa:WatchItems",
         "@northpolesec_protos//syncv2:v2_cc_proto",
-        "@santanetd//src/santanetd:SNDNetworkFlowRuleValidator",
+        "@santanetd//src/santanetd:NetworkFlowRuleValidator",
     ],
 )
 
@@ -404,7 +404,7 @@ santa_unit_test(
         "@northpolesec_protos//sync:v1_cc_proto",
         "@northpolesec_protos//syncv2:v2_cc_proto",
         "@protobuf//src/google/protobuf/json",
-        "@santanetd//src/santanetd:SNDNetworkFlowRuleValidator",
+        "@santanetd//src/santanetd:NetworkFlowRuleValidator",
     ],
 )
 

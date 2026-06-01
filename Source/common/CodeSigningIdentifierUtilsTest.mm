@@ -17,6 +17,8 @@
 #import <Foundation/Foundation.h>
 #import <XCTest/XCTest.h>
 
+#include <string_view>
+
 @interface CodeSigningIdentifierUtilsTest : XCTestCase
 @end
 
@@ -51,6 +53,14 @@
 
   // Invalid - Empty
   XCTAssertFalse(santa::IsValidTeamID(@""));
+
+  // "platform" sentinel via the NSString overload + PlatformSentinel
+  XCTAssertFalse(santa::IsValidTeamID(@"platform"));  // strict by default
+  XCTAssertFalse(santa::IsValidTeamID(@"platform", santa::PlatformSentinel::kDisallowed));
+  XCTAssertTrue(santa::IsValidTeamID(@"platform", santa::PlatformSentinel::kAllowed));
+  // A real team ID is still accepted with kAllowed; nil still rejected.
+  XCTAssertTrue(santa::IsValidTeamID(@"ABCDE12345", santa::PlatformSentinel::kAllowed));
+  XCTAssertFalse(santa::IsValidTeamID(nil, santa::PlatformSentinel::kAllowed));
 }
 
 - (void)testIsValidSigningID {
@@ -177,6 +187,74 @@
     XCTAssertNil(teamID);
     XCTAssertNil(signingID);
   }
+}
+
+#pragma mark - string_view overload Tests
+
+- (void)testIsValidTeamIDStringView {
+  // Valid - 10 alphanumeric (strict default)
+  XCTAssertTrue(santa::IsValidTeamID(std::string_view("ABCDE12345")));
+  XCTAssertTrue(santa::IsValidTeamID(std::string_view("1234567890")));
+  XCTAssertTrue(santa::IsValidTeamID(std::string_view("abcdefghij")));
+
+  // Invalid - wrong length / bad chars / empty
+  XCTAssertFalse(santa::IsValidTeamID(std::string_view("ABCDE1234")));
+  XCTAssertFalse(santa::IsValidTeamID(std::string_view("ABCDE123456")));
+  XCTAssertFalse(santa::IsValidTeamID(std::string_view("ABCDE-1234")));
+  XCTAssertFalse(santa::IsValidTeamID(std::string_view("")));
+
+  // "platform" rejected by default (strict), accepted with kAllowed
+  XCTAssertFalse(santa::IsValidTeamID(std::string_view("platform")));
+  XCTAssertFalse(
+      santa::IsValidTeamID(std::string_view("platform"), santa::PlatformSentinel::kDisallowed));
+  XCTAssertTrue(
+      santa::IsValidTeamID(std::string_view("platform"), santa::PlatformSentinel::kAllowed));
+
+  // kAllowed still rejects non-"platform" invalid tokens, still accepts valid team IDs
+  XCTAssertFalse(
+      santa::IsValidTeamID(std::string_view("platformX"), santa::PlatformSentinel::kAllowed));
+  XCTAssertFalse(
+      santa::IsValidTeamID(std::string_view("ABCDE-1234"), santa::PlatformSentinel::kAllowed));
+  XCTAssertTrue(
+      santa::IsValidTeamID(std::string_view("ABCDE12345"), santa::PlatformSentinel::kAllowed));
+}
+
+- (void)testIsValidCDHashStringView {
+  // Valid
+  XCTAssertTrue(santa::IsValidCDHash(std::string_view("0123456789abcdef0123456789abcdef01234567")));
+  XCTAssertTrue(santa::IsValidCDHash(std::string_view("ABCDEF0123456789ABCDEF0123456789ABCDEF01")));
+
+  // Invalid - length
+  XCTAssertFalse(santa::IsValidCDHash(std::string_view("0123456789abcdef0123456789abcdef0123456")));
+  XCTAssertFalse(
+      santa::IsValidCDHash(std::string_view("0123456789abcdef0123456789abcdef012345678")));
+  XCTAssertFalse(santa::IsValidCDHash(std::string_view("")));
+
+  // Invalid - bad chars
+  XCTAssertFalse(
+      santa::IsValidCDHash(std::string_view("0123456789abcdef0123456789abcdef0123456g")));
+}
+
+- (void)testIsValidSigningIDStringView {
+  // Valid TID:SID and platform:SID
+  XCTAssertTrue(santa::IsValidSigningID(std::string_view("ABCDE12345:com.example.app")));
+  XCTAssertTrue(santa::IsValidSigningID(std::string_view("platform:com.apple.system")));
+  XCTAssertTrue(santa::IsValidSigningID(std::string_view("platform:a")));
+
+  // Invalid TeamID
+  XCTAssertFalse(santa::IsValidSigningID(std::string_view("ABCDE1234:com.example.app")));
+  XCTAssertFalse(santa::IsValidSigningID(std::string_view("ABCDE-1234:com.example.app")));
+
+  // Invalid - missing colon
+  XCTAssertFalse(santa::IsValidSigningID(std::string_view("ABCDE12345com.example.app")));
+
+  // Invalid - empty SID component
+  XCTAssertFalse(santa::IsValidSigningID(std::string_view("ABCDE12345:")));
+  XCTAssertFalse(santa::IsValidSigningID(std::string_view("platform:")));
+
+  // Invalid - only colon / empty
+  XCTAssertFalse(santa::IsValidSigningID(std::string_view(":")));
+  XCTAssertFalse(santa::IsValidSigningID(std::string_view("")));
 }
 
 @end
