@@ -19,6 +19,7 @@
 #include <EndpointSecurity/ESTypes.h>
 #import <Foundation/Foundation.h>
 
+#include <cctype>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -113,6 +114,57 @@ static inline std::vector<uint8_t> HexStringToBuf(std::string_view str) {
 
 static inline std::vector<uint8_t> HexStringToBuf(NSString* str) {
   return HexStringToBuf(NSStringToUTF8StringView(str));
+}
+
+static inline void ToLowerInPlace(std::string& s) {
+  for (char& c : s) {
+    c = std::tolower(static_cast<unsigned char>(c));
+  }
+}
+
+static inline void ToUpperInPlace(std::string& s) {
+  for (char& c : s) {
+    c = std::toupper(static_cast<unsigned char>(c));
+  }
+}
+
+static inline std::string ToLower(const std::string& in) {
+  std::string out = in;
+  ToLowerInPlace(out);
+  return out;
+}
+
+static inline std::string ToUpper(const std::string& in) {
+  std::string out = in;
+  ToUpperInPlace(out);
+  return out;
+}
+
+// ASCII-only, locale-independent case folding. Cheaper than ToLower/ToUpper (no
+// locale facet lookup, inlinable, auto-vectorizable) and deterministic; bytes
+// outside A-Z/a-z are left untouched.
+static inline void AsciiToLowerInPlace(std::string& s) {
+  for (char& c : s) {
+    if (c >= 'A' && c <= 'Z') c += 'a' - 'A';
+  }
+}
+
+static inline void AsciiToUpperInPlace(std::string& s) {
+  for (char& c : s) {
+    if (c >= 'a' && c <= 'z') c -= 'a' - 'A';
+  }
+}
+
+static inline std::string AsciiToLower(const std::string& in) {
+  std::string out = in;
+  AsciiToLowerInPlace(out);
+  return out;
+}
+
+static inline std::string AsciiToUpper(const std::string& in) {
+  std::string out = in;
+  AsciiToUpperInPlace(out);
+  return out;
 }
 
 }  // namespace santa

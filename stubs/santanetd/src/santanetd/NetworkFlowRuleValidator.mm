@@ -12,12 +12,13 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#import <Foundation/Foundation.h>
+#import "src/santanetd/NetworkFlowRuleValidator.h"
 
-#include "syncv2/v2.pb.h"
+namespace santanetd {
 
-/// Validates a NetworkFlowRule.Add proto. Returns YES if valid; otherwise NO
-/// with a populated *error. This stub always returns YES; the real santanetd
-/// implementation performs full validation.
-BOOL SNDValidateNetworkFlowRule(const ::santa::sync::v2::NetworkFlowRule::Add& add,
-                                NSError** error);
+// Stub validator for santanetd-less santa builds; always accepts.
+BOOL ValidateNetworkFlowRule(const ::santa::sync::v2::NetworkFlowRule::Add& add, NSError** error) {
+  return YES;
+}
+
+}  // namespace santanetd

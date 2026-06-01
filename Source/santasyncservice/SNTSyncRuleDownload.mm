@@ -33,7 +33,7 @@
 #import "Source/santasyncservice/SNTSyncLogging.h"
 #import "Source/santasyncservice/SNTSyncState.h"
 #include "google/protobuf/arena.h"
-#import "src/santanetd/SNDNetworkFlowRuleValidator.h"
+#import "src/santanetd/NetworkFlowRuleValidator.h"
 #include "syncv2/v2.pb.h"
 
 namespace pbv2 = ::santa::sync::v2;
@@ -325,7 +325,7 @@ SNTNetworkFlowRule* NetworkFlowRuleFromProto(const ::pbv2::NetworkFlowRule& nr) 
       const ::pbv2::NetworkFlowRule::Add& add = nr.add();
 
       NSError* err;
-      if (!SNDValidateNetworkFlowRule(add, &err)) {
+      if (!santanetd::ValidateNetworkFlowRule(add, &err)) {
         SLOGW(@"Dropping invalid network flow rule %lld: %@", (long long)add.rule_id(),
               err.localizedDescription ?: @"validation failed");
         return nil;

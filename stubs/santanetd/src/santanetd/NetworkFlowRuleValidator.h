@@ -12,19 +12,20 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#import "src/santanetd/SNDNetworkFlowsSerializer.h"
+#ifndef SANTA_STUBS_SANTANETD_SRC_SANTANETD_NETWORKFLOWRULEVALIDATOR_H
+#define SANTA_STUBS_SANTANETD_SRC_SANTANETD_NETWORKFLOWRULEVALIDATOR_H
 
-@class SNDProcessFlows;
-@class SNTCachedDecision;
+#import <Foundation/Foundation.h>
+
+#include "syncv2/v2.pb.h"
 
 namespace santanetd {
 
-void PopulateNetworkActivityProcess(google::protobuf::Arena*,
-                                    ::santa::pb::v1::NetworkActivity_Process*, SNDProcessFlows*,
-                                    SNTCachedDecision*) {}
-
-std::string FormatNetworkFlowsBasicString(SNDProcessFlows*, SNTCachedDecision*) {
-  return {};
-}
+/// Validates a NetworkFlowRule.Add proto. Returns YES if valid; otherwise NO
+/// with a populated *error. This stub always returns YES; the real santanetd
+/// implementation performs full validation.
+BOOL ValidateNetworkFlowRule(const ::santa::sync::v2::NetworkFlowRule::Add& add, NSError** error);
 
 }  // namespace santanetd
+
+#endif  // SANTA_STUBS_SANTANETD_SRC_SANTANETD_NETWORKFLOWRULEVALIDATOR_H
