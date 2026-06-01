@@ -28,8 +28,11 @@
 @property(nonatomic) dispatch_source_t fullSyncTimer;
 @property(nonatomic) dispatch_source_t ruleSyncTimer;
 @property NSUInteger persistedFullSyncInterval;
+@property(nonatomic) BOOL reachable;
+@property(nonatomic) BOOL hasInitialPathState;
 - (void)rescheduleTimerQueue:(dispatch_source_t)timerQueue secondsFromNow:(uint64_t)seconds;
 - (dispatch_source_t)createSyncTimerWithBlock:(void (^)(void))block;
+- (void)handlePathReachable:(BOOL)reachable;
 @end
 
 @interface SNTSyncManagerTest : XCTestCase
@@ -209,6 +212,54 @@
   SNTSyncManager* sm = [[SNTSyncManager alloc] initWithDaemonConnection:nil];
 
   XCTAssertEqual(sm.persistedFullSyncInterval, kDefaultFullSyncInterval);
+}
+
+#pragma mark - Reachability
+
+- (void)testReachabilityBaselineSatisfiedDoesNotTriggerSync {
+  // Reachability is armed after a failure. If the host is already online, the
+  // monitor's first (baseline) update is "satisfied" — this must NOT be treated
+  // as a down->up transition and must not trigger a sync (PR #970 regression:
+  // an immediate, backoff-free retry loop).
+  id mockConnection = OCMClassMock([MOLXPCConnection class]);
+  SNTSyncManager* sm = [[SNTSyncManager alloc] initWithDaemonConnection:mockConnection];
+  id syncManagerMock = OCMPartialMock(sm);
+  OCMReject([syncManagerMock sync]);
+
+  [sm handlePathReachable:YES];
+
+  XCTAssertTrue(sm.hasInitialPathState, @"Baseline update should be recorded");
+  XCTAssertTrue(sm.reachable, @"Baseline state should reflect the reported path");
+  [syncManagerMock stopMocking];
+}
+
+- (void)testReachabilityDownToUpTransitionTriggersSync {
+  // Host offline at arming time (baseline "unsatisfied"), then comes back online.
+  // The down->up transition should trigger exactly one sync.
+  id mockConnection = OCMClassMock([MOLXPCConnection class]);
+  SNTSyncManager* sm = [[SNTSyncManager alloc] initWithDaemonConnection:mockConnection];
+  id syncManagerMock = OCMPartialMock(sm);
+  OCMExpect([syncManagerMock sync]);
+
+  [sm handlePathReachable:NO];   // baseline: offline
+  [sm handlePathReachable:YES];  // network restored
+
+  OCMVerify([syncManagerMock sync]);
+  [syncManagerMock stopMocking];
+}
+
+- (void)testReachabilityStaySatisfiedDoesNotTriggerSync {
+  // Baseline online followed by another "satisfied" update (e.g. an interface
+  // change) is not a down->up transition and must not trigger a sync.
+  id mockConnection = OCMClassMock([MOLXPCConnection class]);
+  SNTSyncManager* sm = [[SNTSyncManager alloc] initWithDaemonConnection:mockConnection];
+  id syncManagerMock = OCMPartialMock(sm);
+  OCMReject([syncManagerMock sync]);
+
+  [sm handlePathReachable:YES];  // baseline: online
+  [sm handlePathReachable:YES];  // still online
+
+  [syncManagerMock stopMocking];
 }
 
 @end

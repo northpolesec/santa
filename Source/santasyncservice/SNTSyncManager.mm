@@ -58,6 +58,11 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
 
 @property(nonatomic) BOOL reachable;
 @property nw_path_monitor_t pathMonitor;
+// Whether the current path monitor has delivered its initial path update.
+// nw_path_monitor reports the current path state once on start; that first
+// update is a baseline and must not trigger a sync. Only a subsequent
+// down->up transition should.
+@property(nonatomic) BOOL hasInitialPathState;
 
 // If set, push notifications are being used.
 @property id<SNTPushNotificationsClientDelegate> pushNotifications;
@@ -804,34 +809,42 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
 
 #pragma mark reachability methods
 
-- (void)setReachable:(BOOL)reachable {
-  _reachable = reachable;
-  if (reachable) {
-    LOGD(@"Internet connection has been restored, triggering a new sync.");
-    [self stopReachability];
-    [self sync];
-  }
-}
-
 // Start listening for network state changes.
 - (void)startReachability {
   if (self.pathMonitor) return;
-  // Reset so the first satisfied update from this monitor triggers a sync.
-  // Without this, a prior monitoring session may have left _reachable=YES,
-  // which would suppress the trigger when re-arming on an already-online host.
-  _reachable = NO;
+  // The monitor delivers the current path state once on start. That first
+  // update establishes a baseline and must not trigger a sync: reachability is
+  // armed after a sync failure, and if the host is already online (e.g. the
+  // failure was a server-side error, not a network outage) the baseline update
+  // would otherwise look like a down->up transition and kick off an immediate
+  // retry with no backoff. Only a genuine down->up transition after the
+  // baseline should trigger a sync.
+  self.hasInitialPathState = NO;
   self.pathMonitor = nw_path_monitor_create();
   // Put the callback on the main thread to ensure serial access.
   nw_path_monitor_set_queue(self.pathMonitor, dispatch_get_main_queue());
   nw_path_monitor_set_update_handler(self.pathMonitor, ^(nw_path_t path) {
-    // Only call the setter when there is a change. This will filter out the redundant calls to
-    // this callback whenever the network interface states change.
-    BOOL reachable = nw_path_get_status(path) == nw_path_status_satisfied;
-    if (self.reachable != reachable) {
-      self.reachable = reachable;
-    }
+    [self handlePathReachable:nw_path_get_status(path) == nw_path_status_satisfied];
   });
   nw_path_monitor_start(self.pathMonitor);
+}
+
+// Handle a path-state update from the monitor. The first update after arming is
+// only a baseline and never triggers a sync; subsequent updates trigger a sync
+// only on a genuine down->up transition.
+- (void)handlePathReachable:(BOOL)reachable {
+  // A sync fires only when a recorded baseline goes from down to up. The first
+  // update just establishes the baseline, so an already-online host (e.g. when
+  // reachability was armed after a non-network sync failure) never triggers a
+  // backoff-free retry.
+  BOOL transitionedUp = self.hasInitialPathState && !self.reachable && reachable;
+  self.hasInitialPathState = YES;
+  self.reachable = reachable;
+  if (transitionedUp) {
+    LOGD(@"Internet connection has been restored, triggering a new sync.");
+    [self stopReachability];
+    [self sync];
+  }
 }
 
 // Stop listening for network state changes.
