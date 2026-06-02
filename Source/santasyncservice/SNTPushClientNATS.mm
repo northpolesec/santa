@@ -525,20 +525,26 @@ static int NATSSSLVerifyCallback(int preverifyOk, void* ctx) {
 }
 
 - (void)disconnectWithCompletion:(void (^)(void))completion {
-  // Early return if nothing to disconnect
-  // Note: We check self.conn directly here rather than isConnectionAlive since we want to
-  // clean up even if the connection is closed but resources still exist
-  if (!self.conn && !self.isConnected && self.tagSubscriptions.count == 0 &&
-      !self.commandsSubscription) {
-    if (completion) {
-      dispatch_async(dispatch_get_main_queue(), completion);
-    }
-    return;
-  }
-
+  // Mark shutting down synchronously so no further work is queued while we tear
+  // down. The connection and subscription state is owned by connectionQueue, so
+  // everything that inspects or mutates it runs there, including the
+  // "nothing to disconnect" check below.
   self.isShuttingDown = YES;
 
   dispatch_async(self.connectionQueue, ^{
+    // conn, tagSubscriptions, and commandsSubscription are only safe to read on
+    // connectionQueue. This check previously ran on the caller's thread and
+    // raced with subscribe/unsubscribeAll (a concurrent NSMutableArray access).
+    // Note: we check self.conn directly rather than isConnectionAlive since we
+    // want to clean up even if the connection is closed but resources still exist.
+    if (!self.conn && !self.isConnected && self.tagSubscriptions.count == 0 &&
+        !self.commandsSubscription) {
+      if (completion) {
+        dispatch_async(dispatch_get_main_queue(), completion);
+      }
+      return;
+    }
+
     LOGD(@"NATS: Starting disconnect");
 
     // Cancel any pending retry timer
@@ -894,6 +900,11 @@ static void disconnectedCallback(natsConnection* nc, void* closure) {
   LOGW(@"NATS: Disconnected from %@%@", self.pushServer ?: @"server", errorInfo);
 
   dispatch_async(self.connectionQueue, ^{
+    // Ignore callbacks from a connection we have already replaced (see
+    // closedCallback). During NATS auto-reconnect the connection object is
+    // reused, so this still matches our current connection.
+    if (nc != self.conn) return;
+
     if (lastError.length > 0) {
       self.lastConnectionError = lastError;
     }
@@ -907,6 +918,11 @@ static void reconnectedCallback(natsConnection* nc, void* closure) {
   SNTPushClientNATS* self = (__bridge SNTPushClientNATS*)closure;
   LOGI(@"NATS: Reconnected to %@", self.pushServer ?: @"server");
   dispatch_async(self.connectionQueue, ^{
+    // Ignore callbacks from a connection we have already replaced (see
+    // closedCallback). During NATS auto-reconnect the connection object is
+    // reused, so this still matches our current connection.
+    if (nc != self.conn) return;
+
     self.isConnected = YES;
     self.lastConnectionError = nil;
 
@@ -942,15 +958,26 @@ static void closedCallback(natsConnection* nc, void* closure) {
   LOGI(@"NATS: Connection to %@ closed%@", self.pushServer ?: @"server", errorInfo);
 
   dispatch_async(self.connectionQueue, ^{
+    // Ignore callbacks from a connection we have already replaced or destroyed;
+    // act only on the connection that is currently ours. nc is compared by
+    // identity only (never dereferenced here), so this is safe even if the
+    // replaced connection has since been freed. Without this guard, a late
+    // closed callback from a prior connection could destroy the live one.
+    if (nc != self.conn) {
+      LOGD(@"NATS: Ignoring closed callback from a replaced connection");
+      return;
+    }
+
     if (lastError.length > 0) {
       self.lastConnectionError = lastError;
     }
     self.isConnected = NO;
 
-    // If we're not shutting down, schedule a reconnection attempt
-    // The closed callback is called when the connection is permanently closed
-    // and NATS won't automatically reconnect, so we need to do it ourselves
-    if (!self.isShuttingDown && self.conn) {
+    // If we're not shutting down, schedule a reconnection attempt.
+    // The closed callback fires when the connection is permanently closed and
+    // NATS won't automatically reconnect, so we handle it ourselves. (nc ==
+    // self.conn here, so self.conn is the just-closed, non-NULL connection.)
+    if (!self.isShuttingDown) {
       LOGI(@"NATS: Connection to %@ closed unexpectedly, cleaning up and scheduling reconnect",
            self.pushServer ?: @"server");
 
