@@ -130,7 +130,7 @@ std::string MachoTypeFromFD(int fd) {
 }  // namespace
 
 SNTBinaryUploadController::SNTBinaryUploadController(std::unique_ptr<SleighLauncher> launcher,
-                                                    uint32_t timeout_seconds)
+                                                     uint32_t timeout_seconds)
     : launcher_(std::move(launcher)), timeout_seconds_(timeout_seconds) {
   serial_queue_ = dispatch_queue_create("com.northpolesec.santa.binaryupload",
                                         DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL);
@@ -169,8 +169,8 @@ pbv1::BinaryUploadResponse SNTBinaryUploadController::HandleSerial(
   NSString* path = StringToNSString(request.path());
   NSError* error = nil;
   MOLCodesignChecker* csc = [[MOLCodesignChecker alloc] initWithBinaryPath:path
-                                                           fileDescriptor:fd
-                                                                    error:&error];
+                                                            fileDescriptor:fd
+                                                                     error:&error];
   if (!csc && !IsUnsignedError(error)) {
     return MakeResponse(pbv1::BinaryUploadResponse::DISPOSITION_REFUSED,
                         "code signature could not be evaluated");
@@ -196,6 +196,11 @@ pbv1::BinaryUploadResponse SNTBinaryUploadController::HandleSerial(
   for (const auto& [key, value] : request.signed_post().form_values()) {
     form_values[key] = value;
   }
+
+  // MOLCodesignChecker's fd-based fat-header read advanced the shared file offset
+  // above; sleigh reads the image from the start, so rewind before handing the fd
+  // off (sleigh also seeks to 0 defensively).
+  lseek(fd, 0, SEEK_SET);
 
   // Hand the fd to LaunchBinaryUpload, which closes it in the parent after fork.
   std::move(close_fd).Cancel();

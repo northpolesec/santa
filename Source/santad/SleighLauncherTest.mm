@@ -90,9 +90,8 @@ class TestableSleighLauncher : public santa::SleighLauncher {
 
   ::santa::telemetry::v1::BinaryMetadata meta;
   meta.set_file_size(14);
-  absl::StatusOr<::santa::commands::v1::BinaryUploadResponse> resp =
-      launcher.LaunchBinaryUpload(fd, "https://example.com/post", {{"key", "objects/x"}}, "", meta,
-                                  {}, /*timeout_seconds=*/10);
+  absl::StatusOr<::santa::commands::v1::BinaryUploadResponse> resp = launcher.LaunchBinaryUpload(
+      fd, "https://example.com/post", {{"key", "objects/x"}}, "", meta, {}, /*timeout_seconds=*/10);
 
   XCTAssertTrue(resp.ok());
   XCTAssertEqual(resp->disposition(),
@@ -142,8 +141,8 @@ class TestableSleighLauncher : public santa::SleighLauncher {
   TestableSleighLauncher launcher(stub.UTF8String);
 
   NSString* inPath = [NSTemporaryDirectory()
-      stringByAppendingPathComponent:[NSString stringWithFormat:@"tlm-%@",
-                                                                [[NSUUID UUID] UUIDString]]];
+      stringByAppendingPathComponent:[NSString
+                                         stringWithFormat:@"tlm-%@", [[NSUUID UUID] UUIDString]]];
   [@"telemetry" writeToFile:inPath atomically:YES encoding:NSUTF8StringEncoding error:nil];
 
   absl::Status s = launcher.Launch({inPath.UTF8String}, /*timeout_seconds=*/10);

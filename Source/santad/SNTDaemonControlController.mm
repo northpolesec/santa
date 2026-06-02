@@ -59,8 +59,8 @@
 #import "Source/santad/SNTNotificationQueue.h"
 #import "Source/santad/SNTSyncdQueue.h"
 #include "Source/santad/TemporaryMonitorMode.h"
-#import "src/santanetd/SNDProcessFlows.h"
 #include "commands/v1.pb.h"
+#import "src/santanetd/SNDProcessFlows.h"
 
 using santa::FlushCacheMode;
 using santa::FlushCacheReason;

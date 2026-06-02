@@ -84,7 +84,7 @@ static NSString* const kBinarySHA256 =
       checkCacheBlock:^SNTAction(SantaVnode) {
         return SNTActionRespondAllow;
       }
-      metricsExportBlock:^(void (^)(BOOL)){
+      metricsExportBlock:^(void (^)(BOOL)) {
       }
       binaryUploadController:nullptr];
 }

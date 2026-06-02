@@ -84,6 +84,9 @@ absl::StatusOr<::santa::commands::v1::BinaryUploadResponse> SleighLauncher::Laun
   absl::StatusOr<std::string> serialized = SerializeBinaryUploadConfig(
       input_fd, signed_post_url, form_values, expected_sha256, metadata, filter_expressions);
   if (!serialized.ok()) {
+    // RunSleigh closes input_fd on all later paths; on this pre-RunSleigh early
+    // return we still own it, so close it here to avoid leaking the descriptor.
+    close(input_fd);
     return serialized.status();
   }
 

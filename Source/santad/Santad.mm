@@ -49,9 +49,9 @@
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
 #import "Source/santad/SNTBinaryUploadController.h"
 #import "Source/santad/SNTDaemonControlController.h"
-#include "Source/santad/SleighLauncher.h"
 #import "Source/santad/SNTDatabaseController.h"
 #import "Source/santad/SNTDecisionCache.h"
+#include "Source/santad/SleighLauncher.h"
 #include "Source/santad/TTYWriter.h"
 
 using santa::AuthResultCache;

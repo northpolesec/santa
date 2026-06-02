@@ -25,22 +25,25 @@
 
 namespace santa {
 
-// Drives a single binary upload: opens the requested file (as root) regular-file
-// only, computes BinaryMetadata from that same fd, reads the upload filter
-// expressions, and launches sleigh to perform the upload. The CEL filter itself
-// runs in sleigh — this controller only computes and forwards inputs.
+// Drives a single binary upload: opens the requested file (as root)
+// regular-file only, computes BinaryMetadata from that same fd, reads the
+// upload filter expressions, and launches sleigh to perform the upload. The CEL
+// filter itself runs in sleigh — this controller only computes and forwards
+// inputs.
 class SNTBinaryUploadController {
  public:
   // launcher performs the sleigh launch; timeout_seconds bounds it (must exceed
   // sleigh's internal upload deadline — see the timeout nesting in the plan).
-  SNTBinaryUploadController(std::unique_ptr<SleighLauncher> launcher, uint32_t timeout_seconds);
+  SNTBinaryUploadController(std::unique_ptr<SleighLauncher> launcher,
+                            uint32_t timeout_seconds);
   virtual ~SNTBinaryUploadController() = default;
 
   SNTBinaryUploadController(const SNTBinaryUploadController&) = delete;
-  SNTBinaryUploadController& operator=(const SNTBinaryUploadController&) = delete;
+  SNTBinaryUploadController& operator=(const SNTBinaryUploadController&) =
+      delete;
 
-  // Handles one request and always returns a populated response (failures map to a
-  // disposition; never throws). Launches are serialized (K=1).
+  // Handles one request and always returns a populated response (failures map
+  // to a disposition; never throws). Launches are serialized (K=1).
   virtual ::santa::commands::v1::BinaryUploadResponse Handle(
       const ::santa::commands::v1::BinaryUploadRequest& request);
 

@@ -16,6 +16,8 @@
 
 #include <CommonCrypto/CommonHMAC.h>
 #include <google/protobuf/descriptor.h>
+#include <google/protobuf/io/coded_stream.h>
+#include <google/protobuf/io/zero_copy_stream_impl.h>
 
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTKillCommand.h"
@@ -62,10 +64,22 @@ bool VerifyCommandRequestHMAC(const ::pbv1::SantaCommandRequest& command, NSData
   ::pbv1::SantaCommandRequest commandCopy = command;
   commandCopy.clear_hmac();
 
+  // Serialize deterministically: protobuf leaves map<> field ordering
+  // unspecified, and the command carries one (signed_post.form_values on a
+  // BinaryUploadRequest). Re-serializing the parsed request to verify would
+  // otherwise emit those entries in C++ hash order, which won't match the order
+  // the signer wrote, and the HMAC would fail. Deterministic mode sorts map
+  // keys; the signer (workshop) MUST serialize deterministically too for digests
+  // to agree.
   std::string serialized;
-  if (!commandCopy.SerializeToString(&serialized)) {
-    LOGE(@"NATS: HMAC verification failed - could not serialize command");
-    return false;
+  {
+    google::protobuf::io::StringOutputStream stream(&serialized);
+    google::protobuf::io::CodedOutputStream coded(&stream);
+    coded.SetSerializationDeterministic(true);
+    if (!commandCopy.SerializeToCodedStream(&coded)) {
+      LOGE(@"NATS: HMAC verification failed - could not serialize command");
+      return false;
+    }
   }
 
   unsigned char computedHMAC[CC_SHA256_DIGEST_LENGTH];
