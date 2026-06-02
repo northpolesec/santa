@@ -18,9 +18,6 @@ bazel_dep(name = "boringssl", version = "0.20260211.0")
 bazel_dep(name = "protos", version = "1.0.1", repo_name = "northpolesec_protos")
 git_override(
     module_name = "protos",
-    # #119 (6bf86d1) — adds commands.BinaryUpload{Request,Response} (#117),
-    # SleighBinaryUpload (#118), and BinaryMetadata + SleighBinaryUpload.{metadata,
-    # filter_expressions} (#119). Must match sleigh's go.mod proto pin.
     commit = "6bf86d157b86747e34feb3544522cdc75ce25385",
     remote = "https://github.com/northpolesec/protos",
 )

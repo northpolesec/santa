@@ -59,6 +59,12 @@ class SleighLauncher {
       const ::santa::telemetry::v1::BinaryMetadata& metadata,
       const std::vector<std::string>& filter_expressions, uint32_t timeout_seconds);
 
+ protected:
+  // Verifies the sleigh binary's code signature before exec. Returns Ok when the
+  // signature is acceptable (and, in DEBUG builds, always — sleigh is unsigned during
+  // local development). Virtual so tests can override it; production enforces it.
+  virtual absl::Status VerifySleighCodeSignature();
+
  private:
   std::string sleigh_path_;
 

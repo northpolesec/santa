@@ -117,6 +117,12 @@ absl::StatusOr<std::string> SleighLauncher::RunSleigh(const std::string& seriali
     return absl::NotFoundError("Sleigh binary not executable: " + sleigh_path_);
   }
 
+  // Code signature check (ObjC, must happen before fork). Done before the pipes
+  // exist so a rejected signature needs no pipe cleanup.
+  if (absl::Status sig = VerifySleighCodeSignature(); !sig.ok()) {
+    return sig;
+  }
+
   // stdin pipe (config in).
   int stdin_pipe[2];
   if (pipe(stdin_pipe) != 0) {
@@ -131,23 +137,6 @@ absl::StatusOr<std::string> SleighLauncher::RunSleigh(const std::string& seriali
       close(stdin_pipe[1]);
       return absl::InternalError("Failed to create stdout pipe");
     }
-  }
-
-  // Code signature check (ObjC, must happen before fork).
-  NSString* sleighNSPath = StringToNSString(sleigh_path_);
-  MOLCodesignChecker* csc = [[MOLCodesignChecker alloc] initWithBinaryPath:sleighNSPath];
-  if (!csc || ![csc.teamID isEqualToString:@"ZMCG7MLDV9"] ||
-      csc.signatureFlags & kSecCodeSignatureAdhoc) {
-    LOGD(@"SleighLauncher::RunSleigh(): Sleigh code signature is invalid");
-#ifndef DEBUG
-    close(stdin_pipe[0]);
-    close(stdin_pipe[1]);
-    if (capture_stdout) {
-      close(stdout_pipe[0]);
-      close(stdout_pipe[1]);
-    }
-    return absl::FailedPreconditionError("Sleigh code signature is invalid");
-#endif
   }
 
   // Prepare argv (before fork, no ObjC in child).
@@ -274,6 +263,19 @@ absl::StatusOr<std::string> SleighLauncher::RunSleigh(const std::string& seriali
   }
 
   return captured;
+}
+
+absl::Status SleighLauncher::VerifySleighCodeSignature() {
+  NSString* sleighNSPath = StringToNSString(sleigh_path_);
+  MOLCodesignChecker* csc = [[MOLCodesignChecker alloc] initWithBinaryPath:sleighNSPath];
+  if (!csc || ![csc.teamID isEqualToString:@"ZMCG7MLDV9"] ||
+      csc.signatureFlags & kSecCodeSignatureAdhoc) {
+    LOGD(@"SleighLauncher::VerifySleighCodeSignature(): Sleigh code signature is invalid");
+#ifndef DEBUG
+    return absl::FailedPreconditionError("Sleigh code signature is invalid");
+#endif
+  }
+  return absl::OkStatus();
 }
 
 void SleighLauncher::PopulateHostInfo(::santa::telemetry::v1::SleighConfig* config) {

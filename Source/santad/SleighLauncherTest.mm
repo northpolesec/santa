@@ -21,15 +21,23 @@
 #include <string>
 
 #include "Source/santad/SleighLauncher.h"
+#include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "commands/v1.pb.h"
 #include "telemetry/sleighconfig.pb.h"
 
-// NOTE: these tests must run with --compilation_mode=dbg so the sleigh code
-// signature check (guarded by #ifndef DEBUG) is compiled out — the stub sleigh
-// used here is unsigned.
+// These tests drive the real fork/stdin/stdout machinery in SleighLauncher in any
+// compilation mode: TestableSleighLauncher overrides the code-signature check (which
+// production enforces outside DEBUG builds) so the unsigned stub sleigh is accepted.
+namespace {
+class TestableSleighLauncher : public santa::SleighLauncher {
+ public:
+  using santa::SleighLauncher::SleighLauncher;
 
-using santa::SleighLauncher;
+ protected:
+  absl::Status VerifySleighCodeSignature() override { return absl::OkStatus(); }
+};
+}  // namespace
 
 @interface SleighLauncherTest : XCTestCase
 @end
@@ -77,7 +85,7 @@ using santa::SleighLauncher;
       [NSString stringWithFormat:@"cat > /dev/null\nprintf %%s '%@' | /usr/bin/base64 -D\n", b64];
   NSString* stub = [self writeStubWithBody:body];
 
-  SleighLauncher launcher(stub.UTF8String);
+  TestableSleighLauncher launcher(stub.UTF8String);
   int fd = [self openTempFileWithBytes:std::string("\xfe\xed\xfa\xcf binary", 14)];
 
   ::santa::telemetry::v1::BinaryMetadata meta;
@@ -97,25 +105,33 @@ using santa::SleighLauncher;
 // that to INTERNAL_ERROR rather than trusting a default-valued parse (M5).
 - (void)testLaunchBinaryUploadNonZeroExitIsError {
   NSString* stub = [self writeStubWithBody:@"cat > /dev/null\nexit 3\n"];
-  SleighLauncher launcher(stub.UTF8String);
+  TestableSleighLauncher launcher(stub.UTF8String);
   int fd = [self openTempFileWithBytes:std::string("data", 4)];
 
   ::santa::telemetry::v1::BinaryMetadata meta;
   absl::StatusOr<::santa::commands::v1::BinaryUploadResponse> resp = launcher.LaunchBinaryUpload(
       fd, "https://example.com", {{"key", "k"}}, "", meta, {}, /*timeout_seconds=*/10);
   XCTAssertFalse(resp.ok());
+  // Specifically a non-zero exit (kUnknown), not the codesign short-circuit
+  // (kFailedPrecondition) — proves the child actually ran and exited 3.
+  XCTAssertEqual(resp.status().code(), absl::StatusCode::kUnknown);
+  XCTAssertTrue(std::string(resp.status().message()).find("exited with code 3") !=
+                std::string::npos);
 }
 
 // Empty stdout (process exits 0 but writes nothing) is an error, not COMPLETED.
 - (void)testLaunchBinaryUploadEmptyStdoutIsError {
   NSString* stub = [self writeStubWithBody:@"cat > /dev/null\n"];
-  SleighLauncher launcher(stub.UTF8String);
+  TestableSleighLauncher launcher(stub.UTF8String);
   int fd = [self openTempFileWithBytes:std::string("data", 4)];
 
   ::santa::telemetry::v1::BinaryMetadata meta;
   absl::StatusOr<::santa::commands::v1::BinaryUploadResponse> resp = launcher.LaunchBinaryUpload(
       fd, "https://example.com", {{"key", "k"}}, "", meta, {}, /*timeout_seconds=*/10);
   XCTAssertFalse(resp.ok());
+  // Empty (but exit-0) stdout maps to kInternal in LaunchBinaryUpload (M5), not the
+  // codesign short-circuit — proves the empty-stdout path is what's exercised.
+  XCTAssertEqual(resp.status().code(), absl::StatusCode::kInternal);
 }
 
 // Telemetry Launch still runs through SerializeConfig after the RunSleigh refactor.
@@ -123,7 +139,7 @@ using santa::SleighLauncher;
 // serialization guard — proving the telemetry path is intact, not crashing.
 - (void)testTelemetryLaunchSerializationGuardIntact {
   NSString* stub = [self writeStubWithBody:@"cat > /dev/null\n"];
-  SleighLauncher launcher(stub.UTF8String);
+  TestableSleighLauncher launcher(stub.UTF8String);
 
   NSString* inPath = [NSTemporaryDirectory()
       stringByAppendingPathComponent:[NSString stringWithFormat:@"tlm-%@",
