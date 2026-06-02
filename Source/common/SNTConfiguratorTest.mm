@@ -32,6 +32,27 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
 @property NSMutableDictionary* syncState;
 @end
 
+// Records the key paths for which KVO notifications are received.
+@interface SNTKVORecordingObserver : NSObject
+@property NSCountedSet<NSString*>* firedKeyPaths;
+@end
+
+@implementation SNTKVORecordingObserver
+- (instancetype)init {
+  self = [super init];
+  if (self) {
+    _firedKeyPaths = [NSCountedSet set];
+  }
+  return self;
+}
+- (void)observeValueForKeyPath:(NSString*)keyPath
+                      ofObject:(id)object
+                        change:(NSDictionary*)change
+                       context:(void*)context {
+  [self.firedKeyPaths addObject:keyPath];
+}
+@end
+
 @interface SNTConfiguratorTest : XCTestCase
 @property NSFileManager* fileMgr;
 @property NSString* testDir;
@@ -451,6 +472,93 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
                  @"clearSyncState must reset in-memory state even when authorizer denies");
   XCTAssertFalse([self.fileMgr fileExistsAtPath:plistPath],
                  @"clearSyncState must remove the plist even when authorizer denies");
+}
+
+#pragma mark - keyPathsForValuesAffecting wiring
+
+// Each of these key paths is observed by santad (Santad.mm) so that runtime
+// config changes take effect. They are computed from configState, so they only
+// fire if a correctly-named keyPathsForValuesAffecting<Key> declares the
+// dependency. A missing or misnamed declaration silently breaks the watcher
+// (e.g. the property renamed allowlist->allowed while the dependency method
+// did not), so assert each fires exactly once when configState is replaced --
+// the same setter path taken on a config reload.
+- (void)testConfigStateChangeNotifiesDerivedKeyObservers {
+  SNTConfigurator* cfg = [[SNTConfigurator alloc] init];
+  SNTKVORecordingObserver* observer = [[SNTKVORecordingObserver alloc] init];
+
+  NSArray<NSString*>* keyPaths = @[
+    @"allowedPathRegex",
+    @"blockedPathRegex",
+    @"enableSilentTTYMode",
+    @"exportMetrics",
+    @"metricExportInterval",
+  ];
+
+  for (NSString* keyPath in keyPaths) {
+    [cfg addObserver:observer
+          forKeyPath:keyPath
+             options:NSKeyValueObservingOptionNew | NSKeyValueObservingOptionOld
+             context:NULL];
+  }
+
+  // Replace configState via the property setter, exactly as a config reload does.
+  cfg.configState = [@{
+    @"AllowedPathRegex" : @"a",
+    @"BlockedPathRegex" : @"b",
+    @"EnableSilentTTYMode" : @YES,
+    @"ExportMetrics" : @YES,
+    @"MetricExportInterval" : @123,
+  } mutableCopy];
+
+  for (NSString* keyPath in keyPaths) {
+    [cfg removeObserver:observer forKeyPath:keyPath context:NULL];
+  }
+
+  for (NSString* keyPath in keyPaths) {
+    XCTAssertEqual([observer.firedKeyPaths countForObject:keyPath], (NSUInteger)1,
+                   @"configState change must notify observers of '%@' (got %lu). Check "
+                   @"keyPathsForValuesAffecting<Key> in SNTConfigurator.mm.",
+                   keyPath, (unsigned long)[observer.firedKeyPaths countForObject:keyPath]);
+  }
+}
+
+// allowedPathRegex/blockedPathRegex fall back from syncState to configState, so
+// their keyPathsForValuesAffecting methods depend on syncState too. The
+// configState test above can't catch a regression that drops syncState from
+// those declarations, so exercise the syncState half here.
+- (void)testSyncStateChangeNotifiesSyncDerivedKeyObservers {
+  SNTConfigurator* cfg = [[SNTConfigurator alloc] init];
+  SNTKVORecordingObserver* observer = [[SNTKVORecordingObserver alloc] init];
+
+  NSArray<NSString*>* keyPaths = @[
+    @"allowedPathRegex",
+    @"blockedPathRegex",
+  ];
+
+  for (NSString* keyPath in keyPaths) {
+    [cfg addObserver:observer
+          forKeyPath:keyPath
+             options:NSKeyValueObservingOptionNew | NSKeyValueObservingOptionOld
+             context:NULL];
+  }
+
+  // Replace syncState via the property setter, as a sync-state commit does.
+  cfg.syncState = [@{
+    @"AllowedPathRegex" : @"a",
+    @"BlockedPathRegex" : @"b",
+  } mutableCopy];
+
+  for (NSString* keyPath in keyPaths) {
+    [cfg removeObserver:observer forKeyPath:keyPath context:NULL];
+  }
+
+  for (NSString* keyPath in keyPaths) {
+    XCTAssertEqual([observer.firedKeyPaths countForObject:keyPath], (NSUInteger)1,
+                   @"syncState change must notify observers of '%@' (got %lu). Check "
+                   @"keyPathsForValuesAffecting<Key> in SNTConfigurator.mm.",
+                   keyPath, (unsigned long)[observer.firedKeyPaths countForObject:keyPath]);
+  }
 }
 
 @end

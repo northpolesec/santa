@@ -118,13 +118,16 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
 
     // Observe changes to fallback rules
     __weak __typeof(self) weakSelf = self;
-    _celFallbackRulesObserver =
-        [[SNTKVOManager alloc] initWithObject:_configurator
-                                     selector:@selector(celFallbackRules)
-                                         type:[NSArray class]
-                                     callback:^(id oldValue, id newValue) {
-                                       [weakSelf compileFallbackRules:(NSArray*)newValue];
-                                     }];
+    _celFallbackRulesObserver = [[SNTKVOManager alloc]
+        initWithObject:_configurator
+              selector:@selector(celFallbackRules)
+                  type:[NSArray class]
+              callback:^(NSArray* oldValue, NSArray* newValue) {
+                if ((!oldValue && !newValue) || [oldValue isEqualToArray:newValue]) {
+                  return;
+                }
+                [weakSelf compileFallbackRules:newValue];
+              }];
   }
   return self;
 }

@@ -360,6 +360,9 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
               callback:^(NSNumber* oldValue, NSNumber* newValue) {
                 uint64_t oldInterval = [oldValue unsignedIntValue];
                 uint64_t newInterval = [newValue unsignedIntValue];
+                if (oldInterval == newInterval) {
+                  return;
+                }
                 LOGI(@"MetricExportInterval changed: %llu -> %llu. Restarting export.", oldInterval,
                      newInterval);
                 metrics->SetInterval(newInterval);
@@ -491,21 +494,21 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                    LOGI(@"AllowDelegatedSignals changed: %@", newValue);
                                    [tamper_client setAllowDelegatedSignals:[newValue boolValue]];
                                  }],
-    [[SNTKVOManager alloc] initWithObject:configurator
-                                 selector:@selector(staticRules)
-                                     type:[NSArray class]
-                                 callback:^(NSArray* oldValue, NSArray* newValue) {
-                                   if ([oldValue isEqualToArray:newValue]) {
-                                     return;
-                                   }
+    [[SNTKVOManager alloc]
+        initWithObject:configurator
+              selector:@selector(staticRules)
+                  type:[NSArray class]
+              callback:^(NSArray* oldValue, NSArray* newValue) {
+                if ((!oldValue && !newValue) || [oldValue isEqualToArray:newValue]) {
+                  return;
+                }
 
-                                   [exec_controller.ruleTable updateStaticRules:newValue];
+                [exec_controller.ruleTable updateStaticRules:newValue];
 
-                                   LOGI(@"StaticRules changed. Flushing caches.");
-                                   auth_result_cache->FlushCache(
-                                       FlushCacheMode::kAllCaches,
-                                       FlushCacheReason::kStaticRulesChanged);
-                                 }],
+                LOGI(@"StaticRules changed. Flushing caches.");
+                auth_result_cache->FlushCache(FlushCacheMode::kAllCaches,
+                                              FlushCacheReason::kStaticRulesChanged);
+              }],
     [[SNTKVOManager alloc]
         initWithObject:configurator
               selector:@selector(eventLogType)
