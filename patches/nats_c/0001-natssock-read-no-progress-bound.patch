@@ -1,0 +1,61 @@
+diff --git a/src/comsock.c b/src/comsock.c
+--- a/src/comsock.c
++++ b/src/comsock.c
+@@ -414,12 +414,24 @@
+     }
+ }
+ 
++// Maximum number of consecutive read attempts that make no forward progress:
++// the socket polls readable but SSL_read/recv returns WANT_READ/WANT_WRITE (or
++// EWOULDBLOCK) and yields no plaintext. A legitimate single TLS record completes
++// in far fewer reads (a max-size ~16KB record is bounded well under this even at
++// one byte per read), so only a never-completing record/message, or a peer that
++// streams records which decrypt to no application data, can reach it. Hitting it
++// means the connection is wedged; we return an error to break the read loop
++// instead of spinning a CPU core at 100%. The read loop then observes the error
++// and tears the connection down / reconnects normally.
++#define NATS_SOCK_MAX_STALLED_READS (250000)
++
+ natsStatus
+ natsSock_Read(natsSockCtx *ctx, char *buffer, size_t maxBufferSize, int *n)
+ {
+-    natsStatus  s         = NATS_OK;
+-    int         readBytes = 0;
+-    bool        needRead  = true;
++    natsStatus  s            = NATS_OK;
++    int         readBytes    = 0;
++    bool        needRead     = true;
++    int         stalledReads = 0;
+ 
+     while (needRead)
+     {
+@@ -445,6 +457,16 @@
+ 
+                     if ((s = natsSock_WaitReady(waitMode, ctx)) != NATS_OK)
+                         return NATS_UPDATE_ERR_STACK(s);
++
++                    // Guard against a peer that keeps the socket readable while
++                    // SSL_read makes no application-level progress (e.g. a
++                    // never-completing TLS record, or a stream of records that
++                    // yield no plaintext). Without this the loop spins at 100%
++                    // CPU and never returns to observe a pending close/reconnect.
++                    if (++stalledReads > NATS_SOCK_MAX_STALLED_READS)
++                        return nats_setError(NATS_STALE_CONNECTION,
++                                             "no read progress after %d stalled reads",
++                                             NATS_SOCK_MAX_STALLED_READS);
+ 
+                     // SSL requires that we go back with the same buffer
+                     // and size. We can't return until SSL_read returns
+@@ -490,6 +512,12 @@
+             if (s != NATS_OK)
+                 return NATS_UPDATE_ERR_STACK(s);
+ 
++            // See the TLS branch above: bound no-forward-progress spinning.
++            if (++stalledReads > NATS_SOCK_MAX_STALLED_READS)
++                return nats_setError(NATS_STALE_CONNECTION,
++                                     "no read progress after %d stalled reads",
++                                     NATS_SOCK_MAX_STALLED_READS);
++
+             continue;
+         }
+ 
