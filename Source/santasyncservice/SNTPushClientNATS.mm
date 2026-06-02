@@ -421,6 +421,17 @@ static int NATSSSLVerifyCallback(int preverifyOk, void* ctx) {
       return;
     }
 
+    // Perform the TLS handshake immediately on connect, before the server sends
+    // its INFO protocol. This means no bytes are ever exchanged in cleartext.
+    // The push servers run with `handshake_first: auto`, which accepts both this
+    // and the standard INFO-then-upgrade flow.
+    status = natsOptions_TLSHandshakeFirst(opts);
+    if (status != NATS_OK) {
+      LOGE(@"NATS: Failed to enable TLS handshake-first: %s", natsStatus_GetText(status));
+      natsOptions_Destroy(opts);
+      return;
+    }
+
     status = natsOptions_SetSSLVerificationCallback(opts, NATSSSLVerifyCallback);
     if (status != NATS_OK) {
       LOGE(@"NATS: Failed to set SSL verification callback: %s", natsStatus_GetText(status));
