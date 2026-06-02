@@ -41,9 +41,12 @@
   if (other == self) return YES;
   if (![other isKindOfClass:[SNTCELFallbackRule class]]) return NO;
   SNTCELFallbackRule* o = other;
-  return ((self.celExpr == o.celExpr || [self.celExpr isEqual:o.celExpr]) &&
-          (self.customMsg == o.customMsg || [self.customMsg isEqual:o.customMsg]) &&
-          (self.customURL == o.customURL || [self.customURL isEqual:o.customURL]));
+  // celExpr is required so isEqualToString: suffices, but customMsg/customURL
+  // are optional: the nil==nil check is load-bearing because
+  // [nil isEqualToString:nil] is NO.
+  return ([self.celExpr isEqualToString:o.celExpr] &&
+          (self.customMsg == o.customMsg || [self.customMsg isEqualToString:o.customMsg]) &&
+          (self.customURL == o.customURL || [self.customURL isEqualToString:o.customURL]));
 }
 
 - (NSUInteger)hash {
