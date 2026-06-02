@@ -37,6 +37,7 @@
 @property(readwrite) NSString* connectedProtocolVersion;
 - (void)establishNetworkExtensionConnection;
 - (void)clearNetworkExtensionConnection;
+- (SNTNetworkExtensionSettings*)generateSettingsForProtocolVersion:(NSString*)protocolVersion;
 @end
 
 @interface SNTNetworkExtensionQueueTest : XCTestCase
@@ -78,6 +79,17 @@
 - (void)stubConfiguratorEnable:(BOOL)enable action:(SNTNetworkFlowDefaultAction)action {
   SNTSyncNetworkExtensionSettings* settings =
       [[SNTSyncNetworkExtensionSettings alloc] initWithEnable:enable flowDefaultAction:action];
+  OCMStub([self.mockConfigurator syncNetworkExtensionSettings]).andReturn(settings);
+}
+
+// Like stubConfiguratorEnable:action: but also sets the sync-side DNS upstream timeout.
+- (void)stubConfiguratorEnable:(BOOL)enable
+                        action:(SNTNetworkFlowDefaultAction)action
+                    dnsTimeout:(NSTimeInterval)dnsTimeout {
+  SNTSyncNetworkExtensionSettings* settings =
+      [[SNTSyncNetworkExtensionSettings alloc] initWithEnable:enable
+                                            flowDefaultAction:action
+                                       dnsUpstreamTimeoutSecs:dnsTimeout];
   OCMStub([self.mockConfigurator syncNetworkExtensionSettings]).andReturn(settings);
 }
 
@@ -258,6 +270,27 @@
 
   XCTAssertNil(self.sut.lastPushedSettings);
   XCTAssertNil(self.sut.lastPushedNetworkFlowRulesHash);
+}
+
+- (void)testGenerateSettingsPropagatesDNSUpstreamTimeout {
+  [self stubConfiguratorEnable:YES action:SNTNetworkFlowDefaultActionDeny dnsTimeout:7.5];
+  SNTNetworkExtensionSettings* settings = [self.sut generateSettingsForProtocolVersion:@"1.0"];
+  XCTAssertEqualWithAccuracy(settings.dnsUpstreamTimeoutSecs, 7.5, 0.0001);
+}
+
+- (void)testGenerateSettingsDefaultsDNSUpstreamTimeoutWhenSyncUnset {
+  // Carrier timeout 0 -> SNTNetworkExtensionSettings normalizes to the 5s default.
+  [self stubConfiguratorEnable:YES action:SNTNetworkFlowDefaultActionDeny dnsTimeout:0];
+  SNTNetworkExtensionSettings* settings = [self.sut generateSettingsForProtocolVersion:@"1.0"];
+  XCTAssertEqualWithAccuracy(settings.dnsUpstreamTimeoutSecs, 5.0, 0.0001);
+}
+
+- (void)testGenerateSettingsIgnoresSyncBelowProtocolV1 {
+  [self stubConfiguratorEnable:YES action:SNTNetworkFlowDefaultActionDeny dnsTimeout:7.5];
+  SNTNetworkExtensionSettings* settings = [self.sut generateSettingsForProtocolVersion:@"0.9"];
+  XCTAssertFalse(settings.enable);
+  // Sync timeout is ignored below protocol v1 -> 5s default.
+  XCTAssertEqualWithAccuracy(settings.dnsUpstreamTimeoutSecs, 5.0, 0.0001);
 }
 
 @end
