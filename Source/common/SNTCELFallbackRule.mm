@@ -37,6 +37,24 @@
   return self;
 }
 
+- (BOOL)isEqual:(id)other {
+  if (other == self) return YES;
+  if (![other isKindOfClass:[SNTCELFallbackRule class]]) return NO;
+  SNTCELFallbackRule* o = other;
+  return ((self.celExpr == o.celExpr || [self.celExpr isEqual:o.celExpr]) &&
+          (self.customMsg == o.customMsg || [self.customMsg isEqual:o.customMsg]) &&
+          (self.customURL == o.customURL || [self.customURL isEqual:o.customURL]));
+}
+
+- (NSUInteger)hash {
+  NSUInteger prime = 31;
+  NSUInteger result = 1;
+  result = prime * result + [self.celExpr hash];
+  result = prime * result + [self.customMsg hash];
+  result = prime * result + [self.customURL hash];
+  return result;
+}
+
 + (BOOL)supportsSecureCoding {
   return YES;
 }

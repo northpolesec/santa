@@ -360,6 +360,9 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
               callback:^(NSNumber* oldValue, NSNumber* newValue) {
                 uint64_t oldInterval = [oldValue unsignedIntValue];
                 uint64_t newInterval = [newValue unsignedIntValue];
+                if (oldInterval == newInterval) {
+                  return;
+                }
                 LOGI(@"MetricExportInterval changed: %llu -> %llu. Restarting export.", oldInterval,
                      newInterval);
                 metrics->SetInterval(newInterval);
@@ -495,7 +498,8 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                  selector:@selector(staticRules)
                                      type:[NSArray class]
                                  callback:^(NSArray* oldValue, NSArray* newValue) {
-                                   if ([oldValue isEqualToArray:newValue]) {
+                                   if ((!oldValue && !newValue) ||
+                                       [oldValue isEqualToArray:newValue]) {
                                      return;
                                    }
 

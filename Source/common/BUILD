@@ -663,6 +663,14 @@ objc_library(
     ],
 )
 
+santa_unit_test(
+    name = "SNTCELFallbackRuleTest",
+    srcs = ["SNTCELFallbackRuleTest.mm"],
+    deps = [
+        ":SNTCELFallbackRule",
+    ],
+)
+
 objc_library(
     name = "SNTRule",
     srcs = ["SNTRule.mm"],
@@ -1155,6 +1163,7 @@ test_suite(
         ":RingBufferTest",
         ":SNTBlockMessageTest",
         ":SNTCachedDecisionTest",
+        ":SNTCELFallbackRuleTest",
         ":SNTConfigBundleTest",
         ":SNTConfiguratorTest",
         ":SNTExportConfigurationTest",
