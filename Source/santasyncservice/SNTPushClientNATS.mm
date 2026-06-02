@@ -455,6 +455,13 @@ static int NATSSSLVerifyCallback(int preverifyOk, void* ctx) {
     }
 
     // Connection options
+    status = natsOptions_SetTimeout(opts, 10000);  // 10s connection timeout
+    if (status != NATS_OK) {
+      LOGE(@"NATS: Failed to set connection timeout: %s", natsStatus_GetText(status));
+      natsOptions_Destroy(opts);
+      return;
+    }
+
     natsOptions_SetAllowReconnect(opts, true);
     natsOptions_SetMaxReconnect(opts, -1);  // Infinite reconnects
 
