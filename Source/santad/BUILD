@@ -869,6 +869,48 @@ objc_library(
         "//Source/common:String",
         "@abseil-cpp//absl/cleanup:cleanup",
         "@abseil-cpp//absl/status:statusor",
+        "@northpolesec_protos//commands:v1_cc_proto",
+        "@northpolesec_protos//telemetry:sleighconfig_cc_proto",
+    ],
+)
+
+santa_unit_test(
+    name = "SleighLauncherTest",
+    srcs = ["SleighLauncherTest.mm"],
+    deps = [
+        ":SleighLauncher",
+        "@abseil-cpp//absl/status:statusor",
+        "@northpolesec_protos//commands:v1_cc_proto",
+        "@northpolesec_protos//telemetry:sleighconfig_cc_proto",
+    ],
+)
+
+objc_library(
+    name = "SNTBinaryUploadController",
+    srcs = ["SNTBinaryUploadController.mm"],
+    hdrs = ["SNTBinaryUploadController.h"],
+    deps = [
+        ":SleighLauncher",
+        "//Source/common:MOLCodesignChecker",
+        "//Source/common:SNTConfigurator",
+        "//Source/common:SNTLogging",
+        "//Source/common:String",
+        "@abseil-cpp//absl/cleanup:cleanup",
+        "@abseil-cpp//absl/status:statusor",
+        "@northpolesec_protos//commands:v1_cc_proto",
+        "@northpolesec_protos//telemetry:sleighconfig_cc_proto",
+    ],
+)
+
+santa_unit_test(
+    name = "SNTBinaryUploadControllerTest",
+    srcs = ["SNTBinaryUploadControllerTest.mm"],
+    deps = [
+        ":SNTBinaryUploadController",
+        ":SleighLauncher",
+        "//Source/common:SNTConfigurator",
+        "@abseil-cpp//absl/status:statusor",
+        "@northpolesec_protos//commands:v1_cc_proto",
         "@northpolesec_protos//telemetry:sleighconfig_cc_proto",
     ],
 )
@@ -991,6 +1033,7 @@ objc_library(
         ":AuthResultCache",
         ":EndpointSecurityLogger",
         ":KillingMachine",
+        ":SNTBinaryUploadController",
         ":SNTDatabaseController",
         ":SNTEventTable",
         ":SNTNetworkExtensionQueue",
@@ -1024,6 +1067,7 @@ objc_library(
         "//Source/common:SNTXPCSyncServiceInterface",
         "//Source/common/faa:WatchItems",
         "@FMDB",
+        "@northpolesec_protos//commands:v1_cc_proto",
         "@santanetd//src/santanetd:SNDProcessFlows",
     ],
 )
@@ -1055,6 +1099,7 @@ objc_library(
         ":EndpointSecurityLogger",
         ":FAAPolicyProcessor",
         ":Metrics",
+        ":SNTBinaryUploadController",
         ":SNTCompilerController",
         ":SNTDaemonControlController",
         ":SNTDatabaseController",
@@ -1072,6 +1117,7 @@ objc_library(
         ":SNTRuleTable",
         ":SNTSyncdQueue",
         ":SandboxExpectations",
+        ":SleighLauncher",
         ":TTYWriter",
         "//Source/common:MOLXPCConnection",
         "//Source/common:PowerMonitor",

@@ -415,6 +415,24 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
                  @"Ping command should return ping response");
 }
 
+- (void)testDispatchBinaryUploadCommandDisabled {
+  // Given: binary_upload is not in AllowedSantaCommands.
+  OCMStub([self.mockConfigurator allowedSantaCommands]).andReturn(@[ @"ping" ]);
+
+  ::pbv1::SantaCommandRequest command;
+  command.set_uuid([[NSUUID UUID] UUIDString].UTF8String);
+  command.mutable_binary_upload()->set_path("/bin/ls");
+  [self signCommandRequest:&command];
+
+  // When: Dispatching the command.
+  ::pbv1::SantaCommandResponse* response = [self.client dispatchSantaCommandToHandler:command
+                                                                              onArena:self.arena];
+
+  // Then: It is rejected before any upload work (no XPC to santad).
+  XCTAssertTrue(response->has_error());
+  XCTAssertEqual(response->error(), ::pbv1::SantaCommandResponse::ERROR_COMMAND_DISABLED);
+}
+
 - (void)testDispatchSantaCommandToHandlerUnknown {
   // Given: A command with no known type set
   ::pbv1::SantaCommandRequest command;

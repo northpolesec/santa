@@ -60,6 +60,7 @@
 #import "Source/santad/SNTSyncdQueue.h"
 #include "Source/santad/TemporaryMonitorMode.h"
 #import "src/santanetd/SNDProcessFlows.h"
+#include "commands/v1.pb.h"
 
 using santa::FlushCacheMode;
 using santa::FlushCacheReason;
@@ -80,6 +81,7 @@ double watchdogRAMPeak = 0;
 @property dispatch_queue_t generalQ;
 @property dispatch_queue_t commandQ;
 @property dispatch_queue_t netFlowQ;
+@property dispatch_queue_t binaryUploadQ;
 
 ///
 ///  Called when caches should be flushed (rules changed, explicit flush command, etc.).
@@ -106,6 +108,7 @@ double watchdogRAMPeak = 0;
   std::shared_ptr<WatchItems> _watchItems;
   std::shared_ptr<santa::TemporaryMonitorMode> _temporaryMonitorMode;
   std::shared_ptr<santa::SandboxExpectations> _sandboxExpectations;
+  std::shared_ptr<santa::SNTBinaryUploadController> _binaryUploadController;
 }
 
 - (instancetype)initWithNotificationQueue:(SNTNotificationQueue*)notQueue
@@ -119,10 +122,13 @@ double watchdogRAMPeak = 0;
                                                     santa::FlushCacheReason))flushCacheBlock
                           cacheCountBlock:(NSArray<NSNumber*>* (^)(void))cacheCountBlock
                           checkCacheBlock:(SNTAction (^)(SantaVnode))checkCacheBlock
-                       metricsExportBlock:(void (^)(void (^reply)(BOOL)))metricsExportBlock {
+                       metricsExportBlock:(void (^)(void (^reply)(BOOL)))metricsExportBlock
+                   binaryUploadController:
+                       (std::shared_ptr<santa::SNTBinaryUploadController>)binaryUploadController {
   self = [super init];
   if (self) {
     _logger = logger;
+    _binaryUploadController = std::move(binaryUploadController);
     _watchItems = std::move(watchItems);
     _sandboxExpectations = std::move(sandboxExpectations);
     _notQueue = notQueue;
@@ -145,6 +151,10 @@ double watchdogRAMPeak = 0;
                                                   DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL,
                                                   dispatch_get_global_queue(QOS_CLASS_UTILITY, 0));
 
+    _binaryUploadQ = dispatch_queue_create_with_target(
+        "com.northpolesec.santa.binaryupload.xpc", DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL,
+        dispatch_get_global_queue(QOS_CLASS_UTILITY, 0));
+
     _temporaryMonitorMode = santa::TemporaryMonitorMode::Create(
         [SNTConfigurator configurator], _notQueue,
         ^(SNTStoredTemporaryMonitorModeAuditEvent* auditEvent) {
@@ -153,6 +163,24 @@ double watchdogRAMPeak = 0;
         });
   }
   return self;
+}
+
+- (void)uploadBinary:(NSData*)serializedRequest reply:(void (^)(NSData*))reply {
+  dispatch_async(_binaryUploadQ, ^{
+    ::santa::commands::v1::BinaryUploadResponse response;
+    ::santa::commands::v1::BinaryUploadRequest request;
+    if (self->_binaryUploadController &&
+        request.ParseFromArray(serializedRequest.bytes, (int)serializedRequest.length)) {
+      response = self->_binaryUploadController->Handle(request);
+    } else {
+      response.set_disposition(
+          ::santa::commands::v1::BinaryUploadResponse::DISPOSITION_INTERNAL_ERROR);
+      response.set_message("failed to parse BinaryUploadRequest");
+    }
+    std::string serialized;
+    response.SerializeToString(&serialized);
+    reply([NSData dataWithBytes:serialized.data() length:serialized.size()]);
+  });
 }
 
 #pragma mark Cache ops

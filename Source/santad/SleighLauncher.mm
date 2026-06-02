@@ -14,12 +14,14 @@
 
 #include "Source/santad/SleighLauncher.h"
 
+#include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
 #include <memory>
+#include <string>
 
 #include "absl/cleanup/cleanup.h"
 
@@ -30,6 +32,7 @@
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTSystemInfo.h"
 #include "Source/common/String.h"
+#include "commands/v1.pb.h"
 #include "telemetry/sleighconfig.pb.h"
 
 namespace santa {
@@ -45,11 +48,7 @@ SleighLauncher::SleighLauncher(std::string sleigh_path) : sleigh_path_(std::move
 
 absl::Status SleighLauncher::Launch(const std::vector<std::string>& input_files,
                                     uint32_t timeout_secs) {
-  if (access(sleigh_path_.c_str(), X_OK) != 0) {
-    return absl::NotFoundError("Sleigh binary not executable: " + sleigh_path_);
-  }
-
-  // Phase 1: Open all input files (as root) and collect FD numbers
+  // Open all input files (as root) and collect FD numbers.
   std::vector<int> input_fds;
   absl::Cleanup close_fds = [&input_fds]() {
     for (int fd : input_fds) {
@@ -66,78 +65,151 @@ absl::Status SleighLauncher::Launch(const std::vector<std::string>& input_files,
     input_fds.push_back(fd);
   }
 
-  // Phase 2: Serialize config with FD numbers
   absl::StatusOr<std::string> serialized = SerializeConfig(input_fds);
   if (!serialized.ok()) {
     LOGD(@"SleighLauncher::Launch(): Failed to serialize SleighConfig");
-    return absl::InternalError("Failed to serialize SleighConfig protobuf");
+    return serialized.status();
   }
 
-  // Phase 3: Create stdin pipe
+  // Hand fd ownership to RunSleigh, which closes them in the parent after fork.
+  std::move(close_fds).Cancel();
+  return RunSleigh(*serialized, input_fds, timeout_secs, /*capture_stdout=*/false).status();
+}
+
+absl::StatusOr<::santa::commands::v1::BinaryUploadResponse> SleighLauncher::LaunchBinaryUpload(
+    int input_fd, const std::string& signed_post_url,
+    const std::map<std::string, std::string>& form_values, const std::string& expected_sha256,
+    const ::santa::telemetry::v1::BinaryMetadata& metadata,
+    const std::vector<std::string>& filter_expressions, uint32_t timeout_seconds) {
+  absl::StatusOr<std::string> serialized = SerializeBinaryUploadConfig(
+      input_fd, signed_post_url, form_values, expected_sha256, metadata, filter_expressions);
+  if (!serialized.ok()) {
+    return serialized.status();
+  }
+
+  absl::StatusOr<std::string> output =
+      RunSleigh(*serialized, {input_fd}, timeout_seconds, /*capture_stdout=*/true);
+  if (!output.ok()) {
+    return output.status();
+  }
+
+  // M5: do not trust a default-valued parse — an empty or unparseable stdout is an
+  // error, not a COMPLETED-with-zero-bytes response.
+  ::santa::commands::v1::BinaryUploadResponse response;
+  if (output->empty() || !response.ParseFromString(*output)) {
+    return absl::InternalError("Sleigh produced no parseable BinaryUploadResponse");
+  }
+  return response;
+}
+
+absl::StatusOr<std::string> SleighLauncher::RunSleigh(const std::string& serialized,
+                                                      const std::vector<int>& input_fds,
+                                                      uint32_t timeout_secs, bool capture_stdout) {
+  // Close our copies of the inherited fds on every return path (the child keeps its
+  // own copies across fork).
+  absl::Cleanup close_fds = [&input_fds]() {
+    for (int fd : input_fds) {
+      close(fd);
+    }
+  };
+
+  if (access(sleigh_path_.c_str(), X_OK) != 0) {
+    return absl::NotFoundError("Sleigh binary not executable: " + sleigh_path_);
+  }
+
+  // stdin pipe (config in).
   int stdin_pipe[2];
   if (pipe(stdin_pipe) != 0) {
-    LOGD(@"SleighLauncher::Launch(): Failed to create stdin pipe");
     return absl::InternalError("Failed to create stdin pipe");
   }
 
-  // Phase 4: Code signature check (ObjC, must happen before fork)
+  // stdout pipe (response out), only when capturing.
+  int stdout_pipe[2] = {-1, -1};
+  if (capture_stdout) {
+    if (pipe(stdout_pipe) != 0) {
+      close(stdin_pipe[0]);
+      close(stdin_pipe[1]);
+      return absl::InternalError("Failed to create stdout pipe");
+    }
+  }
+
+  // Code signature check (ObjC, must happen before fork).
   NSString* sleighNSPath = StringToNSString(sleigh_path_);
   MOLCodesignChecker* csc = [[MOLCodesignChecker alloc] initWithBinaryPath:sleighNSPath];
   if (!csc || ![csc.teamID isEqualToString:@"ZMCG7MLDV9"] ||
       csc.signatureFlags & kSecCodeSignatureAdhoc) {
-    LOGD(@"SleighLauncher::Launch(): Sleigh code signature is invalid");
+    LOGD(@"SleighLauncher::RunSleigh(): Sleigh code signature is invalid");
 #ifndef DEBUG
     close(stdin_pipe[0]);
     close(stdin_pipe[1]);
+    if (capture_stdout) {
+      close(stdout_pipe[0]);
+      close(stdout_pipe[1]);
+    }
     return absl::FailedPreconditionError("Sleigh code signature is invalid");
 #endif
   }
 
-  // Phase 5: Prepare argv (before fork, no ObjC in child)
+  // Prepare argv (before fork, no ObjC in child).
   const char* sleigh_path_cstr = sleigh_path_.c_str();
   const char* argv[] = {sleigh_path_cstr, nullptr};
 
-  // Phase 6: fork
   pid_t pid = fork();
   if (pid < 0) {
     close(stdin_pipe[0]);
     close(stdin_pipe[1]);
-    LOGD(@"SleighLauncher::Launch(): fork() failed");
+    if (capture_stdout) {
+      close(stdout_pipe[0]);
+      close(stdout_pipe[1]);
+    }
+    LOGD(@"SleighLauncher::RunSleigh(): fork() failed");
     return absl::InternalError("fork() failed");
   }
 
   if (pid == 0) {
-    // Child process - only async-signal-safe functions from here
-
-    // Redirect stdin to read end of pipe
+    // Child process - only async-signal-safe functions from here.
     dup2(stdin_pipe[0], STDIN_FILENO);
+    if (capture_stdout) {
+      dup2(stdout_pipe[1], STDOUT_FILENO);
+    }
     close(stdin_pipe[0]);
     close(stdin_pipe[1]);
+    if (capture_stdout) {
+      close(stdout_pipe[0]);
+      close(stdout_pipe[1]);
+    }
 
-    // Drop root privileges
     if (!DropRootPrivileges()) {
       _exit(126);
     }
 
-    // exec sleigh
     execv(sleigh_path_cstr, const_cast<char* const*>(argv));
     _exit(127);
   }
 
-  // Parent process
-  close(stdin_pipe[0]);                     // Close read end
-  fcntl(stdin_pipe[1], F_SETNOSIGPIPE, 1);  // Prevent SIGPIPE if child exits
-  std::move(close_fds).Invoke();            // Close input FDs (child inherited copies)
+  // Parent process.
+  close(stdin_pipe[0]);                     // Close read end of stdin pipe.
+  fcntl(stdin_pipe[1], F_SETNOSIGPIPE, 1);  // Prevent SIGPIPE if child exits early.
 
-  // Write serialized config to stdin pipe
-  const char* data = serialized->data();
-  size_t remaining = serialized->size();
+  int stdout_read_fd = -1;
+  if (capture_stdout) {
+    close(stdout_pipe[1]);  // Parent only reads.
+    stdout_read_fd = stdout_pipe[0];
+  }
+  absl::Cleanup close_stdout_read = [&stdout_read_fd]() {
+    if (stdout_read_fd >= 0) {
+      close(stdout_read_fd);
+    }
+  };
+
+  // Write serialized config to stdin pipe.
+  const char* data = serialized.data();
+  size_t remaining = serialized.size();
   bool write_failed = false;
   while (remaining > 0) {
     ssize_t written = write(stdin_pipe[1], data, remaining);
     if (written < 0) {
       if (errno == EINTR) {
-        // Retry
         continue;
       }
       write_failed = true;
@@ -151,29 +223,47 @@ absl::Status SleighLauncher::Launch(const std::vector<std::string>& input_files,
   if (write_failed) {
     kill(pid, SIGKILL);
     waitpid(pid, nullptr, 0);
-    LOGD(@"SleighLauncher::Launch(): Failed to write config to Sleigh stdin");
+    LOGD(@"SleighLauncher::RunSleigh(): Failed to write config to Sleigh stdin");
     return absl::InternalError("Failed to write config to Sleigh stdin");
   }
 
-  // Async waitpid with timeout using dispatch semaphore
+  // Read stdout to EOF (when capturing) and reap the child on a background queue,
+  // bounded by a timeout on the main thread. Reading before waitpid collects the
+  // full response; on timeout we SIGKILL, which closes the child's stdout and
+  // unblocks the read.
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
   __block int child_status = 0;
+  __block std::string captured;
+  __block bool read_failed = false;
 
   dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+    if (capture_stdout) {
+      char buf[8192];
+      ssize_t n;
+      while ((n = read(stdout_read_fd, buf, sizeof(buf))) > 0) {
+        captured.append(buf, static_cast<size_t>(n));
+      }
+      if (n < 0) {
+        read_failed = true;
+      }
+    }
     waitpid(pid, &child_status, 0);
     dispatch_semaphore_signal(sema);
   });
 
   if (dispatch_semaphore_wait(sema,
                               dispatch_time(DISPATCH_TIME_NOW, timeout_secs * NSEC_PER_SEC))) {
-    // Timeout - kill the process and wait for async waitpid to complete
+    // Timeout - kill the process and wait for the async read/waitpid to complete.
     kill(pid, SIGKILL);
     dispatch_semaphore_wait(sema, DISPATCH_TIME_FOREVER);
     return absl::DeadlineExceededError("Sleigh timed out after " + std::to_string(timeout_secs) +
                                        " seconds");
   }
 
-  // Check exit code
+  if (read_failed) {
+    return absl::InternalError("Failed to read Sleigh stdout");
+  }
+
   if (WIFEXITED(child_status)) {
     int exit_code = WEXITSTATUS(child_status);
     if (exit_code != 0) {
@@ -183,17 +273,19 @@ absl::Status SleighLauncher::Launch(const std::vector<std::string>& input_files,
     return absl::UnknownError("Sleigh terminated abnormally");
   }
 
-  return absl::OkStatus();
+  return captured;
+}
+
+void SleighLauncher::PopulateHostInfo(::santa::telemetry::v1::SleighConfig* config) {
+  NSString* machineID = [[SNTConfigurator configurator] machineID];
+  config->set_host_id(machineID ? [machineID UTF8String] : "");
+  NSString* hostName = [SNTSystemInfo longHostname];
+  config->set_host_name(hostName ? [hostName UTF8String] : "");
 }
 
 absl::StatusOr<std::string> SleighLauncher::SerializeConfig(const std::vector<int>& input_fds) {
-  // Build the SleighConfig protobuf
   ::santa::telemetry::v1::SleighConfig config;
-  NSString* machineID = [[SNTConfigurator configurator] machineID];
-  config.set_host_id(machineID ? [machineID UTF8String] : "");
-  NSString* hostName = [SNTSystemInfo longHostname];
-  std::string host_name = hostName ? [hostName UTF8String] : "";
-  config.set_host_name(host_name);
+  PopulateHostInfo(&config);
 
   auto* export_telemetry = config.mutable_export_telemetry();
 
@@ -207,7 +299,7 @@ absl::StatusOr<std::string> SleighLauncher::SerializeConfig(const std::vector<in
     export_telemetry->add_filter_expressions([expr UTF8String]);
   }
 
-  // Convert export config to parameters for sleigh
+  // Convert export config to parameters for sleigh.
   SNTExportConfiguration* exportConfig = [[SNTConfigurator configurator] exportConfig];
   if (!exportConfig) {
     return absl::InvalidArgumentError("Export configuration is nil");
@@ -221,7 +313,35 @@ absl::StatusOr<std::string> SleighLauncher::SerializeConfig(const std::vector<in
         (*signed_post->mutable_form_values())[[key UTF8String]] = [value UTF8String];
       }];
 
-  // Serialize the protobuf
+  std::string serialized;
+  if (!config.SerializeToString(&serialized)) {
+    return absl::UnknownError("Failed to serialize SleighConfig proto");
+  }
+  return serialized;
+}
+
+absl::StatusOr<std::string> SleighLauncher::SerializeBinaryUploadConfig(
+    int input_fd, const std::string& signed_post_url,
+    const std::map<std::string, std::string>& form_values, const std::string& expected_sha256,
+    const ::santa::telemetry::v1::BinaryMetadata& metadata,
+    const std::vector<std::string>& filter_expressions) {
+  ::santa::telemetry::v1::SleighConfig config;
+  PopulateHostInfo(&config);
+
+  auto* binary_upload = config.mutable_binary_upload();
+  binary_upload->set_input_fd(input_fd);
+  binary_upload->set_expected_sha256(expected_sha256);
+  *binary_upload->mutable_metadata() = metadata;
+  for (const auto& expr : filter_expressions) {
+    binary_upload->add_filter_expressions(expr);
+  }
+
+  auto* signed_post = binary_upload->mutable_signed_post();
+  signed_post->set_url(signed_post_url);
+  for (const auto& [key, value] : form_values) {
+    (*signed_post->mutable_form_values())[key] = value;
+  }
+
   std::string serialized;
   if (!config.SerializeToString(&serialized)) {
     return absl::UnknownError("Failed to serialize SleighConfig proto");

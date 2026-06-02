@@ -85,7 +85,8 @@ static NSString* const kBinarySHA256 =
         return SNTActionRespondAllow;
       }
       metricsExportBlock:^(void (^)(BOOL)){
-      }];
+      }
+      binaryUploadController:nullptr];
 }
 
 - (void)tearDown {
