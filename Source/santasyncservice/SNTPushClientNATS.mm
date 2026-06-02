@@ -115,6 +115,12 @@ static int NATSSSLVerifyCallback(int preverifyOk, void* ctx) {
 
   bool ok = NATSLeafCertHasPushDomain(cert);
 #ifdef DEBUG
+  // DEBUG builds normally allow any otherwise-valid certificate so a local test
+  // server can be used. Setting SANTA_NATS_ENFORCE_PUSH_DOMAIN opts in to the
+  // production domain-pinning behavior, e.g. to test against the prod cluster.
+  if (getenv("SANTA_NATS_ENFORCE_PUSH_DOMAIN")) {
+    return ok ? 1 : 0;
+  }
   if (!ok) {
     LOGW(@"NATS: Leaf certificate SAN does not match *.push.northpole.security "
          @"(allowed in DEBUG build)");
@@ -405,6 +411,27 @@ static int NATSSSLVerifyCallback(int preverifyOk, void* ctx) {
       return;
     }
 
+    // Always require a TLS connection. Setting secure mode here ensures the
+    // client initiates TLS regardless of the URL scheme or build configuration,
+    // rather than relying on the server's INFO to upgrade the connection.
+    status = natsOptions_SetSecure(opts, true);
+    if (status != NATS_OK) {
+      LOGE(@"NATS: Failed to enable TLS: %s", natsStatus_GetText(status));
+      natsOptions_Destroy(opts);
+      return;
+    }
+
+    // Perform the TLS handshake immediately on connect, before the server sends
+    // its INFO protocol. This means no bytes are ever exchanged in cleartext.
+    // The push servers run with `handshake_first: auto`, which accepts both this
+    // and the standard INFO-then-upgrade flow.
+    status = natsOptions_TLSHandshakeFirst(opts);
+    if (status != NATS_OK) {
+      LOGE(@"NATS: Failed to enable TLS handshake-first: %s", natsStatus_GetText(status));
+      natsOptions_Destroy(opts);
+      return;
+    }
+
     status = natsOptions_SetSSLVerificationCallback(opts, NATSSSLVerifyCallback);
     if (status != NATS_OK) {
       LOGE(@"NATS: Failed to set SSL verification callback: %s", natsStatus_GetText(status));
@@ -428,6 +455,13 @@ static int NATSSSLVerifyCallback(int preverifyOk, void* ctx) {
     }
 
     // Connection options
+    status = natsOptions_SetTimeout(opts, 60000);  // 60s connection timeout
+    if (status != NATS_OK) {
+      LOGE(@"NATS: Failed to set connection timeout: %s", natsStatus_GetText(status));
+      natsOptions_Destroy(opts);
+      return;
+    }
+
     natsOptions_SetAllowReconnect(opts, true);
     natsOptions_SetMaxReconnect(opts, -1);  // Infinite reconnects
 
