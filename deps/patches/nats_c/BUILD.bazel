@@ -1,0 +1,10 @@
+# Local source patches applied to the @nats_c (nats.c) external repository.
+# Wired into the repo fetch by //deps:non_module_deps.bzl via
+# git_repository(patches = [...], patch_args = ["-p1"]).
+#
+# Keep one patch per logical change, numbered for deterministic apply order.
+
+exports_files(
+    ["0001-natssock-read-no-progress-bound.patch"],
+    visibility = ["//visibility:public"],
+)

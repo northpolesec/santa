@@ -9,7 +9,7 @@ on:
       - MODULE.bazel
       - BUILD
       - helper.bzl
-      - non_module_deps.bzl
+      - "deps/**"
       - .github/**
       - .bazelrc
 

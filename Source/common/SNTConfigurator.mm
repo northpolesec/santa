@@ -552,11 +552,11 @@ static SNTConfigurator* sharedConfigurator = nil;
       setByAddingObject:NSStringFromSelector(@selector(inTemporaryMonitorMode))];
 }
 
-+ (NSSet*)keyPathsForValuesAffectingAllowlistPathRegex {
++ (NSSet*)keyPathsForValuesAffectingAllowedPathRegex {
   return [self syncAndConfigStateSet];
 }
 
-+ (NSSet*)keyPathsForValuesAffectingBlocklistPathRegex {
++ (NSSet*)keyPathsForValuesAffectingBlockedPathRegex {
   return [self syncAndConfigStateSet];
 }
 
@@ -601,6 +601,10 @@ static SNTConfigurator* sharedConfigurator = nil;
 }
 
 + (NSSet*)keyPathsForValuesAffectingEnableSilentMode {
+  return [self configStateSet];
+}
+
++ (NSSet*)keyPathsForValuesAffectingEnableSilentTTYMode {
   return [self configStateSet];
 }
 
@@ -917,6 +921,14 @@ static SNTConfigurator* sharedConfigurator = nil;
 }
 
 + (NSSet*)keyPathsForValuesAffectingTelemetryExportMaxFilesPerBatch {
+  return [self configStateSet];
+}
+
++ (NSSet*)keyPathsForValuesAffectingExportMetrics {
+  return [self configStateSet];
+}
+
++ (NSSet*)keyPathsForValuesAffectingMetricExportInterval {
   return [self configStateSet];
 }
 
