@@ -516,11 +516,48 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
   }
 
   for (NSString* keyPath in keyPaths) {
-    XCTAssertEqual(
-        [observer.firedKeyPaths countForObject:keyPath], (NSUInteger)1,
-        @"configState change must notify observers of '%@' (got %lu). Check "
-        @"keyPathsForValuesAffecting<Key> in SNTConfigurator.mm.",
-        keyPath, (unsigned long)[observer.firedKeyPaths countForObject:keyPath]);
+    XCTAssertEqual([observer.firedKeyPaths countForObject:keyPath], (NSUInteger)1,
+                   @"configState change must notify observers of '%@' (got %lu). Check "
+                   @"keyPathsForValuesAffecting<Key> in SNTConfigurator.mm.",
+                   keyPath, (unsigned long)[observer.firedKeyPaths countForObject:keyPath]);
+  }
+}
+
+// allowedPathRegex/blockedPathRegex fall back from syncState to configState, so
+// their keyPathsForValuesAffecting methods depend on syncState too. The
+// configState test above can't catch a regression that drops syncState from
+// those declarations, so exercise the syncState half here.
+- (void)testSyncStateChangeNotifiesSyncDerivedKeyObservers {
+  SNTConfigurator* cfg = [[SNTConfigurator alloc] init];
+  SNTKVORecordingObserver* observer = [[SNTKVORecordingObserver alloc] init];
+
+  NSArray<NSString*>* keyPaths = @[
+    @"allowedPathRegex",
+    @"blockedPathRegex",
+  ];
+
+  for (NSString* keyPath in keyPaths) {
+    [cfg addObserver:observer
+          forKeyPath:keyPath
+             options:NSKeyValueObservingOptionNew | NSKeyValueObservingOptionOld
+             context:NULL];
+  }
+
+  // Replace syncState via the property setter, as a sync-state commit does.
+  cfg.syncState = [@{
+    @"AllowedPathRegex" : @"a",
+    @"BlockedPathRegex" : @"b",
+  } mutableCopy];
+
+  for (NSString* keyPath in keyPaths) {
+    [cfg removeObserver:observer forKeyPath:keyPath context:NULL];
+  }
+
+  for (NSString* keyPath in keyPaths) {
+    XCTAssertEqual([observer.firedKeyPaths countForObject:keyPath], (NSUInteger)1,
+                   @"syncState change must notify observers of '%@' (got %lu). Check "
+                   @"keyPathsForValuesAffecting<Key> in SNTConfigurator.mm.",
+                   keyPath, (unsigned long)[observer.firedKeyPaths countForObject:keyPath]);
   }
 }
 
