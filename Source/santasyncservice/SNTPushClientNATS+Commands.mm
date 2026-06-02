@@ -372,6 +372,9 @@ void SetKilledProcessError(SNTKilledProcessError error, ::pbv1::KillResponse::Pr
     case ::pbv1::SantaCommandRequest::kPing: commandName = @"ping"; break;
     case ::pbv1::SantaCommandRequest::kKill: commandName = @"kill"; break;
     case ::pbv1::SantaCommandRequest::kEventUpload: commandName = @"event_upload"; break;
+    // Binary upload is adopted by a separate in-flight change. Leave it unrecognized here so it
+    // falls through to the dispatch switch's default and is rejected as an unknown command.
+    case ::pbv1::SantaCommandRequest::kBinaryUpload:
     case ::pbv1::SantaCommandRequest::COMMAND_NOT_SET: break;
   }
 

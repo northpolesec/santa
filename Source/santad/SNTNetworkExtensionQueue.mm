@@ -370,13 +370,17 @@ NSString* const kSantaNetworkExtensionProtocolVersion = @"1.0";
 
   BOOL enable = NO;
   SNTNetworkFlowDefaultAction flowDefaultAction = SNTNetworkFlowDefaultActionUnspecified;
+  NSTimeInterval dnsUpstreamTimeoutSecs = 0;
+
   if (majorVersion >= 1) {
     enable = syncSettings.enable;
     flowDefaultAction = syncSettings.flowDefaultAction;
+    dnsUpstreamTimeoutSecs = syncSettings.dnsUpstreamTimeoutSecs;
   }
 
   return [[SNTNetworkExtensionSettings alloc] initWithEnable:enable
-                                           flowDefaultAction:flowDefaultAction];
+                                           flowDefaultAction:flowDefaultAction
+                                      dnsUpstreamTimeoutSecs:dnsUpstreamTimeoutSecs];
 }
 
 @end

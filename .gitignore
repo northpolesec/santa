@@ -17,4 +17,5 @@ compile_commands.json
 .cache/
 .vscode/*
 .zed**
+.scratch/
 docs/superpowers/
