@@ -12,9 +12,12 @@ objc_library(
 
 # Stub network flow rule validator (always accepts).
 objc_library(
-    name = "SNDNetworkFlowRuleValidator",
-    srcs = ["SNDNetworkFlowRuleValidator.mm"],
-    hdrs = ["SNDNetworkFlowRuleValidator.h"],
+    name = "NetworkFlowRuleValidator",
+    srcs = ["NetworkFlowRuleValidator.mm"],
+    hdrs = ["NetworkFlowRuleValidator.h"],
+    deps = [
+        "@northpolesec_protos//syncv2:v2_cc_proto",
+    ],
 )
 
 objc_library(
@@ -30,9 +33,9 @@ objc_library(
 )
 
 objc_library(
-    name = "SNDNetworkFlowsSerializer",
-    srcs = ["SNDNetworkFlowsSerializer.mm"],
-    hdrs = ["SNDNetworkFlowsSerializer.h"],
+    name = "NetworkFlowsSerializer",
+    srcs = ["NetworkFlowsSerializer.mm"],
+    hdrs = ["NetworkFlowsSerializer.h"],
     deps = [
         "@protobuf",
     ],

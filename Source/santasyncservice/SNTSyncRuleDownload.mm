@@ -33,7 +33,7 @@
 #import "Source/santasyncservice/SNTSyncLogging.h"
 #import "Source/santasyncservice/SNTSyncState.h"
 #include "google/protobuf/arena.h"
-#import "src/santanetd/SNDNetworkFlowRuleValidator.h"
+#import "src/santanetd/NetworkFlowRuleValidator.h"
 #include "syncv2/v2.pb.h"
 
 namespace pbv2 = ::santa::sync::v2;
@@ -322,17 +322,20 @@ SNTFileAccessRule* FAARuleFromProtoFileAccessRule(const ::pbv2::FileAccessRule& 
 SNTNetworkFlowRule* NetworkFlowRuleFromProto(const ::pbv2::NetworkFlowRule& nr) {
   switch (nr.action_case()) {
     case ::pbv2::NetworkFlowRule::kAdd: {
-      std::string serialized;
-      nr.add().SerializeToString(&serialized);
-      NSData* blob = [NSData dataWithBytes:serialized.data() length:serialized.size()];
+      const ::pbv2::NetworkFlowRule::Add& add = nr.add();
 
       NSError* err;
-      if (!SNDValidateNetworkFlowRule(blob, &err)) {
-        SLOGW(@"Dropping invalid network flow rule %lld: %@", (long long)nr.add().rule_id(),
+      if (!santanetd::ValidateNetworkFlowRule(add, &err)) {
+        SLOGW(@"Dropping invalid network flow rule %lld: %@", (long long)add.rule_id(),
               err.localizedDescription ?: @"validation failed");
         return nil;
       }
-      return [[SNTNetworkFlowRule alloc] initAddRuleWithId:nr.add().rule_id() protoBlob:blob];
+
+      // Serialize only valid rules.
+      std::string serialized;
+      add.SerializeToString(&serialized);
+      NSData* blob = [NSData dataWithBytes:serialized.data() length:serialized.size()];
+      return [[SNTNetworkFlowRule alloc] initAddRuleWithId:add.rule_id() protoBlob:blob];
     }
     case ::pbv2::NetworkFlowRule::kRemove:
       return [[SNTNetworkFlowRule alloc] initRemoveRuleWithId:nr.remove().rule_id()];

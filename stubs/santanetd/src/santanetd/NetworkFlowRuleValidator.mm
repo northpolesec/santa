@@ -12,9 +12,13 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#import "src/santanetd/SNDNetworkFlowRuleValidator.h"
+#import "src/santanetd/NetworkFlowRuleValidator.h"
+
+namespace santanetd {
 
 // Stub validator for santanetd-less santa builds; always accepts.
-BOOL SNDValidateNetworkFlowRule(NSData* blob, NSError** error) {
+BOOL ValidateNetworkFlowRule(const ::santa::sync::v2::NetworkFlowRule::Add& add, NSError** error) {
   return YES;
 }
+
+}  // namespace santanetd

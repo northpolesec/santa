@@ -43,7 +43,7 @@
 #include "Source/santad/Logs/EndpointSecurity/Serializers/SanitizableString.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Utilities.h"
 #import "Source/santad/SNTDecisionCache.h"
-#import "src/santanetd/SNDNetworkFlowsSerializer.h"
+#import "src/santanetd/NetworkFlowsSerializer.h"
 
 namespace santa {
 

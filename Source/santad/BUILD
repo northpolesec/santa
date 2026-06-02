@@ -774,7 +774,7 @@ objc_library(
         "//Source/common:SNTStoredExecutionEvent",
         "//Source/common:String",
         "//Source/common/es:EndpointSecurityAPI",
-        "@santanetd//src/santanetd:SNDNetworkFlowsSerializer",
+        "@santanetd//src/santanetd:NetworkFlowsSerializer",
     ],
 )
 
@@ -802,7 +802,7 @@ objc_library(
         "//Source/common/es:EndpointSecurityAPI",
         "@abseil-cpp//absl/status",
         "@protobuf//src/google/protobuf/json",
-        "@santanetd//src/santanetd:SNDNetworkFlowsSerializer",
+        "@santanetd//src/santanetd:NetworkFlowsSerializer",
     ],
 )
 

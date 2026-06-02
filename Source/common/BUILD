@@ -302,6 +302,9 @@ objc_library(
     name = "CodeSigningIdentifierUtils",
     srcs = ["CodeSigningIdentifierUtils.mm"],
     hdrs = ["CodeSigningIdentifierUtils.h"],
+    deps = [
+        ":String",
+    ],
 )
 
 santa_unit_test(
