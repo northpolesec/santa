@@ -28,15 +28,15 @@
 #import "Source/santactl/SNTCommand.h"
 #import "Source/santactl/SNTCommandController.h"
 
-@interface SNTCommandEventUpload : SNTCommand <SNTCommandProtocol, SNTBundleServiceProgressXPC>
+@interface SNTCommandInventory : SNTCommand <SNTCommandProtocol, SNTBundleServiceProgressXPC>
 @property(atomic) uint64_t currentBinaryCount;
 @property(atomic) uint64_t currentFileCount;
 @property(atomic) uint64_t currentHashedCount;
 @end
 
-@implementation SNTCommandEventUpload
+@implementation SNTCommandInventory
 
-REGISTER_COMMAND_NAME(@"eventupload")
+REGISTER_COMMAND_NAME(@"inventory")
 
 + (BOOL)requiresRoot {
   return NO;
@@ -53,17 +53,21 @@ REGISTER_COMMAND_NAME(@"eventupload")
 + (NSString*)longHelpText {
   return @"Generates a non-execution event containing the metadata of the provided bundle or file."
          @"\n"
-         @"Usage: santactl eventupload [options] [file-or-bundle-paths]\n"
+         @"Usage: santactl inventory [options] [file-or-bundle-paths]\n"
          @"    --binary-only: Create a single event for the provided files only. No surrounding\n"
          @"                   bundle information will be uploaded.\n"
          @"\n"
-         @"Examples: santactl eventupload /Applications/Google\\ Chrome.app\n"
-         @"          santactl eventupload /usr/bin/yes /usr/bin/cal\n"
-         @"          santactl eventupload --binary-only /Applications/Google\\ "
+         @"Examples: santactl inventory /Applications/Google\\ Chrome.app\n"
+         @"          santactl inventory /usr/bin/yes /usr/bin/cal\n"
+         @"          santactl inventory --binary-only /Applications/Google\\ "
          @"Chrome.app/Contents/MacOS/Google\\ Chrome\n"
          @"\n"
          @"Note: A sync server must be configured. To generate and upload bundle events, the sync\n"
          @"server must support bundle hashing.";
+}
+
++ (NSSet<NSString*>*)aliases {
+  return [NSSet setWithArray:@[ @"eventupload" ]];
 }
 
 + (BOOL)isHidden {
