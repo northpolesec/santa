@@ -924,6 +924,44 @@ objc_library(
 )
 
 objc_library(
+    name = "SNTRunningProcessRuleEvaluator",
+    srcs = ["SNTRunningProcessRuleEvaluator.mm"],
+    hdrs = ["SNTRunningProcessRuleEvaluator.h"],
+    deps = [
+        ":KillingMachine",
+        ":SNTDecisionCache",
+        ":SNTRuleTable",
+        "//Source/common:AuditUtilities",
+        "//Source/common:CertificateHelpers",
+        "//Source/common:MOLCodesignChecker",
+        "//Source/common:SNTCachedDecision",
+        "//Source/common:SNTFileInfo",
+        "//Source/common:SNTKillCommand",
+        "//Source/common:SNTLogging",
+        "//Source/common:SNTRule",
+        "//Source/common:SNTRuleIdentifiers",
+        "//Source/common:SNTSystemInfo",
+        "//Source/common:SystemResources",
+    ],
+)
+
+santa_unit_test(
+    name = "SNTRunningProcessRuleEvaluatorTest",
+    srcs = ["SNTRunningProcessRuleEvaluatorTest.mm"],
+    deps = [
+        ":SNTRunningProcessRuleEvaluator",
+        ":SNTDecisionCache",
+        ":SNTRuleTable",
+        "//Source/common:AuditUtilities",
+        "//Source/common:SNTCachedDecision",
+        "//Source/common:SNTKillCommand",
+        "//Source/common:SNTRule",
+        "//Source/common:TestUtils",
+        "@OCMock",
+    ],
+)
+
+objc_library(
     name = "SandboxExpectations",
     srcs = ["SandboxExpectations.mm"],
     hdrs = ["SandboxExpectations.h"],
@@ -952,6 +990,7 @@ santa_unit_test(
     deps = [
         ":SNTDaemonControlController",
         ":SNTDatabaseController",
+        ":SNTRunningProcessRuleEvaluator",
         ":SNTRuleTable",
         ":SandboxExpectations",
         "//Source/common:AuditUtilities",
@@ -995,6 +1034,7 @@ objc_library(
         ":SNTEventTable",
         ":SNTNetworkExtensionQueue",
         ":SNTNotificationQueue",
+        ":SNTRunningProcessRuleEvaluator",
         ":SNTRuleTable",
         ":SNTSyncdQueue",
         ":SandboxExpectations",
@@ -1069,6 +1109,7 @@ objc_library(
         ":SNTExecutionController",
         ":SNTNetworkExtensionQueue",
         ":SNTNotificationQueue",
+        ":SNTRunningProcessRuleEvaluator",
         ":SNTRuleTable",
         ":SNTSyncdQueue",
         ":SandboxExpectations",
@@ -1792,6 +1833,7 @@ test_suite(
         ":SNTNetworkExtensionQueueTest",
         ":SNTNotificationQueueTest",
         ":SNTPolicyProcessorTest",
+        ":SNTRunningProcessRuleEvaluatorTest",
         ":SNTRuleTableTest",
         ":SNTSyncdQueueTest",
         ":SandboxExpectationsTest",

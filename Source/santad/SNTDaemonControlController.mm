@@ -57,6 +57,7 @@
 #import "Source/santad/SNTDatabaseController.h"
 #import "Source/santad/SNTNetworkExtensionQueue.h"
 #import "Source/santad/SNTNotificationQueue.h"
+#import "Source/santad/SNTRunningProcessRuleEvaluator.h"
 #import "Source/santad/SNTSyncdQueue.h"
 #include "Source/santad/TemporaryMonitorMode.h"
 #import "src/santanetd/SNDProcessFlows.h"
@@ -77,6 +78,7 @@ double watchdogRAMPeak = 0;
 @property SNTNotificationQueue* notQueue;
 @property SNTSyncdQueue* syncdQueue;
 @property SNTNetworkExtensionQueue* netExtQueue;
+@property SNTRunningProcessRuleEvaluator* runningProcessRuleEvaluator;
 @property dispatch_queue_t generalQ;
 @property dispatch_queue_t commandQ;
 @property dispatch_queue_t netFlowQ;
@@ -108,18 +110,19 @@ double watchdogRAMPeak = 0;
   std::shared_ptr<santa::SandboxExpectations> _sandboxExpectations;
 }
 
-- (instancetype)initWithNotificationQueue:(SNTNotificationQueue*)notQueue
-                               syncdQueue:(SNTSyncdQueue*)syncdQueue
-                        netExtensionQueue:(SNTNetworkExtensionQueue*)netExtQueue
-                                   logger:(std::shared_ptr<santa::Logger>)logger
-                               watchItems:(std::shared_ptr<santa::WatchItems>)watchItems
-                      sandboxExpectations:
-                          (std::shared_ptr<santa::SandboxExpectations>)sandboxExpectations
-                          flushCacheBlock:(void (^)(santa::FlushCacheMode,
-                                                    santa::FlushCacheReason))flushCacheBlock
-                          cacheCountBlock:(NSArray<NSNumber*>* (^)(void))cacheCountBlock
-                          checkCacheBlock:(SNTAction (^)(SantaVnode))checkCacheBlock
-                       metricsExportBlock:(void (^)(void (^reply)(BOOL)))metricsExportBlock {
+- (instancetype)
+      initWithNotificationQueue:(SNTNotificationQueue*)notQueue
+                     syncdQueue:(SNTSyncdQueue*)syncdQueue
+              netExtensionQueue:(SNTNetworkExtensionQueue*)netExtQueue
+                         logger:(std::shared_ptr<santa::Logger>)logger
+                     watchItems:(std::shared_ptr<santa::WatchItems>)watchItems
+            sandboxExpectations:(std::shared_ptr<santa::SandboxExpectations>)sandboxExpectations
+    runningProcessRuleEvaluator:(SNTRunningProcessRuleEvaluator*)runningProcessRuleEvaluator
+                flushCacheBlock:(void (^)(santa::FlushCacheMode,
+                                          santa::FlushCacheReason))flushCacheBlock
+                cacheCountBlock:(NSArray<NSNumber*>* (^)(void))cacheCountBlock
+                checkCacheBlock:(SNTAction (^)(SantaVnode))checkCacheBlock
+             metricsExportBlock:(void (^)(void (^reply)(BOOL)))metricsExportBlock {
   self = [super init];
   if (self) {
     _logger = logger;
@@ -128,6 +131,7 @@ double watchdogRAMPeak = 0;
     _notQueue = notQueue;
     _syncdQueue = syncdQueue;
     _netExtQueue = netExtQueue;
+    _runningProcessRuleEvaluator = runningProcessRuleEvaluator;
     _flushCacheBlock = flushCacheBlock;
     _cacheCountsBlock = cacheCountBlock;
     _checkCacheBlock = checkCacheBlock;
@@ -252,6 +256,13 @@ double watchdogRAMPeak = 0;
     if (self.flushCacheBlock) {
       self.flushCacheBlock(FlushCacheMode::kAllCaches, FlushCacheReason::kRulesChanged);
     }
+  }
+
+  BOOL executionRulesChanged = executionRules.count > 0 || cleanupType == SNTRuleCleanupAll ||
+                               cleanupType == SNTRuleCleanupNonTransitive ||
+                               cleanupType == SNTRuleCleanupExecutionRules;
+  if (success && executionRulesChanged) {
+    [self.runningProcessRuleEvaluator reevaluateRunningProcesses];
   }
 
   reply(success, errors);

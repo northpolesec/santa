@@ -30,6 +30,7 @@
 #import "Source/common/SNTSandboxExecRequest.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
 #import "Source/santad/SNTDatabaseController.h"
+#import "Source/santad/SNTRunningProcessRuleEvaluator.h"
 #include "Source/santad/SandboxExpectations.h"
 
 using santa::SandboxExpectations;
@@ -49,6 +50,7 @@ static NSString* const kBinarySHA256 =
 @property id mockDatabaseController;
 @property id mockRuleTable;
 @property id mockMOLXPC;
+@property id mockRunningProcessRuleEvaluator;
 @property SNTDaemonControlController* sut;
 @end
 
@@ -63,6 +65,7 @@ static NSString* const kBinarySHA256 =
   self.mockDatabaseController = OCMClassMock([SNTDatabaseController class]);
   self.mockRuleTable = OCMClassMock([SNTRuleTable class]);
   OCMStub([self.mockDatabaseController ruleTable]).andReturn(self.mockRuleTable);
+  self.mockRunningProcessRuleEvaluator = OCMClassMock([SNTRunningProcessRuleEvaluator class]);
 
   // Class-mocked so positive-path tests can stub `currentPeerAuditToken` to
   // return a non-zero token. Unstubbed calls fall through to the real
@@ -76,6 +79,7 @@ static NSString* const kBinarySHA256 =
       logger:nullptr
       watchItems:nullptr
       sandboxExpectations:_sandboxExpectations
+      runningProcessRuleEvaluator:self.mockRunningProcessRuleEvaluator
       flushCacheBlock:^(santa::FlushCacheMode, santa::FlushCacheReason) {
       }
       cacheCountBlock:^NSArray<NSNumber*>*() {
@@ -93,6 +97,7 @@ static NSString* const kBinarySHA256 =
   [self.mockDatabaseController stopMocking];
   [self.mockRuleTable stopMocking];
   [self.mockMOLXPC stopMocking];
+  [self.mockRunningProcessRuleEvaluator stopMocking];
   [super tearDown];
 }
 
@@ -298,6 +303,7 @@ static NSString* const kBinarySHA256 =
   SNTNetworkFlowRule* nfRule = [[SNTNetworkFlowRule alloc] initAddRuleWithId:101 protoBlob:blob];
 
   __block NSArray<SNTNetworkFlowRule*>* forwarded = nil;
+  OCMReject([self.mockRunningProcessRuleEvaluator reevaluateRunningProcesses]);
   OCMStub([self.mockRuleTable addExecutionRules:OCMOCK_ANY
                                 fileAccessRules:OCMOCK_ANY
                                networkFlowRules:OCMOCK_ANY
@@ -323,6 +329,30 @@ static NSString* const kBinarySHA256 =
   XCTAssertTrue(replySuccess);
   XCTAssertEqual(forwarded.count, 1u);
   XCTAssertEqual(forwarded.firstObject.ruleId, 101);
+}
+
+- (void)testRuleAddReevaluatesRunningProcessesForExecutionRules {
+  SNTRule* rule = [[SNTRule alloc] initWithIdentifier:kBinarySHA256
+                                                state:SNTRuleStateBlock
+                                                 type:SNTRuleTypeBinary];
+  OCMStub([self.mockRuleTable addExecutionRules:OCMOCK_ANY
+                                fileAccessRules:OCMOCK_ANY
+                               networkFlowRules:OCMOCK_ANY
+                                    ruleCleanup:SNTRuleCleanupNone
+                                         errors:[OCMArg anyObjectRef]])
+      .andReturn(YES);
+
+  OCMExpect([self.mockRunningProcessRuleEvaluator reevaluateRunningProcesses]);
+
+  [self.sut databaseRuleAddExecutionRules:@[ rule ]
+                          fileAccessRules:@[]
+                         networkFlowRules:@[]
+                              ruleCleanup:SNTRuleCleanupNone
+                                   source:SNTRuleAddSourceSyncService
+                                    reply:^(BOOL, NSArray<NSError*>*){
+                                    }];
+
+  OCMVerifyAll(self.mockRunningProcessRuleEvaluator);
 }
 
 // ---- databaseRulesHash: returns three hashes -------------------------

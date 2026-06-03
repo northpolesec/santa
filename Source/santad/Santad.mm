@@ -50,6 +50,7 @@
 #import "Source/santad/SNTDaemonControlController.h"
 #import "Source/santad/SNTDatabaseController.h"
 #import "Source/santad/SNTDecisionCache.h"
+#import "Source/santad/SNTRunningProcessRuleEvaluator.h"
 #include "Source/santad/TTYWriter.h"
 
 using santa::AuthResultCache;
@@ -86,6 +87,9 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                 std::shared_ptr<santa::EntitlementsFilter> entitlements_filter,
                 std::shared_ptr<santa::SandboxExpectations> sandbox_expectations) {
   SNTConfigurator* configurator = [SNTConfigurator configurator];
+  SNTRunningProcessRuleEvaluator* running_process_rule_evaluator =
+      [[SNTRunningProcessRuleEvaluator alloc] initWithRuleTable:exec_controller.ruleTable
+                                                  decisionCache:[SNTDecisionCache sharedCache]];
 
   std::weak_ptr<Metrics> weak_metrics(metrics);
   SNTDaemonControlController* dc =
@@ -95,6 +99,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
           logger:logger
           watchItems:watch_items
           sandboxExpectations:sandbox_expectations
+          runningProcessRuleEvaluator:running_process_rule_evaluator
           flushCacheBlock:^(FlushCacheMode mode, FlushCacheReason reason) {
             auth_result_cache->FlushCache(mode, reason);
             [exec_controller flushTouchIDApprovalCache];
@@ -508,6 +513,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                 LOGI(@"StaticRules changed. Flushing caches.");
                 auth_result_cache->FlushCache(FlushCacheMode::kAllCaches,
                                               FlushCacheReason::kStaticRulesChanged);
+                [running_process_rule_evaluator reevaluateRunningProcesses];
               }],
     [[SNTKVOManager alloc]
         initWithObject:configurator
