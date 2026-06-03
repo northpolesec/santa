@@ -13,16 +13,6 @@ objc_library(
     hdrs = ["SNTNetworkExtensionSettings.h"],
     deps = [
         "//Source/common:CoderMacros",
-    ],
-)
-
-objc_library(
-    name = "SNTNetworkExtensionConfig",
-    srcs = ["SNTNetworkExtensionConfig.mm"],
-    hdrs = ["SNTNetworkExtensionConfig.h"],
-    deps = [
-        ":SNTNetworkExtensionSettings",
-        "//Source/common:CoderMacros",
         "//Source/common:SNTNetworkFlowRule",
     ],
 )
@@ -31,7 +21,7 @@ objc_library(
     name = "SNDXPCNetworkExtensionInterface",
     hdrs = ["SNDXPCNetworkExtensionInterface.h"],
     deps = [
-        ":SNTNetworkExtensionConfig",
+        ":SNTNetworkExtensionSettings",
     ],
 )
 
@@ -41,7 +31,6 @@ objc_library(
     hdrs = ["SNTXPCNetworkExtensionInterface.h"],
     deps = [
         ":SNDXPCNetworkExtensionInterface",
-        ":SNTNetworkExtensionConfig",
         ":SNTNetworkExtensionSettings",
         "//Source/common:MOLCodesignChecker",
         "//Source/common:MOLXPCConnection",
@@ -73,15 +62,6 @@ santa_unit_test(
     srcs = ["SNTNetworkExtensionSettingsTest.mm"],
     deps = [
         ":SNTNetworkExtensionSettings",
-    ],
-)
-
-santa_unit_test(
-    name = "SNTNetworkExtensionConfigTest",
-    srcs = ["SNTNetworkExtensionConfigTest.mm"],
-    deps = [
-        ":SNTNetworkExtensionConfig",
-        ":SNTNetworkExtensionSettings",
         "//Source/common:SNTNetworkFlowRule",
     ],
 )
@@ -89,7 +69,6 @@ santa_unit_test(
 test_suite(
     name = "unit_tests",
     tests = [
-        ":SNTNetworkExtensionConfigTest",
         ":SNTNetworkExtensionSettingsTest",
         ":SNTSyncNetworkExtensionSettingsTest",
     ],

@@ -1068,7 +1068,7 @@ static const char* const kAllowedCanonicalBundlePaths[] = {
 }
 
 - (void)registerNetworkExtensionWithProtocolVersion:(NSString*)protocolVersion
-                                              reply:(void (^)(SNTNetworkExtensionConfig* config,
+                                              reply:(void (^)(SNTNetworkExtensionSettings* settings,
                                                               NSString* santaProtocolVersion,
                                                               NSError* error))reply {
   NSError* error;
@@ -1081,14 +1081,14 @@ static const char* const kAllowedCanonicalBundlePaths[] = {
     return;
   }
 
-  SNTNetworkExtensionConfig* config =
+  SNTNetworkExtensionSettings* settings =
       [self.netExtQueue handleRegistrationWithProtocolVersion:protocolVersion error:&error];
-  reply(config, kSantaNetworkExtensionProtocolVersion, error);
+  reply(settings, kSantaNetworkExtensionProtocolVersion, error);
 
   // When the network extension registers, it may have just been enabled which can
   // reset network connections. Trigger a NATS reconnect to ensure push notifications
   // are working immediately.
-  if (config) {
+  if (settings) {
     LOGI(@"Network extension registered, triggering push notification reconnect");
     [self.syncdQueue pushNotificationReconnect];
   }

@@ -14,6 +14,8 @@
 
 #import <Foundation/Foundation.h>
 
+@class SNTNetworkFlowRule;
+
 /// Action applied to network flows that match no NetworkFlowRule. Values mirror
 /// pbv2::NetworkFlowDefaultAction (see NetworkFlowDefaultActionFromProto in SNTSyncPreflight).
 typedef NS_ENUM(NSInteger, SNTNetworkFlowDefaultAction) {
@@ -34,14 +36,21 @@ typedef NS_ENUM(NSInteger, SNTNetworkFlowDefaultAction) {
 @property(readonly) SNTNetworkFlowDefaultAction flowDefaultAction;
 
 /// Upstream DNS forward timeout used by santanetd's DNS proxy, in seconds.
-/// Normalized to [1.0, 15.0]; values below the floor (incl. unset/0) become the 5.0 default,
+/// Normalized to [1.0, 15.0]; values below the floor (incl. unset/0) become the 7.0 default,
 /// values above the ceiling clamp to 15.0.
 @property(readonly) NSTimeInterval dnsUpstreamTimeoutSecs;
 
-/// Defaults flowDefaultAction to Unspecified and dnsUpstreamTimeoutSecs to 5s.
+/// The network-flow ruleset for santanetd to apply. At registration this is the full ruleset
+/// (possibly empty); on a runtime update, nil means "rules unchanged — keep the existing index"
+/// while an empty array means "no rules". Transport-only: intentionally excluded from
+/// -isEqual:/-hash (see the implementation), and silently ignored by santanetd builds that predate
+/// network-flow rules.
+@property(readonly, copy) NSArray<SNTNetworkFlowRule*>* networkFlowRules;
+
+/// Defaults flowDefaultAction to Unspecified and dnsUpstreamTimeoutSecs to 7s.
 - (instancetype)initWithEnable:(BOOL)enable;
 
-/// Defaults dnsUpstreamTimeoutSecs to 5s.
+/// Defaults dnsUpstreamTimeoutSecs to 7s.
 - (instancetype)initWithEnable:(BOOL)enable
              flowDefaultAction:(SNTNetworkFlowDefaultAction)flowDefaultAction;
 
@@ -49,9 +58,22 @@ typedef NS_ENUM(NSInteger, SNTNetworkFlowDefaultAction) {
 - (instancetype)initWithEnable:(BOOL)enable
         dnsUpstreamTimeoutSecs:(NSTimeInterval)dnsUpstreamTimeoutSecs;
 
-/// Designated initializer.
+/// Defaults networkFlowRules to nil.
 - (instancetype)initWithEnable:(BOOL)enable
              flowDefaultAction:(SNTNetworkFlowDefaultAction)flowDefaultAction
         dnsUpstreamTimeoutSecs:(NSTimeInterval)dnsUpstreamTimeoutSecs;
+
+/// Designated initializer.
+- (instancetype)initWithEnable:(BOOL)enable
+             flowDefaultAction:(SNTNetworkFlowDefaultAction)flowDefaultAction
+        dnsUpstreamTimeoutSecs:(NSTimeInterval)dnsUpstreamTimeoutSecs
+              networkFlowRules:(NSArray<SNTNetworkFlowRule*>*)networkFlowRules;
+
+/// Returns a copy carrying the receiver's scalar settings, with networkFlowRules set to the given
+/// array (any networkFlowRules on the receiver are not carried over). Because networkFlowRules is
+/// excluded from -isEqual:/-hash, the result compares equal to the receiver — so a rules-bearing
+/// copy can stand in for the scalar receiver as cached last-pushed state without perturbing the
+/// settings delta.
+- (instancetype)settingsByAttachingNetworkFlowRules:(NSArray<SNTNetworkFlowRule*>*)networkFlowRules;
 
 @end
