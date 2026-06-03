@@ -75,7 +75,7 @@ class SleighLauncher {
   // Sets host_id/host_name on a SleighConfig.
   void PopulateHostInfo(::santa::telemetry::v1::SleighConfig* config);
 
-  absl::StatusOr<std::string> SerializeConfig(
+  absl::StatusOr<std::string> SerializeTelemetryUploadConfig(
       const std::vector<int>& input_fds);
 
   absl::StatusOr<std::string> SerializeBinaryUploadConfig(

@@ -133,7 +133,8 @@ class TestableSleighLauncher : public santa::SleighLauncher {
   XCTAssertEqual(resp.status().code(), absl::StatusCode::kInternal);
 }
 
-// LaunchTelemetryExport still runs through SerializeConfig after the RunSleigh refactor.
+// LaunchTelemetryExport still runs through SerializeTelemetryUploadConfig after the RunSleigh
+// refactor.
 // With no export configuration set (unit-test default), it must fail at the
 // serialization guard — proving the telemetry path is intact, not crashing.
 - (void)testTelemetryLaunchSerializationGuardIntact {
@@ -146,7 +147,8 @@ class TestableSleighLauncher : public santa::SleighLauncher {
   [@"telemetry" writeToFile:inPath atomically:YES encoding:NSUTF8StringEncoding error:nil];
 
   absl::Status s = launcher.LaunchTelemetryExport({inPath.UTF8String}, /*timeout_seconds=*/10);
-  XCTAssertFalse(s.ok());  // exportConfig is nil → InvalidArgumentError from SerializeConfig.
+  XCTAssertFalse(s.ok());  // exportConfig is nil → InvalidArgumentError from
+                           // SerializeTelemetryUploadConfig.
 }
 
 @end

@@ -65,7 +65,7 @@ absl::Status SleighLauncher::LaunchTelemetryExport(const std::vector<std::string
     input_fds.push_back(fd);
   }
 
-  absl::StatusOr<std::string> serialized = SerializeConfig(input_fds);
+  absl::StatusOr<std::string> serialized = SerializeTelemetryUploadConfig(input_fds);
   if (!serialized.ok()) {
     LOGD(@"SleighLauncher::LaunchTelemetryExport(): Failed to serialize SleighConfig");
     return serialized.status();
@@ -288,7 +288,8 @@ void SleighLauncher::PopulateHostInfo(::santa::telemetry::v1::SleighConfig* conf
   config->set_host_name(hostName ? [hostName UTF8String] : "");
 }
 
-absl::StatusOr<std::string> SleighLauncher::SerializeConfig(const std::vector<int>& input_fds) {
+absl::StatusOr<std::string> SleighLauncher::SerializeTelemetryUploadConfig(
+    const std::vector<int>& input_fds) {
   ::santa::telemetry::v1::SleighConfig config;
   PopulateHostInfo(&config);
 
