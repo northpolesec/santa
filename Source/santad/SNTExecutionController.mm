@@ -95,14 +95,22 @@ static SNTEventState BlockToAllowDecision(SNTEventState blockDecision) {
   }
 }
 
-// Returns true if two processes execute the same binary, using the same two
-// verification modes as the seatbelt expectation check below: strict cdhash
-// comparison when both are CdhashStrictlyEnforced (the kernel guarantees the
-// cdhash binds to executed content), otherwise a (dev, ino) vnode comparison.
-static bool SameBinary(const es_process_t* a, const es_process_t* b) {
+// Returns true if two processes execute the same binary.
+//   * Strict: when both are CdhashStrictlyEnforced the kernel-reported cdhash is
+//     authoritative (the kernel guarantees it binds to executed content).
+//   * Otherwise: prefer a SHA-256 comparison when both hashes are known. Santa
+//     computes a SHA-256 when authorizing each exec; the target's is `bSHA256`
+//     (cd.sha256) and the source's is read back from SNTDecisionCache by the
+//     caller. SHA-256 binds to content, which is stronger than (dev, ino)
+//     against inode reuse. Fall back to (dev, ino) when a hash is unavailable.
+static bool SameBinary(const es_process_t* a, NSString* aSHA256, const es_process_t* b,
+                       NSString* bSHA256) {
   if (santa::CdhashStrictlyEnforced(a->codesigning_flags) &&
       santa::CdhashStrictlyEnforced(b->codesigning_flags)) {
     return memcmp(a->cdhash, b->cdhash, CS_CDHASH_LEN) == 0;
+  }
+  if (aSHA256.length > 0 && bSHA256.length > 0) {
+    return [aSHA256 isEqualToString:bSHA256];
   }
   return a->executable->stat.st_dev == b->executable->stat.st_dev &&
          a->executable->stat.st_ino == b->executable->stat.st_ino;
@@ -154,7 +162,7 @@ static bool SameBinary(const es_process_t* a, const es_process_t* b) {
     _policyProcessor = policyProcessor;
     _procSignalCache = std::make_unique<SantaCache<std::pair<pid_t, int>, bool>>(100000);
     _touchIDApprovalCache = std::make_unique<SantaCache<std::string, uint64_t>>(100);
-    _sandboxedSeatbeltProcs = std::make_unique<SantaCache<std::pair<pid_t, int>, bool>>(20000);
+    _sandboxedSeatbeltProcs = std::make_unique<SantaCache<std::pair<pid_t, int>, bool>>(100000);
     _processControlBlock = processControlBlock;
     _processTree = std::move(processTree);
     _sandboxExpectations = std::move(sandboxExpectations);
@@ -282,6 +290,28 @@ static bool SameBinary(const es_process_t* a, const es_process_t* b) {
   return NO;
 }
 
+// Returns YES if `instigator` is executing the same binary as `target`. For
+// strictly cdhash-enforced binaries the cdhash is authoritative, so the
+// (relatively expensive) source-hash lookup is skipped. Otherwise the SHA-256
+// Santa computed for the instigator's image is read back from SNTDecisionCache
+// (nil if no decision is cached) and compared against the target's.
+- (BOOL)isSameBinaryAsInstigator:(const es_process_t*)instigator
+                          target:(const es_process_t*)target
+                    targetSHA256:(NSString*)targetSHA256 {
+  NSString* instigatorSHA256 =
+      santa::CdhashStrictlyEnforced(instigator->codesigning_flags)
+          ? nil
+          : [[SNTDecisionCache sharedCache]
+                cachedDecisionForVnode:SantaVnode::VnodeForFile(instigator->executable)]
+                .sha256;
+  return SameBinary(instigator, instigatorSHA256, target, targetSHA256);
+}
+
+- (void)forgetSandboxedSeatbeltProc:(const audit_token_t&)token {
+  _sandboxedSeatbeltProcs->remove(
+      std::make_pair(audit_token_to_pid(token), audit_token_to_pidversion(token)));
+}
+
 - (void)validateExecEvent:(const Message&)esMsg
            cachedDecision:(SNTCachedDecision*)existingDecision
                postAction:(bool (^)(SNTAction, SNTCachedDecision*))postAction {
@@ -392,7 +422,9 @@ static bool SameBinary(const es_process_t* a, const es_process_t* b) {
         cd.decisionExtra = @"Seatbelt expectation verification failed";
       }
     } else if ([self isSandboxedSeatbeltDescendant:esMsg->process] &&
-               SameBinary(esMsg->process, targetProc)) {
+               [self isSameBinaryAsInstigator:esMsg->process
+                                       target:targetProc
+                                 targetSHA256:cd.sha256]) {
       authorized = true;
       cd.decisionExtra = @"Seatbelt requirement relaxed: sandboxed self-exec";
     } else {

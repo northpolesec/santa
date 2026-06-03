@@ -136,6 +136,40 @@ class MockAuthResultCache : public AuthResultCache {
   XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
 }
 
+// As a tree-aware client the authorizer observes NOTIFY_EXIT. It should evict the
+// exiting process from the exec controller's sandboxed-seatbelt cache.
+- (void)testHandleContextMessageEvictsSandboxedSeatbeltProcOnExit {
+  es_file_t file = MakeESFile("foo");
+  es_process_t proc = MakeESProcess(&file);
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_EXIT, &proc);
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsESNewClient();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+
+  // processTree:nullptr keeps the tree-aware superclass a no-op so only the
+  // eviction side effect is exercised.
+  SNTEndpointSecurityAuthorizer* authClient =
+      [[SNTEndpointSecurityAuthorizer alloc] initWithESAPI:mockESApi
+                                                   metrics:nullptr
+                                            execController:self.mockExecController
+                                        compilerController:nil
+                                           authResultCache:nullptr
+                                                 ttyWriter:nullptr
+                                               processTree:nullptr];
+
+  OCMExpect([self.mockExecController forgetSandboxedSeatbeltProc:proc.audit_token])
+      .ignoringNonObjectArgs();
+
+  {
+    Message msg(mockESApi, &esMsg);
+    [authClient handleContextMessage:msg];
+  }
+
+  XCTAssertTrue(OCMVerifyAll(self.mockExecController));
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+}
+
 - (void)testHandleMessage {
 #ifdef THREAD_SANITIZER
   // TSAN and this test do not get along in multiple ways.
