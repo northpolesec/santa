@@ -99,8 +99,7 @@ static NSString* const kSantanetdExtensionBundleID = @"com.northpolesec.santa.ne
       argumentIndex:0
             ofReply:NO];
 
-  [r setClasses:[NSSet setWithObjects:[SNTNetworkExtensionConfig class],
-                                      [SNTNetworkExtensionSettings class], [NSArray class],
+  [r setClasses:[NSSet setWithObjects:[SNTNetworkExtensionSettings class], [NSArray class],
                                       [SNTNetworkFlowRule class], [NSData class], nil]
         forSelector:@selector(registerNetworkExtensionWithProtocolVersion:reply:)
       argumentIndex:0

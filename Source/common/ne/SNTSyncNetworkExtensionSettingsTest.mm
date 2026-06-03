@@ -83,7 +83,7 @@
 
 - (void)testDNSUpstreamTimeoutDefaultsToZeroWhenUnset {
   // The 2-arg convenience init leaves the carrier timeout at 0 ("unset").
-  // Clamping/defaulting to 5s happens downstream in SNTNetworkExtensionSettings.
+  // Clamping/defaulting to 7s happens downstream in SNTNetworkExtensionSettings.
   SNTSyncNetworkExtensionSettings* settings =
       [[SNTSyncNetworkExtensionSettings alloc] initWithEnable:YES
                                             flowDefaultAction:SNTNetworkFlowDefaultActionDeny];

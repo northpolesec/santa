@@ -18,7 +18,6 @@
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTNetworkFlowRule.h"
 #import "Source/common/ne/SNDXPCNetworkExtensionInterface.h"
-#import "Source/common/ne/SNTNetworkExtensionConfig.h"
 #import "Source/common/ne/SNTNetworkExtensionSettings.h"
 
 static NSString* const kSantanetdExtensionBundleID = @"com.northpolesec.santa.netd";
@@ -28,10 +27,9 @@ static NSString* const kSantanetdExtensionBundleID = @"com.northpolesec.santa.ne
 + (NSXPCInterface*)networkExtensionInterface {
   NSXPCInterface* r = [NSXPCInterface interfaceWithProtocol:@protocol(SNDNetworkExtensionXPC)];
 
-  [r setClasses:[NSSet setWithObjects:[SNTNetworkExtensionConfig class],
-                                      [SNTNetworkExtensionSettings class], [NSArray class],
+  [r setClasses:[NSSet setWithObjects:[SNTNetworkExtensionSettings class], [NSArray class],
                                       [SNTNetworkFlowRule class], [NSData class], nil]
-        forSelector:@selector(updateNetworkExtensionConfig:reply:)
+        forSelector:@selector(updateNetworkExtensionSettings:reply:)
       argumentIndex:0
             ofReply:NO];
 
