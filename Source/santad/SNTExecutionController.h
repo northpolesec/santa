@@ -15,6 +15,8 @@
 
 #import <Foundation/Foundation.h>
 
+#include <bsm/libbsm.h>
+
 #import "Source/common/SNTCommonEnums.h"
 #include "Source/common/es/Message.h"
 #include "Source/common/processtree/process_tree.h"
@@ -107,6 +109,14 @@ using LogExecutionBlock = void (^)(santa::Message esMsg);
 ///
 - (void)validateSuspendResumeEvent:(const santa::Message&)esMsg
                         postAction:(void (^)(bool))postAction;
+
+///
+///  Removes any record of the given process from the sandboxed-seatbelt tracking
+///  cache. Called on process exit (via the tree-aware authorizer) so the cache
+///  stays bounded by the set of live sandboxed seatbelt processes. Safe to call
+///  for processes that were never recorded.
+///
+- (void)forgetSandboxedSeatbeltProc:(const audit_token_t&)token;
 
 ///
 /// Perform light, synchronous processing of the given event to decide whether or not the

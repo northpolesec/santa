@@ -50,10 +50,13 @@ using santa::Message;
                execController:(SNTExecutionController*)execController
            compilerController:(SNTCompilerController*)compilerController
               authResultCache:(std::shared_ptr<AuthResultCache>)authResultCache
-                    ttyWriter:(std::shared_ptr<santa::TTYWriter>)ttyWriter {
+                    ttyWriter:(std::shared_ptr<santa::TTYWriter>)ttyWriter
+                  processTree:
+                      (std::shared_ptr<santa::santad::process_tree::ProcessTree>)processTree {
   self = [super initWithESAPI:std::move(esApi)
                       metrics:std::move(metrics)
-                    processor:santa::Processor::kAuthorizer];
+                    processor:santa::Processor::kAuthorizer
+                  processTree:std::move(processTree)];
   if (self) {
     _execController = execController;
     _compilerController = compilerController;
@@ -69,6 +72,19 @@ using santa::Message;
 
 - (NSString*)description {
   return @"Authorizer";
+}
+
+- (bool)handleContextMessage:(Message&)esMsg {
+  bool addedOnly = [super handleContextMessage:esMsg];
+  // The tree-aware superclass vends process lifecycle events to keep the process
+  // tree consistent. Now that this client observes exits, evict the exiting
+  // process from the exec controller's sandboxed-seatbelt cache so it stays
+  // bounded by the set of live sandboxed processes (entries are otherwise
+  // harmless but never reclaimed until the cache fills).
+  if (esMsg->event_type == ES_EVENT_TYPE_NOTIFY_EXIT) {
+    [self.execController forgetSandboxedSeatbeltProc:esMsg->process->audit_token];
+  }
+  return addedOnly;
 }
 
 - (bool)respondToMessage:(const santa::Message&)msg
