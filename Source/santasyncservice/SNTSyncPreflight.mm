@@ -487,10 +487,19 @@ void HandleV2Responses(const ::pbv2::PreflightResponse& resp, SNTSyncState* sync
   }
 
   if (resp.has_network_extension()) {
-    syncState.networkExtensionSettings = [[SNTSyncNetworkExtensionSettings alloc]
-           initWithEnable:resp.network_extension().enable()
-        flowDefaultAction:NetworkFlowDefaultActionFromProto(
-                              resp.network_extension().flow_default_action())];
+    auto& ne = resp.network_extension();
+    SNTNetworkFlowDefaultAction flowDefaultAction =
+        NetworkFlowDefaultActionFromProto(ne.flow_default_action());
+    if (ne.has_dns_upstream_timeout_seconds()) {
+      syncState.networkExtensionSettings = [[SNTSyncNetworkExtensionSettings alloc]
+                  initWithEnable:ne.enable()
+               flowDefaultAction:flowDefaultAction
+          dnsUpstreamTimeoutSecs:ne.dns_upstream_timeout_seconds()];
+    } else {
+      syncState.networkExtensionSettings =
+          [[SNTSyncNetworkExtensionSettings alloc] initWithEnable:ne.enable()
+                                                flowDefaultAction:flowDefaultAction];
+    }
   }
 
   if (resp.has_file_access_event_detail_url()) {

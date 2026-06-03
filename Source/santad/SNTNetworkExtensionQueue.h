@@ -19,7 +19,6 @@
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
 
 @class SNDProcessFlows;
-@class SNTNetworkExtensionConfig;
 @class SNTNetworkExtensionSettings;
 @class SNTNotificationQueue;
 @class SNTRuleTable;
@@ -44,11 +43,12 @@ extern NSString* const kSantaNetworkExtensionProtocolVersion;
 /// nothing if neither changed). Safe to call when santanetd is not connected (no-op).
 - (void)reconcileNetworkExtensionConfig;
 
-/// Handle a santanetd registration. Returns the config (settings + full current ruleset) to seed
-/// it with — the caller returns it in the registration reply so santanetd applies both atomically.
-/// Records it as the last-pushed state so the next reconcile only sends deltas.
-- (SNTNetworkExtensionConfig*)handleRegistrationWithProtocolVersion:(NSString*)protocolVersion
-                                                              error:(NSError**)error;
+/// Handle a santanetd registration. Returns the settings (scalars + full current ruleset carried in
+/// networkFlowRules) to seed it with — the caller returns it in the registration reply so santanetd
+/// applies both atomically. Records it as the last-pushed state so the next reconcile only sends
+/// deltas.
+- (SNTNetworkExtensionSettings*)handleRegistrationWithProtocolVersion:(NSString*)protocolVersion
+                                                                error:(NSError**)error;
 
 - (void)handleNetworkFlows:(NSArray<SNDProcessFlows*>*)processFlows
                windowStart:(NSDate*)windowStart

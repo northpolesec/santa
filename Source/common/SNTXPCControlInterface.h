@@ -20,7 +20,6 @@
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTRuleIdentifiers.h"
 #import "Source/common/SNTXPCUnprivilegedControlInterface.h"
-#import "Source/common/ne/SNTNetworkExtensionConfig.h"
 #import "Source/common/ne/SNTNetworkExtensionSettings.h"
 
 @class SNDProcessFlows;
@@ -75,6 +74,13 @@ typedef NS_ENUM(NSInteger, SNTRuleAddSource) {
 - (void)killProcesses:(SNTKillRequest*)killRequest reply:(void (^)(SNTKillResponse*))reply;
 
 ///
+///  Upload the binary named in a serialized santa.commands.v1.BinaryUploadRequest to
+///  the workshop bucket via Sleigh. reply receives a serialized
+///  santa.commands.v1.BinaryUploadResponse.
+///
+- (void)uploadBinary:(NSData*)serializedRequest reply:(void (^)(NSData* serializedResponse))reply;
+
+///
 /// Control Ops
 ///
 - (void)installSantaApp:(NSString*)appPath reply:(void (^)(BOOL))reply;
@@ -85,7 +91,7 @@ typedef NS_ENUM(NSInteger, SNTRuleAddSource) {
 - (void)installNetworkExtension:(void (^)(BOOL))reply;
 
 - (void)registerNetworkExtensionWithProtocolVersion:(NSString*)protocolVersion
-                                              reply:(void (^)(SNTNetworkExtensionConfig* config,
+                                              reply:(void (^)(SNTNetworkExtensionSettings* settings,
                                                               NSString* santaProtocolVersion,
                                                               NSError* error))reply;
 

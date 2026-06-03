@@ -226,6 +226,7 @@ static NSString* const kEnableNATS =
 static NSString* const kEntitlementsPrefixFilterKey = @"EntitlementsPrefixFilter";
 static NSString* const kEntitlementsTeamIDFilterKey = @"EntitlementsTeamIDFilter";
 static NSString* const kTelemetryFilterExpressionsKey = @"TelemetryFilterExpressions";
+static NSString* const kBinaryUploadFilterExpressionsKey = @"BinaryUploadFilterExpressions";
 static NSString* const kCELFallbackRulesKey = @"CELFallbackRules";
 
 static NSString* const kOnStartUSBOptions = @"OnStartUSBOptions";
@@ -331,6 +332,7 @@ static NSString* const kPushTokenChainKey = @"PushTokenChain";
       kNetworkExtensionSettingsKey : data,
       kPushTokenChainKey : array,
       kTelemetryFilterExpressionsKey : array,
+      kBinaryUploadFilterExpressionsKey : array,
       kCELFallbackRulesKey : data,
       kEventDetailURLKey : string,
       kEventDetailTextKey : string,
@@ -442,6 +444,7 @@ static NSString* const kPushTokenChainKey = @"PushTokenChain";
       kEntitlementsTeamIDFilterKey : array,
       kEnabledProcessAnnotations : array,
       kTelemetryFilterExpressionsKey : array,
+      kBinaryUploadFilterExpressionsKey : array,
       kTelemetryKey : array,
       kBrandingCompanyName : string,
       kBrandingCompanyLogo : string,
@@ -549,11 +552,11 @@ static SNTConfigurator* sharedConfigurator = nil;
       setByAddingObject:NSStringFromSelector(@selector(inTemporaryMonitorMode))];
 }
 
-+ (NSSet*)keyPathsForValuesAffectingAllowlistPathRegex {
++ (NSSet*)keyPathsForValuesAffectingAllowedPathRegex {
   return [self syncAndConfigStateSet];
 }
 
-+ (NSSet*)keyPathsForValuesAffectingBlocklistPathRegex {
++ (NSSet*)keyPathsForValuesAffectingBlockedPathRegex {
   return [self syncAndConfigStateSet];
 }
 
@@ -598,6 +601,10 @@ static SNTConfigurator* sharedConfigurator = nil;
 }
 
 + (NSSet*)keyPathsForValuesAffectingEnableSilentMode {
+  return [self configStateSet];
+}
+
++ (NSSet*)keyPathsForValuesAffectingEnableSilentTTYMode {
   return [self configStateSet];
 }
 
@@ -885,6 +892,10 @@ static SNTConfigurator* sharedConfigurator = nil;
   return [self syncAndConfigStateSet];
 }
 
++ (NSSet*)keyPathsForValuesAffectingBinaryUploadFilterExpressions {
+  return [self syncAndConfigStateSet];
+}
+
 + (NSSet*)keyPathsForValuesAffectingCelFallbackRules {
   return [self syncStateSet];
 }
@@ -910,6 +921,14 @@ static SNTConfigurator* sharedConfigurator = nil;
 }
 
 + (NSSet*)keyPathsForValuesAffectingTelemetryExportMaxFilesPerBatch {
+  return [self configStateSet];
+}
+
++ (NSSet*)keyPathsForValuesAffectingExportMetrics {
+  return [self configStateSet];
+}
+
++ (NSSet*)keyPathsForValuesAffectingMetricExportInterval {
   return [self configStateSet];
 }
 
@@ -2140,6 +2159,25 @@ static SNTConfigurator* sharedConfigurator = nil;
 
 - (void)setSyncServerTelemetryFilterExpressions:(NSArray<NSString*>*)expressions {
   [self updateSyncStateForKey:kTelemetryFilterExpressionsKey
+                        value:EnsureArrayOfStrings(expressions)];
+}
+
+- (NSArray*)binaryUploadFilterExpressions {
+  NSMutableArray* merged = [NSMutableArray array];
+
+  NSArray* configExpressions =
+      EnsureArrayOfStrings(self.configState[kBinaryUploadFilterExpressionsKey]);
+  if (configExpressions) [merged addObjectsFromArray:configExpressions];
+
+  NSArray* syncExpressions =
+      EnsureArrayOfStrings(self.syncState[kBinaryUploadFilterExpressionsKey]);
+  if (syncExpressions) [merged addObjectsFromArray:syncExpressions];
+
+  return merged.count ? [merged copy] : nil;
+}
+
+- (void)setSyncServerBinaryUploadFilterExpressions:(NSArray<NSString*>*)expressions {
+  [self updateSyncStateForKey:kBinaryUploadFilterExpressionsKey
                         value:EnsureArrayOfStrings(expressions)];
 }
 

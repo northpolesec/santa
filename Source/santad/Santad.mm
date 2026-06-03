@@ -47,9 +47,11 @@
 #import "Source/santad/EventProviders/SNTEndpointSecurityRecorder.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityTamperResistance.h"
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
+#import "Source/santad/SNTBinaryUploadController.h"
 #import "Source/santad/SNTDaemonControlController.h"
 #import "Source/santad/SNTDatabaseController.h"
 #import "Source/santad/SNTDecisionCache.h"
+#include "Source/santad/SleighLauncher.h"
 #include "Source/santad/TTYWriter.h"
 
 using santa::AuthResultCache;
@@ -88,6 +90,16 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
   SNTConfigurator* configurator = [SNTConfigurator configurator];
 
   std::weak_ptr<Metrics> weak_metrics(metrics);
+
+  // Binary upload via Sleigh. This timeout SIGKILLs the Sleigh child on expiry,
+  // so it must exceed Sleigh's own 5-min upload deadline. The 1-min margin here
+  // (6 vs 5) lets Sleigh hit its deadline first and return a real response,
+  // rather than being killed mid-upload — which would surface only a generic error.
+  // If Sleigh's internal deadline ever changes this margin needs to be revisited.
+  auto binary_upload_controller = std::make_shared<santa::SNTBinaryUploadController>(
+      santa::SleighLauncher::Create(std::string(santa::SleighLauncher::kDefaultSleighPath)),
+      /*timeout_seconds=*/6 * 60);
+
   SNTDaemonControlController* dc =
       [[SNTDaemonControlController alloc] initWithNotificationQueue:notifier_queue
           syncdQueue:syncd_queue
@@ -111,7 +123,8 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
             } else {
               if (reply) reply(NO);
             }
-          }];
+          }
+          binaryUploadController:binary_upload_controller];
 
   control_connection.exportedObject = dc;
   [control_connection resume];
@@ -361,6 +374,9 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
               callback:^(NSNumber* oldValue, NSNumber* newValue) {
                 uint64_t oldInterval = [oldValue unsignedIntValue];
                 uint64_t newInterval = [newValue unsignedIntValue];
+                if (oldInterval == newInterval) {
+                  return;
+                }
                 LOGI(@"MetricExportInterval changed: %llu -> %llu. Restarting export.", oldInterval,
                      newInterval);
                 metrics->SetInterval(newInterval);
@@ -492,21 +508,21 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                    LOGI(@"AllowDelegatedSignals changed: %@", newValue);
                                    [tamper_client setAllowDelegatedSignals:[newValue boolValue]];
                                  }],
-    [[SNTKVOManager alloc] initWithObject:configurator
-                                 selector:@selector(staticRules)
-                                     type:[NSArray class]
-                                 callback:^(NSArray* oldValue, NSArray* newValue) {
-                                   if ([oldValue isEqualToArray:newValue]) {
-                                     return;
-                                   }
+    [[SNTKVOManager alloc]
+        initWithObject:configurator
+              selector:@selector(staticRules)
+                  type:[NSArray class]
+              callback:^(NSArray* oldValue, NSArray* newValue) {
+                if ((!oldValue && !newValue) || [oldValue isEqualToArray:newValue]) {
+                  return;
+                }
 
-                                   [exec_controller.ruleTable updateStaticRules:newValue];
+                [exec_controller.ruleTable updateStaticRules:newValue];
 
-                                   LOGI(@"StaticRules changed. Flushing caches.");
-                                   auth_result_cache->FlushCache(
-                                       FlushCacheMode::kAllCaches,
-                                       FlushCacheReason::kStaticRulesChanged);
-                                 }],
+                LOGI(@"StaticRules changed. Flushing caches.");
+                auth_result_cache->FlushCache(FlushCacheMode::kAllCaches,
+                                              FlushCacheReason::kStaticRulesChanged);
+              }],
     [[SNTKVOManager alloc]
         initWithObject:configurator
               selector:@selector(eventLogType)

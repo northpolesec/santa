@@ -24,7 +24,6 @@
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTNetworkFlowRule.h"
 #import "Source/common/ne/SNDXPCNetworkExtensionInterface.h"
-#import "Source/common/ne/SNTNetworkExtensionConfig.h"
 #import "Source/common/ne/SNTNetworkExtensionSettings.h"
 #import "Source/common/ne/SNTSyncNetworkExtensionSettings.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
@@ -37,6 +36,7 @@
 @property(readwrite) NSString* connectedProtocolVersion;
 - (void)establishNetworkExtensionConnection;
 - (void)clearNetworkExtensionConnection;
+- (SNTNetworkExtensionSettings*)generateSettingsForProtocolVersion:(NSString*)protocolVersion;
 @end
 
 @interface SNTNetworkExtensionQueueTest : XCTestCase
@@ -81,6 +81,17 @@
   OCMStub([self.mockConfigurator syncNetworkExtensionSettings]).andReturn(settings);
 }
 
+// Like stubConfiguratorEnable:action: but also sets the sync-side DNS upstream timeout.
+- (void)stubConfiguratorEnable:(BOOL)enable
+                        action:(SNTNetworkFlowDefaultAction)action
+                    dnsTimeout:(NSTimeInterval)dnsTimeout {
+  SNTSyncNetworkExtensionSettings* settings =
+      [[SNTSyncNetworkExtensionSettings alloc] initWithEnable:enable
+                                            flowDefaultAction:action
+                                       dnsUpstreamTimeoutSecs:dnsTimeout];
+  OCMStub([self.mockConfigurator syncNetworkExtensionSettings]).andReturn(settings);
+}
+
 // Make the rule table report the given network flow rules hash + ruleset.
 - (void)stubRuleTableHash:(NSString*)hash rules:(NSArray<SNTNetworkFlowRule*>*)rules {
   // reconcile reads the hash via the narrow -networkFlowRulesHash getter.
@@ -101,12 +112,11 @@
   [self stubRuleTableHash:@"h1" rules:@[ [self rule:1], [self rule:2] ]];
 
   OCMExpect([self.mockProxy
-      updateNetworkExtensionConfig:[OCMArg checkWithBlock:^BOOL(SNTNetworkExtensionConfig* c) {
-        return c.settings.enable &&
-               c.settings.flowDefaultAction == SNTNetworkFlowDefaultActionDeny &&
+      updateNetworkExtensionSettings:[OCMArg checkWithBlock:^BOOL(SNTNetworkExtensionSettings* c) {
+        return c.enable && c.flowDefaultAction == SNTNetworkFlowDefaultActionDeny &&
                c.networkFlowRules.count == 2;
       }]
-                             reply:[OCMArg invokeBlock]]);
+                               reply:[OCMArg invokeBlock]]);
 
   [self.sut reconcileNetworkExtensionConfig];
   OCMVerifyAll(self.mockProxy);
@@ -122,12 +132,11 @@
   [self stubRuleTableHash:@"h1" rules:@[ [self rule:1] ]];
 
   OCMExpect([self.mockProxy
-      updateNetworkExtensionConfig:[OCMArg checkWithBlock:^BOOL(SNTNetworkExtensionConfig* c) {
-        return c.settings.enable &&
-               c.settings.flowDefaultAction == SNTNetworkFlowDefaultActionAllow &&
+      updateNetworkExtensionSettings:[OCMArg checkWithBlock:^BOOL(SNTNetworkExtensionSettings* c) {
+        return c.enable && c.flowDefaultAction == SNTNetworkFlowDefaultActionAllow &&
                c.networkFlowRules == nil;
       }]
-                             reply:[OCMArg invokeBlock]]);
+                               reply:[OCMArg invokeBlock]]);
   // Settings-only change must not materialize the ruleset.
   OCMReject([self.mockRuleTable retrieveAllNetworkFlowRulesSnapshot]);
 
@@ -144,12 +153,11 @@
   [self stubRuleTableHash:@"h2" rules:@[ [self rule:1] ]];                   // rules changed
 
   OCMExpect([self.mockProxy
-      updateNetworkExtensionConfig:[OCMArg checkWithBlock:^BOOL(SNTNetworkExtensionConfig* c) {
-        return c.settings.enable &&
-               c.settings.flowDefaultAction == SNTNetworkFlowDefaultActionDeny &&
+      updateNetworkExtensionSettings:[OCMArg checkWithBlock:^BOOL(SNTNetworkExtensionSettings* c) {
+        return c.enable && c.flowDefaultAction == SNTNetworkFlowDefaultActionDeny &&
                c.networkFlowRules.count == 1;
       }]
-                             reply:[OCMArg invokeBlock]]);
+                               reply:[OCMArg invokeBlock]]);
 
   [self.sut reconcileNetworkExtensionConfig];
   OCMVerifyAll(self.mockProxy);
@@ -163,7 +171,7 @@
   [self stubConfiguratorEnable:YES action:SNTNetworkFlowDefaultActionDeny];
   [self stubRuleTableHash:@"h1" rules:@[ [self rule:1] ]];
 
-  OCMReject([self.mockProxy updateNetworkExtensionConfig:OCMOCK_ANY reply:OCMOCK_ANY]);
+  OCMReject([self.mockProxy updateNetworkExtensionSettings:OCMOCK_ANY reply:OCMOCK_ANY]);
 
   [self.sut reconcileNetworkExtensionConfig];
   OCMVerifyAll(self.mockProxy);
@@ -171,7 +179,7 @@
 
 - (void)testReconcileNoConnectionIsNoOp {
   self.sut.netExtConnection = nil;
-  OCMReject([self.mockProxy updateNetworkExtensionConfig:OCMOCK_ANY reply:OCMOCK_ANY]);
+  OCMReject([self.mockProxy updateNetworkExtensionSettings:OCMOCK_ANY reply:OCMOCK_ANY]);
   [self.sut reconcileNetworkExtensionConfig];
   OCMVerifyAll(self.mockProxy);
 }
@@ -180,7 +188,7 @@
   [self stubConfiguratorEnable:YES action:SNTNetworkFlowDefaultActionDeny];
   [self stubRuleTableHash:@"h1" rules:@[ [self rule:1] ]];
 
-  OCMStub([self.mockProxy updateNetworkExtensionConfig:OCMOCK_ANY reply:OCMOCK_ANY])
+  OCMStub([self.mockProxy updateNetworkExtensionSettings:OCMOCK_ANY reply:OCMOCK_ANY])
       .andDo(^(NSInvocation* invocation) {
         void (^__unsafe_unretained replyBlock)(BOOL);
         [invocation getArgument:&replyBlock atIndex:3];
@@ -204,7 +212,7 @@
   [self stubConfiguratorEnable:YES action:SNTNetworkFlowDefaultActionDeny];
   [self stubRuleTableHash:@"h1" rules:@[ [self rule:1] ]];
 
-  OCMStub([self.mockProxy updateNetworkExtensionConfig:OCMOCK_ANY reply:OCMOCK_ANY])
+  OCMStub([self.mockProxy updateNetworkExtensionSettings:OCMOCK_ANY reply:OCMOCK_ANY])
       .andDo(^(NSInvocation* invocation) {
         void (^__unsafe_unretained replyBlock)(BOOL);
         [invocation getArgument:&replyBlock atIndex:3];
@@ -228,20 +236,22 @@
   OCMStub([sutMock establishNetworkExtensionConnection]).andDo(^(NSInvocation* inv) {
     self.sut.netExtConnection = self.mockConnection;
   });
-  OCMReject([self.mockProxy updateNetworkExtensionConfig:OCMOCK_ANY reply:OCMOCK_ANY]);
+  OCMReject([self.mockProxy updateNetworkExtensionSettings:OCMOCK_ANY reply:OCMOCK_ANY]);
 
   NSError* err = nil;
-  SNTNetworkExtensionConfig* config = [self.sut handleRegistrationWithProtocolVersion:@"1.0"
-                                                                                error:&err];
+  SNTNetworkExtensionSettings* settings = [self.sut handleRegistrationWithProtocolVersion:@"1.0"
+                                                                                    error:&err];
 
-  // Reply carries both settings and the full ruleset for atomic application.
+  // Reply carries the scalar settings and the full ruleset (in networkFlowRules) for atomic
+  // application.
   XCTAssertNil(err);
-  XCTAssertTrue(config.settings.enable);
-  XCTAssertEqual(config.settings.flowDefaultAction, SNTNetworkFlowDefaultActionDeny);
-  XCTAssertEqual(config.networkFlowRules.count, 2);
+  XCTAssertTrue(settings.enable);
+  XCTAssertEqual(settings.flowDefaultAction, SNTNetworkFlowDefaultActionDeny);
+  XCTAssertEqual(settings.networkFlowRules.count, 2);
 
-  // last-pushed reflects what the reply seeded, so an immediate no-change reconcile is a no-op.
-  XCTAssertEqualObjects(self.sut.lastPushedSettings, config.settings);
+  // last-pushed reflects what the reply seeded (scalars equal; networkFlowRules is excluded from
+  // -isEqual:), so an immediate no-change reconcile is a no-op.
+  XCTAssertEqualObjects(self.sut.lastPushedSettings, settings);
   XCTAssertEqualObjects(self.sut.lastPushedNetworkFlowRulesHash, @"h1");
 
   OCMVerifyAll(self.mockProxy);
@@ -258,6 +268,27 @@
 
   XCTAssertNil(self.sut.lastPushedSettings);
   XCTAssertNil(self.sut.lastPushedNetworkFlowRulesHash);
+}
+
+- (void)testGenerateSettingsPropagatesDNSUpstreamTimeout {
+  [self stubConfiguratorEnable:YES action:SNTNetworkFlowDefaultActionDeny dnsTimeout:7.5];
+  SNTNetworkExtensionSettings* settings = [self.sut generateSettingsForProtocolVersion:@"1.0"];
+  XCTAssertEqualWithAccuracy(settings.dnsUpstreamTimeoutSecs, 7.5, 0.0001);
+}
+
+- (void)testGenerateSettingsDefaultsDNSUpstreamTimeoutWhenSyncUnset {
+  // Carrier timeout 0 -> SNTNetworkExtensionSettings normalizes to the 7s default.
+  [self stubConfiguratorEnable:YES action:SNTNetworkFlowDefaultActionDeny dnsTimeout:0];
+  SNTNetworkExtensionSettings* settings = [self.sut generateSettingsForProtocolVersion:@"1.0"];
+  XCTAssertEqualWithAccuracy(settings.dnsUpstreamTimeoutSecs, 7.0, 0.0001);
+}
+
+- (void)testGenerateSettingsIgnoresSyncBelowProtocolV1 {
+  [self stubConfiguratorEnable:YES action:SNTNetworkFlowDefaultActionDeny dnsTimeout:7.5];
+  SNTNetworkExtensionSettings* settings = [self.sut generateSettingsForProtocolVersion:@"0.9"];
+  XCTAssertFalse(settings.enable);
+  // Sync timeout is ignored below protocol v1 -> 7s default.
+  XCTAssertEqualWithAccuracy(settings.dnsUpstreamTimeoutSecs, 7.0, 0.0001);
 }
 
 @end

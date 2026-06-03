@@ -29,7 +29,6 @@
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTXPCNotifierInterface.h"
 #import "Source/common/ne/SNDXPCNetworkExtensionInterface.h"
-#import "Source/common/ne/SNTNetworkExtensionConfig.h"
 #import "Source/common/ne/SNTNetworkExtensionSettings.h"
 #import "Source/common/ne/SNTSyncNetworkExtensionSettings.h"
 #import "Source/common/ne/SNTXPCNetworkExtensionInterface.h"
@@ -140,8 +139,12 @@ NSString* const kSantaNetworkExtensionProtocolVersion = @"1.0";
       rules = snapshot.rules;
       hashToRecord = snapshot.networkFlowRulesHash;
     }
-    SNTNetworkExtensionConfig* config = [[SNTNetworkExtensionConfig alloc] initWithSettings:settings
-                                                                           networkFlowRules:rules];
+    // The wire object carries the scalar settings plus the rules delta (nil rules == "unchanged").
+    // lastPushedSettings stays the scalar `settings` object below; networkFlowRules is excluded
+    // from -isEqual:/-hash so it never perturbs the settings delta, and the rules delta is tracked
+    // separately via lastPushedNetworkFlowRulesHash.
+    SNTNetworkExtensionSettings* wireSettings =
+        [settings settingsByAttachingNetworkFlowRules:rules];
 
     // Record lastPushed only on a successful reply, so a netd-side rejection leaves our
     // recorded state matching netd's actual state and the next reconcile retries. The reply
@@ -149,18 +152,18 @@ NSString* const kSantaNetworkExtensionProtocolVersion = @"1.0";
     // WEAKIFY/STRONGIFY breaks the transient self <-> connection <-> reply-block cycle.
     WEAKIFY(self);
     [(id<SNDNetworkExtensionXPC>)[conn remoteObjectProxy]
-        updateNetworkExtensionConfig:config
-                               reply:^(BOOL success) {
-                                 if (!success) {
-                                   LOGW(@"Failed to update network extension config");
-                                   return;
-                                 }
-                                 STRONGIFY(self);
-                                 @synchronized(self) {
-                                   self.lastPushedSettings = settings;
-                                   self.lastPushedNetworkFlowRulesHash = hashToRecord;
-                                 }
-                               }];
+        updateNetworkExtensionSettings:wireSettings
+                                 reply:^(BOOL success) {
+                                   if (!success) {
+                                     LOGW(@"Failed to update network extension settings");
+                                     return;
+                                   }
+                                   STRONGIFY(self);
+                                   @synchronized(self) {
+                                     self.lastPushedSettings = settings;
+                                     self.lastPushedNetworkFlowRulesHash = hashToRecord;
+                                   }
+                                 }];
   }
 }
 
@@ -187,8 +190,8 @@ NSString* const kSantaNetworkExtensionProtocolVersion = @"1.0";
   }
 }
 
-- (SNTNetworkExtensionConfig*)handleRegistrationWithProtocolVersion:(NSString*)protocolVersion
-                                                              error:(NSError**)error {
+- (SNTNetworkExtensionSettings*)handleRegistrationWithProtocolVersion:(NSString*)protocolVersion
+                                                                error:(NSError**)error {
   if (self.netExtConnection) {
     LOGW(@"Network extension attempting to register but already connected, clearing stale "
          @"connection");
@@ -257,8 +260,10 @@ NSString* const kSantaNetworkExtensionProtocolVersion = @"1.0";
     self.lastPushedSettings = settings;
     self.lastPushedNetworkFlowRulesHash = snapshot.networkFlowRulesHash;
 
-    return [[SNTNetworkExtensionConfig alloc] initWithSettings:settings
-                                              networkFlowRules:snapshot.rules];
+    // The reply carries the scalar settings plus the full ruleset in networkFlowRules. We keep
+    // lastPushedSettings as the scalar `settings`; since networkFlowRules is excluded from
+    // -isEqual:, the rules-bearing wire object still compares equal to it.
+    return [settings settingsByAttachingNetworkFlowRules:snapshot.rules];
   }
 }
 
@@ -370,13 +375,17 @@ NSString* const kSantaNetworkExtensionProtocolVersion = @"1.0";
 
   BOOL enable = NO;
   SNTNetworkFlowDefaultAction flowDefaultAction = SNTNetworkFlowDefaultActionUnspecified;
+  NSTimeInterval dnsUpstreamTimeoutSecs = 0;
+
   if (majorVersion >= 1) {
     enable = syncSettings.enable;
     flowDefaultAction = syncSettings.flowDefaultAction;
+    dnsUpstreamTimeoutSecs = syncSettings.dnsUpstreamTimeoutSecs;
   }
 
   return [[SNTNetworkExtensionSettings alloc] initWithEnable:enable
-                                           flowDefaultAction:flowDefaultAction];
+                                           flowDefaultAction:flowDefaultAction
+                                      dnsUpstreamTimeoutSecs:dnsUpstreamTimeoutSecs];
 }
 
 @end

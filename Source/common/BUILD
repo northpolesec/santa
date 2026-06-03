@@ -663,6 +663,14 @@ objc_library(
     ],
 )
 
+santa_unit_test(
+    name = "SNTCELFallbackRuleTest",
+    srcs = ["SNTCELFallbackRuleTest.mm"],
+    deps = [
+        ":SNTCELFallbackRule",
+    ],
+)
+
 objc_library(
     name = "SNTRule",
     srcs = ["SNTRule.mm"],
@@ -1004,7 +1012,6 @@ objc_library(
         ":SNTStoredEvent",
         ":SNTStoredExecutionEvent",
         ":SNTXPCUnprivilegedControlInterface",
-        "//Source/common/ne:SNTNetworkExtensionConfig",
         "//Source/common/ne:SNTNetworkExtensionSettings",
         "@santanetd//src/santanetd:SNDFlowInfo",
         "@santanetd//src/santanetd:SNDProcessFlows",
@@ -1154,6 +1161,7 @@ test_suite(
         ":PrefixTreeTest",
         ":RingBufferTest",
         ":SNTBlockMessageTest",
+        ":SNTCELFallbackRuleTest",
         ":SNTCachedDecisionTest",
         ":SNTConfigBundleTest",
         ":SNTConfiguratorTest",
