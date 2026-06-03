@@ -131,7 +131,7 @@ class MockSleighLauncher : public santa::SleighLauncher {
  public:
   MockSleighLauncher() : santa::SleighLauncher("/fake/sleigh") {}
 
-  MOCK_METHOD(absl::Status, Launch,
+  MOCK_METHOD(absl::Status, LaunchTelemetryExport,
               (const std::vector<std::string>& input_files, uint32_t timeout_seconds), (override));
 };
 
@@ -426,7 +426,7 @@ class MockSleighLauncher : public santa::SleighLauncher {
 
 - (void)setExportExpectationSuccess:(BOOL)success mock:(MockSleighLauncher*)mock {
   absl::Status result = success ? absl::OkStatus() : absl::InternalError("mock failure");
-  EXPECT_CALL(*mock, Launch).WillOnce(Return(result));
+  EXPECT_CALL(*mock, LaunchTelemetryExport).WillOnce(Return(result));
 }
 
 - (void)testExportSuccessWithSupportedTypeAndUnknownFile {
@@ -507,7 +507,7 @@ class MockSleighLauncher : public santa::SleighLauncher {
   NSString* f4 = [self createTestFile:@"f4" contentSize:40 type:ExportLogType::kZstdStream];
 
   absl::Status successResult = absl::OkStatus();
-  EXPECT_CALL(*mockSleighPtr, Launch)
+  EXPECT_CALL(*mockSleighPtr, LaunchTelemetryExport)
       .WillOnce(Return(successResult))
       .WillOnce(Return(successResult));
 
@@ -541,8 +541,8 @@ class MockSleighLauncher : public santa::SleighLauncher {
   auto mockSleigh = std::make_unique<MockSleighLauncher>();
   MockSleighLauncher* mockSleighPtr = mockSleigh.get();
 
-  // No Launch call expected since there are no files
-  EXPECT_CALL(*mockSleighPtr, Launch(testing::_, testing::_)).Times(0);
+  // No LaunchTelemetryExport call expected since there are no files
+  EXPECT_CALL(*mockSleighPtr, LaunchTelemetryExport(testing::_, testing::_)).Times(0);
 
   LoggerPeer l(std::move(mockSleigh), self.exportConfigBlock, TelemetryEvent::kEverything, 5, 1, 3,
                nullptr, mockWriter);
@@ -575,7 +575,7 @@ class MockSleighLauncher : public santa::SleighLauncher {
   NSString* f5 = [self createTestFile:@"f5" contentSize:oneMB type:ExportLogType::kZstdStream];
 
   absl::Status successResult = absl::OkStatus();
-  EXPECT_CALL(*mockSleighPtr, Launch)
+  EXPECT_CALL(*mockSleighPtr, LaunchTelemetryExport)
       .WillOnce(Return(successResult))
       .WillOnce(Return(successResult))
       .WillOnce(Return(successResult));

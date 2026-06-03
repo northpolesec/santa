@@ -289,7 +289,7 @@ void Logger::ExportTelemetrySerialized() {
     }
 
     // Launch sleigh
-    absl::Status result = sleigh_launcher_->Launch(
+    absl::Status result = sleigh_launcher_->LaunchTelemetryExport(
         files_to_export, export_timeout_secs_->load(std::memory_order_relaxed));
 
     if (result.ok()) {

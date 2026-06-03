@@ -26,14 +26,16 @@
 namespace santa {
 
 // Drives a single binary upload: opens the requested file (as root)
-// regular-file only, computes BinaryMetadata from that same fd, reads the
-// upload filter expressions, and launches sleigh to perform the upload. The CEL
-// filter itself runs in sleigh — this controller only computes and forwards
+// regular-file only, computes BinaryMetadata from that same FD, reads the
+// upload filter expressions, and launches Sleigh to perform the upload. The CEL
+// filter itself runs in Sleigh — this controller only computes and forwards
 // inputs.
 class SNTBinaryUploadController {
  public:
-  // launcher performs the sleigh launch; timeout_seconds bounds it (must exceed
-  // sleigh's internal upload deadline — see the timeout nesting in the plan).
+  // launcher performs the Sleigh launch; timeout_seconds bounds it by
+  // SIGKILLing the child on expiry. It must exceed Sleigh's own 5-min upload
+  // deadline (callers pass 6 min) so Sleigh hits its deadline first and returns
+  // a real response instead of being killed mid-upload.
   SNTBinaryUploadController(std::unique_ptr<SleighLauncher> launcher,
                             uint32_t timeout_seconds);
   virtual ~SNTBinaryUploadController() = default;

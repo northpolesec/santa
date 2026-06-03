@@ -91,9 +91,11 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
 
   std::weak_ptr<Metrics> weak_metrics(metrics);
 
-  // Binary upload via sleigh. The launch timeout must exceed sleigh's internal
-  // upload deadline (currently 5 min) so santad doesn't kill sleigh as its own
-  // context fires; see the timeout nesting in the binary-upload spec §7.
+  // Binary upload via Sleigh. This timeout SIGKILLs the Sleigh child on expiry,
+  // so it must exceed Sleigh's own 5-min upload deadline. The 1-min margin here
+  // (6 vs 5) lets Sleigh hit its deadline first and return a real response,
+  // rather than being killed mid-upload — which would surface only a generic error.
+  // If Sleigh's internal deadline ever changes this margin needs to be revisited.
   auto binary_upload_controller = std::make_shared<santa::SNTBinaryUploadController>(
       santa::SleighLauncher::Create(std::string(santa::SleighLauncher::kDefaultSleighPath)),
       /*timeout_seconds=*/6 * 60);

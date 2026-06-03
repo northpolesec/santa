@@ -46,8 +46,8 @@ std::unique_ptr<SleighLauncher> SleighLauncher::Create(std::string sleigh_path) 
 
 SleighLauncher::SleighLauncher(std::string sleigh_path) : sleigh_path_(std::move(sleigh_path)) {}
 
-absl::Status SleighLauncher::Launch(const std::vector<std::string>& input_files,
-                                    uint32_t timeout_secs) {
+absl::Status SleighLauncher::LaunchTelemetryExport(const std::vector<std::string>& input_files,
+                                                   uint32_t timeout_secs) {
   // Open all input files (as root) and collect FD numbers.
   std::vector<int> input_fds;
   absl::Cleanup close_fds = [&input_fds]() {
@@ -59,7 +59,7 @@ absl::Status SleighLauncher::Launch(const std::vector<std::string>& input_files,
   for (const auto& file : input_files) {
     int fd = open(file.c_str(), O_RDONLY);
     if (fd < 0) {
-      LOGD(@"SleighLauncher::Launch(): Failed to open input file: %s", file.c_str());
+      LOGD(@"SleighLauncher::LaunchTelemetryExport(): Failed to open input file: %s", file.c_str());
       return absl::InternalError("Failed to open input file: " + file);
     }
     input_fds.push_back(fd);
@@ -67,7 +67,7 @@ absl::Status SleighLauncher::Launch(const std::vector<std::string>& input_files,
 
   absl::StatusOr<std::string> serialized = SerializeConfig(input_fds);
   if (!serialized.ok()) {
-    LOGD(@"SleighLauncher::Launch(): Failed to serialize SleighConfig");
+    LOGD(@"SleighLauncher::LaunchTelemetryExport(): Failed to serialize SleighConfig");
     return serialized.status();
   }
 
@@ -96,7 +96,7 @@ absl::StatusOr<::santa::commands::v1::BinaryUploadResponse> SleighLauncher::Laun
     return output.status();
   }
 
-  // M5: do not trust a default-valued parse — an empty or unparseable stdout is an
+  // Do not trust a default-valued parse — an empty or unparseable stdout is an
   // error, not a COMPLETED-with-zero-bytes response.
   ::santa::commands::v1::BinaryUploadResponse response;
   if (output->empty() || !response.ParseFromString(*output)) {

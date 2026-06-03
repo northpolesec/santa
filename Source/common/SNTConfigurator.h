@@ -340,7 +340,7 @@
 @property(nullable, readonly, nonatomic) NSArray<NSString*>* telemetryFilterExpressions;
 
 ///
-///  CEL expressions used to drop binaries from upload. Evaluated in sleigh against
+///  CEL expressions used to drop binaries from upload. Evaluated in Sleigh against
 ///  the binary's metadata; an expression returning true drops (refuses) the upload.
 ///
 ///  @note: This property is KVO compliant.
