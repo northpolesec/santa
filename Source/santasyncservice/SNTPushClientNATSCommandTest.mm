@@ -22,6 +22,8 @@
 #import "Source/santasyncservice/SNTPushClientNATS.h"
 #import "Source/santasyncservice/SNTPushNotifications.h"
 #include "commands/v1.pb.h"
+#include "google/protobuf/io/coded_stream.h"
+#include "google/protobuf/io/zero_copy_stream_impl.h"
 
 __BEGIN_DECLS
 
@@ -120,10 +122,18 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   command->set_issued_at(time(nullptr));
   command->clear_hmac();
 
+  // Sign over a deterministic serialization, matching what workshop (and the
+  // verifier) use — otherwise a map field (e.g. signed_post.form_values) could be
+  // ordered differently here than at verification time.
   std::string serialized;
-  if (!command->SerializeToString(&serialized)) {
-    XCTFail(@"Failed to serialize command for HMAC signing");
-    return;
+  {
+    google::protobuf::io::StringOutputStream stream(&serialized);
+    google::protobuf::io::CodedOutputStream coded(&stream);
+    coded.SetSerializationDeterministic(true);
+    if (!command->SerializeToCodedStream(&coded)) {
+      XCTFail(@"Failed to serialize command for HMAC signing");
+      return;
+    }
   }
 
   unsigned char hmac[CC_SHA256_DIGEST_LENGTH];
@@ -413,6 +423,52 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   XCTAssertFalse(response->has_error());
   XCTAssertEqual(response->result_case(), ::pbv1::SantaCommandResponse::kPing,
                  @"Ping command should return ping response");
+}
+
+- (void)testDispatchBinaryUploadCommandDisabled {
+  // Given: binary_upload is not in AllowedSantaCommands.
+  OCMStub([self.mockConfigurator allowedSantaCommands]).andReturn(@[ @"ping" ]);
+
+  ::pbv1::SantaCommandRequest command;
+  command.set_uuid([[NSUUID UUID] UUIDString].UTF8String);
+  command.mutable_binary_upload()->set_path("/bin/ls");
+  [self signCommandRequest:&command];
+
+  // When: Dispatching the command.
+  ::pbv1::SantaCommandResponse* response = [self.client dispatchSantaCommandToHandler:command
+                                                                              onArena:self.arena];
+
+  // Then: It is rejected before any upload work (no XPC to santad).
+  XCTAssertTrue(response->has_error());
+  XCTAssertEqual(response->error(), ::pbv1::SantaCommandResponse::ERROR_COMMAND_DISABLED);
+}
+
+- (void)testHMACVerificationWithFormValuesMap {
+  // A BinaryUploadRequest carries a map<> (signed_post.form_values). Signing and
+  // verification must serialize that map deterministically or the HMAC won't
+  // match. binary_upload is kept out of AllowedSantaCommands, so a command that
+  // passes HMAC surfaces as COMMAND_DISABLED (not INVALID_DATA) — i.e. the
+  // map-bearing command authenticated.
+  OCMStub([self.mockConfigurator allowedSantaCommands]).andReturn(@[ @"ping" ]);
+
+  ::pbv1::SantaCommandRequest command;
+  command.set_uuid([[NSUUID UUID] UUIDString].UTF8String);
+  auto* upload = command.mutable_binary_upload();
+  upload->set_path("/bin/ls");
+  auto& form = *upload->mutable_signed_post()->mutable_form_values();
+  form["key"] = "objects/abc";
+  form["policy"] = "eyJ0ZXN0Ijoi";
+  form["x-amz-signature"] = "deadbeef";
+  form["content-type"] = "application/octet-stream";
+  [self signCommandRequest:&command];
+
+  ::pbv1::SantaCommandResponse* response = [self.client dispatchSantaCommandToHandler:command
+                                                                              onArena:self.arena];
+
+  XCTAssertTrue(response->has_error());
+  XCTAssertEqual(
+      response->error(), ::pbv1::SantaCommandResponse::ERROR_COMMAND_DISABLED,
+      @"Map-bearing command should pass HMAC and be gated, not rejected as INVALID_DATA");
 }
 
 - (void)testDispatchSantaCommandToHandlerUnknown {

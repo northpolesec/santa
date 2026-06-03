@@ -16,6 +16,8 @@
 
 #include <CommonCrypto/CommonHMAC.h>
 #include <google/protobuf/descriptor.h>
+#include <google/protobuf/io/coded_stream.h>
+#include <google/protobuf/io/zero_copy_stream_impl.h>
 
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTKillCommand.h"
@@ -62,10 +64,22 @@ bool VerifyCommandRequestHMAC(const ::pbv1::SantaCommandRequest& command, NSData
   ::pbv1::SantaCommandRequest commandCopy = command;
   commandCopy.clear_hmac();
 
+  // Serialize deterministically: protobuf leaves map<> field ordering
+  // unspecified, and the command carries one (signed_post.form_values on a
+  // BinaryUploadRequest). Re-serializing the parsed request to verify would
+  // otherwise emit those entries in C++ hash order, which won't match the order
+  // the signer wrote, and the HMAC would fail. Deterministic mode sorts map
+  // keys; the signer (workshop) MUST serialize deterministically too for digests
+  // to agree.
   std::string serialized;
-  if (!commandCopy.SerializeToString(&serialized)) {
-    LOGE(@"NATS: HMAC verification failed - could not serialize command");
-    return false;
+  {
+    google::protobuf::io::StringOutputStream stream(&serialized);
+    google::protobuf::io::CodedOutputStream coded(&stream);
+    coded.SetSerializationDeterministic(true);
+    if (!commandCopy.SerializeToCodedStream(&coded)) {
+      LOGE(@"NATS: HMAC verification failed - could not serialize command");
+      return false;
+    }
   }
 
   unsigned char computedHMAC[CC_SHA256_DIGEST_LENGTH];
@@ -170,9 +184,15 @@ void SetKilledProcessError(SNTKilledProcessError error, ::pbv1::KillResponse::Pr
                                     (const ::pbv1::EventUploadRequest&)eventUploadRequest
                                          withCommandUUID:(NSString*)uuid
                                                  onArena:(google::protobuf::Arena*)arena;
+- (void)handleBinaryUploadRequest:(const ::pbv1::BinaryUploadRequest&)binaryUploadRequest
+                       replyTopic:(NSString*)replyTopic;
 - (::pbv1::SantaCommandResponse*)dispatchSantaCommandToHandler:
                                      (const ::pbv1::SantaCommandRequest&)command
                                                        onArena:(google::protobuf::Arena*)arena;
+- (::pbv1::SantaCommandResponse*)dispatchSantaCommandToHandler:
+                                     (const ::pbv1::SantaCommandRequest&)command
+                                                       onArena:(google::protobuf::Arena*)arena
+                                                    replyTopic:(NSString*)replyTopic;
 - (BOOL)checkAndRecordNonce:(NSString*)uuid;
 @end
 
@@ -331,10 +351,63 @@ void SetKilledProcessError(SNTKilledProcessError error, ::pbv1::KillResponse::Pr
   return pbResponse;
 }
 
-// Dispatch Santa command to appropriate handler based on command type
+// Handle BinaryUploadRequest command (async). Forwards the request to santad over
+// XPC; santad opens the file and launches sleigh. The response is published from
+// the XPC reply block so the shared command queue is never blocked for the upload.
+- (void)handleBinaryUploadRequest:(const ::pbv1::BinaryUploadRequest&)binaryUploadRequest
+                       replyTopic:(NSString*)replyTopic {
+  id<SNTPushNotificationsSyncDelegate> strongSyncDelegate = self.syncDelegate;
+  if (!strongSyncDelegate) {
+    LOGE(@"NATS: BinaryUploadRequest failed - no sync delegate");
+    ::pbv1::SantaCommandResponse response;
+    auto* uploadResponse = response.mutable_binary_upload();
+    uploadResponse->set_disposition(::pbv1::BinaryUploadResponse::DISPOSITION_INTERNAL_ERROR);
+    uploadResponse->set_message("santasyncservice has no sync delegate");
+    [self publishResponse:response toReplyTopic:replyTopic];
+    return;
+  }
+
+  std::string serializedRequest;
+  binaryUploadRequest.SerializeToString(&serializedRequest);
+  NSData* requestData = [NSData dataWithBytes:serializedRequest.data()
+                                       length:serializedRequest.size()];
+
+  __weak __typeof(self) weakSelf = self;
+  [[[strongSyncDelegate daemonConnection] remoteObjectProxy]
+      uploadBinary:requestData
+             reply:^(NSData* responseData) {
+               __typeof(self) strongSelf = weakSelf;
+               if (!strongSelf) {
+                 return;
+               }
+               ::pbv1::SantaCommandResponse response;
+               ::pbv1::BinaryUploadResponse uploadResponse;
+               if (responseData &&
+                   uploadResponse.ParseFromArray(responseData.bytes, (int)responseData.length)) {
+                 *response.mutable_binary_upload() = uploadResponse;
+               } else {
+                 LOGE(@"NATS: BinaryUploadRequest got no parseable response from santad");
+                 ::pbv1::BinaryUploadResponse* bu = response.mutable_binary_upload();
+                 bu->set_disposition(::pbv1::BinaryUploadResponse::DISPOSITION_INTERNAL_ERROR);
+                 bu->set_message("no parseable response from santad");
+               }
+               [strongSelf publishResponse:response toReplyTopic:replyTopic];
+             }];
+}
+
+// Backwards-compatible overload for callers that don't publish asynchronously
+// (e.g. unit tests). Equivalent to passing a nil reply topic.
 - (::pbv1::SantaCommandResponse*)dispatchSantaCommandToHandler:
                                      (const ::pbv1::SantaCommandRequest&)command
                                                        onArena:(google::protobuf::Arena*)arena {
+  return [self dispatchSantaCommandToHandler:command onArena:arena replyTopic:nil];
+}
+
+// Dispatch Santa command to appropriate handler based on command type
+- (::pbv1::SantaCommandResponse*)dispatchSantaCommandToHandler:
+                                     (const ::pbv1::SantaCommandRequest&)command
+                                                       onArena:(google::protobuf::Arena*)arena
+                                                    replyTopic:(NSString*)replyTopic {
   auto response = google::protobuf::Arena::Create<::pbv1::SantaCommandResponse>(arena);
 
   // Verify HMAC signature first
@@ -372,9 +445,7 @@ void SetKilledProcessError(SNTKilledProcessError error, ::pbv1::KillResponse::Pr
     case ::pbv1::SantaCommandRequest::kPing: commandName = @"ping"; break;
     case ::pbv1::SantaCommandRequest::kKill: commandName = @"kill"; break;
     case ::pbv1::SantaCommandRequest::kEventUpload: commandName = @"event_upload"; break;
-    // Binary upload is adopted by a separate in-flight change. Leave it unrecognized here so it
-    // falls through to the dispatch switch's default and is rejected as an unknown command.
-    case ::pbv1::SantaCommandRequest::kBinaryUpload:
+    case ::pbv1::SantaCommandRequest::kBinaryUpload: commandName = @"binary_upload"; break;
     case ::pbv1::SantaCommandRequest::COMMAND_NOT_SET: break;
   }
 
@@ -413,6 +484,15 @@ void SetKilledProcessError(SNTKilledProcessError error, ::pbv1::KillResponse::Pr
                                                          onArena:arena];
       response->unsafe_arena_set_allocated_event_upload(eventUploadResponse);
       break;
+    }
+
+    case ::pbv1::SantaCommandRequest::kBinaryUpload: {
+      LOGI(@"NATS: Dispatching BinaryUploadRequest command");
+      // Async: santad opens the file and launches sleigh; the XPC reply block
+      // publishes the response. Returning nullptr tells the caller not to publish
+      // synchronously, keeping the shared command queue unblocked.
+      [self handleBinaryUploadRequest:command.binary_upload() replyTopic:replyTopic];
+      return nullptr;
     }
 
     case ::pbv1::SantaCommandRequest::COMMAND_NOT_SET:
@@ -488,10 +568,14 @@ static void CommandMessageHandlerImpl(natsConnection* nc, natsSubscription* sub,
 
     google::protobuf::Arena arena;
     ::pbv1::SantaCommandResponse* response = [self dispatchSantaCommandToHandler:command
-                                                                         onArena:&arena];
+                                                                         onArena:&arena
+                                                                      replyTopic:replyTopic];
 
-    // Publish the response
-    [self publishResponse:*response toReplyTopic:replyTopic];
+    // A nullptr response means the handler published (or will publish) the response
+    // asynchronously (e.g. binary upload), so don't publish synchronously here.
+    if (response) {
+      [self publishResponse:*response toReplyTopic:replyTopic];
+    }
   });
 }
 

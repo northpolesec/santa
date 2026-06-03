@@ -340,6 +340,14 @@
 @property(nullable, readonly, nonatomic) NSArray<NSString*>* telemetryFilterExpressions;
 
 ///
+///  CEL expressions used to drop binaries from upload. Evaluated in Sleigh against
+///  the binary's metadata; an expression returning true drops (refuses) the upload.
+///
+///  @note: This property is KVO compliant.
+///
+@property(nullable, readonly, nonatomic) NSArray<NSString*>* binaryUploadFilterExpressions;
+
+///
 ///  CEL rules evaluated as fallback when no rules match, before scope checks.
 ///
 ///  @note: This property is KVO compliant.
@@ -441,6 +449,11 @@
 ///  Set the telemetry filter expressions as received from a sync server.
 ///
 - (void)setSyncServerTelemetryFilterExpressions:(nullable NSArray<NSString*>*)expressions;
+
+///
+///  Set the binary upload filter expressions as received from a sync server.
+///
+- (void)setSyncServerBinaryUploadFilterExpressions:(nullable NSArray<NSString*>*)expressions;
 
 ///
 ///  Set the CEL fallback expressions as received from a sync server.

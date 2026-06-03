@@ -290,6 +290,52 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
   }
 }
 
+- (void)testBinaryUploadFilterExpressions {
+  SNTConfigurator* sut = [[SNTConfigurator alloc] init];
+
+  {
+    // No keys set, returns nil
+    sut.configState[@"BinaryUploadFilterExpressions"] = nil;
+    sut.syncState[@"BinaryUploadFilterExpressions"] = nil;
+    XCTAssertNil(sut.binaryUploadFilterExpressions);
+  }
+  {
+    // MDM config only, returns 1 valid expression
+    sut.configState[@"BinaryUploadFilterExpressions"] = @[ @"binary.is_platform_binary" ];
+    sut.syncState[@"BinaryUploadFilterExpressions"] = nil;
+    XCTAssertNotNil(sut.binaryUploadFilterExpressions);
+    XCTAssertEqual(sut.binaryUploadFilterExpressions.count, 1);
+  }
+  {
+    // Sync config only, returns 1 valid expression
+    sut.configState[@"BinaryUploadFilterExpressions"] = nil;
+    sut.syncState[@"BinaryUploadFilterExpressions"] = @[ @"binary.is_platform_binary" ];
+    XCTAssertNotNil(sut.binaryUploadFilterExpressions);
+    XCTAssertEqual(sut.binaryUploadFilterExpressions.count, 1);
+  }
+  {
+    // MDM & Sync config present, returns merged set, MDM config first
+    sut.configState[@"BinaryUploadFilterExpressions"] = @[ @"binary.is_platform_binary" ];
+    sut.syncState[@"BinaryUploadFilterExpressions"] = @[ @"binary.file_size > 100000000" ];
+    XCTAssertNotNil(sut.binaryUploadFilterExpressions);
+    XCTAssertEqual(sut.binaryUploadFilterExpressions.count, 2);
+    XCTAssertEqualObjects(sut.binaryUploadFilterExpressions[0], @"binary.is_platform_binary");
+    XCTAssertEqualObjects(sut.binaryUploadFilterExpressions[1], @"binary.file_size > 100000000");
+  }
+  {
+    // Config with non-array is rejected
+    sut.configState[@"BinaryUploadFilterExpressions"] = @"binary.is_platform_binary";
+    sut.syncState[@"BinaryUploadFilterExpressions"] = nil;
+    XCTAssertNil(sut.binaryUploadFilterExpressions);
+  }
+  {
+    // Config with array of non-strings is rejected
+    sut.configState[@"BinaryUploadFilterExpressions"] = @[ @YES ];
+    sut.syncState[@"BinaryUploadFilterExpressions"] = nil;
+    XCTAssertNil(sut.binaryUploadFilterExpressions);
+  }
+}
+
 - (void)testAllowDelegatedSignalsDefault {
   SNTConfigurator* sut = [[SNTConfigurator alloc] init];
   // Default must be NO

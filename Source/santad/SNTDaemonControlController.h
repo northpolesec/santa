@@ -22,6 +22,7 @@
 #include "Source/common/faa/WatchItems.h"
 #include "Source/santad/EventProviders/AuthResultCache.h"
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
+#include "Source/santad/SNTBinaryUploadController.h"
 #include "Source/santad/SandboxExpectations.h"
 
 @class SNTNotificationQueue;
@@ -44,7 +45,9 @@
                                                     santa::FlushCacheReason))flushCacheBlock
                           cacheCountBlock:(NSArray<NSNumber*>* (^)(void))cacheCountBlock
                           checkCacheBlock:(SNTAction (^)(SantaVnode))checkCacheBlock
-                       metricsExportBlock:(void (^)(void (^reply)(BOOL)))metricsExportBlock;
+                       metricsExportBlock:(void (^)(void (^reply)(BOOL)))metricsExportBlock
+                   binaryUploadController:
+                       (std::shared_ptr<santa::SNTBinaryUploadController>)binaryUploadController;
 
 /// Install the network extension, optionally checking whether an upgrade is needed first.
 /// When force is YES, delegates to installNetworkExtension: as long as installation is authorized.

@@ -74,6 +74,13 @@ typedef NS_ENUM(NSInteger, SNTRuleAddSource) {
 - (void)killProcesses:(SNTKillRequest*)killRequest reply:(void (^)(SNTKillResponse*))reply;
 
 ///
+///  Upload the binary named in a serialized santa.commands.v1.BinaryUploadRequest to
+///  the workshop bucket via Sleigh. reply receives a serialized
+///  santa.commands.v1.BinaryUploadResponse.
+///
+- (void)uploadBinary:(NSData*)serializedRequest reply:(void (^)(NSData* serializedResponse))reply;
+
+///
 /// Control Ops
 ///
 - (void)installSantaApp:(NSString*)appPath reply:(void (^)(BOOL))reply;

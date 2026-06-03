@@ -47,9 +47,11 @@
 #import "Source/santad/EventProviders/SNTEndpointSecurityRecorder.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityTamperResistance.h"
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
+#import "Source/santad/SNTBinaryUploadController.h"
 #import "Source/santad/SNTDaemonControlController.h"
 #import "Source/santad/SNTDatabaseController.h"
 #import "Source/santad/SNTDecisionCache.h"
+#include "Source/santad/SleighLauncher.h"
 #include "Source/santad/TTYWriter.h"
 
 using santa::AuthResultCache;
@@ -88,6 +90,16 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
   SNTConfigurator* configurator = [SNTConfigurator configurator];
 
   std::weak_ptr<Metrics> weak_metrics(metrics);
+
+  // Binary upload via Sleigh. This timeout SIGKILLs the Sleigh child on expiry,
+  // so it must exceed Sleigh's own 5-min upload deadline. The 1-min margin here
+  // (6 vs 5) lets Sleigh hit its deadline first and return a real response,
+  // rather than being killed mid-upload — which would surface only a generic error.
+  // If Sleigh's internal deadline ever changes this margin needs to be revisited.
+  auto binary_upload_controller = std::make_shared<santa::SNTBinaryUploadController>(
+      santa::SleighLauncher::Create(std::string(santa::SleighLauncher::kDefaultSleighPath)),
+      /*timeout_seconds=*/6 * 60);
+
   SNTDaemonControlController* dc =
       [[SNTDaemonControlController alloc] initWithNotificationQueue:notifier_queue
           syncdQueue:syncd_queue
@@ -111,7 +123,8 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
             } else {
               if (reply) reply(NO);
             }
-          }];
+          }
+          binaryUploadController:binary_upload_controller];
 
   control_connection.exportedObject = dc;
   [control_connection resume];
