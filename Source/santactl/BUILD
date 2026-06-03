@@ -104,9 +104,9 @@ objc_library(
     srcs = [
         "Commands/SNTCommandCheckCache.mm",
         "Commands/SNTCommandDoctor.mm",
-        "Commands/SNTCommandEventUpload.mm",
         "Commands/SNTCommandFileInfo.mm",
         "Commands/SNTCommandFlushCache.mm",
+        "Commands/SNTCommandInventory.mm",
         "Commands/SNTCommandMetrics.h",
         "Commands/SNTCommandMetrics.mm",
         "Commands/SNTCommandRule.mm",
