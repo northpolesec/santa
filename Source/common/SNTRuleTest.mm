@@ -123,6 +123,27 @@
   XCTAssertEqual(sut.state, SNTRuleStateAllow);
   XCTAssertEqualObjects(sut.customMsg, @"A custom block message");
   XCTAssertEqualObjects(sut.customURL, @"https://example.com");
+  XCTAssertEqual(sut.runningProcessAction, SNTRuleRunningProcessActionUnset);
+
+  sut = [[SNTRule alloc] initWithDictionary:@{
+    @"identifier" : @"ABCDEFGHIJ",
+    @"policy" : @"BLOCKLIST",
+    @"rule_type" : @"TEAMID",
+    @"running_process_action" : @"force_kill",
+  }
+                                      error:nil];
+  XCTAssertNotNil(sut);
+  XCTAssertEqual(sut.runningProcessAction, SNTRuleRunningProcessActionForceKill);
+
+  sut = [[SNTRule alloc] initWithDictionary:@{
+    @"identifier" : @"ABCDEFGHIJ",
+    @"policy" : @"BLOCKLIST",
+    @"rule_type" : @"TEAMID",
+    @"running_process_action" : @"NONE",
+  }
+                                      error:nil];
+  XCTAssertNotNil(sut);
+  XCTAssertEqual(sut.runningProcessAction, SNTRuleRunningProcessActionNone);
 
   // TeamIDs must be 10 chars in length
   sut = [[SNTRule alloc] initWithDictionary:@{
@@ -279,6 +300,17 @@
   XCTAssertNil(sut);
   XCTAssertNotNil(error);
   XCTAssertEqual(error.code, SNTErrorCodeRuleInvalidRuleType);
+
+  sut = [[SNTRule alloc] initWithDictionary:@{
+    @"identifier" : @"ABCDEFGHIJ",
+    @"policy" : @"ALLOWLIST",
+    @"rule_type" : @"TEAMID",
+    @"running_process_action" : @"gently",
+  }
+                                      error:&error];
+  XCTAssertNil(sut);
+  XCTAssertNotNil(error);
+  XCTAssertEqual(error.code, SNTErrorCodeRuleInvalid);
 }
 
 - (void)testRuleDictionaryRepresentation {
@@ -290,6 +322,7 @@
     @"custom_url" : @"https://example.com",
     @"comment" : @"",
     @"cel_expr" : @"",
+    @"running_process_action" : @"",
   };
 
   SNTRule* sut = [[SNTRule alloc] initWithDictionary:expectedTeamID error:nil];
@@ -304,6 +337,7 @@
     @"custom_url" : @"",
     @"comment" : @"",
     @"cel_expr" : @"",
+    @"running_process_action" : @"",
   };
 
   sut = [[SNTRule alloc] initWithDictionary:expectedBinary error:nil];
@@ -320,6 +354,7 @@
     @"custom_msg" : @"A custom block message",
     @"custom_url" : @"https://example.com",
     @"cel_expr" : @"",
+    @"running_process_action" : @"",
   };
 
   SNTRule* sut = [[SNTRule alloc] initWithDictionary:expected error:nil];
@@ -337,8 +372,10 @@
 }
 
 - (void)testKeyCaseForInitWithDictionary {
-  for (NSString* key in
-       @[ kRulePolicy, kRuleIdentifier, kRuleType, kRuleCustomMsg, kRuleCustomURL, kRuleComment ]) {
+  for (NSString* key in @[
+         kRulePolicy, kRuleIdentifier, kRuleType, kRuleCustomMsg, kRuleCustomURL, kRuleComment,
+         kRuleRunningProcessAction
+       ]) {
     NSDictionary* expected = @{
       @"cel_expr" : @"",
       @"identifier" : @"84de9c61777ca36b13228e2446d53e966096e78db7a72c632b5c185b2ffe68a6",
@@ -347,6 +384,7 @@
       @"custom_msg" : @"A custom block message",
       @"custom_url" : @"https://example.com",
       @"comment" : @"",
+      @"running_process_action" : @"FORCE_KILL",
     };
 
     NSMutableDictionary* dict = [expected mutableCopy];

@@ -139,6 +139,9 @@ NSString* const kRuleCustomMsg = @"custom_msg";
 NSString* const kRuleCustomURL = @"custom_url";
 NSString* const kRuleComment = @"comment";
 NSString* const kRuleCELExpr = @"cel_expr";
+NSString* const kRuleRunningProcessAction = @"running_process_action";
+NSString* const kRuleRunningProcessActionNone = @"NONE";
+NSString* const kRuleRunningProcessActionForceKill = @"FORCE_KILL";
 NSString* const kCursor = @"cursor";
 
 NSString* const kBackoffInterval = @"backoff";

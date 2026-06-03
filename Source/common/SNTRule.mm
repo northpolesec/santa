@@ -37,6 +37,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
 @property(readwrite) NSString* celExpr;
 @property(readwrite) NSString* seatbeltPolicy;
 @property(readwrite) int64_t ruleId;
+@property(readwrite) SNTRuleRunningProcessAction runningProcessAction;
 @end
 
 @implementation SNTRule
@@ -51,6 +52,32 @@ static const NSUInteger kExpectedTeamIDLength = 10;
                            celExpr:(NSString*)celExpr
                     seatbeltPolicy:(NSString*)seatbeltPolicy
                             ruleId:(int64_t)ruleId
+                             error:(NSError**)error {
+  return [self initWithIdentifier:identifier
+                            state:state
+                             type:type
+                        customMsg:customMsg
+                        customURL:customURL
+                        timestamp:timestamp
+                          comment:comment
+                          celExpr:celExpr
+                   seatbeltPolicy:seatbeltPolicy
+                           ruleId:ruleId
+             runningProcessAction:SNTRuleRunningProcessActionUnset
+                            error:error];
+}
+
+- (instancetype)initWithIdentifier:(NSString*)identifier
+                             state:(SNTRuleState)state
+                              type:(SNTRuleType)type
+                         customMsg:(NSString*)customMsg
+                         customURL:(NSString*)customURL
+                         timestamp:(NSUInteger)timestamp
+                           comment:(NSString*)comment
+                           celExpr:(NSString*)celExpr
+                    seatbeltPolicy:(NSString*)seatbeltPolicy
+                            ruleId:(int64_t)ruleId
+              runningProcessAction:(SNTRuleRunningProcessAction)runningProcessAction
                              error:(NSError**)error {
   self = [super init];
   if (self) {
@@ -194,6 +221,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     _celExpr = celExpr;
     _seatbeltPolicy = seatbeltPolicy;
     _ruleId = ruleId;
+    _runningProcessAction = runningProcessAction;
   }
   return self;
 }
@@ -206,6 +234,26 @@ static const NSUInteger kExpectedTeamIDLength = 10;
                            celExpr:(NSString*)celExpr
                     seatbeltPolicy:(NSString*)seatbeltPolicy
                             ruleId:(int64_t)ruleId {
+  return [self initWithIdentifier:identifier
+                            state:state
+                             type:type
+                        customMsg:customMsg
+                        customURL:customURL
+                          celExpr:celExpr
+                   seatbeltPolicy:seatbeltPolicy
+                           ruleId:ruleId
+             runningProcessAction:SNTRuleRunningProcessActionUnset];
+}
+
+- (instancetype)initWithIdentifier:(NSString*)identifier
+                             state:(SNTRuleState)state
+                              type:(SNTRuleType)type
+                         customMsg:(NSString*)customMsg
+                         customURL:(NSString*)customURL
+                           celExpr:(NSString*)celExpr
+                    seatbeltPolicy:(NSString*)seatbeltPolicy
+                            ruleId:(int64_t)ruleId
+              runningProcessAction:(SNTRuleRunningProcessAction)runningProcessAction {
   self = [self initWithIdentifier:identifier
                             state:state
                              type:type
@@ -216,6 +264,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
                           celExpr:celExpr
                    seatbeltPolicy:seatbeltPolicy
                            ruleId:ruleId
+             runningProcessAction:runningProcessAction
                             error:nil];
   // Initialize timestamp to current time if rule is transitive.
   if (self && state == SNTRuleStateAllowTransitive) {
@@ -260,7 +309,8 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     if (![rawKey isKindOfClass:[NSString class]]) continue;
     NSString* key = (NSString*)rawKey;
     NSString* newKey = [key lowercaseString];
-    if (([newKey isEqualToString:kRulePolicy] || [newKey isEqualToString:kRuleType]) &&
+    if (([newKey isEqualToString:kRulePolicy] || [newKey isEqualToString:kRuleType] ||
+         [newKey isEqualToString:kRuleRunningProcessAction]) &&
         [dict[key] isKindOfClass:[NSString class]]) {
       newDict[newKey] = [dict[key] uppercaseString];
     } else {
@@ -372,6 +422,23 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     celExpr = nil;
   }
 
+  NSString* runningProcessActionString = dict[kRuleRunningProcessAction];
+  SNTRuleRunningProcessAction runningProcessAction = SNTRuleRunningProcessActionUnset;
+  if ([runningProcessActionString isKindOfClass:[NSString class]] &&
+      runningProcessActionString.length > 0) {
+    if ([runningProcessActionString isEqual:kRuleRunningProcessActionNone]) {
+      runningProcessAction = SNTRuleRunningProcessActionNone;
+    } else if ([runningProcessActionString isEqual:kRuleRunningProcessActionForceKill]) {
+      runningProcessAction = SNTRuleRunningProcessActionForceKill;
+    } else {
+      [SNTError populateError:error
+                     withCode:SNTErrorCodeRuleInvalid
+                       format:@"Rule received with invalid running process action '%@'",
+                              runningProcessActionString];
+      return nil;
+    }
+  }
+
   return [self initWithIdentifier:identifier
                             state:state
                              type:type
@@ -382,6 +449,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
                           celExpr:celExpr
                    seatbeltPolicy:nil
                            ruleId:0
+             runningProcessAction:runningProcessAction
                             error:error];
 }
 
@@ -411,6 +479,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
   ENCODE(coder, seatbeltPolicy);
   ENCODE_BOXABLE(coder, staticRule);
   ENCODE_BOXABLE(coder, ruleId);
+  ENCODE_BOXABLE(coder, runningProcessAction);
 }
 
 - (instancetype)initWithCoder:(NSCoder*)decoder {
@@ -427,6 +496,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     DECODE(decoder, seatbeltPolicy, NSString);
     DECODE_SELECTOR(decoder, staticRule, NSNumber, boolValue);
     DECODE_SELECTOR(decoder, ruleId, NSNumber, longLongValue);
+    DECODE_SELECTOR(decoder, runningProcessAction, NSNumber, intValue);
   }
   return self;
 }
@@ -460,6 +530,15 @@ static const NSUInteger kExpectedTeamIDLength = 10;
   }
 }
 
+- (NSString*)runningProcessActionToString:(SNTRuleRunningProcessAction)action {
+  switch (action) {
+    case SNTRuleRunningProcessActionNone: return kRuleRunningProcessActionNone;
+    case SNTRuleRunningProcessActionForceKill: return kRuleRunningProcessActionForceKill;
+    case SNTRuleRunningProcessActionUnset: OS_FALLTHROUGH;
+    default: return @"";
+  }
+}
+
 // Returns an NSDictionary representation of the rule. Primarily use for
 // exporting rules.
 - (NSDictionary*)dictionaryRepresentation {
@@ -471,6 +550,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     kRuleCustomURL : self.customURL ?: @"",
     kRuleComment : self.comment ?: @"",
     kRuleCELExpr : self.celExpr ?: @"",
+    kRuleRunningProcessAction : [self runningProcessActionToString:self.runningProcessAction],
   };
 }
 
@@ -480,6 +560,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
   SNTRule* o = other;
   return (
       [self.identifier isEqual:o.identifier] && self.state == o.state && self.type == o.type &&
+      self.runningProcessAction == o.runningProcessAction &&
       (self.celExpr == o.celExpr || [self.celExpr isEqual:o.celExpr]) &&
       (self.seatbeltPolicy == o.seatbeltPolicy || [self.seatbeltPolicy isEqual:o.seatbeltPolicy]));
 }
@@ -490,6 +571,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
   result = prime * result + [self.identifier hash];
   result = prime * result + self.state;
   result = prime * result + self.type;
+  result = prime * result + self.runningProcessAction;
   result = prime * result + [self.celExpr hash];
   result = prime * result + [self.seatbeltPolicy hash];
   return result;

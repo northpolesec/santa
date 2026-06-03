@@ -83,6 +83,12 @@ typedef NS_ENUM(NSInteger, SNTRuleState) {
   SNTRuleStateSeatbelt = 11,
 };
 
+typedef NS_ENUM(NSInteger, SNTRuleRunningProcessAction) {
+  SNTRuleRunningProcessActionUnset = 0,
+  SNTRuleRunningProcessActionNone = 1,
+  SNTRuleRunningProcessActionForceKill = 2,
+};
+
 typedef NS_ENUM(NSInteger, SNTClientMode) {
   SNTClientModeUnknown,
   SNTClientModeMonitor = 1,

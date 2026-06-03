@@ -47,6 +47,7 @@
 @property(readwrite) NSString* customMsg;
 @property(readwrite) NSString* identifier;
 @property(readwrite) NSString* celExpr;
+@property(readwrite) SNTRuleRunningProcessAction runningProcessAction;
 @end
 
 @implementation SNTRuleTableTest
@@ -144,6 +145,33 @@
   XCTAssertEqual(self.sut.executionRuleCount, executionRuleCount + 1);
   XCTAssertEqual(self.sut.binaryRuleCount, binaryRuleCount + 1);
   XCTAssertNil(errors);
+}
+
+- (void)testRunningProcessActionPersists {
+  SNTRule* rule = [self _exampleBinaryRule];
+  rule.runningProcessAction = SNTRuleRunningProcessActionForceKill;
+
+  NSArray<NSError*>* errors;
+  XCTAssertTrue([self.sut addExecutionRules:@[ rule ]
+                                ruleCleanup:SNTRuleCleanupNone
+                                     errors:&errors]);
+  XCTAssertNil(errors);
+
+  NSArray<SNTRule*>* rules = [self.sut retrieveAllExecutionRules];
+  XCTAssertEqual(rules.count, 1u);
+  XCTAssertEqual(rules.firstObject.runningProcessAction, SNTRuleRunningProcessActionForceKill);
+}
+
+- (void)testRunningProcessActionAffectsRulesHash {
+  SNTRule* rule = [self _exampleBinaryRule];
+  [self.sut addExecutionRules:@[ rule ] ruleCleanup:SNTRuleCleanupAll errors:nil];
+  NSString* defaultHash = self.sut.hashOfHashes.executionRulesHash;
+
+  rule = [self _exampleBinaryRule];
+  rule.runningProcessAction = SNTRuleRunningProcessActionForceKill;
+  [self.sut addExecutionRules:@[ rule ] ruleCleanup:SNTRuleCleanupAll errors:nil];
+
+  XCTAssertNotEqualObjects(self.sut.hashOfHashes.executionRulesHash, defaultHash);
 }
 
 - (void)testAddRulesClean {

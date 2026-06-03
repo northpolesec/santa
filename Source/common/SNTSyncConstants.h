@@ -138,6 +138,9 @@ extern NSString* const kRuleCustomMsg;
 extern NSString* const kRuleCustomURL;
 extern NSString* const kRuleComment;
 extern NSString* const kRuleCELExpr;
+extern NSString* const kRuleRunningProcessAction;
+extern NSString* const kRuleRunningProcessActionNone;
+extern NSString* const kRuleRunningProcessActionForceKill;
 extern NSString* const kCursor;
 
 extern NSString* const kBackoffInterval;

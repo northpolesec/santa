@@ -79,6 +79,11 @@
 @property(readonly) int64_t ruleId;
 
 ///
+///  The action that should be taken for matching running processes.
+///
+@property(readonly) SNTRuleRunningProcessAction runningProcessAction;
+
+///
 ///  Designated initializer.
 ///
 - (instancetype)initWithIdentifier:(NSString*)identifier
@@ -93,6 +98,19 @@
                             ruleId:(int64_t)ruleId
                              error:(NSError**)error;
 
+- (instancetype)initWithIdentifier:(NSString*)identifier
+                             state:(SNTRuleState)state
+                              type:(SNTRuleType)type
+                         customMsg:(NSString*)customMsg
+                         customURL:(NSString*)customURL
+                         timestamp:(NSUInteger)timestamp
+                           comment:(NSString*)comment
+                           celExpr:(NSString*)celExpr
+                    seatbeltPolicy:(NSString*)seatbeltPolicy
+                            ruleId:(int64_t)ruleId
+              runningProcessAction:(SNTRuleRunningProcessAction)runningProcessAction
+                             error:(NSError**)error;
+
 ///
 ///  Initialize with a default timestamp: current time if rule state is transitive, 0 otherwise.
 ///
@@ -104,6 +122,16 @@
                            celExpr:(NSString*)celExpr
                     seatbeltPolicy:(NSString*)seatbeltPolicy
                             ruleId:(int64_t)ruleId;
+
+- (instancetype)initWithIdentifier:(NSString*)identifier
+                             state:(SNTRuleState)state
+                              type:(SNTRuleType)type
+                         customMsg:(NSString*)customMsg
+                         customURL:(NSString*)customURL
+                           celExpr:(NSString*)celExpr
+                    seatbeltPolicy:(NSString*)seatbeltPolicy
+                            ruleId:(int64_t)ruleId
+              runningProcessAction:(SNTRuleRunningProcessAction)runningProcessAction;
 
 ///
 ///  Initialize with a default timestamp: current time if rule state is transitive, 0 otherwise.
