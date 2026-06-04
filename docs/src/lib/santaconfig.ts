@@ -525,6 +525,16 @@ changes in the release notes of any future release that changes them.`,
       repeated: true,
       versionAdded: "2026.2",
     },
+    {
+      key: "BinaryUploadFilterExpressions",
+      description: `A list of CEL expressions evaluated on the host before a binary upload.
+        An expression that matches drops the upload, so the file is not sent. Each
+        expression is evaluated against the binary's metadata. Only useful for Workshop
+        customers.`,
+      type: "string",
+      repeated: true,
+      versionAdded: "2026.5",
+    },
   ],
   faa: [
     {
