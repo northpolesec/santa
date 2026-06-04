@@ -21,21 +21,9 @@
 @property(readonly) BOOL enable;
 @property(readonly) SNTNetworkFlowDefaultAction flowDefaultAction;
 
-/// Raw, unnormalized upstream DNS forward timeout from the sync server, in seconds, carried
-/// verbatim (0 == "unset"). This is NOT the effective value: the [1,15]s clamp and the 0 -> 5s
-/// default are applied only when SNTNetworkExtensionSettings is built from this carrier (see
-/// -[SNTNetworkExtensionQueue generateSettingsForProtocolVersion:]). Don't read this directly
-/// expecting an in-range value — go through SNTNetworkExtensionSettings for that.
-@property(readonly) NSTimeInterval dnsUpstreamTimeoutSecs;
-
-/// Defaults dnsUpstreamTimeoutSecs to 0 ("unset").
-- (instancetype)initWithEnable:(BOOL)enable
-             flowDefaultAction:(SNTNetworkFlowDefaultAction)flowDefaultAction;
-
 /// Designated initializer.
 - (instancetype)initWithEnable:(BOOL)enable
-             flowDefaultAction:(SNTNetworkFlowDefaultAction)flowDefaultAction
-        dnsUpstreamTimeoutSecs:(NSTimeInterval)dnsUpstreamTimeoutSecs;
+             flowDefaultAction:(SNTNetworkFlowDefaultAction)flowDefaultAction;
 
 - (NSData*)serialize;
 + (instancetype)deserialize:(NSData*)data;

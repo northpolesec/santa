@@ -36,8 +36,8 @@ typedef NS_ENUM(NSInteger, SNTNetworkFlowDefaultAction) {
 @property(readonly) SNTNetworkFlowDefaultAction flowDefaultAction;
 
 /// Upstream DNS forward timeout used by santanetd's DNS proxy, in seconds.
-/// Normalized to [1.0, 15.0]; values below the floor (incl. unset/0) become the 7.0 default,
-/// values above the ceiling clamp to 15.0.
+/// Normalized to [1.0, 60.0]; values below the floor (incl. unset/0) become the 30.0 default,
+/// values above the ceiling clamp to 60.0.
 @property(readonly) NSTimeInterval dnsUpstreamTimeoutSecs;
 
 /// The network-flow ruleset for santanetd to apply. At registration this is the full ruleset
@@ -47,10 +47,10 @@ typedef NS_ENUM(NSInteger, SNTNetworkFlowDefaultAction) {
 /// network-flow rules.
 @property(readonly, copy) NSArray<SNTNetworkFlowRule*>* networkFlowRules;
 
-/// Defaults flowDefaultAction to Unspecified and dnsUpstreamTimeoutSecs to 7s.
+/// Defaults flowDefaultAction to Unspecified and dnsUpstreamTimeoutSecs to 30s.
 - (instancetype)initWithEnable:(BOOL)enable;
 
-/// Defaults dnsUpstreamTimeoutSecs to 7s.
+/// Defaults dnsUpstreamTimeoutSecs to 30s.
 - (instancetype)initWithEnable:(BOOL)enable
              flowDefaultAction:(SNTNetworkFlowDefaultAction)flowDefaultAction;
 

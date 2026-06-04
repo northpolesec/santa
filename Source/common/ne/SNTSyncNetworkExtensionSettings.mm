@@ -20,24 +20,16 @@
 @interface SNTSyncNetworkExtensionSettings ()
 @property(readwrite) BOOL enable;
 @property(readwrite) SNTNetworkFlowDefaultAction flowDefaultAction;
-@property(readwrite) NSTimeInterval dnsUpstreamTimeoutSecs;
 @end
 
 @implementation SNTSyncNetworkExtensionSettings
 
 - (instancetype)initWithEnable:(BOOL)enable
              flowDefaultAction:(SNTNetworkFlowDefaultAction)flowDefaultAction {
-  return [self initWithEnable:enable flowDefaultAction:flowDefaultAction dnsUpstreamTimeoutSecs:0];
-}
-
-- (instancetype)initWithEnable:(BOOL)enable
-             flowDefaultAction:(SNTNetworkFlowDefaultAction)flowDefaultAction
-        dnsUpstreamTimeoutSecs:(NSTimeInterval)dnsUpstreamTimeoutSecs {
   self = [super init];
   if (self) {
     _enable = enable;
     _flowDefaultAction = flowDefaultAction;
-    _dnsUpstreamTimeoutSecs = dnsUpstreamTimeoutSecs;
   }
   return self;
 }
@@ -57,8 +49,7 @@
 
   SNTSyncNetworkExtensionSettings* otherSettings = (SNTSyncNetworkExtensionSettings*)other;
   return self.enable == otherSettings.enable &&
-         self.flowDefaultAction == otherSettings.flowDefaultAction &&
-         self.dnsUpstreamTimeoutSecs == otherSettings.dnsUpstreamTimeoutSecs;
+         self.flowDefaultAction == otherSettings.flowDefaultAction;
 }
 
 - (NSUInteger)hash {
@@ -66,7 +57,6 @@
   NSUInteger result = 1;
   result = prime * result + self.enable;
   result = prime * result + self.flowDefaultAction;
-  result = prime * result + (NSUInteger)self.dnsUpstreamTimeoutSecs;
   return result;
 }
 
@@ -77,7 +67,6 @@
 - (void)encodeWithCoder:(NSCoder*)coder {
   ENCODE_BOXABLE(coder, enable);
   ENCODE_BOXABLE(coder, flowDefaultAction);
-  ENCODE_BOXABLE(coder, dnsUpstreamTimeoutSecs);
 }
 
 - (instancetype)initWithCoder:(NSCoder*)decoder {
@@ -85,7 +74,6 @@
   if (self) {
     DECODE_SELECTOR(decoder, enable, NSNumber, boolValue);
     DECODE_SELECTOR(decoder, flowDefaultAction, NSNumber, integerValue);
-    DECODE_SELECTOR(decoder, dnsUpstreamTimeoutSecs, NSNumber, doubleValue);
   }
   return self;
 }
