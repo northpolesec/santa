@@ -449,6 +449,8 @@
   XCTAssertTrue([sut sync]);
   XCTAssertNotNil(self.syncState.networkExtensionSettings);
   XCTAssertTrue(self.syncState.networkExtensionSettings.enable);
+  XCTAssertEqual(self.syncState.networkExtensionSettings.flowDefaultAction,
+                 SNTNetworkFlowDefaultActionDeny);
 }
 
 - (void)testReschedulePreflightFail {

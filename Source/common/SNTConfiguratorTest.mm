@@ -536,6 +536,7 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
   NSArray<NSString*>* keyPaths = @[
     @"allowedPathRegex",
     @"blockedPathRegex",
+    @"dnsUpstreamTimeoutSecs",
     @"enableSilentTTYMode",
     @"exportMetrics",
     @"metricExportInterval",
@@ -552,6 +553,7 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
   cfg.configState = [@{
     @"AllowedPathRegex" : @"a",
     @"BlockedPathRegex" : @"b",
+    @"DNSUpstreamTimeoutSeconds" : @(30.0),
     @"EnableSilentTTYMode" : @YES,
     @"ExportMetrics" : @YES,
     @"MetricExportInterval" : @123,
