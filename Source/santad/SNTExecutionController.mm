@@ -49,6 +49,8 @@
 #include "Source/common/SystemResources.h"
 #include "Source/common/Unit.h"
 #include "Source/common/es/EndpointSecurityAPI.h"
+#include "Source/common/processtree/process.h"
+#include "Source/common/processtree/process_tree.h"
 #include "Source/santad/CELActivation.h"
 #import "Source/santad/DataLayer/SNTEventTable.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
@@ -93,6 +95,27 @@ static SNTEventState BlockToAllowDecision(SNTEventState blockDecision) {
   }
 }
 
+// Returns true if two processes execute the same binary.
+//   * Strict: when both are CdhashStrictlyEnforced the kernel-reported cdhash is
+//     authoritative (the kernel guarantees it binds to executed content).
+//   * Otherwise: prefer a SHA-256 comparison when both hashes are known. Santa
+//     computes a SHA-256 when authorizing each exec; the target's is `bSHA256`
+//     (cd.sha256) and the source's is read back from SNTDecisionCache by the
+//     caller. SHA-256 binds to content, which is stronger than (dev, ino)
+//     against inode reuse. Fall back to (dev, ino) when a hash is unavailable.
+static bool SameBinary(const es_process_t* a, NSString* aSHA256, const es_process_t* b,
+                       NSString* bSHA256) {
+  if (santa::CdhashStrictlyEnforced(a->codesigning_flags) &&
+      santa::CdhashStrictlyEnforced(b->codesigning_flags)) {
+    return memcmp(a->cdhash, b->cdhash, CS_CDHASH_LEN) == 0;
+  }
+  if (aSHA256.length > 0 && bSHA256.length > 0) {
+    return [aSHA256 isEqualToString:bSHA256];
+  }
+  return a->executable->stat.st_dev == b->executable->stat.st_dev &&
+         a->executable->stat.st_ino == b->executable->stat.st_ino;
+}
+
 @implementation SNTExecutionController {
   LogExecutionBlock _logger;
   std::shared_ptr<TTYWriter> _ttyWriter;
@@ -105,6 +128,14 @@ static SNTEventState BlockToAllowDecision(SNTEventState blockDecision) {
 
   std::shared_ptr<santa::santad::process_tree::ProcessTree> _processTree;
   std::shared_ptr<santa::SandboxExpectations> _sandboxExpectations;
+
+  // Set of (pid, pidversion) of processes Santa authorized as sandboxed seatbelt
+  // processes. Because the OS sandbox is irreversible, membership implies the
+  // process is still sandboxed; it is used to relax the seatbelt requirement
+  // when such a process re-execs the same binary. Keyed like _procSignalCache;
+  // stale entries from exited processes are harmless because (pid, pidversion)
+  // is globally unique and never recurs.
+  std::unique_ptr<SantaCache<std::pair<pid_t, int>, bool>> _sandboxedSeatbeltProcs;
 }
 
 #pragma mark Initializers
@@ -131,6 +162,7 @@ static SNTEventState BlockToAllowDecision(SNTEventState blockDecision) {
     _policyProcessor = policyProcessor;
     _procSignalCache = std::make_unique<SantaCache<std::pair<pid_t, int>, bool>>(100000);
     _touchIDApprovalCache = std::make_unique<SantaCache<std::string, uint64_t>>(100);
+    _sandboxedSeatbeltProcs = std::make_unique<SantaCache<std::pair<pid_t, int>, bool>>(100000);
     _processControlBlock = processControlBlock;
     _processTree = std::move(processTree);
     _sandboxExpectations = std::move(sandboxExpectations);
@@ -220,6 +252,66 @@ static SNTEventState BlockToAllowDecision(SNTEventState blockDecision) {
   return YES;
 }
 
+// Returns YES if `instigator` is, or descends via fork/exec from, a process
+// Santa authorized as a sandboxed seatbelt process. The OS sandbox is inherited
+// by all descendants, so a process that forked — possibly several times, e.g.
+// the classic double-fork daemonization — from a recorded sandboxed seatbelt
+// process is itself sandboxed even though its own (pid, pidversion) was never
+// recorded. The process tree's parent chain is held by shared_ptr, so the
+// ancestry remains walkable even after intermediate ancestors exit.
+- (BOOL)isSandboxedSeatbeltDescendant:(const es_process_t*)instigator {
+  // Fast path / fallback when the process tree is unavailable: the instigator
+  // itself was recorded (a direct self-exec with no intervening fork).
+  if (_sandboxedSeatbeltProcs->get(
+          std::make_pair(audit_token_to_pid(instigator->audit_token),
+                         audit_token_to_pidversion(instigator->audit_token)))) {
+    return YES;
+  }
+
+  if (!_processTree) {
+    return NO;
+  }
+
+  auto proc = _processTree->Get(santa::santad::process_tree::Pid{
+      .pid = audit_token_to_pid(instigator->audit_token),
+      .pidversion = (uint64_t)audit_token_to_pidversion(instigator->audit_token)});
+  if (!proc) {
+    return NO;
+  }
+
+  // RootSlice walks from the process up to the root (it includes the process
+  // itself as the first element).
+  for (const auto& ancestor : _processTree->RootSlice(*proc)) {
+    if (_sandboxedSeatbeltProcs->get(
+            std::make_pair(ancestor->pid_.pid, (int)ancestor->pid_.pidversion))) {
+      return YES;
+    }
+  }
+  return NO;
+}
+
+// Returns YES if `instigator` is executing the same binary as `target`. For
+// strictly cdhash-enforced binaries the cdhash is authoritative, so the
+// (relatively expensive) source-hash lookup is skipped. Otherwise the SHA-256
+// Santa computed for the instigator's image is read back from SNTDecisionCache
+// (nil if no decision is cached) and compared against the target's.
+- (BOOL)isSameBinaryAsInstigator:(const es_process_t*)instigator
+                          target:(const es_process_t*)target
+                    targetSHA256:(NSString*)targetSHA256 {
+  NSString* instigatorSHA256 =
+      santa::CdhashStrictlyEnforced(instigator->codesigning_flags)
+          ? nil
+          : [[SNTDecisionCache sharedCache]
+                cachedDecisionForVnode:SantaVnode::VnodeForFile(instigator->executable)]
+                .sha256;
+  return SameBinary(instigator, instigatorSHA256, target, targetSHA256);
+}
+
+- (void)forgetSandboxedSeatbeltProc:(const audit_token_t&)token {
+  _sandboxedSeatbeltProcs->remove(
+      std::make_pair(audit_token_to_pid(token), audit_token_to_pidversion(token)));
+}
+
 - (void)validateExecEvent:(const Message&)esMsg
            cachedDecision:(SNTCachedDecision*)existingDecision
                postAction:(bool (^)(SNTAction, SNTCachedDecision*))postAction {
@@ -289,7 +381,21 @@ static SNTEventState BlockToAllowDecision(SNTEventState blockDecision) {
   //     the exec'd vnode to the inode santactl pinned; sha256 binds
   //     content at santad's read time to santactl's hash. This matches
   //     Santa's posture for every other rule state (see SNTPolicyProcessor).
-  // No expectation -> deny.
+  // No expectation -> deny, unless the transitive self-exec relaxation below
+  // applies.
+  //
+  // Transitive sandbox relaxation: the OS sandbox is transitive and
+  // irreversible, so a process Santa already authorized as a sandboxed seatbelt
+  // process (recorded in _sandboxedSeatbeltProcs) — or any process that forked
+  // from it, possibly several times (e.g. double-fork daemonization), and is
+  // still running that same binary's image — stays under the profile originally
+  // applied for that binary. Such a re-exec carries no expectation (santactl is
+  // not involved), so relax the requirement for it. Scope is limited to a
+  // same-binary self-exec by a sandboxed descendant: a different
+  // seatbelt-required binary would inherit an unrelated profile and must still
+  // go through santactl. Membership can only be seeded by first passing the
+  // expectation check, so this introduces no new trust boundary. See
+  // -isSandboxedSeatbeltDescendant: for the fork-aware ancestry walk.
   //
   // Cache safety: flipping the decision here must not let a later exec of
   // the same vnode be auto-allowed without re-checking its expectation.
@@ -300,9 +406,7 @@ static SNTEventState BlockToAllowDecision(SNTEventState blockDecision) {
     auto maybeExp = _sandboxExpectations->Consume(esMsg->process->audit_token);
     bool authorized = false;
 
-    if (!maybeExp) {
-      cd.decisionExtra = @"Binary requires seatbelt sandbox but no expectation was registered";
-    } else {
+    if (maybeExp) {
       if (santa::CdhashStrictlyEnforced(targetProc->codesigning_flags)) {
         authorized = memcmp(maybeExp->cdhash.data(), targetProc->cdhash, CS_CDHASH_LEN) == 0;
       } else {
@@ -317,10 +421,24 @@ static SNTEventState BlockToAllowDecision(SNTEventState blockDecision) {
         // would give an attacker a tuning signal.
         cd.decisionExtra = @"Seatbelt expectation verification failed";
       }
+    } else if ([self isSandboxedSeatbeltDescendant:esMsg->process] &&
+               [self isSameBinaryAsInstigator:esMsg->process
+                                       target:targetProc
+                                 targetSHA256:cd.sha256]) {
+      authorized = true;
+      cd.decisionExtra = @"Seatbelt requirement relaxed: sandboxed self-exec";
+    } else {
+      cd.decisionExtra = @"Binary requires seatbelt sandbox but no expectation was registered";
     }
 
     if (authorized) {
       cd.decision = BlockToAllowDecision(cd.decision);
+      // Record the now-sandboxed target so it may later re-exec itself. Covers
+      // both the expectation path (santactl -> binary) and the relaxed path.
+      _sandboxedSeatbeltProcs->set(
+          std::make_pair(audit_token_to_pid(targetProc->audit_token),
+                         audit_token_to_pidversion(targetProc->audit_token)),
+          true);
     }
   }
 

@@ -17,24 +17,35 @@
 #include "Source/common/es/Enricher.h"
 
 #include "Source/common/es/ESMetricsObserver.h"
-#import "Source/common/es/SNTEndpointSecurityClient.h"
 #import "Source/common/es/SNTEndpointSecurityEventHandler.h"
+#include "Source/common/processtree/process_tree.h"
 #import "Source/santad/EventProviders/AuthResultCache.h"
+#import "Source/santad/EventProviders/SNTEndpointSecurityTreeAwareClient.h"
 #import "Source/santad/SNTCompilerController.h"
 #import "Source/santad/SNTExecutionController.h"
 #include "Source/santad/TTYWriter.h"
 
 /// ES Client focused on subscribing to AUTH variants and authorizing the events
 /// based on configured policy.
+///
+/// This is a tree-aware client so that, by ES's within-client ordering
+/// guarantees, the process tree is kept consistent for the lineage of every
+/// process being authorized: a process's NOTIFY_FORK is folded into the tree
+/// before its AUTH_EXEC is processed here, and the instigator/target nodes are
+/// retained for the duration of authorization. SNTExecutionController relies on
+/// this for its CEL activations and for the seatbelt self-exec relaxation, both
+/// of which walk the tree's ancestry of the exec'ing (already-forked) process.
 @interface SNTEndpointSecurityAuthorizer
-    : SNTEndpointSecurityClient <SNTEndpointSecurityEventHandler>
+    : SNTEndpointSecurityTreeAwareClient <SNTEndpointSecurityEventHandler>
 
 - (instancetype)initWithESAPI:(std::shared_ptr<santa::EndpointSecurityAPI>)esApi
                       metrics:(std::shared_ptr<santa::ESMetricsObserver>)metrics
                execController:(SNTExecutionController*)execController
            compilerController:(SNTCompilerController*)compilerController
               authResultCache:(std::shared_ptr<santa::AuthResultCache>)authResultCache
-                    ttyWriter:(std::shared_ptr<santa::TTYWriter>)ttyWriter;
+                    ttyWriter:(std::shared_ptr<santa::TTYWriter>)ttyWriter
+                  processTree:
+                      (std::shared_ptr<santa::santad::process_tree::ProcessTree>)processTree;
 
 - (void)registerAuthExecProbe:(id<SNTEndpointSecurityProbe>)watcher;
 

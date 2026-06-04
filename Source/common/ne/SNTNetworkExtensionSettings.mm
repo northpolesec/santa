@@ -21,17 +21,21 @@
 
 namespace {
 
-// Below the floor (incl. 0 from a missing archive key) means "not meaningfully set" -> default.
-// Above the ceiling is intentional -> clamp. The 15s ceiling stays well under mDNSResponder's
-// ~30s per-question patience so a santanetd SERVFAIL always lands first.
-const NSTimeInterval kDefaultDNSUpstreamTimeoutSecs = 7.0;
+// Normalization is deliberately asymmetric. Any value below the floor -- 0/unset (e.g. a missing
+// archive key), a negative, or an absurdly small positive like 0.5s -- is treated as "not
+// meaningfully set" and becomes the default; we intentionally do NOT clamp sub-floor values up to
+// the floor, because an aggressively short cleanup timeout is far more likely a mistake than an
+// intent. Above the ceiling IS clamped down to the max. This timeout is a resource-cleanup backstop
+// for the DNS proxy's per-query upstream connection, NOT a fast-fail trigger.
+const NSTimeInterval kDefaultDNSUpstreamTimeoutSecs = 30.0;
 const NSTimeInterval kMinDNSUpstreamTimeoutSecs = 1.0;
-const NSTimeInterval kMaxDNSUpstreamTimeoutSecs = 15.0;
+const NSTimeInterval kMaxDNSUpstreamTimeoutSecs = 60.0;
 
 NSTimeInterval NormalizeDNSUpstreamTimeout(NSTimeInterval v) {
   // Non-finite (NaN/±INF) is not a meaningful timeout; NaN also slips the </> clamp below because
   // every NaN comparison is false. Treat it as "not meaningfully set" -> default.
   if (!std::isfinite(v)) return kDefaultDNSUpstreamTimeoutSecs;
+  // sub-floor (incl. 0) -> default, not clamped to floor
   if (v < kMinDNSUpstreamTimeoutSecs) return kDefaultDNSUpstreamTimeoutSecs;
   if (v > kMaxDNSUpstreamTimeoutSecs) return kMaxDNSUpstreamTimeoutSecs;
   return v;

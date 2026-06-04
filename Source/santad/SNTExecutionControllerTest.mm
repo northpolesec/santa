@@ -17,7 +17,9 @@
 #import <OCMock/OCMock.h>
 #import <XCTest/XCTest.h>
 #include <dispatch/dispatch.h>
+#include "Source/common/processtree/process.h"
 #include "Source/common/processtree/process_tree.h"
+#include "Source/common/processtree/process_tree_test_helpers.h"
 
 #include "Source/common/AuditUtilities.h"
 #import "Source/common/MOLCertificate.h"
@@ -30,6 +32,7 @@
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTRuleIdentifiers.h"
 #import "Source/common/SNTSandboxExecRequest.h"
+#include "Source/common/SantaVnode.h"
 #include "Source/common/TestUtils.h"
 #include "Source/common/es/Message.h"
 #include "Source/common/es/MockEndpointSecurityAPI.h"
@@ -269,6 +272,44 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
 
 - (void)validateExecEvent:(SNTAction)wantAction {
   [self validateExecEvent:wantAction messageSetup:nil];
+}
+
+// Stubs the source-process decision lookup used by the seatbelt self-exec
+// relaxation (-isSameBinaryAsInstigator:...). Pass nil to simulate no cached
+// decision for the instigator (forcing the (dev, ino) fallback), or a SHA-256 to
+// simulate a cached hash for the instigator's image.
+- (void)stubInstigatorSHA256:(NSString*)sha256 {
+  SNTCachedDecision* dec = nil;
+  if (sha256.length) {
+    dec = [[SNTCachedDecision alloc] init];
+    dec.sha256 = sha256;
+  }
+  OCMStub([self.mockDecisionCache cachedDecisionForVnode:SantaVnode{}])
+      .ignoringNonObjectArgs()
+      .andReturn(dec);
+}
+
+// Builds an SNTExecutionController backed by the given process tree, sharing the
+// same mocks and sandbox expectations as the default `self.sut`. Used by the
+// fork-descendant tests, which need a populated process tree (the default
+// `self.sut` is built with a nullptr tree).
+- (SNTExecutionController*)makeControllerWithProcessTree:
+    (std::shared_ptr<santa::santad::process_tree::ProcessTree>)tree {
+  std::shared_ptr<santa::EntitlementsFilter> entitlementsFilter =
+      santa::EntitlementsFilter::Create(@[], @[]);
+  SNTPolicyProcessor* policyProcessor =
+      [[SNTPolicyProcessor alloc] initWithRuleTable:self.mockRuleDatabase
+                                 entitlementsFilter:entitlementsFilter];
+  return [[SNTExecutionController alloc] initWithRuleTable:self.mockRuleDatabase
+                                                eventTable:self.mockEventDatabase
+                                             notifierQueue:nil
+                                                syncdQueue:nil
+                                                    logger:nullptr
+                                                 ttyWriter:santa::TTYWriter::Create(true)
+                                           policyProcessor:policyProcessor
+                                       processControlBlock:santa::ProdSuspendResumeBlock()
+                                               processTree:tree
+                                       sandboxExpectations:_sandboxExpectations];
 }
 
 - (void)stubRule:(SNTRule*)rule forIdentifiers:(struct RuleIdentifiers)wantIdentifiers {
@@ -1337,6 +1378,336 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
                audit_token_t other = santa::MakeStubAuditToken(20, 1);
                const uint8_t cdhash[20] = {0};
                _sandboxExpectations->Register(other, MakeSandboxRequest(0, 0, cdhash, nil));
+             }];
+}
+
+// ---------------- Transitive sandbox relaxation (self-exec) ----------------
+
+// A binary launched under seatbelt (expectation path) that re-execs itself is
+// allowed without a new expectation: it is recorded as sandboxed, and the
+// re-exec is a self-exec.
+- (void)testSeatbeltSandboxedSelfExecAllows {
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"cafebabe");
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateSeatbelt;
+  rule.type = SNTRuleTypeBinary;
+  [self stubRule:rule forIdentifiers:{.binarySHA256 = @"cafebabe"}];
+  // No cached decision for the instigator -> relaxation uses the (dev, ino) fallback.
+  [self stubInstigatorSHA256:nil];
+
+  // Call 1: santactl -> binary authorizes via expectation and records the
+  // sandboxed target token (501, 1).
+  [self validateExecEvent:SNTActionRespondAllowNoCache
+             messageSetup:^(es_message_t* msg) {
+               msg->process->audit_token = santa::MakeStubAuditToken(500, 1);
+               msg->event.exec.target->audit_token = santa::MakeStubAuditToken(501, 1);
+               msg->event.exec.target->codesigning_flags = CS_SIGNED | CS_VALID;
+               msg->event.exec.target->executable->stat.st_dev = 17;
+               msg->event.exec.target->executable->stat.st_ino = 42;
+
+               const uint8_t cdhash[20] = {0};
+               _sandboxExpectations->Register(msg->process->audit_token,
+                                              MakeSandboxRequest(17, 42, cdhash, @"cafebabe"));
+             }];
+
+  // Call 2: the recorded process (now the instigator (501, 1)) re-execs the
+  // same binary (matching dev/ino) with no expectation -> relaxed.
+  [self validateExecEvent:SNTActionRespondAllowNoCache
+             messageSetup:^(es_message_t* msg) {
+               msg->process->audit_token = santa::MakeStubAuditToken(501, 1);
+               msg->process->codesigning_flags = CS_SIGNED | CS_VALID;
+               msg->process->executable->stat.st_dev = 17;
+               msg->process->executable->stat.st_ino = 42;
+               msg->event.exec.target->codesigning_flags = CS_SIGNED | CS_VALID;
+               msg->event.exec.target->executable->stat.st_dev = 17;
+               msg->event.exec.target->executable->stat.st_ino = 42;
+             }];
+}
+
+// Same as above but verifying the strict (cdhash) self-exec comparison.
+- (void)testSeatbeltSandboxedSelfExecStrictAllows {
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateSeatbelt;
+  rule.type = SNTRuleTypeBinary;
+  [self stubRule:rule
+      forIdentifiers:{.cdhash = @"7777777777777777777777777777777777777777", .binarySHA256 = @"a"}];
+
+  // Call 1: authorize via strict expectation, recording target token (511, 1).
+  [self validateExecEvent:SNTActionRespondAllowNoCache
+             messageSetup:^(es_message_t* msg) {
+               uint8_t cdhash[20];
+               memset(cdhash, 0x77, sizeof(cdhash));
+               msg->process->audit_token = santa::MakeStubAuditToken(510, 1);
+               msg->event.exec.target->audit_token = santa::MakeStubAuditToken(511, 1);
+               msg->event.exec.target->codesigning_flags = CS_SIGNED | CS_VALID | CS_HARD;
+               memcpy(msg->event.exec.target->cdhash, cdhash, 20);
+
+               _sandboxExpectations->Register(
+                   msg->process->audit_token,
+                   MakeSandboxRequest(/*dev=*/0, /*ino=*/0, cdhash, /*sha256=*/nil));
+             }];
+
+  // Call 2: recorded process (511, 1) re-execs the same binary (matching
+  // cdhash, both strictly enforced) with no expectation -> relaxed.
+  [self validateExecEvent:SNTActionRespondAllowNoCache
+             messageSetup:^(es_message_t* msg) {
+               uint8_t cdhash[20];
+               memset(cdhash, 0x77, sizeof(cdhash));
+               msg->process->audit_token = santa::MakeStubAuditToken(511, 1);
+               msg->process->codesigning_flags = CS_SIGNED | CS_VALID | CS_HARD;
+               memcpy(msg->process->cdhash, cdhash, 20);
+               msg->event.exec.target->codesigning_flags = CS_SIGNED | CS_VALID | CS_HARD;
+               memcpy(msg->event.exec.target->cdhash, cdhash, 20);
+             }];
+}
+
+// A self-exec from a process Santa never recorded as sandboxed (e.g. launched
+// before the seatbelt rule existed) is denied: the transitive guarantee does
+// not hold.
+- (void)testSeatbeltSelfExecNotTrackedDenies {
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"cafebabe");
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateSeatbelt;
+  rule.type = SNTRuleTypeBinary;
+  [self stubRule:rule forIdentifiers:{.binarySHA256 = @"cafebabe"}];
+
+  [self validateExecEvent:SNTActionRespondDeny
+             messageSetup:^(es_message_t* msg) {
+               msg->process->audit_token = santa::MakeStubAuditToken(520, 1);
+               msg->process->codesigning_flags = CS_SIGNED | CS_VALID;
+               msg->process->executable->stat.st_dev = 17;
+               msg->process->executable->stat.st_ino = 42;
+               msg->event.exec.target->codesigning_flags = CS_SIGNED | CS_VALID;
+               msg->event.exec.target->executable->stat.st_dev = 17;
+               msg->event.exec.target->executable->stat.st_ino = 42;
+             }];
+}
+
+// A recorded sandboxed process exec'ing a *different* seatbelt binary is denied:
+// the relaxation is limited to self-exec.
+- (void)testSeatbeltSandboxedNonSelfExecDenies {
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"cafebabe");
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateSeatbelt;
+  rule.type = SNTRuleTypeBinary;
+  [self stubRule:rule forIdentifiers:{.binarySHA256 = @"cafebabe"}];
+  // No cached decision for the instigator -> relaxation uses the (dev, ino) fallback.
+  [self stubInstigatorSHA256:nil];
+
+  // Call 1: record sandboxed target token (531, 1).
+  [self validateExecEvent:SNTActionRespondAllowNoCache
+             messageSetup:^(es_message_t* msg) {
+               msg->process->audit_token = santa::MakeStubAuditToken(530, 1);
+               msg->event.exec.target->audit_token = santa::MakeStubAuditToken(531, 1);
+               msg->event.exec.target->codesigning_flags = CS_SIGNED | CS_VALID;
+               msg->event.exec.target->executable->stat.st_dev = 17;
+               msg->event.exec.target->executable->stat.st_ino = 42;
+
+               const uint8_t cdhash[20] = {0};
+               _sandboxExpectations->Register(msg->process->audit_token,
+                                              MakeSandboxRequest(17, 42, cdhash, @"cafebabe"));
+             }];
+
+  // Call 2: instigator (531, 1) is recorded, but the target is a different
+  // binary (different dev/ino) -> not a self-exec -> denied.
+  [self validateExecEvent:SNTActionRespondDeny
+             messageSetup:^(es_message_t* msg) {
+               msg->process->audit_token = santa::MakeStubAuditToken(531, 1);
+               msg->process->codesigning_flags = CS_SIGNED | CS_VALID;
+               msg->process->executable->stat.st_dev = 17;
+               msg->process->executable->stat.st_ino = 42;
+               msg->event.exec.target->codesigning_flags = CS_SIGNED | CS_VALID;
+               msg->event.exec.target->executable->stat.st_dev = 99;
+               msg->event.exec.target->executable->stat.st_ino = 88;
+             }];
+}
+
+// A process that forks (possibly several times -- the classic double-fork
+// daemonization) from a sandboxed seatbelt process and then re-execs the same
+// binary is allowed, even though the forked descendant's own (pid, pidversion)
+// was never recorded. The ancestry walk finds the recorded sandboxed ancestor.
+- (void)testSeatbeltSandboxedForkedDescendantSelfExecAllows {
+  using namespace santa::santad::process_tree;
+  auto tree = std::make_shared<ProcessTreeTestPeer>(std::vector<std::unique_ptr<Annotator>>{});
+  std::shared_ptr<const Process> init = tree->InsertInit();
+
+  uint64_t eventId = 1;
+  // B (600, 1): the sandboxed seatbelt process.
+  struct Pid bPid = {.pid = 600, .pidversion = 1};
+  tree->HandleFork(eventId++, *init, bPid);
+  // B fork -> C (601, 2).
+  struct Pid cPid = {.pid = 601, .pidversion = 2};
+  tree->HandleFork(eventId++, **tree->Get(bPid), cPid);
+  // C fork -> D (602, 3).
+  struct Pid dPid = {.pid = 602, .pidversion = 3};
+  tree->HandleFork(eventId++, **tree->Get(cPid), dPid);
+
+  self.sut = [self makeControllerWithProcessTree:tree];
+
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"cafebabe");
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateSeatbelt;
+  rule.type = SNTRuleTypeBinary;
+  [self stubRule:rule forIdentifiers:{.binarySHA256 = @"cafebabe"}];
+  // No cached decision for the instigator -> relaxation uses the (dev, ino) fallback.
+  [self stubInstigatorSHA256:nil];
+
+  // Call 1: B is authorized via expectation; its token (600, 1) is recorded.
+  [self validateExecEvent:SNTActionRespondAllowNoCache
+             messageSetup:^(es_message_t* msg) {
+               msg->process->audit_token = santa::MakeStubAuditToken(599, 1);
+               msg->event.exec.target->audit_token = santa::MakeStubAuditToken(600, 1);
+               msg->event.exec.target->codesigning_flags = CS_SIGNED | CS_VALID;
+               msg->event.exec.target->executable->stat.st_dev = 17;
+               msg->event.exec.target->executable->stat.st_ino = 42;
+
+               const uint8_t cdhash[20] = {0};
+               _sandboxExpectations->Register(msg->process->audit_token,
+                                              MakeSandboxRequest(17, 42, cdhash, @"cafebabe"));
+             }];
+
+  // Call 2: the double-forked descendant D (602, 3) re-execs the same binary
+  // with no expectation -> relaxed via ancestry to recorded B.
+  [self validateExecEvent:SNTActionRespondAllowNoCache
+             messageSetup:^(es_message_t* msg) {
+               msg->process->audit_token = santa::MakeStubAuditToken(602, 3);
+               msg->process->codesigning_flags = CS_SIGNED | CS_VALID;
+               msg->process->executable->stat.st_dev = 17;
+               msg->process->executable->stat.st_ino = 42;
+               msg->event.exec.target->codesigning_flags = CS_SIGNED | CS_VALID;
+               msg->event.exec.target->executable->stat.st_dev = 17;
+               msg->event.exec.target->executable->stat.st_ino = 42;
+             }];
+}
+
+// A descendant of a process Santa never recorded as sandboxed is denied: the
+// ancestry walk finds no recorded ancestor, so the transitive guarantee does
+// not hold.
+- (void)testSeatbeltForkedDescendantOfUnsandboxedDenies {
+  using namespace santa::santad::process_tree;
+  auto tree = std::make_shared<ProcessTreeTestPeer>(std::vector<std::unique_ptr<Annotator>>{});
+  std::shared_ptr<const Process> init = tree->InsertInit();
+
+  uint64_t eventId = 1;
+  struct Pid bPid = {.pid = 700, .pidversion = 1};
+  tree->HandleFork(eventId++, *init, bPid);
+  struct Pid cPid = {.pid = 701, .pidversion = 2};
+  tree->HandleFork(eventId++, **tree->Get(bPid), cPid);
+
+  self.sut = [self makeControllerWithProcessTree:tree];
+
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"cafebabe");
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateSeatbelt;
+  rule.type = SNTRuleTypeBinary;
+  [self stubRule:rule forIdentifiers:{.binarySHA256 = @"cafebabe"}];
+
+  // No ancestor was recorded -> C (701, 2) self-exec is denied.
+  [self validateExecEvent:SNTActionRespondDeny
+             messageSetup:^(es_message_t* msg) {
+               msg->process->audit_token = santa::MakeStubAuditToken(701, 2);
+               msg->process->codesigning_flags = CS_SIGNED | CS_VALID;
+               msg->process->executable->stat.st_dev = 17;
+               msg->process->executable->stat.st_ino = 42;
+               msg->event.exec.target->codesigning_flags = CS_SIGNED | CS_VALID;
+               msg->event.exec.target->executable->stat.st_dev = 17;
+               msg->event.exec.target->executable->stat.st_ino = 42;
+             }];
+}
+
+// In the fallback (non-strict) mode a matching SHA-256 authorizes the self-exec
+// even when (dev, ino) differ, exercising the hash comparison in SameBinary.
+- (void)testSeatbeltSandboxedSelfExecAllowsViaSHA256 {
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"cafebabe");
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateSeatbelt;
+  rule.type = SNTRuleTypeBinary;
+  [self stubRule:rule forIdentifiers:{.binarySHA256 = @"cafebabe"}];
+  // Cached instigator hash matches the target's SHA-256 (@"cafebabe").
+  [self stubInstigatorSHA256:@"cafebabe"];
+
+  // Call 1: record sandboxed target token (701, 1).
+  [self validateExecEvent:SNTActionRespondAllowNoCache
+             messageSetup:^(es_message_t* msg) {
+               msg->process->audit_token = santa::MakeStubAuditToken(700, 1);
+               msg->event.exec.target->audit_token = santa::MakeStubAuditToken(701, 1);
+               msg->event.exec.target->codesigning_flags = CS_SIGNED | CS_VALID;
+               msg->event.exec.target->executable->stat.st_dev = 17;
+               msg->event.exec.target->executable->stat.st_ino = 42;
+
+               const uint8_t cdhash[20] = {0};
+               _sandboxExpectations->Register(msg->process->audit_token,
+                                              MakeSandboxRequest(17, 42, cdhash, @"cafebabe"));
+             }];
+
+  // Call 2: instigator (701, 1) re-execs with a DIFFERENT (dev, ino) but the same
+  // content hash -> relaxed via the SHA-256 comparison rather than (dev, ino).
+  [self validateExecEvent:SNTActionRespondAllowNoCache
+             messageSetup:^(es_message_t* msg) {
+               msg->process->audit_token = santa::MakeStubAuditToken(701, 1);
+               msg->process->codesigning_flags = CS_SIGNED | CS_VALID;
+               msg->process->executable->stat.st_dev = 1;
+               msg->process->executable->stat.st_ino = 2;
+               msg->event.exec.target->codesigning_flags = CS_SIGNED | CS_VALID;
+               msg->event.exec.target->executable->stat.st_dev = 99;
+               msg->event.exec.target->executable->stat.st_ino = 88;
+             }];
+}
+
+// After a process exits (forgetSandboxedSeatbeltProc:), a subsequent self-exec of
+// the same (pid, pidversion) is no longer relaxed.
+- (void)testForgetSandboxedSeatbeltProcDenies {
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"cafebabe");
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateSeatbelt;
+  rule.type = SNTRuleTypeBinary;
+  [self stubRule:rule forIdentifiers:{.binarySHA256 = @"cafebabe"}];
+
+  // Call 1: record sandboxed target token (801, 1).
+  [self validateExecEvent:SNTActionRespondAllowNoCache
+             messageSetup:^(es_message_t* msg) {
+               msg->process->audit_token = santa::MakeStubAuditToken(800, 1);
+               msg->event.exec.target->audit_token = santa::MakeStubAuditToken(801, 1);
+               msg->event.exec.target->codesigning_flags = CS_SIGNED | CS_VALID;
+               msg->event.exec.target->executable->stat.st_dev = 17;
+               msg->event.exec.target->executable->stat.st_ino = 42;
+
+               const uint8_t cdhash[20] = {0};
+               _sandboxExpectations->Register(msg->process->audit_token,
+                                              MakeSandboxRequest(17, 42, cdhash, @"cafebabe"));
+             }];
+
+  // Evict the recorded process, as the tree-aware authorizer does on its exit.
+  audit_token_t exited = santa::MakeStubAuditToken(801, 1);
+  [self.sut forgetSandboxedSeatbeltProc:exited];
+
+  // Call 2: the now-forgotten (801, 1) re-execs -> no longer relaxed -> denied.
+  [self validateExecEvent:SNTActionRespondDeny
+             messageSetup:^(es_message_t* msg) {
+               msg->process->audit_token = santa::MakeStubAuditToken(801, 1);
+               msg->process->codesigning_flags = CS_SIGNED | CS_VALID;
+               msg->process->executable->stat.st_dev = 17;
+               msg->process->executable->stat.st_ino = 42;
+               msg->event.exec.target->codesigning_flags = CS_SIGNED | CS_VALID;
+               msg->event.exec.target->executable->stat.st_dev = 17;
+               msg->event.exec.target->executable->stat.st_ino = 42;
              }];
 }
 

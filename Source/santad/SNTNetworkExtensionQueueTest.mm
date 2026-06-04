@@ -81,15 +81,14 @@
   OCMStub([self.mockConfigurator syncNetworkExtensionSettings]).andReturn(settings);
 }
 
-// Like stubConfiguratorEnable:action: but also sets the sync-side DNS upstream timeout.
+// Like stubConfiguratorEnable:action: but also sets the MDM-sourced DNS upstream timeout.
 - (void)stubConfiguratorEnable:(BOOL)enable
                         action:(SNTNetworkFlowDefaultAction)action
                     dnsTimeout:(NSTimeInterval)dnsTimeout {
   SNTSyncNetworkExtensionSettings* settings =
-      [[SNTSyncNetworkExtensionSettings alloc] initWithEnable:enable
-                                            flowDefaultAction:action
-                                       dnsUpstreamTimeoutSecs:dnsTimeout];
+      [[SNTSyncNetworkExtensionSettings alloc] initWithEnable:enable flowDefaultAction:action];
   OCMStub([self.mockConfigurator syncNetworkExtensionSettings]).andReturn(settings);
+  OCMStub([self.mockConfigurator dnsUpstreamTimeoutSecs]).andReturn(dnsTimeout);
 }
 
 // Make the rule table report the given network flow rules hash + ruleset.
@@ -276,19 +275,19 @@
   XCTAssertEqualWithAccuracy(settings.dnsUpstreamTimeoutSecs, 7.5, 0.0001);
 }
 
-- (void)testGenerateSettingsDefaultsDNSUpstreamTimeoutWhenSyncUnset {
-  // Carrier timeout 0 -> SNTNetworkExtensionSettings normalizes to the 7s default.
+- (void)testGenerateSettingsDefaultsDNSUpstreamTimeoutWhenUnset {
+  // MDM timeout 0 -> SNTNetworkExtensionSettings normalizes to the 30s default.
   [self stubConfiguratorEnable:YES action:SNTNetworkFlowDefaultActionDeny dnsTimeout:0];
   SNTNetworkExtensionSettings* settings = [self.sut generateSettingsForProtocolVersion:@"1.0"];
-  XCTAssertEqualWithAccuracy(settings.dnsUpstreamTimeoutSecs, 7.0, 0.0001);
+  XCTAssertEqualWithAccuracy(settings.dnsUpstreamTimeoutSecs, 30.0, 0.0001);
 }
 
 - (void)testGenerateSettingsIgnoresSyncBelowProtocolV1 {
   [self stubConfiguratorEnable:YES action:SNTNetworkFlowDefaultActionDeny dnsTimeout:7.5];
   SNTNetworkExtensionSettings* settings = [self.sut generateSettingsForProtocolVersion:@"0.9"];
-  XCTAssertFalse(settings.enable);
-  // Sync timeout is ignored below protocol v1 -> 7s default.
-  XCTAssertEqualWithAccuracy(settings.dnsUpstreamTimeoutSecs, 7.0, 0.0001);
+  XCTAssertFalse(settings.enable);  // sync (enable/action) ignored below protocol v1
+  // The MDM timeout is local config, not a sync setting, so it applies regardless of version.
+  XCTAssertEqualWithAccuracy(settings.dnsUpstreamTimeoutSecs, 7.5, 0.0001);
 }
 
 @end

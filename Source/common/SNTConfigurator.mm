@@ -273,6 +273,7 @@ static NSString* const kSyncTypeRequired = @"SyncTypeRequired";
 static NSString* const kExportConfigurationKey = @"ExportConfiguration";
 static NSString* const kModeTransitionKey = @"ModeTransition";
 static NSString* const kNetworkExtensionSettingsKey = @"NetworkExtensionSettings";
+static NSString* const kDNSUpstreamTimeoutSecondsKey = @"DNSUpstreamTimeoutSeconds";
 static NSString* const kPushTokenChainKey = @"PushTokenChain";
 
 - (instancetype)init {
@@ -450,6 +451,7 @@ static NSString* const kPushTokenChainKey = @"PushTokenChain";
       kBrandingCompanyLogo : string,
       kBrandingCompanyLogoDark : string,
       kAllowedSantaCommandsKey : array,
+      kDNSUpstreamTimeoutSecondsKey : number,
     };
 
     _syncStateFilePath = syncStateFilePath;
@@ -797,6 +799,10 @@ static SNTConfigurator* sharedConfigurator = nil;
 }
 
 + (NSSet*)keyPathsForValuesAffectingIgnoreOtherEndpointSecurityClients {
+  return [self configStateSet];
+}
+
++ (NSSet*)keyPathsForValuesAffectingDnsUpstreamTimeoutSecs {
   return [self configStateSet];
 }
 
@@ -1668,6 +1674,11 @@ static SNTConfigurator* sharedConfigurator = nil;
 - (BOOL)ignoreOtherEndpointSecurityClients {
   NSNumber* number = self.configState[kIgnoreOtherEndpointSecurityClients];
   return number ? [number boolValue] : NO;
+}
+
+- (NSTimeInterval)dnsUpstreamTimeoutSecs {
+  NSNumber* v = self.configState[kDNSUpstreamTimeoutSecondsKey];
+  return v ? v.doubleValue : 0;  // 0 == unset
 }
 
 - (NSString*)fcmProject {

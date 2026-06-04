@@ -423,6 +423,15 @@
 @property(readonly, nonatomic) BOOL enableMachineIDDecoration;
 
 ///
+///  Override for santanetd's DNS-proxy upstream cleanup timeout, in seconds.
+///  Surfaced only when we must run a live timeout experiment in an unexpected
+///  environment. 0/unset (or any sub-floor value) means "use the built-in default"; an in-range
+///  value is used as-is and an above-ceiling value is clamped down. The effective value is
+///  normalized by SNTNetworkExtensionSettings (default 30s, ceiling 60s), not here.
+///
+@property(readonly, nonatomic) NSTimeInterval dnsUpstreamTimeoutSecs;
+
+///
 ///  Currently defined settings for Santa's network extension. Its value is set by a sync server.
 ///
 @property(nullable, readonly) SNTSyncNetworkExtensionSettings* syncNetworkExtensionSettings;

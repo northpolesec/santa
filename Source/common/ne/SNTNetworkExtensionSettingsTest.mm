@@ -182,9 +182,9 @@
 }
 
 - (void)testTimeoutDefaultFromEnableInit {
-  // initWithEnable: should default the timeout to 7s.
+  // initWithEnable: should default the timeout to 30s.
   SNTNetworkExtensionSettings* s = [[SNTNetworkExtensionSettings alloc] initWithEnable:YES];
-  XCTAssertEqualWithAccuracy(s.dnsUpstreamTimeoutSecs, 7.0, 0.0001);
+  XCTAssertEqualWithAccuracy(s.dnsUpstreamTimeoutSecs, 30.0, 0.0001);
 }
 
 - (void)testTimeoutInRangePreserved {
@@ -194,20 +194,20 @@
 }
 
 - (void)testTimeoutBelowFloorUsesDefault {
-  // Below the 1.0 floor (incl. 0 / negative) is treated as "unset" -> 7s default.
+  // Below the 1.0 floor (incl. 0 / negative) is treated as "unset" -> 30s default.
   NSTimeInterval belowFloor[] = {0.0, 0.5, -1.0};
   for (size_t i = 0; i < sizeof(belowFloor) / sizeof(belowFloor[0]); i++) {
     SNTNetworkExtensionSettings* s =
         [[SNTNetworkExtensionSettings alloc] initWithEnable:YES
                                      dnsUpstreamTimeoutSecs:belowFloor[i]];
-    XCTAssertEqualWithAccuracy(s.dnsUpstreamTimeoutSecs, 7.0, 0.0001);
+    XCTAssertEqualWithAccuracy(s.dnsUpstreamTimeoutSecs, 30.0, 0.0001);
   }
 }
 
 - (void)testTimeoutAboveCeilingClampsToMax {
   SNTNetworkExtensionSettings* s = [[SNTNetworkExtensionSettings alloc] initWithEnable:YES
-                                                                dnsUpstreamTimeoutSecs:60.0];
-  XCTAssertEqualWithAccuracy(s.dnsUpstreamTimeoutSecs, 15.0, 0.0001);
+                                                                dnsUpstreamTimeoutSecs:100.0];
+  XCTAssertEqualWithAccuracy(s.dnsUpstreamTimeoutSecs, 60.0, 0.0001);
 }
 
 - (void)testTimeoutBoundaryValuesPreserved {
@@ -216,8 +216,8 @@
                                                                     dnsUpstreamTimeoutSecs:1.0];
   XCTAssertEqualWithAccuracy(floor.dnsUpstreamTimeoutSecs, 1.0, 0.0001);
   SNTNetworkExtensionSettings* ceiling = [[SNTNetworkExtensionSettings alloc] initWithEnable:YES
-                                                                      dnsUpstreamTimeoutSecs:15.0];
-  XCTAssertEqualWithAccuracy(ceiling.dnsUpstreamTimeoutSecs, 15.0, 0.0001);
+                                                                      dnsUpstreamTimeoutSecs:60.0];
+  XCTAssertEqualWithAccuracy(ceiling.dnsUpstreamTimeoutSecs, 60.0, 0.0001);
 }
 
 - (void)testTimeoutNonFiniteUsesDefault {
@@ -229,7 +229,7 @@
     SNTNetworkExtensionSettings* s =
         [[SNTNetworkExtensionSettings alloc] initWithEnable:YES
                                      dnsUpstreamTimeoutSecs:nonFinite[i]];
-    XCTAssertEqualWithAccuracy(s.dnsUpstreamTimeoutSecs, 7.0, 0.0001);
+    XCTAssertEqualWithAccuracy(s.dnsUpstreamTimeoutSecs, 30.0, 0.0001);
   }
 }
 
@@ -246,7 +246,7 @@
 }
 
 - (void)testTimeoutMissingKeyDecodesToDefault {
-  // A legacy archive omitting the key must decode to the 7s default, not 0.
+  // A legacy archive omitting the key must decode to the 30s default, not 0.
   //
   // SNTNetworkExtensionSettingsLegacy encodes nothing, so the archive omits the
   // dnsUpstreamTimeoutSecs key. We remap the class name to SNTNetworkExtensionSettings during
@@ -269,11 +269,11 @@
                                forKey:NSKeyedArchiveRootObjectKey];
   [unarchiver finishDecoding];
 
-  XCTAssertEqualWithAccuracy(decoded.dnsUpstreamTimeoutSecs, 7.0, 0.0001);
+  XCTAssertEqualWithAccuracy(decoded.dnsUpstreamTimeoutSecs, 30.0, 0.0001);
 }
 
 - (void)testEqualityAndHashDistinguishDNSUpstreamTimeout {
-  // isEqual: gates whether a sync-only timeout change is pushed to santanetd in
+  // isEqual: gates whether an MDM-sourced timeout change is pushed to santanetd in
   // SNTNetworkExtensionQueue's reconcileNetworkExtensionConfig, so settings that differ only in
   // the timeout must not compare equal. (3.0 and 7.5 are both in range, so they're preserved.)
   SNTNetworkExtensionSettings* a =

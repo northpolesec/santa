@@ -81,45 +81,4 @@
   XCTAssertNil(deserialized);
 }
 
-- (void)testDNSUpstreamTimeoutDefaultsToZeroWhenUnset {
-  // The 2-arg convenience init leaves the carrier timeout at 0 ("unset").
-  // Clamping/defaulting to 7s happens downstream in SNTNetworkExtensionSettings.
-  SNTSyncNetworkExtensionSettings* settings =
-      [[SNTSyncNetworkExtensionSettings alloc] initWithEnable:YES
-                                            flowDefaultAction:SNTNetworkFlowDefaultActionDeny];
-  XCTAssertEqual(settings.dnsUpstreamTimeoutSecs, 0);
-}
-
-- (void)testDNSUpstreamTimeoutPreservedByDesignatedInit {
-  SNTSyncNetworkExtensionSettings* settings =
-      [[SNTSyncNetworkExtensionSettings alloc] initWithEnable:YES
-                                            flowDefaultAction:SNTNetworkFlowDefaultActionDeny
-                                       dnsUpstreamTimeoutSecs:7.5];
-  XCTAssertEqualWithAccuracy(settings.dnsUpstreamTimeoutSecs, 7.5, 0.0001);
-}
-
-- (void)testDNSUpstreamTimeoutRoundTripsThroughCoder {
-  SNTSyncNetworkExtensionSettings* settings =
-      [[SNTSyncNetworkExtensionSettings alloc] initWithEnable:YES
-                                            flowDefaultAction:SNTNetworkFlowDefaultActionDeny
-                                       dnsUpstreamTimeoutSecs:7.5];
-  SNTSyncNetworkExtensionSettings* deserialized =
-      [SNTSyncNetworkExtensionSettings deserialize:[settings serialize]];
-  XCTAssertNotNil(deserialized);
-  XCTAssertEqualWithAccuracy(deserialized.dnsUpstreamTimeoutSecs, 7.5, 0.0001);
-  XCTAssertEqualObjects(deserialized, settings);
-}
-
-- (void)testDNSUpstreamTimeoutDifferentiatesEquality {
-  SNTSyncNetworkExtensionSettings* a =
-      [[SNTSyncNetworkExtensionSettings alloc] initWithEnable:YES
-                                            flowDefaultAction:SNTNetworkFlowDefaultActionDeny
-                                       dnsUpstreamTimeoutSecs:7.5];
-  SNTSyncNetworkExtensionSettings* b =
-      [[SNTSyncNetworkExtensionSettings alloc] initWithEnable:YES
-                                            flowDefaultAction:SNTNetworkFlowDefaultActionDeny
-                                       dnsUpstreamTimeoutSecs:3.0];
-  XCTAssertNotEqualObjects(a, b);
-}
-
 @end

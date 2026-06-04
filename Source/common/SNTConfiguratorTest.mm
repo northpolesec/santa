@@ -536,6 +536,7 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
   NSArray<NSString*>* keyPaths = @[
     @"allowedPathRegex",
     @"blockedPathRegex",
+    @"dnsUpstreamTimeoutSecs",
     @"enableSilentTTYMode",
     @"exportMetrics",
     @"metricExportInterval",
@@ -552,6 +553,7 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
   cfg.configState = [@{
     @"AllowedPathRegex" : @"a",
     @"BlockedPathRegex" : @"b",
+    @"DNSUpstreamTimeoutSeconds" : @(30.0),
     @"EnableSilentTTYMode" : @YES,
     @"ExportMetrics" : @YES,
     @"MetricExportInterval" : @123,
@@ -605,6 +607,15 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
                    @"keyPathsForValuesAffecting<Key> in SNTConfigurator.mm.",
                    keyPath, (unsigned long)[observer.firedKeyPaths countForObject:keyPath]);
   }
+}
+
+- (void)testDNSUpstreamTimeoutSecsForcedConfig {
+  SNTConfigurator* sut = [[SNTConfigurator alloc] init];
+  // Unset -> 0, the "use built-in default" sentinel. The default + [1,60]s clamp live downstream
+  // in SNTNetworkExtensionSettings, so the configurator returns the raw forced value (or 0).
+  XCTAssertEqual(sut.dnsUpstreamTimeoutSecs, 0);
+  sut.configState[@"DNSUpstreamTimeoutSeconds"] = @(30.0);
+  XCTAssertEqualWithAccuracy(sut.dnsUpstreamTimeoutSecs, 30.0, 0.0001);
 }
 
 @end
