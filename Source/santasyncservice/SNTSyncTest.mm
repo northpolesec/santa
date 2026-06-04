@@ -431,31 +431,9 @@
   XCTAssertNil(self.syncState.overrideFileAccessAction);
 }
 
-- (void)testPreflightNetworkExtensionDNSUpstreamTimeout {
-  // network_extension is only parsed on the v2 sync path (HandleV2Responses).
-  if (!self.syncState.isSyncV2) return;
-
-  [self setupDefaultDaemonConnResponses];
-  SNTSyncPreflight* sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
-
-  NSData* respData =
-      [@"{\"client_mode\": \"MONITOR\", \"batch_size\": 100, \"network_extension\": "
-       @"{\"enable\": true, \"flow_default_action\": \"NETWORK_FLOW_DEFAULT_ACTION_DENY\", "
-       @"\"dns_upstream_timeout_seconds\": 7.5}}" dataUsingEncoding:NSUTF8StringEncoding];
-
-  [self stubRequestBody:respData response:nil error:nil validateBlock:nil];
-
-  XCTAssertTrue([sut sync]);
-  XCTAssertNotNil(self.syncState.networkExtensionSettings);
-  XCTAssertTrue(self.syncState.networkExtensionSettings.enable);
-  XCTAssertEqualWithAccuracy(self.syncState.networkExtensionSettings.dnsUpstreamTimeoutSecs, 7.5,
-                             0.0001);
-}
-
-- (void)testPreflightNetworkExtensionDNSUpstreamTimeoutAbsent {
-  // network_extension present but dns_upstream_timeout_seconds omitted: the carrier records the
-  // unset sentinel (0). SNTNetworkExtensionSettings applies the [1,15]s clamp / 5s default
-  // downstream, so the carrier stays 0 here.
+- (void)testPreflightNetworkExtension {
+  // network_extension is only parsed on the v2 sync path (HandleV2Responses). The DNS upstream
+  // timeout is no longer a sync field; only enable + flow_default_action are carried.
   if (!self.syncState.isSyncV2) return;
 
   [self setupDefaultDaemonConnResponses];
@@ -471,7 +449,6 @@
   XCTAssertTrue([sut sync]);
   XCTAssertNotNil(self.syncState.networkExtensionSettings);
   XCTAssertTrue(self.syncState.networkExtensionSettings.enable);
-  XCTAssertEqual(self.syncState.networkExtensionSettings.dnsUpstreamTimeoutSecs, 0);
 }
 
 - (void)testReschedulePreflightFail {
