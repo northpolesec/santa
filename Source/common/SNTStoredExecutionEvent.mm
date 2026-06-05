@@ -180,11 +180,23 @@
 }
 
 - (NSString*)uniqueID {
-  return self.fileSHA256;
+  // Audit events dedup separately from ordinary executions of the same binary,
+  // so an audit-only match is neither merged into nor suppressed by a normal
+  // allow/block event for the same hash. Both still key on the file hash, so a
+  // binary audited repeatedly yields at most one pending event per sync cycle
+  // (the events table is drained on upload) rather than one per execution --
+  // which bounds table growth without needing a separate cap. The key is a pure
+  // function of already-stored fields, so it is stable and thread-safe.
+  return self.auditReturn ? [self.fileSHA256 stringByAppendingString:@":audit"] : self.fileSHA256;
 }
 
 - (BOOL)unactionableEvent {
-  return (self.decision & SNTEventStateAllow) != 0;
+  // Allow decisions are normally throttled as unactionable noise. Audit events
+  // are allow decisions too, but they are intentionally-collected telemetry, so
+  // they must not be suppressed by the storage backoff. Returning NO keeps them
+  // out of the backoff path entirely (see SNTEventTable -addStoredEvents:);
+  // they are instead deduped per sync cycle via -uniqueID's audit-specific key.
+  return !self.auditReturn && (self.decision & SNTEventStateAllow) != 0;
 }
 
 @end

@@ -40,6 +40,24 @@
   faaEvent.accessedPath = @"/not/included";
   faaEvent.process.fileSHA256 = @"bar";
   XCTAssertEqualObjects([faaEvent uniqueID], @"MyRule|MyVersion|bar");
+
+  // Audit events dedup separately from ordinary executions of the same binary,
+  // so an audit-only match isn't merged with a normal allow/block event for the
+  // same hash.
+  SNTStoredExecutionEvent* auditEvent = [[SNTStoredExecutionEvent alloc] init];
+  auditEvent.fileSHA256 = @"foo";
+  auditEvent.decision = SNTEventStateAllowBinary;
+  auditEvent.auditReturn = YES;
+  XCTAssertEqualObjects([auditEvent uniqueID], @"foo:audit");
+  XCTAssertNotEqualObjects([auditEvent uniqueID], @"foo");
+
+  // Repeated audits of the same binary share a key -> at most one pending event
+  // per binary per sync cycle.
+  SNTStoredExecutionEvent* auditEvent2 = [[SNTStoredExecutionEvent alloc] init];
+  auditEvent2.fileSHA256 = @"foo";
+  auditEvent2.decision = SNTEventStateAllowBinary;
+  auditEvent2.auditReturn = YES;
+  XCTAssertEqualObjects([auditEvent2 uniqueID], [auditEvent uniqueID]);
 }
 
 - (void)testUnactionableEvent {
@@ -52,6 +70,12 @@
   execEvent.decision = SNTEventStateAllowBinary;
   XCTAssertTrue([execEvent unactionableEvent]);
   execEvent.decision = SNTEventStateBlockBinary;
+  XCTAssertFalse([execEvent unactionableEvent]);
+
+  // Audit events are allow decisions but are intentionally-collected telemetry,
+  // so they are treated as actionable to bypass the storage backoff.
+  execEvent.decision = SNTEventStateAllowBinary;
+  execEvent.auditReturn = YES;
   XCTAssertFalse([execEvent unactionableEvent]);
 
   // Spot check audit only/denied events
