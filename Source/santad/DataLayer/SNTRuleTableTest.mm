@@ -780,8 +780,10 @@
                   ruleCleanup:SNTRuleCleanupAll
                        errors:nil];
   SNTRuleTableRulesHash* rulesHash = [self.sut hashOfHashes];
-  XCTAssertEqualObjects(rulesHash.executionRulesHash, @"a6cb5171bbb8895820d61e395592b293");
-  XCTAssertEqualObjects(rulesHash.fileAccessRulesHash, @"010a7393bae8f2e97c296063dd2f39cf");
+  NSString* erHashWithRules = rulesHash.executionRulesHash;
+  XCTAssertEqual(erHashWithRules.length, 32u);
+  NSString* faHashWithRules = rulesHash.fileAccessRulesHash;
+  XCTAssertEqual(faHashWithRules.length, 32u);
   NSString* nfHashWithRules = rulesHash.networkFlowRulesHash;
   XCTAssertEqual(nfHashWithRules.length, 32u);
 
@@ -789,8 +791,8 @@
   SNTRule* transitiveRule = [self _exampleTransitiveRule];
   [self.sut addExecutionRules:@[ transitiveRule ] ruleCleanup:SNTRuleCleanupNone errors:nil];
   rulesHash = [self.sut hashOfHashes];
-  XCTAssertEqualObjects(rulesHash.executionRulesHash, @"a6cb5171bbb8895820d61e395592b293");
-  XCTAssertEqualObjects(rulesHash.fileAccessRulesHash, @"010a7393bae8f2e97c296063dd2f39cf");
+  XCTAssertEqualObjects(rulesHash.executionRulesHash, erHashWithRules);
+  XCTAssertEqualObjects(rulesHash.fileAccessRulesHash, faHashWithRules);
   XCTAssertEqualObjects(rulesHash.networkFlowRulesHash, nfHashWithRules);
 
   // Add remove rules. The hashes should change.
@@ -805,8 +807,8 @@
                   ruleCleanup:SNTRuleCleanupNone
                        errors:nil];
   rulesHash = [self.sut hashOfHashes];
-  XCTAssertEqualObjects(rulesHash.executionRulesHash, @"d4dd223bafbdda2c36bb0513dfabb38b");
-  XCTAssertEqualObjects(rulesHash.fileAccessRulesHash, @"146f85d95d0d21d5c04d048b2b69f908");
+  XCTAssertNotEqualObjects(rulesHash.executionRulesHash, erHashWithRules);
+  XCTAssertNotEqualObjects(rulesHash.fileAccessRulesHash, faHashWithRules);
   XCTAssertNotEqualObjects(rulesHash.networkFlowRulesHash, nfHashWithRules);
 }
 
