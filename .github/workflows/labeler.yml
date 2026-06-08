@@ -1,7 +1,11 @@
 name: Process PRs
 
 on:
-  - pull_request_target
+  - pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
 
 jobs:
   labels:
