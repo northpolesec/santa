@@ -696,15 +696,6 @@ double watchdogRAMPeak = 0;
   reply();
 }
 
-- (void)retrieveStatsState:(void (^)(NSDate*, NSString*))reply {
-  reply([[SNTConfigurator configurator] lastStatsSubmissionTimestamp],
-        [[SNTConfigurator configurator] lastStatsSubmissionVersion]);
-}
-
-- (void)saveStatsSubmissionAttemptTime:(NSDate*)timestamp version:(NSString*)version {
-  [[SNTConfigurator configurator] saveStatsSubmissionAttemptTime:timestamp version:version];
-}
-
 #pragma mark Command Ops
 
 - (void)killProcesses:(SNTKillRequest*)killRequest reply:(void (^)(SNTKillResponse*))reply {

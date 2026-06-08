@@ -81,7 +81,6 @@
       SNTConfigurator* configurator = [SNTConfigurator configurator];
 
       NSURL* newSyncBaseURL = [configurator syncBaseURL];
-      BOOL statsCollectionEnabled = [configurator enableStatsCollection];
       BOOL telemetryExportEnabled = [configurator enableTelemetryExport];
 
       // If the SyncBaseURL was added or changed, and a connection already
@@ -96,8 +95,8 @@
 
       self.previousSyncBaseURL = newSyncBaseURL;
 
-      // If newSyncBaseURL or statsCollectionEnabled is set, start the sync service
-      if (newSyncBaseURL || statsCollectionEnabled || telemetryExportEnabled) {
+      // If newSyncBaseURL or telemetryExportEnabled is set, start the sync service
+      if (newSyncBaseURL || telemetryExportEnabled) {
         if (!self.syncConnection.isConnected) {
           [self establishSyncServiceConnectionSerialized];
         }

@@ -24,7 +24,6 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
 @interface SNTConfigurator (Testing)
 - (instancetype)initWithSyncStateFile:(NSString*)syncStateFilePath
                             stateFile:(NSString*)stateFilePath
-                         oldStateFile:(NSString*)oldStateFilePath
             syncStateAccessAuthorizer:(StateFileAccessAuthorizer)syncStateAccessAuthorizer
                 stateAccessAuthorizer:(StateFileAccessAuthorizer)stateAccessAuthorizer;
 
@@ -84,7 +83,6 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
 
   SNTConfigurator* cfg = [[SNTConfigurator alloc] initWithSyncStateFile:syncStatePlistPath
       stateFile:@"/does/not/need/to/exist"
-      oldStateFile:@"/does/not/need/to/exist"
       syncStateAccessAuthorizer:^{
         // Allow all access to the test plist
         return YES;
@@ -357,7 +355,6 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
 - (SNTConfigurator*)configuratorWithEmptySyncStateAtPath:(NSString*)plistPath {
   return [[SNTConfigurator alloc] initWithSyncStateFile:plistPath
       stateFile:@"/does/not/need/to/exist"
-      oldStateFile:@"/does/not/need/to/exist"
       syncStateAccessAuthorizer:^{
         return YES;
       }
@@ -504,7 +501,6 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
   // authorizer and verify clearSyncState still cleans up.
   SNTConfigurator* cfg = [[SNTConfigurator alloc] initWithSyncStateFile:plistPath
       stateFile:@"/does/not/need/to/exist"
-      oldStateFile:@"/does/not/need/to/exist"
       syncStateAccessAuthorizer:^BOOL {
         return NO;
       }

@@ -109,12 +109,8 @@ NSString* const kSyncStateFilePath = @"/var/db/santa/sync-state.plist";
 
 /// The hard-coded path to the state file.
 NSString* const kStateFilePath = @"/var/db/santa/state.plist";
-NSString* const kOldStateFilePath = @"/var/db/santa/stats-state.plist";
 
 /// Keys associated with the state file.
-static NSString* const kStateStatsKey = @"Stats";
-static NSString* const kStateStatsLastSubmissionAttemptKey = @"LastAttempt";
-static NSString* const kStateStatsLastSubmissionVersionKey = @"LastVersion";
 static NSString* const kStateTempMonitorModeKey = @"TMM";
 static NSString* const kStateLastBootUUIDKey = @"LastBootUUID";
 
@@ -141,8 +137,6 @@ static NSString* const kClientAuthCertificateCNKey = @"ClientAuthCertificateCN";
 static NSString* const kClientAuthCertificateIssuerKey = @"ClientAuthCertificateIssuerCN";
 static NSString* const kServerAuthRootsDataKey = @"ServerAuthRootsData";
 static NSString* const kServerAuthRootsFileKey = @"ServerAuthRootsFile";
-static NSString* const kEnableStatsCollectionKey = @"EnableStatsCollection";
-static NSString* const kStatsOrganizationID = @"StatsOrganizationID";
 
 static NSString* const kMachineOwnerKey = @"MachineOwner";
 static NSString* const kMachineOwnerGroupsKey = @"MachineOwnerGroups";
@@ -279,7 +273,6 @@ static NSString* const kPushTokenChainKey = @"PushTokenChain";
 - (instancetype)init {
   return [self initWithSyncStateFile:kSyncStateFilePath
       stateFile:kStateFilePath
-      oldStateFile:kOldStateFilePath
       syncStateAccessAuthorizer:^BOOL() {
         // Only access the sync state if a sync server is configured and running as root
         return self.syncBaseURL != nil && geteuid() == 0;
@@ -292,7 +285,6 @@ static NSString* const kPushTokenChainKey = @"PushTokenChain";
 
 - (instancetype)initWithSyncStateFile:(NSString*)syncStateFilePath
                             stateFile:(NSString*)stateFilePath
-                         oldStateFile:(NSString*)oldStateFilePath
             syncStateAccessAuthorizer:(StateFileAccessAuthorizer)syncStateAccessAuthorizer
                 stateAccessAuthorizer:(StateFileAccessAuthorizer)stateAccessAuthorizer {
   self = [super init];
@@ -398,8 +390,6 @@ static NSString* const kPushTokenChainKey = @"PushTokenChain";
       kClientContentEncoding : string,
       kServerAuthRootsDataKey : data,
       kServerAuthRootsFileKey : string,
-      kEnableStatsCollectionKey : number,
-      kStatsOrganizationID : string,
       kMachineOwnerKey : string,
       kMachineOwnerGroupsKey : array,
       kMachineIDKey : string,
@@ -472,7 +462,6 @@ static NSString* const kPushTokenChainKey = @"PushTokenChain";
     }
 
     if (self.stateAccessAuthorizerBlock()) {
-      [self migrateDeprecatedStatsStatePath:oldStateFilePath];
       _state = [self readStateFromDisk] ?: [NSDictionary dictionary];
 
       // Check if this is first launch after boot before updating the UUID
@@ -699,14 +688,6 @@ static SNTConfigurator* sharedConfigurator = nil;
 }
 
 + (NSSet*)keyPathsForValuesAffectingSyncServerAuthRootsFile {
-  return [self configStateSet];
-}
-
-+ (NSSet*)keyPathsForValuesAffectingEnableStatsCollection {
-  return [self configStateSet];
-}
-
-+ (NSSet*)keyPathsForValuesAffectingStatsOrganizationID {
   return [self configStateSet];
 }
 
@@ -1385,15 +1366,6 @@ static SNTConfigurator* sharedConfigurator = nil;
 
 - (NSString*)syncServerAuthRootsFile {
   return self.configState[kServerAuthRootsFileKey];
-}
-
-- (BOOL)enableStatsCollection {
-  NSNumber* e = self.configState[kEnableStatsCollectionKey];
-  return ([e boolValue] || [self statsOrganizationID].length > 0);
-}
-
-- (NSString*)statsOrganizationID {
-  return self.configState[kStatsOrganizationID];
 }
 
 - (NSDate*)fullSyncLastSuccess {
@@ -2200,42 +2172,6 @@ static SNTConfigurator* sharedConfigurator = nil;
   [self updateSyncStateForKey:kCELFallbackRulesKey value:[SNTCELFallbackRule serializeArray:rules]];
 }
 
-- (void)migrateDeprecatedStatsStatePath:(NSString*)oldPath {
-  if (!self.stateAccessAuthorizerBlock()) {
-    return;
-  }
-
-  // Attempt to load the new state file first. If that succeeds, no migration is necessary
-  if ([NSDictionary dictionaryWithContentsOfFile:self.stateFilePath]) {
-    return;
-  }
-
-  NSDictionary* oldState = [NSDictionary dictionaryWithContentsOfFile:oldPath];
-  if (!oldState) {
-    return;
-  }
-
-  if ([oldState[kStateStatsLastSubmissionAttemptKey] isKindOfClass:[NSDate class]] &&
-      [oldState[kStateStatsLastSubmissionVersionKey] isKindOfClass:[NSString class]]) {
-    NSDictionary* newState = @{
-      kStateStatsKey : @{
-        kStateStatsLastSubmissionAttemptKey : oldState[kStateStatsLastSubmissionAttemptKey],
-        kStateStatsLastSubmissionVersionKey : oldState[kStateStatsLastSubmissionVersionKey],
-      }
-    };
-
-    [newState writeToFile:self.stateFilePath atomically:YES];
-    @synchronized(self) {
-      [self saveStateToDiskSynchronized:newState];
-    }
-  }
-
-  NSError* err;
-  if (![[NSFileManager defaultManager] removeItemAtPath:oldPath error:&err]) {
-    LOGW(@"Unable to remove old state file: %@", err);
-  }
-}
-
 - (NSDictionary*)readStateFromDisk {
   if (!self.stateAccessAuthorizerBlock()) {
     return nil;
@@ -2250,20 +2186,6 @@ static SNTConfigurator* sharedConfigurator = nil;
   // so that unknown state data is removed.
   NSMutableDictionary* newState = [NSMutableDictionary dictionary];
 
-  if ([state[kStateStatsKey] isKindOfClass:[NSDictionary class]]) {
-    NSDictionary* stats = state[kStateStatsKey];
-    if ([stats[kStateStatsLastSubmissionAttemptKey] isKindOfClass:[NSDate class]] &&
-        [stats[kStateStatsLastSubmissionVersionKey] isKindOfClass:[NSString class]]) {
-      _lastStatsSubmissionTimestamp = stats[kStateStatsLastSubmissionAttemptKey];
-      _lastStatsSubmissionVersion = stats[kStateStatsLastSubmissionVersionKey];
-
-      newState[kStateStatsKey] = @{
-        kStateStatsLastSubmissionAttemptKey : _lastStatsSubmissionTimestamp,
-        kStateStatsLastSubmissionVersionKey : _lastStatsSubmissionVersion,
-      };
-    }
-  }
-
   if ([state[kStateTempMonitorModeKey] isKindOfClass:[NSDictionary class]]) {
     newState[kStateTempMonitorModeKey] = state[kStateTempMonitorModeKey];
   }
@@ -2274,19 +2196,6 @@ static SNTConfigurator* sharedConfigurator = nil;
   }
 
   return newState;
-}
-
-- (void)saveStatsSubmissionAttemptTime:(NSDate*)timestamp version:(NSString*)version {
-  @synchronized(self) {
-    [self updateStateSynchronizedKey:kStateStatsKey
-                               value:@{
-                                 kStateStatsLastSubmissionAttemptKey : timestamp,
-                                 kStateStatsLastSubmissionVersionKey : version,
-                               }];
-  }
-
-  _lastStatsSubmissionTimestamp = timestamp;
-  _lastStatsSubmissionVersion = version;
 }
 
 - (void)updateStateSynchronizedKey:(NSString*)key value:(id)value {
