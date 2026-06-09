@@ -15,6 +15,8 @@
 
 #import <Foundation/Foundation.h>
 
+@class MOLCertificate;
+
 /**
   A wrapper around `NSURLSession` providing validation of server certificates and easy-to-use
   client certificate authentication.
@@ -130,5 +132,16 @@
 
 /**  Designated initializer */
 - (instancetype)initWithSessionConfiguration:(NSURLSessionConfiguration*)configuration;
+
+/**
+  The client certificate that was presented to the server during client certificate
+  authentication. This is populated as a side effect of an authentication challenge while making a
+  request, so it is only available after a request that triggered a client certificate challenge.
+
+  Because the selection happens during the live handshake, this reflects the exact certificate the
+  server would receive, including the case where the certificate is chosen from the certificate
+  authority names sent by the server. Returns `nil` if no client certificate has been presented.
+*/
+@property(readonly, nonatomic) MOLCertificate* clientCertificate;
 
 @end

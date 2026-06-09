@@ -16,6 +16,7 @@
 #import <Foundation/Foundation.h>
 #include <os/log.h>
 
+#import "Source/common/MOLCertificate.h"
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTExportConfiguration.h"
@@ -67,8 +68,13 @@
 // Check sync server connectivity by making a preflight test request using the syncservice's
 // existing session configuration (auth, certs, headers, proxy). Returns the HTTP status code
 // and a human-readable description. Status 0 indicates a connection error.
+//
+// If the request triggered a client certificate authentication challenge, clientCertificate is the
+// certificate that was presented to the server (allowing the caller to detect e.g. expiry). It is
+// nil if no client certificate was presented.
 - (void)checkSyncServerStatus:(NSXPCListenerEndpoint*)logListener
-                        reply:(void (^)(NSInteger statusCode, NSString* description))reply;
+                        reply:(void (^)(NSInteger statusCode, NSString* description,
+                                        MOLCertificate* clientCertificate))reply;
 
 @end
 

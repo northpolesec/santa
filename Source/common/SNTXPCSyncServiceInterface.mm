@@ -33,6 +33,11 @@
       argumentIndex:0
             ofReply:NO];
 
+  [r setClasses:[NSSet setWithObject:[MOLCertificate class]]
+        forSelector:@selector(checkSyncServerStatus:reply:)
+      argumentIndex:2
+            ofReply:YES];
+
   return r;
 }
 

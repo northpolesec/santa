@@ -33,6 +33,7 @@ using ScopedSecTrustRef = santa::ScopedCFTypeRef<SecTrustRef>;
 @interface MOLAuthenticatingURLSession ()
 @property NSURLSessionConfiguration* sessionConfig;
 @property(copy, nonatomic) NSArray* anchors;
+@property(readwrite, nonatomic) MOLCertificate* clientCertificate;
 @end
 
 @implementation MOLAuthenticatingURLSession
@@ -282,6 +283,10 @@ using ScopedSecTrustRef = santa::ScopedCFTypeRef<SecTrustRef>;
     MOLCertificate* clientCert = [[MOLCertificate alloc] initWithSecCertificateRef:certificate];
     if (certificate) CFRelease(certificate);
     if (clientCert) [self log:@"[Client Trust] Certificate: %@", clientCert];
+
+    // Record the certificate that is being presented so callers can inspect it (e.g. to check for
+    // expiry) after the request completes.
+    self.clientCertificate = clientCert;
 
     // We have an identity but we don't know whether the private key is accessible to us, and if it
     // isn't the framework will not give us any useful feedback. So, pull the private key from the
