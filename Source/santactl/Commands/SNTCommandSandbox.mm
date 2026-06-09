@@ -269,6 +269,10 @@ REGISTER_COMMAND_NAME(@"sandbox")
   snprintf(uidBuf, sizeof(uidBuf), "%u", getuid());
   params.push_back("UID");
   params.push_back(uidBuf);
+  // The full path to the binary being evaluated, so profiles can reference the
+  // executable they are sandboxing via (param "BINARY_PATH").
+  params.push_back("BINARY_PATH");
+  params.push_back(execPathCStr);
   params.push_back(nullptr);
 
   char* errorbuf = NULL;
