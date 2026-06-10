@@ -21,6 +21,7 @@
 #include <optional>
 #include <vector>
 
+#import "Source/common/MOLCertificate.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTXPCControlInterface.h"
@@ -49,6 +50,56 @@ void print(NSString* format, ...) {
   }
   vfprintf(stdout, format.UTF8String, args);
   va_end(args);
+}
+
+typedef NS_ENUM(NSInteger, SNTDoctorClientCertValidity) {
+  SNTDoctorClientCertValidityValid,
+  SNTDoctorClientCertValidityExpired,
+  SNTDoctorClientCertValidityNotYetValid,
+};
+
+// Classifies a client certificate's validity window relative to `now`. A certificate that has
+// passed its notAfter date is Expired, one that has not yet reached its notBefore date is
+// NotYetValid, and anything in between (including a newer certificate that would be accepted) is
+// Valid. Exposed (non-static) so it can be unit tested.
+SNTDoctorClientCertValidity SNTDoctorClassifyClientCertificate(MOLCertificate* cert, NSDate* now) {
+  NSDate* validUntil = cert.validUntil;
+  if (validUntil && [validUntil compare:now] == NSOrderedAscending) {
+    return SNTDoctorClientCertValidityExpired;
+  }
+  NSDate* validFrom = cert.validFrom;
+  if (validFrom && [validFrom compare:now] == NSOrderedDescending) {
+    return SNTDoctorClientCertValidityNotYetValid;
+  }
+  return SNTDoctorClientCertValidityValid;
+}
+
+static NSString* FormatCertificateDate(NSDate* date) {
+  if (!date) return @"(unknown date)";
+  NSDateFormatter* formatter = [[NSDateFormatter alloc] init];
+  formatter.dateFormat = @"yyyy-MM-dd HH:mm:ss ZZZZ";
+  formatter.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+  return [formatter stringFromDate:date];
+}
+
+// Prints the validity status of the client certificate presented during the preflight handshake.
+// Returns YES if the certificate is outside its validity window (expired or not yet valid).
+static BOOL ReportClientCertificate(MOLCertificate* cert) {
+  NSString* cn = cert.commonName ?: @"<unknown>";
+  switch (SNTDoctorClassifyClientCertificate(cert, [NSDate date])) {
+    case SNTDoctorClientCertValidityExpired:
+      print(@"[-] Sync client certificate (CN: %s) expired on %s", cn.UTF8String,
+            FormatCertificateDate(cert.validUntil).UTF8String);
+      return YES;
+    case SNTDoctorClientCertValidityNotYetValid:
+      print(@"[-] Sync client certificate (CN: %s) is not valid until %s", cn.UTF8String,
+            FormatCertificateDate(cert.validFrom).UTF8String);
+      return YES;
+    case SNTDoctorClientCertValidityValid:
+      print(@"[+] Sync client certificate (CN: %s) is valid until %s", cn.UTF8String,
+            FormatCertificateDate(cert.validUntil).UTF8String);
+      return NO;
+  }
 }
 
 // Returns YES if a user is logged in at the GUI console, NO otherwise.
@@ -241,7 +292,11 @@ REGISTER_COMMAND_NAME(@"doctor")
   }
 
   [proxy checkSyncServerStatus:logListener.endpoint
-                         reply:^(NSInteger statusCode, NSString* description) {
+                         reply:^(NSInteger statusCode, NSString* description,
+                                 MOLCertificate* clientCertificate) {
+                           if (clientCertificate) {
+                             if (ReportClientCertificate(clientCertificate)) err = YES;
+                           }
                            if (statusCode == 0) {
                              print(@"[-] Failed to retrieve preflight data: %s",
                                    description.UTF8String);

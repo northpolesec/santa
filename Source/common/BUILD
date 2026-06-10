@@ -1044,6 +1044,7 @@ objc_library(
     hdrs = ["SNTXPCSyncServiceInterface.h"],
     module_name = "santa_common_SNTXPCSyncServiceInterface",
     deps = [
+        ":MOLCertificate",
         ":MOLXPCConnection",
         ":SNTCommonEnums",
         ":SNTExportConfiguration",

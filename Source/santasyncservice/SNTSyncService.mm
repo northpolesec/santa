@@ -102,7 +102,8 @@
 }
 
 - (void)checkSyncServerStatus:(NSXPCListenerEndpoint*)logListener
-                        reply:(void (^)(NSInteger statusCode, NSString* description))reply {
+                        reply:(void (^)(NSInteger statusCode, NSString* description,
+                                        MOLCertificate* clientCertificate))reply {
   MOLXPCConnection* ll;
   if (logListener) {
     ll = [[MOLXPCConnection alloc] initClientWithListener:logListener];
@@ -111,10 +112,11 @@
     [ll resume];
     [[SNTSyncBroadcaster broadcaster] addLogListener:ll];
   }
-  [self.syncManager checkSyncServerStatus:^(NSInteger statusCode, NSString* description) {
+  [self.syncManager checkSyncServerStatus:^(NSInteger statusCode, NSString* description,
+                                            MOLCertificate* clientCertificate) {
     [[SNTSyncBroadcaster broadcaster] barrier];
     if (ll) [[SNTSyncBroadcaster broadcaster] removeLogListener:ll];
-    reply(statusCode, description);
+    reply(statusCode, description, clientCertificate);
   }];
 }
 

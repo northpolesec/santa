@@ -273,14 +273,22 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   });
 }
 
-- (void)checkSyncServerStatus:(void (^)(NSInteger statusCode, NSString* description))reply {
+- (void)checkSyncServerStatus:(void (^)(NSInteger statusCode, NSString* description,
+                                        MOLCertificate* clientCertificate))reply {
   SNTSyncStatusType status = SNTSyncStatusTypeUnknown;
   SNTSyncState* syncState = [self createSyncStateWithStatus:&status];
   if (!syncState) {
     SLOGE(@"Failed to create sync state: %ld", (long)status);
-    reply(0, [NSString stringWithFormat:@"Failed to create sync state: %ld", (long)status]);
+    reply(0, [NSString stringWithFormat:@"Failed to create sync state: %ld", (long)status], nil);
     return;
   }
+
+  // The MOLAuthenticatingURLSession is the session's delegate. It records the client certificate it
+  // presents during the TLS handshake, which lets the caller inspect the exact certificate the
+  // server received (e.g. to detect expiry), including when it was selected based on the
+  // certificate authority names the server sent.
+  MOLAuthenticatingURLSession* authURLSession =
+      (MOLAuthenticatingURLSession*)syncState.session.delegate;
 
   NSURL* url = [NSURL URLWithString:@"preflight/santactl-doctor-test"
                       relativeToURL:syncState.syncBaseURL];
@@ -295,7 +303,9 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   auto replied = std::make_shared<std::atomic<bool>>(false);
   void (^guardedReply)(NSInteger, NSString*) = ^(NSInteger code, NSString* desc) {
     if (replied->exchange(true)) return;
-    reply(code, desc);
+    // The client certificate (if any) is captured during the handshake, so it is available
+    // regardless of whether the request ultimately succeeded or failed.
+    reply(code, desc, authURLSession.clientCertificate);
   };
 
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
