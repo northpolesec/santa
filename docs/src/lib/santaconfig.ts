@@ -121,19 +121,6 @@ export const SantaConfigKeyGroups: SantaConfigGroups = {
       defaultValue: false,
     },
     {
-      key: "EnableStatsCollection",
-      description: `If true, Santa will periodically collect and send basic, non-identifying stats to the maintainers
-        at North Pole Security to help better support Santa. See Stats documentation for complete details`,
-      type: "bool",
-      defaultValue: false,
-    },
-    {
-      key: "StatsOrganizationID",
-      description: `This key should only be set for organizations that have a contract with North Pole Security.
-        See Stats documentation for complete details`,
-      type: "string",
-    },
-    {
       key: "AntiSuspendSigningIDs",
       description: "A list of Signing IDs to protect from `pid_suspend` calls.",
       type: "string",

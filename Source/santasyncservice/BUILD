@@ -42,20 +42,6 @@ objc_library(
 )
 
 objc_library(
-    name = "polaris_lib",
-    srcs = [
-        "SNTPolaris.h",
-        "SNTPolaris.mm",
-    ],
-    deps = [
-        "//Source/common:SNTLogging",
-        "//Source/common:SNTSystemInfo",
-        "//Source/common:String",
-        "@northpolesec_protos//stats:v1_cc_proto",
-    ],
-)
-
-objc_library(
     name = "SNTSyncState",
     srcs = ["SNTSyncState.mm"],
     hdrs = ["SNTSyncState.h"],
@@ -226,7 +212,6 @@ objc_library(
         ":SNTSyncStage",
         ":SNTSyncState",
         ":broadcaster_lib",
-        ":polaris_lib",
         "//Source/common:EncodeEntitlements",
         "//Source/common:MOLAuthenticatingURLSession",
         "//Source/common:MOLCertificate",
