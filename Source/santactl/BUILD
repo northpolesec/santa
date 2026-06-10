@@ -235,9 +235,25 @@ santa_unit_test(
     ],
 )
 
+santa_unit_test(
+    name = "SNTCommandDoctorTest",
+    srcs = [
+        "Commands/SNTCommandDoctorTest.mm",
+    ],
+    resources = [
+        "Commands/testdata/example_org_client_cert.pem",
+    ],
+    visibility = ["//:santa_package_group"],
+    deps = [
+        ":santactl_lib",
+        "//Source/common:MOLCertificate",
+    ],
+)
+
 test_suite(
     name = "unit_tests",
     tests = [
+        ":SNTCommandDoctorTest",
         ":SNTCommandFileInfoTest",
         ":SNTCommandMetricsTest",
     ],
