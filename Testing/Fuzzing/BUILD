@@ -34,3 +34,15 @@ objc_fuzz_test(
     ),
     deps = ["//Source/common/verifyinghasher:HeaderParser"],
 )
+
+objc_fuzz_test(
+    name = "KernelCsBlobFuzzer",
+    srcs = ["KernelCsBlobFuzzer.mm"],
+    corpus = glob(
+        ["KernelCsBlobFuzzer_corpus/*"],
+        allow_empty = True,
+    ),
+    # KernelCsBlob's sdk_dylibs=["bsm"] / sdk_frameworks=["Security"]
+    # propagate through this dep.
+    deps = ["//Source/common/verifyinghasher:KernelCsBlob"],
+)

@@ -14,20 +14,59 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Regenerate Testing/Fuzzing/VerifyingHasherFuzzer_corpus/* and
-# Testing/Fuzzing/HeaderParserFuzzer_corpus/*. Self-relocates so the
+# Regenerate Testing/Fuzzing/VerifyingHasherFuzzer_corpus/*,
+# Testing/Fuzzing/HeaderParserFuzzer_corpus/*, and
+# Testing/Fuzzing/KernelCsBlobFuzzer_corpus/*. Self-relocates so the
 # script can be invoked from anywhere. Idempotent — overwrites existing
 # files.
 #
 # Requires macOS + Apple Clang (the arm64e target is Apple-only) plus
-# `lipo`, `codesign`, `dd`, `python3`. Not portable to Linux.
+# `lipo`, `otool`, `codesign`, `dd`, `python3`. Not portable to Linux.
 set -uexo pipefail
 
 cd "$(dirname "$0")/.."
 
 CORPUS=Fuzzing/VerifyingHasherFuzzer_corpus
 HDR=Fuzzing/HeaderParserFuzzer_corpus
-mkdir -p "$CORPUS" "$HDR"
+KCB=Fuzzing/KernelCsBlobFuzzer_corpus
+TESTDATA=../Source/common/verifyinghasher/testdata
+mkdir -p "$CORPUS" "$HDR" "$KCB"
+
+# Extract the raw arm64 cs_blob (the embedded-signature SuperBlob, trimmed
+# to sb->length) from a Mach-O fixture $1 into $2. Handles both fat inputs
+# (arm64 slice offset from `lipo`) and thin arm64 inputs (offset 0).
+# Unlike the VerifyingHasher/HeaderParser fuzzers, KernelCsBlob::ParseBytes
+# consumes a raw SuperBlob, not a Mach-O — so the seeds are the extracted
+# cs_blobs, not the binaries themselves.
+#
+# This is the hardened sibling of the manual recipe in
+# Source/common/verifyinghasher/testdata/README.md: it matches the arch
+# field exactly (`$2=="arm64"`, so an arm64e slice can't be picked) and
+# only reads `dataoff` once the LC_CODE_SIGNATURE flag is set. Keep these
+# stricter forms — do not "reconcile" them back to the README's looser
+# `/architecture arm64/` regex.
+extract_arm64_csblob() {
+    local src="$1" dst="$2" slice_off data_off
+    # `lipo` errors on a thin file (pipefail would abort); `|| true`
+    # collapses that to an empty match → slice_off defaults to 0.
+    slice_off=$(lipo -detailed_info "$src" 2>/dev/null \
+        | awk '$1=="architecture" && $2=="arm64"{f=1} f&&$1=="offset"{print $2; exit}' || true)
+    slice_off=${slice_off:-0}
+    data_off=$(otool -arch arm64 -l "$src" \
+        | awk '/LC_CODE_SIGNATURE/{f=1} f&&/dataoff/{print $2; exit}')
+    if [[ -z "$data_off" ]]; then
+        echo "no arm64 LC_CODE_SIGNATURE in $src" >&2
+        exit 1
+    fi
+    python3 - "$src" "$dst" "$slice_off" "$data_off" <<'PY'
+import sys
+src, dst, slice_off, data_off = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
+data = open(src, "rb").read()
+abs_off = slice_off + data_off
+sb_len = int.from_bytes(data[abs_off + 4:abs_off + 8], "big")  # SuperBlob length (BE)
+open(dst, "wb").write(data[abs_off:abs_off + sb_len])
+PY
+}
 
 TMP=$(mktemp -d)
 # Single-quote so $TMP is expanded by the trap body at exit time, with
@@ -127,4 +166,16 @@ for src in thin_arm64e fat32 fat64_synthetic hw_universal; do
     dd if="$CORPUS/$src" of="$HDR/${src}_hdr" bs=1 count=32768 status=none
 done
 
-echo "Corpus regenerated: $(ls $CORPUS | wc -l | tr -d ' ') seed(s) in $CORPUS, $(ls $HDR | wc -l | tr -d ' ') in $HDR"
+# 7. KernelCsBlob corpus: raw cs_blobs (SuperBlobs), NOT Mach-Os.
+#    - santactl_2026.4.csblob is already a raw SuperBlob (Dev-ID + TSA,
+#      notarized-style) — copy it verbatim from the production testdata.
+#    - The arm64 cs_blob is extracted from each committed Mach-O fixture:
+#        hw_universal   ad-hoc, multi-CD (SHA-1/256/256T/384)
+#        hw_entitled    XML + DER entitlement slots (thin arm64)
+#        hw_team_signed Dev-ID, developer-controlled signingTime
+cp "$TESTDATA/santactl_2026.4.csblob" "$KCB/santactl_2026.4.csblob"
+extract_arm64_csblob "$TESTDATA/hw_universal"   "$KCB/hw_universal.csblob"
+extract_arm64_csblob "$TESTDATA/hw_entitled"    "$KCB/hw_entitled.csblob"
+extract_arm64_csblob "$TESTDATA/hw_team_signed" "$KCB/hw_team_signed.csblob"
+
+echo "Corpus regenerated: $(ls $CORPUS | wc -l | tr -d ' ') seed(s) in $CORPUS, $(ls $HDR | wc -l | tr -d ' ') in $HDR, $(ls $KCB | wc -l | tr -d ' ') in $KCB"
