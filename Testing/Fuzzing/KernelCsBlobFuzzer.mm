@@ -34,7 +34,7 @@
 
 #include "Source/common/verifyinghasher/KernelCsBlob.h"
 
-extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   santa::KernelCsBlob::ParseBytes(std::span<const uint8_t>(data, size),
                                   /*cd_bytes=*/{});
   return 0;
