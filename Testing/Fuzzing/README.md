@@ -11,6 +11,11 @@ libFuzzer harnesses for `//Source/common/verifyinghasher`.
   `CountingMemoryFileReader`).
 - **`:HeaderParserFuzzer`** — focused on `santa::HeaderParser::Update()`
   with a fixed 256-byte chunk size, exercising multi-chunk replay paths.
+- **`:KernelCsBlobFuzzer`** — drives `santa::KernelCsBlob::ParseBytes()`
+  (the SuperBlob/BlobIndex walk + slot extraction + CMSDecoder pipeline)
+  over the raw cs_blob buffer; `cd_bytes` is passed empty. Oracle is ASan
+  only. NB: seeds are raw cs_blobs (SuperBlobs), **not** Mach-Os, since
+  `ParseBytes` consumes a SuperBlob directly.
 
 Each target's seed corpus lives next to its source file:
 
@@ -21,6 +26,11 @@ Each target's seed corpus lives next to its source file:
   duplicated here.
 - `HeaderParserFuzzer_corpus/` — header-only synthetic seeds (`fat32_hdr`,
   `fat64_synthetic_hdr`, `hw_universal_hdr`, `thin_arm64e_hdr`).
+- `KernelCsBlobFuzzer_corpus/` — raw cs_blob (SuperBlob) seeds:
+  `santactl_2026.4.csblob` (Dev-ID + TSA, notarized-style; copied verbatim
+  from the production testdata) plus the arm64 cs_blobs extracted from the
+  `hw_universal` (ad-hoc/multi-CD), `hw_entitled` (XML + DER entitlement
+  slots), and `hw_team_signed` (Dev-ID/signingTime) Mach-O fixtures.
 
 ## One-time toolchain bootstrap
 
@@ -47,7 +57,8 @@ the comment in the script).
 ```bash
 bazel test --config=fuzz \
     //Testing/Fuzzing:VerifyingHasherFuzzer \
-    //Testing/Fuzzing:HeaderParserFuzzer
+    //Testing/Fuzzing:HeaderParserFuzzer \
+    //Testing/Fuzzing:KernelCsBlobFuzzer
 ```
 
 Replays each seed through the fuzzer; exits non-zero on any crash, ASan
@@ -59,6 +70,8 @@ finding, or single-observation oracle trip.
 bazel run --config=fuzz //Testing/Fuzzing:VerifyingHasherFuzzer_run \
     -- --timeout_secs=120
 bazel run --config=fuzz //Testing/Fuzzing:HeaderParserFuzzer_run \
+    -- --timeout_secs=120
+bazel run --config=fuzz //Testing/Fuzzing:KernelCsBlobFuzzer_run \
     -- --timeout_secs=120
 ```
 
@@ -83,13 +96,15 @@ affect the corpus shape (rare).
 ```
 
 The script self-relocates, so it's safe to invoke from anywhere. It
-overwrites the existing seed files in both `*_corpus/` directories. The
-`hw_universal` production fixture is **not** touched — it lives at
-`Source/common/verifyinghasher/testdata/hw_universal` and is regenerated
-separately.
+overwrites the existing seed files in all three `*_corpus/` directories.
+The production fixtures under `Source/common/verifyinghasher/testdata/`
+are **not** touched — the `KernelCsBlobFuzzer_corpus/` seeds are *derived*
+from them (cs_blob extracted from the committed Mach-Os; the raw
+`santactl_2026.4.csblob` copied verbatim), so regenerate those fixtures
+first if they change.
 
 Requirements: macOS + Apple Clang (`arm64e` target is Apple-only) plus
-`lipo`, `codesign`, `dd`, `python3`. Not portable to Linux.
+`lipo`, `otool`, `codesign`, `dd`, `python3`. Not portable to Linux.
 
 ## Supported inputs (what the fuzzers cover)
 
