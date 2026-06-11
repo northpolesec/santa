@@ -63,8 +63,17 @@ import sys
 src, dst, slice_off, data_off = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
 data = open(src, "rb").read()
 abs_off = slice_off + data_off
+# Fail fast rather than silently emit a truncated/empty seed: Python slicing
+# does not raise on out-of-range bounds, so validate offset, magic, and length.
+if abs_off < 0 or abs_off + 8 > len(data):
+    raise SystemExit(f"{src}: LC_CODE_SIGNATURE offset {abs_off} out of range")
+if data[abs_off:abs_off + 4] != b"\xfa\xde\x0c\xc0":  # CSMAGIC_EMBEDDED_SIGNATURE
+    raise SystemExit(f"{src}: no SuperBlob magic at offset {abs_off}")
 sb_len = int.from_bytes(data[abs_off + 4:abs_off + 8], "big")  # SuperBlob length (BE)
-open(dst, "wb").write(data[abs_off:abs_off + sb_len])
+if sb_len < 8 or abs_off + sb_len > len(data):
+    raise SystemExit(f"{src}: implausible SuperBlob length {sb_len}")
+with open(dst, "wb") as f:
+    f.write(data[abs_off:abs_off + sb_len])
 PY
 }
 
