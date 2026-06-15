@@ -35,6 +35,9 @@
 //
 //   explicit Foo(PassKey) {}
 // };
+
+namespace santa {
+
 template <typename T>
 class PassKey {
   friend T;
@@ -43,5 +46,7 @@ class PassKey {
  protected:
   static PassKey<T> MakeKey() { return PassKey<T>{}; }
 };
+
+}  // namespace santa
 
 #endif  // SANTA_COMMON_PASSKEY_H
