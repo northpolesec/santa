@@ -14,10 +14,20 @@
 
 #include "Source/common/AuditUtilities.h"
 
+#import <Foundation/Foundation.h>
 #include <assert.h>
 #include <mach/mach.h>
 
+#include <cstring>
+
 namespace santa {
+
+std::optional<ProcessID> ProcessID::FromTokenData(NSData* tokenData) {
+  if (tokenData.length < sizeof(audit_token_t)) return std::nullopt;
+  audit_token_t tok;
+  memcpy(&tok, tokenData.bytes, sizeof(tok));
+  return FromToken(tok);
+}
 
 std::optional<audit_token_t> GetMyAuditToken() {
   audit_token_t tok;

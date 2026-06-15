@@ -17,8 +17,11 @@
 
 #include <bsm/libbsm.h>
 
+#include <cstdint>
 #include <optional>
 #include <utility>
+
+@class NSData;
 
 namespace santa {
 
@@ -49,6 +52,34 @@ static inline gid_t EffectiveGroup(const audit_token_t& tok) {
 static inline std::pair<pid_t, int> PidPidversion(const audit_token_t& tok) {
   return {Pid(tok), Pidversion(tok)};
 }
+
+// Runtime identity of a process: pid + pidversion, so a recycled pid can't
+// alias a dead one. Value type; usable directly as a hash-map key.
+struct ProcessID {
+  pid_t pid = 0;
+  int pidversion = 0;
+
+  static ProcessID FromToken(const audit_token_t& tok) { return {Pid(tok), Pidversion(tok)}; }
+  // Defined in AuditUtilities.mm. nullopt if the data is too short to hold an
+  // audit_token_t. Used for NetworkExtension flows whose sourceAppAuditToken
+  // is delivered as NSData.
+  static std::optional<ProcessID> FromTokenData(NSData* tokenData);
+
+  // Stable 64-bit packing for callers that need a scalar handle (e.g. the
+  // NSNumber on the flow-event wire). Not needed to use this as a key.
+  constexpr uint64_t Packed() const {
+    return (static_cast<uint64_t>(static_cast<uint32_t>(pid)) << 32) |
+           static_cast<uint32_t>(pidversion);
+  }
+
+  friend bool operator==(const ProcessID& a, const ProcessID& b) {
+    return a.pid == b.pid && a.pidversion == b.pidversion;
+  }
+  template <typename H>
+  friend H AbslHashValue(H h, const ProcessID& p) {
+    return H::combine(std::move(h), p.pid, p.pidversion);
+  }
+};
 
 static inline audit_token_t MakeStubAuditToken(pid_t pid, int pidver) {
   return audit_token_t{

@@ -154,6 +154,15 @@ objc_library(
     sdk_dylibs = ["bsm"],
 )
 
+santa_unit_test(
+    name = "AuditUtilitiesTest",
+    srcs = ["AuditUtilitiesTest.mm"],
+    deps = [
+        ":AuditUtilities",
+        "@abseil-cpp//absl/container:flat_hash_map",
+    ],
+)
+
 # This target shouldn't be used directly.
 # Use a more specific scoped type instead.
 objc_library(
@@ -1149,6 +1158,7 @@ santa_unit_test(
 test_suite(
     name = "unit_tests",
     tests = [
+        ":AuditUtilitiesTest",
         ":CodeSigningIdentifierUtilsTest",
         ":EncodeEntitlementsTest",
         ":KeychainTest",
