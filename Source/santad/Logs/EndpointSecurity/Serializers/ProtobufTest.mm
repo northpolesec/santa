@@ -329,6 +329,12 @@ void SerializeAndCheck(es_event_type_t eventType,
     XCTAssertTrue(CompareTime(santaMsg.processed_time(), enrichmentTime));
     XCTAssertTrue(CompareTime(santaMsg.event_time(), msgTime));
 
+    // event_id is an xxhash64 hex digest (16 chars). It's non-deterministic
+    // (mixes a monotonic clock) so just verify it's populated and well-formed.
+    XCTAssertTrue(santaMsg.has_event_id());
+    XCTAssertEqual(santaMsg.event_id().size(), 16);
+    XCTAssertEqual(santaMsg.event_id().find_first_not_of("0123456789abcdef"), std::string::npos);
+
     // Convert JSON strings to objects and compare each key-value set.
     NSError* jsonError;
     NSData* objectData = [wantData dataUsingEncoding:NSUTF8StringEncoding];

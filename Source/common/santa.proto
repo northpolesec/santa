@@ -1278,6 +1278,9 @@ message SantaMessage {
   // will remain the same across sleep/wake/hibernate cycles.
   optional string boot_session_uuid = 4;
 
+  // Event ID is an opaque unique identifier for this event.
+  optional string event_id = 5;
+
   // Event type being described by this message
   oneof event {
     Execution execution = 10;

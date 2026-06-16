@@ -36,6 +36,7 @@
 #include "Source/common/SNTLogging.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
 #import "Source/common/SNTSystemInfo.h"
+#include "Source/common/SNTXxhash.h"
 #import "Source/common/String.h"
 #include "Source/common/es/EndpointSecurityAPI.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Utilities.h"
@@ -432,6 +433,13 @@ static inline void EncodeCertificateInfo(::pbv1::CertificateInfo* pb_cert_info, 
   EncodeTimestamp(santa_msg->mutable_event_time(), event_time);
   EncodeTimestamp(santa_msg->mutable_processed_time(), processed_time);
   santa_msg->set_boot_session_uuid(boot_session_uuid_);
+
+  // Event ID: xxhash of the boot session UUID and a monotonic per-event clock.
+  santa::Xxhash64 event_id;
+  event_id.Update(boot_session_uuid_.data(), boot_session_uuid_.size());
+  uint64_t mono_time = clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW);
+  event_id.Update(&mono_time, sizeof(mono_time));
+  santa_msg->set_event_id(event_id.HexDigest());
 
   return santa_msg;
 }

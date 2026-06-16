@@ -795,6 +795,7 @@ objc_library(
         "//Source/common:SNTLogging",
         "//Source/common:SNTStoredExecutionEvent",
         "//Source/common:SNTSystemInfo",
+        "//Source/common:SNTXxhash",
         "//Source/common:String",
         "//Source/common:santa_cc_proto",
         "//Source/common/es:EndpointSecurityAPI",
