@@ -122,10 +122,10 @@ class Protobuf : public Serializer {
   bool json_;
   // Cached boot session UUID to avoid repeated ObjC dispatch on every event.
   std::string boot_session_uuid_;
-  // Random per-process secret, generated once at construction. Each event_id is
-  // a keyed xxHash128 of the counter under this secret, so events are unique
+  // Random per-process salt, generated once at construction. Each event_id is
+  // the xxHash128 of this salt combined with the counter, so events are unique
   // within a session and unlinkable across sessions without per-event RNG.
-  std::array<uint8_t, XXH3_SECRET_SIZE_MIN> event_id_secret_;
+  std::array<uint8_t, 16> session_salt_;
   // Monotonically increasing per-event counter, ensuring each event_id is unique.
   std::atomic<uint64_t> event_counter_{0};
 };

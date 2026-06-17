@@ -29,16 +29,14 @@ using DigestFunc64 = XXH64_hash_t (*)(const XXH3_state_t*);
 using DigestFunc128 = XXH128_hash_t (*)(const XXH3_state_t*);
 using CanonicalFunc64 = void (*)(XXH64_canonical_t*, XXH64_hash_t);
 using CanonicalFunc128 = void (*)(XXH128_canonical_t*, XXH128_hash_t);
-using WithSecretFunc64 = XXH64_hash_t (*)(const void*, size_t, const void*,
-                                          size_t);
-using WithSecretFunc128 = XXH128_hash_t (*)(const void*, size_t, const void*,
-                                            size_t);
+using OneShotFunc64 = XXH64_hash_t (*)(const void*, size_t);
+using OneShotFunc128 = XXH128_hash_t (*)(const void*, size_t);
 
 struct XxhashFuncPtrs64 {
   static constexpr ResetFunc Reset = XXH3_64bits_reset;
   static constexpr UpdateFunc Update = XXH3_64bits_update;
   static constexpr DigestFunc64 Digest = XXH3_64bits_digest;
-  static constexpr WithSecretFunc64 WithSecret = XXH3_64bits_withSecret;
+  static constexpr OneShotFunc64 OneShot = XXH3_64bits;
   static constexpr CanonicalFunc64 CanonicalFromHash = XXH64_canonicalFromHash;
   using hash_type = XXH64_hash_t;
   using canonical_type = XXH64_canonical_t;
@@ -48,7 +46,7 @@ struct XxhashFuncPtrs128 {
   static constexpr ResetFunc Reset = XXH3_128bits_reset;
   static constexpr UpdateFunc Update = XXH3_128bits_update;
   static constexpr DigestFunc128 Digest = XXH3_128bits_digest;
-  static constexpr WithSecretFunc128 WithSecret = XXH3_128bits_withSecret;
+  static constexpr OneShotFunc128 OneShot = XXH3_128bits;
   static constexpr CanonicalFunc128 CanonicalFromHash =
       XXH128_canonicalFromHash;
   using hash_type = XXH128_hash_t;
@@ -92,14 +90,10 @@ class Xxhash {
     return std::string(operation_id, sizeof(canonical_type) * 2);
   }
 
-  // One-shot hex digest of `data` keyed by `secret`. Unlike the streaming API
-  // this copies no state, making it cheap on hot paths. `secret_size` must be
-  // at least XXH3_SECRET_SIZE_MIN bytes.
-  static std::string HexDigestWithSecret(const void* data, size_t size,
-                                         const void* secret,
-                                         size_t secret_size) {
-    hash_type hash =
-        XxhashFuncPtrs::WithSecret(data, size, secret, secret_size);
+  // One-shot hex digest of `data`. Hashes in a single call without allocating
+  // or copying streaming state, making it cheap on hot paths.
+  static std::string HexDigestOneShot(const void* data, size_t size) {
+    hash_type hash = XxhashFuncPtrs::OneShot(data, size);
     canonical_type canonical_hash;
     XxhashFuncPtrs::CanonicalFromHash(&canonical_hash, hash);
 
