@@ -128,4 +128,32 @@
   XCTAssertSemaTrue(sema, 0, "Digest callback block was not called");
 }
 
+- (void)testHexDigestWithSecret {
+  // Two distinct secrets, each >= XXH3_SECRET_SIZE_MIN bytes.
+  uint8_t secret1[XXH3_SECRET_SIZE_MIN];
+  uint8_t secret2[XXH3_SECRET_SIZE_MIN];
+  for (size_t i = 0; i < sizeof(secret1); i++) {
+    secret1[i] = (uint8_t)i;
+    secret2[i] = (uint8_t)(i + 1);
+  }
+
+  // Deterministic: same data + secret -> same digest, with the expected width.
+  std::string a = santa::Xxhash128::HexDigestWithSecret("hello", 5, secret1, sizeof(secret1));
+  std::string b = santa::Xxhash128::HexDigestWithSecret("hello", 5, secret1, sizeof(secret1));
+  XCTAssertCppStringEqual(a, b);
+  XCTAssertEqual(a.size(), 32u);
+
+  // Keying: a different secret yields a different digest for the same data.
+  std::string c = santa::Xxhash128::HexDigestWithSecret("hello", 5, secret2, sizeof(secret2));
+  XCTAssertTrue(a != c);
+
+  // Different data yields a different digest under the same secret.
+  std::string d = santa::Xxhash128::HexDigestWithSecret("world", 5, secret1, sizeof(secret1));
+  XCTAssertTrue(a != d);
+
+  // The 64-bit variant produces a 16-char digest.
+  std::string e = santa::Xxhash64::HexDigestWithSecret("hello", 5, secret1, sizeof(secret1));
+  XCTAssertEqual(e.size(), 16u);
+}
+
 @end

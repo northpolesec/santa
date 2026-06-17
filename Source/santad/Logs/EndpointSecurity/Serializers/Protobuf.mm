@@ -65,11 +65,8 @@ Protobuf::Protobuf(std::shared_ptr<EndpointSecurityAPI> esapi, SNTDecisionCache*
       esapi_(std::move(esapi)),
       json_(json),
       boot_session_uuid_(NSStringToUTF8String([SNTSystemInfo bootSessionUUID])) {
-  // Prime the event_id hash with the invariant inputs: the boot session UUID
-  // and a random per-process seed. Per-event hashes copy this primed state.
-  uint32_t seed = arc4random();
-  event_id_hash_base_.Update(boot_session_uuid_.data(), boot_session_uuid_.size());
-  event_id_hash_base_.Update(&seed, sizeof(seed));
+  // Generate a random per-process secret used to key each event_id hash.
+  arc4random_buf(event_id_secret_.data(), event_id_secret_.size());
 }
 
 static inline void EncodeTimestamp(Timestamp* timestamp, struct timespec ts) {
@@ -440,12 +437,12 @@ static inline void EncodeCertificateInfo(::pbv1::CertificateInfo* pb_cert_info, 
   EncodeTimestamp(santa_msg->mutable_processed_time(), processed_time);
   santa_msg->set_boot_session_uuid(boot_session_uuid_);
 
-  // Event ID: the primed hash (boot session UUID + random per-process seed) with
-  // a monotonically increasing counter folded in, making each event_id unique.
-  santa::Xxhash128 event_id(event_id_hash_base_);
+  // Event ID: a keyed xxHash128 of a monotonic counter under the per-process
+  // secret. The counter makes each event unique; the secret makes the IDs
+  // opaque and distinct across sessions. One-shot keyed hash, no state copy.
   uint64_t counter = event_counter_.fetch_add(1, std::memory_order_relaxed);
-  event_id.Update(&counter, sizeof(counter));
-  santa_msg->set_event_id(event_id.HexDigest());
+  santa_msg->set_event_id(santa::Xxhash128::HexDigestWithSecret(
+      &counter, sizeof(counter), event_id_secret_.data(), event_id_secret_.size()));
 
   return santa_msg;
 }
