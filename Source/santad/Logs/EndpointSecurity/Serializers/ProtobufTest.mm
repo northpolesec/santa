@@ -329,6 +329,12 @@ void SerializeAndCheck(es_event_type_t eventType,
     XCTAssertTrue(CompareTime(santaMsg.processed_time(), enrichmentTime));
     XCTAssertTrue(CompareTime(santaMsg.event_time(), msgTime));
 
+    // event_id is an xxhash128 hex digest (32 chars). Verify it's populated and
+    // well-formed; uniqueness across events is covered by testEventIDUnique.
+    XCTAssertTrue(santaMsg.has_event_id());
+    XCTAssertEqual(santaMsg.event_id().size(), 32);
+    XCTAssertEqual(santaMsg.event_id().find_first_not_of("0123456789abcdef"), std::string::npos);
+
     // Convert JSON strings to objects and compare each key-value set.
     NSError* jsonError;
     NSData* objectData = [wantData dataUsingEncoding:NSUTF8StringEncoding];
@@ -508,6 +514,34 @@ void SerializeAndCheckNonESEvents(
                     esMsg->event.exchangedata.file1 = &file1;
                     esMsg->event.exchangedata.file2 = &file2;
                   }];
+}
+
+- (void)testEventIDUnique {
+  // Two events serialized by the same Protobuf instance must get distinct
+  // event_ids (the per-event counter guarantees uniqueness).
+  std::shared_ptr<MockEndpointSecurityAPI> mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+
+  __block es_file_t procFile = MakeESFile("foo", MakeStat(100));
+  __block es_file_t closeFile = MakeESFile("close_file", MakeStat(300));
+  __block es_process_t proc =
+      MakeESProcess(&procFile, MakeAuditToken(12, 34), MakeAuditToken(56, 78));
+
+  std::shared_ptr<Serializer> bs = Protobuf::Create(mockESApi, self.mockDecisionCache, false);
+
+  auto serializeClose = ^std::string {
+    es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_CLOSE, &proc);
+    esMsg.event.close.target = &closeFile;
+    std::unique_ptr<EnrichedMessage> enrichedMsg = Enricher().Enrich(Message(mockESApi, &esMsg));
+    std::vector<uint8_t> vec = bs->SerializeMessage(std::move(enrichedMsg));
+    ::pbv1::SantaMessage santaMsg;
+    XCTAssertTrue(santaMsg.ParseFromString(std::string(vec.begin(), vec.end())));
+    return santaMsg.event_id();
+  };
+
+  XCTAssertNotEqual(serializeClose(), serializeClose());
+
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
 }
 
 - (void)testGetDecisionEnum {

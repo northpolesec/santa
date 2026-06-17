@@ -36,6 +36,7 @@
 #include "Source/common/SNTLogging.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
 #import "Source/common/SNTSystemInfo.h"
+#include "Source/common/SNTXxhash.h"
 #import "Source/common/String.h"
 #include "Source/common/es/EndpointSecurityAPI.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Utilities.h"
@@ -63,7 +64,10 @@ Protobuf::Protobuf(std::shared_ptr<EndpointSecurityAPI> esapi, SNTDecisionCache*
     : Serializer(std::move(decision_cache)),
       esapi_(std::move(esapi)),
       json_(json),
-      boot_session_uuid_(NSStringToUTF8String([SNTSystemInfo bootSessionUUID])) {}
+      boot_session_uuid_(NSStringToUTF8String([SNTSystemInfo bootSessionUUID])) {
+  // Generate a random per-process salt mixed into each event_id hash.
+  arc4random_buf(session_salt_.data(), session_salt_.size());
+}
 
 static inline void EncodeTimestamp(Timestamp* timestamp, struct timespec ts) {
   timestamp->set_seconds(ts.tv_sec);
@@ -432,6 +436,17 @@ static inline void EncodeCertificateInfo(::pbv1::CertificateInfo* pb_cert_info, 
   EncodeTimestamp(santa_msg->mutable_event_time(), event_time);
   EncodeTimestamp(santa_msg->mutable_processed_time(), processed_time);
   santa_msg->set_boot_session_uuid(boot_session_uuid_);
+
+  // Event ID: xxHash128 of the per-process salt combined with a monotonic
+  // counter. The counter makes each event unique; the salt makes the IDs
+  // opaque and distinct across sessions. The 24-byte input exercises xxHash's
+  // full-width path, so the digest uses the entire 128-bit space.
+  uint64_t counter = event_counter_.fetch_add(1, std::memory_order_relaxed);
+  uint8_t buf[sizeof(session_salt_) + sizeof(counter)];
+  memcpy(buf, session_salt_.data(), sizeof(session_salt_));
+  memcpy(buf + sizeof(session_salt_), &counter, sizeof(counter));
+
+  santa_msg->set_event_id(santa::Xxhash128::HexDigestOneShot(buf, sizeof(buf)));
 
   return santa_msg;
 }

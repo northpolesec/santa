@@ -19,11 +19,15 @@
 #import <Foundation/Foundation.h>
 #include <google/protobuf/arena.h>
 
+#include <array>
+#include <atomic>
+#include <cstdint>
 #include <memory>
 #include <vector>
 
 #include "Source/common/Platform.h"
 #import "Source/common/SNTCachedDecision.h"
+#include "Source/common/SNTXxhash.h"
 #include "Source/common/es/EndpointSecurityAPI.h"
 #include "Source/common/santa.pb.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Serializer.h"
@@ -118,6 +122,12 @@ class Protobuf : public Serializer {
   bool json_;
   // Cached boot session UUID to avoid repeated ObjC dispatch on every event.
   std::string boot_session_uuid_;
+  // Random per-process salt, generated once at construction. Each event_id is
+  // the xxHash128 of this salt combined with the counter, so events are unique
+  // within a session and unlinkable across sessions without per-event RNG.
+  std::array<uint8_t, 16> session_salt_;
+  // Monotonically increasing per-event counter, ensuring each event_id is unique.
+  std::atomic<uint64_t> event_counter_{0};
 };
 
 }  // namespace santa

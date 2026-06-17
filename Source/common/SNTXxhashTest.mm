@@ -128,4 +128,17 @@
   XCTAssertSemaTrue(sema, 0, "Digest callback block was not called");
 }
 
+- (void)testOneShotHexDigest {
+  // The one-shot static HexDigest must match the streaming digest of the same
+  // bytes, for both widths.
+  santa::Xxhash64 state64;
+  state64.Update("helloworld", 10);
+  XCTAssertCppStringEqual(santa::Xxhash64::HexDigestOneShot("helloworld", 10), state64.HexDigest());
+
+  santa::Xxhash128 state128;
+  state128.Update("helloworld", 10);
+  XCTAssertCppStringEqual(santa::Xxhash128::HexDigestOneShot("helloworld", 10),
+                          state128.HexDigest());
+}
+
 @end
