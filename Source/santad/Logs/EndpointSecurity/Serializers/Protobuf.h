@@ -124,7 +124,7 @@ class Protobuf : public Serializer {
   // xxHash state primed at construction with the boot session UUID and a random
   // per-process seed. Each event_id copies this state and folds in the counter,
   // avoiding re-hashing the invariant prefix on every event.
-  santa::Xxhash64 event_id_hash_base_;
+  santa::Xxhash128 event_id_hash_base_;
   // Monotonically increasing per-event counter, ensuring each event_id is unique.
   std::atomic<uint64_t> event_counter_{0};
 };

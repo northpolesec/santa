@@ -442,7 +442,7 @@ static inline void EncodeCertificateInfo(::pbv1::CertificateInfo* pb_cert_info, 
 
   // Event ID: the primed hash (boot session UUID + random per-process seed) with
   // a monotonically increasing counter folded in, making each event_id unique.
-  santa::Xxhash64 event_id(event_id_hash_base_);
+  santa::Xxhash128 event_id(event_id_hash_base_);
   uint64_t counter = event_counter_.fetch_add(1, std::memory_order_relaxed);
   event_id.Update(&counter, sizeof(counter));
   santa_msg->set_event_id(event_id.HexDigest());

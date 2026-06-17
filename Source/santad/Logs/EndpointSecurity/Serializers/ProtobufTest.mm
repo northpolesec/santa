@@ -329,10 +329,10 @@ void SerializeAndCheck(es_event_type_t eventType,
     XCTAssertTrue(CompareTime(santaMsg.processed_time(), enrichmentTime));
     XCTAssertTrue(CompareTime(santaMsg.event_time(), msgTime));
 
-    // event_id is an xxhash64 hex digest (16 chars). Verify it's populated and
+    // event_id is an xxhash128 hex digest (32 chars). Verify it's populated and
     // well-formed; uniqueness across events is covered by testEventIDUnique.
     XCTAssertTrue(santaMsg.has_event_id());
-    XCTAssertEqual(santaMsg.event_id().size(), 16);
+    XCTAssertEqual(santaMsg.event_id().size(), 32);
     XCTAssertEqual(santaMsg.event_id().find_first_not_of("0123456789abcdef"), std::string::npos);
 
     // Convert JSON strings to objects and compare each key-value set.
