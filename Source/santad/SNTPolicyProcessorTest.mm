@@ -163,6 +163,43 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
       expectedDecision:SNTEventStateBlockCDHash];
 }
 
+// SILENT_GUI_BLOCKLIST and SILENT_TTY_BLOCKLIST suppress only one notification
+// channel, so the two flags must be asserted independently rather than via the
+// shared `silent:` helper (which expects them to match).
+- (void)testDecisionForSilentGUIBlock {
+  SNTRule* rule = [[SNTRule alloc] initWithDictionary:@{
+    @"rule_type" : @"CDHASH",
+    @"identifier" : @"a023fbe5361a5bbd793dc3889556e93f41ec9bb8",
+    @"policy" : @"SILENT_GUI_BLOCKLIST"
+  }
+                                                error:nil];
+  XCTAssertNotNil(rule, "invalid test rule dictionary");
+
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+  cd.cdhash = rule.identifier;
+  [self.processor decision:cd forRule:rule withTransitiveRules:YES andCELActivationCallback:nil];
+  XCTAssertEqual(cd.decision, SNTEventStateBlockCDHash);
+  XCTAssertTrue(cd.silentBlockGUI);
+  XCTAssertFalse(cd.silentBlockTTY);
+}
+
+- (void)testDecisionForSilentTTYBlock {
+  SNTRule* rule = [[SNTRule alloc] initWithDictionary:@{
+    @"rule_type" : @"CDHASH",
+    @"identifier" : @"a023fbe5361a5bbd793dc3889556e93f41ec9bb8",
+    @"policy" : @"SILENT_TTY_BLOCKLIST"
+  }
+                                                error:nil];
+  XCTAssertNotNil(rule, "invalid test rule dictionary");
+
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+  cd.cdhash = rule.identifier;
+  [self.processor decision:cd forRule:rule withTransitiveRules:YES andCELActivationCallback:nil];
+  XCTAssertEqual(cd.decision, SNTEventStateBlockCDHash);
+  XCTAssertFalse(cd.silentBlockGUI);
+  XCTAssertTrue(cd.silentBlockTTY);
+}
+
 - (void)testDecisionForAllowbyCDHashRuleMatches {
   SNTRule* rule = [[SNTRule alloc] initWithDictionary:@{
     @"rule_type" : @"CDHASH",
