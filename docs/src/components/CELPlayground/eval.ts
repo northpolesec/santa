@@ -1,4 +1,5 @@
 import { Environment } from "@marcbachmann/cel-js";
+import { Duration } from "@marcbachmann/cel-js/evaluator";
 import { parse as parseYAML } from "yaml";
 import {
   VARIABLES,
@@ -84,6 +85,19 @@ function buildEnvironment(): Environment {
     (_minutes: bigint) => v2Entries.nameToValue["REQUIRE_TOUCHID_ONLY"],
   );
 
+  // Relative-time helpers (V2). today() is the start of the current UTC day
+  // (truncated to a whole day, not the literal instant); any expression that
+  // uses it is non-cacheable. days(n) is n*24h, sugar for the day windows that
+  // native duration() can't express (it only parses up to hours).
+  const dayMs = 24 * 60 * 60 * 1000;
+  env.registerFunction("today(): google.protobuf.Timestamp", () => {
+    return new Date(Math.floor(Date.now() / dayMs) * dayMs);
+  });
+  env.registerFunction(
+    "days(int): google.protobuf.Duration",
+    (n: bigint) => new Duration(n * 86400n),
+  );
+
   return env;
 }
 
@@ -163,7 +177,10 @@ function usesV2Features(
   return false;
 }
 
-function isCacheable(identifiers: Set<string>): boolean {
+function isCacheable(identifiers: Set<string>, calls: Set<string>): boolean {
+  // today() resolves to the current day, so any result derived from it would go
+  // stale at the next UTC midnight. Such expressions are not cached.
+  if (calls.has("today")) return false;
   return !VARIABLES.some((v) => v.dynamic && identifiers.has(v.name));
 }
 
@@ -189,7 +206,7 @@ export function evaluate(expression: string, yamlInput: string): EvalResult {
     const { identifiers, calls } = analyzeAST(evalFn.ast);
     const value = evalFn(ctx);
     const displayValue = mapResultToName(value);
-    const cacheable = isCacheable(identifiers);
+    const cacheable = isCacheable(identifiers, calls);
     const isV2 = usesV2Features(identifiers, calls);
 
     return { valid: true, value: displayValue, cacheable, isV2 };

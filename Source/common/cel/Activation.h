@@ -15,12 +15,16 @@
 #ifndef SANTA_COMMON_CEL_ACTIVATION_H
 #define SANTA_COMMON_CEL_ACTIVATION_H
 
+#include <cstdint>
 #include <map>
+#include <memory>
+#include <optional>
 #include <type_traits>
 #include <vector>
 
 #include "Source/common/Memoizer.h"
 #include "Source/common/cel/CELProtoTraits.h"
+#include "Source/common/cel/RelativeTimeFunction.h"
 
 #include "absl/strings/string_view.h"
 
@@ -64,11 +68,15 @@ class Activation : public ::google::api::expr::runtime::BaseActivation {
   std::optional<::google::api::expr::runtime::CelValue> FindValue(
       absl::string_view name, google::protobuf::Arena* arena) const override;
 
-  // Activation does not support lazy-loaded functions.
+  // Vends the lazy today() function for CELv2. Resolving it here (rather than
+  // registering an eager function) keeps it out of constant folding and lets it
+  // flag the evaluation as non-cacheable on this activation as a side effect.
   std::vector<const ::google::api::expr::runtime::CelFunction*> FindFunctionOverloads(
-      absl::string_view) const override {
-    return {};
-  }
+      absl::string_view name) const override;
+
+  // Reset per-evaluation state. Called by the Evaluator before each evaluation
+  // so a reused activation reflects only the current expression.
+  void ResetEvalState() const { usedRelativeTime_ = false; }
 
   static std::vector<std::pair<absl::string_view, ::cel::Type>> GetVariables(
       google::protobuf::Arena* arena);
@@ -85,6 +93,13 @@ class Activation : public ::google::api::expr::runtime::BaseActivation {
   Memoizer<std::string> path_;
   Memoizer<std::vector<AncestorT>> ancestors_;
   Memoizer<std::vector<FileDescriptorT>> fds_;
+
+  // Set during evaluation when a relative-time function (today()) is used, which
+  // makes the result non-cacheable. Mutable so it can be updated from the const
+  // evaluation path.
+  mutable bool usedRelativeTime_ = false;
+  // Lazily-created today() implementation, vended via FindFunctionOverloads.
+  mutable std::unique_ptr<TodayFunction> todayFn_;
 
   bool IsResultCacheable() const;
 

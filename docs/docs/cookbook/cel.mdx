@@ -38,6 +38,34 @@ target.signing_time >= timestamp('2025-05-31T00:00:00Z')
   `}
 />
 
+## Apps signed within the last N days <AddedBadge added={"2026.6"} />
+
+This allows executions only when the binary was securely signed within a sliding
+window — here, the last 90 days. Unlike a fixed `timestamp(...)`, the window
+moves forward automatically each day, so the rule never needs to be re-pushed.
+`today()` is the start of the current UTC day and `days(n)` is `n`×24h (the
+standard `duration()` only parses units up to hours). This requires
+[Workshop](https://northpole.security/), and because `today()` changes daily the
+result is not cached.
+
+```clike
+target.secure_signing_time > today() - days(90)
+```
+
+<PlaygroundLink
+  expression={`target.secure_signing_time > today() - days(90)`}
+  context={`
+    target:
+      secure_signing_time: "2026-05-01T00:00:00Z"
+    args:
+      - "--version"
+    envs:
+      HOME: "/Users/admin"
+    euid: 501
+    cwd: "/Applications"
+  `}
+/>
+
 ## Prevent users from disabling gatekeeper
 
 Create a signing ID rule for `platform:com.apple.spctl` and attach the following CEL program

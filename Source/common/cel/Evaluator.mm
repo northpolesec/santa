@@ -30,6 +30,7 @@
 #include "parser/parser.h"
 
 #include "Source/common/cel/Activation.h"
+#include "Source/common/cel/RelativeTimeFunction.h"
 #include "Source/common/cel/TouchIDFunction.h"
 #include "Source/common/cel/result.pb.h"
 
@@ -60,9 +61,12 @@ static absl::StatusOr<std::unique_ptr<::cel::Compiler>> CreateCompiler(
     return result;
   }
 
-  // Add TouchID cooldown functions for CELv2 only
+  // Add TouchID cooldown and relative-time functions for CELv2 only
   if constexpr (IsV2) {
     if (auto result = santa::cel::AddTouchIDCooldownCompilerLibrary(*builder); !result.ok()) {
+      return result;
+    }
+    if (auto result = santa::cel::AddRelativeTimeCompilerLibrary(*builder); !result.ok()) {
       return result;
     }
   }
@@ -145,9 +149,13 @@ absl::StatusOr<std::unique_ptr<::cel_runtime::CelExpression>> Evaluator<IsV2>::C
     return result;
   }
 
-  // Register TouchID cooldown functions for CELv2 only
+  // Register TouchID cooldown and relative-time functions for CELv2 only
   if constexpr (IsV2) {
     if (auto result = santa::cel::RegisterTouchIDCooldownFunctions(builder->GetRegistry(), options);
+        !result.ok()) {
+      return result;
+    }
+    if (auto result = santa::cel::RegisterRelativeTimeFunctions(builder->GetRegistry(), options);
         !result.ok()) {
       return result;
     }
@@ -164,6 +172,10 @@ template <bool IsV2>
 absl::StatusOr<typename Evaluator<IsV2>::EvaluationResultT> Evaluator<IsV2>::Evaluate(
     const ::cel_runtime::CelExpression* expression_plan, const ActivationT& activation,
     google::protobuf::Arena* arena) {
+  // Clear any per-evaluation state (e.g. the relative-time flag set by today())
+  // so a reused activation reflects only this expression's result.
+  activation.ResetEvalState();
+
   absl::StatusOr<cel_runtime::CelValue> result = expression_plan->Evaluate(activation, arena);
 
   if (!result.ok()) {

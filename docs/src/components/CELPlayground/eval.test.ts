@@ -155,6 +155,42 @@ describe("evaluate", () => {
     expect(result.error).toBe("YAML input must be a mapping");
   });
 
+  it("evaluates today() - days(n) against secure_signing_time", () => {
+    // Signed ~30 days ago: within the last 90 days -> ALLOWLIST.
+    const signed = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const yaml = `target:\n  secure_signing_time: "${signed}"`;
+    const result = evaluate(
+      "target.secure_signing_time > today() - days(90)",
+      yaml,
+    );
+    expect(result.valid).toBe(true);
+    expect(result.value).toBe("ALLOWLIST");
+  });
+
+  it("days(n) matches the equivalent native duration()", () => {
+    const signed = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const yaml = `target:\n  secure_signing_time: "${signed}"`;
+    const withDays = evaluate(
+      "target.secure_signing_time > today() - days(90)",
+      yaml,
+    );
+    const withDuration = evaluate(
+      "target.secure_signing_time > today() - duration('2160h')",
+      yaml,
+    );
+    expect(withDays.value).toBe(withDuration.value);
+  });
+
+  it("marks expressions using today() as non-cacheable and V2", () => {
+    const result = evaluate(
+      "target.signing_time > today() - days(90)",
+      DEFAULT_YAML,
+    );
+    expect(result.valid).toBe(true);
+    expect(result.cacheable).toBe(false);
+    expect(result.isV2).toBe(true);
+  });
+
   it("handles secure_signing_time", () => {
     const yaml = `target:\n  secure_signing_time: "2025-06-01T00:00:00Z"`;
     const result = evaluate(
