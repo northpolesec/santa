@@ -178,6 +178,10 @@ describe("evaluate", () => {
       "target.secure_signing_time > today() - duration('2160h')",
       yaml,
     );
+    // Guard against both evaluations failing (undefined === undefined).
+    expect(withDays.valid).toBe(true);
+    expect(withDuration.valid).toBe(true);
+    expect(withDays.value).toBe("ALLOWLIST");
     expect(withDays.value).toBe(withDuration.value);
   });
 
