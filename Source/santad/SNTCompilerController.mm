@@ -67,12 +67,14 @@ static constexpr std::string_view kIgnoredCompilerProcessPathPrefix = "/dev/";
   if (pid < 0 || pid >= PID_MAX) return NO;
   int32_t stored = self->_compilerPIDs[pid].load(std::memory_order_relaxed);
   if (stored == 0) return NO;
-  int32_t pidversion = audit_token_to_pidversion(tok);
-  if (stored == pidversion) return YES;
-  // Stale entry: the original compiler exited and the PID was recycled.
-  // Clear it eagerly so subsequent checks short-circuit on 0.
-  self->_compilerPIDs[pid].store(0, std::memory_order_relaxed);
-  return NO;
+  // Only the exact compiler instance (matching pidversion) is a compiler. A
+  // mismatch means the event came from a different incarnation at the same PID:
+  // most commonly the process's own pre-exec image, which emits NOTIFY events at an
+  // earlier pidversion, or a recycled PID. Return NO, but do not clear the slot. A
+  // mismatched event can be delivered after the real compiler was marked, and
+  // clearing here would drop the still-valid mark and prevent the compiler's
+  // output from getting a transitive rule.
+  return stored == audit_token_to_pidversion(tok);
 }
 
 - (void)setProcess:(const audit_token_t&)tok isCompiler:(bool)isCompiler {

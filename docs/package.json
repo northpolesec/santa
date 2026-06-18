@@ -18,12 +18,12 @@
   },
   "dependencies": {
     "@buf/northpolesec_protos.bufbuild_es": "2.11.0-20260209184743-b0ac9f132e69.1",
-    "@docusaurus/core": "3.10.0",
-    "@docusaurus/plugin-client-redirects": "3.10.0",
-    "@docusaurus/plugin-google-gtag": "3.10.0",
-    "@docusaurus/preset-classic": "3.10.0",
-    "@docusaurus/theme-common": "3.10.0",
-    "@docusaurus/theme-mermaid": "3.10.0",
+    "@docusaurus/core": "3.10.1",
+    "@docusaurus/plugin-client-redirects": "3.10.1",
+    "@docusaurus/plugin-google-gtag": "3.10.1",
+    "@docusaurus/preset-classic": "3.10.1",
+    "@docusaurus/theme-common": "3.10.1",
+    "@docusaurus/theme-mermaid": "3.10.1",
     "@hookform/resolvers": "^5.2.2",
     "@marcbachmann/cel-js": "^7.3.1",
     "@mdx-js/react": "^3.1.1",
@@ -54,11 +54,12 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
-    "@docusaurus/module-type-aliases": "3.10.0",
-    "@docusaurus/tsconfig": "3.10.0",
-    "@docusaurus/types": "3.10.0",
+    "@docusaurus/module-type-aliases": "3.10.1",
+    "@docusaurus/tsconfig": "3.10.1",
+    "@docusaurus/types": "3.10.1",
     "prettier": "3.5.1",
     "typescript": "~5.6.3",
+    "vite": "^7.3.5",
     "vitest": "^4.1.0"
   },
   "browserslist": {
@@ -79,18 +80,22 @@
   "packageManager": "pnpm@10.24.0+sha512.01ff8ae71b4419903b65c60fb2dc9d34cf8bb6e06d03bde112ef38f7a34d6904c424ba66bea5cdcf12890230bf39f9580473140ed9c946fef328b6e5238a345a",
   "pnpm": {
     "overrides": {
+      "@babel/core@<7.29.6": "7.29.6",
       "@babel/plugin-transform-modules-systemjs@<7.29.4": "7.29.4",
-      "dompurify@>=3.0.0 <=3.3.3": "3.4.0",
+      "@docsearch/react@<4.4.1": "4.6.3",
+      "dompurify@<3.4.11": "3.4.11",
       "esbuild@<0.28.1": "0.28.1",
       "fast-uri@<3.1.2": "3.1.2",
       "joi@<18.2.1": "18.2.1",
+      "launch-editor@<2.14.1": "2.14.1",
       "lodash-es@<=4.17.23": "4.18.1",
       "mermaid@<11.15.0": "11.15.0",
       "qs@>=6.11.1 <=6.15.1": "6.15.2",
       "serialize-javascript@<7.0.5": "7.0.5",
       "shell-quote@<=1.8.3": "1.8.4",
       "uuid@<14.0.0": "14.0.0",
-      "webpack-dev-server@<=5.2.3": "5.2.4",
+      "webpack-dev-server@<5.2.5": "5.2.5",
+      "ws@>=7.0.0 <7.5.11": "7.5.11",
       "ws@>=8.0.0 <8.21.0": "8.21.0"
     }
   }
