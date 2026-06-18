@@ -63,7 +63,8 @@
 
 @property NSString* customMsg;
 @property NSString* customURL;
-@property BOOL silentBlock;
+@property BOOL silentBlockGUI;
+@property BOOL silentBlockTTY;
 @property BOOL seatbeltRequired;
 
 @property BOOL staticRule;

@@ -24,6 +24,15 @@ describe("evaluate", () => {
     expect(result.value).toBe("SILENT_BLOCKLIST");
   });
 
+  it.each(["SILENT_GUI_BLOCKLIST", "SILENT_TTY_BLOCKLIST"])(
+    "resolves the %s constant",
+    (name) => {
+      const result = evaluate(name, DEFAULT_YAML);
+      expect(result.valid).toBe(true);
+      expect(result.value).toBe(name);
+    },
+  );
+
   it("marks expressions using only target fields as cacheable", () => {
     const result = evaluate(
       "target.signing_time >= timestamp('2025-01-01T00:00:00Z')",

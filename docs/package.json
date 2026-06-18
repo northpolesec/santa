@@ -17,7 +17,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@buf/northpolesec_protos.bufbuild_es": "2.11.0-20260209184743-b0ac9f132e69.1",
+    "@buf/northpolesec_protos.bufbuild_es": "2.11.0-20260618192259-0c525ad667e7.1",
     "@docusaurus/core": "3.10.1",
     "@docusaurus/plugin-client-redirects": "3.10.1",
     "@docusaurus/plugin-google-gtag": "3.10.1",

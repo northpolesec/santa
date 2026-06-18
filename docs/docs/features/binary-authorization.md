@@ -291,13 +291,28 @@ application is blocked.
 
 Value: `SILENT_BLOCKLIST`
 
-Silent Blocklist rules are identical to normal Blocklist rules but the GUI will
-not be displayed when such a rule is triggered.
+Silent Blocklist rules are identical to normal Blocklist rules but no
+notification is shown when such a rule is triggered: both the GUI dialog and the
+terminal (TTY) message are suppressed.
 
 This rule type should be used sparingly. Blocking an application without
 informing the user that it was Santa that did it can be a _very_ confusing
 experience for users and lead to wasted time trying to determine the underlying
 cause.
+
+#### Silent GUI Blocklist <AddedBadge added={"2026.6"} />
+
+Value: `SILENT_GUI_BLOCKLIST`
+
+Identical to [Silent Blocklist](#silent-blocklist) but suppresses only the GUI
+dialog; the terminal (TTY) message is still shown.
+
+#### Silent TTY Blocklist <AddedBadge added={"2026.6"} />
+
+Value: `SILENT_TTY_BLOCKLIST`
+
+Identical to [Silent Blocklist](#silent-blocklist) but suppresses only the
+terminal (TTY) message; the GUI dialog is still shown.
 
 #### CEL <AddedBadge added={"2025.6"} /> {#cel}
 
@@ -441,7 +456,9 @@ use `platform` as the Team ID prefix (e.g., `platform:com.apple.curl`).
 | `ALLOWLIST` | Allow execution |
 | `ALLOWLIST_COMPILER` | Allow execution and enable transitive allowlisting (if configured) |
 | `BLOCKLIST` | Block execution |
-| `SILENT_BLOCKLIST` | Block execution without showing a notification |
+| `SILENT_BLOCKLIST` | Block execution without showing any notification (GUI and TTY) |
+| `SILENT_GUI_BLOCKLIST` | Block execution, suppressing only the GUI notification |
+| `SILENT_TTY_BLOCKLIST` | Block execution, suppressing only the TTY notification |
 | `CEL` | Evaluate a CEL expression to determine the action |
 
 #### Example Rules

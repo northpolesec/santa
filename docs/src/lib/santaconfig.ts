@@ -998,6 +998,8 @@ thousand static rules working correctly, but we don't recommend using StaticRule
             { value: "ALLOWLIST_COMPILER", label: "Allowlist Compiler" },
             { value: "BLOCKLIST", label: "Blocklist Compiler" },
             { value: "SILENT_BLOCKLIST", label: "Silent Blocklist" },
+            { value: "SILENT_GUI_BLOCKLIST", label: "Silent GUI Blocklist" },
+            { value: "SILENT_TTY_BLOCKLIST", label: "Silent TTY Blocklist" },
           ],
         },
         {

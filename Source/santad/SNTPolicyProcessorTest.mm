@@ -112,7 +112,8 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
                          andCELActivationCallback:nil];
   XCTAssertEqual(cd.decision, decision);
   XCTAssertEqual(decisionIsFinal, final);
-  XCTAssertEqual(cd.silentBlock, silent);
+  XCTAssertEqual(cd.silentBlockGUI, silent);
+  XCTAssertEqual(cd.silentBlockTTY, silent);
 }
 
 - (void)testDecisionForBlockByCDHashRuleMatches {
@@ -744,7 +745,8 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
              withTransitiveRules:YES
         andCELActivationCallback:activation];
     XCTAssertEqual(cd.decision, SNTEventStateAllowBinary);
-    XCTAssertFalse(cd.silentBlock);
+    XCTAssertFalse(cd.silentBlockGUI);
+    XCTAssertFalse(cd.silentBlockTTY);
     XCTAssertTrue(cd.cacheable);
   }
   {
@@ -756,7 +758,8 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
              withTransitiveRules:YES
         andCELActivationCallback:activation];
     XCTAssertEqual(cd.decision, SNTEventStateBlockBinary);
-    XCTAssertFalse(cd.silentBlock);
+    XCTAssertFalse(cd.silentBlockGUI);
+    XCTAssertFalse(cd.silentBlockTTY);
     XCTAssertTrue(cd.cacheable);
   }
   {
@@ -768,7 +771,8 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
              withTransitiveRules:YES
         andCELActivationCallback:activation];
     XCTAssertEqual(cd.decision, SNTEventStateAllowBinary);
-    XCTAssertFalse(cd.silentBlock);
+    XCTAssertFalse(cd.silentBlockGUI);
+    XCTAssertFalse(cd.silentBlockTTY);
     XCTAssertFalse(cd.cacheable);
   }
   {
@@ -780,7 +784,8 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
              withTransitiveRules:YES
         andCELActivationCallback:activation];
     XCTAssertEqual(cd.decision, SNTEventStateAllowBinary);
-    XCTAssertFalse(cd.silentBlock);
+    XCTAssertFalse(cd.silentBlockGUI);
+    XCTAssertFalse(cd.silentBlockTTY);
     XCTAssertFalse(cd.cacheable);
   }
   {
@@ -792,7 +797,8 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
              withTransitiveRules:YES
         andCELActivationCallback:activation];
     XCTAssertEqual(cd.decision, SNTEventStateBlockBinary);
-    XCTAssertTrue(cd.silentBlock);
+    XCTAssertTrue(cd.silentBlockGUI);
+    XCTAssertTrue(cd.silentBlockTTY);
     XCTAssertFalse(cd.cacheable);
   }
   {
@@ -804,7 +810,8 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
              withTransitiveRules:YES
         andCELActivationCallback:activation];
     XCTAssertEqual(cd.decision, SNTEventStateBlockBinary);
-    XCTAssertFalse(cd.silentBlock);
+    XCTAssertFalse(cd.silentBlockGUI);
+    XCTAssertFalse(cd.silentBlockTTY);
     XCTAssertFalse(cd.cacheable);
   }
   {
@@ -816,7 +823,8 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
              withTransitiveRules:YES
         andCELActivationCallback:activation];
     XCTAssertEqual(cd.decision, SNTEventStateAllowBinary);
-    XCTAssertFalse(cd.silentBlock);
+    XCTAssertFalse(cd.silentBlockGUI);
+    XCTAssertFalse(cd.silentBlockTTY);
     XCTAssertFalse(cd.cacheable);
   }
   {
@@ -829,7 +837,8 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
         andCELActivationCallback:activation];
     XCTAssertEqual(cd.decision, SNTEventStateBlockBinary);
     XCTAssertTrue(cd.holdAndAsk);
-    XCTAssertFalse(cd.silentBlock);
+    XCTAssertFalse(cd.silentBlockGUI);
+    XCTAssertFalse(cd.silentBlockTTY);
     XCTAssertFalse(cd.cacheable);
   }
   {
@@ -1002,7 +1011,8 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
              withTransitiveRules:YES
         andCELActivationCallback:activation];
     XCTAssertEqual(cd.decision, SNTEventStateBlockBinary);
-    XCTAssertFalse(cd.silentBlock);
+    XCTAssertFalse(cd.silentBlockGUI);
+    XCTAssertFalse(cd.silentBlockTTY);
     XCTAssertFalse(cd.cacheable);
   }
 
@@ -1043,7 +1053,8 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
              withTransitiveRules:YES
         andCELActivationCallback:activation];
     XCTAssertEqual(cd.decision, SNTEventStateBlockBinary);
-    XCTAssertFalse(cd.silentBlock);
+    XCTAssertFalse(cd.silentBlockGUI);
+    XCTAssertFalse(cd.silentBlockTTY);
     XCTAssertFalse(cd.cacheable);
   }
 
@@ -1173,7 +1184,8 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
                                   activationCallback:[self fallbackTestActivationCallback]];
   XCTAssertTrue(handled);
   XCTAssertEqual(cd.decision, SNTEventStateBlockCELFallback);
-  XCTAssertTrue(cd.silentBlock);
+  XCTAssertTrue(cd.silentBlockGUI);
+  XCTAssertTrue(cd.silentBlockTTY);
 }
 
 - (void)testCELFallbackUnspecifiedSkipsToNext {

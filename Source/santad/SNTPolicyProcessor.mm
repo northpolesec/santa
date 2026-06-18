@@ -52,6 +52,8 @@ struct CELEvaluationResult {
   SNTRuleState resultState;  // If succeeded, the resulting state
 };
 
+static void ApplySilentBlock(SNTCachedDecision* cd, SNTRuleState state);
+
 struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
   SNTRuleIdentifiers* ri =
       [[SNTRuleIdentifiers alloc] initWithRuleIdentifiers:{
@@ -294,6 +296,8 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
       case ReturnValue::ALLOWLIST_COMPILER: resultState = SNTRuleStateAllowCompiler; break;
       case ReturnValue::BLOCKLIST: resultState = SNTRuleStateBlock; break;
       case ReturnValue::SILENT_BLOCKLIST: resultState = SNTRuleStateSilentBlock; break;
+      case ReturnValue::SILENT_GUI_BLOCKLIST: resultState = SNTRuleStateSilentBlockGUI; break;
+      case ReturnValue::SILENT_TTY_BLOCKLIST: resultState = SNTRuleStateSilentBlockTTY; break;
       case ReturnValue::AUDIT:
         // AUDIT is identical to ALLOWLIST on the client; the only difference
         // is that the resulting event is flagged so the sync server can
@@ -342,15 +346,15 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
       case ReturnValue::ALLOWLIST_COMPILER: resultState = SNTRuleStateAllowCompiler; break;
       case ReturnValue::BLOCKLIST: resultState = SNTRuleStateBlock; break;
       case ReturnValue::SILENT_BLOCKLIST: resultState = SNTRuleStateSilentBlock; break;
+      case ReturnValue::SILENT_GUI_BLOCKLIST: resultState = SNTRuleStateSilentBlockGUI; break;
+      case ReturnValue::SILENT_TTY_BLOCKLIST: resultState = SNTRuleStateSilentBlockTTY; break;
       default:
         LOGW(@"Unexpected return value from CEL expression: %d", returnValue);
         return {.succeeded = false, .decisionMade = false, .resultState = {}};
     }
   }
 
-  if (resultState == SNTRuleStateSilentBlock) {
-    cd.silentBlock = YES;
-  }
+  ApplySilentBlock(cd, resultState);
 
   if (!cacheable) {
     cd.cacheable = NO;
@@ -403,6 +407,20 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
                            inFallbackContext:NO];
 }
 
+// Sets the GUI/TTY notification suppression flags on the cached decision based
+// on which silent-block variant the rule resolved to.
+static void ApplySilentBlock(SNTCachedDecision* cd, SNTRuleState state) {
+  switch (state) {
+    case SNTRuleStateSilentBlock:
+      cd.silentBlockGUI = YES;
+      cd.silentBlockTTY = YES;
+      break;
+    case SNTRuleStateSilentBlockGUI: cd.silentBlockGUI = YES; break;
+    case SNTRuleStateSilentBlockTTY: cd.silentBlockTTY = YES; break;
+    default: break;
+  }
+}
+
 // This method applies the rules to the cached decision object.
 //
 // It returns YES if the decision was made, NO if the decision was not made.
@@ -429,23 +447,33 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
           {{SNTRuleTypeCDHash, SNTRuleStateAllowCompiler}, SNTEventStateAllowCompilerCDHash},
           {{SNTRuleTypeCDHash, SNTRuleStateBlock}, SNTEventStateBlockCDHash},
           {{SNTRuleTypeCDHash, SNTRuleStateSilentBlock}, SNTEventStateBlockCDHash},
+          {{SNTRuleTypeCDHash, SNTRuleStateSilentBlockGUI}, SNTEventStateBlockCDHash},
+          {{SNTRuleTypeCDHash, SNTRuleStateSilentBlockTTY}, SNTEventStateBlockCDHash},
           {{SNTRuleTypeBinary, SNTRuleStateAllow}, SNTEventStateAllowBinary},
           {{SNTRuleTypeBinary, SNTRuleStateAllowLocalBinary}, SNTEventStateAllowLocalBinary},
           {{SNTRuleTypeBinary, SNTRuleStateAllowTransitive}, SNTEventStateAllowTransitive},
           {{SNTRuleTypeBinary, SNTRuleStateAllowCompiler}, SNTEventStateAllowCompilerBinary},
           {{SNTRuleTypeBinary, SNTRuleStateSilentBlock}, SNTEventStateBlockBinary},
+          {{SNTRuleTypeBinary, SNTRuleStateSilentBlockGUI}, SNTEventStateBlockBinary},
+          {{SNTRuleTypeBinary, SNTRuleStateSilentBlockTTY}, SNTEventStateBlockBinary},
           {{SNTRuleTypeBinary, SNTRuleStateBlock}, SNTEventStateBlockBinary},
           {{SNTRuleTypeSigningID, SNTRuleStateAllow}, SNTEventStateAllowSigningID},
           {{SNTRuleTypeSigningID, SNTRuleStateAllowLocalSigningID},
            SNTEventStateAllowLocalSigningID},
           {{SNTRuleTypeSigningID, SNTRuleStateAllowCompiler}, SNTEventStateAllowCompilerSigningID},
           {{SNTRuleTypeSigningID, SNTRuleStateSilentBlock}, SNTEventStateBlockSigningID},
+          {{SNTRuleTypeSigningID, SNTRuleStateSilentBlockGUI}, SNTEventStateBlockSigningID},
+          {{SNTRuleTypeSigningID, SNTRuleStateSilentBlockTTY}, SNTEventStateBlockSigningID},
           {{SNTRuleTypeSigningID, SNTRuleStateBlock}, SNTEventStateBlockSigningID},
           {{SNTRuleTypeCertificate, SNTRuleStateAllow}, SNTEventStateAllowCertificate},
           {{SNTRuleTypeCertificate, SNTRuleStateSilentBlock}, SNTEventStateBlockCertificate},
+          {{SNTRuleTypeCertificate, SNTRuleStateSilentBlockGUI}, SNTEventStateBlockCertificate},
+          {{SNTRuleTypeCertificate, SNTRuleStateSilentBlockTTY}, SNTEventStateBlockCertificate},
           {{SNTRuleTypeCertificate, SNTRuleStateBlock}, SNTEventStateBlockCertificate},
           {{SNTRuleTypeTeamID, SNTRuleStateAllow}, SNTEventStateAllowTeamID},
           {{SNTRuleTypeTeamID, SNTRuleStateSilentBlock}, SNTEventStateBlockTeamID},
+          {{SNTRuleTypeTeamID, SNTRuleStateSilentBlockGUI}, SNTEventStateBlockTeamID},
+          {{SNTRuleTypeTeamID, SNTRuleStateSilentBlockTTY}, SNTEventStateBlockTeamID},
           {{SNTRuleTypeTeamID, SNTRuleStateBlock}, SNTEventStateBlockTeamID},
           // Seatbelt rules start out as a block of the rule's type. If the
           // ancestor/sandbox check succeeds in the execution controller, the
@@ -471,7 +499,9 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
   }
 
   switch (state) {
-    case SNTRuleStateSilentBlock: cd.silentBlock = YES; break;
+    case SNTRuleStateSilentBlock:
+    case SNTRuleStateSilentBlockGUI:
+    case SNTRuleStateSilentBlockTTY: ApplySilentBlock(cd, state); break;
     case SNTRuleStateAllowCompiler:
       if (!enableTransitiveRules) {
         switch (type) {

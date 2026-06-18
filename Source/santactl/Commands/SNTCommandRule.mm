@@ -56,7 +56,9 @@ REGISTER_COMMAND_NAME(@"rule")
           @"  One of:\n"
           @"    --allow: add to allow\n"
           @"    --block: add to block\n"
-          @"    --silent-block: add to silent block\n"
+          @"    --silent-block: add to silent block (suppress GUI and TTY notifications)\n"
+          @"    --silent-block-gui: add to silent block (suppress only GUI notifications)\n"
+          @"    --silent-block-tty: add to silent block (suppress only TTY notifications)\n"
           @"    --compiler: allow and mark as a compiler\n"
           @"    --cel {cel_expr}: add a CEL rule\n"
           @"           See https://northpole.dev/features/binary-authorization#cel for more "
@@ -163,6 +165,10 @@ REGISTER_COMMAND_NAME(@"rule")
     } else if ([arg caseInsensitiveCompare:@"--silent-block"] == NSOrderedSame ||
                [arg caseInsensitiveCompare:@"--silent-blacklist"] == NSOrderedSame) {
       state = SNTRuleStateSilentBlock;
+    } else if ([arg caseInsensitiveCompare:@"--silent-block-gui"] == NSOrderedSame) {
+      state = SNTRuleStateSilentBlockGUI;
+    } else if ([arg caseInsensitiveCompare:@"--silent-block-tty"] == NSOrderedSame) {
+      state = SNTRuleStateSilentBlockTTY;
     } else if ([arg caseInsensitiveCompare:@"--compiler"] == NSOrderedSame) {
       state = SNTRuleStateAllowCompiler;
     } else if ([arg caseInsensitiveCompare:@"--cel"] == NSOrderedSame) {
