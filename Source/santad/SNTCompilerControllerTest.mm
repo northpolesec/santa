@@ -97,12 +97,14 @@ static const pid_t PID_MAX = 99999;
   [cc setProcess:compilerTok isCompiler:true];
   XCTAssertTrue([cc isCompiler:compilerTok]);
 
-  // Same PID, different pidversion (simulates PID reuse after missed EXIT)
+  // Same PID, different pidversion (e.g. PID reuse after a missed EXIT, or the
+  // process's pre-exec incarnation) is not the marked compiler.
   audit_token_t reusedTok = MakeAuditToken(12, 99);
   XCTAssertFalse([cc isCompiler:reusedTok]);
 
-  // Stale entry should have been eagerly cleared — even the original token returns NO now
-  XCTAssertFalse([cc isCompiler:compilerTok]);
+  // The mismatched check must not have cleared the mark: the original instance is
+  // still recognized.
+  XCTAssertTrue([cc isCompiler:compilerTok]);
 
   // Negative pidversion should work normally
   audit_token_t negPidverTok = MakeAuditToken(50, -1);
@@ -113,8 +115,36 @@ static const pid_t PID_MAX = 99999;
   audit_token_t differentNegPidverTok = MakeAuditToken(50, -2);
   XCTAssertFalse([cc isCompiler:differentNegPidverTok]);
 
-  // Stale entry should have been eagerly cleared
-  XCTAssertFalse([cc isCompiler:negPidverTok]);
+  // Again, the mark survives the mismatched check.
+  XCTAssertTrue([cc isCompiler:negPidverTok]);
+}
+
+// Regression test for the transitive-allowlisting failure where a compiler's mark
+// was destroyed before its own output close could be processed.
+//
+// A compiler is marked using the pidversion value the process has *after* its
+// execve. The same PID also emits NOTIFY events from its pre-exec incarnation (the
+// forked-but-not-yet-exec'd parent image), which carry an earlier pidversion. Those
+// events are delivered on a separate, lower-priority notify client and can be
+// processed *after* the mark is set. An isCompiler: check for the earlier
+// pidversion must return NO without disturbing the mark; otherwise the compiler's
+// real output close finds no mark and no transitive rule is created.
+- (void)testIsCompilerMismatchDoesNotClearMark {
+  SNTCompilerController* cc = [[SNTCompilerController alloc] init];
+
+  // Compiler marked at its post-exec pidversion.
+  audit_token_t markTok = MakeAuditToken(12, 100);
+  [cc setProcess:markTok isCompiler:true];
+  XCTAssertTrue([cc isCompiler:markTok]);
+
+  // A close from the same PID's pre-exec incarnation (earlier pidversion) is not the
+  // marked compiler, so it returns NO.
+  audit_token_t preExecTok = MakeAuditToken(12, 99);
+  XCTAssertFalse([cc isCompiler:preExecTok]);
+
+  // Crucially, that mismatched check must not have cleared the mark: the compiler's
+  // own subsequent events must still be recognized so its output gets a rule.
+  XCTAssertTrue([cc isCompiler:markTok]);
 }
 
 - (void)testIsCompilerPidversionZeroEdgeCase {
