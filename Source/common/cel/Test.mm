@@ -24,6 +24,7 @@
 
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
+#include "absl/time/time.h"
 #include "google/protobuf/arena.h"
 
 @interface CELTest : XCTestCase
@@ -268,6 +269,121 @@
       XCTAssertEqual(result.value().cacheable, false);
     }
   }
+}
+
+- (void)testRelativeTimestamps {
+  using ReturnValue = santa::cel::CELProtoTraits<true>::ReturnValue;
+  using ExecutableFileT = santa::cel::CELProtoTraits<true>::ExecutableFileT;
+  using AncestorT = santa::cel::CELProtoTraits<true>::AncestorT;
+  using FileDescriptorT = santa::cel::CELProtoTraits<true>::FileDescriptorT;
+
+  constexpr int64_t kSecondsPerDay = 24 * 60 * 60;
+  int64_t nowSec = absl::ToUnixSeconds(absl::Now());
+
+  // Binary signed 10 days ago.
+  auto f = std::make_unique<ExecutableFileT>();
+  f->mutable_secure_signing_time()->set_seconds(nowSec - 10 * kSecondsPerDay);
+  santa::cel::Activation<true> activation(
+      std::move(f),
+      ^std::vector<std::string>() {
+        return {};
+      },
+      ^std::map<std::string, std::string>() {
+        return {};
+      },
+      ^uid_t() {
+        return 0;
+      },
+      ^std::string() {
+        return "/";
+      },
+      ^std::string() {
+        return "/usr/bin/test";
+      },
+      ^std::vector<AncestorT>() {
+        return {};
+      },
+      ^std::vector<FileDescriptorT>() {
+        return {};
+      });
+
+  auto sut = santa::cel::Evaluator<true>::Create();
+  XCTAssertTrue(sut.ok());
+
+  {
+    // Signed within the last 5 days? No (signed 10 days ago) -> BLOCKLIST.
+    // Using today() must make the result non-cacheable.
+    auto result = sut.value()->CompileAndEvaluate("target.secure_signing_time > today() - days(5)",
+                                                  activation);
+    if (!result.ok()) {
+      XCTFail(@"Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::BLOCKLIST);
+      XCTAssertFalse(result.value().cacheable);
+    }
+  }
+  {
+    // Signed within the last 90 days? Yes (10 days ago) -> ALLOWLIST.
+    // duration() arithmetic should work natively too (90 days == 2160h).
+    auto result = sut.value()->CompileAndEvaluate(
+        "target.secure_signing_time > today() - duration('2160h')", activation);
+    if (!result.ok()) {
+      XCTFail(@"Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
+      XCTAssertFalse(result.value().cacheable);
+    }
+  }
+  {
+    // Expressions that don't use today() remain cacheable.
+    auto result =
+        sut.value()->CompileAndEvaluate("target.secure_signing_time >= timestamp(0)", activation);
+    if (!result.ok()) {
+      XCTFail(@"Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
+      XCTAssertTrue(result.value().cacheable);
+    }
+  }
+}
+
+- (void)testRelativeTimestampsV1Unsupported {
+  using ExecutableFileT = santa::cel::CELProtoTraits<false>::ExecutableFileT;
+  using AncestorT = santa::cel::CELProtoTraits<false>::AncestorT;
+  using FileDescriptorT = santa::cel::CELProtoTraits<false>::FileDescriptorT;
+
+  auto f = std::make_unique<ExecutableFileT>();
+  santa::cel::Activation<false> activation(
+      std::move(f),
+      ^std::vector<std::string>() {
+        return {};
+      },
+      ^std::map<std::string, std::string>() {
+        return {};
+      },
+      ^uid_t() {
+        return 0;
+      },
+      ^std::string() {
+        return "/";
+      },
+      ^std::string() {
+        return "/usr/bin/test";
+      },
+      ^std::vector<AncestorT>() {
+        return {};
+      },
+      ^std::vector<FileDescriptorT>() {
+        return {};
+      });
+
+  auto sut = santa::cel::Evaluator<false>::Create();
+  XCTAssertTrue(sut.ok());
+
+  // today() / days() are CELv2 only.
+  auto result =
+      sut.value()->CompileAndEvaluate("target.signing_time > today() - days(5)", activation);
+  XCTAssertFalse(result.ok());
 }
 
 - (void)testAuditReturnValue {

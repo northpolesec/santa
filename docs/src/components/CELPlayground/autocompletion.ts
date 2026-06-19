@@ -373,6 +373,25 @@ export const celWorkshopFunctions: CELCompletionItem[] = [
     insertTextRules: "insertAsSnippet",
     v2Only: true,
   },
+  {
+    label: "today",
+    kind: "function",
+    detail: "today() -> timestamp",
+    documentation:
+      "Returns the start of the current UTC day (00:00:00Z). Combine with duration arithmetic to compare against a sliding window, e.g. target.secure_signing_time > today() - days(90). Any expression using today() is not cacheable.",
+    insertText: "today()",
+    v2Only: true,
+  },
+  {
+    label: "days",
+    kind: "function",
+    detail: "days(int) -> duration",
+    documentation:
+      "Returns a duration of n*24h. Convenience for day-length windows, since the built-in duration() only parses units up to hours (e.g. days(90) == duration('2160h')).",
+    insertText: "days(${1:n})",
+    insertTextRules: "insertAsSnippet",
+    v2Only: true,
+  },
 ];
 
 // Comprehension snippets
@@ -529,6 +548,8 @@ export const celLanguageDefinition = {
     // Workshop custom functions
     "require_touchid_with_cooldown_minutes",
     "require_touchid_only_with_cooldown_minutes",
+    "today",
+    "days",
   ],
 
   // Operators (CEL-specific, no assignment operators)
