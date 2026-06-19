@@ -375,12 +375,26 @@ if used in rules for frequently-executed binaries.
 
 :::
 
+In addition to the [CEL standard library](https://github.com/google/cel-spec/blob/master/doc/langdef.md#standard-definitions)
+(including `timestamp`, `duration`, and the arithmetic between them), the
+following helper functions are available. They require [Workshop](https://northpole.security/):
+
+| Function | Returns | Description |
+| -------- | ------- | ----------- |
+| `today()` | `timestamp` | The start of the current UTC day (`00:00:00Z`). Combine with duration arithmetic to compare against a sliding window, e.g. `target.secure_signing_time > today() - days(90)`. Any expression using `today()` is **not cacheable**, as its value changes each day. |
+| `days(n)` | `duration` | A duration of `n` days (`n`×24h). Convenience for day-length windows, since the standard `duration()` only parses units up to hours (`days(90)` is equivalent to `duration('2160h')`). |
+
 Some examples of valid CEL expressions:
 
 ```clike
 // Only allow executing versions of an app signed on or after May 31st 2025.
 // This expression will be cacheable.
 target.signing_time >= timestamp('2025-05-31T00:00:00Z')
+
+// Only allow apps securely signed within the last 90 days. The window slides
+// automatically each day. Requires Workshop.
+// This expression will NOT be cacheable.
+target.secure_signing_time > today() - days(90)
 
 // Only allow Chrome from this team, block other apps.
 // Useful when attached to a TEAMID rule to allow a specific app.

@@ -191,6 +191,21 @@ std::optional<cel_runtime::CelValue> Activation<IsV2>::FindValue(
 }
 
 template <bool IsV2>
+std::vector<const cel_runtime::CelFunction*> Activation<IsV2>::FindFunctionOverloads(
+    absl::string_view name) const {
+  // Relative-time functions are CELv2 only.
+  if constexpr (IsV2) {
+    if (name == "today") {
+      if (!todayFn_) {
+        todayFn_ = std::make_unique<TodayFunction>(&usedRelativeTime_);
+      }
+      return {todayFn_.get()};
+    }
+  }
+  return {};
+}
+
+template <bool IsV2>
 std::vector<std::pair<absl::string_view, ::cel::Type>> Activation<IsV2>::GetVariables(
     google::protobuf::Arena* arena) {
   std::vector<std::pair<absl::string_view, ::cel::Type>> v;
@@ -249,6 +264,12 @@ std::vector<std::pair<absl::string_view, ::cel::Type>> Activation<IsV2>::GetVari
 
 template <bool IsV2>
 bool Activation<IsV2>::IsResultCacheable() const {
+  // today() resolves to the current day, so a cached result would go stale at
+  // the next UTC midnight. Don't cache expressions that use it.
+  if (usedRelativeTime_) {
+    return false;
+  }
+
   if (args_.HasValue() || envs_.HasValue() || euid_.HasValue() || cwd_.HasValue() ||
       path_.HasValue()) {
     return false;
