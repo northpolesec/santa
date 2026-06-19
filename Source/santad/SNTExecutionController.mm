@@ -679,7 +679,10 @@ static bool SameBinary(const es_process_t* a, NSString* aSHA256, const es_proces
         };
       }
 
-      if (!cd.silentBlockGUI) {
+      // Suppress the GUI for a silent-GUI block, but never when holding for
+      // approval: a held process depends on the GUI reply to resume or be killed,
+      // so it must always be shown even if the flags were somehow combined.
+      if (!cd.silentBlockGUI || cd.holdAndAsk) {
         // Let the user know what happened in the GUI.
         [self.notifierQueue addEvent:se
                    withCustomMessage:cd.customMsg
