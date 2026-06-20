@@ -316,6 +316,10 @@ static const NSUInteger kExpectedTeamIDLength = 10;
   } else if ([policyString isEqual:kRulePolicySilentBlocklist] ||
              [policyString isEqual:kRulePolicySilentBlocklistDeprecated]) {
     state = SNTRuleStateSilentBlock;
+  } else if ([policyString isEqual:kRulePolicySilentGUIBlocklist]) {
+    state = SNTRuleStateSilentBlockGUI;
+  } else if ([policyString isEqual:kRulePolicySilentTTYBlocklist]) {
+    state = SNTRuleStateSilentBlockTTY;
   } else if ([policyString isEqual:kRulePolicyRemove]) {
     state = SNTRuleStateRemove;
   } else if ([policyString isEqual:kRulePolicyCEL]) {
@@ -437,6 +441,8 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     case SNTRuleStateAllowCompiler: return kRulePolicyAllowlistCompiler;
     case SNTRuleStateBlock: return kRulePolicyBlocklist;
     case SNTRuleStateSilentBlock: return kRulePolicySilentBlocklist;
+    case SNTRuleStateSilentBlockGUI: return kRulePolicySilentGUIBlocklist;
+    case SNTRuleStateSilentBlockTTY: return kRulePolicySilentTTYBlocklist;
     case SNTRuleStateRemove: return kRulePolicyRemove;
     case SNTRuleStateAllowTransitive: return @"AllowTransitive";
     case SNTRuleStateAllowLocalBinary: return kRulePolicyAllowlistLocalBinary;
@@ -515,7 +521,9 @@ static const NSUInteger kExpectedTeamIDLength = 10;
       eventState = SNTEventStateAllow;
       break;
     case SNTRuleStateBlock: OS_FALLTHROUGH;
-    case SNTRuleStateSilentBlock:
+    case SNTRuleStateSilentBlock: OS_FALLTHROUGH;
+    case SNTRuleStateSilentBlockGUI: OS_FALLTHROUGH;
+    case SNTRuleStateSilentBlockTTY:
       output = [@"Blocked" mutableCopy];
       eventState = SNTEventStateBlock;
       break;
@@ -547,6 +555,8 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     case SNTRuleStateAllowCompiler: [output appendString:@", Compiler"]; break;
     case SNTRuleStateAllowTransitive: [output appendString:@", Transitive"]; break;
     case SNTRuleStateSilentBlock: [output appendString:@", Silent"]; break;
+    case SNTRuleStateSilentBlockGUI: [output appendString:@", Silent GUI"]; break;
+    case SNTRuleStateSilentBlockTTY: [output appendString:@", Silent TTY"]; break;
     default: break;
   }
 

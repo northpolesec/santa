@@ -79,7 +79,8 @@
   copy.quarantineURL = _quarantineURL;
   copy.customMsg = _customMsg;
   copy.customURL = _customURL;
-  copy.silentBlock = _silentBlock;
+  copy.silentBlockGUI = _silentBlockGUI;
+  copy.silentBlockTTY = _silentBlockTTY;
   copy.seatbeltRequired = _seatbeltRequired;
   copy.staticRule = _staticRule;
   copy.ruleId = _ruleId;

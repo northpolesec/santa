@@ -44,6 +44,10 @@ struct CELProtoTraits<false> {
   static constexpr ReturnValue BLOCKLIST = ::santa::cel::v1::BLOCKLIST;
   static constexpr ReturnValue SILENT_BLOCKLIST =
       ::santa::cel::v1::SILENT_BLOCKLIST;
+  static constexpr ReturnValue SILENT_GUI_BLOCKLIST =
+      ::santa::cel::v1::SILENT_GUI_BLOCKLIST;
+  static constexpr ReturnValue SILENT_TTY_BLOCKLIST =
+      ::santa::cel::v1::SILENT_TTY_BLOCKLIST;
 
   // Descriptor accessors
   static const google::protobuf::EnumDescriptor* ReturnValue_descriptor() {
@@ -73,6 +77,10 @@ struct CELProtoTraits<true> {
   static constexpr ReturnValue BLOCKLIST = ::santa::cel::v2::BLOCKLIST;
   static constexpr ReturnValue SILENT_BLOCKLIST =
       ::santa::cel::v2::SILENT_BLOCKLIST;
+  static constexpr ReturnValue SILENT_GUI_BLOCKLIST =
+      ::santa::cel::v2::SILENT_GUI_BLOCKLIST;
+  static constexpr ReturnValue SILENT_TTY_BLOCKLIST =
+      ::santa::cel::v2::SILENT_TTY_BLOCKLIST;
   static constexpr ReturnValue REQUIRE_TOUCHID =
       ::santa::cel::v2::REQUIRE_TOUCHID;
   static constexpr ReturnValue REQUIRE_TOUCHID_ONLY =

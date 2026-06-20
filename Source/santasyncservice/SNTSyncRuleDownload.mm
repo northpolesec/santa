@@ -362,6 +362,8 @@ SNTRule* RuleFromProtoRule(const typename santa::ProtoTraits<IsV2>::RuleT& rule)
     case Traits::ALLOWLIST_COMPILER: state = SNTRuleStateAllowCompiler; break;
     case Traits::BLOCKLIST: state = SNTRuleStateBlock; break;
     case Traits::SILENT_BLOCKLIST: state = SNTRuleStateSilentBlock; break;
+    case Traits::SILENT_GUI_BLOCKLIST: state = SNTRuleStateSilentBlockGUI; break;
+    case Traits::SILENT_TTY_BLOCKLIST: state = SNTRuleStateSilentBlockTTY; break;
     case Traits::REMOVE: state = SNTRuleStateRemove; break;
     case Traits::CEL: state = (IsV2) ? SNTRuleStateCELv2 : SNTRuleStateCEL; break;
     default:

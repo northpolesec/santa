@@ -97,6 +97,8 @@ struct ProtoTraits<false> {
   static constexpr Policy ALLOWLIST_COMPILER = ::santa::sync::v1::ALLOWLIST_COMPILER;
   static constexpr Policy BLOCKLIST = ::santa::sync::v1::BLOCKLIST;
   static constexpr Policy SILENT_BLOCKLIST = ::santa::sync::v1::SILENT_BLOCKLIST;
+  static constexpr Policy SILENT_GUI_BLOCKLIST = ::santa::sync::v1::SILENT_GUI_BLOCKLIST;
+  static constexpr Policy SILENT_TTY_BLOCKLIST = ::santa::sync::v1::SILENT_TTY_BLOCKLIST;
   static constexpr Policy REMOVE = ::santa::sync::v1::REMOVE;
   static constexpr Policy CEL = ::santa::sync::v1::CEL;
 
@@ -196,6 +198,8 @@ struct ProtoTraits<true> {
   static constexpr Policy ALLOWLIST_COMPILER = ::santa::sync::v2::ALLOWLIST_COMPILER;
   static constexpr Policy BLOCKLIST = ::santa::sync::v2::BLOCKLIST;
   static constexpr Policy SILENT_BLOCKLIST = ::santa::sync::v2::SILENT_BLOCKLIST;
+  static constexpr Policy SILENT_GUI_BLOCKLIST = ::santa::sync::v2::SILENT_GUI_BLOCKLIST;
+  static constexpr Policy SILENT_TTY_BLOCKLIST = ::santa::sync::v2::SILENT_TTY_BLOCKLIST;
   static constexpr Policy REMOVE = ::santa::sync::v2::REMOVE;
   static constexpr Policy CEL = ::santa::sync::v2::CEL;
   static constexpr Policy SEATBELT = ::santa::sync::v2::SEATBELT;

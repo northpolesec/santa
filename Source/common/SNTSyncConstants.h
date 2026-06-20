@@ -126,6 +126,8 @@ extern NSString* const kRulePolicyBlocklist;
 extern NSString* const kRulePolicyBlocklistDeprecated;
 extern NSString* const kRulePolicySilentBlocklist;
 extern NSString* const kRulePolicySilentBlocklistDeprecated;
+extern NSString* const kRulePolicySilentGUIBlocklist;
+extern NSString* const kRulePolicySilentTTYBlocklist;
 extern NSString* const kRulePolicyRemove;
 extern NSString* const kRulePolicyCEL;
 extern NSString* const kRuleType;

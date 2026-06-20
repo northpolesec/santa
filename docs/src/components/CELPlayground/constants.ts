@@ -56,7 +56,17 @@ export const VARIABLES: CELVariable[] = [
   {
     name: "SILENT_BLOCKLIST",
     type: "string",
-    documentation: "Silent block policy constant",
+    documentation: "Silent block policy constant (suppresses GUI and TTY notifications)",
+  },
+  {
+    name: "SILENT_GUI_BLOCKLIST",
+    type: "string",
+    documentation: "Silent block policy constant (suppresses only the GUI notification)",
+  },
+  {
+    name: "SILENT_TTY_BLOCKLIST",
+    type: "string",
+    documentation: "Silent block policy constant (suppresses only the TTY notification)",
   },
   {
     name: "REQUIRE_TOUCHID",

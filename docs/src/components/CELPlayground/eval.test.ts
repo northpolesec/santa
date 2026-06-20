@@ -18,10 +18,14 @@ describe("evaluate", () => {
     expect(result.value).toBe("BLOCKLIST");
   });
 
-  it("returns a named constant for enum results", () => {
-    const result = evaluate("SILENT_BLOCKLIST", DEFAULT_YAML);
+  it.each([
+    "SILENT_BLOCKLIST",
+    "SILENT_GUI_BLOCKLIST",
+    "SILENT_TTY_BLOCKLIST",
+  ])("returns a named constant for the %s enum result", (name) => {
+    const result = evaluate(name, DEFAULT_YAML);
     expect(result.valid).toBe(true);
-    expect(result.value).toBe("SILENT_BLOCKLIST");
+    expect(result.value).toBe(name);
   });
 
   it("marks expressions using only target fields as cacheable", () => {

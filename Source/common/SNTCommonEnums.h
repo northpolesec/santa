@@ -81,6 +81,11 @@ typedef NS_ENUM(NSInteger, SNTRuleState) {
   SNTRuleStateCELv2 = 10,
 
   SNTRuleStateSeatbelt = 11,
+
+  // Silent blocks that suppress only one notification channel. Plain
+  // SNTRuleStateSilentBlock suppresses both GUI and TTY.
+  SNTRuleStateSilentBlockGUI = 12,
+  SNTRuleStateSilentBlockTTY = 13,
 };
 
 typedef NS_ENUM(NSInteger, SNTClientMode) {

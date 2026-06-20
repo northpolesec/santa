@@ -583,7 +583,7 @@ static bool SameBinary(const es_process_t* a, NSString* aSHA256, const es_proces
         });
       }
 
-      if (!cd.silentBlock) {
+      if (!cd.silentBlockTTY) {
         _ttyWriter->Write(targetProc, ^NSString* {
           if (cd.holdAndAsk) {
             if (stoppedProc) {
@@ -616,67 +616,73 @@ static bool SameBinary(const es_process_t* a, NSString* aSHA256, const es_proces
           }
           return msg;
         });
+      }
 
-        NotificationReplyBlock replyBlock = nil;
+      NotificationReplyBlock replyBlock = nil;
 
-        if (cd.holdAndAsk) {
-          // Copy the esMsg to ensure that when the passed-in ref goes away
-          // we're still holding a valid Message object inside the replyBlock.
-          __block Message esMsgCopy(esMsg);
-          replyBlock = ^(BOOL authenticated) {
-            LOGD(@"User responded to block event for %@ with authenticated: %d", se.filePath,
-                 authenticated);
-            if (authenticated) {
-              if (cd.decisionClientMode == SNTClientModeStandalone &&
-                  cd.decision == SNTEventStateBlockUnknown) {
-                // Create a rule for the binary that was allowed by the user in
-                // standalone mode and notify the sync service.
-                [self createRuleForStandaloneModeEvent:se];
-              }
-
-              // Update decision to reflect that it was allowed via TouchID,
-              // preserving the rule type (e.g., BlockSigningID -> AllowSigningID)
-              cd.decision = BlockToAllowDecision(cd.decision);
-              cd.decisionExtra = @"TouchID Approved";
-
-              // Cache the TouchID approval so subsequent executions within the cooldown period
-              // don't require re-authorization - only if cooldown was specified and > 0
-              if (cd.sha256 && cd.touchIDCooldownMinutes != nil &&
-                  [cd.touchIDCooldownMinutes unsignedLongLongValue] > 0) {
-                std::string sha256Key = santa::NSStringToUTF8String(cd.sha256);
-                self->_touchIDApprovalCache->set(sha256Key, GetCurrentUptime());
-              }
-
-              if (stoppedProc) {
-                _ttyWriter->Write(targetProc, @"Authorized, allowing execution\n---\n\n");
-              }
-
-              // Allow the binary to begin running.
-              self.processControlBlock(newProcPid, ProcessControl::Resume);
-            } else {
-              // Decision stays as-is when TouchID is denied, just populate the extra field.
-              cd.decisionExtra = @"TouchID Denied";
-
-              // The user did not approve, so kill the stopped process.
-              if (stoppedProc) {
-                _ttyWriter->Write(targetProc,
-                                  @"Authorization not given, denying execution\n---\n\n");
-              }
-              self.processControlBlock(newProcPid, ProcessControl::Kill);
+      // holdAndAsk (TouchID) is never combined with a silent block, so its reply
+      // block is built unconditionally here and only fires via the GUI below.
+      if (cd.holdAndAsk) {
+        // Copy the esMsg to ensure that when the passed-in ref goes away
+        // we're still holding a valid Message object inside the replyBlock.
+        __block Message esMsgCopy(esMsg);
+        replyBlock = ^(BOOL authenticated) {
+          LOGD(@"User responded to block event for %@ with authenticated: %d", se.filePath,
+               authenticated);
+          if (authenticated) {
+            if (cd.decisionClientMode == SNTClientModeStandalone &&
+                cd.decision == SNTEventStateBlockUnknown) {
+              // Create a rule for the binary that was allowed by the user in
+              // standalone mode and notify the sync service.
+              [self createRuleForStandaloneModeEvent:se];
             }
 
-            // Clear holdAndAsk and update cache so it's recorded as a final decision
-            cd.holdAndAsk = NO;
-            [[SNTDecisionCache sharedCache] cacheDecision:cd];
+            // Update decision to reflect that it was allowed via TouchID,
+            // preserving the rule type (e.g., BlockSigningID -> AllowSigningID)
+            cd.decision = BlockToAllowDecision(cd.decision);
+            cd.decisionExtra = @"TouchID Approved";
 
-            // Log the execution event (since NOTIFY was suppressed during holdAndAsk)
-            self->_logger(std::move(esMsgCopy));
+            // Cache the TouchID approval so subsequent executions within the cooldown period
+            // don't require re-authorization - only if cooldown was specified and > 0
+            if (cd.sha256 && cd.touchIDCooldownMinutes != nil &&
+                [cd.touchIDCooldownMinutes unsignedLongLongValue] > 0) {
+              std::string sha256Key = santa::NSStringToUTF8String(cd.sha256);
+              self->_touchIDApprovalCache->set(sha256Key, GetCurrentUptime());
+            }
 
-            _procSignalCache->remove(pidAndVersion);
-            postAction(authenticated ? SNTActionHoldAllowed : SNTActionHoldDenied, cd);
-          };
-        }
+            if (stoppedProc) {
+              _ttyWriter->Write(targetProc, @"Authorized, allowing execution\n---\n\n");
+            }
 
+            // Allow the binary to begin running.
+            self.processControlBlock(newProcPid, ProcessControl::Resume);
+          } else {
+            // Decision stays as-is when TouchID is denied, just populate the extra field.
+            cd.decisionExtra = @"TouchID Denied";
+
+            // The user did not approve, so kill the stopped process.
+            if (stoppedProc) {
+              _ttyWriter->Write(targetProc, @"Authorization not given, denying execution\n---\n\n");
+            }
+            self.processControlBlock(newProcPid, ProcessControl::Kill);
+          }
+
+          // Clear holdAndAsk and update cache so it's recorded as a final decision
+          cd.holdAndAsk = NO;
+          [[SNTDecisionCache sharedCache] cacheDecision:cd];
+
+          // Log the execution event (since NOTIFY was suppressed during holdAndAsk)
+          self->_logger(std::move(esMsgCopy));
+
+          _procSignalCache->remove(pidAndVersion);
+          postAction(authenticated ? SNTActionHoldAllowed : SNTActionHoldDenied, cd);
+        };
+      }
+
+      // Suppress the GUI for a silent-GUI block, but never when holding for
+      // approval: a held process depends on the GUI reply to resume or be killed,
+      // so it must always be shown even if the flags were somehow combined.
+      if (!cd.silentBlockGUI || cd.holdAndAsk) {
         // Let the user know what happened in the GUI.
         [self.notifierQueue addEvent:se
                    withCustomMessage:cd.customMsg

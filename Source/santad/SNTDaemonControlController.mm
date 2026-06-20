@@ -312,7 +312,9 @@ double watchdogRAMPeak = 0;
     NSString* action;
     switch (rule.state) {
       case SNTRuleStateBlock:
-      case SNTRuleStateSilentBlock: action = @"Denied by rule"; break;
+      case SNTRuleStateSilentBlock:
+      case SNTRuleStateSilentBlockGUI:
+      case SNTRuleStateSilentBlockTTY: action = @"Denied by rule"; break;
       default: action = @"Allowed by rule"; break;
     }
     reply(rule, action);
