@@ -53,6 +53,9 @@ static inline std::pair<pid_t, int> PidPidversion(const audit_token_t& tok) {
   return {Pid(tok), Pidversion(tok)};
 }
 
+// nullopt if the data is too short to hold an audit_token_t
+std::optional<audit_token_t> AuditTokenFromData(NSData* tokenData);
+
 // Runtime identity of a process: pid + pidversion, so a recycled pid can't
 // alias a dead one. Value type; usable directly as a hash-map key.
 struct ProcessID {
@@ -60,9 +63,7 @@ struct ProcessID {
   int pidversion = 0;
 
   static ProcessID FromToken(const audit_token_t& tok) { return {Pid(tok), Pidversion(tok)}; }
-  // Defined in AuditUtilities.mm. nullopt if the data is too short to hold an
-  // audit_token_t. Used for NetworkExtension flows whose sourceAppAuditToken
-  // is delivered as NSData.
+  // nullopt if the data is too short to hold an audit_token_t.
   static std::optional<ProcessID> FromTokenData(NSData* tokenData);
 
   // Stable 64-bit packing for callers that need a scalar handle (e.g. the
