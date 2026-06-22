@@ -11,6 +11,9 @@ jobs:
   labels:
     name: Labelers
     runs-on: ubuntu-latest
+    # Labeling is best-effort. Fork PRs get a read-only GITHUB_TOKEN, so the
+    # labeler can't apply labels there — don't let that fail the PR.
+    continue-on-error: true
     permissions:
       contents: read
       issues: write
