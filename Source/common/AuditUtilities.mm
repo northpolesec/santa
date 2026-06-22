@@ -22,11 +22,17 @@
 
 namespace santa {
 
-std::optional<ProcessID> ProcessID::FromTokenData(NSData* tokenData) {
+std::optional<audit_token_t> AuditTokenFromData(NSData* tokenData) {
   if (tokenData.length < sizeof(audit_token_t)) return std::nullopt;
   audit_token_t tok;
   memcpy(&tok, tokenData.bytes, sizeof(tok));
-  return FromToken(tok);
+  return tok;
+}
+
+std::optional<ProcessID> ProcessID::FromTokenData(NSData* tokenData) {
+  std::optional<audit_token_t> tok = AuditTokenFromData(tokenData);
+  if (!tok) return std::nullopt;
+  return FromToken(*tok);
 }
 
 std::optional<audit_token_t> GetMyAuditToken() {

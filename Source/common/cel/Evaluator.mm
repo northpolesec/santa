@@ -41,7 +41,7 @@ namespace cel {
 
 template <bool IsV2>
 static absl::StatusOr<std::unique_ptr<::cel::Compiler>> CreateCompiler(
-    google::protobuf::Arena* arena) {
+    google::protobuf::Arena* arena, bool allowUnspecified) {
   // Create a compiler builder with the generated descriptor pool for protos.
   absl::StatusOr<std::unique_ptr<::cel::CompilerBuilder>> builderStatus =
       ::cel::NewCompilerBuilder(google::protobuf::DescriptorPool::generated_pool());
@@ -83,7 +83,7 @@ static absl::StatusOr<std::unique_ptr<::cel::Compiler>> CreateCompiler(
 
   // Add all the possible variables to the type checker.
   ::cel::TypeCheckerBuilder& checker_builder = builder->GetCheckerBuilder();
-  for (const auto& variable : Activation<IsV2>::GetVariables(arena)) {
+  for (const auto& variable : Activation<IsV2>::GetVariables(arena, allowUnspecified)) {
     if (auto result =
             checker_builder.AddVariable(::cel::MakeVariableDecl(variable.first, variable.second));
         !result.ok()) {
@@ -96,10 +96,10 @@ static absl::StatusOr<std::unique_ptr<::cel::Compiler>> CreateCompiler(
 }
 
 template <bool IsV2>
-absl::StatusOr<std::unique_ptr<Evaluator<IsV2>>> Evaluator<IsV2>::Create() {
+absl::StatusOr<std::unique_ptr<Evaluator<IsV2>>> Evaluator<IsV2>::Create(bool allowUnspecified) {
   auto arena = std::make_unique<google::protobuf::Arena>();
 
-  auto compiler = CreateCompiler<IsV2>(arena.get());
+  auto compiler = CreateCompiler<IsV2>(arena.get(), allowUnspecified);
   if (!compiler.ok()) {
     return compiler.status();
   }
@@ -172,10 +172,6 @@ template <bool IsV2>
 absl::StatusOr<typename Evaluator<IsV2>::EvaluationResultT> Evaluator<IsV2>::Evaluate(
     const ::cel_runtime::CelExpression* expression_plan, const ActivationT& activation,
     google::protobuf::Arena* arena) {
-  // Clear any per-evaluation state (e.g. the relative-time flag set by today())
-  // so a reused activation reflects only this expression's result.
-  activation.ResetEvalState();
-
   absl::StatusOr<cel_runtime::CelValue> result = expression_plan->Evaluate(activation, arena);
 
   if (!result.ok()) {

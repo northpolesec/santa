@@ -22,6 +22,7 @@
 
 #include "absl/container/flat_hash_map.h"
 
+using santa::AuditTokenFromData;
 using santa::ProcessID;
 
 // ProcessID must stay an aggregate with trivial copy/move so it works as a
@@ -62,6 +63,25 @@ static_assert(std::is_aggregate_v<ProcessID>);
 
 - (void)testFromTokenDataNilIsNullopt {
   XCTAssertFalse(ProcessID::FromTokenData(nil).has_value());
+}
+
+- (void)testAuditTokenFromDataValid {
+  audit_token_t tok = santa::MakeStubAuditToken(1234, 9);
+  NSData* data = [NSData dataWithBytes:&tok length:sizeof(tok)];
+  std::optional<audit_token_t> got = AuditTokenFromData(data);
+  XCTAssertTrue(got.has_value());
+  XCTAssertEqual(santa::Pid(*got), 1234);
+  XCTAssertEqual(santa::Pidversion(*got), 9);
+}
+
+- (void)testAuditTokenFromDataTooShortIsNullopt {
+  uint8_t shortBytes[sizeof(audit_token_t) - 1] = {0};
+  NSData* data = [NSData dataWithBytes:shortBytes length:sizeof(shortBytes)];
+  XCTAssertFalse(AuditTokenFromData(data).has_value());
+}
+
+- (void)testAuditTokenFromDataNilIsNullopt {
+  XCTAssertFalse(AuditTokenFromData(nil).has_value());
 }
 
 - (void)testPackedScheme {
