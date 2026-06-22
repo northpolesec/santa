@@ -1240,6 +1240,68 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   XCTAssertEqual(cd.decision, SNTEventStateAllowCELFallback);
 }
 
+// A fallback chain's cacheability is the AND of every rule evaluated, not just
+// the one that produces the decision. If an earlier rule reads per-execution
+// context (args here) and then falls through with UNSPECIFIED, a later constant
+// ALLOWLIST must not be cached: the ES cache is keyed by vnode, so a different
+// exec with different args could be wrongly auto-allowed. This depends on
+// cd.cacheable being applied before the early UNSPECIFIED return and on the
+// shared activation's memoizer state persisting across the chain.
+- (void)testCELFallbackChainContextFallThroughIsNotCacheable {
+  [[SNTConfigurator configurator] setSyncServerCELFallbackRules:@[
+    [self ruleWithExpr:@"size(args) > 100 ? ALLOWLIST : UNSPECIFIED"],
+    [self ruleWithExpr:@"ALLOWLIST"],
+  ]];
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+  cd.sha256 = @"aabbccdd";
+  XCTAssertTrue(cd.cacheable);  // sanity: starts cacheable
+
+  BOOL handled =
+      [self.processor evaluateCELFallbackExpressions:cd
+                                  activationCallback:[self fallbackTestActivationCallback]];
+  XCTAssertTrue(handled);
+  XCTAssertEqual(cd.decision, SNTEventStateAllowCELFallback);
+  XCTAssertFalse(cd.cacheable);
+}
+
+// As above, but the earlier rule uses today() (relative time) before falling
+// through. today() makes the result non-cacheable, and that must stick through
+// to the constant ALLOWLIST that follows.
+- (void)testCELFallbackChainRelativeTimeFallThroughIsNotCacheable {
+  [[SNTConfigurator configurator] setSyncServerCELFallbackRules:@[
+    [self ruleWithExpr:@"today() == today() ? UNSPECIFIED : ALLOWLIST"],
+    [self ruleWithExpr:@"ALLOWLIST"],
+  ]];
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+  cd.sha256 = @"aabbccdd";
+
+  BOOL handled =
+      [self.processor evaluateCELFallbackExpressions:cd
+                                  activationCallback:[self fallbackTestActivationCallback]];
+  XCTAssertTrue(handled);
+  XCTAssertEqual(cd.decision, SNTEventStateAllowCELFallback);
+  XCTAssertFalse(cd.cacheable);
+}
+
+// Control: a constant-only chain (no per-exec context, no today()) stays
+// cacheable, proving the assertions above flip due to the context touch and not
+// merely because the chain fell through.
+- (void)testCELFallbackChainConstantFallThroughStaysCacheable {
+  [[SNTConfigurator configurator] setSyncServerCELFallbackRules:@[
+    [self ruleWithExpr:@"UNSPECIFIED"],
+    [self ruleWithExpr:@"ALLOWLIST"],
+  ]];
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+  cd.sha256 = @"aabbccdd";
+
+  BOOL handled =
+      [self.processor evaluateCELFallbackExpressions:cd
+                                  activationCallback:[self fallbackTestActivationCallback]];
+  XCTAssertTrue(handled);
+  XCTAssertEqual(cd.decision, SNTEventStateAllowCELFallback);
+  XCTAssertTrue(cd.cacheable);
+}
+
 - (void)testCELFallbackAllUnspecifiedFallsThrough {
   [[SNTConfigurator configurator] setSyncServerCELFallbackRules:@[
     [self ruleWithExpr:@"UNSPECIFIED"],

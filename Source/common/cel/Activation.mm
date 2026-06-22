@@ -207,17 +207,17 @@ std::vector<const cel_runtime::CelFunction*> Activation<IsV2>::FindFunctionOverl
 
 template <bool IsV2>
 std::vector<std::pair<absl::string_view, ::cel::Type>> Activation<IsV2>::GetVariables(
-    google::protobuf::Arena* arena) {
+    google::protobuf::Arena* arena, bool includeUnspecified) {
   std::vector<std::pair<absl::string_view, ::cel::Type>> v;
 
   // Add variables for all of the return values so that users can use names like
   // ALLOWLIST or BLOCKLIST in their CEL expressions without having to use the
   // proto package name prefix.
   auto retDescriptor = Traits::ReturnValue_descriptor();
-  // For V2, start from value 0 to include UNSPECIFIED — needed for fallback
-  // expressions where UNSPECIFIED means "no decision, try next expression".
-  // For V1, start from 1 to skip UNSPECIFIED.
-  int startIdx = IsV2 ? 0 : 1;
+  // UNSPECIFIED (value 0) means "no decision, try next expression" and is only
+  // valid for fallback expressions, so only register it when includeUnspecified
+  // is set. V1 has no UNSPECIFIED return value, so always skip it there.
+  int startIdx = (IsV2 && includeUnspecified) ? 0 : 1;
   for (int i = startIdx; i < retDescriptor->value_count(); i++) {
     auto value = retDescriptor->value(i);
     if constexpr (IsV2) {

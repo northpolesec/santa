@@ -311,6 +311,19 @@
   XCTAssertTrue(sut.ok());
 
   {
+    // Expressions that don't use today() are cacheable. Checked first, on a
+    // fresh activation: the relative-time flag is sticky, so once a today()
+    // expression below marks the activation non-cacheable it stays that way.
+    auto result =
+        sut.value()->CompileAndEvaluate("target.secure_signing_time >= timestamp(0)", activation);
+    if (!result.ok()) {
+      XCTFail(@"Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
+      XCTAssertTrue(result.value().cacheable);
+    }
+  }
+  {
     // Signed within the last 5 days? No (signed 10 days ago) -> BLOCKLIST.
     // Using today() must make the result non-cacheable.
     auto result = sut.value()->CompileAndEvaluate("target.secure_signing_time > today() - days(5)",
@@ -335,14 +348,15 @@
     }
   }
   {
-    // Expressions that don't use today() remain cacheable.
+    // The relative-time flag is sticky: reusing this activation for a non-today()
+    // expression still yields a non-cacheable result.
     auto result =
         sut.value()->CompileAndEvaluate("target.secure_signing_time >= timestamp(0)", activation);
     if (!result.ok()) {
       XCTFail(@"Failed to evaluate: %s", result.status().message().data());
     } else {
       XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
-      XCTAssertTrue(result.value().cacheable);
+      XCTAssertFalse(result.value().cacheable);
     }
   }
 }

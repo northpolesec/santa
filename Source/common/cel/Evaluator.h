@@ -61,7 +61,11 @@ class Evaluator {
   using ActivationT = Activation<IsV2>;
   using EvaluationResultT = EvaluationResult<IsV2>;
 
-  static absl::StatusOr<std::unique_ptr<Evaluator>> Create();
+  // allowUnspecified permits the expression to return UNSPECIFIED (fall through
+  // to the next rule). Only fallback expressions should set this; regular rules
+  // leave it false so a UNSPECIFIED return fails to compile. No-op for V1.
+  static absl::StatusOr<std::unique_ptr<Evaluator>> Create(
+      bool allowUnspecified = false);
 
   Evaluator(std::unique_ptr<::cel::Compiler> compiler,
             std::unique_ptr<google::protobuf::Arena> arena)
