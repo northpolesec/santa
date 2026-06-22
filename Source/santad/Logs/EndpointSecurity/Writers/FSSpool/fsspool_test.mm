@@ -304,17 +304,24 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
   NSError* err = nil;
   XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.tmpDir error:&err] count], 0);
   XCTAssertNil(err);
-  XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.spoolDir error:&err] count], 1);
+  NSArray<NSString*>* afterFirst = [self.fileMgr contentsOfDirectoryAtPath:self.spoolDir
+                                                                     error:&err];
   XCTAssertNil(err);
+  XCTAssertEqual(afterFirst.count, 1);
 
-  // Try to write again, but expect failure. File counts shouldn't change.
+  // Writing again when the spool is full evicts the oldest file to make room and writes the new
+  // one, rather than dropping the write.
   XCTAssertStatusOk(writer->Write(largeMessage));
-  XCTAssertStatusNotOk(writer->Flush());
+  XCTAssertStatusOk(writer->Flush());
 
   XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.tmpDir error:&err] count], 0);
   XCTAssertNil(err);
-  XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.spoolDir error:&err] count], 1);
+  NSArray<NSString*>* afterSecond = [self.fileMgr contentsOfDirectoryAtPath:self.spoolDir
+                                                                      error:&err];
   XCTAssertNil(err);
+  // Still a single file, but it's the newer one: the oldest was evicted.
+  XCTAssertEqual(afterSecond.count, 1);
+  XCTAssertNotEqualObjects(afterFirst.firstObject, afterSecond.firstObject);
 }
 
 - (void)testSpoolFullStreamBatcher {
@@ -338,17 +345,52 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
   NSError* err = nil;
   XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.tmpDir error:&err] count], 0);
   XCTAssertNil(err);
-  XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.spoolDir error:&err] count], 1);
+  NSArray<NSString*>* afterFirst = [self.fileMgr contentsOfDirectoryAtPath:self.spoolDir
+                                                                     error:&err];
   XCTAssertNil(err);
+  XCTAssertEqual(afterFirst.count, 1);
 
-  // Try to write again, but expect failure. File counts shouldn't change.
-  XCTAssertStatusNotOk(writer->Write(largeMessage));
+  // Writing again when the spool is full evicts the oldest file to make room and writes the new
+  // one, rather than dropping the write.
+  XCTAssertStatusOk(writer->Write(largeMessage));
   XCTAssertStatusOk(writer->Flush());
 
   XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.tmpDir error:&err] count], 0);
   XCTAssertNil(err);
-  XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.spoolDir error:&err] count], 1);
+  NSArray<NSString*>* afterSecond = [self.fileMgr contentsOfDirectoryAtPath:self.spoolDir
+                                                                      error:&err];
   XCTAssertNil(err);
+  // Still a single file, but it's the newer one: the oldest was evicted.
+  XCTAssertEqual(afterSecond.count, 1);
+  XCTAssertNotEqualObjects(afterFirst.firstObject, afterSecond.firstObject);
+}
+
+- (void)testSpoolEvictionCallback {
+  // Plain locals (not __block): FsSpoolWriter invokes the callback synchronously during
+  // Write/Flush.
+  size_t totalEvicted = 0;
+  int callbackCalls = 0;
+  std::function<void(size_t)> cb = [&totalEvicted, &callbackCalls](size_t erased) {
+    totalEvicted += erased;
+    callbackCalls++;
+  };
+
+  auto writer = std::make_unique<FsSpoolWriterPeer<fsspool::AnyBatcher>>(
+      fsspool::AnyBatcher(), [self.baseDir UTF8String], kSpoolSize, cb);
+  std::vector<uint8_t> largeMessage(kSpoolSize + 1, '\x42');
+
+  // First file: the spool starts empty, so nothing is evicted.
+  XCTAssertStatusOk(writer->Write(largeMessage));
+  XCTAssertStatusOk(writer->Flush());
+  XCTAssertEqual(callbackCalls, 0);
+  XCTAssertEqual(totalEvicted, (size_t)0);
+
+  // Second file: the spool is now over the limit, so the single oldest file is evicted and the
+  // callback is invoked with the number erased.
+  XCTAssertStatusOk(writer->Write(largeMessage));
+  XCTAssertStatusOk(writer->Flush());
+  XCTAssertEqual(callbackCalls, 1);
+  XCTAssertEqual(totalEvicted, (size_t)1);
 }
 
 - (void)testWriteMessageNoFlushAnyBatcher {

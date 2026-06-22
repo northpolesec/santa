@@ -839,6 +839,7 @@ objc_library(
     deps = [
         ":EndpointSecurityWriter",
         "//Source/common:SNTLogging",
+        "//Source/common:SNTMetricSet",
         "//Source/common:santa_cc_proto",
         "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:fsspool",
         "@abseil-cpp//absl/container:flat_hash_map",

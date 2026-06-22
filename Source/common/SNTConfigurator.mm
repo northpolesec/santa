@@ -1517,7 +1517,7 @@ static SNTConfigurator* sharedConfigurator = nil;
 - (NSUInteger)spoolDirectorySizeThresholdMB {
   return self.configState[kSpoolDirectorySizeThresholdMB]
              ? [self.configState[kSpoolDirectorySizeThresholdMB] unsignedIntegerValue]
-             : 100;
+             : 250;
 }
 
 - (float)spoolDirectoryEventMaxFlushTimeSec {

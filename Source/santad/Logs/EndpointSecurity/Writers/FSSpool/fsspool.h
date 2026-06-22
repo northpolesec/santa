@@ -22,7 +22,10 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 
+#include <algorithm>
+#include <functional>
 #include <string>
+#include <vector>
 
 #include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/AnyBatcher.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/StreamBatcher.h"
@@ -66,13 +69,19 @@ class FsSpoolWriter {
   // The base, spool, and temporary directory will be created as needed on the
   // first call to Write() - however the base directory can be created into an
   // existing path (i.e. this class will not do an `mkdir -p`).
-  FsSpoolWriter(T batcher, absl::string_view base_dir, size_t max_spool_size)
+  // `eviction_callback`, when set, is invoked with the number of spool files
+  // erased whenever the spool exceeds its size limit and the oldest files are
+  // evicted to make room. Used to surface an eviction metric without coupling
+  // this generic spool library to a particular metrics implementation.
+  FsSpoolWriter(T batcher, absl::string_view base_dir, size_t max_spool_size,
+                std::function<void(size_t)> eviction_callback = nullptr)
       : batcher_(std::move(batcher)),
         base_dir_(base_dir),
         spool_dir_(SpoolNewDirectory(base_dir)),
         tmp_dir_(SpoolTempDirectory(base_dir)),
         space_check_failure_since_last_flush_(false),
         max_spool_size_(max_spool_size),
+        eviction_callback_(std::move(eviction_callback)),
         id_(absl::StrFormat(
             "%016x",
             absl::Uniform<uint64_t>(absl::BitGen(), 0,
@@ -98,23 +107,25 @@ class FsSpoolWriter {
   ~FsSpoolWriter() { (void)Flush(); };
 
   absl::Status SpaceAvailable() {
-    if (spool_size_estimate_ > max_spool_size_) {
-      absl::StatusOr<size_t> estimate = EstimateSpoolDirSize();
-      if (!estimate.ok()) {
-        return estimate.status();  // failed to recompute spool size
-      }
-
-      spool_size_estimate_ = *estimate;
-      if (spool_size_estimate_ > max_spool_size_) {
-        // Still over the limit: avoid writing.
-        return absl::ResourceExhaustedError(
-            "Spool size estimate greater than max allowed");
-      } else {
-        return absl::OkStatus();
-      }
-    } else {
+    if (spool_size_estimate_ <= max_spool_size_) {
       return absl::OkStatus();
     }
+
+    absl::StatusOr<size_t> estimate = EstimateSpoolDirSize();
+    if (!estimate.ok()) {
+      return estimate.status();  // failed to recompute spool size
+    }
+    spool_size_estimate_ = *estimate;
+
+    if (spool_size_estimate_ > max_spool_size_) {
+      // Over the limit: rather than dropping all new telemetry, erase the
+      // oldest spool files to make room. This keeps the freshest data flowing
+      // (and lets signal processing continue) at the cost of the oldest,
+      // not-yet-exported files.
+      EvictOldestSpoolFiles();
+    }
+
+    return absl::OkStatus();
   }
 
   absl::Status InitializeCurrentSpoolStateIfNeeded() {
@@ -276,6 +287,60 @@ class FsSpoolWriter {
     }
   }
 
+  // Deletes the oldest spool files until the estimated on-disk size of the
+  // spool directory is back under max_spool_size_ (or no files remain). Updates
+  // spool_size_estimate_ to the post-eviction total. Best-effort: a file that
+  // fails to unlink is left in place and skipped.
+  void EvictOldestSpoolFiles() {
+    struct SpoolFile {
+      time_t mtime;
+      std::string path;
+      size_t occupancy;
+    };
+
+    std::vector<SpoolFile> files;
+    size_t total = 0;
+    (void)IterateDirectory(spool_dir_, [this, &files, &total](
+                                           const std::string& file_name,
+                                           bool* stop) {
+      if (file_name == std::string(".") || file_name == std::string("..")) {
+        return;
+      }
+      std::string file_path =
+          absl::StrCat(spool_dir_, PathSeparator(), file_name);
+      struct stat stats;
+      if (stat(file_path.c_str(), &stats) < 0 || !StatIsReg(stats.st_mode)) {
+        return;
+      }
+      size_t occupancy = EstimateDiskOccupation(stats.st_size);
+      files.push_back({stats.st_mtime, std::move(file_path), occupancy});
+      total += occupancy;
+    });
+
+    // Oldest first.
+    std::sort(files.begin(), files.end(),
+              [](const SpoolFile& a, const SpoolFile& b) {
+                return a.mtime < b.mtime;
+              });
+
+    size_t evicted = 0;
+    for (const SpoolFile& file : files) {
+      if (total <= max_spool_size_) {
+        break;
+      }
+      if (Unlink(file.path.c_str()) == 0) {
+        total -= file.occupancy;
+        evicted++;
+      }
+    }
+
+    spool_size_estimate_ = total;
+
+    if (evicted > 0 && eviction_callback_) {
+      eviction_callback_(evicted);
+    }
+  }
+
   struct CurrentSpoolState {
     CurrentSpoolState() : tmp_fd(-1) {}
 
@@ -308,6 +373,10 @@ class FsSpoolWriter {
   // file gets deleted from the spool while the estimate is being computed, the
   // final estimate is likely to still include the size of that file).
   const size_t max_spool_size_;
+
+  // Invoked (when set) with the number of spool files erased during an
+  // eviction.
+  std::function<void(size_t)> eviction_callback_;
 
   // 64bit hex ID for this writer. Used in combination with the sequence
   // number to generate unique names for files. This is generated through

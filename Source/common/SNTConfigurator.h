@@ -270,7 +270,7 @@
 ///
 ///  If eventLogType is set to protobuf, spoolDirectorySizeThresholdMB sets the total size
 ///  limit for all files saved in the spoolDirectory.
-///  Defaults to 100.
+///  Defaults to 250.
 ///
 ///  @note: This property is KVO compliant, but should only be read once at santad startup.
 ///

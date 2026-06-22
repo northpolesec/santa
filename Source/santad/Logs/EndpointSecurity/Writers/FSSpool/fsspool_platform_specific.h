@@ -56,6 +56,10 @@ absl::Status IterateDirectory(
 
 absl::StatusOr<size_t> EstimateDirSize(const std::string& dir);
 
+// Estimate of the on-disk space (in bytes, rounded up to whole disk clusters)
+// occupied by a file of the given logical size.
+size_t EstimateDiskOccupation(size_t fileSize);
+
 }  // namespace fsspool
 
 #endif  // SANTA_SANTAD_LOGS_ENDPOINTSECURITY_WRITERS_FSSPOOL_FSSPOOLPLATFORMSPECIFIC_H
