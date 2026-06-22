@@ -59,6 +59,7 @@ objc_library(
         "//Source/common:SNTLogging",
         "//Source/common:SNTStoredExecutionEvent",
         "//Source/common:SNTStoredFileAccessEvent",
+        "//Source/common:SNTStoredSignalReport",
         "//Source/common:SNTStoredTemporaryMonitorModeAuditEvent",
         "//Source/common:SantaCache",
         "//Source/common:String",
@@ -878,6 +879,22 @@ objc_library(
     ],
 )
 
+objc_library(
+    name = "SignalScanner",
+    srcs = ["SignalScanner.mm"],
+    hdrs = ["SignalScanner.h"],
+    deps = [
+        ":SleighLauncher",
+        "//Source/common:SNTLogging",
+        "//Source/common:SNTSignal",
+        "//Source/common:SNTStoredSignalReport",
+        "@abseil-cpp//absl/base:core_headers",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/synchronization",
+        "@northpolesec_protos//telemetry:sleighconfig_cc_proto",
+    ],
+)
+
 santa_unit_test(
     name = "SleighLauncherTest",
     srcs = ["SleighLauncherTest.mm"],
@@ -1165,6 +1182,7 @@ objc_library(
         ":SNTRuleTable",
         ":SNTSyncdQueue",
         ":SandboxExpectations",
+        ":SignalScanner",
         ":SleighLauncher",
         ":TTYWriter",
         "//Source/common:MOLXPCConnection",
@@ -1174,8 +1192,10 @@ objc_library(
         "//Source/common:SNTExportConfiguration",
         "//Source/common:SNTLogging",
         "//Source/common:SNTMetricSet",
+        "//Source/common:SNTStoredSignalReport",
         "//Source/common:SNTStrengthify",
         "//Source/common:SNTXPCControlInterface",
+        "//Source/common:SNTXPCSyncServiceInterface",
         "//Source/common:SNTXPCUnprivilegedControlInterface",
         "//Source/common:TelemetryEventMap",
         "//Source/common:Unit",
@@ -1303,6 +1323,7 @@ santa_unit_test(
         "//Source/common:SNTLogging",
         "//Source/common:SNTStoredExecutionEvent",
         "//Source/common:SNTStoredFileAccessEvent",
+        "//Source/common:SNTStoredSignalReport",
         "//Source/common:SNTStoredTemporaryMonitorModeAuditEvent",
         "//Source/common:SantaCache",
         "//Source/common:String",

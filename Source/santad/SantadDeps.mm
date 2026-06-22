@@ -22,8 +22,10 @@
 #import "Source/common/SNTExportConfiguration.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTMetricSet.h"
+#import "Source/common/SNTStoredSignalReport.h"
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTXPCControlInterface.h"
+#import "Source/common/SNTXPCSyncServiceInterface.h"
 #include "Source/common/TelemetryEventMap.h"
 #include "Source/common/es/EndpointSecurityAPI.h"
 #include "Source/common/es/EnrichedTypes.h"
@@ -38,6 +40,7 @@
 #import "Source/santad/SNTDecisionCache.h"
 #import "Source/santad/SNTNetworkExtensionQueue.h"
 #import "Source/santad/SNTPolicyProcessor.h"
+#include "Source/santad/SignalScanner.h"
 #include "Source/santad/SleighLauncher.h"
 #include "Source/santad/TTYWriter.h"
 
@@ -46,6 +49,7 @@ using santa::Enricher;
 using santa::Logger;
 using santa::Metrics;
 using santa::PrefixTree;
+using santa::SignalScanner;
 using santa::SleighLauncher;
 using santa::TTYWriter;
 using santa::WatchItems;
@@ -155,13 +159,41 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator* configurator,
   uint64_t spool_flush_timeout_ms = [configurator spoolDirectoryEventMaxFlushTimeSec] * 1000;
   uint32_t telemetry_export_frequency_secs = [configurator telemetryExportIntervalSec];
 
+  // Signal scanner: runs a Sleigh signal scan over each closed telemetry spool file using the
+  // synced detection signals, persists the resulting reports, and attempts an immediate upload.
+  std::shared_ptr<SignalScanner> signal_scanner = SignalScanner::Create(
+      SleighLauncher::Create(std::string(SleighLauncher::kDefaultSleighPath)),
+      [configurator telemetryExportTimeoutSec], ^(NSArray<SNTStoredSignalReport*>* reports) {
+        // Persist first so the reports survive an upload failure (and a later sync re-tries).
+        // Storage deduplicates repeated firings of the same signal; only the stored subset is
+        // uploaded so a misconfigured signal can't flood the server with identical reports.
+        reports = [[SNTDatabaseController eventTable] addStoredSignalReports:reports];
+        if (reports.count == 0) return;
+        // Attempt an immediate out-of-band upload. The sync service deletes the reports on
+        // success and otherwise leaves them for the next sync.
+        MOLXPCConnection* conn = [SNTXPCSyncServiceInterface configuredConnection];
+        [conn resume];
+        [conn.remoteObjectProxy uploadSignalReportsToSyncServer:reports
+                                                          reply:^(BOOL success) {
+                                                            if (!success) {
+                                                              LOGD(@"Immediate signal report "
+                                                                   @"upload failed; will retry on "
+                                                                   @"next sync");
+                                                            }
+                                                          }];
+      });
+  // Set initial signal set, to be updated on each sync (see signalRulesChangedCallback below).
+  signal_scanner->SetSignals([rule_table retrieveAllSignals]);
+
   std::shared_ptr<::Logger> logger = Logger::Create(
       esapi, SleighLauncher::Create(std::string(SleighLauncher::kDefaultSleighPath)),
       ^SNTExportConfiguration*() {
         return [configurator exportConfig];
       },
-      // The spool-file-closed handler (signal scanner) is wired up in a later change.
-      nullptr, TelemetryConfigToBitmask([configurator telemetry]), [configurator eventLogType],
+      ^(std::string path) {
+        signal_scanner->ScanFile(std::move(path));
+      },
+      TelemetryConfigToBitmask([configurator telemetry]), [configurator eventLogType],
       [SNTDecisionCache sharedCache], [configurator eventLogPath], [configurator spoolDirectory],
       spool_dir_threshold_bytes, spool_file_threshold_bytes, spool_flush_timeout_ms,
       telemetry_export_frequency_secs, [configurator telemetryExportTimeoutSec],
@@ -237,6 +269,12 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator* configurator,
     } else {
       watch_items->SetConfigPath([configurator fileAccessPolicyPlist]);
     }
+  };
+
+  // Refresh the scanner's in-memory signal set whenever the synced signal config changes.
+  rule_table.signalRulesChangedCallback = ^(int64_t signalRuleCount) {
+    STRONGIFY(rule_table);
+    signal_scanner->SetSignals([rule_table retrieveAllSignals]);
   };
 
   std::shared_ptr<::Metrics> metrics =

@@ -20,6 +20,7 @@
 #import "Source/common/SNTXPCSyncServiceInterface.h"
 
 @class MOLXPCConnection;
+@class SNTStoredSignalReport;
 
 ///
 ///  Handles push notifications and periodic syncing with a sync server.
@@ -69,6 +70,8 @@
 ///  Handle SNTSyncServiceXPC messages forwarded from SNTSyncService.
 ///
 - (void)postEventsToSyncServer:(NSArray<SNTStoredEvent*>*)events reply:(void (^)(BOOL))reply;
+- (void)uploadSignalReportsToSyncServer:(NSArray<SNTStoredSignalReport*>*)reports
+                                  reply:(void (^)(BOOL))reply;
 - (void)postBundleEventToSyncServer:(SNTStoredExecutionEvent*)event
                               reply:(void (^)(SNTBundleEventAction))reply;
 - (void)pushNotificationStatus:(void (^)(SNTPushNotificationStatus))reply;

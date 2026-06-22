@@ -22,13 +22,16 @@
 #import "Source/common/SNTStoredEvent.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
 #import "Source/common/SNTStoredFileAccessEvent.h"
+#import "Source/common/SNTStoredSignalReport.h"
 #import "Source/common/SNTStoredTemporaryMonitorModeAuditEvent.h"
 #include "Source/common/SantaCache.h"
 #include "Source/common/String.h"
 
-static const uint32_t kEventTableCurrentVersion = 5;
+static const uint32_t kEventTableCurrentVersion = 6;
 // 4 hour cache
 static const NSTimeInterval kUnactionableEventCacheTimeSeconds = (60 * 60 * 4);
+// Deduplicate repeated firings of the same signal to at most one per name per 10 minutes.
+static const NSTimeInterval kSignalReportDedupWindowSeconds = (60 * 10);
 
 @interface SNTEventTable ()
 // This property is only set once, safe to be nonatomic
@@ -37,6 +40,7 @@ static const NSTimeInterval kUnactionableEventCacheTimeSeconds = (60 * 60 * 4);
 
 @implementation SNTEventTable {
   std::unique_ptr<SantaCache<std::string, NSDate*>> _storeBackoff;
+  std::unique_ptr<SantaCache<std::string, NSDate*>> _signalReportBackoff;
 }
 
 - (uint32_t)currentSupportedVersion {
@@ -45,6 +49,7 @@ static const NSTimeInterval kUnactionableEventCacheTimeSeconds = (60 * 60 * 4);
 
 - (uint32_t)initializeDatabase:(FMDatabase*)db fromVersion:(uint32_t)version {
   _storeBackoff = std::make_unique<SantaCache<std::string, NSDate*>>(2048);
+  _signalReportBackoff = std::make_unique<SantaCache<std::string, NSDate*>>(2048);
   self.unactionableEventCacheTimeSeconds = kUnactionableEventCacheTimeSeconds;
 
   int newVersion = 0;
@@ -97,6 +102,15 @@ static const NSTimeInterval kUnactionableEventCacheTimeSeconds = (60 * 60 * 4);
     [db executeUpdate:@"ALTER TABLE events RENAME COLUMN filesha256 TO uniqueid"];
     [db executeUpdate:@"CREATE UNIQUE INDEX uniqueid ON events (uniqueid)"];
     newVersion = 5;
+  }
+
+  if (version < 6) {
+    // Signal reports produced by Sleigh signal scans, pending upload to the sync server.
+    // No dedup: a signal legitimately fires repeatedly.
+    [db executeUpdate:@"CREATE TABLE 'signal_reports' ("
+                      @"'idx' INTEGER PRIMARY KEY,"
+                      @"'report_data' BLOB NOT NULL);"];
+    newVersion = 6;
   }
 
   return newVersion;
@@ -236,6 +250,76 @@ static const NSTimeInterval kUnactionableEventCacheTimeSeconds = (60 * 60 * 4);
   [self inDatabase:^(FMDatabase* db) {
     for (NSNumber* index in indexes) {
       [db executeUpdate:@"DELETE FROM events WHERE idx=?", index];
+    }
+  }];
+}
+
+#pragma mark Signal reports
+
+- (NSArray<SNTStoredSignalReport*>*)addStoredSignalReports:
+    (NSArray<SNTStoredSignalReport*>*)reports {
+  NSMutableArray<SNTStoredSignalReport*>* stored = [NSMutableArray array];
+  [self inTransaction:^(FMDatabase* db, BOOL* rollback) {
+    for (SNTStoredSignalReport* report in reports) {
+      if (![report isKindOfClass:[SNTStoredSignalReport class]] || report.reportData.length == 0) {
+        continue;
+      }
+      // Deduplicate: skip a report whose signal already fired within the dedup window. A
+      // misconfigured signal can match on every event, and uploading thousands of identical
+      // reports adds server load without adding value.
+      if (report.name.length && [self backoffForSignalName:report.name]) {
+        continue;
+      }
+      if (![db executeUpdate:@"INSERT INTO 'signal_reports' (idx, report_data) VALUES (?, ?) "
+                             @"ON CONFLICT(idx) DO NOTHING",
+                             report.idx, report.reportData]) {
+        *rollback = YES;
+        [stored removeAllObjects];
+        return;
+      }
+      [stored addObject:report];
+    }
+  }];
+  return stored;
+}
+
+// Returns YES if a signal with this name fired within the dedup window (and should be dropped).
+// Otherwise records the current time as its last-stored time and returns NO.
+- (BOOL)backoffForSignalName:(NSString*)name {
+  NSDate* backoff = _signalReportBackoff->get(santa::NSStringToUTF8String(name));
+  NSDate* now = [NSDate date];
+  if (([now timeIntervalSince1970] - [backoff timeIntervalSince1970]) <
+      kSignalReportDedupWindowSeconds) {
+    return YES;
+  }
+  _signalReportBackoff->set(santa::NSStringToUTF8String(name), now);
+  return NO;
+}
+
+- (NSArray<SNTStoredSignalReport*>*)pendingSignalReports {
+  NSMutableArray<SNTStoredSignalReport*>* reports = [NSMutableArray array];
+  [self inDatabase:^(FMDatabase* db) {
+    FMResultSet* rs = [db executeQuery:@"SELECT idx, report_data FROM signal_reports"];
+    while ([rs next]) {
+      SNTStoredSignalReport* report =
+          [[SNTStoredSignalReport alloc] initWithReportData:[rs dataForColumnIndex:1]];
+      if (report) {
+        report.idx = @([rs longLongIntForColumnIndex:0]);
+        [reports addObject:report];
+      } else {
+        [db executeUpdate:@"DELETE FROM signal_reports WHERE idx=?",
+                          @([rs longLongIntForColumnIndex:0])];
+      }
+    }
+    [rs close];
+  }];
+  return reports;
+}
+
+- (void)deleteSignalReportsWithIds:(NSArray*)indexes {
+  [self inDatabase:^(FMDatabase* db) {
+    for (NSNumber* index in indexes) {
+      [db executeUpdate:@"DELETE FROM signal_reports WHERE idx=?", index];
     }
   }];
 }
