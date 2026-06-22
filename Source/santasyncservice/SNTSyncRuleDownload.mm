@@ -327,7 +327,8 @@ SNTNetworkFlowRule* NetworkFlowRuleFromProto(const ::pbv2::NetworkFlowRule& nr) 
       // `name` is the primary key. santanetd's validator only checks the proto's
       // rule_id/matchers, so guard the empty-name case here.
       if (add.name().empty()) {
-        SLOGW(@"Dropping network flow rule with empty name (rule_id %lld)", (long long)add.rule_id());
+        SLOGW(@"Dropping network flow rule with empty name (rule_id %lld)",
+              (long long)add.rule_id());
         return nil;
       }
 

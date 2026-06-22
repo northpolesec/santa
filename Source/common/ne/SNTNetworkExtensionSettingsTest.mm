@@ -370,7 +370,9 @@
               initWithEnable:YES
            flowDefaultAction:SNTNetworkFlowDefaultActionDeny
       dnsUpstreamTimeoutSecs:7.5
-            networkFlowRules:@[ [[SNTNetworkFlowRule alloc] initAddRuleWithName:@"rule-1" ruleId:1 protoBlob:blob] ]];
+            networkFlowRules:@[ [[SNTNetworkFlowRule alloc] initAddRuleWithName:@"rule-1"
+                                                                         ruleId:1
+                                                                      protoBlob:blob] ]];
 
   SNTNetworkExtensionSettings* attached = [base settingsByAttachingNetworkFlowRules:@[
     [[SNTNetworkFlowRule alloc] initAddRuleWithName:@"rule-2" ruleId:2 protoBlob:blob],

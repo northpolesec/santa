@@ -32,8 +32,8 @@
 - (void)testAddRuleCarriesBlob {
   NSData* blob = [@"fake-proto-bytes" dataUsingEncoding:NSUTF8StringEncoding];
   SNTNetworkFlowRule* rule = [[SNTNetworkFlowRule alloc] initAddRuleWithName:@"rule-a"
-                                                                     ruleId:42
-                                                                  protoBlob:blob];
+                                                                      ruleId:42
+                                                                   protoBlob:blob];
   XCTAssertNotNil(rule);
   XCTAssertEqualObjects(rule.ruleName, @"rule-a");
   XCTAssertEqual(rule.ruleId, 42);
@@ -43,8 +43,8 @@
 
 - (void)testAddRuleRejectsNilBlob {
   SNTNetworkFlowRule* rule = [[SNTNetworkFlowRule alloc] initAddRuleWithName:@"rule-a"
-                                                                     ruleId:42
-                                                                  protoBlob:nil];
+                                                                      ruleId:42
+                                                                   protoBlob:nil];
   XCTAssertNil(rule);
 }
 
@@ -70,8 +70,8 @@
 - (void)testNSSecureCodingRoundTripAdd {
   NSData* blob = [@"abc" dataUsingEncoding:NSUTF8StringEncoding];
   SNTNetworkFlowRule* orig = [[SNTNetworkFlowRule alloc] initAddRuleWithName:@"rule-c"
-                                                                     ruleId:7
-                                                                  protoBlob:blob];
+                                                                      ruleId:7
+                                                                   protoBlob:blob];
   NSError* err = nil;
   NSData* archived = [NSKeyedArchiver archivedDataWithRootObject:orig
                                            requiringSecureCoding:YES
@@ -112,8 +112,8 @@
 - (void)testProtoBlobIsCopied {
   NSMutableData* blob = [[@"abc" dataUsingEncoding:NSUTF8StringEncoding] mutableCopy];
   SNTNetworkFlowRule* rule = [[SNTNetworkFlowRule alloc] initAddRuleWithName:@"rule-e"
-                                                                     ruleId:1
-                                                                  protoBlob:blob];
+                                                                      ruleId:1
+                                                                   protoBlob:blob];
   [blob appendBytes:"xyz" length:3];
   XCTAssertEqual(rule.protoBlob.length, 3u);
 }

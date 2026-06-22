@@ -58,7 +58,10 @@
   if (ruleName.length == 0) {
     return nil;
   }
-  return [self initWithState:SNTNetworkFlowRuleStateRemove ruleName:ruleName ruleId:0 protoBlob:nil];
+  return [self initWithState:SNTNetworkFlowRuleStateRemove
+                    ruleName:ruleName
+                      ruleId:0
+                   protoBlob:nil];
 }
 
 + (BOOL)supportsSecureCoding {

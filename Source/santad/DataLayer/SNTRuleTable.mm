@@ -633,9 +633,10 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
       // UNIQUE, an Add whose rule_id collides with a different existing name
       // evicts that other row; a correct server never reuses a rule_id across
       // names, so this is acceptable defensive behavior.
-      if (![db executeUpdate:@"INSERT OR REPLACE INTO network_flow_rules (name, rule_id, rule_blob) "
-                             @"VALUES (?, ?, ?)",
-                             rule.ruleName, @(rule.ruleId), rule.protoBlob]) {
+      if (![db
+              executeUpdate:@"INSERT OR REPLACE INTO network_flow_rules (name, rule_id, rule_blob) "
+                            @"VALUES (?, ?, ?)",
+                            rule.ruleName, @(rule.ruleId), rule.protoBlob]) {
         [errors addObject:[SNTError createErrorWithCode:SNTErrorCodeInsertOrReplaceRuleFailed
                                                 message:@"A database error occurred while "
                                                         @"inserting/replacing a network flow rule"
@@ -972,8 +973,8 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
       // NSData materializes an owned deep copy — so the rule safely outlives this result set
       // and `[rs close]` (e.g. when later serialized over XPC to santanetd).
       [outRules addObject:[[SNTNetworkFlowRule alloc] initAddRuleWithName:ruleName
-                                                                  ruleId:ruleId
-                                                               protoBlob:blob]];
+                                                                   ruleId:ruleId
+                                                                protoBlob:blob]];
     }
   }
   [rs close];

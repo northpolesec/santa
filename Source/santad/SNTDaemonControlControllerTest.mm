@@ -297,8 +297,8 @@ static NSString* const kBinarySHA256 =
 - (void)testRuleAddForwardsNetworkFlowRules {
   NSData* blob = [@"blob" dataUsingEncoding:NSUTF8StringEncoding];
   SNTNetworkFlowRule* nfRule = [[SNTNetworkFlowRule alloc] initAddRuleWithName:@"rule-101"
-                                                                       ruleId:101
-                                                                    protoBlob:blob];
+                                                                        ruleId:101
+                                                                     protoBlob:blob];
 
   __block NSArray<SNTNetworkFlowRule*>* forwarded = nil;
   OCMStub([self.mockRuleTable addExecutionRules:OCMOCK_ANY
