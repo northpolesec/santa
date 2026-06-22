@@ -104,7 +104,9 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
            std::string(evaluatorV1.status().message()).c_str());
     }
 
-    auto evaluatorV2 = santa::cel::Evaluator<true>::Create();
+    // This evaluator also handles CEL fallback expressions, which may return
+    // UNSPECIFIED to fall through to the next rule.
+    auto evaluatorV2 = santa::cel::Evaluator<true>::Create(/*allowUnspecified=*/true);
     if (evaluatorV2.ok()) {
       celEvaluatorV2_ = std::move(*evaluatorV2);
     } else {
@@ -286,6 +288,12 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
     // V1 doesn't support TouchID, so cooldown is always nullopt
   }
 
+  // Apply cacheability before the switch below so that an early return from a
+  // particular return value doesn't drop a non-cacheable result.
+  if (!cacheable) {
+    cd.cacheable = NO;
+  }
+
   SNTRuleState resultState;
   if (useV2) {
     using ReturnValue = santa::cel::CELProtoTraits<true>::ReturnValue;
@@ -355,10 +363,6 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
   }
 
   ApplySilentBlock(cd, resultState);
-
-  if (!cacheable) {
-    cd.cacheable = NO;
-  }
 
   return {.succeeded = true, .decisionMade = false, .resultState = resultState};
 }

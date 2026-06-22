@@ -74,12 +74,12 @@ class Activation : public ::google::api::expr::runtime::BaseActivation {
   std::vector<const ::google::api::expr::runtime::CelFunction*> FindFunctionOverloads(
       absl::string_view name) const override;
 
-  // Reset per-evaluation state. Called by the Evaluator before each evaluation
-  // so a reused activation reflects only the current expression.
-  void ResetEvalState() const { usedRelativeTime_ = false; }
-
+  // includeUnspecified registers the UNSPECIFIED return value as a usable
+  // identifier. Only fallback expressions may return UNSPECIFIED (to fall
+  // through to the next rule), so regular rules pass false and any use of
+  // UNSPECIFIED then fails to compile.
   static std::vector<std::pair<absl::string_view, ::cel::Type>> GetVariables(
-      google::protobuf::Arena* arena);
+      google::protobuf::Arena* arena, bool includeUnspecified);
 
   template <bool V2>
   friend class Evaluator;
