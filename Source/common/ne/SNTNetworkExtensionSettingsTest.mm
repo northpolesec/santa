@@ -303,8 +303,8 @@
            flowDefaultAction:SNTNetworkFlowDefaultActionDeny
       dnsUpstreamTimeoutSecs:7.5
             networkFlowRules:@[
-              [[SNTNetworkFlowRule alloc] initAddRuleWithId:1 protoBlob:blob],
-              [[SNTNetworkFlowRule alloc] initAddRuleWithId:2 protoBlob:blob],
+              [[SNTNetworkFlowRule alloc] initAddRuleWithName:@"rule-1" ruleId:1 protoBlob:blob],
+              [[SNTNetworkFlowRule alloc] initAddRuleWithName:@"rule-2" ruleId:2 protoBlob:blob],
             ]];
   NSData* data = [NSKeyedArchiver archivedDataWithRootObject:settings
                                        requiringSecureCoding:YES
@@ -320,6 +320,7 @@
   XCTAssertEqual(decoded.flowDefaultAction, SNTNetworkFlowDefaultActionDeny);
   XCTAssertEqualWithAccuracy(decoded.dnsUpstreamTimeoutSecs, 7.5, 0.0001);
   XCTAssertEqual(decoded.networkFlowRules.count, 2u);
+  XCTAssertEqualObjects(decoded.networkFlowRules[0].ruleName, @"rule-1");
   XCTAssertEqual(decoded.networkFlowRules[0].ruleId, 1);
   XCTAssertEqualObjects(decoded.networkFlowRules[0].protoBlob, blob);
 }
@@ -352,7 +353,7 @@
            flowDefaultAction:SNTNetworkFlowDefaultActionDeny
       dnsUpstreamTimeoutSecs:5.0
             networkFlowRules:@[
-              [[SNTNetworkFlowRule alloc] initAddRuleWithId:1 protoBlob:blob],
+              [[SNTNetworkFlowRule alloc] initAddRuleWithName:@"rule-1" ruleId:1 protoBlob:blob],
             ]];
   SNTNetworkExtensionSettings* withoutRules =
       [[SNTNetworkExtensionSettings alloc] initWithEnable:YES
@@ -369,11 +370,11 @@
               initWithEnable:YES
            flowDefaultAction:SNTNetworkFlowDefaultActionDeny
       dnsUpstreamTimeoutSecs:7.5
-            networkFlowRules:@[ [[SNTNetworkFlowRule alloc] initAddRuleWithId:1 protoBlob:blob] ]];
+            networkFlowRules:@[ [[SNTNetworkFlowRule alloc] initAddRuleWithName:@"rule-1" ruleId:1 protoBlob:blob] ]];
 
   SNTNetworkExtensionSettings* attached = [base settingsByAttachingNetworkFlowRules:@[
-    [[SNTNetworkFlowRule alloc] initAddRuleWithId:2 protoBlob:blob],
-    [[SNTNetworkFlowRule alloc] initAddRuleWithId:3 protoBlob:blob],
+    [[SNTNetworkFlowRule alloc] initAddRuleWithName:@"rule-2" ruleId:2 protoBlob:blob],
+    [[SNTNetworkFlowRule alloc] initAddRuleWithName:@"rule-3" ruleId:3 protoBlob:blob],
   ]];
 
   // Scalars are carried forward from the receiver.
@@ -382,6 +383,7 @@
   XCTAssertEqualWithAccuracy(attached.dnsUpstreamTimeoutSecs, 7.5, 0.0001);
   // The rules are set from the argument, not merged with the receiver's.
   XCTAssertEqual(attached.networkFlowRules.count, 2u);
+  XCTAssertEqualObjects(attached.networkFlowRules[0].ruleName, @"rule-2");
   XCTAssertEqual(attached.networkFlowRules[0].ruleId, 2);
   // networkFlowRules is excluded from equality, so the copy compares equal to the receiver — the
   // property that lets it stand in as cached last-pushed state.
@@ -399,8 +401,8 @@
            flowDefaultAction:SNTNetworkFlowDefaultActionDeny
       dnsUpstreamTimeoutSecs:7.5
             networkFlowRules:@[
-              [[SNTNetworkFlowRule alloc] initAddRuleWithId:1 protoBlob:blob],
-              [[SNTNetworkFlowRule alloc] initAddRuleWithId:2 protoBlob:blob],
+              [[SNTNetworkFlowRule alloc] initAddRuleWithName:@"rule-1" ruleId:1 protoBlob:blob],
+              [[SNTNetworkFlowRule alloc] initAddRuleWithName:@"rule-2" ruleId:2 protoBlob:blob],
             ]];
   NSData* data = [NSKeyedArchiver archivedDataWithRootObject:newFormat
                                        requiringSecureCoding:YES
