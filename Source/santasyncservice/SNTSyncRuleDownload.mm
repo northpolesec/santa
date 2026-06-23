@@ -324,9 +324,18 @@ SNTNetworkFlowRule* NetworkFlowRuleFromProto(const ::pbv2::NetworkFlowRule& nr) 
     case ::pbv2::NetworkFlowRule::kAdd: {
       const ::pbv2::NetworkFlowRule::Add& add = nr.add();
 
+      // `name` is the primary key. santanetd's validator only checks the proto's
+      // rule_id/matchers, so guard the empty-name case here.
+      if (add.name().empty()) {
+        SLOGW(@"Dropping network flow rule with empty name (rule_id %lld)",
+              (long long)add.rule_id());
+        return nil;
+      }
+
       NSError* err;
       if (!santanetd::ValidateNetworkFlowRule(add, &err)) {
-        SLOGW(@"Dropping invalid network flow rule %lld: %@", (long long)add.rule_id(),
+        SLOGW(@"Dropping invalid network flow rule %@ (rule_id %lld): %@",
+              StringToNSString(add.name()), (long long)add.rule_id(),
               err.localizedDescription ?: @"validation failed");
         return nil;
       }
@@ -335,10 +344,18 @@ SNTNetworkFlowRule* NetworkFlowRuleFromProto(const ::pbv2::NetworkFlowRule& nr) 
       std::string serialized;
       add.SerializeToString(&serialized);
       NSData* blob = [NSData dataWithBytes:serialized.data() length:serialized.size()];
-      return [[SNTNetworkFlowRule alloc] initAddRuleWithId:add.rule_id() protoBlob:blob];
+      return [[SNTNetworkFlowRule alloc] initAddRuleWithName:StringToNSString(add.name())
+                                                      ruleId:add.rule_id()
+                                                   protoBlob:blob];
     }
-    case ::pbv2::NetworkFlowRule::kRemove:
-      return [[SNTNetworkFlowRule alloc] initRemoveRuleWithId:nr.remove().rule_id()];
+    case ::pbv2::NetworkFlowRule::kRemove: {
+      const std::string& name = nr.remove().name();
+      if (name.empty()) {
+        SLOGW(@"Dropping network flow remove rule with empty name");
+        return nil;
+      }
+      return [[SNTNetworkFlowRule alloc] initRemoveRuleWithName:StringToNSString(name)];
+    }
     default: return nil;
   }
 }

@@ -34,7 +34,7 @@
 #include "Source/common/String.h"
 #include "Source/common/cel/Evaluator.h"
 
-static const uint32_t kRuleTableCurrentVersion = 13;
+static const uint32_t kRuleTableCurrentVersion = 14;
 
 // How many rules must be in database before we start trying to remove transitive rules.
 static const int64_t kTransitiveRuleCullingThreshold = 500000;
@@ -357,6 +357,24 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
     newVersion = 13;
   }
 
+  if (version < 14) {
+    // Re-key network_flow_rules on `name` (the sync server's identity for the rule).
+    // `rule_id` is the rule's version; it is kept UNIQUE because santanetd still
+    // uses it as the unique in-memory identity / precedence tiebreak, reading it
+    // out of the serialized Add blob.
+    //
+    // The pre-v14 schema keyed on `rule_id` and had no `name` column. These
+    // rules are server-owned and re-sync on the next rule download, so the
+    // table is dropped and recreated under the new schema.
+    [db executeUpdate:@"DROP TABLE 'network_flow_rules'"];
+    [db executeUpdate:@"CREATE TABLE 'network_flow_rules' ("
+                      @"'name' TEXT NOT NULL PRIMARY KEY, "
+                      @"'rule_id' INTEGER NOT NULL UNIQUE, "
+                      @"'rule_blob' BLOB NOT NULL"
+                      @")"];
+    newVersion = 14;
+  }
+
   // Save signing info for launchd and santad. Used to ensure they are always allowed.
   self.santadCSInfo = [[MOLCodesignChecker alloc] initWithSelf];
   self.launchdCSInfo = [[MOLCodesignChecker alloc] initWithPID:1];
@@ -617,6 +635,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
     // 3. If an Add rule, must have a non-empty blob (init enforces this on the model side too)
     if (![rule isKindOfClass:[SNTNetworkFlowRule class]] ||
         (rule.state != SNTNetworkFlowRuleStateAdd && rule.state != SNTNetworkFlowRuleStateRemove) ||
+        rule.ruleName.length == 0 ||
         (rule.state == SNTNetworkFlowRuleStateAdd && rule.protoBlob.length == 0)) {
       [errors
           addObject:[SNTError createErrorWithCode:SNTErrorCodeRuleInvalid
@@ -626,7 +645,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
     }
 
     if (rule.state == SNTNetworkFlowRuleStateRemove) {
-      if (![db executeUpdate:@"DELETE FROM network_flow_rules WHERE rule_id=?", @(rule.ruleId)]) {
+      if (![db executeUpdate:@"DELETE FROM network_flow_rules WHERE name=?", rule.ruleName]) {
         [errors addObject:[SNTError createErrorWithCode:SNTErrorCodeRemoveRuleFailed
                                                 message:@"A database error occurred while deleting "
                                                         @"a network flow rule"
@@ -634,9 +653,14 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
         return NO;
       }
     } else {
-      if (![db executeUpdate:@"INSERT OR REPLACE INTO network_flow_rules (rule_id, rule_blob) "
-                             @"VALUES (?, ?)",
-                             @(rule.ruleId), rule.protoBlob]) {
+      // Upsert keyed on `name` (the primary key). Because `rule_id` is also
+      // UNIQUE, an Add whose rule_id collides with a different existing name
+      // evicts that other row; a correct server never reuses a rule_id across
+      // names, so this is acceptable defensive behavior.
+      if (![db
+              executeUpdate:@"INSERT OR REPLACE INTO network_flow_rules (name, rule_id, rule_blob) "
+                            @"VALUES (?, ?, ?)",
+                            rule.ruleName, @(rule.ruleId), rule.protoBlob]) {
         [errors addObject:[SNTError createErrorWithCode:SNTErrorCodeInsertOrReplaceRuleFailed
                                                 message:@"A database error occurred while "
                                                         @"inserting/replacing a network flow rule"
@@ -934,15 +958,15 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
   return faaRules;
 }
 
-// Single source of truth for scanning network_flow_rules in rule_id order. On a cold cache
+// Single source of truth for scanning network_flow_rules in name order. On a cold cache
 // it computes and caches the digest; when `outRules` is non-nil it also materializes the Add
 // rules into it. The hash covers exactly the blobs of the rows added to `outRules`, so a
 // snapshot's `rules` and `networkFlowRulesHash` agree by construction, and the hash-only
 // callers (hashOfHashes) and the array caller (the snapshot) can never diverge.
 //
 // INVARIANT: a row is included iff its rule_blob is non-nil (the column is NOT NULL, so in
-// practice every row). SNTNetworkFlowRule.initAddRuleWithId: must keep rejecting ONLY nil
-// blobs.
+// practice every row). SNTNetworkFlowRule.initAddRuleWithName:ruleId:protoBlob: must keep rejecting
+// nil blobs (and empty names).
 //
 // Must be called inside an inDatabase:/inTransaction: block.
 - (NSString*)networkFlowRulesHashSerializedInDB:(FMDatabase*)db
@@ -953,25 +977,28 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
     return self.cachedNetworkFlowRulesHash;
   }
 
-  // Column order: 0=rule_id, 1=rule_blob. rule_id is field 1
-  // of the NetworkFlowRule.Add proto and is therefore already part of rule_blob, so the hash
-  // need only fold in the blob bytes; ordering by rule_id ASC makes it deterministic.
+  // Column order: 0=name, 1=rule_id, 2=rule_blob. Both `name` (field 1) and `rule_id` (field 2)
+  // of the NetworkFlowRule.Add proto are already part of rule_blob, so the hash need only fold in
+  // the blob bytes; ordering by name ASC makes it deterministic.
   santa::Xxhash128 h;
-  FMResultSet* rs = [db executeQuery:@"SELECT rule_id, rule_blob FROM network_flow_rules "
-                                     @"ORDER BY rule_id ASC"];
+  FMResultSet* rs = [db executeQuery:@"SELECT name, rule_id, rule_blob FROM network_flow_rules "
+                                     @"ORDER BY name ASC"];
   while ([rs next]) {
-    NSData* blob = [rs dataNoCopyForColumnIndex:1];
+    NSData* blob = [rs dataNoCopyForColumnIndex:2];
     if (!blob) continue;
     if (!haveCachedHash) {
       h.Update(blob.bytes, blob.length);
     }
     if (outRules) {
-      int64_t ruleId = [rs longLongIntForColumnIndex:0];
+      NSString* ruleName = [rs stringForColumnIndex:0];
+      int64_t ruleId = [rs longLongIntForColumnIndex:1];
       // `blob` is a no-copy view into SQLite's buffer (invalid after the next step), but
       // SNTNetworkFlowRule's `protoBlob` is a `copy` property and -[NSData copy] of a no-copy
       // NSData materializes an owned deep copy — so the rule safely outlives this result set
       // and `[rs close]` (e.g. when later serialized over XPC to santanetd).
-      [outRules addObject:[[SNTNetworkFlowRule alloc] initAddRuleWithId:ruleId protoBlob:blob]];
+      [outRules addObject:[[SNTNetworkFlowRule alloc] initAddRuleWithName:ruleName
+                                                                   ruleId:ruleId
+                                                                protoBlob:blob]];
     }
   }
   [rs close];
