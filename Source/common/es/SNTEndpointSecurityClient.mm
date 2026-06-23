@@ -23,6 +23,8 @@
 #include <sys/qos.h>
 
 #include <algorithm>
+#include <memory>
+#include <optional>
 #include <set>
 #include <string>
 #include <string_view>
@@ -338,15 +340,20 @@ using santa::Processor;
   int64_t processingBudget = [self computeBudgetForDeadline:msg->deadline
                                                 currentTime:mach_absolute_time()];
 
-  // Copy the original message and then move into the auto-responder block
-  __block Message tmpDeadlineMsg = msg;
+  // Copy the original message into a heap holder shared with the auto-responder
+  // block. The holder lets the handler release the copy as soon as it wins the
+  // race (see below) instead of keeping the Message (and its underlying
+  // es_message_t) alive until the budget elapses.
+  auto deadlineMsgHolder = std::make_shared<std::optional<Message>>(msg);
   dispatch_after(dispatch_time(DISPATCH_TIME_NOW, processingBudget), self->_authQueue, ^(void) {
     if (dispatch_semaphore_wait(processingSema, DISPATCH_TIME_NOW) != 0) {
-      // Handler has already responded, nothing to do.
+      // Handler has already responded, nothing to do. The handler also released
+      // the message copy, so the holder may already be empty.
       return;
     }
 
-    Message deadlineMsg = std::move(tmpDeadlineMsg);
+    // We won the race, so the handler has not reset the holder.
+    Message deadlineMsg = std::move(**deadlineMsgHolder);
 
     es_auth_result_t authResult;
     if (self.configurator.failClosed) {
@@ -370,6 +377,11 @@ using santa::Processor;
     if (dispatch_semaphore_wait(processingSema, DISPATCH_TIME_NOW) != 0) {
       // Deadline expired, wait for deadline block to finish.
       dispatch_semaphore_wait(deadlineExpiredSema, DISPATCH_TIME_FOREVER);
+    } else {
+      // We won the race against the deadline block, which will now no-op. Release
+      // our copy of the message immediately rather than holding it (and the
+      // underlying es_message_t) alive until the deadline block fires.
+      deadlineMsgHolder->reset();
     }
   });
 }

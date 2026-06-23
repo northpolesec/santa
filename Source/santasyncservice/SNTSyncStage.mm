@@ -39,6 +39,10 @@ using santa::NSStringToUTF8String;
 @property(readwrite) SNTSyncState* syncState;
 @property(readwrite) MOLXPCConnection* daemonConn;
 
+// Base for the exponential retry backoff (2^attempt seconds). Overridable so tests
+// can set it to 0 and skip the real nanosleep. ponytail: test seam, not a tunable.
+@property double retryBackoffBase;
+
 @end
 
 @implementation SNTSyncStage
@@ -49,6 +53,7 @@ using santa::NSStringToUTF8String;
     _syncState = syncState;
     _urlSession = syncState.session;
     _daemonConn = syncState.daemonConn;
+    _retryBackoffBase = 2;
   }
   return self;
 }
@@ -146,10 +151,9 @@ using santa::NSStringToUTF8String;
   int maxAttempts = 5;
   for (int attempt = 1; attempt <= maxAttempts; ++attempt) {
     if (attempt >= 2) {
-      // Exponentially back off with larger and larger delays.
-      int exponentialBackoffMultiplier = 2;  // E.g. 2^2 = 4, 2^3 = 8, 2^4 = 16...
-      struct timespec ts = {.tv_sec = __darwin_time_t(pow(exponentialBackoffMultiplier, attempt))};
-      nanosleep(&ts, NULL);
+      // Exponentially back off with larger and larger delays. E.g. 2^2 = 4, 2^3 = 8, 2^4 = 16...
+      struct timespec ts = {.tv_sec = __darwin_time_t(pow(self.retryBackoffBase, attempt))};
+      if (ts.tv_sec > 0) nanosleep(&ts, NULL);
     }
 
     SLOGD(@"Performing request, attempt %d (of %d maximum)...", attempt, maxAttempts);
