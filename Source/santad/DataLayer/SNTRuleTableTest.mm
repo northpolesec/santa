@@ -1121,4 +1121,118 @@
                         [self.sut hashOfHashes].networkFlowRulesHash);
 }
 
+#pragma mark Signal rules
+
+- (SNTSignal*)_signalNamed:(NSString*)name byte:(uint8_t)b {
+  uint8_t bytes[] = {b, b, b};
+  return [[SNTSignal alloc] initAddRuleWithName:name
+                                           data:[NSData dataWithBytes:bytes length:sizeof(bytes)]];
+}
+
+- (void)testSetAndRetrieveSignals {
+  XCTAssertEqual([self.sut signalRuleCount], 0);
+
+  SNTSignal* a = [self _signalNamed:@"CRED-001" byte:0x11];
+  SNTSignal* b = [self _signalNamed:@"CRED-002" byte:0x22];
+  NSArray<SNTSignal*>* signals = @[ a, b ];
+  XCTAssertTrue([self.sut updateSignals:signals cleanReplace:YES]);
+  XCTAssertEqual([self.sut signalRuleCount], 2);
+
+  NSMutableDictionary<NSString*, NSData*>* got = [NSMutableDictionary dictionary];
+  for (SNTSignal* s in [self.sut retrieveAllSignals]) {
+    got[s.name] = s.data;
+  }
+  XCTAssertEqualObjects(got[@"CRED-001"], a.data);
+  XCTAssertEqualObjects(got[@"CRED-002"], b.data);
+}
+
+- (void)testUpdateSignalsCleanReplace {
+  NSArray<SNTSignal*>* initial =
+      @[ [self _signalNamed:@"A" byte:1], [self _signalNamed:@"B" byte:2] ];
+  XCTAssertTrue([self.sut updateSignals:initial cleanReplace:YES]);
+  XCTAssertEqual([self.sut signalRuleCount], 2);
+
+  // A clean-replace with a new full set replaces the previous one entirely.
+  XCTAssertTrue([self.sut updateSignals:@[ [self _signalNamed:@"C" byte:3] ] cleanReplace:YES]);
+  XCTAssertEqual([self.sut signalRuleCount], 1);
+  XCTAssertEqualObjects([self.sut retrieveAllSignals].firstObject.name, @"C");
+
+  // A clean-replace with an empty set clears them.
+  XCTAssertTrue([self.sut updateSignals:@[] cleanReplace:YES]);
+  XCTAssertEqual([self.sut signalRuleCount], 0);
+}
+
+- (void)testUpdateSignalsUpsert {
+  NSArray<SNTSignal*>* initial =
+      @[ [self _signalNamed:@"A" byte:1], [self _signalNamed:@"B" byte:2] ];
+  XCTAssertTrue([self.sut updateSignals:initial cleanReplace:YES]);
+  XCTAssertEqual([self.sut signalRuleCount], 2);
+
+  // A non-clean update upserts by name: "B" is updated, "C" added, "A" left untouched.
+  SNTSignal* newB = [self _signalNamed:@"B" byte:9];
+  NSArray<SNTSignal*>* delta = @[ newB, [self _signalNamed:@"C" byte:3] ];
+  XCTAssertTrue([self.sut updateSignals:delta cleanReplace:NO]);
+  XCTAssertEqual([self.sut signalRuleCount], 3);
+
+  NSMutableDictionary<NSString*, NSData*>* got = [NSMutableDictionary dictionary];
+  for (SNTSignal* s in [self.sut retrieveAllSignals]) {
+    got[s.name] = s.data;
+  }
+  XCTAssertEqualObjects(got[@"B"], newB.data);  // replaced
+  XCTAssertNotNil(got[@"A"]);                   // preserved
+  XCTAssertNotNil(got[@"C"]);                   // added
+
+  // An empty non-clean update is a no-op (does not clear).
+  XCTAssertTrue([self.sut updateSignals:@[] cleanReplace:NO]);
+  XCTAssertEqual([self.sut signalRuleCount], 3);
+}
+
+- (void)testUpdateSignalsRemove {
+  NSArray<SNTSignal*>* initial =
+      @[ [self _signalNamed:@"A" byte:1], [self _signalNamed:@"B" byte:2] ];
+  XCTAssertTrue([self.sut updateSignals:initial cleanReplace:YES]);
+  XCTAssertEqual([self.sut signalRuleCount], 2);
+
+  // A non-clean update with a remove rule deletes by name; an add in the same batch is applied.
+  NSArray<SNTSignal*>* delta =
+      @[ [[SNTSignal alloc] initRemoveRuleWithName:@"A"], [self _signalNamed:@"C" byte:3] ];
+  XCTAssertTrue([self.sut updateSignals:delta cleanReplace:NO]);
+  XCTAssertEqual([self.sut signalRuleCount], 2);
+
+  NSMutableSet<NSString*>* names = [NSMutableSet set];
+  for (SNTSignal* s in [self.sut retrieveAllSignals]) {
+    [names addObject:s.name];
+  }
+  XCTAssertFalse([names containsObject:@"A"]);  // removed
+  XCTAssertTrue([names containsObject:@"B"]);   // preserved
+  XCTAssertTrue([names containsObject:@"C"]);   // added
+
+  // Removing a non-existent signal is harmless.
+  XCTAssertTrue([self.sut updateSignals:@[ [[SNTSignal alloc] initRemoveRuleWithName:@"nope"] ]
+                           cleanReplace:NO]);
+  XCTAssertEqual([self.sut signalRuleCount], 2);
+}
+
+- (void)testSignalRulesChangedCallbackFiresOnlyOnChange {
+  __block int callbackCount = 0;
+  __block int64_t lastCount = -1;
+  self.sut.signalRulesChangedCallback = ^(int64_t count) {
+    callbackCount++;
+    lastCount = count;
+  };
+
+  // First set: changes from empty -> fires.
+  XCTAssertTrue([self.sut updateSignals:@[ [self _signalNamed:@"A" byte:1] ] cleanReplace:YES]);
+  XCTAssertEqual(callbackCount, 1);
+  XCTAssertEqual(lastCount, 1);
+
+  // Identical set: hash unchanged -> does NOT fire.
+  XCTAssertTrue([self.sut updateSignals:@[ [self _signalNamed:@"A" byte:1] ] cleanReplace:YES]);
+  XCTAssertEqual(callbackCount, 1);
+
+  // Different set: fires again.
+  XCTAssertTrue([self.sut updateSignals:@[ [self _signalNamed:@"A" byte:9] ] cleanReplace:YES]);
+  XCTAssertEqual(callbackCount, 2);
+}
+
 @end

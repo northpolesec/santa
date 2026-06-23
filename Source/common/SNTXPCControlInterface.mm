@@ -20,6 +20,7 @@
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTRule.h"
+#import "Source/common/SNTSignal.h"
 #import "Source/common/SNTStoredEvent.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
 #import "Source/common/ne/SNTNetworkExtensionSettings.h"
@@ -57,6 +58,11 @@ static NSString* const kSantanetdExtensionBundleID = @"com.northpolesec.santa.ne
         forSelector:@selector(databaseEventsPending:)
       argumentIndex:0
             ofReply:YES];
+
+  [r setClasses:[NSSet setWithObjects:[NSArray class], [SNTSignal class], nil]
+        forSelector:@selector(databaseUpdateSignals:cleanReplace:reply:)
+      argumentIndex:0
+            ofReply:NO];
 
   [r setClasses:[NSSet setWithObjects:[NSArray class], [SNTRule class], nil]
         forSelector:@selector

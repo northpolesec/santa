@@ -713,6 +713,15 @@ objc_library(
     ],
 )
 
+objc_library(
+    name = "SNTSignal",
+    srcs = ["SNTSignal.mm"],
+    hdrs = ["SNTSignal.h"],
+    deps = [
+        ":CoderMacros",
+    ],
+)
+
 santa_unit_test(
     name = "SNTNetworkFlowRuleTest",
     srcs = ["SNTNetworkFlowRuleTest.mm"],
@@ -1018,6 +1027,7 @@ objc_library(
         ":SNTNetworkFlowRule",
         ":SNTRule",
         ":SNTRuleIdentifiers",
+        ":SNTSignal",
         ":SNTStoredEvent",
         ":SNTStoredExecutionEvent",
         ":SNTXPCUnprivilegedControlInterface",

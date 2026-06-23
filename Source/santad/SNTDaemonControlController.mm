@@ -213,6 +213,7 @@ double watchdogRAMPeak = 0;
       .cdhash = [rdb cdhashRuleCount],
       .fileAccess = [rdb fileAccessRuleCount],
       .networkFlow = [rdb networkFlowRuleCount],
+      .signals = [rdb signalRuleCount],
   };
 
   // Update counts with data from StaticRules configuration
@@ -295,6 +296,12 @@ double watchdogRAMPeak = 0;
 
 - (void)databaseRemoveEventsWithIDs:(NSArray*)ids {
   [[SNTDatabaseController eventTable] deleteEventsWithIds:ids];
+}
+
+- (void)databaseUpdateSignals:(NSArray<SNTSignal*>*)signals
+                 cleanReplace:(BOOL)cleanReplace
+                        reply:(void (^)(BOOL))reply {
+  reply([[SNTDatabaseController ruleTable] updateSignals:signals cleanReplace:cleanReplace]);
 }
 
 - (void)databaseRuleForIdentifiers:(SNTRuleIdentifiers*)identifiers
@@ -427,10 +434,10 @@ double watchdogRAMPeak = 0;
 #endif
 }
 
-- (void)databaseRulesHash:(void (^)(NSString*, NSString*, NSString*))reply {
+- (void)databaseRulesHash:(void (^)(NSString*, NSString*, NSString*, NSString*))reply {
   SNTRuleTableRulesHash* rulesHash = [[SNTDatabaseController ruleTable] hashOfHashes];
-  reply(rulesHash.executionRulesHash, rulesHash.fileAccessRulesHash,
-        rulesHash.networkFlowRulesHash);
+  reply(rulesHash.executionRulesHash, rulesHash.fileAccessRulesHash, rulesHash.networkFlowRulesHash,
+        rulesHash.signalRulesHash);
 }
 
 #pragma mark Config Ops

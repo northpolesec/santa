@@ -19,6 +19,7 @@
 #import "Source/common/SNTNetworkFlowRule.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTRuleIdentifiers.h"
+#import "Source/common/SNTSignal.h"
 #import "Source/common/SNTXPCUnprivilegedControlInterface.h"
 #import "Source/common/ne/SNTNetworkExtensionSettings.h"
 
@@ -50,6 +51,9 @@ typedef NS_ENUM(NSInteger, SNTRuleAddSource) {
                                 reply:(void (^)(BOOL, NSArray<NSError*>* error))reply;
 - (void)databaseEventsPending:(void (^)(NSArray<SNTStoredEvent*>* events))reply;
 - (void)databaseRemoveEventsWithIDs:(NSArray*)ids;
+- (void)databaseUpdateSignals:(NSArray<SNTSignal*>*)signals
+                 cleanReplace:(BOOL)cleanReplace
+                        reply:(void (^)(BOOL))reply;
 - (void)retrieveAllExecutionRules:(void (^)(NSArray<SNTRule*>* rules, NSError* error))reply;
 - (void)retrieveAllFileAccessRules:
     (void (^)(NSDictionary<NSString*, NSDictionary*>* fileAccessRules, NSError* error))reply;

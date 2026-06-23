@@ -196,57 +196,57 @@ class MockSleighLauncher : public santa::SleighLauncher {
   // Ensure that the factory method creates expected serializers/writers pairs
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
 
-  XCTAssertEqual(nullptr, Logger::Create(mockESApi, nil, nil, TelemetryEvent::kEverything,
+  XCTAssertEqual(nullptr, Logger::Create(mockESApi, nil, nil, nil, TelemetryEvent::kEverything,
                                          (SNTEventLogType)123, nil, @"/tmp/temppy", @"/tmp/spool",
                                          1, 1, 1, 1, 1, 1, 1));
 
-  LoggerPeer logger(Logger::Create(mockESApi, nil, nil, TelemetryEvent::kEverything,
+  LoggerPeer logger(Logger::Create(mockESApi, nil, nil, nil, TelemetryEvent::kEverything,
                                    SNTEventLogTypeFilelog, nil, @"/tmp/temppy", @"/tmp/spool", 1, 1,
                                    1, 1, 1, 1, 1));
   XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<BasicString>(logger.serializer_));
   XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<File>(logger.writer_));
 
-  logger = LoggerPeer(Logger::Create(mockESApi, nil, nil, TelemetryEvent::kEverything,
+  logger = LoggerPeer(Logger::Create(mockESApi, nil, nil, nil, TelemetryEvent::kEverything,
                                      SNTEventLogTypeSyslog, nil, @"/tmp/temppy", @"/tmp/spool", 1,
                                      1, 1, 1, 1, 1, 1));
   XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<BasicString>(logger.serializer_));
   XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<Syslog>(logger.writer_));
 
-  logger = LoggerPeer(Logger::Create(mockESApi, nil, nil, TelemetryEvent::kEverything,
+  logger = LoggerPeer(Logger::Create(mockESApi, nil, nil, nil, TelemetryEvent::kEverything,
                                      SNTEventLogTypeNull, nil, @"/tmp/temppy", @"/tmp/spool", 1, 1,
                                      1, 1, 1, 1, 1));
   XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<Empty>(logger.serializer_));
   XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<Null>(logger.writer_));
 
-  logger = LoggerPeer(Logger::Create(mockESApi, nil, nil, TelemetryEvent::kEverything,
+  logger = LoggerPeer(Logger::Create(mockESApi, nil, nil, nil, TelemetryEvent::kEverything,
                                      SNTEventLogTypeProtobuf, nil, @"/tmp/temppy", @"/tmp/spool", 1,
                                      1, 1, 1, 1, 1, 1));
   XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<Protobuf>(logger.serializer_));
   XCTAssertNotEqual(nullptr,
                     std::dynamic_pointer_cast<Spool<::fsspool::AnyBatcher>>(logger.writer_));
 
-  logger = LoggerPeer(Logger::Create(mockESApi, nil, nil, TelemetryEvent::kEverything,
+  logger = LoggerPeer(Logger::Create(mockESApi, nil, nil, nil, TelemetryEvent::kEverything,
                                      SNTEventLogTypeProtobufStream, nil, @"/tmp/temppy",
                                      @"/tmp/spool", 1, 1, 1, 1, 1, 1, 1));
   XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<Protobuf>(logger.serializer_));
   XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<Spool<::fsspool::UncompressedStreamBatcher>>(
                                  logger.writer_));
 
-  logger = LoggerPeer(Logger::Create(mockESApi, nil, nil, TelemetryEvent::kEverything,
+  logger = LoggerPeer(Logger::Create(mockESApi, nil, nil, nil, TelemetryEvent::kEverything,
                                      SNTEventLogTypeProtobufStreamGzip, nil, @"/tmp/temppy",
                                      @"/tmp/spool", 1, 1, 1, 1, 1, 1, 1));
   XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<Protobuf>(logger.serializer_));
   XCTAssertNotEqual(nullptr,
                     std::dynamic_pointer_cast<Spool<::fsspool::GzipStreamBatcher>>(logger.writer_));
 
-  logger = LoggerPeer(Logger::Create(mockESApi, nil, nil, TelemetryEvent::kEverything,
+  logger = LoggerPeer(Logger::Create(mockESApi, nil, nil, nil, TelemetryEvent::kEverything,
                                      SNTEventLogTypeProtobufStreamZstd, nil, @"/tmp/temppy",
                                      @"/tmp/spool", 1, 1, 1, 1, 1, 1, 1));
   XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<Protobuf>(logger.serializer_));
   XCTAssertNotEqual(nullptr,
                     std::dynamic_pointer_cast<Spool<::fsspool::ZstdStreamBatcher>>(logger.writer_));
 
-  logger = LoggerPeer(Logger::Create(mockESApi, nil, nil, TelemetryEvent::kEverything,
+  logger = LoggerPeer(Logger::Create(mockESApi, nil, nil, nil, TelemetryEvent::kEverything,
                                      SNTEventLogTypeJSON, nil, @"/tmp/temppy", @"/tmp/spool", 1, 1,
                                      1, 1, 1, 1, 1));
   XCTAssertNotEqual(nullptr, std::dynamic_pointer_cast<Protobuf>(logger.serializer_));
@@ -370,7 +370,7 @@ class MockSleighLauncher : public santa::SleighLauncher {
 
 - (void)testExportTracker {
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
-  LoggerPeer logger(Logger::Create(mockESApi, nil, nil, TelemetryEvent::kEverything,
+  LoggerPeer logger(Logger::Create(mockESApi, nil, nil, nil, TelemetryEvent::kEverything,
                                    SNTEventLogTypeNull, nil, @"", @"", 1, 1, 1, 1, 1, 1, 1));
 
   // Nothing in the map initially

@@ -215,7 +215,7 @@
       clientMode:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(SNTClientModeMonitor), nil])]);
   OCMStub([self.daemonConnRop
       databaseRulesHash:([OCMArg invokeBlockWithArgs:@"the-hash", @"the-faa-hash", @"the-nf-hash",
-                                                     nil])]);
+                                                     @"the-signal-hash", nil])]);
 }
 
 #pragma mark - SNTSyncStage Tests

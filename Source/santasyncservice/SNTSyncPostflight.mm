@@ -44,6 +44,9 @@ BOOL Postflight(SNTSyncPostflight* self) {
         static_cast<uint32_t>(self.syncState.networkFlowRulesReceived));
     req->set_network_flow_rules_processed(
         static_cast<uint32_t>(self.syncState.networkFlowRulesProcessed));
+    req->set_telemetry_signal_rules_received(static_cast<uint32_t>(self.syncState.signalsReceived));
+    req->set_telemetry_signal_rules_processed(
+        static_cast<uint32_t>(self.syncState.signalsProcessed));
   }
 
   switch (self.syncState.syncType) {
@@ -53,11 +56,13 @@ BOOL Postflight(SNTSyncPostflight* self) {
   }
 
   id<SNTDaemonControlXPC> rop = [self.daemonConn synchronousRemoteObjectProxy];
-  [rop databaseRulesHash:^(NSString* execRulesHash, NSString* faaRulesHash, NSString* nfRulesHash) {
+  [rop databaseRulesHash:^(NSString* execRulesHash, NSString* faaRulesHash, NSString* nfRulesHash,
+                           NSString* signalRulesHash) {
     req->set_rules_hash(santa::NSStringToUTF8String(execRulesHash));
     if constexpr (IsV2) {
       req->set_file_access_rules_hash(santa::NSStringToUTF8String(faaRulesHash));
       req->set_network_flow_rules_hash(santa::NSStringToUTF8String(nfRulesHash));
+      req->set_telemetry_signal_rules_hash(santa::NSStringToUTF8String(signalRulesHash));
     }
   }];
 

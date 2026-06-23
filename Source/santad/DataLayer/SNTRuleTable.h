@@ -20,6 +20,7 @@
 #import "Source/common/SNTNetworkFlowRule.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTRuleIdentifiers.h"
+#import "Source/common/SNTSignal.h"
 #import "Source/santad/DataLayer/SNTDatabaseTable.h"
 
 @class SNTCachedDecision;
@@ -30,6 +31,7 @@
 @property(readonly) NSString* executionRulesHash;
 @property(readonly) NSString* fileAccessRulesHash;
 @property(readonly) NSString* networkFlowRulesHash;
+@property(readonly) NSString* signalRulesHash;
 @end
 
 /// Atomic point-in-time view of the network flow ruleset. Returned from
@@ -98,6 +100,11 @@
 - (int64_t)networkFlowRuleCount;
 
 ///
+/// @return Number of signal config rules in the database
+///
+- (int64_t)signalRuleCount;
+
+///
 ///  @return Rule for given identifiers.
 ///          Currently: binary, signingID, certificate or teamID (in that order).
 ///          The first matching rule found is returned.
@@ -162,6 +169,19 @@
 - (NSDictionary<NSString*, NSDictionary*>*)retrieveAllFileAccessRules;
 
 ///
+///  Update the signal config rules synced from the server during rule download. When
+///  `cleanReplace` is YES (clean sync) all existing signals are deleted first; otherwise the
+///  given signals are upserted by name (normal, incremental sync). Fires
+///  `signalRulesChangedCallback` if the set actually changed.
+///
+- (BOOL)updateSignals:(NSArray<SNTSignal*>*)signals cleanReplace:(BOOL)cleanReplace;
+
+///
+///  Retrieve all signal config rules from the database.
+///
+- (NSArray<SNTSignal*>*)retrieveAllSignals;
+
+///
 ///  Atomic snapshot of all stored network flow rules (as Add rules, ordered by rule_id ASC)
 ///  and the hash that identifies them, read inside a single database transaction so the two
 ///  correspond to the same state. Intended for assembling the full-set XPC push to santanetd.
@@ -202,5 +222,11 @@
 /// addExecutionRules:fileAccessRules:ruleCleanup:error: with the latest rule count.
 ///
 @property(copy) void (^fileAccessRulesChangedCallback)(int64_t faaRuleCount);
+
+///
+/// If set, this callback is called when signal config rule content is changed via
+/// updateSignals:cleanReplace: with the latest rule count.
+///
+@property(copy) void (^signalRulesChangedCallback)(int64_t signalRuleCount);
 
 @end

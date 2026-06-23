@@ -329,27 +329,31 @@ static NSString* const kBinarySHA256 =
   XCTAssertEqual(forwarded.firstObject.ruleId, 101);
 }
 
-// ---- databaseRulesHash: returns three hashes -------------------------
+// ---- databaseRulesHash: returns four hashes --------------------------
 
-- (void)testDatabaseRulesHashReturnsThreeHashes {
+- (void)testDatabaseRulesHashReturnsFourHashes {
   id mockHash = OCMClassMock([SNTRuleTableRulesHash class]);
   OCMStub([mockHash executionRulesHash]).andReturn(@"exec-hash");
   OCMStub([mockHash fileAccessRulesHash]).andReturn(@"faa-hash");
   OCMStub([mockHash networkFlowRulesHash]).andReturn(@"nf-hash");
+  OCMStub([mockHash signalRulesHash]).andReturn(@"signal-hash");
   OCMStub([self.mockRuleTable hashOfHashes]).andReturn(mockHash);
 
   __block NSString* gotExec = nil;
   __block NSString* gotFAA = nil;
   __block NSString* gotNF = nil;
-  [self.sut databaseRulesHash:^(NSString* exec, NSString* faa, NSString* nf) {
+  __block NSString* gotSignal = nil;
+  [self.sut databaseRulesHash:^(NSString* exec, NSString* faa, NSString* nf, NSString* signal) {
     gotExec = exec;
     gotFAA = faa;
     gotNF = nf;
+    gotSignal = signal;
   }];
 
   XCTAssertEqualObjects(gotExec, @"exec-hash");
   XCTAssertEqualObjects(gotFAA, @"faa-hash");
   XCTAssertEqualObjects(gotNF, @"nf-hash");
+  XCTAssertEqualObjects(gotSignal, @"signal-hash");
   [mockHash stopMocking];
 }
 

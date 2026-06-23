@@ -50,7 +50,8 @@ class Spool : public Writer, public std::enable_shared_from_this<Spool<T>> {
   // Factory
   static std::shared_ptr<Spool<T>> Create(T batcher, std::string_view base_dir,
                                           size_t max_spool_disk_size, size_t max_spool_batch_size,
-                                          uint64_t flush_timeout_ms) {
+                                          uint64_t flush_timeout_ms,
+                                          void (^file_closed_f)(std::string) = nullptr) {
     dispatch_queue_t q = dispatch_queue_create("com.northpolesec.santa.daemon.file_base_q",
                                                DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL);
     dispatch_source_t timer_source = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, q);
@@ -78,9 +79,9 @@ class Spool : public Writer, public std::enable_shared_from_this<Spool<T>> {
       [size_gauge set:(size.ok() ? static_cast<long long>(*size) : 0) forFieldValues:@[]];
     }];
 
-    auto spool_writer = std::make_shared<Spool<T>>(q, timer_source, std::move(batcher), base_dir,
-                                                   max_spool_disk_size, max_spool_batch_size,
-                                                   nullptr, nullptr, std::move(eviction_callback));
+    auto spool_writer = std::make_shared<Spool<T>>(
+        q, timer_source, std::move(batcher), base_dir, max_spool_disk_size, max_spool_batch_size,
+        nullptr, nullptr, file_closed_f, std::move(eviction_callback));
 
     spool_writer->BeginFlushTask();
 
@@ -90,6 +91,7 @@ class Spool : public Writer, public std::enable_shared_from_this<Spool<T>> {
   Spool(dispatch_queue_t q, dispatch_source_t timer_source, T batcher, std::string_view base_dir,
         size_t max_spool_disk_size, size_t max_spool_file_size,
         void (^write_complete_f)(void) = nullptr, void (^flush_task_complete_f)(void) = nullptr,
+        void (^file_closed_f)(std::string) = nullptr,
         std::function<void(size_t)> eviction_callback = nullptr)
       : q_(q),
         timer_source_(timer_source),
@@ -100,7 +102,8 @@ class Spool : public Writer, public std::enable_shared_from_this<Spool<T>> {
         spool_file_size_threshold_leniency_(spool_file_size_threshold_ *
                                             spool_file_size_threshold_leniency_factor_),
         write_complete_f_(write_complete_f),
-        flush_task_complete_f_(flush_task_complete_f) {}
+        flush_task_complete_f_(flush_task_complete_f),
+        file_closed_f_(file_closed_f) {}
 
   ~Spool() {
     // Note: `log_batch_writer_` is automatically flushed when destroyed
@@ -215,12 +218,18 @@ class Spool : public Writer, public std::enable_shared_from_this<Spool<T>> {
 
  private:
   bool FlushSerialized() {
-    if (spool_writer_.Flush().ok()) {
-      accumulated_bytes_ = 0;
-      return true;
-    } else {
+    absl::StatusOr<std::optional<std::string>> result = spool_writer_.Flush();
+    if (!result.ok()) {
       return false;
     }
+    accumulated_bytes_ = 0;
+    // A spool file was just closed (renamed into the spool dir). Hand its path
+    // off to the file-closed callback. The callback MUST be cheap (it runs on
+    // this serial queue `q_`) — it should dispatch any real work elsewhere.
+    if (file_closed_f_ && result->has_value()) {
+      file_closed_f_(result->value());
+    }
+    return true;
   }
 
   dispatch_queue_t q_ = NULL;
@@ -235,6 +244,7 @@ class Spool : public Writer, public std::enable_shared_from_this<Spool<T>> {
   bool flush_task_started_ = false;
   void (^write_complete_f_)(void);
   void (^flush_task_complete_f_)(void);
+  void (^file_closed_f_)(std::string);
 
   size_t accumulated_bytes_ = 0;
 };

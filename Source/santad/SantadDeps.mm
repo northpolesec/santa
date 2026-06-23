@@ -160,7 +160,8 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator* configurator,
       ^SNTExportConfiguration*() {
         return [configurator exportConfig];
       },
-      TelemetryConfigToBitmask([configurator telemetry]), [configurator eventLogType],
+      // The spool-file-closed handler (signal scanner) is wired up in a later change.
+      nullptr, TelemetryConfigToBitmask([configurator telemetry]), [configurator eventLogType],
       [SNTDecisionCache sharedCache], [configurator eventLogPath], [configurator spoolDirectory],
       spool_dir_threshold_bytes, spool_file_threshold_bytes, spool_flush_timeout_ms,
       telemetry_export_frequency_secs, [configurator telemetryExportTimeoutSec],

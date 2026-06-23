@@ -46,6 +46,11 @@ namespace santa {
 
 using GetExportConfigBlock = SNTExportConfiguration* (^)(void);
 
+// Invoked with the path of a spool file each time one is closed (finalized into
+// the spool dir). Used to drive per-file signal scans. Runs on the spool's
+// serial queue, so the block must be cheap and dispatch any real work elsewhere.
+using SpoolFileClosedBlock = void (^)(std::string);
+
 class Logger : public Timer<Logger> {
  public:
   enum class ExportLogType {
@@ -56,11 +61,12 @@ class Logger : public Timer<Logger> {
   static std::unique_ptr<Logger> Create(
       std::shared_ptr<santa::EndpointSecurityAPI> esapi,
       std::unique_ptr<santa::SleighLauncher> sleigh_launcher,
-      GetExportConfigBlock getExportConfigBlock, TelemetryEvent telemetry_mask,
-      SNTEventLogType log_type, SNTDecisionCache* decision_cache, NSString* event_log_path,
-      NSString* spool_log_path, size_t spool_dir_size_threshold, size_t spool_file_size_threshold,
-      uint64_t spool_flush_timeout_ms, uint32_t telemetry_export_seconds,
-      uint32_t telemetry_export_timeout_seconds, uint32_t telemetry_export_batch_threshold_size_mb,
+      GetExportConfigBlock getExportConfigBlock, SpoolFileClosedBlock spoolFileClosed,
+      TelemetryEvent telemetry_mask, SNTEventLogType log_type, SNTDecisionCache* decision_cache,
+      NSString* event_log_path, NSString* spool_log_path, size_t spool_dir_size_threshold,
+      size_t spool_file_size_threshold, uint64_t spool_flush_timeout_ms,
+      uint32_t telemetry_export_seconds, uint32_t telemetry_export_timeout_seconds,
+      uint32_t telemetry_export_batch_threshold_size_mb,
       uint32_t telemetry_export_max_files_per_batch);
 
   Logger(std::unique_ptr<santa::SleighLauncher> sleigh_launcher,
