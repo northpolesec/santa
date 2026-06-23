@@ -59,10 +59,23 @@ absl::Status SleighLauncher::LaunchTelemetryExport(const std::vector<std::string
   for (const auto& file : input_files) {
     int fd = open(file.c_str(), O_RDONLY);
     if (fd < 0) {
+      // The file may have been evicted (spool full) or already consumed between
+      // enumeration and now. A vanished file isn't an error: skip it and export
+      // the rest rather than failing the whole batch.
+      if (errno == ENOENT) {
+        LOGD(@"SleighLauncher::LaunchTelemetryExport(): Skipping missing input file: %s",
+             file.c_str());
+        continue;
+      }
       LOGD(@"SleighLauncher::LaunchTelemetryExport(): Failed to open input file: %s", file.c_str());
       return absl::InternalError("Failed to open input file: " + file);
     }
     input_fds.push_back(fd);
+  }
+
+  // Everything vanished before we could open it; nothing to export.
+  if (input_fds.empty()) {
+    return absl::OkStatus();
   }
 
   absl::StatusOr<std::string> serialized = SerializeTelemetryUploadConfig(input_fds);
