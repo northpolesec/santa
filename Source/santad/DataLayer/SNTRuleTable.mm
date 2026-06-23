@@ -75,6 +75,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
 @interface SNTRuleTable () {
   std::unique_ptr<santa::cel::Evaluator<false>> _celEvaluator;
   std::unique_ptr<santa::cel::Evaluator<true>> _celV2Evaluator;
+  dispatch_once_t _criticalSystemBinariesToken;
 }
 @property MOLCodesignChecker* santadCSInfo;
 @property MOLCodesignChecker* launchdCSInfo;
@@ -227,6 +228,16 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
   self.criticalSystemBinaries = bins;
 }
 
+- (NSDictionary<NSString*, SNTCachedDecision*>*)criticalSystemBinaries {
+  // Computed lazily and cached: most callers (and tests) never need it, and
+  // hashing/codesigning the critical binaries is expensive. dispatch_once keeps
+  // it thread-safe across concurrent decision lookups.
+  dispatch_once(&_criticalSystemBinariesToken, ^{
+    [self setupSystemCriticalBinaries];
+  });
+  return _criticalSystemBinaries;
+}
+
 - (uint32_t)currentSupportedVersion {
   return kRuleTableCurrentVersion;
 }
@@ -364,8 +375,8 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
     LOGE(@"Failed to create CELv2 evaluator: %s", std::string(celEval.status().message()).c_str());
   }
 
-  // Setup critical system binaries
-  [self setupSystemCriticalBinaries];
+  // Critical system binaries (hashing + codesigning real binaries) are computed
+  // lazily on first access via the criticalSystemBinaries getter, keeping init cheap.
 
   // Prime the cached static rules.
   [self updateStaticRules:[[SNTConfigurator configurator] staticRules]];

@@ -72,6 +72,9 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator* configurator,
     LOGE(@"Failed to initialize rule table.");
     exit(EXIT_FAILURE);
   }
+  // Prime the lazily-computed critical system binaries now, at startup, so the
+  // expensive hashing/codesigning doesn't block the first AUTH decision.
+  (void)rule_table.criticalSystemBinaries;
 
   SNTEventTable* event_table = [SNTDatabaseController eventTable];
   if (!event_table) {
