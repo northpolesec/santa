@@ -34,7 +34,7 @@
 #include "Source/common/String.h"
 #include "Source/common/cel/Evaluator.h"
 
-static const uint32_t kRuleTableCurrentVersion = 13;
+static const uint32_t kRuleTableCurrentVersion = 14;
 
 // How many rules must be in database before we start trying to remove transitive rules.
 static const int64_t kTransitiveRuleCullingThreshold = 500000;
@@ -339,16 +339,31 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
   }
 
   if (version < 13) {
-    // `name` is the primary key (the sync server's identity for the rule).
+    [db executeUpdate:@"CREATE TABLE 'network_flow_rules' ("
+                      @"'rule_id' INTEGER PRIMARY KEY, "
+                      @"'rule_blob' BLOB NOT NULL"
+                      @")"];
+    newVersion = 13;
+  }
+
+  if (version < 14) {
+    // Re-key network_flow_rules on `name` (the sync server's identity for the rule).
     // `rule_id` is the rule's version; it is kept UNIQUE because santanetd still
     // uses it as the unique in-memory identity / precedence tiebreak, reading it
     // out of the serialized Add blob.
+    //
+    // The pre-v14 schema keyed on `rule_id` and had no `name` column. Because
+    // `name` is only available inside the serialized Add blob (proto field 1) and
+    // cannot be extracted in SQL, existing rows cannot be migrated in place. These
+    // rules are server-owned and re-sync on the next rule download, so the table is
+    // dropped and recreated under the new schema.
+    [db executeUpdate:@"DROP TABLE 'network_flow_rules'"];
     [db executeUpdate:@"CREATE TABLE 'network_flow_rules' ("
                       @"'name' TEXT NOT NULL PRIMARY KEY, "
                       @"'rule_id' INTEGER NOT NULL UNIQUE, "
                       @"'rule_blob' BLOB NOT NULL"
                       @")"];
-    newVersion = 13;
+    newVersion = 14;
   }
 
   // Save signing info for launchd and santad. Used to ensure they are always allowed.
