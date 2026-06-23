@@ -352,11 +352,9 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
     // uses it as the unique in-memory identity / precedence tiebreak, reading it
     // out of the serialized Add blob.
     //
-    // The pre-v14 schema keyed on `rule_id` and had no `name` column. Because
-    // `name` is only available inside the serialized Add blob (proto field 1) and
-    // cannot be extracted in SQL, existing rows cannot be migrated in place. These
-    // rules are server-owned and re-sync on the next rule download, so the table is
-    // dropped and recreated under the new schema.
+    // The pre-v14 schema keyed on `rule_id` and had no `name` column. These
+    // rules are server-owned and re-sync on the next rule download, so the
+    // table is dropped and recreated under the new schema.
     [db executeUpdate:@"DROP TABLE 'network_flow_rules'"];
     [db executeUpdate:@"CREATE TABLE 'network_flow_rules' ("
                       @"'name' TEXT NOT NULL PRIMARY KEY, "
