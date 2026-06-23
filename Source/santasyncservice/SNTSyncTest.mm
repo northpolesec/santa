@@ -53,6 +53,7 @@
 
 @interface SNTSyncStage (XSSI)
 - (NSData*)stripXssi:(NSData*)data;
+@property double retryBackoffBase;
 @end
 
 @interface SNTSyncManager (Testing)
@@ -282,6 +283,7 @@
   NSURL* u1 = [NSURL URLWithString:stageName relativeToURL:self.syncState.syncBaseURL];
 
   SNTSyncStage* sut = [[SNTSyncStage alloc] initWithState:self.syncState];
+  sut.retryBackoffBase = 0;  // Skip the real retry nanosleep.
   NSMutableURLRequest* req = [NSMutableURLRequest requestWithURL:u1];
   XCTAssertNil([sut performRequest:req intoMessage:NULL timeout:5]);
   XCTAssertEqualObjects(self.syncState.xsrfToken, @"my-xsrf-token");
@@ -330,6 +332,7 @@
   NSURL* u1 = [NSURL URLWithString:stageName relativeToURL:self.syncState.syncBaseURL];
 
   SNTSyncStage* sut = [[SNTSyncStage alloc] initWithState:self.syncState];
+  sut.retryBackoffBase = 0;  // Skip the real retry nanosleep.
   NSMutableURLRequest* req = [NSMutableURLRequest requestWithURL:u1];
   XCTAssertNil([sut performRequest:req intoMessage:NULL timeout:5]);
   XCTAssertEqualObjects(self.syncState.xsrfToken, @"my-xsrf-token");
@@ -1109,6 +1112,8 @@
                                                                  nil])]);
   OCMStub([self.daemonConnRop postRuleSyncNotificationForApplication:[OCMArg any]
                                                                reply:([OCMArg invokeBlock])]);
+  // Invoke the reply immediately; otherwise sync blocks on the 5s reply timeout.
+  OCMStub([self.daemonConnRop updateSyncSettings:[OCMArg any] reply:([OCMArg invokeBlock])]);
   [sut sync];
 
   NSArray* rules = @[
@@ -1168,6 +1173,8 @@
                                                                  nil])]);
   OCMStub([self.daemonConnRop postRuleSyncNotificationForApplication:[OCMArg any]
                                                                reply:([OCMArg invokeBlock])]);
+  // Invoke the reply immediately; otherwise sync blocks on the 5s reply timeout.
+  OCMStub([self.daemonConnRop updateSyncSettings:[OCMArg any] reply:([OCMArg invokeBlock])]);
   [sut sync];
 
   SNTRuleState state = self.syncState.isSyncV2 ? SNTRuleStateCELv2 : SNTRuleStateCEL;
@@ -1220,6 +1227,8 @@
                                                                  nil])]);
   OCMStub([self.daemonConnRop postRuleSyncNotificationForApplication:[OCMArg any]
                                                                reply:([OCMArg invokeBlock])]);
+  // Invoke the reply immediately; otherwise sync blocks on the 5s reply timeout.
+  OCMStub([self.daemonConnRop updateSyncSettings:[OCMArg any] reply:([OCMArg invokeBlock])]);
   [sut sync];
 
   NSArray* rules = @[
