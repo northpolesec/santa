@@ -114,7 +114,7 @@ class FsSpoolWriter {
     // Recompute the spool size with a single directory walk, also collecting
     // per-file metadata so eviction (below) can reuse it instead of walking and
     // stat()ing every file a second time.
-    std::vector<SpoolFile> files;
+    std::vector<DirEntryInfo> files;
     absl::StatusOr<size_t> estimate = EstimateSpoolDirSize(&files);
     if (!estimate.ok()) {
       return estimate.status();  // failed to recompute spool size
@@ -269,57 +269,13 @@ class FsSpoolWriter {
     return result;
   }
 
-  struct SpoolFile {
-    time_t mtime;
-    std::string path;
-    size_t occupancy;
-  };
-
-  // Estimate the size of the spool directory. However, only recompute a new
-  // estimate if the spool directory has had a change to its modification time.
-  // When `files` is non-null and a recompute happens, it is populated with the
-  // per-file metadata gathered during the walk, so callers needing to evict can
-  // avoid a second walk (and a second stat() of every file).
+  // Returns the on-disk size of the spool directory via a single bulk scan
+  // (no stat() per file). When `files` is non-null it is also populated with
+  // the per-file metadata gathered during that scan, so callers needing to
+  // evict can avoid a second scan of the directory.
   absl::StatusOr<size_t> EstimateSpoolDirSize(
-      std::vector<SpoolFile>* files = nullptr) {
-    struct stat stats;
-    if (stat(spool_dir_.c_str(), &stats) < 0) {
-      return absl::ErrnoToStatus(errno, "failed to stat spool directory");
-    }
-
-    if (stats.st_mtimespec.tv_sec == spool_dir_last_mtime_.tv_sec &&
-        stats.st_mtimespec.tv_nsec == spool_dir_last_mtime_.tv_nsec) {
-      // If the spool's last modification time hasn't changed then
-      // re-use the current estimate.
-      return spool_size_estimate_;
-    }
-
-    // Store the updated mtime
-    spool_dir_last_mtime_ = stats.st_mtimespec;
-
-    // Single pass over the spool directory: accumulate the total occupancy and,
-    // when requested, collect per-file metadata for eviction.
-    size_t total = 0;
-    (void)IterateDirectory(
-        spool_dir_, [this, files, &total](const std::string& file_name, bool*) {
-          if (file_name == std::string(".") || file_name == std::string("..")) {
-            return;
-          }
-          std::string file_path =
-              absl::StrCat(spool_dir_, PathSeparator(), file_name);
-          struct stat file_stats;
-          if (stat(file_path.c_str(), &file_stats) < 0 ||
-              !StatIsReg(file_stats.st_mode)) {
-            return;
-          }
-          size_t occupancy = EstimateDiskOccupation(file_stats.st_size);
-          total += occupancy;
-          if (files != nullptr) {
-            files->push_back(
-                {file_stats.st_mtime, std::move(file_path), occupancy});
-          }
-        });
-    return total;
+      std::vector<DirEntryInfo>* files = nullptr) {
+    return BulkStatRegularFiles(spool_dir_, files);
   }
 
   // Deletes the oldest spool files until the estimated on-disk size of the
@@ -329,17 +285,17 @@ class FsSpoolWriter {
   // `files`/`total` come from the caller's directory walk, so no second walk is
   // needed. Updates spool_size_estimate_ to the post-eviction total.
   // Best-effort: a file that fails to unlink is left in place and skipped.
-  void EvictOldestSpoolFiles(std::vector<SpoolFile>& files, size_t total) {
+  void EvictOldestSpoolFiles(std::vector<DirEntryInfo>& files, size_t total) {
     const size_t high_water_mark = max_spool_size_ - max_spool_size_ / 10;
 
     // Oldest first.
     std::sort(files.begin(), files.end(),
-              [](const SpoolFile& a, const SpoolFile& b) {
+              [](const DirEntryInfo& a, const DirEntryInfo& b) {
                 return a.mtime < b.mtime;
               });
 
     size_t evicted = 0;
-    for (const SpoolFile& file : files) {
+    for (const DirEntryInfo& file : files) {
       if (total <= high_water_mark) {
         break;
       }
@@ -370,7 +326,6 @@ class FsSpoolWriter {
   const std::string base_dir_;
   const std::string spool_dir_;
   const std::string tmp_dir_;
-  struct timespec spool_dir_last_mtime_ = {};
   CurrentSpoolState current_spool_state_;
 
   // This acts as an optimization when initializing a CurrentSpoolState to help
