@@ -27,7 +27,7 @@ typedef NS_ENUM(NSInteger, SNTSignalState) {
 
 @property(readonly) SNTSignalState state;
 @property(readonly, copy) NSString* name;
-@property(readonly) NSData* data;
+@property(readonly, copy) NSData* data;
 
 - (instancetype)initAddRuleWithName:(NSString*)name data:(NSData*)data;
 - (instancetype)initRemoveRuleWithName:(NSString*)name;

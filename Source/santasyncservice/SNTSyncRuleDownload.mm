@@ -573,7 +573,9 @@ void ProcessDeprecatedBundleNotificationsForRule(
                                                            }
                                                            dispatch_semaphore_signal(signalSema);
                                                          }];
-    dispatch_semaphore_wait(signalSema, dispatch_time(DISPATCH_TIME_NOW, 30 * NSEC_PER_SEC));
+    if (dispatch_semaphore_wait(signalSema, dispatch_time(DISPATCH_TIME_NOW, 30 * NSEC_PER_SEC))) {
+      SLOGW(@"Timeout updating telemetry signals");
+    }
   }
 
   // If the request was successfully completed, but no new rules received, just return

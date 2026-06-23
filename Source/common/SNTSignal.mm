@@ -29,7 +29,7 @@
   if (self) {
     _state = state;
     _name = [name copy];
-    _data = data;
+    _data = [data copy];
   }
   return self;
 }

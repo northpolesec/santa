@@ -865,7 +865,11 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
     // On a clean sync the server sends the full set, so delete everything first. On a normal
     // sync the server sends incremental add/remove rules.
     if (cleanReplace) {
-      [db executeUpdate:@"DELETE FROM signal_rules"];
+      if (![db executeUpdate:@"DELETE FROM signal_rules"]) {
+        LOGE(@"Failed to clear signal rules: %@", [db lastErrorMessage]);
+        *rollback = failed = YES;
+        return;
+      }
     }
 
     for (SNTSignal* signal in signals) {
