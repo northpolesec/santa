@@ -19,6 +19,7 @@
 #import <Foundation/Foundation.h>
 #include <dispatch/dispatch.h>
 
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -26,6 +27,7 @@
 #include <vector>
 
 #import "Source/common/SNTLogging.h"
+#import "Source/common/SNTMetricSet.h"
 #include "Source/common/santa.pb.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/fsspool.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/Writer.h"
@@ -55,8 +57,30 @@ class Spool : public Writer, public std::enable_shared_from_this<Spool<T>> {
     dispatch_source_set_timer(timer_source, dispatch_time(DISPATCH_TIME_NOW, 0),
                               NSEC_PER_MSEC * flush_timeout_ms, 0);
 
+    // Records how many spool files are erased when the spool exceeds its size limit.
+    SNTMetricCounter* eviction_counter = [[SNTMetricSet sharedInstance]
+        counterWithName:@"/santa/spool/eviction_count"
+             fieldNames:@[]
+               helpText:@"Number of spool files erased to stay under the spool size limit"];
+    std::function<void(size_t)> eviction_callback = [eviction_counter](size_t erased) {
+      [eviction_counter incrementBy:static_cast<long long>(erased) forFieldValues:@[]];
+    };
+
+    // Reports the current on-disk size of the spool directory, sampled at metric export time.
+    SNTMetricInt64Gauge* size_gauge = [[SNTMetricSet sharedInstance]
+        int64GaugeWithName:@"/santa/spool/size_bytes"
+                fieldNames:@[]
+                  helpText:@"Current on-disk size of the telemetry spool directory in bytes"];
+    std::string spool_dir =
+        ::fsspool::SpoolNewDirectory(absl::string_view(base_dir.data(), base_dir.length()));
+    [[SNTMetricSet sharedInstance] registerCallback:^{
+      auto size = ::fsspool::EstimateDirSize(spool_dir);
+      [size_gauge set:(size.ok() ? static_cast<long long>(*size) : 0) forFieldValues:@[]];
+    }];
+
     auto spool_writer = std::make_shared<Spool<T>>(q, timer_source, std::move(batcher), base_dir,
-                                                   max_spool_disk_size, max_spool_batch_size);
+                                                   max_spool_disk_size, max_spool_batch_size,
+                                                   nullptr, nullptr, std::move(eviction_callback));
 
     spool_writer->BeginFlushTask();
 
@@ -65,12 +89,13 @@ class Spool : public Writer, public std::enable_shared_from_this<Spool<T>> {
 
   Spool(dispatch_queue_t q, dispatch_source_t timer_source, T batcher, std::string_view base_dir,
         size_t max_spool_disk_size, size_t max_spool_file_size,
-        void (^write_complete_f)(void) = nullptr, void (^flush_task_complete_f)(void) = nullptr)
+        void (^write_complete_f)(void) = nullptr, void (^flush_task_complete_f)(void) = nullptr,
+        std::function<void(size_t)> eviction_callback = nullptr)
       : q_(q),
         timer_source_(timer_source),
         spool_reader_(absl::string_view(base_dir.data(), base_dir.length())),
         spool_writer_(std::move(batcher), absl::string_view(base_dir.data(), base_dir.length()),
-                      max_spool_disk_size),
+                      max_spool_disk_size, std::move(eviction_callback)),
         spool_file_size_threshold_(max_spool_file_size),
         spool_file_size_threshold_leniency_(spool_file_size_threshold_ *
                                             spool_file_size_threshold_leniency_factor_),

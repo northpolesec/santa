@@ -16,9 +16,11 @@
 #ifndef SANTA_SANTAD_LOGS_ENDPOINTSECURITY_WRITERS_FSSPOOL_FSSPOOLPLATFORMSPECIFIC_H
 #define SANTA_SANTAD_LOGS_ENDPOINTSECURITY_WRITERS_FSSPOOL_FSSPOOLPLATFORMSPECIFIC_H
 
+#include <ctime>
 #include <functional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
@@ -53,6 +55,20 @@ absl::Status WriteBuffer(int fd, absl::string_view msg);
 absl::Status IterateDirectory(
     const std::string& dir,
     std::function<void(const std::string&, bool*)> callback);
+
+// Metadata for a single regular file gathered during a bulk directory scan.
+struct DirEntryInfo {
+  std::string path;
+  time_t mtime;
+  size_t occupancy;  // true on-disk allocated size, in bytes
+};
+
+// Lists the regular files in `dir` together with their mtime and on-disk size
+// in a single getattrlistbulk(2) pass - i.e. without a stat() per file. Returns
+// the summed on-disk size of those files. When `entries` is non-null it is also
+// populated with the per-file metadata. Non-regular entries are ignored.
+absl::StatusOr<size_t> BulkStatRegularFiles(
+    const std::string& dir, std::vector<DirEntryInfo>* entries = nullptr);
 
 absl::StatusOr<size_t> EstimateDirSize(const std::string& dir);
 

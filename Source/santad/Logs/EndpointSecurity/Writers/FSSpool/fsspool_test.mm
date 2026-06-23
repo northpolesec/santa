@@ -38,9 +38,6 @@ class FsSpoolWriterPeer : public FsSpoolWriter<T> {
   // Private Methods
   using FsSpoolWriter<T>::BuildDirectoryStructureIfNeeded;
   using FsSpoolWriter<T>::EstimateSpoolDirSize;
-
-  // Private member variables
-  using FsSpoolWriter<T>::spool_size_estimate_;
 };
 
 }  // namespace fsspool
@@ -129,11 +126,12 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
   XCTAssertTrue([self.fileMgr fileExistsAtPath:fifoFile]);
 }
 
-- (void)testEstimateSpoolDirSizeAnyBatcher {
+- (void)testEstimateSpoolDirSize {
   NSString* testData = @"What a day for some testing!";
   NSString* largeTestData = RepeatedString(@"A", 10240);
   NSString* path = [NSString stringWithFormat:@"%@/%@", self.spoolDir, @"temppy.log"];
-  NSString* emptyPath = [NSString stringWithFormat:@"%@/%@", self.spoolDir, @"empty.log"];
+  NSString* secondPath = [NSString stringWithFormat:@"%@/%@", self.spoolDir, @"second.log"];
+  // EstimateSpoolDirSize is batcher-independent, so one batcher exercises it.
   auto writer = std::make_unique<FsSpoolWriterPeer<fsspool::AnyBatcher>>(
       fsspool::AnyBatcher(), [self.baseDir UTF8String], kSpoolSize);
 
@@ -141,108 +139,41 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
   XCTAssertStatusOk(writer->BuildDirectoryStructureIfNeeded());
   XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.spoolDir error:nil] count], 0);
 
-  // Ensure that the initial spool dir estimate is 0
+  // An empty spool dir estimates to 0.
   auto status = writer->EstimateSpoolDirSize();
   XCTAssertStatusOk(status);
   XCTAssertEqual(*status, 0);
 
-  // Force the current estimate to be 0 since we're not recomputing on first write.
-  writer->spool_size_estimate_ = *status;
-
+  // A file shows up in the estimate.
   XCTAssertTrue([testData writeToFile:path atomically:YES encoding:NSUTF8StringEncoding error:nil]);
-
-  // Ensure the test file was created
   XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.spoolDir error:nil] count], 1);
-
-  // Ensure the spool size estimate has grown at least as much as the content length
   status = writer->EstimateSpoolDirSize();
   XCTAssertStatusOk(status);
-  // Update the current estimate
-  writer->spool_size_estimate_ = *status;
-  XCTAssertGreaterThanOrEqual(writer->spool_size_estimate_, testData.length);
+  XCTAssertGreaterThanOrEqual(*status, testData.length);
+  size_t before_growth = *status;
 
-  // Modify file contents without modifying spool directory mtime
+  // Growing a file's contents (without touching the spool dir's mtime) is
+  // reflected immediately: every call does a fresh scan, there is no mtime cache.
   NSFileHandle* fileHandle = [NSFileHandle fileHandleForWritingAtPath:path];
   [fileHandle seekToEndOfFile];
   [fileHandle writeData:[largeTestData dataUsingEncoding:NSUTF8StringEncoding]];
   [fileHandle closeFile];
-
-  // Ensure only one file still exists
   XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.spoolDir error:nil] count], 1);
-
-  // Ensure that the returned estimate is the same as the old since mtime didn't change
   status = writer->EstimateSpoolDirSize();
   XCTAssertStatusOk(status);
-  // Check that the current estimate is the same as the old estimate
-  XCTAssertEqual(*status, writer->spool_size_estimate_);
-
-  // Create a second file in the spool dir to bump mtime
-  XCTAssertTrue([@"" writeToFile:emptyPath atomically:YES encoding:NSUTF8StringEncoding error:nil]);
-  XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.spoolDir error:nil] count], 2);
-
-  status = writer->EstimateSpoolDirSize();
-  XCTAssertStatusOk(status);
-
-  // Ensure the newly returned size is appropriate
+  XCTAssertGreaterThan(*status, before_growth);
   XCTAssertGreaterThanOrEqual(*status, testData.length + largeTestData.length);
-}
+  size_t before_second = *status;
 
-- (void)testEstimateSpoolDirSizeStreamBatcher {
-  NSString* testData = @"What a day for some testing!";
-  NSString* largeTestData = RepeatedString(@"A", 10240);
-  NSString* path = [NSString stringWithFormat:@"%@/%@", self.spoolDir, @"temppy.log"];
-  NSString* emptyPath = [NSString stringWithFormat:@"%@/%@", self.spoolDir, @"empty.log"];
-  auto writer = std::make_unique<FsSpoolWriterPeer<fsspool::UncompressedStreamBatcher>>(
-      fsspool::UncompressedStreamBatcher(), [self.baseDir UTF8String], kSpoolSize);
-
-  // Create the spool dir structure and ensure no files exist
-  XCTAssertStatusOk(writer->BuildDirectoryStructureIfNeeded());
-  XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.spoolDir error:nil] count], 0);
-
-  // Ensure that the initial spool dir estimate is 0
-  auto status = writer->EstimateSpoolDirSize();
-  XCTAssertStatusOk(status);
-  XCTAssertEqual(*status, 0);
-
-  // Force the current estimate to be 0 since we're not recomputing on first write.
-  writer->spool_size_estimate_ = *status;
-
-  XCTAssertTrue([testData writeToFile:path atomically:YES encoding:NSUTF8StringEncoding error:nil]);
-
-  // Ensure the test file was created
-  XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.spoolDir error:nil] count], 1);
-
-  // Ensure the spool size estimate has grown at least as much as the content length
-  status = writer->EstimateSpoolDirSize();
-  XCTAssertStatusOk(status);
-  // Update the current estimate
-  writer->spool_size_estimate_ = *status;
-  XCTAssertGreaterThanOrEqual(writer->spool_size_estimate_, testData.length);
-
-  // Modify file contents without modifying spool directory mtime
-  NSFileHandle* fileHandle = [NSFileHandle fileHandleForWritingAtPath:path];
-  [fileHandle seekToEndOfFile];
-  [fileHandle writeData:[largeTestData dataUsingEncoding:NSUTF8StringEncoding]];
-  [fileHandle closeFile];
-
-  // Ensure only one file still exists
-  XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.spoolDir error:nil] count], 1);
-
-  // Ensure that the returned estimate is the same as the old since mtime didn't change
-  status = writer->EstimateSpoolDirSize();
-  XCTAssertStatusOk(status);
-  // Check that the current estimate is the same as the old estimate
-  XCTAssertEqual(*status, writer->spool_size_estimate_);
-
-  // Create a second file in the spool dir to bump mtime
-  XCTAssertTrue([@"" writeToFile:emptyPath atomically:YES encoding:NSUTF8StringEncoding error:nil]);
+  // A second file adds to the total.
+  XCTAssertTrue([largeTestData writeToFile:secondPath
+                                atomically:YES
+                                  encoding:NSUTF8StringEncoding
+                                     error:nil]);
   XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.spoolDir error:nil] count], 2);
-
   status = writer->EstimateSpoolDirSize();
   XCTAssertStatusOk(status);
-
-  // Ensure the newly returned size is appropriate
-  XCTAssertGreaterThanOrEqual(*status, testData.length + largeTestData.length);
+  XCTAssertGreaterThan(*status, before_second);
 }
 
 - (void)testSimpleWriteAnyBatcher {
@@ -304,17 +235,24 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
   NSError* err = nil;
   XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.tmpDir error:&err] count], 0);
   XCTAssertNil(err);
-  XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.spoolDir error:&err] count], 1);
+  NSArray<NSString*>* afterFirst = [self.fileMgr contentsOfDirectoryAtPath:self.spoolDir
+                                                                     error:&err];
   XCTAssertNil(err);
+  XCTAssertEqual(afterFirst.count, 1);
 
-  // Try to write again, but expect failure. File counts shouldn't change.
+  // Writing again when the spool is full evicts the oldest file to make room and writes the new
+  // one, rather than dropping the write.
   XCTAssertStatusOk(writer->Write(largeMessage));
-  XCTAssertStatusNotOk(writer->Flush());
+  XCTAssertStatusOk(writer->Flush());
 
   XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.tmpDir error:&err] count], 0);
   XCTAssertNil(err);
-  XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.spoolDir error:&err] count], 1);
+  NSArray<NSString*>* afterSecond = [self.fileMgr contentsOfDirectoryAtPath:self.spoolDir
+                                                                      error:&err];
   XCTAssertNil(err);
+  // Still a single file, but it's the newer one: the oldest was evicted.
+  XCTAssertEqual(afterSecond.count, 1);
+  XCTAssertNotEqualObjects(afterFirst.firstObject, afterSecond.firstObject);
 }
 
 - (void)testSpoolFullStreamBatcher {
@@ -338,17 +276,52 @@ google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
   NSError* err = nil;
   XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.tmpDir error:&err] count], 0);
   XCTAssertNil(err);
-  XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.spoolDir error:&err] count], 1);
+  NSArray<NSString*>* afterFirst = [self.fileMgr contentsOfDirectoryAtPath:self.spoolDir
+                                                                     error:&err];
   XCTAssertNil(err);
+  XCTAssertEqual(afterFirst.count, 1);
 
-  // Try to write again, but expect failure. File counts shouldn't change.
-  XCTAssertStatusNotOk(writer->Write(largeMessage));
+  // Writing again when the spool is full evicts the oldest file to make room and writes the new
+  // one, rather than dropping the write.
+  XCTAssertStatusOk(writer->Write(largeMessage));
   XCTAssertStatusOk(writer->Flush());
 
   XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.tmpDir error:&err] count], 0);
   XCTAssertNil(err);
-  XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.spoolDir error:&err] count], 1);
+  NSArray<NSString*>* afterSecond = [self.fileMgr contentsOfDirectoryAtPath:self.spoolDir
+                                                                      error:&err];
   XCTAssertNil(err);
+  // Still a single file, but it's the newer one: the oldest was evicted.
+  XCTAssertEqual(afterSecond.count, 1);
+  XCTAssertNotEqualObjects(afterFirst.firstObject, afterSecond.firstObject);
+}
+
+- (void)testSpoolEvictionCallback {
+  // Plain locals (not __block): FsSpoolWriter invokes the callback synchronously during
+  // Write/Flush.
+  size_t totalEvicted = 0;
+  int callbackCalls = 0;
+  std::function<void(size_t)> cb = [&totalEvicted, &callbackCalls](size_t erased) {
+    totalEvicted += erased;
+    callbackCalls++;
+  };
+
+  auto writer = std::make_unique<FsSpoolWriterPeer<fsspool::AnyBatcher>>(
+      fsspool::AnyBatcher(), [self.baseDir UTF8String], kSpoolSize, cb);
+  std::vector<uint8_t> largeMessage(kSpoolSize + 1, '\x42');
+
+  // First file: the spool starts empty, so nothing is evicted.
+  XCTAssertStatusOk(writer->Write(largeMessage));
+  XCTAssertStatusOk(writer->Flush());
+  XCTAssertEqual(callbackCalls, 0);
+  XCTAssertEqual(totalEvicted, (size_t)0);
+
+  // Second file: the spool is now over the limit, so the single oldest file is evicted and the
+  // callback is invoked with the number erased.
+  XCTAssertStatusOk(writer->Write(largeMessage));
+  XCTAssertStatusOk(writer->Flush());
+  XCTAssertEqual(callbackCalls, 1);
+  XCTAssertEqual(totalEvicted, (size_t)1);
 }
 
 - (void)testWriteMessageNoFlushAnyBatcher {
