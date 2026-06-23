@@ -125,8 +125,16 @@ class FsSpoolWriter {
       // Over the limit: rather than dropping all new telemetry, erase the
       // oldest spool files to make room. This keeps the freshest data flowing
       // (and lets signal processing continue) at the cost of the oldest,
-      // not-yet-exported files.
+      // not-yet-exported files. Updates spool_size_estimate_ to the
+      // post-eviction total.
       EvictOldestSpoolFiles(files, *estimate);
+
+      // If eviction couldn't free enough space (e.g. unlinks failing on a
+      // read-only remount or immutable files), keep the spool bounded by
+      // refusing the write rather than letting it grow without limit.
+      if (spool_size_estimate_ > max_spool_size_) {
+        return absl::ResourceExhaustedError("No space left in spool directory");
+      }
     }
 
     return absl::OkStatus();
@@ -279,14 +287,14 @@ class FsSpoolWriter {
   }
 
   // Deletes the oldest spool files until the estimated on-disk size of the
-  // spool directory drops below the high-water mark (90% of max_spool_size_).
-  // Evicting to a high-water mark rather than to exactly the limit frees ~10%
+  // spool directory drops below the low-water mark (90% of max_spool_size_).
+  // Evicting to a low-water mark rather than to exactly the limit frees ~10%
   // of headroom so eviction doesn't immediately recur on the next few writes.
   // `files`/`total` come from the caller's directory walk, so no second walk is
   // needed. Updates spool_size_estimate_ to the post-eviction total.
   // Best-effort: a file that fails to unlink is left in place and skipped.
   void EvictOldestSpoolFiles(std::vector<DirEntryInfo>& files, size_t total) {
-    const size_t high_water_mark = max_spool_size_ - max_spool_size_ / 10;
+    const size_t low_water_mark = max_spool_size_ - max_spool_size_ / 10;
 
     // Oldest first.
     std::sort(files.begin(), files.end(),
@@ -296,7 +304,7 @@ class FsSpoolWriter {
 
     size_t evicted = 0;
     for (const DirEntryInfo& file : files) {
-      if (total <= high_water_mark) {
+      if (total <= low_water_mark) {
         break;
       }
       if (Unlink(file.path.c_str()) == 0) {

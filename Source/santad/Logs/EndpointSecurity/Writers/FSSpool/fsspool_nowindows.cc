@@ -23,6 +23,7 @@
 #include <unistd.h>
 
 #include <functional>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -145,10 +146,12 @@ absl::StatusOr<size_t> BulkStatRegularFiles(
 
   size_t total = 0;
   // 64KiB holds ~580 entries/call, so even a 15k-file spool is a couple dozen
-  // syscalls rather than one stat() per file.
-  char buf[64 * 1024];
+  // syscalls rather than one stat() per file. Heap-allocated (uninitialized) to
+  // keep it off the stack.
+  constexpr size_t kBufSize = 64 * 1024;
+  auto buf = std::make_unique_for_overwrite<char[]>(kBufSize);
   for (;;) {
-    int count = getattrlistbulk(fd, &attr_list, buf, sizeof(buf), 0);
+    int count = getattrlistbulk(fd, &attr_list, buf.get(), kBufSize, 0);
     if (count < 0) {
       absl::Status status = absl::ErrnoToStatus(
           errno, absl::StrCat("getattrlistbulk failed on ", dir));
@@ -159,7 +162,7 @@ absl::StatusOr<size_t> BulkStatRegularFiles(
       break;  // end of directory
     }
 
-    char* entry = buf;
+    char* entry = buf.get();
     for (int i = 0; i < count; i++) {
       // Fields are packed in attrlist order; copy them out to dodge alignment
       // issues. ATTR_CMN_RETURNED_ATTRS tells us which ones are actually
