@@ -798,7 +798,7 @@
   removeRule.state = SNTRuleStateRemove;
   SNTFileAccessRule* faaRemoveRule =
       [[SNTFileAccessRule alloc] initRemoveRuleWithName:@"AnotherRule"];
-  SNTNetworkFlowRule* nfRemoveRule = [[SNTNetworkFlowRule alloc] initRemoveRuleWithId:2];
+  SNTNetworkFlowRule* nfRemoveRule = [[SNTNetworkFlowRule alloc] initRemoveRuleWithName:@"rule-2"];
   [self.sut addExecutionRules:@[ removeRule ]
               fileAccessRules:@[ faaRemoveRule ]
              networkFlowRules:@[ nfRemoveRule ]
@@ -824,9 +824,12 @@
 }
 
 - (SNTNetworkFlowRule*)_exampleNetworkFlowAddRuleWithId:(int64_t)ruleId blob:(NSString*)blob {
-  return
-      [[SNTNetworkFlowRule alloc] initAddRuleWithId:ruleId
-                                          protoBlob:[blob dataUsingEncoding:NSUTF8StringEncoding]];
+  // `name` is the primary key; derive a unique one from the id so id and name stay 1:1 and the
+  // existing id-keyed test bodies keep their upsert/dedup semantics.
+  return [[SNTNetworkFlowRule alloc]
+      initAddRuleWithName:[NSString stringWithFormat:@"rule-%lld", ruleId]
+                   ruleId:ruleId
+                protoBlob:[blob dataUsingEncoding:NSUTF8StringEncoding]];
 }
 
 - (BOOL)_addNetworkFlowRules:(NSArray<SNTNetworkFlowRule*>*)rules
@@ -870,7 +873,7 @@
 
 - (void)testRemoveNetworkFlowRule {
   SNTNetworkFlowRule* add = [self _exampleNetworkFlowAddRuleWithId:7 blob:@"x"];
-  SNTNetworkFlowRule* remove = [[SNTNetworkFlowRule alloc] initRemoveRuleWithId:7];
+  SNTNetworkFlowRule* remove = [[SNTNetworkFlowRule alloc] initRemoveRuleWithName:@"rule-7"];
   XCTAssertTrue([self _addNetworkFlowRules:@[ add ] ruleCleanup:SNTRuleCleanupNone errors:nil]);
   XCTAssertEqual(self.sut.networkFlowRuleCount, 1);
   XCTAssertTrue([self _addNetworkFlowRules:@[ remove ] ruleCleanup:SNTRuleCleanupNone errors:nil]);
@@ -878,13 +881,59 @@
 }
 
 - (void)testRemoveNetworkFlowRuleNonexistentIsNotAnError {
-  SNTNetworkFlowRule* remove = [[SNTNetworkFlowRule alloc] initRemoveRuleWithId:999];
+  SNTNetworkFlowRule* remove = [[SNTNetworkFlowRule alloc] initRemoveRuleWithName:@"rule-999"];
   NSArray<NSError*>* errors;
   XCTAssertTrue([self _addNetworkFlowRules:@[ remove ]
                                ruleCleanup:SNTRuleCleanupNone
                                     errors:&errors]);
   XCTAssertNil(errors);
   XCTAssertEqual(self.sut.networkFlowRuleCount, 0);
+}
+
+- (void)testNetworkFlowRulesKeyedByNameNotRuleId {
+  // Two rules with distinct names and distinct rule_ids coexist; removing one by name leaves the
+  // other untouched.
+  SNTNetworkFlowRule* a = [[SNTNetworkFlowRule alloc]
+      initAddRuleWithName:@"alpha"
+                   ruleId:1
+                protoBlob:[@"a" dataUsingEncoding:NSUTF8StringEncoding]];
+  SNTNetworkFlowRule* b = [[SNTNetworkFlowRule alloc]
+      initAddRuleWithName:@"beta"
+                   ruleId:2
+                protoBlob:[@"b" dataUsingEncoding:NSUTF8StringEncoding]];
+  XCTAssertTrue(([self _addNetworkFlowRules:@[ a, b ] ruleCleanup:SNTRuleCleanupNone errors:nil]));
+  XCTAssertEqual(self.sut.networkFlowRuleCount, 2);
+
+  SNTNetworkFlowRule* removeAlpha = [[SNTNetworkFlowRule alloc] initRemoveRuleWithName:@"alpha"];
+  XCTAssertTrue([self _addNetworkFlowRules:@[ removeAlpha ]
+                               ruleCleanup:SNTRuleCleanupNone
+                                    errors:nil]);
+  NSArray<SNTNetworkFlowRule*>* all = [self.sut retrieveAllNetworkFlowRulesSnapshot].rules;
+  XCTAssertEqual(all.count, 1u);
+  XCTAssertEqualObjects(all.firstObject.ruleName, @"beta");
+}
+
+- (void)testNetworkFlowRuleIdUniqueAcrossNames {
+  // rule_id carries a UNIQUE constraint (santanetd relies on rule_id uniqueness). Under
+  // INSERT OR REPLACE, an Add reusing an existing rule_id under a different name evicts the prior
+  // row rather than producing two rows that share a rule_id.
+  SNTNetworkFlowRule* a = [[SNTNetworkFlowRule alloc]
+      initAddRuleWithName:@"alpha"
+                   ruleId:5
+                protoBlob:[@"a" dataUsingEncoding:NSUTF8StringEncoding]];
+  XCTAssertTrue([self _addNetworkFlowRules:@[ a ] ruleCleanup:SNTRuleCleanupNone errors:nil]);
+  XCTAssertEqual(self.sut.networkFlowRuleCount, 1);
+
+  SNTNetworkFlowRule* b = [[SNTNetworkFlowRule alloc]
+      initAddRuleWithName:@"beta"
+                   ruleId:5
+                protoBlob:[@"b" dataUsingEncoding:NSUTF8StringEncoding]];
+  XCTAssertTrue([self _addNetworkFlowRules:@[ b ] ruleCleanup:SNTRuleCleanupNone errors:nil]);
+
+  NSArray<SNTNetworkFlowRule*>* all = [self.sut retrieveAllNetworkFlowRulesSnapshot].rules;
+  XCTAssertEqual(all.count, 1u);
+  XCTAssertEqualObjects(all.firstObject.ruleName, @"beta");
+  XCTAssertEqual(all.firstObject.ruleId, 5);
 }
 
 - (void)testCleanAllTruncatesNetworkFlowRules {
@@ -987,7 +1036,7 @@
 
 - (void)testNetworkFlowRulesHashIsOrderIndependent {
   // Inserting the same two rules in different orders yields the same hash, since
-  // the hash sorts by rule_id ASC.
+  // the hash sorts by name ASC.
   SNTNetworkFlowRule* a = [self _exampleNetworkFlowAddRuleWithId:1 blob:@"a"];
   SNTNetworkFlowRule* b = [self _exampleNetworkFlowAddRuleWithId:2 blob:@"b"];
 
@@ -1016,7 +1065,9 @@
 
   SNTNetworkFlowRulesSnapshot* snapshot = [self.sut retrieveAllNetworkFlowRulesSnapshot];
   XCTAssertEqual(snapshot.rules.count, 2u);
+  XCTAssertEqualObjects(snapshot.rules[0].ruleName, @"rule-1");
   XCTAssertEqual(snapshot.rules[0].ruleId, 1);
+  XCTAssertEqualObjects(snapshot.rules[1].ruleName, @"rule-2");
   XCTAssertEqual(snapshot.rules[1].ruleId, 2);
   // The snapshot's hash must match the hash hashOfHashes computes for the same state.
   XCTAssertEqualObjects(snapshot.networkFlowRulesHash,

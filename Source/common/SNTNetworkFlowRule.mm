@@ -17,6 +17,7 @@
 #import "Source/common/CoderMacros.h"
 
 @interface SNTNetworkFlowRule ()
+@property(readwrite, copy) NSString* ruleName;
 @property(readwrite) int64_t ruleId;
 @property(readwrite) SNTNetworkFlowRuleState state;
 @property(readwrite, copy) NSData* protoBlob;
@@ -25,6 +26,7 @@
 @implementation SNTNetworkFlowRule
 
 - (instancetype)initWithState:(SNTNetworkFlowRuleState)state
+                     ruleName:(NSString*)ruleName
                        ruleId:(int64_t)ruleId
                     protoBlob:(NSData*)protoBlob {
   if (state != SNTNetworkFlowRuleStateAdd && state != SNTNetworkFlowRuleStateRemove) {
@@ -33,21 +35,33 @@
   self = [super init];
   if (self) {
     _state = state;
+    _ruleName = [ruleName copy];
     _ruleId = ruleId;
     _protoBlob = [protoBlob copy];
   }
   return self;
 }
 
-- (instancetype)initAddRuleWithId:(int64_t)ruleId protoBlob:(NSData*)protoBlob {
-  if (!protoBlob) {
+- (instancetype)initAddRuleWithName:(NSString*)ruleName
+                             ruleId:(int64_t)ruleId
+                          protoBlob:(NSData*)protoBlob {
+  if (ruleName.length == 0 || !protoBlob) {
     return nil;
   }
-  return [self initWithState:SNTNetworkFlowRuleStateAdd ruleId:ruleId protoBlob:protoBlob];
+  return [self initWithState:SNTNetworkFlowRuleStateAdd
+                    ruleName:ruleName
+                      ruleId:ruleId
+                   protoBlob:protoBlob];
 }
 
-- (instancetype)initRemoveRuleWithId:(int64_t)ruleId {
-  return [self initWithState:SNTNetworkFlowRuleStateRemove ruleId:ruleId protoBlob:nil];
+- (instancetype)initRemoveRuleWithName:(NSString*)ruleName {
+  if (ruleName.length == 0) {
+    return nil;
+  }
+  return [self initWithState:SNTNetworkFlowRuleStateRemove
+                    ruleName:ruleName
+                      ruleId:0
+                   protoBlob:nil];
 }
 
 + (BOOL)supportsSecureCoding {
@@ -55,6 +69,7 @@
 }
 
 - (void)encodeWithCoder:(NSCoder*)coder {
+  ENCODE(coder, ruleName);
   ENCODE_BOXABLE(coder, ruleId);
   ENCODE_BOXABLE(coder, state);
   ENCODE(coder, protoBlob);
@@ -63,6 +78,7 @@
 - (instancetype)initWithCoder:(NSCoder*)decoder {
   self = [super init];
   if (self) {
+    DECODE(decoder, ruleName, NSString);
     DECODE_SELECTOR(decoder, ruleId, NSNumber, longLongValue);
     DECODE_SELECTOR(decoder, state, NSNumber, integerValue);
     DECODE(decoder, protoBlob, NSData);

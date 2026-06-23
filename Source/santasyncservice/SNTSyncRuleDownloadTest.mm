@@ -335,12 +335,14 @@ extern SNTNetworkFlowRule* NetworkFlowRuleFromProto(const ::pbv2::NetworkFlowRul
 - (void)testNetworkFlowRuleFromProtoAdd {
   ::pbv2::NetworkFlowRule nr;
   ::pbv2::NetworkFlowRule::Add* add = nr.mutable_add();
+  add->set_name("block-egress");
   add->set_rule_id(42);
   add->set_action(::pbv2::NetworkFlowRule::ACTION_DENY);
   add->set_direction(::pbv2::NETWORK_FLOW_DIRECTION_OUTGOING);
 
   SNTNetworkFlowRule* rule = NetworkFlowRuleFromProto(nr);
   XCTAssertNotNil(rule);
+  XCTAssertEqualObjects(rule.ruleName, @"block-egress");
   XCTAssertEqual(rule.ruleId, 42);
   XCTAssertEqual(rule.state, SNTNetworkFlowRuleStateAdd);
   XCTAssertNotNil(rule.protoBlob);
@@ -348,19 +350,35 @@ extern SNTNetworkFlowRule* NetworkFlowRuleFromProto(const ::pbv2::NetworkFlowRul
   // The blob round-trips back to the originating Add.
   ::pbv2::NetworkFlowRule::Add parsed;
   XCTAssertTrue(parsed.ParseFromArray(rule.protoBlob.bytes, (int)rule.protoBlob.length));
+  XCTAssertEqual(parsed.name(), "block-egress");
   XCTAssertEqual(parsed.rule_id(), 42);
   XCTAssertEqual(parsed.action(), ::pbv2::NetworkFlowRule::ACTION_DENY);
 }
 
+- (void)testNetworkFlowRuleFromProtoAddEmptyNameIsNil {
+  ::pbv2::NetworkFlowRule nr;
+  ::pbv2::NetworkFlowRule::Add* add = nr.mutable_add();
+  add->set_rule_id(42);
+  add->set_action(::pbv2::NetworkFlowRule::ACTION_DENY);
+  add->set_direction(::pbv2::NETWORK_FLOW_DIRECTION_OUTGOING);
+  XCTAssertNil(NetworkFlowRuleFromProto(nr));
+}
+
 - (void)testNetworkFlowRuleFromProtoRemove {
   ::pbv2::NetworkFlowRule nr;
-  nr.mutable_remove()->set_rule_id(99);
+  nr.mutable_remove()->set_name("block-egress");
 
   SNTNetworkFlowRule* rule = NetworkFlowRuleFromProto(nr);
   XCTAssertNotNil(rule);
-  XCTAssertEqual(rule.ruleId, 99);
+  XCTAssertEqualObjects(rule.ruleName, @"block-egress");
   XCTAssertEqual(rule.state, SNTNetworkFlowRuleStateRemove);
   XCTAssertNil(rule.protoBlob);
+}
+
+- (void)testNetworkFlowRuleFromProtoRemoveEmptyNameIsNil {
+  ::pbv2::NetworkFlowRule nr;
+  nr.mutable_remove();
+  XCTAssertNil(NetworkFlowRuleFromProto(nr));
 }
 
 - (void)testNetworkFlowRuleFromProtoEmptyIsNil {

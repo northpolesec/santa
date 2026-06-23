@@ -102,8 +102,9 @@
 
 - (SNTNetworkFlowRule*)rule:(int64_t)ruleId {
   return [[SNTNetworkFlowRule alloc]
-      initAddRuleWithId:ruleId
-              protoBlob:[@"blob" dataUsingEncoding:NSUTF8StringEncoding]];
+      initAddRuleWithName:[NSString stringWithFormat:@"rule-%lld", ruleId]
+                   ruleId:ruleId
+                protoBlob:[@"blob" dataUsingEncoding:NSUTF8StringEncoding]];
 }
 
 - (void)testReconcileSeedsFullConfigWhenNothingPushedYet {

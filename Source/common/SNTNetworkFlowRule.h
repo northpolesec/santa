@@ -22,19 +22,26 @@ typedef NS_ENUM(NSInteger, SNTNetworkFlowRuleState) {
 
 /// Wire-format wrapper for a single NetworkFlowRule from the sync server.
 /// Carries the raw serialized NetworkFlowRule.Add proto bytes when state == Add.
-/// Carries only ruleId when state == Remove.
+/// Carries only ruleName when state == Remove.
+///
+/// ruleName is the primary key. ruleId is the rule's version; it is carried on
+/// Add rules (and stored, unique, alongside the name) but is not part of a
+/// Remove, which identifies the rule to delete by name alone.
 @interface SNTNetworkFlowRule : NSObject <NSSecureCoding>
 
+@property(readonly, copy) NSString* ruleName;
 @property(readonly) int64_t ruleId;
 @property(readonly) SNTNetworkFlowRuleState state;
 
 /// Serialized NetworkFlowRule.Add proto bytes. Nil for Remove rules.
 @property(readonly, copy) NSData* protoBlob;
 
-/// Construct an Add rule. Returns nil if protoBlob is nil.
-- (instancetype)initAddRuleWithId:(int64_t)ruleId protoBlob:(NSData*)protoBlob;
+/// Construct an Add rule. Returns nil if ruleName is empty or protoBlob is nil.
+- (instancetype)initAddRuleWithName:(NSString*)ruleName
+                             ruleId:(int64_t)ruleId
+                          protoBlob:(NSData*)protoBlob;
 
-/// Construct a Remove rule.
-- (instancetype)initRemoveRuleWithId:(int64_t)ruleId;
+/// Construct a Remove rule. Returns nil if ruleName is empty.
+- (instancetype)initRemoveRuleWithName:(NSString*)ruleName;
 
 @end
