@@ -880,13 +880,13 @@ BlockGenResult CreatePolicyBlockGen() {
 }
 
 - (void)testIsWatchItemNameValid {
-  // Only legal C identifiers should be accepted
+  // Resource names: 1-63 chars of letters, digits, periods, colons, hyphens,
+  // and underscores.
   XCTAssertFalse(IsWatchItemNameValid(nil, nil));
   XCTAssertFalse(IsWatchItemNameValid(@"", nil));
-  XCTAssertFalse(IsWatchItemNameValid(@"1abc", nil));
-  XCTAssertFalse(IsWatchItemNameValid(@"abc-1234", nil));
   XCTAssertFalse(IsWatchItemNameValid(@"a=b", nil));
   XCTAssertFalse(IsWatchItemNameValid(@"a!b", nil));
+  XCTAssertFalse(IsWatchItemNameValid(@"a b", nil));
   XCTAssertFalse(IsWatchItemNameValid(@(1), nil));
   XCTAssertFalse(IsWatchItemNameValid(@[], nil));
   XCTAssertFalse(IsWatchItemNameValid(@{}, nil));
@@ -895,11 +895,14 @@ BlockGenResult CreatePolicyBlockGen() {
   XCTAssertTrue(IsWatchItemNameValid(@"_", nil));
   XCTAssertTrue(IsWatchItemNameValid(@"_1", nil));
   XCTAssertTrue(IsWatchItemNameValid(@"_1_", nil));
+  XCTAssertTrue(IsWatchItemNameValid(@"1abc", nil));
+  XCTAssertTrue(IsWatchItemNameValid(@"abc-1234", nil));
   XCTAssertTrue(IsWatchItemNameValid(@"abc", nil));
   XCTAssertTrue(IsWatchItemNameValid(@"A", nil));
   XCTAssertTrue(IsWatchItemNameValid(@"A_B", nil));
   XCTAssertTrue(IsWatchItemNameValid(@"FooName", nil));
   XCTAssertTrue(IsWatchItemNameValid(@"bar_Name", nil));
+  XCTAssertTrue(IsWatchItemNameValid(@"rule.v2:prod", nil));
   XCTAssertTrue(IsWatchItemNameValid(RepeatedString(@"A", 63), nil));
 }
 

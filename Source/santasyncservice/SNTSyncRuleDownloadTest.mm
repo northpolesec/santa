@@ -285,7 +285,7 @@ extern SNTNetworkFlowRule* NetworkFlowRuleFromProto(const ::pbv2::NetworkFlowRul
     ::pbv2::FileAccessRule::Path* path = addRule->add_paths();
     path->set_path("/foo");
     path->set_path_type(::pbv2::FileAccessRule::Path::PATH_TYPE_LITERAL);
-    addRule->set_name("my-test-rule");
+    addRule->set_name("my test rule");
     addRule->set_version("v1");
     addRule->set_rule_type(::pbv2::FileAccessRule::RULE_TYPE_PROCESSES_WITH_DENIED_PATHS);
 

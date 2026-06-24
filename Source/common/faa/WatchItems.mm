@@ -78,9 +78,10 @@ static constexpr NSUInteger kMaxTeamIDLength = 10;
 // Semi-arbitrary upper bound.
 static constexpr NSUInteger kMaxSigningIDLength = 512;
 
-// FAA Rule names must conform to rules for valid C identifiers
+// FAA Rule names are 1-63 byte resource names containing only letters, digits,
+// periods, colons, hyphens, and underscores.
 static constexpr NSUInteger kMaxRuleNameLength = 63;
-static NSString* const kValidRuleNamePattern = @"^[A-Za-z_][A-Za-z0-9_]*$";
+static NSString* const kValidRuleNamePattern = @"^[A-Za-z0-9._:-]+$";
 
 // Semi-arbitrary min/max allowed reapplication frequency.
 // Goal is to prevent a configuration setting that would cause too much
@@ -617,7 +618,7 @@ bool IsWatchItemNameValid(id key, NSError** err) {
   static NSRegularExpression* regex;
 
   dispatch_once(&once_token, ^{
-    // Should only match legal C identifiers
+    // Letters, digits, periods, colons, hyphens, and underscores.
     regex = [NSRegularExpression regularExpressionWithPattern:kValidRuleNamePattern
                                                       options:0
                                                         error:nil];
