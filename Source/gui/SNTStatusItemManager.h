@@ -33,4 +33,20 @@
 /// @param available YES if a TMM policy is available, NO otherwise
 - (void)setTemporaryMonitorModePolicyAvailable:(BOOL)available;
 
+- (void)enterAdminModeWithExpiration:(NSDate*)expiration;
+- (void)leaveAdminMode;
+
+/// Sets whether the temporary admin mode menu items should be visible
+/// @param available YES if a TAM policy is available and the user is not already an admin
+- (void)setTemporaryAdminModeAvailable:(BOOL)available;
+
+/// Notifies the daemon that the current user's session has resigned active (fast user switch).
+/// If an admin session is active for this user, asks the daemon to end it with SessionEnded.
+- (void)temporaryAdminModeSessionResignedActive;
+
+/// Re-queries the daemon for live Monitor/Admin session and availability state. Called when the
+/// user's session becomes active again (e.g. returning from fast user switching) to reconcile any
+/// daemon notifications missed while the session was inactive.
+- (void)reconcileTimedModeState;
+
 @end
