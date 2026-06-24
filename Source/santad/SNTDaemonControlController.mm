@@ -1156,7 +1156,7 @@ static const char* const kAllowedCanonicalBundlePaths[] = {
 }
 
 - (void)checkTemporaryMonitorModePolicyAvailable:(void (^)(BOOL))reply {
-  reply(_temporaryMonitorMode->Available(nil));
+  reply(_temporaryMonitorMode->Available());
 }
 
 #pragma mark Network Extension Ops
