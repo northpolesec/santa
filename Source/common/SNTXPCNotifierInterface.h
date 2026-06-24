@@ -46,6 +46,12 @@
 - (void)enterTemporaryMonitorMode:(NSDate*)expiration;
 - (void)leaveTemporaryMonitorMode;
 - (void)temporaryMonitorModePolicyAvailable:(BOOL)available;
+- (void)authorizeTemporaryAdminModeRequiringJustification:(BOOL)requireJustification
+                                                    reply:(void (^)(BOOL authenticated,
+                                                                    NSString* reason))reply;
+- (void)enterTemporaryAdminMode:(NSDate*)expiration;
+- (void)leaveTemporaryAdminMode;
+- (void)temporaryAdminModeAvailable:(BOOL)available;
 - (void)setNetworkExtensionFilterEnabled:(BOOL)enabled reply:(void (^)(BOOL success))reply;
 @end
 

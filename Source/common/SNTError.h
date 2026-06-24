@@ -55,6 +55,16 @@ typedef NS_ENUM(NSInteger, SNTErrorCode) {
   SNTErrorCodeTMMInvalidSyncServer = 612,
   SNTErrorCodeTMMAuthFailed = 613,
 
+  // Temporary Admin Mode errors
+  SNTErrorCodeTAMNoPolicy = 614,
+  SNTErrorCodeTAMInvalidSyncServer = 615,
+  SNTErrorCodeTAMAuthFailed = 616,
+  SNTErrorCodeTAMAlreadyAdmin = 617,
+  SNTErrorCodeTAMMembershipChangeFailed = 618,
+  SNTErrorCodeTAMNoConsoleUser = 619,
+  SNTErrorCodeTAMSessionAlreadyActive = 620,
+  SNTErrorCodeTAMJustificationRequired = 621,
+
   // Network Extension errors
   SNTErrorCodeNetworkExtensionNotAuthorized = 710,
   SNTErrorCodeNetworkExtensionProtocolVersionInvalid = 711,
