@@ -200,4 +200,12 @@
   }
 }
 
+- (void)authorizeTemporaryAdminModeRequiringJustification:(BOOL)requireJustification
+                                                    reply:(void (^)(BOOL authenticated,
+                                                                    NSString* reason))reply {
+  [[self.notifierConnection synchronousRemoteObjectProxy]
+      authorizeTemporaryAdminModeRequiringJustification:requireJustification
+                                                  reply:reply];
+}
+
 @end
