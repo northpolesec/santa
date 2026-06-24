@@ -763,6 +763,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
   return [self addExecutionRules:executionRules
                  fileAccessRules:nil
                 networkFlowRules:nil
+                         signals:nil
                      ruleCleanup:cleanupType
                           errors:errors];
 }
@@ -770,15 +771,16 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
 - (BOOL)addExecutionRules:(NSArray<SNTRule*>*)executionRules
           fileAccessRules:(NSArray<SNTFileAccessRule*>*)fileAccessRules
          networkFlowRules:(NSArray<SNTNetworkFlowRule*>*)networkFlowRules
+                  signals:(NSArray<SNTSignal*>*)signals
               ruleCleanup:(SNTRuleCleanup)cleanupType
                    errors:(NSArray<NSError*>**)errors {
   // Only accept all-empty rule arrays if the cleanup-type is not none.
   if (executionRules.count == 0 && fileAccessRules.count == 0 && networkFlowRules.count == 0 &&
-      cleanupType == SNTRuleCleanupNone) {
+      signals.count == 0 && cleanupType == SNTRuleCleanupNone) {
     if (errors) {
       *errors = @[ [SNTError createErrorWithCode:SNTErrorCodeEmptyRuleArray
-                                          format:@"Empty execution, file access, and network "
-                                                 @"flow rule arrays"] ];
+                                          format:@"Empty execution, file access, network flow, and "
+                                                 @"signal rule arrays"] ];
     }
     return NO;
   }
@@ -788,20 +790,26 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
   __block NSString* faaRulesHashBefore;
   __block NSString* faaRulesHashAfter;
   __block int64_t faaRuleCount = 0;
+  __block NSString* signalRulesHashBefore;
+  __block NSString* signalRulesHashAfter;
+  __block int64_t signalRuleCount = 0;
 
   [self inTransaction:^(FMDatabase* db, BOOL* rollback) {
     faaRulesHashBefore = [self fileAccessRulesHashSerialized:db];
+    signalRulesHashBefore = [self signalRulesHashSerialized:db];
     switch (cleanupType) {
       case SNTRuleCleanupAll:
         [db executeUpdate:@"DELETE FROM execution_rules"];
         [db executeUpdate:@"DELETE FROM file_access_rules"];
         [db executeUpdate:@"DELETE FROM network_flow_rules"];
+        [db executeUpdate:@"DELETE FROM signal_rules"];
         break;
       case SNTRuleCleanupNonTransitive:
         [db executeUpdate:@"DELETE FROM execution_rules WHERE state != ?",
                           @(SNTRuleStateAllowTransitive)];
         [db executeUpdate:@"DELETE FROM file_access_rules"];
         [db executeUpdate:@"DELETE FROM network_flow_rules"];
+        [db executeUpdate:@"DELETE FROM signal_rules"];
         break;
       case SNTRuleCleanupExecutionRules:
         [db executeUpdate:@"DELETE FROM execution_rules WHERE state != ?",
@@ -831,6 +839,11 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
       return;
     }
 
+    if (![self addSignals:signals toDB:db errors:blockErrors]) {
+      *rollback = failed = YES;
+      return;
+    }
+
     // Clear the rules hashes
     self.cachedExecutionRulesHash = nil;
     self.cachedFileAccessRulesHash = nil;
@@ -838,82 +851,66 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
 
     faaRulesHashAfter = [self fileAccessRulesHashSerialized:db];
     faaRuleCount = [self fileAccessRuleCountSerialized:db];
+    signalRulesHashAfter = [self signalRulesHashSerialized:db];
+    signalRuleCount = [self signalRuleCountSerialized:db];
   }];
 
   if (blockErrors.count > 0 && errors) {
     *errors = [blockErrors copy];
   }
 
-  // If the DB updated successfully, call the "rules changed" callback if appropriate
+  // If the DB updated successfully, call the "rules changed" callbacks if appropriate
   if (!failed && self.fileAccessRulesChangedCallback &&
       ![faaRulesHashBefore isEqualToString:faaRulesHashAfter]) {
     self.fileAccessRulesChangedCallback(faaRuleCount);
   }
-
-  return !failed;
-}
-
-- (BOOL)updateSignals:(NSArray<SNTSignal*>*)signals cleanReplace:(BOOL)cleanReplace {
-  __block BOOL failed = NO;
-  __block NSString* signalRulesHashBefore;
-  __block NSString* signalRulesHashAfter;
-  __block int64_t signalRuleCount = 0;
-
-  [self inTransaction:^(FMDatabase* db, BOOL* rollback) {
-    signalRulesHashBefore = [self signalRulesHashSerialized:db];
-
-    // On a clean sync the server sends the full set, so delete everything first. On a normal
-    // sync the server sends incremental add/remove rules.
-    if (cleanReplace) {
-      if (![db executeUpdate:@"DELETE FROM signal_rules"]) {
-        LOGE(@"Failed to clear signal rules: %@", [db lastErrorMessage]);
-        *rollback = failed = YES;
-        return;
-      }
-    }
-
-    for (SNTSignal* signal in signals) {
-      if (![signal isKindOfClass:[SNTSignal class]] || signal.name.length == 0) {
-        LOGE(@"Signal array contained invalid entry: %@", signal);
-        *rollback = failed = YES;
-        return;
-      }
-
-      if (signal.state == SNTSignalStateRemove) {
-        if (![db executeUpdate:@"DELETE FROM signal_rules WHERE name=?", signal.name]) {
-          LOGE(@"Failed to delete signal rule: %@", [db lastErrorMessage]);
-          *rollback = failed = YES;
-          return;
-        }
-      } else if (signal.data.length > 0) {
-        if (![db executeUpdate:
-                     @"INSERT OR REPLACE INTO signal_rules (name, rule_data) VALUES (?, ?)",
-                     signal.name, signal.data]) {
-          LOGE(@"Failed to insert signal rule: %@", [db lastErrorMessage]);
-          *rollback = failed = YES;
-          return;
-        }
-      } else {
-        LOGE(@"Signal add rule missing data: %@", signal);
-        *rollback = failed = YES;
-        return;
-      }
-    }
-
-    // Clear the cached hash so it is recomputed against the new contents.
-    self.cachedSignalRulesHash = nil;
-
-    signalRulesHashAfter = [self signalRulesHashSerialized:db];
-    signalRuleCount = [self signalRuleCountSerialized:db];
-  }];
-
-  // If the DB updated successfully, call the "rules changed" callback if appropriate.
   if (!failed && self.signalRulesChangedCallback &&
       ![signalRulesHashBefore isEqualToString:signalRulesHashAfter]) {
     self.signalRulesChangedCallback(signalRuleCount);
   }
 
   return !failed;
+}
+
+- (BOOL)addSignals:(NSArray<SNTSignal*>*)signals
+              toDB:(FMDatabase*)db
+            errors:(NSMutableArray<NSError*>*)errors {
+  for (SNTSignal* signal in signals) {
+    if (![signal isKindOfClass:[SNTSignal class]] || signal.name.length == 0) {
+      [errors addObject:[SNTError createErrorWithCode:SNTErrorCodeRuleInvalid
+                                              message:@"Signal array contained invalid entry"
+                                               detail:signal.description]];
+      return NO;
+    }
+
+    if (signal.state == SNTSignalStateRemove) {
+      if (![db executeUpdate:@"DELETE FROM signal_rules WHERE name=?", signal.name]) {
+        [errors addObject:[SNTError createErrorWithCode:SNTErrorCodeRemoveRuleFailed
+                                                message:@"A database error occurred while deleting "
+                                                        @"a signal rule"
+                                                 detail:[db lastErrorMessage]]];
+        return NO;
+      }
+    } else if (signal.data.length > 0) {
+      if (![db executeUpdate:@"INSERT OR REPLACE INTO signal_rules (name, rule_data) VALUES (?, ?)",
+                             signal.name, signal.data]) {
+        [errors addObject:[SNTError createErrorWithCode:SNTErrorCodeInsertOrReplaceRuleFailed
+                                                message:@"A database error occurred while "
+                                                        @"inserting/replacing a signal rule"
+                                                 detail:[db lastErrorMessage]]];
+        return NO;
+      }
+    } else {
+      [errors addObject:[SNTError createErrorWithCode:SNTErrorCodeRuleInvalid
+                                              message:@"Signal add rule missing data"
+                                               detail:signal.description]];
+      return NO;
+    }
+  }
+
+  // Clear the cached hash so it is recomputed against the new contents.
+  self.cachedSignalRulesHash = nil;
+  return YES;
 }
 
 - (NSArray<SNTSignal*>*)retrieveAllSignals {

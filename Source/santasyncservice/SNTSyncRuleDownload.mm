@@ -556,31 +556,9 @@ void ProcessDeprecatedBundleNotificationsForRule(
     return NO;
   }
 
-  // Apply telemetry signals (sync v2 only). On a clean sync the full set replaces what's stored;
-  // on a normal sync the received signals are upserted by name. Applied before the early-return
-  // below so a signals-only sync still takes effect. A failure is non-fatal — the signals are
-  // re-sent on the next sync.
-  if (self.syncState.isSyncV2) {
-    BOOL cleanReplace = (self.syncState.syncType == SNTSyncTypeClean ||
-                         self.syncState.syncType == SNTSyncTypeCleanAll);
-    dispatch_semaphore_t signalSema = dispatch_semaphore_create(0);
-    [[self.daemonConn remoteObjectProxy] databaseUpdateSignals:newRules.signals
-                                                  cleanReplace:cleanReplace
-                                                         reply:^(BOOL success) {
-                                                           if (!success) {
-                                                             SLOGW(@"Failed to update telemetry "
-                                                                   @"signals");
-                                                           }
-                                                           dispatch_semaphore_signal(signalSema);
-                                                         }];
-    if (dispatch_semaphore_wait(signalSema, dispatch_time(DISPATCH_TIME_NOW, 30 * NSEC_PER_SEC))) {
-      SLOGW(@"Timeout updating telemetry signals");
-    }
-  }
-
   // If the request was successfully completed, but no new rules received, just return
   if (!newRules.executionRules.count && !newRules.fileAccessRules.count &&
-      !newRules.networkRules.count) {
+      !newRules.networkRules.count && !newRules.signals.count) {
     return YES;
   }
 
@@ -593,6 +571,7 @@ void ProcessDeprecatedBundleNotificationsForRule(
       databaseRuleAddExecutionRules:newRules.executionRules
                     fileAccessRules:newRules.fileAccessRules
                    networkFlowRules:newRules.networkRules
+                            signals:newRules.signals
                         ruleCleanup:SyncTypeToRuleCleanup(self.syncState.syncType)
                              source:SNTRuleAddSourceSyncService
                               reply:^(BOOL didSucceed, NSArray<NSError*>* e) {

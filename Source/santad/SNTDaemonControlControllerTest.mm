@@ -304,6 +304,7 @@ static NSString* const kBinarySHA256 =
   OCMStub([self.mockRuleTable addExecutionRules:OCMOCK_ANY
                                 fileAccessRules:OCMOCK_ANY
                                networkFlowRules:OCMOCK_ANY
+                                        signals:OCMOCK_ANY
                                     ruleCleanup:SNTRuleCleanupNone
                                          errors:[OCMArg anyObjectRef]])
       .andDo(^(NSInvocation* inv) {
@@ -317,6 +318,7 @@ static NSString* const kBinarySHA256 =
   [self.sut databaseRuleAddExecutionRules:@[]
                           fileAccessRules:@[]
                          networkFlowRules:@[ nfRule ]
+                                  signals:@[]
                               ruleCleanup:SNTRuleCleanupNone
                                    source:SNTRuleAddSourceSyncService
                                     reply:^(BOOL success, NSArray<NSError*>* errors) {

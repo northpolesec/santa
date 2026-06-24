@@ -241,6 +241,7 @@ double watchdogRAMPeak = 0;
 - (void)databaseRuleAddExecutionRules:(NSArray<SNTRule*>*)executionRules
                       fileAccessRules:(NSArray<SNTFileAccessRule*>*)fileAccessRules
                      networkFlowRules:(NSArray<SNTNetworkFlowRule*>*)networkFlowRules
+                              signals:(NSArray<SNTSignal*>*)signals
                           ruleCleanup:(SNTRuleCleanup)cleanupType
                                source:(SNTRuleAddSource)source
                                 reply:(void (^)(BOOL, NSArray<NSError*>* error))reply {
@@ -269,6 +270,7 @@ double watchdogRAMPeak = 0;
   BOOL success = [ruleTable addExecutionRules:executionRules
                               fileAccessRules:fileAccessRules
                              networkFlowRules:networkFlowRules
+                                      signals:signals
                                   ruleCleanup:cleanupType
                                        errors:&errors];
 
@@ -296,12 +298,6 @@ double watchdogRAMPeak = 0;
 
 - (void)databaseRemoveEventsWithIDs:(NSArray*)ids {
   [[SNTDatabaseController eventTable] deleteEventsWithIds:ids];
-}
-
-- (void)databaseUpdateSignals:(NSArray<SNTSignal*>*)signals
-                 cleanReplace:(BOOL)cleanReplace
-                        reply:(void (^)(BOOL))reply {
-  reply([[SNTDatabaseController ruleTable] updateSignals:signals cleanReplace:cleanReplace]);
 }
 
 - (void)databaseRuleForIdentifiers:(SNTRuleIdentifiers*)identifiers

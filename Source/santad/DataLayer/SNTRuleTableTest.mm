@@ -215,6 +215,7 @@
   XCTAssertFalse([self.sut addExecutionRules:@[]
                              fileAccessRules:@[]
                             networkFlowRules:@[]
+                                     signals:@[]
                                  ruleCleanup:SNTRuleCleanupNone
                                       errors:&errors]);
   XCTAssertEqual(errors.count, 1);
@@ -271,6 +272,7 @@
   [self.sut addExecutionRules:@[]
               fileAccessRules:@[ r1 ]
              networkFlowRules:nil
+                      signals:nil
                   ruleCleanup:SNTRuleCleanupNone
                        errors:&errors];
   XCTAssertNil(errors);
@@ -280,6 +282,7 @@
   [self.sut addExecutionRules:@[]
               fileAccessRules:@[ r2 ]
              networkFlowRules:nil
+                      signals:nil
                   ruleCleanup:SNTRuleCleanupNone
                        errors:&errors];
   XCTAssertNil(errors);
@@ -297,6 +300,7 @@
   [self.sut addExecutionRules:@[]
               fileAccessRules:@[ r3 ]
              networkFlowRules:nil
+                      signals:nil
                   ruleCleanup:SNTRuleCleanupNone
                        errors:&errors];
   XCTAssertNil(errors);
@@ -326,6 +330,7 @@
   [self.sut addExecutionRules:@[ execRule ]
               fileAccessRules:@[ faaRule ]
              networkFlowRules:nil
+                      signals:nil
                   ruleCleanup:SNTRuleCleanupNone
                        errors:&errors];
 
@@ -339,6 +344,7 @@
   [self.sut addExecutionRules:@[ execRule ]
               fileAccessRules:@[]
              networkFlowRules:nil
+                      signals:nil
                   ruleCleanup:SNTRuleCleanupNone
                        errors:&errors];
   XCTAssertSemaFalse(sema, "Rules changed callback was unexpectedly called");
@@ -352,6 +358,7 @@
   [self.sut addExecutionRules:@[ execRule ]
               fileAccessRules:@[ faaRule ]
              networkFlowRules:nil
+                      signals:nil
                   ruleCleanup:SNTRuleCleanupNone
                        errors:&errors];
 
@@ -777,6 +784,7 @@
   [self.sut addExecutionRules:rules
               fileAccessRules:faaRules
              networkFlowRules:nfRules
+                      signals:nil
                   ruleCleanup:SNTRuleCleanupAll
                        errors:nil];
   SNTRuleTableRulesHash* rulesHash = [self.sut hashOfHashes];
@@ -802,6 +810,7 @@
   [self.sut addExecutionRules:@[ removeRule ]
               fileAccessRules:@[ faaRemoveRule ]
              networkFlowRules:@[ nfRemoveRule ]
+                      signals:nil
                   ruleCleanup:SNTRuleCleanupNone
                        errors:nil];
   rulesHash = [self.sut hashOfHashes];
@@ -838,6 +847,7 @@
   return [self.sut addExecutionRules:nil
                      fileAccessRules:nil
                     networkFlowRules:rules
+                             signals:nil
                          ruleCleanup:cleanup
                               errors:errors];
 }
@@ -958,6 +968,7 @@
   XCTAssertTrue([self.sut addExecutionRules:@[ [self _exampleBinaryRule] ]
                             fileAccessRules:nil
                            networkFlowRules:nil
+                                    signals:nil
                                 ruleCleanup:SNTRuleCleanupNonTransitive
                                      errors:nil]);
   XCTAssertEqual(self.sut.networkFlowRuleCount, 0);
@@ -972,6 +983,7 @@
   XCTAssertTrue([self.sut addExecutionRules:@[ [self _exampleBinaryRule] ]
                             fileAccessRules:nil
                            networkFlowRules:nil
+                                    signals:nil
                                 ruleCleanup:SNTRuleCleanupExecutionRules
                                      errors:nil]);
   XCTAssertEqual(self.sut.networkFlowRuleCount, 1);
@@ -982,6 +994,7 @@
   XCTAssertFalse([self.sut addExecutionRules:@[]
                              fileAccessRules:@[]
                             networkFlowRules:@[]
+                                     signals:@[]
                                  ruleCleanup:SNTRuleCleanupNone
                                       errors:&errors]);
   XCTAssertEqual(errors.count, 1);
@@ -996,6 +1009,7 @@
   XCTAssertTrue([self.sut addExecutionRules:@[]
                             fileAccessRules:@[]
                            networkFlowRules:@[ r ]
+                                    signals:nil
                                 ruleCleanup:SNTRuleCleanupNone
                                      errors:&errors]);
   XCTAssertNil(errors);
@@ -1129,13 +1143,24 @@
                                            data:[NSData dataWithBytes:bytes length:sizeof(bytes)]];
 }
 
+- (BOOL)_addSignals:(NSArray<SNTSignal*>*)signals
+        ruleCleanup:(SNTRuleCleanup)cleanup
+             errors:(NSArray<NSError*>**)errors {
+  return [self.sut addExecutionRules:nil
+                     fileAccessRules:nil
+                    networkFlowRules:nil
+                             signals:signals
+                         ruleCleanup:cleanup
+                              errors:errors];
+}
+
 - (void)testSetAndRetrieveSignals {
   XCTAssertEqual([self.sut signalRuleCount], 0);
 
   SNTSignal* a = [self _signalNamed:@"CRED-001" byte:0x11];
   SNTSignal* b = [self _signalNamed:@"CRED-002" byte:0x22];
-  NSArray<SNTSignal*>* signals = @[ a, b ];
-  XCTAssertTrue([self.sut updateSignals:signals cleanReplace:YES]);
+  NSArray* signals = @[ a, b ];
+  XCTAssertTrue([self _addSignals:signals ruleCleanup:SNTRuleCleanupAll errors:nil]);
   XCTAssertEqual([self.sut signalRuleCount], 2);
 
   NSMutableDictionary<NSString*, NSData*>* got = [NSMutableDictionary dictionary];
@@ -1146,32 +1171,32 @@
   XCTAssertEqualObjects(got[@"CRED-002"], b.data);
 }
 
-- (void)testUpdateSignalsCleanReplace {
-  NSArray<SNTSignal*>* initial =
-      @[ [self _signalNamed:@"A" byte:1], [self _signalNamed:@"B" byte:2] ];
-  XCTAssertTrue([self.sut updateSignals:initial cleanReplace:YES]);
+- (void)testSignalsCleanReplace {
+  NSArray* signals = @[ [self _signalNamed:@"A" byte:1], [self _signalNamed:@"B" byte:2] ];
+  XCTAssertTrue([self _addSignals:signals ruleCleanup:SNTRuleCleanupAll errors:nil]);
   XCTAssertEqual([self.sut signalRuleCount], 2);
 
-  // A clean-replace with a new full set replaces the previous one entirely.
-  XCTAssertTrue([self.sut updateSignals:@[ [self _signalNamed:@"C" byte:3] ] cleanReplace:YES]);
+  // A clean sync with a new full set replaces the previous one entirely.
+  XCTAssertTrue([self _addSignals:@[ [self _signalNamed:@"C" byte:3] ]
+                      ruleCleanup:SNTRuleCleanupAll
+                           errors:nil]);
   XCTAssertEqual([self.sut signalRuleCount], 1);
   XCTAssertEqualObjects([self.sut retrieveAllSignals].firstObject.name, @"C");
 
-  // A clean-replace with an empty set clears them.
-  XCTAssertTrue([self.sut updateSignals:@[] cleanReplace:YES]);
+  // A clean sync with an empty signal set clears them.
+  XCTAssertTrue([self _addSignals:@[] ruleCleanup:SNTRuleCleanupAll errors:nil]);
   XCTAssertEqual([self.sut signalRuleCount], 0);
 }
 
-- (void)testUpdateSignalsUpsert {
-  NSArray<SNTSignal*>* initial =
-      @[ [self _signalNamed:@"A" byte:1], [self _signalNamed:@"B" byte:2] ];
-  XCTAssertTrue([self.sut updateSignals:initial cleanReplace:YES]);
+- (void)testSignalsUpsert {
+  NSArray* signals = @[ [self _signalNamed:@"A" byte:1], [self _signalNamed:@"B" byte:2] ];
+  XCTAssertTrue([self _addSignals:signals ruleCleanup:SNTRuleCleanupAll errors:nil]);
   XCTAssertEqual([self.sut signalRuleCount], 2);
 
-  // A non-clean update upserts by name: "B" is updated, "C" added, "A" left untouched.
+  // A normal (non-clean) sync upserts by name: "B" is updated, "C" added, "A" left untouched.
   SNTSignal* newB = [self _signalNamed:@"B" byte:9];
-  NSArray<SNTSignal*>* delta = @[ newB, [self _signalNamed:@"C" byte:3] ];
-  XCTAssertTrue([self.sut updateSignals:delta cleanReplace:NO]);
+  signals = @[ newB, [self _signalNamed:@"C" byte:3] ];
+  XCTAssertTrue([self _addSignals:signals ruleCleanup:SNTRuleCleanupNone errors:nil]);
   XCTAssertEqual([self.sut signalRuleCount], 3);
 
   NSMutableDictionary<NSString*, NSData*>* got = [NSMutableDictionary dictionary];
@@ -1181,22 +1206,16 @@
   XCTAssertEqualObjects(got[@"B"], newB.data);  // replaced
   XCTAssertNotNil(got[@"A"]);                   // preserved
   XCTAssertNotNil(got[@"C"]);                   // added
-
-  // An empty non-clean update is a no-op (does not clear).
-  XCTAssertTrue([self.sut updateSignals:@[] cleanReplace:NO]);
-  XCTAssertEqual([self.sut signalRuleCount], 3);
 }
 
-- (void)testUpdateSignalsRemove {
-  NSArray<SNTSignal*>* initial =
-      @[ [self _signalNamed:@"A" byte:1], [self _signalNamed:@"B" byte:2] ];
-  XCTAssertTrue([self.sut updateSignals:initial cleanReplace:YES]);
+- (void)testSignalsRemove {
+  NSArray* signals = @[ [self _signalNamed:@"A" byte:1], [self _signalNamed:@"B" byte:2] ];
+  XCTAssertTrue([self _addSignals:signals ruleCleanup:SNTRuleCleanupAll errors:nil]);
   XCTAssertEqual([self.sut signalRuleCount], 2);
 
   // A non-clean update with a remove rule deletes by name; an add in the same batch is applied.
-  NSArray<SNTSignal*>* delta =
-      @[ [[SNTSignal alloc] initRemoveRuleWithName:@"A"], [self _signalNamed:@"C" byte:3] ];
-  XCTAssertTrue([self.sut updateSignals:delta cleanReplace:NO]);
+  signals = @[ [[SNTSignal alloc] initRemoveRuleWithName:@"A"], [self _signalNamed:@"C" byte:3] ];
+  XCTAssertTrue([self _addSignals:signals ruleCleanup:SNTRuleCleanupNone errors:nil]);
   XCTAssertEqual([self.sut signalRuleCount], 2);
 
   NSMutableSet<NSString*>* names = [NSMutableSet set];
@@ -1208,9 +1227,27 @@
   XCTAssertTrue([names containsObject:@"C"]);   // added
 
   // Removing a non-existent signal is harmless.
-  XCTAssertTrue([self.sut updateSignals:@[ [[SNTSignal alloc] initRemoveRuleWithName:@"nope"] ]
-                           cleanReplace:NO]);
+  XCTAssertTrue([self _addSignals:@[ [[SNTSignal alloc] initRemoveRuleWithName:@"nope"] ]
+                      ruleCleanup:SNTRuleCleanupNone
+                           errors:nil]);
   XCTAssertEqual([self.sut signalRuleCount], 2);
+}
+
+// Signals ride the unified add method alongside the other rule types, in one transaction.
+- (void)testAddRulesAppliesSignals {
+  SNTSignal* sig = [self _signalNamed:@"CRED-001" byte:0x11];
+  NSArray<NSError*>* errors;
+  XCTAssertTrue([self.sut addExecutionRules:@[ [self _exampleBinaryRule] ]
+                            fileAccessRules:nil
+                           networkFlowRules:@[ [self _exampleNetworkFlowAddRuleWithId:1
+                                                                                 blob:@"blob"] ]
+                                    signals:@[ sig ]
+                                ruleCleanup:SNTRuleCleanupNone
+                                     errors:&errors]);
+  XCTAssertNil(errors);
+  XCTAssertEqual(self.sut.executionRuleCount, 1);
+  XCTAssertEqual(self.sut.networkFlowRuleCount, 1);
+  XCTAssertEqual([self.sut signalRuleCount], 1);
 }
 
 - (void)testSignalRulesChangedCallbackFiresOnlyOnChange {
@@ -1222,16 +1259,22 @@
   };
 
   // First set: changes from empty -> fires.
-  XCTAssertTrue([self.sut updateSignals:@[ [self _signalNamed:@"A" byte:1] ] cleanReplace:YES]);
+  XCTAssertTrue([self _addSignals:@[ [self _signalNamed:@"A" byte:1] ]
+                      ruleCleanup:SNTRuleCleanupAll
+                           errors:nil]);
   XCTAssertEqual(callbackCount, 1);
   XCTAssertEqual(lastCount, 1);
 
   // Identical set: hash unchanged -> does NOT fire.
-  XCTAssertTrue([self.sut updateSignals:@[ [self _signalNamed:@"A" byte:1] ] cleanReplace:YES]);
+  XCTAssertTrue([self _addSignals:@[ [self _signalNamed:@"A" byte:1] ]
+                      ruleCleanup:SNTRuleCleanupAll
+                           errors:nil]);
   XCTAssertEqual(callbackCount, 1);
 
   // Different set: fires again.
-  XCTAssertTrue([self.sut updateSignals:@[ [self _signalNamed:@"A" byte:9] ] cleanReplace:YES]);
+  XCTAssertTrue([self _addSignals:@[ [self _signalNamed:@"A" byte:9] ]
+                      ruleCleanup:SNTRuleCleanupAll
+                           errors:nil]);
   XCTAssertEqual(callbackCount, 2);
 }
 

@@ -296,6 +296,7 @@ REGISTER_COMMAND_NAME(@"rule")
         databaseRuleAddExecutionRules:@[]
                       fileAccessRules:nil
                      networkFlowRules:nil
+                              signals:nil
                           ruleCleanup:cleanupType
                                source:SNTRuleAddSourceSantactl
                                 reply:^(BOOL success, NSArray<NSError*>* errors) {
@@ -416,6 +417,7 @@ REGISTER_COMMAND_NAME(@"rule")
       databaseRuleAddExecutionRules:@[ newRule ]
                     fileAccessRules:nil
                    networkFlowRules:nil
+                            signals:nil
                         ruleCleanup:SNTRuleCleanupNone
                              source:SNTRuleAddSourceSantactl
                               reply:^(BOOL success, NSArray<NSError*>* errors) {
@@ -518,6 +520,7 @@ REGISTER_COMMAND_NAME(@"rule")
       databaseRuleAddExecutionRules:parsedRules
                     fileAccessRules:nil
                    networkFlowRules:nil
+                            signals:nil
                         ruleCleanup:cleanupType
                              source:SNTRuleAddSourceSantactl
                               reply:^(BOOL success, NSArray<NSError*>* errors) {

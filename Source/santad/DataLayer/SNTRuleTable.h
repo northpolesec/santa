@@ -119,6 +119,8 @@
 ///  @param executionRules Array of SNTRule objects to add.
 ///  @param fileAccessRules Array of SNTFileAccessRule objects to add.
 ///  @param networkFlowRules Array of SNTNetworkFlowRule objects to add.
+///  @param signals Array of SNTSignal objects to add/remove. On a clean sync (cleanup type all or
+///         non-transitive) the full set replaces what's stored; otherwise they're upserted by name.
 ///  @param ruleCleanup Rule cleanup type to perform (e.g. all, none, non-transitive).
 ///  @param errors When returning NO, will be filled with an array of errors.
 ///  @return YES if adding all rules passed, NO if any were rejected.
@@ -126,13 +128,14 @@
 - (BOOL)addExecutionRules:(NSArray<SNTRule*>*)executionRules
           fileAccessRules:(NSArray<SNTFileAccessRule*>*)fileAccessRules
          networkFlowRules:(NSArray<SNTNetworkFlowRule*>*)networkFlowRules
+                  signals:(NSArray<SNTSignal*>*)signals
               ruleCleanup:(SNTRuleCleanup)cleanupType
                    errors:(NSArray<NSError*>**)errors;
 
 ///
-/// Wrapper for `addExecutionRules:fileAccessRules:networkFlowRules:ruleCleanup:errors:` when
-/// there are no file access or network flow rules to add. Used by legacy code paths that only
-/// produce execution rules.
+/// Wrapper for `addExecutionRules:fileAccessRules:networkFlowRules:signals:ruleCleanup:errors:`
+/// when there are no file access, network flow, or signal rules to add. Used by legacy code paths
+/// that only produce execution rules.
 ///
 - (BOOL)addExecutionRules:(NSArray<SNTRule*>*)rules
               ruleCleanup:(SNTRuleCleanup)cleanupType
@@ -167,14 +170,6 @@
 ///  Retrieve all file access rules from the database for export.
 ///
 - (NSDictionary<NSString*, NSDictionary*>*)retrieveAllFileAccessRules;
-
-///
-///  Update the signal config rules synced from the server during rule download. When
-///  `cleanReplace` is YES (clean sync) all existing signals are deleted first; otherwise the
-///  given signals are upserted by name (normal, incremental sync). Fires
-///  `signalRulesChangedCallback` if the set actually changed.
-///
-- (BOOL)updateSignals:(NSArray<SNTSignal*>*)signals cleanReplace:(BOOL)cleanReplace;
 
 ///
 ///  Retrieve all signal config rules from the database.
@@ -225,7 +220,8 @@
 
 ///
 /// If set, this callback is called when signal config rule content is changed via
-/// updateSignals:cleanReplace: with the latest rule count.
+/// addExecutionRules:fileAccessRules:networkFlowRules:signals:ruleCleanup:errors: with the latest
+/// rule count.
 ///
 @property(copy) void (^signalRulesChangedCallback)(int64_t signalRuleCount);
 

@@ -1106,6 +1106,7 @@
       databaseRuleAddExecutionRules:OCMOCK_ANY
                     fileAccessRules:OCMOCK_ANY
                    networkFlowRules:OCMOCK_ANY
+                            signals:OCMOCK_ANY
                         ruleCleanup:SNTRuleCleanupNone
                              source:SNTRuleAddSourceSyncService
                               reply:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(YES), [NSNull null],
@@ -1150,6 +1151,7 @@
   OCMVerify([self.daemonConnRop databaseRuleAddExecutionRules:rules
                                               fileAccessRules:OCMOCK_ANY
                                              networkFlowRules:OCMOCK_ANY
+                                                      signals:OCMOCK_ANY
                                                   ruleCleanup:SNTRuleCleanupNone
                                                        source:SNTRuleAddSourceSyncService
                                                         reply:OCMOCK_ANY]);
@@ -1167,6 +1169,7 @@
       databaseRuleAddExecutionRules:OCMOCK_ANY
                     fileAccessRules:OCMOCK_ANY
                    networkFlowRules:OCMOCK_ANY
+                            signals:OCMOCK_ANY
                         ruleCleanup:SNTRuleCleanupNone
                              source:SNTRuleAddSourceSyncService
                               reply:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(YES), [NSNull null],
@@ -1202,6 +1205,7 @@
   OCMVerify([self.daemonConnRop databaseRuleAddExecutionRules:rules
                                               fileAccessRules:OCMOCK_ANY
                                              networkFlowRules:OCMOCK_ANY
+                                                      signals:OCMOCK_ANY
                                                   ruleCleanup:SNTRuleCleanupNone
                                                        source:SNTRuleAddSourceSyncService
                                                         reply:OCMOCK_ANY]);
@@ -1221,6 +1225,7 @@
       databaseRuleAddExecutionRules:OCMOCK_ANY
                     fileAccessRules:OCMOCK_ANY
                    networkFlowRules:OCMOCK_ANY
+                            signals:OCMOCK_ANY
                         ruleCleanup:SNTRuleCleanupNone
                              source:SNTRuleAddSourceSyncService
                               reply:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(YES), [NSNull null],
@@ -1245,6 +1250,7 @@
   OCMVerify([self.daemonConnRop databaseRuleAddExecutionRules:rules
                                               fileAccessRules:OCMOCK_ANY
                                              networkFlowRules:OCMOCK_ANY
+                                                      signals:OCMOCK_ANY
                                                   ruleCleanup:SNTRuleCleanupNone
                                                        source:SNTRuleAddSourceSyncService
                                                         reply:OCMOCK_ANY]);
