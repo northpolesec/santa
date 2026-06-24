@@ -18,6 +18,7 @@
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTExportConfiguration.h"
 #import "Source/common/SNTModeTransition.h"
+#import "Source/common/SNTTemporaryAdminPolicy.h"
 #import "Source/common/ne/SNTSyncNetworkExtensionSettings.h"
 
 @class SNTCELFallbackRule;
@@ -90,6 +91,7 @@
 @property NSString* overrideFileAccessAction;
 @property SNTExportConfiguration* exportConfig;
 @property SNTModeTransition* modeTransition;
+@property SNTTemporaryAdminPolicy* temporaryAdminPolicy;
 @property SNTSyncNetworkExtensionSettings* networkExtensionSettings;
 @property NSString* eventDetailURL;
 @property NSString* eventDetailText;

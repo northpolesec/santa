@@ -27,6 +27,7 @@
 #import "Source/common/SNTStoredExecutionEvent.h"
 #import "Source/common/SNTStoredFileAccessEvent.h"
 #import "Source/common/SNTStoredNetworkMountEvent.h"
+#import "Source/common/SNTStoredTemporaryAdminModeAuditEvent.h"
 #import "Source/common/SNTStoredTemporaryMonitorModeAuditEvent.h"
 #import "Source/common/SNTStoredUSBMountEvent.h"
 #import "Source/common/SNTSyncConstants.h"
@@ -54,6 +55,8 @@ typename santa::ProtoTraits<IsV2>::FileAccessEventT* MessageForFileAccessEvent(
     SNTStoredFileAccessEvent* event, google::protobuf::Arena* arena);
 ::pbv2::AuditEvent* MessageForTemporaryMonitorModeAuditEvent(
     SNTStoredTemporaryMonitorModeAuditEvent* event, google::protobuf::Arena* arena);
+::pbv2::AuditEvent* MessageForTemporaryAdminModeAuditEvent(
+    SNTStoredTemporaryAdminModeAuditEvent* event, google::protobuf::Arena* arena);
 ::pbv2::NetworkMountEvent* MessageForNetworkMountEvent(SNTStoredNetworkMountEvent* event,
                                                        google::protobuf::Arena* arena);
 ::pbv2::USBMountEvent* MessageForUSBMountEvent(SNTStoredUSBMountEvent* event,
@@ -130,6 +133,13 @@ BOOL EventUpload(SNTSyncEventUpload* self, NSArray<SNTStoredEvent*>* events) {
       if constexpr (IsV2) {
         if (auto e = MessageForTemporaryMonitorModeAuditEvent(
                 (SNTStoredTemporaryMonitorModeAuditEvent*)event, pArena)) {
+          uploadAuditEvents->UnsafeArenaAddAllocated(e);
+        }
+      }
+    } else if ([event isKindOfClass:[SNTStoredTemporaryAdminModeAuditEvent class]]) {
+      if constexpr (IsV2) {
+        if (auto e = MessageForTemporaryAdminModeAuditEvent(
+                (SNTStoredTemporaryAdminModeAuditEvent*)event, pArena)) {
           uploadAuditEvents->UnsafeArenaAddAllocated(e);
         }
       }
@@ -521,6 +531,127 @@ void MessageForTemporaryMonitorModeLeaveAuditEvent(
   } else if ([event isKindOfClass:[SNTStoredTemporaryMonitorModeLeaveAuditEvent class]]) {
     MessageForTemporaryMonitorModeLeaveAuditEvent(
         (SNTStoredTemporaryMonitorModeLeaveAuditEvent*)event, pbTmm->mutable_leave());
+  }
+
+  return pbAudit;
+}
+
+void MessageForTemporaryAdminModeEnterAuditEvent(SNTStoredTemporaryAdminModeEnterAuditEvent* event,
+                                                 ::pbv2::TemporaryAdminModeEnter* pbEnter) {
+  if (!pbEnter) {
+    return;
+  }
+
+  pbEnter->set_seconds(event.seconds);
+  pbEnter->set_username(NSStringToUTF8StringView(event.username));
+  pbEnter->set_user_justification(NSStringToUTF8StringView(event.userJustification));
+
+  switch (event.reason) {
+    case SNTTemporaryAdminModeEnterReasonOnDemand:
+      pbEnter->set_reason(::pbv2::TemporaryAdminModeEnter::REASON_ON_DEMAND);
+      break;
+    case SNTTemporaryAdminModeEnterReasonOnDemandRefresh:
+      pbEnter->set_reason(::pbv2::TemporaryAdminModeEnter::REASON_ON_DEMAND_REFRESH);
+      break;
+    case SNTTemporaryAdminModeEnterReasonRestart:
+      pbEnter->set_reason(::pbv2::TemporaryAdminModeEnter::REASON_RESTART);
+      break;
+    default: pbEnter->set_reason(::pbv2::TemporaryAdminModeEnter::REASON_UNSPECIFIED); break;
+  }
+}
+
+void MessageForTemporaryAdminModeLeaveAuditEvent(SNTStoredTemporaryAdminModeLeaveAuditEvent* event,
+                                                 ::pbv2::TemporaryAdminModeLeave* pbLeave) {
+  if (!pbLeave) {
+    return;
+  }
+
+  pbLeave->set_username(NSStringToUTF8StringView(event.username));
+
+  switch (event.reason) {
+    case SNTTemporaryAdminModeLeaveReasonSessionExpired:
+      pbLeave->set_reason(::pbv2::TemporaryAdminModeLeave::REASON_EXPIRY);
+      break;
+    case SNTTemporaryAdminModeLeaveReasonCancelled:
+      pbLeave->set_reason(::pbv2::TemporaryAdminModeLeave::REASON_CANCELLED);
+      break;
+    case SNTTemporaryAdminModeLeaveReasonRevoked:
+      pbLeave->set_reason(::pbv2::TemporaryAdminModeLeave::REASON_REVOKED);
+      break;
+    case SNTTemporaryAdminModeLeaveReasonSyncServerChanged:
+      pbLeave->set_reason(::pbv2::TemporaryAdminModeLeave::REASON_SYNC_SERVER_CHANGED);
+      break;
+    case SNTTemporaryAdminModeLeaveReasonReboot:
+      pbLeave->set_reason(::pbv2::TemporaryAdminModeLeave::REASON_REBOOT);
+      break;
+    case SNTTemporaryAdminModeLeaveReasonScreenLocked:
+      pbLeave->set_reason(::pbv2::TemporaryAdminModeLeave::REASON_SCREEN_LOCKED);
+      break;
+    case SNTTemporaryAdminModeLeaveReasonSessionEnded:
+      pbLeave->set_reason(::pbv2::TemporaryAdminModeLeave::REASON_SESSION_ENDED);
+      break;
+    default: pbLeave->set_reason(::pbv2::TemporaryAdminModeLeave::REASON_UNSPECIFIED); break;
+  }
+}
+
+void MessageForTemporaryAdminModeDeniedAuditEvent(
+    SNTStoredTemporaryAdminModeDeniedAuditEvent* event,
+    ::pbv2::TemporaryAdminModeDenied* pbDenied) {
+  if (!pbDenied) {
+    return;
+  }
+
+  pbDenied->set_username(NSStringToUTF8StringView(event.username));
+
+  switch (event.reason) {
+    case SNTTemporaryAdminModeDeniedReasonNoPolicy:
+      pbDenied->set_reason(::pbv2::TemporaryAdminModeDenied::REASON_NO_POLICY);
+      break;
+    case SNTTemporaryAdminModeDeniedReasonNotEligible:
+      pbDenied->set_reason(::pbv2::TemporaryAdminModeDenied::REASON_NOT_ELIGIBLE);
+      break;
+    case SNTTemporaryAdminModeDeniedReasonAuthFailed:
+      pbDenied->set_reason(::pbv2::TemporaryAdminModeDenied::REASON_AUTH_FAILED);
+      break;
+    case SNTTemporaryAdminModeDeniedReasonJustificationRequired:
+      pbDenied->set_reason(::pbv2::TemporaryAdminModeDenied::REASON_JUSTIFICATION_REQUIRED);
+      break;
+    case SNTTemporaryAdminModeDeniedReasonAlreadyAdmin:
+      pbDenied->set_reason(::pbv2::TemporaryAdminModeDenied::REASON_ALREADY_ADMIN);
+      break;
+    case SNTTemporaryAdminModeDeniedReasonSessionAlreadyActive:
+      pbDenied->set_reason(::pbv2::TemporaryAdminModeDenied::REASON_SESSION_ALREADY_ACTIVE);
+      break;
+    case SNTTemporaryAdminModeDeniedReasonMembershipChangeFailed:
+      pbDenied->set_reason(::pbv2::TemporaryAdminModeDenied::REASON_MEMBERSHIP_CHANGE_FAILED);
+      break;
+    default: pbDenied->set_reason(::pbv2::TemporaryAdminModeDenied::REASON_UNSPECIFIED); break;
+  }
+}
+
+::pbv2::AuditEvent* MessageForTemporaryAdminModeAuditEvent(
+    SNTStoredTemporaryAdminModeAuditEvent* event, google::protobuf::Arena* arena) {
+  if (![event isKindOfClass:[SNTStoredTemporaryAdminModeEnterAuditEvent class]] &&
+      ![event isKindOfClass:[SNTStoredTemporaryAdminModeLeaveAuditEvent class]] &&
+      ![event isKindOfClass:[SNTStoredTemporaryAdminModeDeniedAuditEvent class]]) {
+    return nullptr;
+  }
+
+  auto pbAudit = google::protobuf::Arena::Create<typename ::pbv2::AuditEvent>(arena);
+  pbAudit->set_timestamp([[event occurrenceDate] timeIntervalSince1970]);
+
+  auto pbTam = pbAudit->mutable_temporary_admin_mode();
+  pbTam->set_session_id(NSStringToUTF8StringView(event.uuid));
+
+  if ([event isKindOfClass:[SNTStoredTemporaryAdminModeEnterAuditEvent class]]) {
+    MessageForTemporaryAdminModeEnterAuditEvent((SNTStoredTemporaryAdminModeEnterAuditEvent*)event,
+                                                pbTam->mutable_enter());
+  } else if ([event isKindOfClass:[SNTStoredTemporaryAdminModeLeaveAuditEvent class]]) {
+    MessageForTemporaryAdminModeLeaveAuditEvent((SNTStoredTemporaryAdminModeLeaveAuditEvent*)event,
+                                                pbTam->mutable_leave());
+  } else if ([event isKindOfClass:[SNTStoredTemporaryAdminModeDeniedAuditEvent class]]) {
+    MessageForTemporaryAdminModeDeniedAuditEvent(
+        (SNTStoredTemporaryAdminModeDeniedAuditEvent*)event, pbTam->mutable_denied());
   }
 
   return pbAudit;

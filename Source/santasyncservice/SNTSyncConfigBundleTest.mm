@@ -21,6 +21,7 @@
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigBundle.h"
 #import "Source/common/SNTModeTransition.h"
+#import "Source/common/SNTTemporaryAdminPolicy.h"
 #import "Source/common/ne/SNTSyncNetworkExtensionSettings.h"
 #import "Source/santasyncservice/SNTSyncState.h"
 
@@ -45,6 +46,7 @@
 @property NSDate* fullSyncLastSuccess;
 @property NSDate* ruleSyncLastSuccess;
 @property SNTModeTransition* modeTransition;
+@property SNTTemporaryAdminPolicy* temporaryAdminPolicy;
 @property NSString* eventDetailURL;
 @property NSString* eventDetailText;
 @property NSString* fileAccessEventDetailURL;
@@ -92,6 +94,7 @@
   XCTAssertNil(bundle.fullSyncLastSuccess);
   XCTAssertNil(bundle.ruleSyncLastSuccess);
   XCTAssertNil(bundle.modeTransition);
+  XCTAssertNil(bundle.temporaryAdminPolicy);
   XCTAssertNil(bundle.eventDetailURL);
   XCTAssertNil(bundle.eventDetailText);
   XCTAssertNil(bundle.networkExtensionSettings);
@@ -127,6 +130,11 @@
   bundle = PostflightConfigBundle(syncState);
   XCTAssertNotNil(bundle.modeTransition);
   XCTAssertEqual(bundle.modeTransition.type, SNTModeTransitionTypeRevoke);
+
+  syncState.temporaryAdminPolicy = [[SNTTemporaryAdminPolicy alloc] initRevocation];
+  bundle = PostflightConfigBundle(syncState);
+  XCTAssertNotNil(bundle.temporaryAdminPolicy);
+  XCTAssertEqual(bundle.temporaryAdminPolicy.type, SNTTemporaryAdminPolicyTypeRevoke);
 
   syncState.eventDetailURL = @"my://url";
   bundle = PostflightConfigBundle(syncState);
