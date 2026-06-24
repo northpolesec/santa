@@ -43,4 +43,8 @@ using NotificationReplyBlock = void (^)(BOOL);
 
 - (void)authorizeTemporaryMonitorMode:(void (^)(BOOL authenticated))reply;
 
+- (void)authorizeTemporaryAdminModeRequiringJustification:(BOOL)requireJustification
+                                                    reply:(void (^)(BOOL authenticated,
+                                                                    NSString* reason))reply;
+
 @end
