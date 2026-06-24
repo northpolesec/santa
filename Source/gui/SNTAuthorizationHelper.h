@@ -22,6 +22,15 @@
 /// Authorize temporary monitor mode via TouchID.
 + (void)authorizeTemporaryMonitorModeWithReplyBlock:(void (^)(BOOL success))replyBlock;
 
+/// Authorize temporary admin mode via TouchID, optionally collecting a justification string first.
+/// If requireJustification is YES, an alert with a text field is presented before the Touch ID
+/// prompt; if the user cancels that alert replyBlock is called with (NO, @"") and no LA prompt is
+/// shown. replyBlock is always called exactly once with (authenticated, justification).
++ (void)authorizeTemporaryAdminModeRequiringJustification:(BOOL)requireJustification
+                                               replyBlock:
+                                                   (void (^)(BOOL authenticated,
+                                                             NSString* justification))replyBlock;
+
 /// Authorize execution of a binary via TouchID.
 + (void)authorizeExecutionForEvent:(SNTStoredExecutionEvent*)event
                         replyBlock:(void (^)(BOOL success))replyBlock;
