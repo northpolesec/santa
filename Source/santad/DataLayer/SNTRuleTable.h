@@ -119,8 +119,7 @@
 ///  @param executionRules Array of SNTRule objects to add.
 ///  @param fileAccessRules Array of SNTFileAccessRule objects to add.
 ///  @param networkFlowRules Array of SNTNetworkFlowRule objects to add.
-///  @param signals Array of SNTSignal objects to add/remove. On a clean sync (cleanup type all or
-///         non-transitive) the full set replaces what's stored; otherwise they're upserted by name.
+///  @param signals Array of SNTSignal objects to add/remove.
 ///  @param ruleCleanup Rule cleanup type to perform (e.g. all, none, non-transitive).
 ///  @param errors When returning NO, will be filled with an array of errors.
 ///  @return YES if adding all rules passed, NO if any were rejected.
