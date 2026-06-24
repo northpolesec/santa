@@ -16,6 +16,8 @@
 #import "Source/santad/EventProviders/SNTEndpointSecurityRecorder.h"
 #include <os/base.h>
 
+#import "Source/santad/SNTLoginWindowSessionHandlerProtocol.h"
+
 #include <EndpointSecurity/EndpointSecurity.h>
 
 #include "Source/common/Platform.h"
@@ -56,6 +58,7 @@ es_file_t* GetTargetFileForPrefixTree(const es_message_t* msg) {
 
 @interface SNTEndpointSecurityRecorder ()
 @property SNTCompilerController* compilerController;
+@property(nonatomic, strong) id<SNTLoginWindowSessionHandler> loginWindowSessionHandler;
 @property SNTConfigurator* configurator;
 @end
 
@@ -71,6 +74,7 @@ es_file_t* GetTargetFileForPrefixTree(const es_message_t* msg) {
                        logger:(std::shared_ptr<Logger>)logger
                      enricher:(std::shared_ptr<Enricher>)enricher
            compilerController:(SNTCompilerController*)compilerController
+    loginWindowSessionHandler:(id<SNTLoginWindowSessionHandler>)loginWindowSessionHandler
               authResultCache:(std::shared_ptr<AuthResultCache>)authResultCache
                    prefixTree:(std::shared_ptr<PrefixTree<Unit>>)prefixTree
                   processTree:(std::shared_ptr<ProcessTree>)processTree {
@@ -82,6 +86,7 @@ es_file_t* GetTargetFileForPrefixTree(const es_message_t* msg) {
     _enricher = enricher;
     _logger = logger;
     _compilerController = compilerController;
+    _loginWindowSessionHandler = loginWindowSessionHandler;
     _authResultCache = authResultCache;
     _prefixTree = prefixTree;
     _configurator = [SNTConfigurator configurator];
@@ -121,6 +126,22 @@ es_file_t* GetTargetFileForPrefixTree(const es_message_t* msg) {
   }
 
   [self.compilerController handleEvent:esMsg withLogger:self->_logger];
+
+  switch (esMsg->event_type) {
+    case ES_EVENT_TYPE_NOTIFY_LW_SESSION_LOCK:
+      [self.loginWindowSessionHandler
+          handleLoginWindowSessionEvent:esMsg->event_type
+                               username:santa::StringToNSString(santa::StringTokenToStringView(
+                                            esMsg->event.lw_session_lock->username))];
+      break;
+    case ES_EVENT_TYPE_NOTIFY_LW_SESSION_LOGOUT:
+      [self.loginWindowSessionHandler
+          handleLoginWindowSessionEvent:esMsg->event_type
+                               username:santa::StringToNSString(santa::StringTokenToStringView(
+                                            esMsg->event.lw_session_logout->username))];
+      break;
+    default: break;
+  }
 
   // The logger will take care of this, but we check early so we
   // don't do any unnecessary work

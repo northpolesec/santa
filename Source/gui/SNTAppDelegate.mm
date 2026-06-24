@@ -50,19 +50,25 @@
 
   NSNotificationCenter* workspaceNotifications = [[NSWorkspace sharedWorkspace] notificationCenter];
 
-  [workspaceNotifications addObserverForName:NSWorkspaceSessionDidResignActiveNotification
-                                      object:nil
-                                       queue:[NSOperationQueue currentQueue]
-                                  usingBlock:^(NSNotification* note) {
-                                    self.daemonListener.invalidationHandler = nil;
-                                    [self.daemonListener invalidate];
-                                    self.daemonListener = nil;
-                                  }];
+  [workspaceNotifications
+      addObserverForName:NSWorkspaceSessionDidResignActiveNotification
+                  object:nil
+                   queue:[NSOperationQueue currentQueue]
+              usingBlock:^(NSNotification* note) {
+                [self.statusItemManager temporaryAdminModeSessionResignedActive];
+                self.daemonListener.invalidationHandler = nil;
+                [self.daemonListener invalidate];
+                self.daemonListener = nil;
+              }];
   [workspaceNotifications addObserverForName:NSWorkspaceSessionDidBecomeActiveNotification
                                       object:nil
                                        queue:[NSOperationQueue currentQueue]
                                   usingBlock:^(NSNotification* note) {
                                     [self attemptDaemonReconnection];
+                                    // Reconcile timed-mode state: while this session was inactive
+                                    // (e.g. fast user switching) the daemon may have ended a
+                                    // session and the leave notification was missed.
+                                    [self.statusItemManager reconcileTimedModeState];
                                   }];
 
   // Watch for windows being closed, so that we can restore the activation policy to accessory.

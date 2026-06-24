@@ -217,6 +217,7 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
                                                   logger:mockLogger
                                                 enricher:mockEnricher
                                       compilerController:mockCC
+                               loginWindowSessionHandler:nil
                                          authResultCache:mockAuthCache
                                               prefixTree:prefixTree
                                              processTree:nullptr];
@@ -621,6 +622,7 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
                                                   logger:mockLogger
                                                 enricher:mockEnricher
                                       compilerController:mockCC
+                               loginWindowSessionHandler:nil
                                          authResultCache:mockAuthCache
                                               prefixTree:prefixTree
                                              processTree:nullptr];
@@ -694,6 +696,7 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
                                                   logger:mockLogger
                                                 enricher:mockEnricher
                                       compilerController:mockCC
+                               loginWindowSessionHandler:nil
                                          authResultCache:mockAuthCache
                                               prefixTree:prefixTree
                                              processTree:nullptr];
@@ -766,6 +769,7 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
                                                   logger:mockLogger
                                                 enricher:mockEnricher
                                       compilerController:mockCC
+                               loginWindowSessionHandler:nil
                                          authResultCache:mockAuthCache
                                               prefixTree:prefixTree
                                              processTree:nullptr];
