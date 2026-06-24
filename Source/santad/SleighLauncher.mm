@@ -33,6 +33,7 @@
 #import "Source/common/SNTSystemInfo.h"
 #include "Source/common/String.h"
 #include "commands/v1.pb.h"
+#include "common/signals.pb.h"
 #include "telemetry/sleighconfig.pb.h"
 
 namespace santa {
@@ -116,6 +117,38 @@ absl::StatusOr<::santa::commands::v1::BinaryUploadResponse> SleighLauncher::Laun
     return absl::InternalError("Sleigh produced no parseable BinaryUploadResponse");
   }
   return response;
+}
+
+absl::StatusOr<::santa::telemetry::v1::SleighSignalScanResponse> SleighLauncher::LaunchSignalScan(
+    const std::string& input_file, const std::vector<std::string>& serialized_signals,
+    uint32_t timeout_secs) {
+  int fd = open(input_file.c_str(), O_RDONLY);
+  if (fd < 0) {
+    LOGD(@"SleighLauncher::LaunchSignalScan(): Failed to open input file: %s", input_file.c_str());
+    return absl::InternalError("Failed to open input file: " + input_file);
+  }
+
+  absl::StatusOr<std::string> serialized = SerializeSignalScanConfig(fd, serialized_signals);
+  if (!serialized.ok()) {
+    // RunSleigh closes fd on all later paths; on this pre-RunSleigh early return
+    // we still own it, so close it here to avoid leaking the descriptor.
+    close(fd);
+    return serialized.status();
+  }
+
+  absl::StatusOr<std::string> output =
+      RunSleigh(*serialized, {fd}, timeout_secs, /*capture_stdout=*/true);
+  if (!output.ok()) {
+    return output.status();
+  }
+
+  // Do not trust a default-valued parse — an empty or unparseable stdout is an
+  // error, not an empty-but-valid signal report.
+  ::santa::telemetry::v1::SleighResponse response;
+  if (output->empty() || !response.ParseFromString(*output)) {
+    return absl::InternalError("Sleigh produced no parseable SleighResponse");
+  }
+  return response.signal_scan();
 }
 
 absl::StatusOr<std::string> SleighLauncher::RunSleigh(const std::string& serialized,
@@ -359,6 +392,28 @@ absl::StatusOr<std::string> SleighLauncher::SerializeBinaryUploadConfig(
   signed_post->set_url(signed_post_url);
   for (const auto& [key, value] : form_values) {
     (*signed_post->mutable_form_values())[key] = value;
+  }
+
+  std::string serialized;
+  if (!config.SerializeToString(&serialized)) {
+    return absl::UnknownError("Failed to serialize SleighConfig proto");
+  }
+  return serialized;
+}
+
+absl::StatusOr<std::string> SleighLauncher::SerializeSignalScanConfig(
+    int input_fd, const std::vector<std::string>& serialized_signals) {
+  ::santa::telemetry::v1::SleighConfig config;
+  PopulateHostInfo(&config);
+
+  auto* signal_scan = config.mutable_signal_scan();
+  signal_scan->add_input_fds(input_fd);
+
+  for (const auto& serialized_signal : serialized_signals) {
+    ::santa::common::v1::Signal* signal = signal_scan->add_signals();
+    if (!signal->ParseFromString(serialized_signal)) {
+      return absl::InvalidArgumentError("Failed to parse serialized Signal proto");
+    }
   }
 
   std::string serialized;

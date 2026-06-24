@@ -29,12 +29,13 @@
 #import "Source/common/SNTFileInfo.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTRule.h"
+#import "Source/common/SNTSignal.h"
 #import "Source/common/SNTXxhash.h"
 #import "Source/common/SigningIDHelpers.h"
 #include "Source/common/String.h"
 #include "Source/common/cel/Evaluator.h"
 
-static const uint32_t kRuleTableCurrentVersion = 14;
+static const uint32_t kRuleTableCurrentVersion = 15;
 
 // How many rules must be in database before we start trying to remove transitive rules.
 static const int64_t kTransitiveRuleCullingThreshold = 500000;
@@ -91,17 +92,20 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
 @property(atomic) NSString* cachedExecutionRulesHash;
 @property(atomic) NSString* cachedFileAccessRulesHash;
 @property(atomic) NSString* cachedNetworkFlowRulesHash;
+@property(atomic) NSString* cachedSignalRulesHash;
 @end
 
 @implementation SNTRuleTableRulesHash
 - (instancetype)initWithExecutionRulesHash:(NSString*)executionRulesHash
                        fileAccessRulesHash:(NSString*)fileAccessRulesHash
-                      networkFlowRulesHash:(NSString*)networkFlowRulesHash {
+                      networkFlowRulesHash:(NSString*)networkFlowRulesHash
+                           signalRulesHash:(NSString*)signalRulesHash {
   self = [super init];
   if (self) {
     _executionRulesHash = executionRulesHash;
     _fileAccessRulesHash = fileAccessRulesHash;
     _networkFlowRulesHash = networkFlowRulesHash;
+    _signalRulesHash = signalRulesHash;
   }
   return self;
 }
@@ -375,6 +379,13 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
     newVersion = 14;
   }
 
+  if (version < 15) {
+    [db executeUpdate:@"CREATE TABLE 'signal_rules' ("
+                      @"'name' TEXT NOT NULL PRIMARY KEY,"
+                      @"'rule_data' BLOB NOT NULL)"];
+    newVersion = 15;
+  }
+
   // Save signing info for launchd and santad. Used to ensure they are always allowed.
   self.santadCSInfo = [[MOLCodesignChecker alloc] initWithSelf];
   self.launchdCSInfo = [[MOLCodesignChecker alloc] initWithPID:1];
@@ -466,6 +477,18 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
   __block NSUInteger count = 0;
   [self inDatabase:^(FMDatabase* db) {
     count = [self fileAccessRuleCountSerialized:db];
+  }];
+  return count;
+}
+
+- (int64_t)signalRuleCountSerialized:(FMDatabase*)db {
+  return [db longForQuery:@"SELECT COUNT(*) FROM signal_rules"];
+}
+
+- (int64_t)signalRuleCount {
+  __block NSUInteger count = 0;
+  [self inDatabase:^(FMDatabase* db) {
+    count = [self signalRuleCountSerialized:db];
   }];
   return count;
 }
@@ -740,6 +763,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
   return [self addExecutionRules:executionRules
                  fileAccessRules:nil
                 networkFlowRules:nil
+                         signals:nil
                      ruleCleanup:cleanupType
                           errors:errors];
 }
@@ -747,15 +771,16 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
 - (BOOL)addExecutionRules:(NSArray<SNTRule*>*)executionRules
           fileAccessRules:(NSArray<SNTFileAccessRule*>*)fileAccessRules
          networkFlowRules:(NSArray<SNTNetworkFlowRule*>*)networkFlowRules
+                  signals:(NSArray<SNTSignal*>*)signals
               ruleCleanup:(SNTRuleCleanup)cleanupType
                    errors:(NSArray<NSError*>**)errors {
   // Only accept all-empty rule arrays if the cleanup-type is not none.
   if (executionRules.count == 0 && fileAccessRules.count == 0 && networkFlowRules.count == 0 &&
-      cleanupType == SNTRuleCleanupNone) {
+      signals.count == 0 && cleanupType == SNTRuleCleanupNone) {
     if (errors) {
       *errors = @[ [SNTError createErrorWithCode:SNTErrorCodeEmptyRuleArray
-                                          format:@"Empty execution, file access, and network "
-                                                 @"flow rule arrays"] ];
+                                          format:@"Empty execution, file access, network flow, and "
+                                                 @"signal rule arrays"] ];
     }
     return NO;
   }
@@ -765,20 +790,26 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
   __block NSString* faaRulesHashBefore;
   __block NSString* faaRulesHashAfter;
   __block int64_t faaRuleCount = 0;
+  __block NSString* signalRulesHashBefore;
+  __block NSString* signalRulesHashAfter;
+  __block int64_t signalRuleCount = 0;
 
   [self inTransaction:^(FMDatabase* db, BOOL* rollback) {
     faaRulesHashBefore = [self fileAccessRulesHashSerialized:db];
+    signalRulesHashBefore = [self signalRulesHashSerialized:db];
     switch (cleanupType) {
       case SNTRuleCleanupAll:
         [db executeUpdate:@"DELETE FROM execution_rules"];
         [db executeUpdate:@"DELETE FROM file_access_rules"];
         [db executeUpdate:@"DELETE FROM network_flow_rules"];
+        [db executeUpdate:@"DELETE FROM signal_rules"];
         break;
       case SNTRuleCleanupNonTransitive:
         [db executeUpdate:@"DELETE FROM execution_rules WHERE state != ?",
                           @(SNTRuleStateAllowTransitive)];
         [db executeUpdate:@"DELETE FROM file_access_rules"];
         [db executeUpdate:@"DELETE FROM network_flow_rules"];
+        [db executeUpdate:@"DELETE FROM signal_rules"];
         break;
       case SNTRuleCleanupExecutionRules:
         [db executeUpdate:@"DELETE FROM execution_rules WHERE state != ?",
@@ -808,6 +839,11 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
       return;
     }
 
+    if (![self addSignals:signals toDB:db errors:blockErrors]) {
+      *rollback = failed = YES;
+      return;
+    }
+
     // Clear the rules hashes
     self.cachedExecutionRulesHash = nil;
     self.cachedFileAccessRulesHash = nil;
@@ -815,19 +851,82 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
 
     faaRulesHashAfter = [self fileAccessRulesHashSerialized:db];
     faaRuleCount = [self fileAccessRuleCountSerialized:db];
+    signalRulesHashAfter = [self signalRulesHashSerialized:db];
+    signalRuleCount = [self signalRuleCountSerialized:db];
   }];
 
   if (blockErrors.count > 0 && errors) {
     *errors = [blockErrors copy];
   }
 
-  // If the DB updated successfully, call the "rules changed" callback if appropriate
+  // If the DB updated successfully, call the "rules changed" callbacks if appropriate
   if (!failed && self.fileAccessRulesChangedCallback &&
       ![faaRulesHashBefore isEqualToString:faaRulesHashAfter]) {
     self.fileAccessRulesChangedCallback(faaRuleCount);
   }
+  if (!failed && self.signalRulesChangedCallback &&
+      ![signalRulesHashBefore isEqualToString:signalRulesHashAfter]) {
+    self.signalRulesChangedCallback(signalRuleCount);
+  }
 
   return !failed;
+}
+
+- (BOOL)addSignals:(NSArray<SNTSignal*>*)signals
+              toDB:(FMDatabase*)db
+            errors:(NSMutableArray<NSError*>*)errors {
+  for (SNTSignal* signal in signals) {
+    if (![signal isKindOfClass:[SNTSignal class]] || signal.name.length == 0) {
+      [errors addObject:[SNTError createErrorWithCode:SNTErrorCodeRuleInvalid
+                                              message:@"Signal array contained invalid entry"
+                                               detail:signal.description]];
+      return NO;
+    }
+
+    if (signal.state == SNTSignalStateRemove) {
+      if (![db executeUpdate:@"DELETE FROM signal_rules WHERE name=?", signal.name]) {
+        [errors addObject:[SNTError createErrorWithCode:SNTErrorCodeRemoveRuleFailed
+                                                message:@"A database error occurred while deleting "
+                                                        @"a signal rule"
+                                                 detail:[db lastErrorMessage]]];
+        return NO;
+      }
+    } else if (signal.data.length > 0) {
+      if (![db executeUpdate:@"INSERT OR REPLACE INTO signal_rules (name, rule_data) VALUES (?, ?)",
+                             signal.name, signal.data]) {
+        [errors addObject:[SNTError createErrorWithCode:SNTErrorCodeInsertOrReplaceRuleFailed
+                                                message:@"A database error occurred while "
+                                                        @"inserting/replacing a signal rule"
+                                                 detail:[db lastErrorMessage]]];
+        return NO;
+      }
+    } else {
+      [errors addObject:[SNTError createErrorWithCode:SNTErrorCodeRuleInvalid
+                                              message:@"Signal add rule missing data"
+                                               detail:signal.description]];
+      return NO;
+    }
+  }
+
+  // Clear the cached hash so it is recomputed against the new contents.
+  self.cachedSignalRulesHash = nil;
+  return YES;
+}
+
+- (NSArray<SNTSignal*>*)retrieveAllSignals {
+  NSMutableArray<SNTSignal*>* signals = [NSMutableArray array];
+  [self inDatabase:^(FMDatabase* db) {
+    FMResultSet* rs = [db executeQuery:@"SELECT name, rule_data FROM signal_rules"];
+    while ([rs next]) {
+      SNTSignal* signal = [[SNTSignal alloc] initAddRuleWithName:[rs stringForColumnIndex:0]
+                                                            data:[rs dataForColumnIndex:1]];
+      if (signal) {
+        [signals addObject:signal];
+      }
+    }
+    [rs close];
+  }];
+  return signals;
 }
 
 - (BOOL)addedRulesShouldFlushDecisionCache:(NSArray*)rules {
@@ -1124,6 +1223,29 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
   return digest;
 }
 
+- (NSString*)signalRulesHashSerialized:(FMDatabase*)db {
+  if (self.cachedSignalRulesHash.length) {
+    return self.cachedSignalRulesHash;
+  }
+
+  santa::Xxhash128 hash;
+
+  // Columns: 0=name, 1=rule_data.
+  FMResultSet* rs = [db executeQuery:@"SELECT name, rule_data FROM signal_rules ORDER BY name ASC"];
+  while ([rs next]) {
+    NSString* name = [rs stringForColumnIndex:0];
+    NSData* blob = [rs dataNoCopyForColumnIndex:1];
+
+    hash.Update(name.UTF8String, [name lengthOfBytesUsingEncoding:NSUTF8StringEncoding]);
+    hash.Update(blob.bytes, blob.length);
+  }
+  [rs close];
+
+  NSString* digest = santa::StringToNSString(hash.HexDigest());
+  self.cachedSignalRulesHash = digest;
+  return digest;
+}
+
 - (NSString*)networkFlowRulesHashSerialized:(FMDatabase*)db {
   // Shares the single scan/filter used to materialize the ruleset, so this hash and the
   // snapshot's hash can never drift apart. See -networkFlowRulesHashSerializedInDB:collectInto:.
@@ -1136,7 +1258,8 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
     hashes = [[SNTRuleTableRulesHash alloc]
         initWithExecutionRulesHash:[self executionRulesHashSerialized:db]
                fileAccessRulesHash:[self fileAccessRulesHashSerialized:db]
-              networkFlowRulesHash:[self networkFlowRulesHashSerialized:db]];
+              networkFlowRulesHash:[self networkFlowRulesHashSerialized:db]
+                   signalRulesHash:[self signalRulesHashSerialized:db]];
   }];
   return hashes;
 }

@@ -62,6 +62,18 @@ class SleighLauncher {
                      const std::vector<std::string>& filter_expressions,
                      uint32_t timeout_seconds);
 
+  // Signal scan: open input_file (as root), hand the FD to a Sleigh child along
+  // with the detection signals to evaluate (each a serialized
+  // santa.common.v1.Signal), capture Sleigh's stdout, and parse it as a
+  // SleighResponse. Sleigh uploads nothing; it only reports which signals
+  // matched. An empty/unparseable stdout, or a non-zero exit, is returned as an
+  // error. The caller passes signals in (from the synced signal_rules config);
+  // this method does not read configuration.
+  virtual absl::StatusOr<::santa::telemetry::v1::SleighSignalScanResponse>
+  LaunchSignalScan(const std::string& input_file,
+                   const std::vector<std::string>& serialized_signals,
+                   uint32_t timeout_seconds);
+
  protected:
   // Verifies the Sleigh binary's code signature before exec. Returns Ok when
   // the signature is acceptable (and, in DEBUG builds, always — Sleigh is
@@ -84,6 +96,9 @@ class SleighLauncher {
       const std::string& expected_sha256,
       const ::santa::telemetry::v1::BinaryMetadata& metadata,
       const std::vector<std::string>& filter_expressions);
+
+  absl::StatusOr<std::string> SerializeSignalScanConfig(
+      int input_fd, const std::vector<std::string>& serialized_signals);
 
   // Forks Sleigh, writes the serialized config to its stdin, optionally
   // captures its stdout, and waits up to timeout_secs (SIGKILL on timeout).

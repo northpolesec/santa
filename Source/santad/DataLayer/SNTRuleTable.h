@@ -20,6 +20,7 @@
 #import "Source/common/SNTNetworkFlowRule.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTRuleIdentifiers.h"
+#import "Source/common/SNTSignal.h"
 #import "Source/santad/DataLayer/SNTDatabaseTable.h"
 
 @class SNTCachedDecision;
@@ -30,6 +31,7 @@
 @property(readonly) NSString* executionRulesHash;
 @property(readonly) NSString* fileAccessRulesHash;
 @property(readonly) NSString* networkFlowRulesHash;
+@property(readonly) NSString* signalRulesHash;
 @end
 
 /// Atomic point-in-time view of the network flow ruleset. Returned from
@@ -98,6 +100,11 @@
 - (int64_t)networkFlowRuleCount;
 
 ///
+/// @return Number of signal config rules in the database
+///
+- (int64_t)signalRuleCount;
+
+///
 ///  @return Rule for given identifiers.
 ///          Currently: binary, signingID, certificate or teamID (in that order).
 ///          The first matching rule found is returned.
@@ -112,6 +119,7 @@
 ///  @param executionRules Array of SNTRule objects to add.
 ///  @param fileAccessRules Array of SNTFileAccessRule objects to add.
 ///  @param networkFlowRules Array of SNTNetworkFlowRule objects to add.
+///  @param signals Array of SNTSignal objects to add/remove.
 ///  @param ruleCleanup Rule cleanup type to perform (e.g. all, none, non-transitive).
 ///  @param errors When returning NO, will be filled with an array of errors.
 ///  @return YES if adding all rules passed, NO if any were rejected.
@@ -119,13 +127,14 @@
 - (BOOL)addExecutionRules:(NSArray<SNTRule*>*)executionRules
           fileAccessRules:(NSArray<SNTFileAccessRule*>*)fileAccessRules
          networkFlowRules:(NSArray<SNTNetworkFlowRule*>*)networkFlowRules
+                  signals:(NSArray<SNTSignal*>*)signals
               ruleCleanup:(SNTRuleCleanup)cleanupType
                    errors:(NSArray<NSError*>**)errors;
 
 ///
-/// Wrapper for `addExecutionRules:fileAccessRules:networkFlowRules:ruleCleanup:errors:` when
-/// there are no file access or network flow rules to add. Used by legacy code paths that only
-/// produce execution rules.
+/// Wrapper for `addExecutionRules:fileAccessRules:networkFlowRules:signals:ruleCleanup:errors:`
+/// when there are no file access, network flow, or signal rules to add. Used by legacy code paths
+/// that only produce execution rules.
 ///
 - (BOOL)addExecutionRules:(NSArray<SNTRule*>*)rules
               ruleCleanup:(SNTRuleCleanup)cleanupType
@@ -160,6 +169,11 @@
 ///  Retrieve all file access rules from the database for export.
 ///
 - (NSDictionary<NSString*, NSDictionary*>*)retrieveAllFileAccessRules;
+
+///
+///  Retrieve all signal config rules from the database.
+///
+- (NSArray<SNTSignal*>*)retrieveAllSignals;
 
 ///
 ///  Atomic snapshot of all stored network flow rules (as Add rules, ordered by rule_id ASC)
@@ -202,5 +216,12 @@
 /// addExecutionRules:fileAccessRules:ruleCleanup:error: with the latest rule count.
 ///
 @property(copy) void (^fileAccessRulesChangedCallback)(int64_t faaRuleCount);
+
+///
+/// If set, this callback is called when signal config rule content is changed via
+/// addExecutionRules:fileAccessRules:networkFlowRules:signals:ruleCleanup:errors: with the latest
+/// rule count.
+///
+@property(copy) void (^signalRulesChangedCallback)(int64_t signalRuleCount);
 
 @end

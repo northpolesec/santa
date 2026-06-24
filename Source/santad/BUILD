@@ -41,6 +41,7 @@ objc_library(
         "//Source/common:SNTNetworkFlowRule",
         "//Source/common:SNTRule",
         "//Source/common:SNTRuleIdentifiers",
+        "//Source/common:SNTSignal",
         "//Source/common:SNTXxhash",
         "//Source/common:SigningIDHelpers",
         "//Source/common:String",
@@ -872,6 +873,7 @@ objc_library(
         "@abseil-cpp//absl/cleanup:cleanup",
         "@abseil-cpp//absl/status:statusor",
         "@northpolesec_protos//commands:v1_cc_proto",
+        "@northpolesec_protos//common:signals_cc_proto",
         "@northpolesec_protos//telemetry:sleighconfig_cc_proto",
     ],
 )
@@ -1333,6 +1335,7 @@ santa_unit_test(
         "//Source/common:SNTNetworkFlowRule",
         "//Source/common:SNTRule",
         "//Source/common:SNTRuleIdentifiers",
+        "//Source/common:SNTSignal",
         "//Source/common:SigningIDHelpers",
         "//Source/common:String",
         "//Source/common:TestUtils",
