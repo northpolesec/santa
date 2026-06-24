@@ -481,9 +481,7 @@ static NSString* const silencedNotificationsKey = @"SilencedNotifications";
 }
 
 - (void)authorizeTemporaryMonitorMode:(void (^)(BOOL authenticated))reply {
-  [SNTAuthorizationHelper authorizeTemporaryMonitorModeWithReplyBlock:^(BOOL success) {
-    reply(success);
-  }];
+  [SNTAuthorizationHelper authorizeTemporaryMonitorModeWithReplyBlock:reply];
 }
 
 - (void)enterTemporaryMonitorMode:(NSDate*)expiration {
@@ -496,6 +494,28 @@ static NSString* const silencedNotificationsKey = @"SilencedNotifications";
 
 - (void)temporaryMonitorModePolicyAvailable:(BOOL)available {
   [self.statusItemManager setTemporaryMonitorModePolicyAvailable:available];
+}
+
+- (void)authorizeTemporaryAdminModeRequiringJustification:(BOOL)requireJustification
+                                                    reply:(void (^)(BOOL authenticated,
+                                                                    NSString* reason))reply {
+  // The daemon passes through the policy's requireJustification flag; only prompt for a
+  // reason when the policy calls for one. The daemon still enforces the requirement
+  // (an empty reason is rejected with TAMJustificationRequired).
+  [SNTAuthorizationHelper authorizeTemporaryAdminModeRequiringJustification:requireJustification
+                                                                 replyBlock:reply];
+}
+
+- (void)enterTemporaryAdminMode:(NSDate*)expiration {
+  [self.statusItemManager enterAdminModeWithExpiration:expiration];
+}
+
+- (void)leaveTemporaryAdminMode {
+  [self.statusItemManager leaveAdminMode];
+}
+
+- (void)temporaryAdminModeAvailable:(BOOL)available {
+  [self.statusItemManager setTemporaryAdminModeAvailable:available];
 }
 
 - (void)setNetworkExtensionFilterEnabled:(BOOL)enabled reply:(void (^)(BOOL success))reply {

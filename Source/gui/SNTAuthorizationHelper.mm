@@ -14,6 +14,7 @@
 
 #import "Source/gui/SNTAuthorizationHelper.h"
 
+#import <Cocoa/Cocoa.h>
 #import <LocalAuthentication/LocalAuthentication.h>
 
 #import "Source/common/SNTConfigurator.h"
@@ -40,6 +41,48 @@
   NSString* reason = NSLocalizedString(@"authorize temporary Monitor Mode",
                                        @"Authorize temporary Monitor Mode exception");
   [self authorizeWithReason:reason replyBlock:replyBlock];
+}
+
++ (void)authorizeTemporaryAdminModeRequiringJustification:(BOOL)requireJustification
+                                               replyBlock:
+                                                   (void (^)(BOOL authenticated,
+                                                             NSString* justification))replyBlock {
+  dispatch_async(dispatch_get_main_queue(), ^{
+    NSString* capturedJustification = @"";
+
+    if (requireJustification) {
+      NSAlert* alert = [[NSAlert alloc] init];
+      alert.messageText =
+          NSLocalizedString(@"Request Admin Privileges", @"Temporary admin mode alert title");
+      alert.informativeText =
+          NSLocalizedString(@"Enter a justification for requesting admin privileges:",
+                            @"Temporary admin mode alert body");
+      [alert addButtonWithTitle:NSLocalizedString(@"OK", @"OK button")];
+      [alert addButtonWithTitle:NSLocalizedString(@"Cancel", @"Cancel button")];
+
+      NSTextField* justificationField =
+          [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 300, 22)];
+      justificationField.placeholderString =
+          NSLocalizedString(@"Justification", @"Temporary admin mode justification placeholder");
+      alert.accessoryView = justificationField;
+
+      NSModalResponse response = [alert runModal];
+      if (response != NSAlertFirstButtonReturn) {
+        replyBlock(NO, @"");
+        return;
+      }
+      capturedJustification = [justificationField.stringValue copy] ?: @"";
+    }
+
+    NSString* authReason =
+        NSLocalizedString(@"request admin privileges", @"Authorize temporary Admin Mode exception");
+    // Capture capturedJustification so it is available in the LA reply block.
+    NSString* justificationForReply = capturedJustification;
+    [self authorizeWithReason:authReason
+                   replyBlock:^(BOOL success) {
+                     replyBlock(success, justificationForReply);
+                   }];
+  });
 }
 
 + (void)authorizeExecutionForEvent:(SNTStoredExecutionEvent*)event
