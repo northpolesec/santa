@@ -62,11 +62,12 @@ static constexpr uint32_t kMaxTelemetryExportIntervalSecs = 3600;
 std::unique_ptr<Logger> Logger::Create(
     std::shared_ptr<EndpointSecurityAPI> esapi,
     std::unique_ptr<santa::SleighLauncher> sleigh_launcher,
-    GetExportConfigBlock getExportConfigBlock, TelemetryEvent telemetry_mask,
-    SNTEventLogType log_type, SNTDecisionCache* decision_cache, NSString* event_log_path,
-    NSString* spool_log_path, size_t spool_dir_size_threshold, size_t spool_file_size_threshold,
-    uint64_t spool_flush_timeout_ms, uint32_t telemetry_export_seconds,
-    uint32_t telemetry_export_timeout_seconds, uint32_t telemetry_export_batch_threshold_size_mb,
+    GetExportConfigBlock getExportConfigBlock, SpoolFileClosedBlock spoolFileClosed,
+    TelemetryEvent telemetry_mask, SNTEventLogType log_type, SNTDecisionCache* decision_cache,
+    NSString* event_log_path, NSString* spool_log_path, size_t spool_dir_size_threshold,
+    size_t spool_file_size_threshold, uint64_t spool_flush_timeout_ms,
+    uint32_t telemetry_export_seconds, uint32_t telemetry_export_timeout_seconds,
+    uint32_t telemetry_export_batch_threshold_size_mb,
     uint32_t telemetry_export_max_files_per_batch) {
   std::shared_ptr<santa::Serializer> serializer;
   std::shared_ptr<santa::Writer> writer;
@@ -89,13 +90,14 @@ std::unique_ptr<Logger> Logger::Create(
       serializer = Protobuf::Create(esapi, std::move(decision_cache));
       writer = Spool<::fsspool::AnyBatcher>::Create(
           ::fsspool::AnyBatcher(), [spool_log_path UTF8String], spool_dir_size_threshold,
-          spool_file_size_threshold, spool_flush_timeout_ms);
+          spool_file_size_threshold, spool_flush_timeout_ms, spoolFileClosed);
       break;
     case SNTEventLogTypeProtobufStream:
       serializer = Protobuf::Create(esapi, std::move(decision_cache));
       writer = Spool<::fsspool::UncompressedStreamBatcher>::Create(
           ::fsspool::UncompressedStreamBatcher(), [spool_log_path UTF8String],
-          spool_dir_size_threshold, spool_file_size_threshold, spool_flush_timeout_ms);
+          spool_dir_size_threshold, spool_file_size_threshold, spool_flush_timeout_ms,
+          spoolFileClosed);
       break;
     case SNTEventLogTypeProtobufStreamGzip:
       serializer = Protobuf::Create(esapi, std::move(decision_cache));
@@ -104,7 +106,7 @@ std::unique_ptr<Logger> Logger::Create(
             return std::make_shared<google::protobuf::io::GzipOutputStream>(raw_stream);
           }),
           [spool_log_path UTF8String], spool_dir_size_threshold, spool_file_size_threshold,
-          spool_flush_timeout_ms);
+          spool_flush_timeout_ms, spoolFileClosed);
       break;
     case SNTEventLogTypeProtobufStreamZstd:
       serializer = Protobuf::Create(esapi, std::move(decision_cache));
@@ -113,7 +115,7 @@ std::unique_ptr<Logger> Logger::Create(
             return ::fsspool::ZstdOutputStream::Create(raw_stream);
           }),
           [spool_log_path UTF8String], spool_dir_size_threshold, spool_file_size_threshold,
-          spool_flush_timeout_ms);
+          spool_flush_timeout_ms, spoolFileClosed);
       break;
     case SNTEventLogTypeJSON:
       serializer = Protobuf::Create(esapi, std::move(decision_cache), true);

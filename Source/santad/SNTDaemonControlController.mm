@@ -213,6 +213,7 @@ double watchdogRAMPeak = 0;
       .cdhash = [rdb cdhashRuleCount],
       .fileAccess = [rdb fileAccessRuleCount],
       .networkFlow = [rdb networkFlowRuleCount],
+      .signals = [rdb signalRuleCount],
   };
 
   // Update counts with data from StaticRules configuration
@@ -240,6 +241,7 @@ double watchdogRAMPeak = 0;
 - (void)databaseRuleAddExecutionRules:(NSArray<SNTRule*>*)executionRules
                       fileAccessRules:(NSArray<SNTFileAccessRule*>*)fileAccessRules
                      networkFlowRules:(NSArray<SNTNetworkFlowRule*>*)networkFlowRules
+                              signals:(NSArray<SNTSignal*>*)signals
                           ruleCleanup:(SNTRuleCleanup)cleanupType
                                source:(SNTRuleAddSource)source
                                 reply:(void (^)(BOOL, NSArray<NSError*>* error))reply {
@@ -268,6 +270,7 @@ double watchdogRAMPeak = 0;
   BOOL success = [ruleTable addExecutionRules:executionRules
                               fileAccessRules:fileAccessRules
                              networkFlowRules:networkFlowRules
+                                      signals:signals
                                   ruleCleanup:cleanupType
                                        errors:&errors];
 
@@ -427,10 +430,10 @@ double watchdogRAMPeak = 0;
 #endif
 }
 
-- (void)databaseRulesHash:(void (^)(NSString*, NSString*, NSString*))reply {
+- (void)databaseRulesHash:(void (^)(NSString*, NSString*, NSString*, NSString*))reply {
   SNTRuleTableRulesHash* rulesHash = [[SNTDatabaseController ruleTable] hashOfHashes];
-  reply(rulesHash.executionRulesHash, rulesHash.fileAccessRulesHash,
-        rulesHash.networkFlowRulesHash);
+  reply(rulesHash.executionRulesHash, rulesHash.fileAccessRulesHash, rulesHash.networkFlowRulesHash,
+        rulesHash.signalRulesHash);
 }
 
 #pragma mark Config Ops

@@ -137,6 +137,7 @@ REGISTER_COMMAND_NAME(@"status")
       .cdhash = -1,
       .fileAccess = -1,
       .networkFlow = -1,
+      .signals = -1,
   };
   [rop databaseRuleCounts:^(struct RuleCounts counts) {
     ruleCounts = counts;
@@ -157,7 +158,8 @@ REGISTER_COMMAND_NAME(@"status")
   __block NSString* executionRulesHash;
   __block NSString* fileAccessRulesHash;
   __block NSString* networkFlowRulesHash;
-  [rop databaseRulesHash:^(NSString* execRulesHash, NSString* faaRulesHash, NSString* nfRulesHash) {
+  [rop databaseRulesHash:^(NSString* execRulesHash, NSString* faaRulesHash, NSString* nfRulesHash,
+                           NSString* signalRulesHash) {
     executionRulesHash = execRulesHash;
     fileAccessRulesHash = faaRulesHash;
     networkFlowRulesHash = nfRulesHash;
@@ -316,6 +318,9 @@ REGISTER_COMMAND_NAME(@"status")
   NSURL* metricsURLStr = configurator.metricURL;
   NSUInteger metricExportInterval = configurator.metricExportInterval;
 
+  BOOL telemetryExportEnabled = configurator.enableTelemetryExport;
+  NSUInteger telemetryExportInterval = configurator.telemetryExportIntervalSec;
+
   NSArray<NSString*>* allowedCommands = configurator.allowedSantaCommands;
   NSString* allowedStr = !allowedCommands ? @"All"
                          : allowedCommands.count > 0
@@ -452,6 +457,14 @@ REGISTER_COMMAND_NAME(@"status")
       };
     }
 
+    stats[@"telemetry"] = [@{
+      @"signal_rules" : @(ruleCounts.signals),
+      @"export_enabled" : @(telemetryExportEnabled),
+    } mutableCopy];
+    if (telemetryExportEnabled) {
+      stats[@"telemetry"][@"export_interval_seconds"] = @(telemetryExportInterval);
+    }
+
     NSData* statsData = [NSJSONSerialization dataWithJSONObject:stats
                                                         options:NSJSONWritingPrettyPrinted
                                                           error:nil];
@@ -529,6 +542,14 @@ REGISTER_COMMAND_NAME(@"status")
       printf("  %-40s | %llu\n", "Rule Count", watchItemsRuleCount);
       printf("  %-40s | %s\n", "Last Policy Update", watchItemsLastUpdateStr.UTF8String);
     }
+
+    printf(">>> Telemetry\n");
+    printf("  %-40s | %s\n", "Export Enabled", telemetryExportEnabled ? "Yes" : "No");
+    if (telemetryExportEnabled) {
+      printf("  %-40s | %s\n", "Export Interval",
+             [FormatInterval(telemetryExportInterval) UTF8String]);
+    }
+    printf("  %-40s | %lld\n", "Signal Rules", ruleCounts.signals);
 
     printf(">>> Sync\n");
     printf("  %-40s | %s\n", "Enabled", syncURLStr.length ? "Yes" : "No");

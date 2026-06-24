@@ -22,6 +22,7 @@
 #import "Source/common/SNTFileAccessRule.h"
 #import "Source/common/SNTNetworkFlowRule.h"
 #import "Source/common/SNTRule.h"
+#import "Source/common/SNTSignal.h"
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTXPCControlInterface.h"
 #import "Source/common/String.h"
@@ -59,23 +60,27 @@ NSDictionary* OptionsFromProtoFAARuleAdd(const ::pbv2::FileAccessRule::Add& pbAd
 NSArray* ProcessesFromProtoFAARuleProcesses(
     const google::protobuf::RepeatedPtrField<::pbv2::FileAccessRule::Process>& pbProcesses);
 SNTNetworkFlowRule* NetworkFlowRuleFromProto(const ::pbv2::NetworkFlowRule& nr);
+SNTSignal* SignalFromProtoSignalRule(const ::pbv2::TelemetrySignalRule& sr);
 
 // Small local object to more easily return the different sets of downloaded rules.
 @interface SNTDownloadedRuleSets : NSObject
 @property(readonly) NSArray<SNTRule*>* executionRules;
 @property(readonly) NSArray<SNTFileAccessRule*>* fileAccessRules;
 @property(readonly) NSArray<SNTNetworkFlowRule*>* networkRules;
+@property(readonly) NSArray<SNTSignal*>* signals;
 @end
 
 @implementation SNTDownloadedRuleSets
 - (instancetype)initWithExecutionRules:(NSArray<SNTRule*>*)executionRules
                        fileAccessRules:(NSArray<SNTFileAccessRule*>*)fileAccessRules
-                          networkRules:(NSArray<SNTNetworkFlowRule*>*)networkRules {
+                          networkRules:(NSArray<SNTNetworkFlowRule*>*)networkRules
+                               signals:(NSArray<SNTSignal*>*)signals {
   self = [super init];
   if (self) {
     _executionRules = executionRules;
     _fileAccessRules = fileAccessRules;
     _networkRules = networkRules;
+    _signals = signals;
   }
   return self;
 }
@@ -101,9 +106,11 @@ SNTDownloadedRuleSets* DownloadNewRulesFromServer(SNTSyncRuleDownload* self) {
   self.syncState.rulesReceived = 0;
   self.syncState.fileAccessRulesReceived = 0;
   self.syncState.networkFlowRulesReceived = 0;
+  self.syncState.signalsReceived = 0;
   NSMutableArray<SNTRule*>* newRules = [NSMutableArray array];
   NSMutableArray<SNTFileAccessRule*>* newFileAccessRules = [NSMutableArray array];
   NSMutableArray<SNTNetworkFlowRule*>* newNetworkRules = [NSMutableArray array];
+  NSMutableArray<SNTSignal*>* newSignals = [NSMutableArray array];
   std::string cursor;
 
   do {
@@ -152,6 +159,15 @@ SNTDownloadedRuleSets* DownloadNewRulesFromServer(SNTSyncRuleDownload* self) {
           }
           [newNetworkRules addObject:rule];
         }
+
+        for (const ::pbv2::TelemetrySignalRule& signalRule : response.telemetry_signal_rules()) {
+          SNTSignal* s = SignalFromProtoSignalRule(signalRule);
+          if (!s) {
+            SLOGD(@"Ignoring bad telemetry signal rule: %s", signalRule.Utf8DebugString().c_str());
+            continue;
+          }
+          [newSignals addObject:s];
+        }
       }
 
       cursor = response.cursor();
@@ -160,6 +176,7 @@ SNTDownloadedRuleSets* DownloadNewRulesFromServer(SNTSyncRuleDownload* self) {
       if constexpr (IsV2) {
         self.syncState.fileAccessRulesReceived += response.file_access_rules_size();
         self.syncState.networkFlowRulesReceived += response.network_flow_rules_size();
+        self.syncState.signalsReceived += response.telemetry_signal_rules_size();
       }
     }
   } while (!cursor.empty());
@@ -167,10 +184,12 @@ SNTDownloadedRuleSets* DownloadNewRulesFromServer(SNTSyncRuleDownload* self) {
   self.syncState.rulesProcessed = newRules.count;
   self.syncState.fileAccessRulesProcessed = newFileAccessRules.count;
   self.syncState.networkFlowRulesProcessed = newNetworkRules.count;
+  self.syncState.signalsProcessed = newSignals.count;
 
   return [[SNTDownloadedRuleSets alloc] initWithExecutionRules:newRules
                                                fileAccessRules:newFileAccessRules
-                                                  networkRules:newNetworkRules];
+                                                  networkRules:newNetworkRules
+                                                       signals:newSignals];
 }
 
 NSArray* PathsFromProtoFAARulePaths(
@@ -360,6 +379,45 @@ SNTNetworkFlowRule* NetworkFlowRuleFromProto(const ::pbv2::NetworkFlowRule& nr) 
   }
 }
 
+// A valid signal name is 1-64 characters, each matching [A-Za-z0-9_.:-].
+bool IsValidSignalName(const std::string& name) {
+  if (name.size() < 1 || name.size() > 64) {
+    return false;
+  }
+  for (char c : name) {
+    bool ok = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') ||
+              c == '_' || c == '-' || c == '.' || c == ':';
+    if (!ok) {
+      return false;
+    }
+  }
+  return true;
+}
+
+SNTSignal* SignalFromProtoSignalRule(const ::pbv2::TelemetrySignalRule& sr) {
+  switch (sr.action_case()) {
+    case ::pbv2::TelemetrySignalRule::kAdd: {
+      const ::santa::common::v1::Signal& signal = sr.add().signal();
+      if (!IsValidSignalName(signal.name())) {
+        return nil;
+      }
+      std::string bytes;
+      if (!signal.SerializeToString(&bytes)) {
+        return nil;
+      }
+      return [[SNTSignal alloc] initAddRuleWithName:StringToNSString(signal.name())
+                                               data:[NSData dataWithBytes:bytes.data()
+                                                                   length:bytes.size()]];
+    }
+    case ::pbv2::TelemetrySignalRule::kRemove:
+      if (!IsValidSignalName(sr.remove().name())) {
+        return nil;
+      }
+      return [[SNTSignal alloc] initRemoveRuleWithName:StringToNSString(sr.remove().name())];
+    default: return nil;
+  }
+}
+
 template <bool IsV2>
 SNTRule* RuleFromProtoRule(const typename santa::ProtoTraits<IsV2>::RuleT& rule) {
   using Traits = santa::ProtoTraits<IsV2>;
@@ -497,9 +555,10 @@ void ProcessDeprecatedBundleNotificationsForRule(
   if (!newRules) {
     return NO;
   }
+
   // If the request was successfully completed, but no new rules received, just return
   if (!newRules.executionRules.count && !newRules.fileAccessRules.count &&
-      !newRules.networkRules.count) {
+      !newRules.networkRules.count && !newRules.signals.count) {
     return YES;
   }
 
@@ -512,6 +571,7 @@ void ProcessDeprecatedBundleNotificationsForRule(
       databaseRuleAddExecutionRules:newRules.executionRules
                     fileAccessRules:newRules.fileAccessRules
                    networkFlowRules:newRules.networkRules
+                            signals:newRules.signals
                         ruleCleanup:SyncTypeToRuleCleanup(self.syncState.syncType)
                              source:SNTRuleAddSourceSyncService
                               reply:^(BOOL didSucceed, NSArray<NSError*>* e) {

@@ -24,6 +24,7 @@
 
 #include <algorithm>
 #include <functional>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -174,9 +175,12 @@ class FsSpoolWriter {
     return batcher_.InitializeBatch(current_spool_state_.tmp_fd);
   }
 
-  absl::Status CompleteCurrentSpoolState() {
+  // Completes the in-progress spool file (if any), renaming it from the tmp
+  // directory into the spool directory. Returns the path of the just-completed
+  // spool file, or std::nullopt when no file was open.
+  absl::StatusOr<std::optional<std::string>> CompleteCurrentSpoolState() {
     if (!current_spool_state_.IsOpen()) {
-      return absl::OkStatus();
+      return std::optional<std::string>(std::nullopt);
     }
 
     absl::StatusOr<size_t> size_estimate =
@@ -198,7 +202,7 @@ class FsSpoolWriter {
       return status;
     }
 
-    return absl::OkStatus();
+    return std::optional<std::string>(current_spool_state_.spool_file);
   }
 
   // Returns ResourceExhaustedError the first time no space is available
@@ -227,7 +231,9 @@ class FsSpoolWriter {
     return batcher_.Write(std::move(bytes));
   }
 
-  absl::Status Flush() {
+  // Flushes the in-progress spool file. Returns the path of the just-completed
+  // spool file, or std::nullopt when no file was open.
+  absl::StatusOr<std::optional<std::string>> Flush() {
     // If the batcher wasn't initialized before Write, it must be initialized
     // now
     if (!batcher_.ShouldInitializeBeforeWrite()) {
@@ -237,9 +243,10 @@ class FsSpoolWriter {
       }
     }
 
-    absl::Status status = CompleteCurrentSpoolState();
+    absl::StatusOr<std::optional<std::string>> result =
+        CompleteCurrentSpoolState();
     space_check_failure_since_last_flush_ = false;
-    return status;
+    return result;
   }
 
   friend class fsspool::FsSpoolWriterPeer<T>;
