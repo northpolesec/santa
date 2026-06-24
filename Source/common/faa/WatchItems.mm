@@ -81,7 +81,7 @@ static constexpr NSUInteger kMaxSigningIDLength = 512;
 // FAA Rule names are 1-64 byte resource names containing only letters, digits,
 // periods, colons, hyphens, and underscores.
 static constexpr NSUInteger kMaxRuleNameLength = 64;
-static NSString* const kValidRuleNamePattern = @"^[A-Za-z0-9._:-]+$";
+static NSString* const kValidRuleNamePattern = @"^[A-Za-z0-9._:-]+\\z";
 
 // Semi-arbitrary min/max allowed reapplication frequency.
 // Goal is to prevent a configuration setting that would cause too much

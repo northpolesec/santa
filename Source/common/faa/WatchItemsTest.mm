@@ -891,6 +891,12 @@ BlockGenResult CreatePolicyBlockGen() {
   XCTAssertFalse(IsWatchItemNameValid(@[], nil));
   XCTAssertFalse(IsWatchItemNameValid(@{}, nil));
   XCTAssertFalse(IsWatchItemNameValid(RepeatedString(@"A", 65), nil));
+  // Regression: the pattern is anchored with `\z`, not `$`. ICU's `$` matches
+  // before a final line terminator, which would let a trailing newline/CR slip
+  // through `^...+$`. `\z` requires the absolute end of input.
+  XCTAssertFalse(IsWatchItemNameValid(@"rule\n", nil));
+  XCTAssertFalse(IsWatchItemNameValid(@"rule\r", nil));
+  XCTAssertFalse(IsWatchItemNameValid(@"rule\r\n", nil));
 
   XCTAssertTrue(IsWatchItemNameValid(@"_", nil));
   XCTAssertTrue(IsWatchItemNameValid(@"_1", nil));
