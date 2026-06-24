@@ -20,6 +20,7 @@
 @class SNTCELFallbackRule;
 @class SNTExportConfiguration;
 @class SNTModeTransition;
+@class SNTTemporaryAdminPolicy;
 @class SNTSyncNetworkExtensionSettings;
 @class SNTRule;
 
@@ -849,6 +850,16 @@ extern NSString* _Nonnull const kEnableMenuItemUserOverride;
 ///  Set the mode transition configuration as received from a sync server.
 ///
 - (void)setSyncServerModeTransition:(nonnull SNTModeTransition*)modeTransition;
+
+///
+///  Currently defined Temporary Admin Mode policy. Its value is set by a sync server.
+///
+@property(nullable, readonly) SNTTemporaryAdminPolicy* temporaryAdminPolicy;
+
+///
+///  Set the Temporary Admin Mode policy as received from a sync server.
+///
+- (void)setSyncServerTemporaryAdminPolicy:(nonnull SNTTemporaryAdminPolicy*)temporaryAdminPolicy;
 
 ///
 ///  Return if Santa is temporarily in Monitor Mode and will revert back

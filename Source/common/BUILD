@@ -533,6 +533,7 @@ objc_library(
         ":SNTRule",
         ":SNTStrengthify",
         ":SNTSystemInfo",
+        ":SNTTemporaryAdminPolicy",
         "//Source/common/faa:WatchItems",
         "//Source/common/ne:SNTSyncNetworkExtensionSettings",
     ],
@@ -549,6 +550,7 @@ objc_library(
         ":SNTCommonEnums",
         ":SNTExportConfiguration",
         ":SNTModeTransition",
+        ":SNTTemporaryAdminPolicy",
         "//Source/common/ne:SNTSyncNetworkExtensionSettings",
     ],
 )
@@ -561,6 +563,7 @@ santa_unit_test(
         ":SNTConfigBundle",
         ":SNTExportConfiguration",
         ":SNTModeTransition",
+        ":SNTTemporaryAdminPolicy",
         "//Source/common/ne:SNTSyncNetworkExtensionSettings",
     ],
 )
@@ -599,6 +602,24 @@ santa_unit_test(
     srcs = ["SNTModeTransitionTest.mm"],
     deps = [
         ":SNTModeTransition",
+    ],
+)
+
+objc_library(
+    name = "SNTTemporaryAdminPolicy",
+    srcs = ["SNTTemporaryAdminPolicy.mm"],
+    hdrs = ["SNTTemporaryAdminPolicy.h"],
+    deps = [
+        ":CoderMacros",
+        ":SNTLogging",
+    ],
+)
+
+santa_unit_test(
+    name = "SNTTemporaryAdminPolicyTest",
+    srcs = ["SNTTemporaryAdminPolicyTest.mm"],
+    deps = [
+        ":SNTTemporaryAdminPolicy",
     ],
 )
 
@@ -855,12 +876,32 @@ objc_library(
 )
 
 objc_library(
+    name = "SNTTimedSessionAuditEvent",
+    srcs = ["SNTTimedSessionAuditEvent.mm"],
+    hdrs = ["SNTTimedSessionAuditEvent.h"],
+    deps = [
+        ":CoderMacros",
+        ":SNTStoredEvent",
+    ],
+)
+
+objc_library(
     name = "SNTStoredTemporaryMonitorModeAuditEvent",
     srcs = ["SNTStoredTemporaryMonitorModeAuditEvent.mm"],
     hdrs = ["SNTStoredTemporaryMonitorModeAuditEvent.h"],
     deps = [
         ":CoderMacros",
-        ":SNTStoredEvent",
+        ":SNTTimedSessionAuditEvent",
+    ],
+)
+
+objc_library(
+    name = "SNTStoredTemporaryAdminModeAuditEvent",
+    srcs = ["SNTStoredTemporaryAdminModeAuditEvent.mm"],
+    hdrs = ["SNTStoredTemporaryAdminModeAuditEvent.h"],
+    deps = [
+        ":CoderMacros",
+        ":SNTTimedSessionAuditEvent",
     ],
 )
 
@@ -904,6 +945,15 @@ santa_unit_test(
     deps = [
         ":SNTStoredEvent",
         ":SNTStoredTemporaryMonitorModeAuditEvent",
+        ":SNTTimedSessionAuditEvent",
+    ],
+)
+
+santa_unit_test(
+    name = "SNTStoredTemporaryAdminModeAuditEventTest",
+    srcs = ["SNTStoredTemporaryAdminModeAuditEventTest.mm"],
+    deps = [
+        ":SNTStoredTemporaryAdminModeAuditEvent",
     ],
 )
 
@@ -1256,8 +1306,10 @@ test_suite(
         ":SNTStoredNetworkFlowEventTest",
         ":SNTStoredNetworkMountEventTest",
         ":SNTStoredProcessTest",
+        ":SNTStoredTemporaryAdminModeAuditEventTest",
         ":SNTStoredTemporaryMonitorModeAuditEventTest",
         ":SNTStoredUSBMountEventTest",
+        ":SNTTemporaryAdminPolicyTest",
         ":SNTTimerTest",
         ":SNTXxhashTest",
         ":SantaCacheTest",

@@ -68,6 +68,16 @@ typedef NS_ENUM(NSInteger, SNTErrorCode) {
   SNTErrorCodeSandboxAlreadyPending = 813,
   SNTErrorCodeSandboxInternal = 814,
   SNTErrorCodeSandboxCapacityExceeded = 815,
+
+  // Temporary Admin Mode errors
+  SNTErrorCodeTAMNoPolicy = 910,
+  SNTErrorCodeTAMInvalidSyncServer = 911,
+  SNTErrorCodeTAMAuthFailed = 912,
+  SNTErrorCodeTAMAlreadyAdmin = 913,
+  SNTErrorCodeTAMMembershipChangeFailed = 914,
+  SNTErrorCodeTAMNoConsoleUser = 915,
+  SNTErrorCodeTAMSessionAlreadyActive = 916,
+  SNTErrorCodeTAMJustificationRequired = 917,
 };
 
 @interface SNTError : NSObject

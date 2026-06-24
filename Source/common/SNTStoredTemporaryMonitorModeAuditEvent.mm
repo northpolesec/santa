@@ -17,11 +17,17 @@
 
 #import "Source/common/CoderMacros.h"
 
-@interface SNTStoredTemporaryMonitorModeAuditEvent ()
-// These events should never get dropped due to a conflict. E.g., if a session is refreshed
-// multiple times, each refresh should be reported. This property will be used to compute a
-// random UUID on each instatiation to prevent caching.
-@property(readonly) NSUUID* uniqueUuid;
+// NB: Intentionally not overriding SNTTimedSessionAuditEvent / SNTStoredEvent base class methods:
+//   - (NSString *)uniqueID
+//   - (BOOL)unactionableEvent
+// This class should not be directly instantiated. The base class provides these implementations
+// using the per-instance uniqueUuid so subclasses inherit correct behavior automatically.
+@implementation SNTStoredTemporaryMonitorModeAuditEvent
+
++ (BOOL)supportsSecureCoding {
+  return YES;
+}
+
 @end
 
 @implementation SNTStoredTemporaryMonitorModeEnterAuditEvent
@@ -56,15 +62,6 @@
   return self;
 }
 
-- (NSString*)uniqueID {
-  return [self.uniqueUuid UUIDString];
-}
-
-- (BOOL)unactionableEvent {
-  // These events should always be stored
-  return NO;
-}
-
 @end
 
 @implementation SNTStoredTemporaryMonitorModeLeaveAuditEvent
@@ -90,52 +87,6 @@
   self = [super initWithCoder:decoder];
   if (self) {
     DECODE_SELECTOR(decoder, reason, NSNumber, integerValue);
-  }
-  return self;
-}
-
-- (NSString*)uniqueID {
-  return [self.uniqueUuid UUIDString];
-}
-
-- (BOOL)unactionableEvent {
-  // These events should always be stored
-  return NO;
-}
-
-@end
-
-// NB: Intentionally not implementing SNTStoredEvent base class methods:
-//   - (NSString *)uniqueID
-//   - (BOOL)unactionableEvent
-// This class should not be directly instantiated. The default base class implementation
-// for these methods will throw, making it so attempting to instantiate this is not very useful.
-@implementation SNTStoredTemporaryMonitorModeAuditEvent
-
-- (instancetype)initWithUUID:(NSString*)uuid {
-  self = [super init];
-  if (self) {
-    _uuid = uuid;
-    _uniqueUuid = [NSUUID UUID];
-  }
-  return self;
-}
-
-+ (BOOL)supportsSecureCoding {
-  return YES;
-}
-
-- (void)encodeWithCoder:(NSCoder*)coder {
-  [super encodeWithCoder:coder];
-  ENCODE(coder, uuid);
-  ENCODE(coder, uniqueUuid);
-}
-
-- (instancetype)initWithCoder:(NSCoder*)decoder {
-  self = [super initWithCoder:decoder];
-  if (self) {
-    DECODE(decoder, uuid, NSString);
-    DECODE(decoder, uniqueUuid, NSUUID);
   }
   return self;
 }

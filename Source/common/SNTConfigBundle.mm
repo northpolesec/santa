@@ -18,6 +18,7 @@
 #import "Source/common/SNTCELFallbackRule.h"
 #import "Source/common/SNTExportConfiguration.h"
 #import "Source/common/SNTModeTransition.h"
+#import "Source/common/SNTTemporaryAdminPolicy.h"
 #import "Source/common/ne/SNTSyncNetworkExtensionSettings.h"
 
 @interface SNTConfigBundle ()
@@ -41,6 +42,7 @@
 @property NSDate* fullSyncLastSuccess;
 @property NSDate* ruleSyncLastSuccess;
 @property SNTModeTransition* modeTransition;
+@property SNTTemporaryAdminPolicy* temporaryAdminPolicy;
 @property NSString* eventDetailURL;
 @property NSString* eventDetailText;
 @property NSString* fileAccessEventDetailURL;
@@ -83,6 +85,7 @@
   ENCODE(coder, fullSyncLastSuccess);
   ENCODE(coder, ruleSyncLastSuccess);
   ENCODE(coder, modeTransition);
+  ENCODE(coder, temporaryAdminPolicy);
   ENCODE(coder, eventDetailURL);
   ENCODE(coder, eventDetailText);
   ENCODE(coder, fileAccessEventDetailURL);
@@ -121,6 +124,7 @@
     DECODE(decoder, fullSyncLastSuccess, NSDate);
     DECODE(decoder, ruleSyncLastSuccess, NSDate);
     DECODE(decoder, modeTransition, SNTModeTransition);
+    DECODE(decoder, temporaryAdminPolicy, SNTTemporaryAdminPolicy);
     DECODE(decoder, eventDetailURL, NSString);
     DECODE(decoder, eventDetailText, NSString);
     DECODE(decoder, fileAccessEventDetailURL, NSString);
@@ -254,6 +258,12 @@
 - (void)modeTransition:(void (^)(SNTModeTransition*))block {
   if (self.modeTransition) {
     block(self.modeTransition);
+  }
+}
+
+- (void)temporaryAdminPolicy:(void (^)(SNTTemporaryAdminPolicy*))block {
+  if (self.temporaryAdminPolicy) {
+    block(self.temporaryAdminPolicy);
   }
 }
 

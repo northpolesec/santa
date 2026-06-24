@@ -14,6 +14,7 @@
 
 #import "Source/common/SNTStoredEvent.h"
 #import "Source/common/SNTStoredTemporaryMonitorModeAuditEvent.h"
+#import "Source/common/SNTTimedSessionAuditEvent.h"
 
 #import <Foundation/Foundation.h>
 #import <XCTest/XCTest.h>
@@ -24,7 +25,7 @@
 @implementation StoredEventTest
 
 - (void)testUniqueID {
-  // Ensure some UUID-length string is returned.It should be random and not match
+  // Ensure some UUID-length string is returned. It should be random and not match
   // what the object was initialized with.
   SNTStoredTemporaryMonitorModeEnterAuditEvent* tmmAuditEnter =
       [[SNTStoredTemporaryMonitorModeEnterAuditEvent alloc]
@@ -79,8 +80,11 @@
   XCTAssertNotNil(archivedTmmEnterEvent);
   XCTAssertNotNil(archivedTmmLeaveEvent);
 
+  // SNTTimedSessionAuditEvent must be included so NSKeyedUnarchiver can decode the
+  // intermediate class in the hierarchy.
   NSSet* allowedClasses =
-      [NSSet setWithObjects:[SNTStoredTemporaryMonitorModeAuditEvent class],
+      [NSSet setWithObjects:[SNTTimedSessionAuditEvent class],
+                            [SNTStoredTemporaryMonitorModeAuditEvent class],
                             [SNTStoredTemporaryMonitorModeEnterAuditEvent class],
                             [SNTStoredTemporaryMonitorModeLeaveAuditEvent class], nil];
 
@@ -93,9 +97,14 @@
       [unarchivedTmmEnterEvent isKindOfClass:[SNTStoredTemporaryMonitorModeEnterAuditEvent class]]);
   SNTStoredTemporaryMonitorModeEnterAuditEvent* tmmEnterAuditEvent =
       (SNTStoredTemporaryMonitorModeEnterAuditEvent*)unarchivedTmmEnterEvent;
-  XCTAssertEqualObjects([tmmEnterAuditEvent uniqueID], [tmmAuditEnter uniqueID]);
-  XCTAssertEqual(tmmEnterAuditEvent.seconds, 123);
+  // uuid, seconds, and reason must survive a coding round-trip.
+  XCTAssertEqualObjects(tmmEnterAuditEvent.uuid, @"abc");
+  XCTAssertEqual(tmmEnterAuditEvent.seconds, 123u);
   XCTAssertEqual(tmmEnterAuditEvent.reason, SNTTemporaryMonitorModeEnterReasonOnDemandRefresh);
+  // uniqueID is keyed on the per-instance uniqueUuid — must be non-nil and survive encoding.
+  XCTAssertEqualObjects([tmmEnterAuditEvent uniqueID], [tmmAuditEnter uniqueID]);
+  XCTAssertNotNil([tmmEnterAuditEvent uniqueID]);
+  XCTAssertFalse([tmmEnterAuditEvent unactionableEvent]);
 
   SNTStoredEvent* unarchivedTmmLeaveEvent =
       [NSKeyedUnarchiver unarchivedObjectOfClasses:allowedClasses
@@ -106,8 +115,12 @@
       [unarchivedTmmLeaveEvent isKindOfClass:[SNTStoredTemporaryMonitorModeLeaveAuditEvent class]]);
   SNTStoredTemporaryMonitorModeLeaveAuditEvent* tmmLeaveAuditEvent =
       (SNTStoredTemporaryMonitorModeLeaveAuditEvent*)unarchivedTmmLeaveEvent;
-  XCTAssertEqualObjects([tmmLeaveAuditEvent uniqueID], [tmmAuditLeave uniqueID]);
+  // uuid and reason must survive a coding round-trip.
+  XCTAssertEqualObjects(tmmLeaveAuditEvent.uuid, @"xyz");
   XCTAssertEqual(tmmLeaveAuditEvent.reason, SNTTemporaryMonitorModeLeaveReasonSyncServerChanged);
+  XCTAssertEqualObjects([tmmLeaveAuditEvent uniqueID], [tmmAuditLeave uniqueID]);
+  XCTAssertNotNil([tmmLeaveAuditEvent uniqueID]);
+  XCTAssertFalse([tmmLeaveAuditEvent unactionableEvent]);
 }
 
 @end
