@@ -119,7 +119,7 @@ which will be used in logs and in the block UI.
 
 :::info
 
-Rule names (the `WatchItems` dictionary keys) must be 1-63 characters long and
+Rule names (the `WatchItems` dictionary keys) must be 1-64 characters long and
 match the regular expression `^[A-Za-z0-9._:-]+$`, containing only letters,
 digits, periods, colons, hyphens, and underscores. For example, `ChromeCookies`,
 `my_rule_1`, and `my-rule.v2` are valid, but `My Rule` and `rule=1` are not.

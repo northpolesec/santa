@@ -78,9 +78,9 @@ static constexpr NSUInteger kMaxTeamIDLength = 10;
 // Semi-arbitrary upper bound.
 static constexpr NSUInteger kMaxSigningIDLength = 512;
 
-// FAA Rule names are 1-63 byte resource names containing only letters, digits,
+// FAA Rule names are 1-64 byte resource names containing only letters, digits,
 // periods, colons, hyphens, and underscores.
-static constexpr NSUInteger kMaxRuleNameLength = 63;
+static constexpr NSUInteger kMaxRuleNameLength = 64;
 static NSString* const kValidRuleNamePattern = @"^[A-Za-z0-9._:-]+$";
 
 // Semi-arbitrary min/max allowed reapplication frequency.
