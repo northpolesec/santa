@@ -379,14 +379,14 @@ SNTNetworkFlowRule* NetworkFlowRuleFromProto(const ::pbv2::NetworkFlowRule& nr) 
   }
 }
 
-// A valid signal name is 4-64 characters, each matching [A-Za-z0-9_-].
+// A valid signal name is 1-64 characters, each matching [A-Za-z0-9_.:-].
 bool IsValidSignalName(const std::string& name) {
-  if (name.size() < 4 || name.size() > 64) {
+  if (name.size() < 1 || name.size() > 64) {
     return false;
   }
   for (char c : name) {
     bool ok = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') ||
-              c == '_' || c == '-';
+              c == '_' || c == '-' || c == '.' || c == ':';
     if (!ok) {
       return false;
     }
