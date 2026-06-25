@@ -568,7 +568,7 @@ changes in the release notes of any future release that changes them.`,
             {
               key: "<Name>",
               description: `A unique name that identifies a single watch item rule. This value will be reported in
-              events. The name must be a legal C identifier`,
+              events. The name must be 1-64 characters matching the regular expression ^[A-Za-z0-9._:-]+$`,
               type: "dict",
               subFields: [
                 {

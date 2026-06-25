@@ -93,7 +93,7 @@
   SNTStoredFileAccessEvent* faaEvent = [[SNTStoredFileAccessEvent alloc] init];
   faaEvent.process.fileSHA256 = @"bar";
 
-  faaEvent.process.parent = [[SNTStoredFileAccessProcess alloc] init];
+  faaEvent.process.parent = [[SNTStoredProcess alloc] init];
   faaEvent.process.parent.pid = @(123);
 
   NSData* archivedExecEvent = [NSKeyedArchiver archivedDataWithRootObject:execEvent

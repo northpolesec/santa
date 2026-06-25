@@ -18,6 +18,7 @@ objc_library(
         "//Source/common:SNTStoredExecutionEvent",
         "//Source/common:SNTStoredFileAccessEvent",
         "//Source/common:SNTStoredNetworkMountEvent",
+        "//Source/common:SNTStoredProcess",
         "//Source/common:SNTStoredTemporaryMonitorModeAuditEvent",
     ],
 )

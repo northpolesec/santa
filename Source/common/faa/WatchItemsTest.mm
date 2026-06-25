@@ -880,27 +880,36 @@ BlockGenResult CreatePolicyBlockGen() {
 }
 
 - (void)testIsWatchItemNameValid {
-  // Only legal C identifiers should be accepted
+  // Resource names: 1-64 chars of letters, digits, periods, colons, hyphens,
+  // and underscores.
   XCTAssertFalse(IsWatchItemNameValid(nil, nil));
   XCTAssertFalse(IsWatchItemNameValid(@"", nil));
-  XCTAssertFalse(IsWatchItemNameValid(@"1abc", nil));
-  XCTAssertFalse(IsWatchItemNameValid(@"abc-1234", nil));
   XCTAssertFalse(IsWatchItemNameValid(@"a=b", nil));
   XCTAssertFalse(IsWatchItemNameValid(@"a!b", nil));
+  XCTAssertFalse(IsWatchItemNameValid(@"a b", nil));
   XCTAssertFalse(IsWatchItemNameValid(@(1), nil));
   XCTAssertFalse(IsWatchItemNameValid(@[], nil));
   XCTAssertFalse(IsWatchItemNameValid(@{}, nil));
-  XCTAssertFalse(IsWatchItemNameValid(RepeatedString(@"A", 64), nil));
+  XCTAssertFalse(IsWatchItemNameValid(RepeatedString(@"A", 65), nil));
+  // Regression: the pattern is anchored with `\z`, not `$`. ICU's `$` matches
+  // before a final line terminator, which would let a trailing newline/CR slip
+  // through `^...+$`. `\z` requires the absolute end of input.
+  XCTAssertFalse(IsWatchItemNameValid(@"rule\n", nil));
+  XCTAssertFalse(IsWatchItemNameValid(@"rule\r", nil));
+  XCTAssertFalse(IsWatchItemNameValid(@"rule\r\n", nil));
 
   XCTAssertTrue(IsWatchItemNameValid(@"_", nil));
   XCTAssertTrue(IsWatchItemNameValid(@"_1", nil));
   XCTAssertTrue(IsWatchItemNameValid(@"_1_", nil));
+  XCTAssertTrue(IsWatchItemNameValid(@"1abc", nil));
+  XCTAssertTrue(IsWatchItemNameValid(@"abc-1234", nil));
   XCTAssertTrue(IsWatchItemNameValid(@"abc", nil));
   XCTAssertTrue(IsWatchItemNameValid(@"A", nil));
   XCTAssertTrue(IsWatchItemNameValid(@"A_B", nil));
   XCTAssertTrue(IsWatchItemNameValid(@"FooName", nil));
   XCTAssertTrue(IsWatchItemNameValid(@"bar_Name", nil));
-  XCTAssertTrue(IsWatchItemNameValid(RepeatedString(@"A", 63), nil));
+  XCTAssertTrue(IsWatchItemNameValid(@"rule.v2:prod", nil));
+  XCTAssertTrue(IsWatchItemNameValid(RepeatedString(@"A", 64), nil));
 }
 
 - (void)testParseConfig {

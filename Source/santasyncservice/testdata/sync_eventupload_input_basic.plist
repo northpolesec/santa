@@ -1090,11 +1090,11 @@
 		<dict>
 			<key>$classes</key>
 			<array>
-				<string>SNTStoredFileAccessProcess</string>
+				<string>SNTStoredProcess</string>
 				<string>NSObject</string>
 			</array>
 			<key>$classname</key>
-			<string>SNTStoredFileAccessProcess</string>
+			<string>SNTStoredProcess</string>
 		</dict>
 		<integer>1</integer>
 		<dict>

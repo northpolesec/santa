@@ -238,6 +238,7 @@ objc_library(
         "//Source/common:SNTStoredExecutionEvent",
         "//Source/common:SNTStoredFileAccessEvent",
         "//Source/common:SNTStoredNetworkMountEvent",
+        "//Source/common:SNTStoredProcess",
         "//Source/common:SNTStoredSignalReport",
         "//Source/common:SNTStoredTemporaryMonitorModeAuditEvent",
         "//Source/common:SNTStoredUSBMountEvent",
@@ -315,6 +316,7 @@ santa_unit_test(
         "//Source/common:SNTStoredExecutionEvent",
         "//Source/common:SNTStoredFileAccessEvent",
         "//Source/common:SNTStoredNetworkMountEvent",
+        "//Source/common:SNTStoredProcess",
         "//Source/common:SNTStoredSignalReport",
         "//Source/common:SNTStoredTemporaryMonitorModeAuditEvent",
         "//Source/common:SNTStoredUSBMountEvent",
@@ -388,6 +390,7 @@ santa_unit_test(
         "//Source/common:SNTStoredExecutionEvent",
         "//Source/common:SNTStoredFileAccessEvent",
         "//Source/common:SNTStoredNetworkMountEvent",
+        "//Source/common:SNTStoredProcess",
         "//Source/common:SNTStoredSignalReport",
         "//Source/common:SNTStoredTemporaryMonitorModeAuditEvent",
         "//Source/common:SNTStoredUSBMountEvent",
@@ -468,6 +471,7 @@ santa_unit_test(
         "//Source/common:SNTSystemInfo",
         "@OCMock",
         "@boringssl//:crypto",
+        "@northpolesec_protos//commands:v1_cc_proto",
     ],
 )
 
