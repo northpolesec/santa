@@ -158,3 +158,4 @@ const NSUInteger kMinimumFullSyncInterval = 60;
 const NSUInteger kDefaultFullSyncInterval = 600;
 const NSUInteger kDefaultPushNotificationsFullSyncInterval = 14400;
 const NSUInteger kDefaultPushNotificationsGlobalRuleSyncDeadline = 600;
+const NSUInteger kDefaultPushNotificationTagSyncJitterSeconds = 180;

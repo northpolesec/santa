@@ -165,3 +165,9 @@ extern const NSUInteger kMinimumFullSyncInterval;
 extern const NSUInteger kDefaultFullSyncInterval;
 extern const NSUInteger kDefaultPushNotificationsFullSyncInterval;
 extern const NSUInteger kDefaultPushNotificationsGlobalRuleSyncDeadline;
+
+///
+///  The default maximum random jitter (in seconds) applied before syncing in
+///  response to a tag push notification that does not specify its own jitter.
+///
+extern const NSUInteger kDefaultPushNotificationTagSyncJitterSeconds;
