@@ -106,7 +106,8 @@ static const NSTimeInterval kSignalReportDedupWindowSeconds = (60 * 10);
 
   if (version < 6) {
     // Signal reports produced by Sleigh signal scans, pending upload to the sync server.
-    // No dedup: a signal legitimately fires repeatedly.
+    // Repeated firings of the same signal are deduplicated per-name within a time window
+    // (kSignalReportDedupWindowSeconds) before they reach this table; see addStoredSignalReports:.
     [db executeUpdate:@"CREATE TABLE 'signal_reports' ("
                       @"'idx' INTEGER PRIMARY KEY,"
                       @"'report_data' BLOB NOT NULL);"];
@@ -277,7 +278,13 @@ static const NSTimeInterval kSignalReportDedupWindowSeconds = (60 * 10);
         [stored removeAllObjects];
         return;
       }
-      [stored addObject:report];
+      // ON CONFLICT skips silently and still reports success, so only treat the report as stored
+      // if a row was actually inserted. Capture the assigned rowid so the immediate upload path
+      // (which deletes by idx after a successful upload) has it.
+      if ([db changes] > 0) {
+        report.idx = @([db lastInsertRowId]);
+        [stored addObject:report];
+      }
     }
   }];
   return stored;

@@ -806,6 +806,7 @@ objc_library(
     name = "SNTStoredSignalReport",
     srcs = ["SNTStoredSignalReport.mm"],
     hdrs = ["SNTStoredSignalReport.h"],
+    module_name = "santa_common_SNTStoredSignalReport",
     deps = [
         ":CoderMacros",
     ],
