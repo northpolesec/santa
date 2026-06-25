@@ -704,27 +704,45 @@ static int NATSSSLVerifyCallback(int preverifyOk, void* ctx) {
 }
 
 // Handle a push notification for the given subject by dispatching a sync.
-// Tag subjects (santa.tag.*) get a random jitter delay of 0-180 seconds to
-// avoid thundering herd when many hosts share the same tag. Host subjects
-// (santa.host.*) trigger an immediate sync.
-- (void)handlePushNotificationForSubject:(NSString*)subject {
+// Tag subjects (santa.tag.*) sync with a random jitter delay to avoid a
+// thundering herd when many hosts share the same tag. The amount of jitter is
+// controlled by the optional SyncRequest payload:
+//   - If max_jitter is set, the sync is scheduled at a random point in
+//     [0, max_jitter) seconds. A max_jitter of 0 yields an immediate sync.
+//   - If max_jitter is not set (or the payload is absent/undecodable), the
+//     default of [0, kDefaultPushNotificationTagSyncJitterSeconds) is used.
+// Host subjects (santa.host.*) always trigger an immediate sync.
+- (void)handlePushNotificationForSubject:(NSString*)subject withPayload:(NSData*)payload {
   dispatch_async(self.messageQueue, ^{
-    if (!self.isShuttingDown) {
-      uint32_t jitterSeconds = 0;
-      if ([subject hasPrefix:@"santa.tag."]) {
-        jitterSeconds = arc4random_uniform(181);
-        LOGI(@"NATS: Scheduling sync in %u seconds (jitter) due to tag message on %@",
-             jitterSeconds, subject);
-      } else {
-        LOGI(@"NATS: Triggering immediate sync due to message on %@", subject);
+    if (self.isShuttingDown) {
+      return;
+    }
+
+    uint32_t jitterSeconds = 0;
+    if ([subject hasPrefix:@"santa.tag."]) {
+      // Default to the standard jitter window unless the SyncRequest overrides it.
+      uint32_t maxJitter = (uint32_t)kDefaultPushNotificationTagSyncJitterSeconds;
+
+      ::pbv1::SyncRequest syncRequest;
+      if (payload.length > 0 && syncRequest.ParseFromArray(payload.bytes, (int)payload.length) &&
+          syncRequest.has_max_jitter()) {
+        // max_jitter is explicitly set, honor it (including an explicit 0,
+        // which requests an immediate sync).
+        maxJitter = syncRequest.max_jitter();
       }
 
-      dispatch_async(dispatch_get_main_queue(), ^{
-        if (!self.isShuttingDown) {
-          [self.syncDelegate syncSecondsFromNow:jitterSeconds];
-        }
-      });
+      jitterSeconds = arc4random_uniform(maxJitter);
+      LOGI(@"NATS: Scheduling sync in %u seconds (max jitter %u) due to tag message on %@",
+           jitterSeconds, maxJitter, subject);
+    } else {
+      LOGI(@"NATS: Triggering immediate sync due to message on %@", subject);
     }
+
+    dispatch_async(dispatch_get_main_queue(), ^{
+      if (!self.isShuttingDown) {
+        [self.syncDelegate syncSecondsFromNow:jitterSeconds];
+      }
+    });
   });
 }
 
@@ -746,16 +764,11 @@ static void messageHandler(natsConnection* nc, natsSubscription* sub, natsMsg* m
   int dataLen = natsMsg_GetDataLength(msg);
 
   NSString* msgSubject = subject ? @(subject) : @"<unknown>";
-  NSString* msgData;
-  if (data && dataLen > 0) {
-    // Decode the payload as a UTF-8 string.
-    // TODO in the future handle binary data e.g. protobuf if / when needed.
-    msgData = [[NSString alloc] initWithBytes:data length:dataLen encoding:NSUTF8StringEncoding];
-  } else {
-    msgData = @"";
-  }
+  // Copy the (optionally present) payload out of the NATS-owned message before
+  // it is destroyed. For tag subjects this is an encoded SyncRequest proto.
+  NSData* payload = (data && dataLen > 0) ? [NSData dataWithBytes:data length:dataLen] : nil;
 
-  LOGD(@"NATS: Received message on subject '%@': %@", msgSubject, msgData ?: @"<no data>");
+  LOGD(@"NATS: Received message on subject '%@' (%d byte payload)", msgSubject, dataLen);
 
   // Process on message queue to serialize handling of messages and gurantee we
   // avoid blocking the NATS managed thread. Then call back to the main thread
@@ -764,7 +777,7 @@ static void messageHandler(natsConnection* nc, natsSubscription* sub, natsMsg* m
   //
   // IMPORTANT: Do not touch the nats objects in this block they are owned by
   // the nats library and will be destroyed after this block.
-  [self handlePushNotificationForSubject:msgSubject];
+  [self handlePushNotificationForSubject:msgSubject withPayload:payload];
 
   natsMsg_Destroy(msg);
 }

@@ -459,6 +459,7 @@ santa_unit_test(
         "//Source/common:SNTSystemInfo",
         "@OCMock",
         "@boringssl//:crypto",
+        "@northpolesec_protos//commands:v1_cc_proto",
     ],
 )
 

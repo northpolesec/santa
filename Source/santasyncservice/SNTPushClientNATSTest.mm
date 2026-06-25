@@ -22,10 +22,14 @@
 #import "Source/santasyncservice/SNTPushNotifications.h"
 #import "Source/santasyncservice/SNTSyncState.h"
 
+#include "commands/v1.pb.h"
+
 extern "C" {
 #include <openssl/x509v3.h>
 #import "src/nats.h"
 }
+
+namespace pbv1 = ::santa::commands::v1;
 
 // Forward declaration of the extracted domain-check function.
 extern "C" bool NATSLeafCertHasPushDomain(X509* cert);
@@ -84,7 +88,7 @@ static X509* CreateCertWithDNSSANBytes(const char* data, size_t len) {
                             jwt:(NSString*)jwt
                    pushDeviceID:(NSString*)deviceID
                            tags:(NSArray<NSString*>*)tags;
-- (void)handlePushNotificationForSubject:(NSString*)subject;
+- (void)handlePushNotificationForSubject:(NSString*)subject withPayload:(NSData*)payload;
 @end
 
 @interface SNTPushClientNATSTest : XCTestCase
@@ -643,10 +647,64 @@ static X509* CreateCertWithDNSSANBytes(const char* data, size_t len) {
         [expectation fulfill];
       });
 
-  // When: A tag push notification is received
-  [self.client handlePushNotificationForSubject:@"santa.tag.production"];
+  // When: A tag push notification is received with no payload
+  [self.client handlePushNotificationForSubject:@"santa.tag.production" withPayload:nil];
 
-  // Then: syncSecondsFromNow should be called with jitter in [0, 180]
+  // Then: syncSecondsFromNow should be called with the default jitter in [0, 180]
+  [self waitForExpectations:@[ expectation ] timeout:2.0];
+}
+
+- (void)testTagMessageWithSyncRequestJitter {
+  // Given: Client is initialized
+  self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
+
+  XCTestExpectation* expectation =
+      [self expectationWithDescription:@"syncSecondsFromNow called with SyncRequest jitter"];
+
+  OCMStub([self.mockSyncDelegate syncSecondsFromNow:0])
+      .ignoringNonObjectArgs()
+      .andDo(^(NSInvocation* invocation) {
+        uint64_t seconds;
+        [invocation getArgument:&seconds atIndex:2];
+        XCTAssertLessThanOrEqual(seconds, 30u);
+        [expectation fulfill];
+      });
+
+  // When: A tag push notification is received with a SyncRequest setting max_jitter to 30
+  pbv1::SyncRequest request;
+  request.set_max_jitter(30);
+  std::string serialized = request.SerializeAsString();
+  NSData* payload = [NSData dataWithBytes:serialized.data() length:serialized.size()];
+  [self.client handlePushNotificationForSubject:@"santa.tag.production" withPayload:payload];
+
+  // Then: syncSecondsFromNow should be called with jitter in [0, 30]
+  [self waitForExpectations:@[ expectation ] timeout:2.0];
+}
+
+- (void)testTagMessageWithSyncRequestZeroJitter {
+  // Given: Client is initialized
+  self.client = [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
+
+  XCTestExpectation* expectation =
+      [self expectationWithDescription:@"syncSecondsFromNow called with 0 for zero jitter"];
+
+  OCMStub([self.mockSyncDelegate syncSecondsFromNow:0])
+      .ignoringNonObjectArgs()
+      .andDo(^(NSInvocation* invocation) {
+        uint64_t seconds;
+        [invocation getArgument:&seconds atIndex:2];
+        XCTAssertEqual(seconds, 0u);
+        [expectation fulfill];
+      });
+
+  // When: A tag push notification is received with a SyncRequest explicitly setting max_jitter to 0
+  pbv1::SyncRequest request;
+  request.set_max_jitter(0);
+  std::string serialized = request.SerializeAsString();
+  NSData* payload = [NSData dataWithBytes:serialized.data() length:serialized.size()];
+  [self.client handlePushNotificationForSubject:@"santa.tag.production" withPayload:payload];
+
+  // Then: syncSecondsFromNow should be called with 0 (immediate sync)
   [self waitForExpectations:@[ expectation ] timeout:2.0];
 }
 
@@ -667,7 +725,7 @@ static X509* CreateCertWithDNSSANBytes(const char* data, size_t len) {
       });
 
   // When: A host push notification is received
-  [self.client handlePushNotificationForSubject:@"santa.host.ABC123"];
+  [self.client handlePushNotificationForSubject:@"santa.host.ABC123" withPayload:nil];
 
   // Then: syncSecondsFromNow should be called with 0 (no jitter)
   [self waitForExpectations:@[ expectation ] timeout:2.0];
