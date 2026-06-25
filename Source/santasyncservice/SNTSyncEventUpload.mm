@@ -359,7 +359,7 @@ typename santa::ProtoTraits<IsV2>::FileAccessEventT* MessageForFileAccessEvent(
     }
   }
 
-  SNTStoredFileAccessProcess* p = event.process;
+  SNTStoredProcess* p = event.process;
   auto process_chain = e->mutable_process_chain();
   while (p) {
     typename Traits::ProcessT* proc = process_chain->Add();

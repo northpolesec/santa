@@ -544,7 +544,7 @@ FileAccessPolicyDecision FAAPolicyProcessor::ProcessTargetAndPolicy(
     event.process.signingChain = cd.certChain;
     struct passwd* user = getpwuid(audit_token_to_ruid(msg->process->audit_token));
     if (user) event.process.executingUser = @(user->pw_name);
-    event.process.parent = [[SNTStoredFileAccessProcess alloc] init];
+    event.process.parent = [[SNTStoredProcess alloc] init];
     event.process.parent.pid = @(audit_token_to_pid(msg->process->parent_audit_token));
     event.process.parent.filePath = StringToNSString(msg.ParentProcessPath());
 

@@ -1623,7 +1623,7 @@
   faaEvent.decision = FileAccessPolicyDecision::kDenied;
   faaEvent.occurrenceDate = [NSDate dateWithTimeIntervalSince1970:1700000001];
   faaEvent.ruleId = 99;
-  SNTStoredFileAccessProcess* proc = [[SNTStoredFileAccessProcess alloc] init];
+  SNTStoredProcess* proc = [[SNTStoredProcess alloc] init];
   proc.filePath = @"/bin/cat";
   proc.pid = @(555);
   faaEvent.process = proc;
