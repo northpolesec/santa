@@ -820,6 +820,17 @@ objc_library(
 )
 
 objc_library(
+    name = "SNTStoredProcess",
+    srcs = ["SNTStoredProcess.mm"],
+    hdrs = ["SNTStoredProcess.h"],
+    module_name = "santa_common_SNTStoredProcess",
+    deps = [
+        ":CoderMacros",
+        ":MOLCertificate",
+    ],
+)
+
+objc_library(
     name = "SNTStoredFileAccessEvent",
     srcs = ["SNTStoredFileAccessEvent.mm"],
     hdrs = ["SNTStoredFileAccessEvent.h"],
@@ -830,6 +841,7 @@ objc_library(
         ":MOLCertificate",
         ":SNTCommonEnums",
         ":SNTStoredEvent",
+        ":SNTStoredProcess",
     ],
 )
 
@@ -865,6 +877,14 @@ santa_unit_test(
     deps = [
         ":SNTFileInfo",
         ":SNTStoredExecutionEvent",
+    ],
+)
+
+santa_unit_test(
+    name = "SNTStoredProcessTest",
+    srcs = ["SNTStoredProcessTest.mm"],
+    deps = [
+        ":SNTStoredProcess",
     ],
 )
 
@@ -1199,6 +1219,7 @@ test_suite(
         ":SNTStoredEventTest",
         ":SNTStoredExecutionEventTest",
         ":SNTStoredNetworkMountEventTest",
+        ":SNTStoredProcessTest",
         ":SNTStoredTemporaryMonitorModeAuditEventTest",
         ":SNTStoredUSBMountEventTest",
         ":SNTTimerTest",

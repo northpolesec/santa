@@ -101,7 +101,7 @@ NSString* GenerateRandomHexStringWithSHA256Length() {
   event.process.signingChain = [csInfo certificates];
   event.process.executingUser = @"nobody";
   event.process.pid = @(1234);
-  event.process.parent = [[SNTStoredFileAccessProcess alloc] init];
+  event.process.parent = [[SNTStoredProcess alloc] init];
   event.process.parent.pid = @(4567);
   event.decision = FileAccessPolicyDecision::kDenied;
   return event;

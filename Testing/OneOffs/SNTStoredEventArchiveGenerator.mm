@@ -118,7 +118,7 @@ void AddStoredFileAccessEvents(NSMutableArray<SNTStoredEvent*>* storedEvents) {
   faaEvent.process.teamID = csc.teamID;
   faaEvent.process.pid = @(123);
   faaEvent.process.executingUser = @"nobody";
-  faaEvent.process.parent = [[SNTStoredFileAccessProcess alloc] init];
+  faaEvent.process.parent = [[SNTStoredProcess alloc] init];
   faaEvent.process.parent.pid = @(456);
 
   [storedEvents addObject:faaEvent];

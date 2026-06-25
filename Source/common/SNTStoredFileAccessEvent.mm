@@ -16,13 +16,14 @@
 
 #import "Source/common/CoderMacros.h"
 #import "Source/common/MOLCertificate.h"
+#import "Source/common/SNTStoredProcess.h"
 
 @implementation SNTStoredFileAccessEvent
 
 - (instancetype)init {
   self = [super init];
   if (self) {
-    _process = [[SNTStoredFileAccessProcess alloc] init];
+    _process = [[SNTStoredProcess alloc] init];
   }
   return self;
 }
@@ -46,7 +47,7 @@
     DECODE(decoder, ruleVersion, NSString);
     DECODE(decoder, ruleName, NSString);
     DECODE(decoder, accessedPath, NSString);
-    DECODE(decoder, process, SNTStoredFileAccessProcess);
+    DECODE(decoder, process, SNTStoredProcess);
     DECODE_SELECTOR(decoder, decision, NSNumber, intValue);
     DECODE_SELECTOR(decoder, ruleId, NSNumber, longLongValue);
   }
@@ -66,47 +67,6 @@
 
 - (BOOL)unactionableEvent {
   return self.decision == FileAccessPolicyDecision::kAllowedAuditOnly;
-}
-
-@end
-
-@implementation SNTStoredFileAccessProcess
-
-+ (BOOL)supportsSecureCoding {
-  return YES;
-}
-
-- (void)encodeWithCoder:(NSCoder*)coder {
-  ENCODE(coder, filePath);
-  ENCODE(coder, cdhash);
-  ENCODE(coder, fileSHA256);
-  ENCODE(coder, signingID);
-  ENCODE(coder, signingChain);
-  ENCODE(coder, teamID);
-  ENCODE(coder, pid);
-  ENCODE(coder, executingUser);
-  ENCODE(coder, parent);
-}
-
-- (instancetype)initWithCoder:(NSCoder*)decoder {
-  self = [super init];
-  if (self) {
-    DECODE(decoder, filePath, NSString);
-    DECODE(decoder, cdhash, NSString);
-    DECODE(decoder, fileSHA256, NSString);
-    DECODE(decoder, signingID, NSString);
-    DECODE_ARRAY(decoder, signingChain, MOLCertificate);
-    DECODE(decoder, teamID, NSString);
-    DECODE(decoder, pid, NSNumber);
-    DECODE(decoder, executingUser, NSString);
-    DECODE(decoder, parent, SNTStoredFileAccessProcess);
-  }
-  return self;
-}
-
-- (NSString*)description {
-  return [NSString
-      stringWithFormat:@"SNTStoredFileAccessProcess (pid: %@): %@", self.pid, self.filePath];
 }
 
 @end
