@@ -15,7 +15,6 @@
 #import "Source/common/SNTStoredFileAccessEvent.h"
 
 #import "Source/common/CoderMacros.h"
-#import "Source/common/MOLCertificate.h"
 #import "Source/common/SNTStoredProcess.h"
 
 @implementation SNTStoredFileAccessEvent

@@ -56,7 +56,7 @@
 
 // Mimics an archive written by a Santa version from before the rename (the
 // process object carries the legacy class name). The alias registered in
-// +[SNTStoredProcess load] must decode it into the current type.
+// +[SNTStoredProcess initialize] must decode it into the current type.
 - (void)testDecodesLegacyArchivedClassName {
   SNTStoredProcess* p = [[SNTStoredProcess alloc] init];
   p.filePath = @"/usr/bin/curl";

@@ -406,6 +406,8 @@ NSString* GenerateRandomHexStringWithSHA256Length() {
       [self dataFromFixture:@"new_sntstoredexecutionevent_archive.plist"];
   OCMExpect([mockResultSet dataNoCopyForColumn:@"eventdata"]).andReturn(newStoredExecEventData);
 
+  // This fixture's process is archived under the pre-rename class name, so decoding
+  // it exercises the SNTStoredProcess unarchiver alias (the persisted-upgrade path).
   NSData* newStoredFileAccessEventData =
       [self dataFromFixture:@"sntstoredfileaccessevent_archive.plist"];
   OCMExpect([mockResultSet dataNoCopyForColumn:@"eventdata"])

@@ -838,7 +838,6 @@ objc_library(
     deps = [
         ":CertificateHelpers",
         ":CoderMacros",
-        ":MOLCertificate",
         ":SNTCommonEnums",
         ":SNTStoredEvent",
         ":SNTStoredProcess",
@@ -862,6 +861,7 @@ santa_unit_test(
         ":SNTStoredEvent",
         ":SNTStoredExecutionEvent",
         ":SNTStoredFileAccessEvent",
+        ":SNTStoredProcess",
     ],
 )
 
