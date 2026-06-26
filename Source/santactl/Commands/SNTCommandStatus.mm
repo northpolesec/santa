@@ -290,6 +290,21 @@ REGISTER_COMMAND_NAME(@"status")
     }];
   }
 
+  // Temporary Admin Mode status for the invoking user. The daemon resolves the
+  // target uid from the XPC peer audit token; `secondsRemaining` is nil when no
+  // session is active.
+  __block BOOL temporaryAdminModeAvailable = NO;
+  __block BOOL currentUserIsAdmin = NO;
+  [rop checkTemporaryAdminModeAvailable:^(BOOL available, BOOL alreadyAdmin) {
+    temporaryAdminModeAvailable = available;
+    currentUserIsAdmin = alreadyAdmin;
+  }];
+
+  __block NSNumber* temporaryAdminModeSecondsRemaining = nil;
+  [rop temporaryAdminModeSecondsRemaining:^(NSNumber* secs) {
+    temporaryAdminModeSecondsRemaining = secs;
+  }];
+
   // Format dates
   NSDateFormatter* dateFormatter = [[NSDateFormatter alloc] init];
   dateFormatter.dateFormat = @"yyyy/MM/dd HH:mm:ss Z";
@@ -465,6 +480,15 @@ REGISTER_COMMAND_NAME(@"status")
       stats[@"telemetry"][@"export_interval_seconds"] = @(telemetryExportInterval);
     }
 
+    NSMutableDictionary* temporaryAdminMode = [@{
+      @"available" : @(temporaryAdminModeAvailable),
+      @"current_user_is_admin" : @(currentUserIsAdmin),
+    } mutableCopy];
+    if (temporaryAdminModeSecondsRemaining != nil) {
+      temporaryAdminMode[@"session_seconds_remaining"] = temporaryAdminModeSecondsRemaining;
+    }
+    stats[@"temporary_admin_mode"] = temporaryAdminMode;
+
     NSData* statsData = [NSJSONSerialization dataWithJSONObject:stats
                                                         options:NSJSONWritingPrettyPrinted
                                                           error:nil];
@@ -504,6 +528,15 @@ REGISTER_COMMAND_NAME(@"status")
     printf("  %-40s | %lld\n", "Static Rules", staticRuleCount);
     printf("  %-40s | %lld  (Peak: %.2f%%)\n", "Watchdog CPU Events", cpuEvents, cpuPeak);
     printf("  %-40s | %lld  (Peak: %.2fMB)\n", "Watchdog RAM Events", ramEvents, ramPeak);
+
+    printf(">>> Temporary Admin Mode\n");
+    printf("  %-40s | %s\n", "Available", (temporaryAdminModeAvailable ? "Yes" : "No"));
+    printf("  %-40s | %s\n", "Current User Is Admin", (currentUserIsAdmin ? "Yes" : "No"));
+    if (temporaryAdminModeSecondsRemaining != nil) {
+      printf("  %-40s | %s\n", "Session Time Remaining",
+             [FormatTimeRemaining([temporaryAdminModeSecondsRemaining unsignedLongLongValue])
+                 UTF8String]);
+    }
 
     printf(">>> Cache Info\n");
     printf("  %-40s | %lld\n", "Root cache count", rootCacheCount);
