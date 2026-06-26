@@ -60,6 +60,7 @@
 #import "Source/santad/SNTSyncdQueue.h"
 #include "Source/santad/TemporaryMonitorMode.h"
 #include "commands/v1.pb.h"
+#import "src/santanetd/SNDNetworkFlowDecision.h"
 #import "src/santanetd/SNDProcessFlows.h"
 
 using santa::FlushCacheMode;
@@ -1158,6 +1159,14 @@ static const char* const kAllowedCanonicalBundlePaths[] = {
                      reply:(void (^)(void))reply {
   dispatch_async(self.netFlowQ, ^{
     [self.netExtQueue handleNetworkFlows:processFlows windowStart:windowStart windowEnd:windowEnd];
+  });
+  reply();
+}
+
+- (void)reportNetworkFlowDecisions:(NSArray<SNDNetworkFlowDecision*>*)decisions
+                             reply:(void (^)(void))reply {
+  dispatch_async(self.netFlowQ, ^{
+    [self.netExtQueue handleNetworkFlowDecisions:decisions];
   });
   reply();
 }

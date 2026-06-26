@@ -1074,6 +1074,7 @@ objc_library(
         ":SNTXPCUnprivilegedControlInterface",
         "//Source/common/ne:SNTNetworkExtensionSettings",
         "@santanetd//src/santanetd:SNDFlowInfo",
+        "@santanetd//src/santanetd:SNDNetworkFlowDecision",
         "@santanetd//src/santanetd:SNDProcessFlows",
         "@santanetd//src/santanetd:SNDProcessInfo",
     ],

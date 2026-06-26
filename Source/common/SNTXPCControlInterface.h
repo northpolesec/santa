@@ -23,6 +23,7 @@
 #import "Source/common/SNTXPCUnprivilegedControlInterface.h"
 #import "Source/common/ne/SNTNetworkExtensionSettings.h"
 
+@class SNDNetworkFlowDecision;
 @class SNDProcessFlows;
 @class SNTStoredEvent;
 
@@ -97,6 +98,9 @@ typedef NS_ENUM(NSInteger, SNTRuleAddSource) {
                windowStart:(NSDate*)windowStart
                  windowEnd:(NSDate*)windowEnd
                      reply:(void (^)(void))reply;
+
+- (void)reportNetworkFlowDecisions:(NSArray<SNDNetworkFlowDecision*>*)decisions
+                             reply:(void (^)(void))reply;
 
 @end
 

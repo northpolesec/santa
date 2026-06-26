@@ -33,6 +33,12 @@ objc_library(
 )
 
 objc_library(
+    name = "SNDNetworkFlowDecision",
+    srcs = ["SNDNetworkFlowDecision.mm"],
+    hdrs = ["SNDNetworkFlowDecision.h"],
+)
+
+objc_library(
     name = "NetworkFlowsSerializer",
     srcs = ["NetworkFlowsSerializer.mm"],
     hdrs = ["NetworkFlowsSerializer.h"],

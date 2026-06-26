@@ -18,15 +18,23 @@
 #import <OCMock/OCMock.h>
 #import <XCTest/XCTest.h>
 
+#include <unistd.h>
 #include <memory>
 
 #import "Source/common/MOLXPCConnection.h"
+#import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTNetworkFlowRule.h"
+#import "Source/common/SNTStoredNetworkFlowEvent.h"
+#import "Source/common/SNTStoredProcess.h"
+#import "Source/common/SantaVnode.h"
 #import "Source/common/ne/SNDXPCNetworkExtensionInterface.h"
 #import "Source/common/ne/SNTNetworkExtensionSettings.h"
 #import "Source/common/ne/SNTSyncNetworkExtensionSettings.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
+#import "Source/santad/SNTDecisionCache.h"
+#import "Source/santad/SNTSyncdQueue.h"
+#import "src/santanetd/SNDNetworkFlowDecision.h"
 
 @interface SNTNetworkExtensionQueue (Testing)
 @property MOLXPCConnection* netExtConnection;
@@ -42,6 +50,8 @@
 @interface SNTNetworkExtensionQueueTest : XCTestCase
 @property SNTNetworkExtensionQueue* sut;
 @property id mockRuleTable;
+@property id mockSyncdQueue;
+@property id mockDecisionCache;
 @property id mockConfigurator;
 @property id mockConnection;
 @property id mockProxy;
@@ -51,12 +61,15 @@
 
 - (void)setUp {
   self.mockRuleTable = OCMClassMock([SNTRuleTable class]);
+  self.mockSyncdQueue = OCMClassMock([SNTSyncdQueue class]);
+  self.mockDecisionCache = OCMClassMock([SNTDecisionCache class]);
 
   // Construct the SUT before mocking the configurator so its init-time KVO watchers attach
   // to the real configurator singleton (KVO on a class mock is unreliable).
   self.sut = [[SNTNetworkExtensionQueue alloc] initWithNotifierQueue:nil
-                                                          syncdQueue:nil
+                                                          syncdQueue:self.mockSyncdQueue
                                                            ruleTable:self.mockRuleTable
+                                                       decisionCache:self.mockDecisionCache
                                                               logger:nullptr];
 
   self.mockConfigurator = OCMClassMock([SNTConfigurator class]);
@@ -289,6 +302,111 @@
   XCTAssertFalse(settings.enable);  // sync (enable/action) ignored below protocol v1
   // The MDM timeout is local config, not a sync setting, so it applies regardless of version.
   XCTAssertEqualWithAccuracy(settings.dnsUpstreamTimeoutSecs, 7.5, 0.0001);
+}
+
+// Make shouldInstallNetworkExtension report YES (sync v2 + enabled NE settings).
+- (void)stubNetworkExtensionEnabled {
+  OCMStub([self.mockConfigurator isSyncV2Enabled]).andReturn(YES);
+  [self stubConfiguratorEnable:YES action:SNTNetworkFlowDefaultActionDeny];
+}
+
+- (void)testHandleNetworkFlowDecisionsEnrichesAndEnqueues {
+  [self stubNetworkExtensionEnabled];
+
+  // A real event from the converter; cd enrichment fills sha256 + certs.
+  SNTStoredNetworkFlowEvent* event = [[SNTStoredNetworkFlowEvent alloc] init];
+  event.decision = SNTNetworkFlowDecisionBlock;
+  event.ruleId = 7;
+  event.process.filePath = @"/usr/bin/curl";
+
+  SantaVnode vnode = {.fsid = 1, .fileid = 2};
+  id decision = OCMClassMock([SNDNetworkFlowDecision class]);
+  OCMStub([decision storedEvent]).andReturn(event);
+  OCMStub([(SNDNetworkFlowDecision*)decision vnode]).andReturn(vnode);
+
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+  cd.sha256 = @"abc123";
+  cd.certChain = @[];  // empty chain is fine; non-nil proves the assignment path
+  OCMStub([self.mockDecisionCache cachedDecisionForVnode:vnode])
+      .ignoringNonObjectArgs()
+      .andReturn(cd);
+
+  OCMExpect([self.mockSyncdQueue addStoredEvent:event]);
+  [self.sut handleNetworkFlowDecisions:@[ decision ]];
+  OCMVerifyAll(self.mockSyncdQueue);
+
+  XCTAssertEqualObjects(event.process.fileSHA256, @"abc123");
+  XCTAssertEqualObjects(event.process.signingChain, @[]);
+}
+
+- (void)testHandleNetworkFlowDecisionsNilConverterNoOps {
+  [self stubNetworkExtensionEnabled];
+
+  // The open-build stub returns nil from storedEvent -> nothing enqueued.
+  id decision = OCMClassMock([SNDNetworkFlowDecision class]);
+  OCMStub([decision storedEvent]).andReturn(nil);
+
+  OCMReject([self.mockSyncdQueue addStoredEvent:OCMOCK_ANY]);
+  [self.sut handleNetworkFlowDecisions:@[ decision ]];
+}
+
+// Create a (sparse) temp file of the given size and return its path.
+- (NSString*)tempFileOfSize:(off_t)size name:(NSString*)name {
+  NSString* path = [NSTemporaryDirectory() stringByAppendingPathComponent:name];
+  NSFileManager* fm = [NSFileManager defaultManager];
+  [fm removeItemAtPath:path error:nil];
+  [fm createFileAtPath:path contents:nil attributes:nil];
+  truncate(path.fileSystemRepresentation, size);
+  return path;
+}
+
+// A mock decision whose storedEvent points at the given on-disk path, with a cache
+// miss so the handler falls through to rehydrate.
+- (id)decisionForCacheMissWithEvent:(SNTStoredNetworkFlowEvent*)event {
+  id decision = OCMClassMock([SNDNetworkFlowDecision class]);
+  OCMStub([decision storedEvent]).andReturn(event);
+  OCMStub([(SNDNetworkFlowDecision*)decision vnode]).andReturn(SantaVnode{});
+  // cachedDecisionForVnode: left unstubbed -> nil (miss).
+  return decision;
+}
+
+- (void)testHandleNetworkFlowDecisionsRehydratesSmallBinarySynchronously {
+  [self stubNetworkExtensionEnabled];
+  NSString* path = [self tempFileOfSize:1024 name:@"flow-small.bin"];
+
+  SNTStoredNetworkFlowEvent* event = [[SNTStoredNetworkFlowEvent alloc] init];
+  event.process.filePath = path;
+  id decision = [self decisionForCacheMissWithEvent:event];
+
+  OCMExpect([self.mockDecisionCache rehydrateAndCacheDecisionForFileInfo:OCMOCK_ANY]);
+  OCMReject([self.mockDecisionCache asyncRehydrateAndCacheDecisionForFileInfo:OCMOCK_ANY]);
+  OCMExpect([self.mockSyncdQueue addStoredEvent:event]);
+
+  [self.sut handleNetworkFlowDecisions:@[ decision ]];
+
+  OCMVerifyAll(self.mockDecisionCache);
+  OCMVerifyAll(self.mockSyncdQueue);
+  [[NSFileManager defaultManager] removeItemAtPath:path error:nil];
+}
+
+- (void)testHandleNetworkFlowDecisionsRehydratesLargeBinaryAsynchronously {
+  [self stubNetworkExtensionEnabled];
+  NSString* path = [self tempFileOfSize:(kMaxSyncRehydrateBytes + 1) name:@"flow-large.bin"];
+
+  SNTStoredNetworkFlowEvent* event = [[SNTStoredNetworkFlowEvent alloc] init];
+  event.process.filePath = path;
+  id decision = [self decisionForCacheMissWithEvent:event];
+
+  // Oversized binary: warm the cache async, never hash on this serial queue.
+  OCMExpect([self.mockDecisionCache asyncRehydrateAndCacheDecisionForFileInfo:OCMOCK_ANY]);
+  OCMReject([self.mockDecisionCache rehydrateAndCacheDecisionForFileInfo:OCMOCK_ANY]);
+  OCMExpect([self.mockSyncdQueue addStoredEvent:event]);  // still uploads, thin
+
+  [self.sut handleNetworkFlowDecisions:@[ decision ]];
+
+  OCMVerifyAll(self.mockDecisionCache);
+  OCMVerifyAll(self.mockSyncdQueue);
+  [[NSFileManager defaultManager] removeItemAtPath:path error:nil];
 }
 
 @end
