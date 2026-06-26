@@ -44,6 +44,17 @@ typedef NS_ENUM(int32_t, SNTNetworkFlowSocketFamily) {
   SNTNetworkFlowSocketFamilyINET6 = 30,
 };
 
+/// How the matching rule's remote matcher matched the flow, most to least
+/// specific. Values aligned to the v2 proto NetworkFlowTier.
+typedef NS_ENUM(int32_t, SNTNetworkFlowTier) {
+  SNTNetworkFlowTierUnspecified = 0,
+  SNTNetworkFlowTierExactIP = 1,
+  SNTNetworkFlowTierCIDR = 2,
+  SNTNetworkFlowTierHostname = 3,
+  SNTNetworkFlowTierDomain = 4,
+  SNTNetworkFlowTierAnyRemote = 5,
+};
+
 /// A per-flow policy decision event, mirroring the v2 proto NetworkFlowEvent.
 @interface SNTStoredNetworkFlowEvent : SNTStoredEvent <NSSecureCoding>
 
@@ -60,12 +71,19 @@ typedef NS_ENUM(int32_t, SNTNetworkFlowSocketFamily) {
 
 // Outcome.
 @property SNTNetworkFlowDecision decision;
+@property SNTNetworkFlowTier decisionTier;
 @property int64_t ruleId;
+@property(nullable) NSString* ruleName;
 @property(nullable) NSArray<NSNumber*>* competingRuleIds;  // capped at 10, precedence-ordered
 @property uint32_t totalCompetingRuleCount;
 
 // Process (originating; .parent = lightweight parent).
 @property(nullable) SNTStoredProcess* process;
+
+// Opaque dedup keys built by santanetd (process identity + rule + matched-tier
+// discriminator, with cap-driven degradation). santa-internal, never uploaded.
+@property(nullable) NSString* eventDedupeKey;  // backs uniqueID (upload backoff)
+@property(nullable) NSString* uiDedupeKey;     // drives the dialog de-dup
 
 // santad-local, NOT mapped to the proto: drives the loud-deny dialog only.
 @property BOOL silent;

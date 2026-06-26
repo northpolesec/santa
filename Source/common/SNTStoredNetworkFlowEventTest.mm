@@ -24,19 +24,13 @@
 
 @implementation SNTStoredNetworkFlowEventTest
 
-- (void)testUniqueIDCoarseOnRuleAndProcess {
+- (void)testUniqueIDReturnsEventDedupeKey {
+  // uniqueID is an opaque pass-through of the santanetd-built event key; the
+  // composition/dedup semantics are tested in santanetd, not here.
   SNTStoredNetworkFlowEvent* e = [[SNTStoredNetworkFlowEvent alloc] init];
-  e.ruleId = 42;
-  e.process.cdhash = @"cd00";
-  e.remoteAddress = @"1.2.3.4";  // destination must NOT affect uniqueID
-  XCTAssertEqualObjects([e uniqueID], @"42|cd00");
-
-  e.remoteAddress = @"9.9.9.9";  // different destination, same key
-  XCTAssertEqualObjects([e uniqueID], @"42|cd00");
-
-  e.process.cdhash = nil;  // falls back to signingID
-  e.process.signingID = @"com.example.app";
-  XCTAssertEqualObjects([e uniqueID], @"42|com.example.app");
+  e.eventDedupeKey = @"TEAM:com.example.app|42|foo.com";
+  e.remoteAddress = @"1.2.3.4";  // unrelated to the (opaque) key
+  XCTAssertEqualObjects([e uniqueID], @"TEAM:com.example.app|42|foo.com");
 }
 
 - (void)testUnactionableAlwaysYes {
@@ -55,9 +49,13 @@
   e.hostname = @"example.com";
   e.flowTime = [NSDate dateWithTimeIntervalSince1970:1700000000];
   e.decision = SNTNetworkFlowDecisionBlock;
+  e.decisionTier = SNTNetworkFlowTierDomain;
   e.ruleId = 7;
+  e.ruleName = @"block-example";
   e.competingRuleIds = @[ @(3), @(5) ];
   e.totalCompetingRuleCount = 12;
+  e.eventDedupeKey = @"TEAM:com.apple.curl|7|example.com";
+  e.uiDedupeKey = @"4242:1|7|example.com";
   e.silent = YES;
   e.process.filePath = @"/usr/bin/curl";
   e.process.cdhash = @"deadbeef";
@@ -84,12 +82,18 @@
   XCTAssertEqualObjects(d.hostname, @"example.com");
   XCTAssertEqualObjects(d.flowTime, [NSDate dateWithTimeIntervalSince1970:1700000000]);
   XCTAssertEqual(d.decision, SNTNetworkFlowDecisionBlock);
+  XCTAssertEqual(d.decisionTier, SNTNetworkFlowTierDomain);
   XCTAssertEqual(d.ruleId, 7);
+  XCTAssertEqualObjects(d.ruleName, @"block-example");
   XCTAssertEqualObjects(d.competingRuleIds, (@[ @(3), @(5) ]));
   XCTAssertEqual(d.totalCompetingRuleCount, 12u);
+  XCTAssertEqualObjects(d.eventDedupeKey, @"TEAM:com.apple.curl|7|example.com");
+  XCTAssertEqualObjects(d.uiDedupeKey, @"4242:1|7|example.com");
   XCTAssertTrue(d.silent);  // local field survives the round-trip
   XCTAssertEqualObjects(d.process.filePath, @"/usr/bin/curl");
   XCTAssertEqualObjects(d.process.parent.pid, @(1));
+  XCTAssertEqualObjects([d uniqueID],
+                        @"TEAM:com.apple.curl|7|example.com");  // backed by eventDedupeKey
 }
 
 @end
