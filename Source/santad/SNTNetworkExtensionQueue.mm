@@ -19,6 +19,7 @@
 #include <utility>
 
 #import "Source/common/MOLXPCConnection.h"
+#import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTError.h"
@@ -26,6 +27,8 @@
 #import "Source/common/SNTKVOManager.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTNetworkFlowRule.h"
+#import "Source/common/SNTStoredNetworkFlowEvent.h"
+#import "Source/common/SNTStoredProcess.h"
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTXPCNotifierInterface.h"
 #import "Source/common/ne/SNDXPCNetworkExtensionInterface.h"
@@ -33,11 +36,15 @@
 #import "Source/common/ne/SNTSyncNetworkExtensionSettings.h"
 #import "Source/common/ne/SNTXPCNetworkExtensionInterface.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
+#import "Source/santad/SNTDecisionCache.h"
 #import "Source/santad/SNTNotificationQueue.h"
 #import "Source/santad/SNTSyncdQueue.h"
+#import "src/santanetd/SNDNetworkFlowDecision.h"
 #import "src/santanetd/SNDProcessFlows.h"
 
-NSString* const kSantaNetworkExtensionProtocolVersion = @"1.0";
+// 1.1 adds reportNetworkFlowDecisions:. santanetd emits flow decisions only when
+// the daemon advertises >= 1.1 (older/downgraded daemons keep the gate closed).
+NSString* const kSantaNetworkExtensionProtocolVersion = @"1.1";
 
 @interface SNTNetworkExtensionQueue () {
   std::shared_ptr<santa::Logger> _logger;
@@ -48,6 +55,8 @@ NSString* const kSantaNetworkExtensionProtocolVersion = @"1.0";
 @property(weak) SNTNotificationQueue* notifierQueue;
 @property(weak) SNTSyncdQueue* syncdQueue;
 @property SNTRuleTable* ruleTable;
+// Enriches flow-decision events with cd-sourced SHA-256 + cert chain.
+@property SNTDecisionCache* decisionCache;
 // What santanetd was last told. Reset when the connection drops so a fresh santanetd
 // (which persists nothing) is re-seeded with the full config on its next registration.
 @property SNTNetworkExtensionSettings* lastPushedSettings;
@@ -59,12 +68,14 @@ NSString* const kSantaNetworkExtensionProtocolVersion = @"1.0";
 - (instancetype)initWithNotifierQueue:(SNTNotificationQueue*)notifierQueue
                            syncdQueue:(SNTSyncdQueue*)syncdQueue
                             ruleTable:(SNTRuleTable*)ruleTable
+                        decisionCache:(SNTDecisionCache*)decisionCache
                                logger:(std::shared_ptr<santa::Logger>)logger {
   self = [super init];
   if (self) {
     _notifierQueue = notifierQueue;
     _syncdQueue = syncdQueue;
     _ruleTable = ruleTable;
+    _decisionCache = decisionCache;
     _logger = std::move(logger);
 
     WEAKIFY(self);
@@ -187,6 +198,39 @@ NSString* const kSantaNetworkExtensionProtocolVersion = @"1.0";
 
   for (SNDProcessFlows* pf in processFlows) {
     _logger->LogNetworkFlows(pf, windowStartTS, windowEndTS);
+  }
+}
+
+- (void)handleNetworkFlowDecisions:(NSArray<SNDNetworkFlowDecision*>*)decisions {
+  if (![self shouldInstallNetworkExtension] || !decisions.count) {
+    return;
+  }
+
+  for (SNDNetworkFlowDecision* decision in decisions) {
+    SNTStoredNetworkFlowEvent* event = [decision storedEvent];
+    if (!event) continue;  // open build / converter declined
+
+    // Enrich the originating process with cd-sourced fields (SHA-256, cert chain)
+    // that santanetd cannot provide. Prefer the cached exec decision (vnode key); on a
+    // miss, rehydrate from the process path. Large binaries rehydrate asynchronously so
+    // a whole-file hash never blocks this serial queue (a later flow from the same
+    // process picks up the warmed cache). Fall back to thin on any failure; never drop
+    // the event on enrichment trouble.
+    SNTCachedDecision* cd = [self.decisionCache cachedDecisionForVnode:[decision vnode]];
+    if (!cd && event.process.filePath) {
+      SNTFileInfo* fi = [[SNTFileInfo alloc] initWithPath:event.process.filePath error:NULL];
+      if (fi.fileSize > kMaxSyncRehydrateBytes) {
+        [self.decisionCache asyncRehydrateAndCacheDecisionForFileInfo:fi];
+      } else if (fi) {
+        cd = [self.decisionCache rehydrateAndCacheDecisionForFileInfo:fi];
+      }
+    }
+    if (cd) {
+      event.process.fileSHA256 = cd.sha256;
+      event.process.signingChain = cd.certChain;
+    }
+
+    [self.syncdQueue addStoredEvent:event];
   }
 }
 

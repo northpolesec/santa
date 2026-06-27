@@ -41,13 +41,6 @@ namespace santa {
 static constexpr size_t kNumProcesses = 2048;
 static constexpr size_t kPerProcessSetCapacity = 128;
 
-// Files larger than this threshold are not hashed on the AUTH path; the
-// rehydrate is dispatched async so future events pick up the populated
-// decision cache entry. SHA-256 throughput on Apple silicon is roughly
-// 500 MiB/s, so 32 MiB hashes in ~60-70ms — comfortably within the ES
-// auth-deadline budget.
-static constexpr off_t kMaxSyncRehydrateBytes = 32 * 1024 * 1024;
-
 static constexpr uint32_t kOpenFlagsIndicatingWrite = FWRITE | O_APPEND | O_TRUNC;
 
 bool IsBlockDecision(FileAccessPolicyDecision decision) {

@@ -22,6 +22,11 @@
 #import "Source/common/SantaVnode.h"
 #include "Source/santad/EntitlementsFilter.h"
 
+// Files larger than this are rehydrated asynchronously rather than blocking the
+// caller on a synchronous whole-file hash + codesign. At Santa's ~500 MiB/s
+// rehydrate throughput, 32 MiB completes in roughly 60-70 ms.
+inline constexpr off_t kMaxSyncRehydrateBytes = 32 * 1024 * 1024;
+
 @interface SNTDecisionCache : NSObject
 
 + (instancetype)sharedCache;
