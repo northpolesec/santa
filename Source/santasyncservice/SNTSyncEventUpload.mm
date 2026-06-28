@@ -26,7 +26,9 @@
 #import "Source/common/SNTStoredEvent.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
 #import "Source/common/SNTStoredFileAccessEvent.h"
+#import "Source/common/SNTStoredNetworkFlowEvent.h"
 #import "Source/common/SNTStoredNetworkMountEvent.h"
+#import "Source/common/SNTStoredProcess.h"
 #import "Source/common/SNTStoredTemporaryMonitorModeAuditEvent.h"
 #import "Source/common/SNTStoredUSBMountEvent.h"
 #import "Source/common/SNTSyncConstants.h"
@@ -56,6 +58,8 @@ typename santa::ProtoTraits<IsV2>::FileAccessEventT* MessageForFileAccessEvent(
     SNTStoredTemporaryMonitorModeAuditEvent* event, google::protobuf::Arena* arena);
 ::pbv2::NetworkMountEvent* MessageForNetworkMountEvent(SNTStoredNetworkMountEvent* event,
                                                        google::protobuf::Arena* arena);
+::pbv2::NetworkFlowEvent* MessageForNetworkFlowEvent(SNTStoredNetworkFlowEvent* event,
+                                                     google::protobuf::Arena* arena);
 ::pbv2::USBMountEvent* MessageForUSBMountEvent(SNTStoredUSBMountEvent* event,
                                                google::protobuf::Arena* arena);
 
@@ -105,9 +109,11 @@ BOOL EventUpload(SNTSyncEventUpload* self, NSArray<SNTStoredEvent*>* events) {
   google::protobuf::RepeatedPtrField<typename Traits::AuditEventT>* uploadAuditEvents =
       req->mutable_audit_events();
   google::protobuf::RepeatedPtrField<::pbv2::NetworkMountEvent>* uploadNetworkMountEvents;
+  google::protobuf::RepeatedPtrField<::pbv2::NetworkFlowEvent>* uploadNetworkFlowEvents;
   google::protobuf::RepeatedPtrField<::pbv2::USBMountEvent>* uploadUSBMountEvents;
   if constexpr (IsV2) {
     uploadNetworkMountEvents = req->mutable_network_mount_events();
+    uploadNetworkFlowEvents = req->mutable_network_flow_events();
     uploadUSBMountEvents = req->mutable_usb_mount_events();
   }
   __block BOOL success = YES;
@@ -125,6 +131,12 @@ BOOL EventUpload(SNTSyncEventUpload* self, NSArray<SNTStoredEvent*>* events) {
     } else if ([event isKindOfClass:[SNTStoredFileAccessEvent class]]) {
       if (auto e = MessageForFileAccessEvent<IsV2>((SNTStoredFileAccessEvent*)event, pArena)) {
         uploadFAAEvents->UnsafeArenaAddAllocated(e);
+      }
+    } else if ([event isKindOfClass:[SNTStoredNetworkFlowEvent class]]) {
+      if constexpr (IsV2) {
+        if (auto e = MessageForNetworkFlowEvent((SNTStoredNetworkFlowEvent*)event, pArena)) {
+          uploadNetworkFlowEvents->UnsafeArenaAddAllocated(e);
+        }
       }
     } else if ([event isKindOfClass:[SNTStoredTemporaryMonitorModeAuditEvent class]]) {
       if constexpr (IsV2) {
@@ -157,6 +169,7 @@ BOOL EventUpload(SNTSyncEventUpload* self, NSArray<SNTStoredEvent*>* events) {
         uploadEvents->size() + uploadFAAEvents->size() + uploadAuditEvents->size();
     if constexpr (IsV2) {
       totalEventCount += uploadNetworkMountEvents->size();
+      totalEventCount += uploadNetworkFlowEvents->size();
       totalEventCount += uploadUSBMountEvents->size();
     }
 
@@ -176,6 +189,7 @@ BOOL EventUpload(SNTSyncEventUpload* self, NSArray<SNTStoredEvent*>* events) {
       uploadAuditEvents->Clear();
       if constexpr (IsV2) {
         uploadNetworkMountEvents->Clear();
+        uploadNetworkFlowEvents->Clear();
         uploadUSBMountEvents->Clear();
       }
     }
@@ -188,6 +202,46 @@ BOOL EventUpload(SNTSyncEventUpload* self, NSArray<SNTStoredEvent*>* events) {
   }
 
   return success;
+}
+
+// Populates a proto Certificate from a MOLCertificate. The proto type is deduced
+// so it serves both the v1 and v2 Certificate messages.
+template <typename CertT>
+void PopulateCertificate(CertT* c, MOLCertificate* cert) {
+  c->set_sha256(NSStringToUTF8String(cert.SHA256));
+  c->set_cn(NSStringToUTF8String(cert.commonName));
+  c->set_org(NSStringToUTF8String(cert.orgName));
+  c->set_ou(NSStringToUTF8String(cert.orgUnit));
+  c->set_valid_from([cert.validFrom timeIntervalSince1970]);
+  c->set_valid_until([cert.validUntil timeIntervalSince1970]);
+}
+
+// Populates one node of a process_chain from a stored process descriptor,
+// including its signing chain. The proto type is deduced so it serves both the
+// v1 and v2 Process messages.
+template <typename ProcT>
+void PopulateProcess(ProcT* proc, SNTStoredProcess* p) {
+  if (p.filePath) {
+    proc->set_file_path(NSStringToUTF8StringView(p.filePath));
+  }
+  if (p.fileSHA256) {
+    proc->set_file_sha256(NSStringToUTF8StringView(p.fileSHA256));
+  }
+  if (p.cdhash) {
+    proc->set_cdhash(NSStringToUTF8StringView(p.cdhash));
+  }
+  if (p.signingID) {
+    proc->set_signing_id(NSStringToUTF8StringView(p.signingID));
+  }
+  if (p.teamID) {
+    proc->set_team_id(NSStringToUTF8StringView(p.teamID));
+  }
+  if (p.pid) {
+    proc->set_pid([p.pid intValue]);
+  }
+  for (MOLCertificate* cert in p.signingChain) {
+    PopulateCertificate(proc->add_signing_chain(), cert);
+  }
 }
 
 template <bool IsV2>
@@ -284,13 +338,7 @@ typename santa::ProtoTraits<IsV2>::EventT* MessageForExecutionEvent(
   }
 
   for (MOLCertificate* cert in event.signingChain) {
-    typename Traits::CertificateT* c = e->add_signing_chain();
-    c->set_sha256(NSStringToUTF8String(cert.SHA256));
-    c->set_cn(NSStringToUTF8String(cert.commonName));
-    c->set_org(NSStringToUTF8String(cert.orgName));
-    c->set_ou(NSStringToUTF8String(cert.orgUnit));
-    c->set_valid_from([cert.validFrom timeIntervalSince1970]);
-    c->set_valid_until([cert.validUntil timeIntervalSince1970]);
+    PopulateCertificate(e->add_signing_chain(), cert);
   }
 
   typename Traits::EntitlementInfoT* pb_entitlement_info = e->mutable_entitlement_info();
@@ -359,45 +407,8 @@ typename santa::ProtoTraits<IsV2>::FileAccessEventT* MessageForFileAccessEvent(
     }
   }
 
-  SNTStoredProcess* p = event.process;
-  auto process_chain = e->mutable_process_chain();
-  while (p) {
-    typename Traits::ProcessT* proc = process_chain->Add();
-    if (p.filePath) {
-      proc->set_file_path(NSStringToUTF8StringView(p.filePath));
-    }
-
-    if (p.fileSHA256) {
-      proc->set_file_sha256(NSStringToUTF8StringView(p.fileSHA256));
-    }
-
-    if (p.cdhash) {
-      proc->set_cdhash(NSStringToUTF8StringView(p.cdhash));
-    }
-
-    if (p.signingID) {
-      proc->set_signing_id(NSStringToUTF8StringView(p.signingID));
-    }
-
-    if (p.teamID) {
-      proc->set_team_id(NSStringToUTF8StringView(p.teamID));
-    }
-
-    if (p.pid) {
-      proc->set_pid([p.pid intValue]);
-    }
-
-    for (MOLCertificate* cert in p.signingChain) {
-      typename Traits::CertificateT* c = proc->add_signing_chain();
-      c->set_sha256(NSStringToUTF8String(cert.SHA256));
-      c->set_cn(NSStringToUTF8String(cert.commonName));
-      c->set_org(NSStringToUTF8String(cert.orgName));
-      c->set_ou(NSStringToUTF8String(cert.orgUnit));
-      c->set_valid_from([cert.validFrom timeIntervalSince1970]);
-      c->set_valid_until([cert.validUntil timeIntervalSince1970]);
-    }
-
-    p = p.parent;
+  for (SNTStoredProcess* p = event.process; p != nil; p = p.parent) {
+    PopulateProcess(e->add_process_chain(), p);
   }
 
   return e;
@@ -416,6 +427,38 @@ typename santa::ProtoTraits<IsV2>::FileAccessEventT* MessageForFileAccessEvent(
   pbNetworkMountEvent->set_access_time([event.occurrenceDate timeIntervalSince1970]);
 
   return pbNetworkMountEvent;
+}
+
+::pbv2::NetworkFlowEvent* MessageForNetworkFlowEvent(SNTStoredNetworkFlowEvent* event,
+                                                     google::protobuf::Arena* arena) {
+  auto e = google::protobuf::Arena::Create<typename ::pbv2::NetworkFlowEvent>(arena);
+
+  e->set_remote_address(NSStringToUTF8String(event.remoteAddress));
+  e->set_remote_port(event.remotePort);
+  e->set_local_address(NSStringToUTF8String(event.localAddress));
+  e->set_local_port(event.localPort);
+  e->set_protocol(event.protocol);
+  // Native santa enums are value-aligned to the proto enums (see
+  // SNTStoredNetworkFlowEvent.h), so they map by a plain cast.
+  e->set_socket_family(static_cast<::pbv2::NetworkFlowSocketFamily>(event.socketFamily));
+  e->set_direction(static_cast<::pbv2::NetworkFlowDirection>(event.direction));
+  e->set_hostname(NSStringToUTF8String(event.hostname));
+  e->set_decision(static_cast<::pbv2::NetworkFlowDecision>(event.decision));
+  e->set_decision_tier(static_cast<::pbv2::NetworkFlowTier>(event.decisionTier));
+  e->set_rule_id(event.ruleId);
+  e->set_rule_name(NSStringToUTF8String(event.ruleName));
+  for (NSNumber* competingRuleId in event.competingRuleIds) {
+    e->add_competing_rule_ids(competingRuleId.longLongValue);
+  }
+  e->set_total_competing_rule_count(event.totalCompetingRuleCount);
+  e->set_flow_time([event.flowTime timeIntervalSince1970]);
+
+  // process_chain: originating process first, then each parent.
+  for (SNTStoredProcess* p = event.process; p != nil; p = p.parent) {
+    PopulateProcess(e->add_process_chain(), p);
+  }
+
+  return e;
 }
 
 ::pbv2::USBMountEvent* MessageForUSBMountEvent(SNTStoredUSBMountEvent* event,
