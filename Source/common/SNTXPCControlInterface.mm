@@ -26,6 +26,7 @@
 #import "Source/common/SNTStoredSignalReport.h"
 #import "Source/common/ne/SNTNetworkExtensionSettings.h"
 #import "src/santanetd/SNDFlowInfo.h"
+#import "src/santanetd/SNDNetworkFlowDecision.h"
 #import "src/santanetd/SNDProcessFlows.h"
 #import "src/santanetd/SNDProcessInfo.h"
 
@@ -114,6 +115,12 @@ static NSString* const kSantanetdExtensionBundleID = @"com.northpolesec.santa.ne
   [r setClasses:[NSSet setWithObjects:[NSArray class], [SNDProcessFlows class],
                                       [SNDProcessInfo class], [SNDFlowInfo class], nil]
         forSelector:@selector(reportNetworkFlows:windowStart:windowEnd:reply:)
+      argumentIndex:0
+            ofReply:NO];
+
+  [r setClasses:[NSSet setWithObjects:[NSArray class], [SNDNetworkFlowDecision class],
+                                      [SNDProcessInfo class], nil]
+        forSelector:@selector(reportNetworkFlowDecisions:reply:)
       argumentIndex:0
             ofReply:NO];
 

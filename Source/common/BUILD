@@ -928,6 +928,27 @@ santa_unit_test(
 )
 
 objc_library(
+    name = "SNTStoredNetworkFlowEvent",
+    srcs = ["SNTStoredNetworkFlowEvent.mm"],
+    hdrs = ["SNTStoredNetworkFlowEvent.h"],
+    module_name = "santa_common_SNTStoredNetworkFlowEvent",
+    deps = [
+        ":CoderMacros",
+        ":SNTStoredEvent",
+        ":SNTStoredProcess",
+    ],
+)
+
+santa_unit_test(
+    name = "SNTStoredNetworkFlowEventTest",
+    srcs = ["SNTStoredNetworkFlowEventTest.mm"],
+    deps = [
+        ":SNTStoredNetworkFlowEvent",
+        ":SNTStoredProcess",
+    ],
+)
+
+objc_library(
     name = "SNTStoredNetworkMountEvent",
     srcs = ["SNTStoredNetworkMountEvent.mm"],
     hdrs = ["SNTStoredNetworkMountEvent.h"],
@@ -1064,6 +1085,7 @@ objc_library(
         ":SNTXPCUnprivilegedControlInterface",
         "//Source/common/ne:SNTNetworkExtensionSettings",
         "@santanetd//src/santanetd:SNDFlowInfo",
+        "@santanetd//src/santanetd:SNDNetworkFlowDecision",
         "@santanetd//src/santanetd:SNDProcessFlows",
         "@santanetd//src/santanetd:SNDProcessInfo",
     ],
@@ -1230,6 +1252,7 @@ test_suite(
         ":SNTSandboxExecRequestTest",
         ":SNTStoredEventTest",
         ":SNTStoredExecutionEventTest",
+        ":SNTStoredNetworkFlowEventTest",
         ":SNTStoredNetworkMountEventTest",
         ":SNTStoredProcessTest",
         ":SNTStoredTemporaryMonitorModeAuditEventTest",

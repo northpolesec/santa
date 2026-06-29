@@ -18,7 +18,9 @@
 
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
 
+@class SNDNetworkFlowDecision;
 @class SNDProcessFlows;
+@class SNTDecisionCache;
 @class SNTNetworkExtensionSettings;
 @class SNTNotificationQueue;
 @class SNTRuleTable;
@@ -33,6 +35,7 @@ extern NSString* const kSantaNetworkExtensionProtocolVersion;
 - (instancetype)initWithNotifierQueue:(SNTNotificationQueue*)notifierQueue
                            syncdQueue:(SNTSyncdQueue*)syncdQueue
                             ruleTable:(SNTRuleTable*)ruleTable
+                        decisionCache:(SNTDecisionCache*)decisionCache
                                logger:(std::shared_ptr<santa::Logger>)logger
     NS_DESIGNATED_INITIALIZER;
 
@@ -53,6 +56,10 @@ extern NSString* const kSantaNetworkExtensionProtocolVersion;
 - (void)handleNetworkFlows:(NSArray<SNDProcessFlows*>*)processFlows
                windowStart:(NSDate*)windowStart
                  windowEnd:(NSDate*)windowEnd;
+
+/// Enrich + enqueue per-flow decisions reported by santanetd. Runs off the XPC reply
+/// path (dispatched by SNTDaemonControlController). No-op without a real santanetd.
+- (void)handleNetworkFlowDecisions:(NSArray<SNDNetworkFlowDecision*>*)decisions;
 
 /// Returns YES if the network extension should be installed.
 /// Checks that sync v2 is enabled and network extension settings have enable set to YES.
