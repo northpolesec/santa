@@ -15,6 +15,7 @@
 #include "Source/santad/SignalScanner.h"
 
 #import "Source/common/SNTLogging.h"
+#include "absl/cleanup/cleanup.h"
 #include "telemetry/sleighconfig.pb.h"
 
 namespace santa {
@@ -59,12 +60,27 @@ void SignalScanner::SetSignals(NSArray<SNTSignal*>* signals) {
 }
 
 void SignalScanner::ScanFile(std::string path, std::shared_ptr<ScopedFile> file) {
+  // No readable fd for the closed file (the spool layer's open failed): nothing to scan.
+  if (!file) {
+    return;
+  }
+
+  // Cap the number of opened-but-not-yet-scanned files (see kMaxInFlightScans). Checked here,
+  // synchronously on the spool's queue, so an over-cap drop releases `file` (and its fd) right
+  // away instead of letting it sit in the scan queue. Scans run serially, so ScanFile is never
+  // called concurrently; only the decrement (below) races, which the atomic handles.
+  if (in_flight_.fetch_add(1, std::memory_order_relaxed) >= kMaxInFlightScans) {
+    in_flight_.fetch_sub(1, std::memory_order_relaxed);
+    LOGD(@"Signal scan dropped for %s: already at %d in-flight scans", path.c_str(),
+         kMaxInFlightScans);
+    return;
+  }
+
   auto shared_this = shared_from_this();
   dispatch_async(scan_q_, ^{
-    // No readable fd for the closed file (the spool layer's open failed): nothing to scan.
-    if (!file) {
-      return;
-    }
+    absl::Cleanup decrement = [shared_this] {
+      shared_this->in_flight_.fetch_sub(1, std::memory_order_relaxed);
+    };
 
     std::vector<std::string> signals;
     {

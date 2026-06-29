@@ -18,6 +18,7 @@
 #import <Foundation/Foundation.h>
 #include <dispatch/dispatch.h>
 
+#include <atomic>
 #include <memory>
 #include <string>
 #include <vector>
@@ -67,10 +68,19 @@ class SignalScanner : public std::enable_shared_from_this<SignalScanner> {
   SignalScanner(std::unique_ptr<SleighLauncher> sleigh_launcher, uint32_t timeout_secs,
                 ReportHandlerBlock report_handler, dispatch_queue_t scan_q);
 
+  // Upper bound on opened-but-not-yet-scanned files. Each pending scan retains an open fd to a
+  // closed spool file; scans run serially (one Sleigh fork at a time), so under sustained heavy
+  // telemetry the backlog — and the retained fds — would otherwise grow without limit, exhausting
+  // the daemon's fd budget and pinning unlinked spool files on disk (defeating spool eviction).
+  // When the cap is hit, new scans are dropped (and their fds released), shedding load the same
+  // way the spool evicts its oldest files to stay bounded.
+  static constexpr int kMaxInFlightScans = 32;
+
   std::unique_ptr<SleighLauncher> sleigh_launcher_;
   uint32_t timeout_secs_;
   ReportHandlerBlock report_handler_;
   dispatch_queue_t scan_q_;
+  std::atomic<int> in_flight_{0};
   absl::Mutex lock_;
   // Each entry is a serialized santa.common.v1.Signal.
   std::vector<std::string> signals_ ABSL_GUARDED_BY(lock_);
