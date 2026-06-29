@@ -156,8 +156,9 @@ absl::StatusOr<::santa::telemetry::v1::SleighSignalScanResponse> SleighLauncher:
 absl::StatusOr<std::string> SleighLauncher::RunSleigh(const std::string& serialized,
                                                       const std::vector<int>& input_fds,
                                                       uint32_t timeout_secs, bool capture_stdout) {
-  // Close our copies of the inherited fds on every return path (the child keeps its
-  // own copies across fork).
+  // Safety net that closes our copies of the input fds on any return before fork (or if fork
+  // fails). After a successful fork the parent closes them explicitly and cancels this — the
+  // child keeps its own inherited copies.
   absl::Cleanup close_fds = [&input_fds]() {
     for (int fd : input_fds) {
       close(fd);
@@ -228,6 +229,14 @@ absl::StatusOr<std::string> SleighLauncher::RunSleigh(const std::string& seriali
   }
 
   // Parent process.
+  // The parent doesn't use its copies of the input fds after fork — the child inherited its own
+  // across fork and references them by number via the serialized config. Close them now rather
+  // than holding them open for the whole scan, and cancel the safety-net cleanup.
+  for (int fd : input_fds) {
+    close(fd);
+  }
+  std::move(close_fds).Cancel();
+
   close(stdin_pipe[0]);                     // Close read end of stdin pipe.
   fcntl(stdin_pipe[1], F_SETNOSIGPIPE, 1);  // Prevent SIGPIPE if child exits early.
 
