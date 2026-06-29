@@ -28,6 +28,11 @@ using santa::NSStringToUTF8String;
 
 namespace pbv2 = ::santa::sync::v2;
 
+@interface SNTSyncSignalUpload ()
+/// Upload the given signal reports. On success, removes them from the database.
+- (BOOL)uploadSignalReports:(NSArray<SNTStoredSignalReport*>*)reports;
+@end
+
 @implementation SNTSyncSignalUpload
 
 - (NSURL*)stageURL {

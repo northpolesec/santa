@@ -21,7 +21,4 @@
 /// Only supported in sync v2.
 @interface SNTSyncSignalUpload : SNTSyncStage
 
-/// Upload the given signal reports. On success, removes them from the database.
-- (BOOL)uploadSignalReports:(NSArray<SNTStoredSignalReport*>*)reports;
-
 @end

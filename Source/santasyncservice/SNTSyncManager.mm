@@ -173,35 +173,41 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
     return;
   }
 
-  SNTSyncStatusType status = SNTSyncStatusTypeUnknown;
-  SNTSyncState* syncState = [self createSyncStateWithStatus:&status];
-  if (!syncState) {
-    LOGE(@"Signal report upload failed to create sync state: %ld", status);
-    if (reply) reply(NO);
-    return;
-  }
+  // Run on syncQueue so this out-of-band upload can't overlap a scheduled
+  // sync's signalupload stage. Both paths read the pending set from the DB at
+  // upload time via [p sync], so whichever runs first uploads and deletes the
+  // rows and the other finds nothing pending — the server never receives
+  // duplicates. The passed-in reports just signal that there is work to do;
+  // they are already persisted in the DB.
+  dispatch_async(self.syncQueue, ^() {
+    SNTSyncStatusType status = SNTSyncStatusTypeUnknown;
+    SNTSyncState* syncState = [self createSyncStateWithStatus:&status];
+    if (!syncState) {
+      LOGE(@"Signal report upload failed to create sync state: %ld", status);
+      if (reply) reply(NO);
+      return;
+    }
 
-  // Signal report upload is only supported in sync v2. Leave the reports pending for the next
-  // (v2) sync if v2 is not enabled.
-  if (!syncState.isSyncV2) {
-    LOGD(@"Signal report upload skipped: sync v2 not enabled. Reports remain pending.");
-    if (reply) reply(NO);
-    return;
-  }
+    // Signal report upload is only supported in sync v2. Leave the reports pending for the next
+    // (v2) sync if v2 is not enabled.
+    if (!syncState.isSyncV2) {
+      LOGD(@"Signal report upload skipped: sync v2 not enabled. Reports remain pending.");
+      if (reply) reply(NO);
+      return;
+    }
 
-  SNTSyncSignalUpload* p = [[SNTSyncSignalUpload alloc] initWithState:syncState];
-  BOOL success;
-  if ([p uploadSignalReports:reports]) {
-    LOGD(@"Signal report upload complete");
-    success = YES;
-  } else {
-    LOGE(@"Signal report upload failed. Reports remain pending for the next sync.");
-    [self startReachability];
-    success = NO;
-  }
-  self.xsrfToken = syncState.xsrfToken;
-  self.xsrfTokenHeader = syncState.xsrfTokenHeader;
-  if (reply) reply(success);
+    SNTSyncSignalUpload* p = [[SNTSyncSignalUpload alloc] initWithState:syncState];
+    BOOL success = [p sync];
+    if (success) {
+      LOGD(@"Signal report upload complete");
+    } else {
+      LOGE(@"Signal report upload failed. Reports remain pending for the next sync.");
+      [self startReachability];
+    }
+    self.xsrfToken = syncState.xsrfToken;
+    self.xsrfTokenHeader = syncState.xsrfTokenHeader;
+    if (reply) reply(success);
+  });
 }
 
 - (void)postBundleEventToSyncServer:(SNTStoredExecutionEvent*)event
