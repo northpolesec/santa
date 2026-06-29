@@ -1113,7 +1113,6 @@ objc_library(
         ":SNTStoredExecutionEvent",
         ":SNTStoredFileAccessEvent",
         ":SNTStoredNetworkFlowEvent",
-        ":SNTStoredProcess",
     ],
 )
 

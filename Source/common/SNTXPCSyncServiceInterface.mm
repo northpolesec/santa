@@ -16,7 +16,6 @@
 #import "Source/common/SNTXPCSyncServiceInterface.h"
 
 #import "Source/common/SNTStoredNetworkFlowEvent.h"
-#import "Source/common/SNTStoredProcess.h"
 
 @implementation SNTXPCSyncServiceInterface
 
@@ -26,8 +25,7 @@
   [r setClasses:[NSSet setWithObjects:[NSArray class], [SNTStoredEvent class],
                                       [SNTStoredExecutionEvent class],
                                       [SNTStoredFileAccessEvent class],
-                                      [SNTStoredNetworkFlowEvent class], [SNTStoredProcess class],
-                                      [MOLCertificate class], nil]
+                                      [SNTStoredNetworkFlowEvent class], nil]
         forSelector:@selector(postEventsToSyncServer:reply:)
       argumentIndex:0
             ofReply:NO];
