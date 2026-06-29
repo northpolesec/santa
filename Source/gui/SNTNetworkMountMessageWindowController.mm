@@ -16,6 +16,8 @@
 
 #import "Source/gui/SNTNetworkMountMessageWindowView-Swift.h"
 
+#import "Source/common/SNTStrengthify.h"
+
 @implementation SNTNetworkMountMessageWindowController
 
 - (instancetype)initWithEvent:(SNTStoredNetworkMountEvent*)event
@@ -33,12 +35,14 @@
 
   self.window = [SNTMessageWindowController defaultWindow];
 
+  WEAKIFY(self);
   self.window.contentViewController = [SNTNetworkMountMessageWindowViewFactory
       createWithWindow:self.window
                  event:self.event
           configBundle:self.configBundle
            silenceable:([self messageHash] != nil)
        uiStateCallback:^(NSTimeInterval preventNotificationsPeriod) {
+         STRONGIFY(self);
          self.silenceFutureNotificationsPeriod = preventNotificationsPeriod;
        }];
   self.window.delegate = self;

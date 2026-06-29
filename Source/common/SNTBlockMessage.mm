@@ -151,6 +151,15 @@ static id EncodedValueOrNull(id value) {
   return [SNTBlockMessage formatMessage:customMsg withFallback:defaultBannedMessage];
 }
 
++ (NSAttributedString*)attributedBlockMessageForNetworkFlowEventWithCustomMessage:
+    (NSString*)customMsg {
+  NSString* defaultBlockedMessage = NSLocalizedString(
+      @"The following application has been blocked<br />from reaching a network destination",
+      @"The default message to show the user when a network flow is blocked");
+
+  return [SNTBlockMessage formatMessage:customMsg withFallback:defaultBlockedMessage];
+}
+
 + (NSString*)blockReasonForEvent:(SNTStoredExecutionEvent*)event {
   NSString* reason;
   switch (event.decision) {

@@ -232,6 +232,9 @@
 /* No comment provided by engineer. */
 "Too many syncs are in progress. Please try again later." = "Забагато синхронізацій виконується. Будь ласка, спробуйте пізніше.";
 
+/* The default message to show the user when a network flow is blocked */
+"The following application has been blocked<br />from reaching a network destination" = "Наступній програмі заблоковано доступ<br />до мережевого ресурсу";
+
 /* The default message to show the user when an unknown application is blocked */
 "The following application has been blocked from executing<br />because its trustworthiness cannot be determined" = "Наступна програма була заблокована для виконання,<br />оскільки не може бути визначена її достовірність";
 

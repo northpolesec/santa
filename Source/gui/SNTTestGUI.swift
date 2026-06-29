@@ -20,9 +20,11 @@ import santa_common_SNTConfigurator
 import santa_common_SNTCommonEnums
 import santa_common_SNTDeviceEvent
 import santa_common_SNTStoredExecutionEvent
+import santa_common_SNTStoredNetworkFlowEvent
 import Source_gui_SNTDeviceMessageWindowView
 import Source_gui_SNTBinaryMessageWindowView
 import Source_gui_SNTAboutWindowView
+import Source_gui_SNTNetworkFlowMessageWindowView
 
 func ShowWindow(_ vc: NSViewController, _ window: NSWindow, appearance: AppearanceMode = .system) {
   window.contentRect(forFrameRect: NSMakeRect(0, 0, 0, 0))
@@ -462,12 +464,131 @@ struct AboutView: View {
   }
 }
 
+struct NetworkFlowView: View {
+  @State private var application: String = "/Applications/Malware.app/Contents/MacOS/Malware"
+  @State private var hostname: String = "evil.example.com"
+  @State private var remoteAddress: String = "93.184.216.34"
+  @State private var remotePort: String = "443"
+  @State private var ruleName: String = "block-evil-example"
+  @State private var ruleId: String = "42"
+  @State private var decisionTier: SNTNetworkFlowTier = .domain
+  @State private var sha256: String = "60055b1f6fb276bfacf61f91505a72201987f20ad8b6867cce3058f4c0f0f5e5"
+  @State private var cdhash: String = "e38e71023d09c2e8e78a0e382669d1338ee8876a"
+  @State private var signingID: String = "com.example.malware"
+  @State private var teamID: String = "9X9633G7QW"
+  @State private var pid: String = "12345"
+  @State private var executingUser: String = NSUserName()
+  @State private var allowNotificationSilence: Bool = true
+
+  @State private var brandingCompanyName: String = ""
+  @State private var brandingCompanyLogo: String = ""
+  @State private var brandingCompanyLogoDark: String = ""
+  @State private var appearanceMode: AppearanceMode = .system
+
+  var body: some View {
+    VStack {
+      GroupBox(label: Label("Event Properties", systemImage: "")) {
+        Form {
+          TextField(text: $application, label: { Text(verbatim: "Application") })
+          TextField(text: $sha256, label: { Text(verbatim: "SHA-256") })
+          TextField(text: $cdhash, label: { Text(verbatim: "CDHash") })
+          TextField(text: $signingID, label: { Text(verbatim: "Signing ID") })
+          TextField(text: $teamID, label: { Text(verbatim: "Team ID") })
+          TextField(text: $pid, label: { Text(verbatim: "PID") })
+          TextField(text: $executingUser, label: { Text(verbatim: "Executing User") })
+          TextField(text: $hostname, label: { Text(verbatim: "Hostname") })
+          TextField(text: $remoteAddress, label: { Text(verbatim: "Remote Address") })
+          TextField(text: $remotePort, label: { Text(verbatim: "Remote Port") })
+          TextField(text: $ruleName, label: { Text(verbatim: "Rule Name") })
+          TextField(text: $ruleId, label: { Text(verbatim: "Rule ID") })
+          HStack {
+            Picker(selection: $decisionTier, label: Text(verbatim: "Match (decisionTier)")) {
+              Text(verbatim: "Exact IP").tag(SNTNetworkFlowTier.exactIP)
+              Text(verbatim: "CIDR").tag(SNTNetworkFlowTier.CIDR)
+              Text(verbatim: "Hostname").tag(SNTNetworkFlowTier.hostname)
+              Text(verbatim: "Domain").tag(SNTNetworkFlowTier.domain)
+              Text(verbatim: "Any Remote").tag(SNTNetworkFlowTier.anyRemote)
+            }.pickerStyle(.segmented)
+          }
+        }
+      }
+
+      GroupBox(label: Label("Config Overrides", systemImage: "")) {
+        Form {
+          HStack {
+            Toggle(isOn: $allowNotificationSilence) {
+              Text(verbatim: "Allow notification silences")
+            }
+          }
+          CommonPropertiesView(
+            brandingCompanyName: $brandingCompanyName,
+            brandingCompanyLogo: $brandingCompanyLogo,
+            brandingCompanyLogoDark: $brandingCompanyLogoDark,
+            appearanceMode: $appearanceMode
+          )
+        }
+      }
+
+      Button("Display") {
+        var configMap: [String: Any] = [:]
+        if !brandingCompanyName.isEmpty {
+          configMap["BrandingCompanyName"] = brandingCompanyName
+        }
+        if !brandingCompanyLogo.isEmpty {
+          configMap["BrandingCompanyLogo"] = brandingCompanyLogo
+        }
+        if !brandingCompanyLogoDark.isEmpty {
+          configMap["BrandingCompanyLogoDark"] = brandingCompanyLogoDark
+        }
+        if !configMap.isEmpty {
+          SNTConfigurator.overrideConfig(configMap)
+        }
+
+        let event = SNTStoredNetworkFlowEvent()
+        event.decision = .block
+        event.process?.filePath = application
+        event.process?.fileSHA256 = sha256
+        event.process?.cdhash = cdhash
+        event.process?.signingID = signingID
+        event.process?.teamID = teamID
+        event.process?.pid = NSNumber(value: Int(pid) ?? 0)
+        event.process?.executingUser = executingUser
+        event.hostname = hostname
+        event.remoteAddress = remoteAddress
+        event.remotePort = UInt16(remotePort) ?? 0
+        event.direction = .outgoing
+        event.`protocol` = 6
+        event.ruleName = ruleName
+        event.ruleId = Int64(ruleId) ?? 0
+        event.decisionTier = decisionTier
+
+        let bundle = SNTConfigBundle()
+        bundle.setValue(NSNumber(value: allowNotificationSilence), forKey: "enableNotificationSilences")
+
+        let window = NSWindow()
+        ShowWindow(
+          SNTNetworkFlowMessageWindowViewFactory.createWith(
+            window: window,
+            event: event,
+            configBundle: bundle,
+            silenceable: true,
+            uiStateCallback: { interval in print("Silence interval was set to \(interval)") }
+          ),
+          window,
+          appearance: appearanceMode
+        )
+      }
+    }
+  }
+}
+
 struct ContentView: View {
   var body: some View {
     TabView {
       BinaryView().padding(15.0).tabItem({ Text("Binary") })
       FAAView().padding(15.0).tabItem({ Text("FAA") })
       DeviceView().padding(15.0).tabItem({ Text("Device") })
+      NetworkFlowView().padding(15.0).tabItem({ Text("Network Flow") })
       AboutView().padding(15.0).tabItem({ Text("About") })
     }
   }

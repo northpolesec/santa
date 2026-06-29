@@ -19,6 +19,7 @@
 #import "Source/common/SNTBlockMessage.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTDeviceEvent.h"
+#import "Source/common/SNTStrengthify.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -38,12 +39,14 @@ NS_ASSUME_NONNULL_BEGIN
 
   self.window = [SNTMessageWindowController defaultWindow];
 
+  WEAKIFY(self);
   self.window.contentViewController = [SNTDeviceMessageWindowViewFactory
       createWithWindow:self.window
                  event:self.event
           configBundle:self.configBundle
            silenceable:([self messageHash] != nil)
        uiStateCallback:^(NSTimeInterval preventNotificationsPeriod) {
+         STRONGIFY(self);
          self.silenceFutureNotificationsPeriod = preventNotificationsPeriod;
        }];
   self.window.delegate = self;

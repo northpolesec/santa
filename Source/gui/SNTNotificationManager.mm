@@ -29,6 +29,7 @@
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
 #import "Source/common/SNTStoredFileAccessEvent.h"
+#import "Source/common/SNTStoredNetworkFlowEvent.h"
 #import "Source/common/SNTStoredNetworkMountEvent.h"
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTSyncConstants.h"
@@ -40,6 +41,7 @@
 #import "Source/gui/SNTDeviceMessageWindowController.h"
 #import "Source/gui/SNTFileAccessMessageWindowController.h"
 #import "Source/gui/SNTMessageWindowController.h"
+#import "Source/gui/SNTNetworkFlowMessageWindowController.h"
 #import "Source/gui/SNTNetworkMountMessageWindowController.h"
 #import "Source/gui/SNTStatusItemManager.h"
 #import "src/santanetd/SNDFilterConfigurationHelper.h"
@@ -101,7 +103,7 @@ static NSString* const silencedNotificationsKey = @"SilencedNotifications";
 
 - (BOOL)notificationAlreadyQueued:(SNTMessageWindowController*)pendingMsg {
   for (SNTMessageWindowController* msg in self.pendingNotifications) {
-    if ([[msg messageHash] isEqual:[pendingMsg messageHash]]) return YES;
+    if ([[msg queueDedupeHash] isEqual:[pendingMsg queueDedupeHash]]) return YES;
   }
   return NO;
 }
@@ -478,6 +480,23 @@ static NSString* const silencedNotificationsKey = @"SilencedNotifications";
                                                       configState:configState];
 
   [self queueMessage:pendingMsg enableSilences:YES];
+}
+
+- (void)postNetworkFlowBlockNotification:(SNTStoredNetworkFlowEvent*)event
+                            configBundle:(SNTConfigBundle*)configBundle {
+  if (!event) {
+    LOGI(@"Error: Missing event object in message received from daemon!");
+    return;
+  }
+
+  SNTNetworkFlowMessageWindowController* pendingMsg =
+      [[SNTNetworkFlowMessageWindowController alloc] initWithEvent:event configBundle:configBundle];
+
+  __block BOOL enableSilences = YES;
+  [configBundle enableNotificationSilences:^(BOOL val) {
+    enableSilences = val;
+  }];
+  [self queueMessage:pendingMsg enableSilences:enableSilences];
 }
 
 - (void)authorizeTemporaryMonitorMode:(void (^)(BOOL authenticated))reply {

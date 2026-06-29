@@ -70,4 +70,24 @@
   [self waitForExpectationsWithTimeout:0.1 handler:NULL];
 }
 
+- (void)testNetworkFlowConfigBundle {
+  __block XCTestExpectation* exp = [self expectationWithDescription:@"Result Block"];
+  SNTConfigBundle* bundle;
+
+  SNTConfigurator* configurator = [SNTConfigurator configurator];
+  id mockConfigurator = OCMPartialMock(configurator);
+
+  OCMExpect([mockConfigurator enableNotificationSilences]).andReturn(YES);
+
+  bundle = santa::NetworkFlowConfigBundle(mockConfigurator);
+
+  [bundle enableNotificationSilences:^(BOOL val) {
+    XCTAssertTrue(val);
+    [exp fulfill];
+  }];
+
+  // Low timeout because code above is synchronous
+  [self waitForExpectationsWithTimeout:0.1 handler:NULL];
+}
+
 @end

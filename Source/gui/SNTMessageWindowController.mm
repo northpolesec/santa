@@ -80,4 +80,8 @@
   return nil;
 }
 
+- (NSString*)queueDedupeHash {
+  return [self messageHash];
+}
+
 @end

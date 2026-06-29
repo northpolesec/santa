@@ -35,6 +35,7 @@
 #import "Source/common/ne/SNTNetworkExtensionSettings.h"
 #import "Source/common/ne/SNTSyncNetworkExtensionSettings.h"
 #import "Source/common/ne/SNTXPCNetworkExtensionInterface.h"
+#import "Source/santad/DaemonConfigBundle.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
 #import "Source/santad/SNTDecisionCache.h"
 #import "Source/santad/SNTNotificationQueue.h"
@@ -45,6 +46,10 @@
 // 1.1 adds reportNetworkFlowDecisions:. santanetd emits flow decisions only when
 // the daemon advertises >= 1.1 (older/downgraded daemons keep the gate closed).
 NSString* const kSantaNetworkExtensionProtocolVersion = @"1.1";
+
+// Suppress repeat loud-deny dialogs for the same uiDedupeKey for this long. Short relative to
+// the event-upload backoff: it only collapses prompt bursts for one (process, rule, destination).
+static const NSTimeInterval kNetworkFlowDialogDedupeInterval = 60;
 
 @interface SNTNetworkExtensionQueue () {
   std::shared_ptr<santa::Logger> _logger;
@@ -61,6 +66,11 @@ NSString* const kSantaNetworkExtensionProtocolVersion = @"1.1";
 // (which persists nothing) is re-seeded with the full config on its next registration.
 @property SNTNetworkExtensionSettings* lastPushedSettings;
 @property NSString* lastPushedNetworkFlowRulesHash;
+// uiDedupeKey -> dialog suppression expiry. Touched only on the serial netFlowQ that runs
+// handleNetworkFlowDecisions:.
+@property NSMutableDictionary<NSString*, NSDate*>* flowDialogDedupeCache;
+// Last full prune of flowDialogDedupeCache; gates how often the cache is swept.
+@property NSDate* lastDedupeSweep;
 @end
 
 @implementation SNTNetworkExtensionQueue
@@ -77,6 +87,7 @@ NSString* const kSantaNetworkExtensionProtocolVersion = @"1.1";
     _ruleTable = ruleTable;
     _decisionCache = decisionCache;
     _logger = std::move(logger);
+    _flowDialogDedupeCache = [NSMutableDictionary dictionary];
 
     WEAKIFY(self);
 
@@ -231,7 +242,54 @@ NSString* const kSantaNetworkExtensionProtocolVersion = @"1.1";
     }
 
     [self.syncdQueue addStoredEvent:event];
+
+    // Loud denies (Block decision, not silent) get an informational dialog; audits and silent
+    // denies do not. Gate on a live GUI connection before the dedupe check: with none (e.g. at the
+    // loginwindow) the post is a no-op, and consuming the dedupe slot would suppress the first real
+    // dialog once a GUI connects within the window. The uiDedupeKey cache then collapses repeats
+    // for the same (process, rule, destination).
+    MOLXPCConnection* notifierConnection = self.notifierQueue.notifierConnection;
+    if (event.decision == SNTNetworkFlowDecisionBlock && !event.silent && notifierConnection &&
+        [self shouldPostFlowDialogForKey:event.uiDedupeKey]) {
+      [[notifierConnection remoteObjectProxy]
+          postNetworkFlowBlockNotification:event
+                              configBundle:santa::NetworkFlowConfigBundle(
+                                               [SNTConfigurator configurator])];
+    }
   }
+}
+
+// Suppress repeat loud-deny dialogs for the same uiDedupeKey within the window. The per-key check
+// is O(1); expired entries are pruned at most once per window rather than on every decision, so
+// the cache stays bounded even when a deny-broadly ruleset yields many distinct keys. Confined to
+// the serial netFlowQ.
+- (BOOL)shouldPostFlowDialogForKey:(NSString*)key {
+  if (!key.length) return YES;  // no key to de-dup on; don't suppress
+
+  NSDate* now = [NSDate date];
+
+  // Only an unexpired entry for this key suppresses; a stale one is overwritten below.
+  NSDate* expiry = self.flowDialogDedupeCache[key];
+  if (expiry && [expiry compare:now] == NSOrderedDescending) return NO;
+  self.flowDialogDedupeCache[key] = [now dateByAddingTimeInterval:kNetworkFlowDialogDedupeInterval];
+
+  if (!self.lastDedupeSweep ||
+      [now timeIntervalSinceDate:self.lastDedupeSweep] >= kNetworkFlowDialogDedupeInterval) {
+    [self pruneExpiredFlowDialogEntriesAsOf:now];
+    self.lastDedupeSweep = now;
+  }
+  return YES;
+}
+
+// Drop expired suppression entries to bound the cache. Confined to the serial netFlowQ.
+- (void)pruneExpiredFlowDialogEntriesAsOf:(NSDate*)now {
+  NSMutableArray<NSString*>* expired = [NSMutableArray array];
+  for (NSString* cached in self.flowDialogDedupeCache) {
+    if ([self.flowDialogDedupeCache[cached] compare:now] != NSOrderedDescending) {
+      [expired addObject:cached];
+    }
+  }
+  [self.flowDialogDedupeCache removeObjectsForKeys:expired];
 }
 
 - (SNTNetworkExtensionSettings*)handleRegistrationWithProtocolVersion:(NSString*)protocolVersion

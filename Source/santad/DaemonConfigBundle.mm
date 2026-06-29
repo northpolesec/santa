@@ -22,6 +22,14 @@
 
 namespace santa {
 
+SNTConfigBundle* NetworkFlowConfigBundle(SNTConfigurator* configurator) {
+  SNTConfigBundle* bundle = [[SNTConfigBundle alloc] init];
+
+  bundle.enableNotificationSilences = @(configurator.enableNotificationSilences);
+
+  return bundle;
+}
+
 SNTConfigBundle* NetworkMountConfigBundle(SNTConfigurator* configurator) {
   SNTConfigBundle* bundle = [[SNTConfigBundle alloc] init];
 

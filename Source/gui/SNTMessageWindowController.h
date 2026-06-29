@@ -27,8 +27,12 @@
 - (IBAction)closeWindow:(id)sender;
 
 /// Generate a distinct key for a given displayed event. This key is used for silencing future
-/// notifications.
+/// notifications, and by default for collapsing notifications already queued.
 - (NSString*)messageHash;
+
+/// Key used to collapse a notification that is already queued or on-screen. Defaults to
+/// -messageHash; override when queue de-dup should be finer-grained than the silence key.
+- (NSString*)queueDedupeHash;
 
 ///  Linked to checkbox in UI to prevent future notifications for the given event for a given period
 @property NSTimeInterval silenceFutureNotificationsPeriod;

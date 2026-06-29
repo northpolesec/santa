@@ -232,6 +232,9 @@
 /* No comment provided by engineer. */
 "Team ID" = "Team-ID";
 
+/* The default message to show the user when a network flow is blocked */
+"The following application has been blocked<br />from reaching a network destination" = "Die folgende Applikation wurde daran gehindert,<br />ein Netzwerkziel zu erreichen";
+
 /* The default message to show the user when an unknown application is blocked */
 "The following application has been blocked from executing<br />because its trustworthiness cannot be determined" = "Die folgende Applikation wurde blockiert,<br />da ihre Vertrauenswürdigkeit nicht überprüft werden kann";
 

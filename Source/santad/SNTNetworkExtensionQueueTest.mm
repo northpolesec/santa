@@ -27,17 +27,20 @@
 #import "Source/common/SNTNetworkFlowRule.h"
 #import "Source/common/SNTStoredNetworkFlowEvent.h"
 #import "Source/common/SNTStoredProcess.h"
+#import "Source/common/SNTXPCNotifierInterface.h"
 #import "Source/common/SantaVnode.h"
 #import "Source/common/ne/SNDXPCNetworkExtensionInterface.h"
 #import "Source/common/ne/SNTNetworkExtensionSettings.h"
 #import "Source/common/ne/SNTSyncNetworkExtensionSettings.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
 #import "Source/santad/SNTDecisionCache.h"
+#import "Source/santad/SNTNotificationQueue.h"
 #import "Source/santad/SNTSyncdQueue.h"
 #import "src/santanetd/SNDNetworkFlowDecision.h"
 
 @interface SNTNetworkExtensionQueue (Testing)
 @property MOLXPCConnection* netExtConnection;
+@property(weak) SNTNotificationQueue* notifierQueue;
 @property SNTRuleTable* ruleTable;
 @property SNTNetworkExtensionSettings* lastPushedSettings;
 @property NSString* lastPushedNetworkFlowRulesHash;
@@ -55,6 +58,9 @@
 @property id mockConfigurator;
 @property id mockConnection;
 @property id mockProxy;
+@property id mockNotifierQueue;
+@property id mockNotifierConnection;
+@property id mockNotifierProxy;
 @end
 
 @implementation SNTNetworkExtensionQueueTest
@@ -407,6 +413,117 @@
   OCMVerifyAll(self.mockDecisionCache);
   OCMVerifyAll(self.mockSyncdQueue);
   [[NSFileManager defaultManager] removeItemAtPath:path error:nil];
+}
+
+// Wire up a notifier connection so the loud-deny post branch reaches a verifiable proxy.
+// Returns the proxy mock for expectations; the strong test refs keep the queue's weak
+// notifierQueue alive for the test's duration.
+- (id)setUpNotifierProxy {
+  self.mockNotifierQueue = OCMClassMock([SNTNotificationQueue class]);
+  self.mockNotifierConnection = OCMClassMock([MOLXPCConnection class]);
+  self.mockNotifierProxy = OCMProtocolMock(@protocol(SNTNotifierXPC));
+  OCMStub([self.mockNotifierQueue notifierConnection]).andReturn(self.mockNotifierConnection);
+  OCMStub([self.mockNotifierConnection remoteObjectProxy]).andReturn(self.mockNotifierProxy);
+  self.sut.notifierQueue = self.mockNotifierQueue;
+  return self.mockNotifierProxy;
+}
+
+- (SNTStoredNetworkFlowEvent*)loudDenyEventWithUIKey:(NSString*)uiDedupeKey {
+  SNTStoredNetworkFlowEvent* event = [[SNTStoredNetworkFlowEvent alloc] init];
+  event.decision = SNTNetworkFlowDecisionBlock;
+  event.silent = NO;
+  event.uiDedupeKey = uiDedupeKey;
+  return event;
+}
+
+- (void)testHandleNetworkFlowDecisionsLoudDenyPostsDialog {
+  [self stubNetworkExtensionEnabled];
+  id proxy = [self setUpNotifierProxy];
+
+  SNTStoredNetworkFlowEvent* event = [self loudDenyEventWithUIKey:@"4242:1|7|example.com"];
+  // isNotNil guards the queue -> NetworkFlowConfigBundle -> post wiring (a real bundle is built).
+  OCMExpect([proxy postNetworkFlowBlockNotification:event configBundle:[OCMArg isNotNil]]);
+
+  [self.sut handleNetworkFlowDecisions:@[ [self decisionForCacheMissWithEvent:event] ]];
+
+  OCMVerifyAll(proxy);
+}
+
+- (void)testHandleNetworkFlowDecisionsAuditDoesNotPostDialog {
+  [self stubNetworkExtensionEnabled];
+  id proxy = [self setUpNotifierProxy];
+
+  SNTStoredNetworkFlowEvent* event = [self loudDenyEventWithUIKey:@"k"];
+  event.decision = SNTNetworkFlowDecisionAudit;
+  OCMReject([proxy postNetworkFlowBlockNotification:OCMOCK_ANY configBundle:OCMOCK_ANY]);
+
+  [self.sut handleNetworkFlowDecisions:@[ [self decisionForCacheMissWithEvent:event] ]];
+
+  OCMVerifyAll(proxy);
+}
+
+- (void)testHandleNetworkFlowDecisionsSilentDenyDoesNotPostDialog {
+  [self stubNetworkExtensionEnabled];
+  id proxy = [self setUpNotifierProxy];
+
+  SNTStoredNetworkFlowEvent* event = [self loudDenyEventWithUIKey:@"k"];
+  event.silent = YES;
+  OCMReject([proxy postNetworkFlowBlockNotification:OCMOCK_ANY configBundle:OCMOCK_ANY]);
+
+  [self.sut handleNetworkFlowDecisions:@[ [self decisionForCacheMissWithEvent:event] ]];
+
+  OCMVerifyAll(proxy);
+}
+
+- (void)testHandleNetworkFlowDecisionsDeDupesRepeatDialogByUIKey {
+  [self stubNetworkExtensionEnabled];
+  id proxy = [self setUpNotifierProxy];
+
+  // Same uiDedupeKey within the window: only the first prompts.
+  SNTStoredNetworkFlowEvent* first = [self loudDenyEventWithUIKey:@"same-key"];
+  SNTStoredNetworkFlowEvent* second = [self loudDenyEventWithUIKey:@"same-key"];
+  OCMExpect([proxy postNetworkFlowBlockNotification:first configBundle:OCMOCK_ANY]);
+  OCMReject([proxy postNetworkFlowBlockNotification:second configBundle:OCMOCK_ANY]);
+
+  [self.sut handleNetworkFlowDecisions:@[
+    [self decisionForCacheMissWithEvent:first], [self decisionForCacheMissWithEvent:second]
+  ]];
+
+  OCMVerifyAll(proxy);
+}
+
+- (void)testHandleNetworkFlowDecisionsNoGUIConnectionDoesNotConsumeDedupeSlot {
+  [self stubNetworkExtensionEnabled];
+
+  // No notifier connection yet (notifierQueue is nil): the post is skipped, and the dedupe slot
+  // must NOT be consumed so the dialog still shows once a GUI connects within the window.
+  SNTStoredNetworkFlowEvent* first = [self loudDenyEventWithUIKey:@"same-key"];
+  [self.sut handleNetworkFlowDecisions:@[ [self decisionForCacheMissWithEvent:first] ]];
+
+  // GUI connects; the same flow must still prompt (the earlier disconnected deny didn't burn it).
+  id proxy = [self setUpNotifierProxy];
+  SNTStoredNetworkFlowEvent* second = [self loudDenyEventWithUIKey:@"same-key"];
+  OCMExpect([proxy postNetworkFlowBlockNotification:second configBundle:[OCMArg isNotNil]]);
+
+  [self.sut handleNetworkFlowDecisions:@[ [self decisionForCacheMissWithEvent:second] ]];
+
+  OCMVerifyAll(proxy);
+}
+
+- (void)testHandleNetworkFlowDecisionsDistinctUIKeysBothPost {
+  [self stubNetworkExtensionEnabled];
+  id proxy = [self setUpNotifierProxy];
+
+  SNTStoredNetworkFlowEvent* first = [self loudDenyEventWithUIKey:@"key-1"];
+  SNTStoredNetworkFlowEvent* second = [self loudDenyEventWithUIKey:@"key-2"];
+  OCMExpect([proxy postNetworkFlowBlockNotification:first configBundle:OCMOCK_ANY]);
+  OCMExpect([proxy postNetworkFlowBlockNotification:second configBundle:OCMOCK_ANY]);
+
+  [self.sut handleNetworkFlowDecisions:@[
+    [self decisionForCacheMissWithEvent:first], [self decisionForCacheMissWithEvent:second]
+  ]];
+
+  OCMVerifyAll(proxy);
 }
 
 @end

@@ -54,6 +54,9 @@ NS_ASSUME_NONNULL_BEGIN
 + (NSAttributedString*)attributedBlockMessageForNetworkMountEventWithCustomMessage:
     (nullable NSString*)customMsg;
 
++ (NSAttributedString*)attributedBlockMessageForNetworkFlowEventWithCustomMessage:
+    (nullable NSString*)customMsg;
+
 ///
 ///  Return a URL generated from the EventDetailURL configuration key
 ///  after replacing templates in the URL with values from the event.
