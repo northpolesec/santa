@@ -26,7 +26,9 @@
 #import "Source/common/SNTStoredEvent.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
 #import "Source/common/SNTStoredFileAccessEvent.h"
+#import "Source/common/SNTStoredNetworkFlowEvent.h"
 #import "Source/common/SNTStoredNetworkMountEvent.h"
+#import "Source/common/SNTStoredProcess.h"
 #import "Source/common/SNTStoredTemporaryMonitorModeAuditEvent.h"
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTSystemInfo.h"
@@ -982,6 +984,112 @@
             } else {
               XCTAssertEqual(events.count, 0);
             }
+
+            return YES;
+          }];
+
+  [sut sync];
+}
+
+- (void)testMessageForNetworkFlowEventMapsAllFields {
+  SNTSyncEventUpload* sut = [[SNTSyncEventUpload alloc] initWithState:self.syncState];
+  self.syncState.eventBatchSize = 50;
+
+  // A v1-uploadable event so a request is always sent; NetworkFlowEvents are v2-only.
+  SNTStoredExecutionEvent* exec = [[SNTStoredExecutionEvent alloc] init];
+  exec.decision = SNTEventStateBlockBinary;
+  exec.fileSHA256 = @"exec-sha256";
+
+  // Three flow events exercise the decision mapping (Allow/Block/Audit).
+  SNTStoredNetworkFlowEvent* allow = [[SNTStoredNetworkFlowEvent alloc] init];
+  allow.decision = SNTNetworkFlowDecisionAllow;
+
+  SNTStoredNetworkFlowEvent* block = [[SNTStoredNetworkFlowEvent alloc] init];
+  block.remoteAddress = @"93.184.216.34";
+  block.remotePort = 443;
+  block.localAddress = @"10.0.0.2";
+  block.localPort = 51000;
+  block.protocol = 6;
+  block.socketFamily = SNTNetworkFlowSocketFamilyINET;
+  block.direction = SNTNetworkFlowDirectionOutgoing;
+  block.hostname = @"example.com";
+  block.flowTime = [NSDate dateWithTimeIntervalSince1970:1700000123];
+  block.decision = SNTNetworkFlowDecisionBlock;
+  block.decisionTier = SNTNetworkFlowTierDomain;
+  block.ruleId = 7;
+  block.ruleName = @"block-example";
+  block.competingRuleIds = @[ @(3), @(5) ];
+  block.totalCompetingRuleCount = 12;
+  block.eventDedupeKey = @"TEAM:com.apple.curl|7|example.com";  // santa-internal, never uploaded
+  block.uiDedupeKey = @"4242:1|7|example.com";                  // santa-internal, never uploaded
+  block.process.filePath = @"/usr/bin/curl";
+  block.process.cdhash = @"deadbeef";
+  block.process.fileSHA256 = @"abc123";
+  block.process.signingID = @"com.apple.curl";
+  block.process.teamID = @"APPLE";
+  block.process.pid = @(4242);
+  block.process.parent = [[SNTStoredProcess alloc] init];
+  block.process.parent.filePath = @"/sbin/launchd";
+  block.process.parent.pid = @(1);
+
+  SNTStoredNetworkFlowEvent* audit = [[SNTStoredNetworkFlowEvent alloc] init];
+  audit.decision = SNTNetworkFlowDecisionAudit;
+
+  NSArray* events = @[ exec, allow, block, audit ];
+  OCMStub([self.daemonConnRop databaseEventsPending:([OCMArg invokeBlockWithArgs:events, nil])]);
+
+  [self stubRequestBody:nil
+               response:nil
+                  error:nil
+          validateBlock:^BOOL(NSURLRequest* req) {
+            NSDictionary* requestDict = [self dictFromRequest:req];
+            NSArray* flows = requestDict[@"network_flow_events"];
+
+            if (!self.syncState.isSyncV2) {
+              XCTAssertNil(flows);  // v2-only; never uploaded under v1
+              return YES;
+            }
+
+            XCTAssertEqual(flows.count, 3);
+
+            // 3-way decision mapping.
+            XCTAssertEqualObjects(flows[0][@"decision"], @"NETWORK_FLOW_DECISION_ALLOW");
+            XCTAssertEqualObjects(flows[1][@"decision"], @"NETWORK_FLOW_DECISION_BLOCK");
+            XCTAssertEqualObjects(flows[2][@"decision"], @"NETWORK_FLOW_DECISION_AUDIT");
+
+            // Every mapped field, asserted on the fully-populated (blocked) event.
+            // NetworkFlowEvent's own proto fields carry no json_name, so they
+            // serialize lowerCamelCase; the nested Process fields keep snake_case.
+            NSDictionary* f = flows[1];
+            XCTAssertEqualObjects(f[@"remoteAddress"], @"93.184.216.34");
+            XCTAssertEqualObjects(f[@"remotePort"], @(443));
+            XCTAssertEqualObjects(f[@"localAddress"], @"10.0.0.2");
+            XCTAssertEqualObjects(f[@"localPort"], @(51000));
+            XCTAssertEqualObjects(f[@"protocol"], @(6));
+            XCTAssertEqualObjects(f[@"socketFamily"], @"NETWORK_FLOW_SOCKET_FAMILY_INET");
+            XCTAssertEqualObjects(f[@"direction"], @"NETWORK_FLOW_DIRECTION_OUTGOING");
+            XCTAssertEqualObjects(f[@"hostname"], @"example.com");
+            XCTAssertEqualObjects(f[@"decisionTier"], @"NETWORK_FLOW_TIER_DOMAIN");
+            XCTAssertEqualObjects(f[@"ruleId"], @"7");  // int64 -> JSON string
+            XCTAssertEqualObjects(f[@"ruleName"], @"block-example");
+            XCTAssertEqualObjects(f[@"competingRuleIds"], (@[ @"3", @"5" ]));  // int64 -> strings
+            XCTAssertEqualObjects(f[@"totalCompetingRuleCount"], @(12));
+            XCTAssertEqualObjects(f[@"flowTime"], @(1700000123));
+
+            NSArray* chain = f[@"processChain"];
+            XCTAssertEqual(chain.count, 2);
+            XCTAssertEqualObjects(chain[0][@"file_path"], @"/usr/bin/curl");
+            XCTAssertEqualObjects(chain[0][@"cdhash"], @"deadbeef");
+            XCTAssertEqualObjects(chain[0][@"file_sha256"], @"abc123");
+            XCTAssertEqualObjects(chain[0][@"signing_id"], @"com.apple.curl");
+            XCTAssertEqualObjects(chain[0][@"team_id"], @"APPLE");
+            XCTAssertEqualObjects(chain[0][@"pid"], @(4242));
+            XCTAssertEqualObjects(chain[1][@"file_path"], @"/sbin/launchd");
+            XCTAssertEqualObjects(chain[1][@"pid"], @(1));
+
+            // Internal dedup keys are never serialized to the proto.
+            XCTAssertNil(f[@"eventDedupeKey"]);
+            XCTAssertNil(f[@"uiDedupeKey"]);
 
             return YES;
           }];

@@ -1123,6 +1123,7 @@ objc_library(
         ":SNTStoredEvent",
         ":SNTStoredExecutionEvent",
         ":SNTStoredFileAccessEvent",
+        ":SNTStoredNetworkFlowEvent",
         ":SNTStoredSignalReport",
     ],
 )
