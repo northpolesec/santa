@@ -71,7 +71,7 @@ void SignalScanner::ScanFile(std::string path, std::shared_ptr<ScopedFile> file)
   // called concurrently; only the decrement (below) races, which the atomic handles.
   if (in_flight_.fetch_add(1, std::memory_order_relaxed) >= kMaxInFlightScans) {
     in_flight_.fetch_sub(1, std::memory_order_relaxed);
-    LOGD(@"Signal scan dropped for %s: already at %d in-flight scans", path.c_str(),
+    LOGW(@"Signal scan dropped for %s: already at %d in-flight scans", path.c_str(),
          kMaxInFlightScans);
     return;
   }
@@ -97,7 +97,7 @@ void SignalScanner::ScanFile(std::string path, std::shared_ptr<ScopedFile> file)
         shared_this->sleigh_launcher_->LaunchSignalScan(file->UnsafeFD(), signals,
                                                         shared_this->timeout_secs_);
     if (!response.ok()) {
-      LOGD(@"Signal scan failed for %s: %s", path.c_str(),
+      LOGW(@"Signal scan failed for %s: %s", path.c_str(),
            std::string(response.status().message()).c_str());
       return;
     }

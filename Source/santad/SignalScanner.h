@@ -74,7 +74,7 @@ class SignalScanner : public std::enable_shared_from_this<SignalScanner> {
   // the daemon's fd budget and pinning unlinked spool files on disk (defeating spool eviction).
   // When the cap is hit, new scans are dropped (and their fds released), shedding load the same
   // way the spool evicts its oldest files to stay bounded.
-  static constexpr int kMaxInFlightScans = 32;
+  static constexpr int kMaxInFlightScans = 100;
 
   std::unique_ptr<SleighLauncher> sleigh_launcher_;
   uint32_t timeout_secs_;
