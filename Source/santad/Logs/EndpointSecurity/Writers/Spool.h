@@ -236,7 +236,9 @@ class Spool : public Writer, public std::enable_shared_from_this<Spool<T>> {
     if (file_closed_f_ && result->has_value()) {
       const std::string& closed_path = result->value();
       std::shared_ptr<santa::ScopedFile> scoped_file;
-      int fd = open(closed_path.c_str(), O_RDONLY);
+      // O_CLOEXEC so this retained fd doesn't leak into the Sleigh fork/exec; only the dup that
+      // LaunchSignalScan hands to RunSleigh is meant to be inherited (dup() clears close-on-exec).
+      int fd = open(closed_path.c_str(), O_RDONLY | O_CLOEXEC);
       if (fd >= 0) {
         scoped_file = std::make_shared<santa::ScopedFile>(fd);
       } else {
