@@ -119,6 +119,20 @@ swift_library(
 )
 
 swift_library(
+    name = "SNTNetworkFlowMessageWindowView",
+    srcs = [
+        "SNTNetworkFlowMessageWindowView.swift",
+    ],
+    generates_header = 1,
+    deps = [
+        ":SNTMessageView",
+        "//Source/common:SNTBlockMessage_SantaGUI",
+        "//Source/common:SNTConfigBundle",
+        "//Source/common:SNTStoredNetworkFlowEvent",
+    ],
+)
+
+swift_library(
     name = "SNTNetworkMountMessageWindowView",
     srcs = [
         "SNTNetworkMountMessageWindowView.swift",
@@ -163,6 +177,8 @@ objc_library(
         "SNTFileAccessMessageWindowController.mm",
         "SNTMessageWindowController.h",
         "SNTMessageWindowController.mm",
+        "SNTNetworkFlowMessageWindowController.h",
+        "SNTNetworkFlowMessageWindowController.mm",
         "SNTNetworkMountMessageWindowController.h",
         "SNTNetworkMountMessageWindowController.mm",
         "SNTNotificationManager.h",
@@ -185,6 +201,7 @@ objc_library(
         ":SNTDeviceMessageWindowView",
         ":SNTFileAccessMessageWindowView",
         ":SNTFileInfoView",
+        ":SNTNetworkFlowMessageWindowView",
         ":SNTNetworkMountMessageWindowView",
         ":SNTSystemExtensionDelegate",
         "//Source/common:CertificateHelpers",
@@ -202,12 +219,14 @@ objc_library(
         "//Source/common:SNTLogging",
         "//Source/common:SNTStoredExecutionEvent",
         "//Source/common:SNTStoredFileAccessEvent",
+        "//Source/common:SNTStoredNetworkFlowEvent",
         "//Source/common:SNTStoredNetworkMountEvent",
         "//Source/common:SNTStrengthify",
         "//Source/common:SNTSyncConstants",
         "//Source/common:SNTXPCControlInterface",
         "//Source/common:SNTXPCNotifierInterface",
         "//Source/common:SNTXPCSyncServiceInterface",
+        "//Source/common:SigningIDHelpers",
     ],
 )
 
@@ -264,6 +283,7 @@ swift_library(
         ":SNTDeviceMessageWindowView",
         ":SNTFileAccessMessageWindowView",
         ":SNTMessageView",
+        ":SNTNetworkFlowMessageWindowView",
         "//Source/common:SNTConfigBundle",
         "//Source/common:SNTDeviceEvent",
     ],
@@ -294,7 +314,9 @@ santa_unit_test(
     ],
     deps = [
         ":SantaGUI_lib",
+        "//Source/common:SNTConfigBundle",
         "//Source/common:SNTStoredExecutionEvent",
+        "//Source/common:SNTStoredNetworkFlowEvent",
         "@OCMock",
     ],
 )

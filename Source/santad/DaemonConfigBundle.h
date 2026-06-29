@@ -20,6 +20,9 @@
 
 namespace santa {
 
+// Create a config bundle for use by the blocked network flow UI
+SNTConfigBundle* NetworkFlowConfigBundle(SNTConfigurator* configurator);
+
 // Create a config bundle for use by the blocked network share UI
 SNTConfigBundle* NetworkMountConfigBundle(SNTConfigurator* configurator);
 

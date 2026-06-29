@@ -23,6 +23,7 @@
 @class SNTDeviceEvent;
 @class SNTStoredExecutionEvent;
 @class SNTStoredFileAccessEvent;
+@class SNTStoredNetworkFlowEvent;
 @class SNTStoredNetworkMountEvent;
 
 /// Protocol implemented by SantaGUI and utilized by santad
@@ -40,6 +41,8 @@
                               customURL:(NSString*)url
                              customText:(NSString*)text
                             configState:(SNTConfigState*)configState;
+- (void)postNetworkFlowBlockNotification:(SNTStoredNetworkFlowEvent*)event
+                            configBundle:(SNTConfigBundle*)configBundle;
 - (void)postClientModeNotification:(SNTClientMode)clientmode;
 - (void)postRuleSyncNotificationForApplication:(NSString*)app;
 - (void)authorizeTemporaryMonitorMode:(void (^)(BOOL authenticated))reply;

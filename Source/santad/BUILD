@@ -210,6 +210,7 @@ objc_library(
     srcs = ["SNTNetworkExtensionQueue.mm"],
     hdrs = ["SNTNetworkExtensionQueue.h"],
     deps = [
+        ":DaemonConfigBundle",
         ":EndpointSecurityLogger",
         ":SNTDecisionCache",
         ":SNTNotificationQueue",
@@ -243,6 +244,7 @@ santa_unit_test(
     deps = [
         ":SNTDecisionCache",
         ":SNTNetworkExtensionQueue",
+        ":SNTNotificationQueue",
         ":SNTRuleTable",
         ":SNTSyncdQueue",
         "//Source/common:MOLXPCConnection",
@@ -251,6 +253,7 @@ santa_unit_test(
         "//Source/common:SNTNetworkFlowRule",
         "//Source/common:SNTStoredNetworkFlowEvent",
         "//Source/common:SNTStoredProcess",
+        "//Source/common:SNTXPCNotifierInterface",
         "//Source/common:SantaVnode",
         "//Source/common/ne:SNDXPCNetworkExtensionInterface",
         "//Source/common/ne:SNTNetworkExtensionSettings",
