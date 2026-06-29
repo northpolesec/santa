@@ -69,8 +69,13 @@ class SleighLauncher {
   // matched. An empty/unparseable stdout, or a non-zero exit, is returned as an
   // error. The caller passes signals in (from the synced signal_rules config);
   // this method does not read configuration.
+  //
+  // input_fd must be a readable fd positioned at offset 0. The caller retains
+  // ownership of input_fd (this method scans a dup of it); holding that fd open
+  // keeps the spool file's data readable even after the telemetry exporter
+  // unlinks the path, so the scan and export need no coordination.
   virtual absl::StatusOr<::santa::telemetry::v1::SleighSignalScanResponse>
-  LaunchSignalScan(const std::string& input_file,
+  LaunchSignalScan(int input_fd,
                    const std::vector<std::string>& serialized_signals,
                    uint32_t timeout_seconds);
 

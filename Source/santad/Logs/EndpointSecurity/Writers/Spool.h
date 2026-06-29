@@ -18,6 +18,7 @@
 
 #import <Foundation/Foundation.h>
 #include <dispatch/dispatch.h>
+#include <fcntl.h>
 
 #include <functional>
 #include <memory>
@@ -28,6 +29,7 @@
 
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTMetricSet.h"
+#include "Source/common/ScopedFile.h"
 #include "Source/common/santa.pb.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/fsspool.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/Writer.h"
@@ -48,10 +50,10 @@ template <::fsspool::BatcherInterface T>
 class Spool : public Writer, public std::enable_shared_from_this<Spool<T>> {
  public:
   // Factory
-  static std::shared_ptr<Spool<T>> Create(T batcher, std::string_view base_dir,
-                                          size_t max_spool_disk_size, size_t max_spool_batch_size,
-                                          uint64_t flush_timeout_ms,
-                                          void (^file_closed_f)(std::string) = nullptr) {
+  static std::shared_ptr<Spool<T>> Create(
+      T batcher, std::string_view base_dir, size_t max_spool_disk_size, size_t max_spool_batch_size,
+      uint64_t flush_timeout_ms,
+      void (^file_closed_f)(std::string, std::shared_ptr<santa::ScopedFile>) = nullptr) {
     dispatch_queue_t q = dispatch_queue_create("com.northpolesec.santa.daemon.file_base_q",
                                                DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL);
     dispatch_source_t timer_source = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, q);
@@ -91,7 +93,7 @@ class Spool : public Writer, public std::enable_shared_from_this<Spool<T>> {
   Spool(dispatch_queue_t q, dispatch_source_t timer_source, T batcher, std::string_view base_dir,
         size_t max_spool_disk_size, size_t max_spool_file_size,
         void (^write_complete_f)(void) = nullptr, void (^flush_task_complete_f)(void) = nullptr,
-        void (^file_closed_f)(std::string) = nullptr,
+        void (^file_closed_f)(std::string, std::shared_ptr<santa::ScopedFile>) = nullptr,
         std::function<void(size_t)> eviction_callback = nullptr)
       : q_(q),
         timer_source_(timer_source),
@@ -223,11 +225,25 @@ class Spool : public Writer, public std::enable_shared_from_this<Spool<T>> {
       return false;
     }
     accumulated_bytes_ = 0;
-    // A spool file was just closed (renamed into the spool dir). Hand its path
-    // off to the file-closed callback. The callback MUST be cheap (it runs on
-    // this serial queue `q_`) — it should dispatch any real work elsewhere.
+    // A spool file was just closed (renamed into the spool dir). Hand its path and a read-only fd
+    // off to the file-closed callback. The callback MUST be cheap (it runs on this serial queue
+    // `q_`) — it should dispatch any real work elsewhere.
+    //
+    // Acquiring the fd here on `q_` is ordered before any export selection or deletion of this
+    // file (BatchMessagePaths and the AckMessage/remove both run on `q_`), so the open always
+    // succeeds. The open fd then keeps the inode's data alive for the asynchronous signal scan
+    // even after the telemetry exporter unlinks the path — so scan and export need no coordination.
     if (file_closed_f_ && result->has_value()) {
-      file_closed_f_(result->value());
+      const std::string& closed_path = result->value();
+      std::shared_ptr<santa::ScopedFile> scoped_file;
+      int fd = open(closed_path.c_str(), O_RDONLY);
+      if (fd >= 0) {
+        scoped_file = std::make_shared<santa::ScopedFile>(fd);
+      } else {
+        LOGW(@"Spool: failed to open closed file for signal scan: %s (errno %d)",
+             closed_path.c_str(), errno);
+      }
+      file_closed_f_(closed_path, std::move(scoped_file));
     }
     return true;
   }
@@ -244,7 +260,7 @@ class Spool : public Writer, public std::enable_shared_from_this<Spool<T>> {
   bool flush_task_started_ = false;
   void (^write_complete_f_)(void);
   void (^flush_task_complete_f_)(void);
-  void (^file_closed_f_)(std::string);
+  void (^file_closed_f_)(std::string, std::shared_ptr<santa::ScopedFile>);
 
   size_t accumulated_bytes_ = 0;
 };

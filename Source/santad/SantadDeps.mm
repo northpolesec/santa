@@ -25,7 +25,6 @@
 #import "Source/common/SNTStoredSignalReport.h"
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTXPCControlInterface.h"
-#import "Source/common/SNTXPCSyncServiceInterface.h"
 #include "Source/common/TelemetryEventMap.h"
 #include "Source/common/es/EndpointSecurityAPI.h"
 #include "Source/common/es/EnrichedTypes.h"
@@ -169,18 +168,9 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator* configurator,
         // uploaded so a misconfigured signal can't flood the server with identical reports.
         reports = [[SNTDatabaseController eventTable] addStoredSignalReports:reports];
         if (reports.count == 0) return;
-        // Attempt an immediate out-of-band upload. The sync service deletes the reports on
-        // success and otherwise leaves them for the next sync.
-        MOLXPCConnection* conn = [SNTXPCSyncServiceInterface configuredConnection];
-        [conn resume];
-        [conn.remoteObjectProxy uploadSignalReportsToSyncServer:reports
-                                                          reply:^(BOOL success) {
-                                                            if (!success) {
-                                                              LOGD(@"Immediate signal report "
-                                                                   @"upload failed; will retry on "
-                                                                   @"next sync");
-                                                            }
-                                                          }];
+        // Attempt an immediate out-of-band upload over the persistent sync service connection. The
+        // sync service deletes the reports on success and otherwise leaves them for the next sync.
+        [syncd_queue uploadSignalReports:reports];
       });
   // Set initial signal set, to be updated on each sync (see signalRulesChangedCallback below).
   signal_scanner->SetSignals([rule_table retrieveAllSignals]);
@@ -190,8 +180,8 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator* configurator,
       ^SNTExportConfiguration*() {
         return [configurator exportConfig];
       },
-      ^(std::string path) {
-        signal_scanner->ScanFile(std::move(path));
+      ^(std::string path, std::shared_ptr<santa::ScopedFile> file) {
+        signal_scanner->ScanFile(std::move(path), std::move(file));
       },
       TelemetryConfigToBitmask([configurator telemetry]), [configurator eventLogType],
       [SNTDecisionCache sharedCache], [configurator eventLogPath], [configurator spoolDirectory],

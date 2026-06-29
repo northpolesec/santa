@@ -24,6 +24,7 @@
 
 #import "Source/common/SNTSignal.h"
 #import "Source/common/SNTStoredSignalReport.h"
+#include "Source/common/ScopedFile.h"
 #include "Source/santad/SleighLauncher.h"
 #include "absl/base/thread_annotations.h"
 #include "absl/synchronization/mutex.h"
@@ -53,10 +54,12 @@ class SignalScanner : public std::enable_shared_from_this<SignalScanner> {
   // Replace the in-memory signal set. Thread-safe.
   void SetSignals(NSArray<SNTSignal*>* signals);
 
-  // Asynchronously scan a just-closed spool file at `path`. Returns immediately;
-  // the scan runs on the private serial queue. A no-op when no signals are
-  // configured.
-  void ScanFile(std::string path);
+  // Asynchronously scan a just-closed spool file at `path`, read via `file` (a read-only fd open
+  // on it). Returns immediately; the scan runs on the private serial queue. A no-op when no
+  // signals are configured or `file` is null. Holding `file` open lets the scan read the data
+  // even if the telemetry exporter unlinks the path before the scan runs; the fd is closed when
+  // the scan completes.
+  void ScanFile(std::string path, std::shared_ptr<ScopedFile> file);
 
  private:
   // Private: SignalScanner relies on shared_from_this(), so it must only ever be owned by a

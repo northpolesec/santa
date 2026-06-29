@@ -201,6 +201,20 @@
   }];
 }
 
+- (void)uploadSignalReports:(NSArray<SNTStoredSignalReport*>*)reports {
+  if (!reports.count) return;
+  [self dispatchBlockOnSyncdQueue:^{
+    [self.syncConnection.remoteObjectProxy
+        uploadSignalReportsToSyncServer:reports
+                                  reply:^(BOOL success) {
+                                    if (!success) {
+                                      LOGD(@"Immediate signal report upload failed; will retry on "
+                                           @"next sync");
+                                    }
+                                  }];
+  }];
+}
+
 - (void)dispatchBlockOnSyncdQueue:(void (^)(void))block {
   if (!block) return;
   dispatch_async(self.syncdQueue, ^{

@@ -54,26 +54,32 @@ void SignalScanner::SetSignals(NSArray<SNTSignal*>* signals) {
     v.emplace_back(static_cast<const char*>(data.bytes), data.length);
   }
 
-  absl::MutexLock lock(&lock_);
+  absl::MutexLock lock(lock_);
   signals_ = std::move(v);
 }
 
-void SignalScanner::ScanFile(std::string path) {
+void SignalScanner::ScanFile(std::string path, std::shared_ptr<ScopedFile> file) {
   auto shared_this = shared_from_this();
   dispatch_async(scan_q_, ^{
+    // No readable fd for the closed file (the spool layer's open failed): nothing to scan.
+    if (!file) {
+      return;
+    }
+
     std::vector<std::string> signals;
     {
-      absl::MutexLock lock(&shared_this->lock_);
+      absl::MutexLock lock(shared_this->lock_);
       signals = shared_this->signals_;
     }
 
-    // Nothing configured: don't even launch Sleigh.
+    // Nothing configured: don't even launch Sleigh. (The captured `file` closes on return.)
     if (signals.empty()) {
       return;
     }
 
     absl::StatusOr<::santa::telemetry::v1::SleighSignalScanResponse> response =
-        shared_this->sleigh_launcher_->LaunchSignalScan(path, signals, shared_this->timeout_secs_);
+        shared_this->sleigh_launcher_->LaunchSignalScan(file->UnsafeFD(), signals,
+                                                        shared_this->timeout_secs_);
     if (!response.ok()) {
       LOGD(@"Signal scan failed for %s: %s", path.c_str(),
            std::string(response.status().message()).c_str());

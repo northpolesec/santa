@@ -120,12 +120,14 @@ absl::StatusOr<::santa::commands::v1::BinaryUploadResponse> SleighLauncher::Laun
 }
 
 absl::StatusOr<::santa::telemetry::v1::SleighSignalScanResponse> SleighLauncher::LaunchSignalScan(
-    const std::string& input_file, const std::vector<std::string>& serialized_signals,
-    uint32_t timeout_secs) {
-  int fd = open(input_file.c_str(), O_RDONLY);
+    int input_fd, const std::vector<std::string>& serialized_signals, uint32_t timeout_secs) {
+  // Scan a dup: RunSleigh closes the fds it is handed, but the caller owns input_fd (it keeps the
+  // spool file's inode alive for the duration of the scan). The dup shares input_fd's offset,
+  // which the caller guarantees is at 0.
+  int fd = dup(input_fd);
   if (fd < 0) {
-    LOGD(@"SleighLauncher::LaunchSignalScan(): Failed to open input file: %s", input_file.c_str());
-    return absl::InternalError("Failed to open input file: " + input_file);
+    LOGD(@"SleighLauncher::LaunchSignalScan(): Failed to dup input fd: %d", errno);
+    return absl::InternalError("Failed to dup signal scan input fd");
   }
 
   absl::StatusOr<std::string> serialized = SerializeSignalScanConfig(fd, serialized_signals);
