@@ -232,6 +232,9 @@
 /* Block reason for Team ID rule match */
 "Team ID rule" = "チームIDルール";
 
+/* The default message to show the user when a network flow is blocked */
+"The following application has been blocked<br />from reaching a network destination" = "次のアプリケーションによる<br />ネットワーク宛先への接続がブロックされました";
+
 /* The default message to show the user when an unknown application is blocked */
 "The following application has been blocked from executing<br />because its trustworthiness cannot be determined" = "次のアプリケーションは信頼性を判断できないため、<br />実行がブロックされました";
 

@@ -217,6 +217,9 @@
 /* No comment provided by engineer. */
 "The event upload failed. Please check your network connection and try again." = "The event upload failed. Please check your network connection and try again.";
 
+/* The default message to show the user when a network flow is blocked */
+"The following application has been blocked<br />from reaching a network destination" = "The following application has been blocked<br />from reaching a network destination";
+
 /* The default message to show the user when an unknown application is blocked */
 "The following application has been blocked from executing<br />because its trustworthiness cannot be determined" = "The following application has been blocked from executing<br />because its trustworthiness cannot be determined";
 
