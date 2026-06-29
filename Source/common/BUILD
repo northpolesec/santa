@@ -803,6 +803,16 @@ objc_library(
 )
 
 objc_library(
+    name = "SNTStoredSignalReport",
+    srcs = ["SNTStoredSignalReport.mm"],
+    hdrs = ["SNTStoredSignalReport.h"],
+    module_name = "santa_common_SNTStoredSignalReport",
+    deps = [
+        ":CoderMacros",
+    ],
+)
+
+objc_library(
     name = "SNTStoredExecutionEvent",
     srcs = ["SNTStoredExecutionEvent.mm"],
     hdrs = ["SNTStoredExecutionEvent.h"],
@@ -1071,6 +1081,7 @@ objc_library(
         ":SNTSignal",
         ":SNTStoredEvent",
         ":SNTStoredExecutionEvent",
+        ":SNTStoredSignalReport",
         ":SNTXPCUnprivilegedControlInterface",
         "//Source/common/ne:SNTNetworkExtensionSettings",
         "@santanetd//src/santanetd:SNDFlowInfo",
@@ -1112,6 +1123,7 @@ objc_library(
         ":SNTStoredEvent",
         ":SNTStoredExecutionEvent",
         ":SNTStoredFileAccessEvent",
+        ":SNTStoredSignalReport",
     ],
 )
 

@@ -18,6 +18,7 @@
 
 @class SNTNotificationMessage;
 @class SNTStoredEvent;
+@class SNTStoredSignalReport;
 
 ///
 /// Responsible for managing the event table.
@@ -67,5 +68,28 @@
 ///  @param indexes an array of event IDs.
 ///
 - (void)deleteEventsWithIds:(NSArray*)indexes;
+
+#pragma mark Signal reports
+
+///
+///  Add signal reports (produced by a Sleigh signal scan) to the database, pending upload.
+///  Repeated firings of the same signal are deduplicated to at most one per signal name per
+///  dedup window, so a misconfigured signal cannot flood the server with identical reports.
+///
+///  @return the subset of `reports` that were actually stored (i.e. not deduplicated), so the
+///  caller can upload exactly what was persisted.
+///
+- (NSArray<SNTStoredSignalReport*>*)addStoredSignalReports:
+    (NSArray<SNTStoredSignalReport*>*)reports;
+
+///
+///  Retrieves all pending signal reports in the database.
+///
+- (NSArray<SNTStoredSignalReport*>*)pendingSignalReports;
+
+///
+///  Delete multiple signal reports from the database with an array of IDs.
+///
+- (void)deleteSignalReportsWithIds:(NSArray*)indexes;
 
 @end

@@ -23,6 +23,7 @@
 #import "Source/common/SNTSignal.h"
 #import "Source/common/SNTStoredEvent.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
+#import "Source/common/SNTStoredSignalReport.h"
 #import "Source/common/ne/SNTNetworkExtensionSettings.h"
 #import "src/santanetd/SNDFlowInfo.h"
 #import "src/santanetd/SNDNetworkFlowDecision.h"
@@ -57,6 +58,11 @@ static NSString* const kSantanetdExtensionBundleID = @"com.northpolesec.santa.ne
 + (void)initializeControlInterface:(NSXPCInterface*)r {
   [r setClasses:[NSSet setWithObjects:[NSArray class], [SNTStoredEvent class], nil]
         forSelector:@selector(databaseEventsPending:)
+      argumentIndex:0
+            ofReply:YES];
+
+  [r setClasses:[NSSet setWithObjects:[NSArray class], [SNTStoredSignalReport class], nil]
+        forSelector:@selector(databaseSignalReportsPending:)
       argumentIndex:0
             ofReply:YES];
 

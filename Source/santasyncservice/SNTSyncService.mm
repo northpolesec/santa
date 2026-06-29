@@ -80,6 +80,11 @@
   [self.syncManager postEventsToSyncServer:events reply:reply];
 }
 
+- (void)uploadSignalReportsToSyncServer:(NSArray<SNTStoredSignalReport*>*)reports
+                                  reply:(void (^)(BOOL))reply {
+  [self.syncManager uploadSignalReportsToSyncServer:reports reply:reply];
+}
+
 - (void)postBundleEventToSyncServer:(SNTStoredExecutionEvent*)event
                               reply:(void (^)(SNTBundleEventAction))reply {
   [self.syncManager postBundleEventToSyncServer:event reply:reply];

@@ -27,6 +27,7 @@
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTStoredEvent.h"
+#import "Source/common/SNTStoredSignalReport.h"
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTXPCBundleServiceInterface.h"
@@ -41,6 +42,7 @@
 #import "Source/santasyncservice/SNTSyncPreflight.h"
 #import "Source/santasyncservice/SNTSyncPublishMetrics.h"
 #import "Source/santasyncservice/SNTSyncRuleDownload.h"
+#import "Source/santasyncservice/SNTSyncSignalUpload.h"
 #import "Source/santasyncservice/SNTSyncState.h"
 #include "absl/cleanup/cleanup.h"
 
@@ -162,6 +164,50 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   self.xsrfToken = syncState.xsrfToken;
   self.xsrfTokenHeader = syncState.xsrfTokenHeader;
   if (reply) reply(success);
+}
+
+- (void)uploadSignalReportsToSyncServer:(NSArray<SNTStoredSignalReport*>*)reports
+                                  reply:(void (^)(BOOL))reply {
+  if (!reports.count) {
+    if (reply) reply(YES);
+    return;
+  }
+
+  // Run on syncQueue so this out-of-band upload can't overlap a scheduled
+  // sync's signalupload stage. Both paths read the pending set from the DB at
+  // upload time via [p sync], so whichever runs first uploads and deletes the
+  // rows and the other finds nothing pending — the server never receives
+  // duplicates. The passed-in reports just signal that there is work to do;
+  // they are already persisted in the DB.
+  dispatch_async(self.syncQueue, ^() {
+    SNTSyncStatusType status = SNTSyncStatusTypeUnknown;
+    SNTSyncState* syncState = [self createSyncStateWithStatus:&status];
+    if (!syncState) {
+      LOGE(@"Signal report upload failed to create sync state: %ld", status);
+      if (reply) reply(NO);
+      return;
+    }
+
+    // Signal report upload is only supported in sync v2. Leave the reports pending for the next
+    // (v2) sync if v2 is not enabled.
+    if (!syncState.isSyncV2) {
+      LOGD(@"Signal report upload skipped: sync v2 not enabled. Reports remain pending.");
+      if (reply) reply(NO);
+      return;
+    }
+
+    SNTSyncSignalUpload* p = [[SNTSyncSignalUpload alloc] initWithState:syncState];
+    BOOL success = [p sync];
+    if (success) {
+      LOGD(@"Signal report upload complete");
+    } else {
+      LOGE(@"Signal report upload failed. Reports remain pending for the next sync.");
+      [self startReachability];
+    }
+    self.xsrfToken = syncState.xsrfToken;
+    self.xsrfTokenHeader = syncState.xsrfTokenHeader;
+    if (reply) reply(success);
+  });
 }
 
 - (void)postBundleEventToSyncServer:(SNTStoredExecutionEvent*)event
@@ -651,11 +697,30 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   SNTSyncEventUpload* p = [[SNTSyncEventUpload alloc] initWithState:syncState];
   if ([p sync]) {
     SLOGD(@"Event upload complete");
-    return [self ruleDownloadWithSyncState:syncState];
+    return [self signalUploadWithSyncState:syncState];
   }
 
   SLOGE(@"Event upload failed, aborting run");
   return SNTSyncStatusTypeEventUploadFailed;
+}
+
+- (SNTSyncStatusType)signalUploadWithSyncState:(SNTSyncState*)syncState {
+  // Signal report upload is only supported in sync v2. Skip on v1.
+  if (!syncState.isSyncV2) {
+    return [self ruleDownloadWithSyncState:syncState];
+  }
+
+  SLOGD(@"Signal upload starting");
+  SNTSyncSignalUpload* p = [[SNTSyncSignalUpload alloc] initWithState:syncState];
+  if ([p sync]) {
+    SLOGD(@"Signal upload complete");
+  } else {
+    // Best-effort: pending reports remain in the DB and are retried on the next sync.
+    SLOGE(@"Signal upload failed, will retry on next sync");
+  }
+
+  // A signal upload failure must not abort the sync.
+  return [self ruleDownloadWithSyncState:syncState];
 }
 
 - (SNTSyncStatusType)ruleDownloadWithSyncState:(SNTSyncState*)syncState {
