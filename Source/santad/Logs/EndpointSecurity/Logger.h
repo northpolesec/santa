@@ -40,6 +40,7 @@
 
 namespace santa {
 class LoggerPeer;
+class ScopedFile;
 }  // namespace santa
 
 namespace santa {
@@ -47,9 +48,12 @@ namespace santa {
 using GetExportConfigBlock = SNTExportConfiguration* (^)(void);
 
 // Invoked with the path of a spool file each time one is closed (finalized into
-// the spool dir). Used to drive per-file signal scans. Runs on the spool's
-// serial queue, so the block must be cheap and dispatch any real work elsewhere.
-using SpoolFileClosedBlock = void (^)(std::string);
+// the spool dir), along with a read-only fd open on that file (nullptr if the
+// open failed). Used to drive per-file signal scans. Runs on the spool's serial
+// queue, so the block must be cheap and dispatch any real work elsewhere. The
+// fd lets the scan read the file even after the telemetry exporter unlinks the
+// path; the consumer owns the ScopedFile and closes it when the scan is done.
+using SpoolFileClosedBlock = void (^)(std::string, std::shared_ptr<santa::ScopedFile>);
 
 class Logger : public Timer<Logger> {
  public:

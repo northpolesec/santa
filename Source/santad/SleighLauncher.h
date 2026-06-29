@@ -62,15 +62,20 @@ class SleighLauncher {
                      const std::vector<std::string>& filter_expressions,
                      uint32_t timeout_seconds);
 
-  // Signal scan: open input_file (as root), hand the FD to a Sleigh child along
-  // with the detection signals to evaluate (each a serialized
-  // santa.common.v1.Signal), capture Sleigh's stdout, and parse it as a
-  // SleighResponse. Sleigh uploads nothing; it only reports which signals
-  // matched. An empty/unparseable stdout, or a non-zero exit, is returned as an
-  // error. The caller passes signals in (from the synced signal_rules config);
-  // this method does not read configuration.
+  // Signal scan: hand input_fd to a Sleigh child along with the detection
+  // signals to evaluate (each a serialized santa.common.v1.Signal), capture
+  // Sleigh's stdout, and parse it as a SleighResponse. Sleigh uploads nothing;
+  // it only reports which signals matched. An empty/unparseable stdout, or a
+  // non-zero exit, is returned as an error. The caller passes signals in (from
+  // the synced signal_rules config); this method does not read configuration.
+  //
+  // input_fd must be an already-open, readable fd positioned at offset 0. The
+  // caller retains ownership of input_fd (this method scans a dup of it);
+  // holding that fd open keeps the spool file's data readable even after the
+  // telemetry exporter unlinks the path, so the scan and export need no
+  // coordination.
   virtual absl::StatusOr<::santa::telemetry::v1::SleighSignalScanResponse>
-  LaunchSignalScan(const std::string& input_file,
+  LaunchSignalScan(int input_fd,
                    const std::vector<std::string>& serialized_signals,
                    uint32_t timeout_seconds);
 

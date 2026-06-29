@@ -23,6 +23,7 @@
 #import "Source/common/SNTStoredEvent.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
 #import "Source/common/SNTStoredFileAccessEvent.h"
+#import "Source/common/SNTStoredSignalReport.h"
 
 ///
 ///  Protocol implemented by syncservice and utilized by daemon and ctl for communication with a
@@ -30,6 +31,11 @@
 ///
 @protocol SNTSyncServiceXPC
 - (void)postEventsToSyncServer:(NSArray<SNTStoredEvent*>*)events reply:(void (^)(BOOL))reply;
+
+// Upload signal reports out of band. Only supported in sync v2; if v2 is not enabled the reply
+// is NO and the reports are left pending in the database for the next sync.
+- (void)uploadSignalReportsToSyncServer:(NSArray<SNTStoredSignalReport*>*)reports
+                                  reply:(void (^)(BOOL))reply;
 - (void)postBundleEventToSyncServer:(SNTStoredExecutionEvent*)event
                               reply:(void (^)(SNTBundleEventAction))reply;
 - (void)pushNotificationStatus:(void (^)(SNTPushNotificationStatus))reply;

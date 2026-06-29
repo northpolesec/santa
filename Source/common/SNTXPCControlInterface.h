@@ -26,6 +26,7 @@
 @class SNDNetworkFlowDecision;
 @class SNDProcessFlows;
 @class SNTStoredEvent;
+@class SNTStoredSignalReport;
 
 ///
 ///  Protocol implemented by santad and utilized by santactl (privileged operations)
@@ -53,6 +54,8 @@ typedef NS_ENUM(NSInteger, SNTRuleAddSource) {
                                 reply:(void (^)(BOOL, NSArray<NSError*>* error))reply;
 - (void)databaseEventsPending:(void (^)(NSArray<SNTStoredEvent*>* events))reply;
 - (void)databaseRemoveEventsWithIDs:(NSArray*)ids;
+- (void)databaseSignalReportsPending:(void (^)(NSArray<SNTStoredSignalReport*>* reports))reply;
+- (void)databaseRemoveSignalReportsWithIDs:(NSArray*)ids;
 - (void)retrieveAllExecutionRules:(void (^)(NSArray<SNTRule*>* rules, NSError* error))reply;
 - (void)retrieveAllFileAccessRules:
     (void (^)(NSDictionary<NSString*, NSDictionary*>* fileAccessRules, NSError* error))reply;

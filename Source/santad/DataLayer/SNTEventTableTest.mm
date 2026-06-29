@@ -24,6 +24,7 @@
 #import "Source/common/SNTFileInfo.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
 #import "Source/common/SNTStoredFileAccessEvent.h"
+#import "Source/common/SNTStoredSignalReport.h"
 #import "Source/common/SNTStoredTemporaryMonitorModeAuditEvent.h"
 #include "Source/common/TestUtils.h"
 
@@ -391,6 +392,77 @@ NSString* GenerateRandomHexStringWithSHA256Length() {
   NSString* path = [[NSBundle bundleForClass:[self class]] pathForResource:file ofType:nil];
   XCTAssertNotNil(path, @"failed to load testdata: %@", file);
   return [NSData dataWithContentsOfFile:path];
+}
+
+- (SNTStoredSignalReport*)createTestSignalReport {
+  uint8_t bytes[8];
+  arc4random_buf(bytes, sizeof(bytes));
+  return [[SNTStoredSignalReport alloc] initWithReportData:[NSData dataWithBytes:bytes
+                                                                          length:sizeof(bytes)]];
+}
+
+- (SNTStoredSignalReport*)createTestSignalReportNamed:(NSString*)name {
+  SNTStoredSignalReport* report = [self createTestSignalReport];
+  report.name = name;
+  return report;
+}
+
+- (void)testAddAndRetrieveSignalReports {
+  XCTAssertEqual([self.sut pendingSignalReports].count, 0);
+
+  SNTStoredSignalReport* r1 = [self createTestSignalReport];
+  SNTStoredSignalReport* r2 = [self createTestSignalReport];
+  NSArray<SNTStoredSignalReport*>* reports = @[ r1, r2 ];
+  XCTAssertEqual([self.sut addStoredSignalReports:reports].count, 2);
+
+  NSArray<SNTStoredSignalReport*>* pending = [self.sut pendingSignalReports];
+  XCTAssertEqual(pending.count, 2);
+
+  // Round-trip: the stored bytes survive intact.
+  NSMutableSet<NSData*>* gotData = [NSMutableSet set];
+  for (SNTStoredSignalReport* r in pending) {
+    [gotData addObject:r.reportData];
+  }
+  XCTAssertTrue([gotData containsObject:r1.reportData]);
+  XCTAssertTrue([gotData containsObject:r2.reportData]);
+}
+
+- (void)testDeleteSignalReportsWithIds {
+  SNTStoredSignalReport* r1 = [self createTestSignalReport];
+  SNTStoredSignalReport* r2 = [self createTestSignalReport];
+  NSArray<SNTStoredSignalReport*>* reports = @[ r1, r2 ];
+  XCTAssertEqual([self.sut addStoredSignalReports:reports].count, 2);
+  XCTAssertEqual([self.sut pendingSignalReports].count, 2);
+
+  [self.sut deleteSignalReportsWithIds:@[ r1.idx ]];
+  NSArray<SNTStoredSignalReport*>* pending = [self.sut pendingSignalReports];
+  XCTAssertEqual(pending.count, 1);
+  XCTAssertEqualObjects(pending.firstObject.reportData, r2.reportData);
+
+  [self.sut deleteSignalReportsWithIds:@[ r2.idx ]];
+  XCTAssertEqual([self.sut pendingSignalReports].count, 0);
+}
+
+- (void)testSignalReportDedupByName {
+  // Two reports for the same signal in one batch: only the first is stored.
+  SNTStoredSignalReport* a1 = [self createTestSignalReportNamed:@"SIG-1"];
+  SNTStoredSignalReport* a2 = [self createTestSignalReportNamed:@"SIG-1"];
+  NSArray<SNTStoredSignalReport*>* dupBatch = @[ a1, a2 ];
+  NSArray<SNTStoredSignalReport*>* stored = [self.sut addStoredSignalReports:dupBatch];
+  XCTAssertEqual(stored.count, 1);
+  XCTAssertEqualObjects(stored.firstObject.reportData, a1.reportData);
+  XCTAssertEqual([self.sut pendingSignalReports].count, 1);
+
+  // A different signal name is stored.
+  XCTAssertEqual(
+      [self.sut addStoredSignalReports:@[ [self createTestSignalReportNamed:@"SIG-2"] ]].count, 1);
+  XCTAssertEqual([self.sut pendingSignalReports].count, 2);
+
+  // The same signal again within the window is dropped, independent of the DB row's lifetime
+  // (the dedup window outlives the row, so deleting/uploading the first does not reset it).
+  [self.sut deleteSignalReportsWithIds:@[ a1.idx ]];
+  XCTAssertEqual(
+      [self.sut addStoredSignalReports:@[ [self createTestSignalReportNamed:@"SIG-1"] ]].count, 0);
 }
 
 - (void)testEventFromResultSet {

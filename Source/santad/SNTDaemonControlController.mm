@@ -301,6 +301,14 @@ double watchdogRAMPeak = 0;
   [[SNTDatabaseController eventTable] deleteEventsWithIds:ids];
 }
 
+- (void)databaseSignalReportsPending:(void (^)(NSArray<SNTStoredSignalReport*>*))reply {
+  reply([[SNTDatabaseController eventTable] pendingSignalReports]);
+}
+
+- (void)databaseRemoveSignalReportsWithIDs:(NSArray*)ids {
+  [[SNTDatabaseController eventTable] deleteSignalReportsWithIds:ids];
+}
+
 - (void)databaseRuleForIdentifiers:(SNTRuleIdentifiers*)identifiers
                              reply:(void (^)(SNTRule*))reply {
   reply([[SNTDatabaseController ruleTable] executionRuleForIdentifiers:[identifiers toStruct]]);

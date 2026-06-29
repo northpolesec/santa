@@ -20,6 +20,7 @@
 #import "Source/common/SNTStoredExecutionEvent.h"
 
 @class MOLXPCConnection;
+@class SNTStoredSignalReport;
 
 @interface SNTSyncdQueue : NSObject
 
@@ -33,6 +34,11 @@
 - (void)addBundleEvents:(NSArray<SNTStoredExecutionEvent*>*)events
          withBundleHash:(NSString*)bundleHash;
 - (void)addBundleEvent:(SNTStoredExecutionEvent*)event reply:(void (^)(SNTBundleEventAction))reply;
+
+/// Attempt an immediate out-of-band upload of signal reports, reusing the persistent sync service
+/// connection. The reports must already be persisted; the sync service deletes them on success and
+/// otherwise leaves them pending for the next sync.
+- (void)uploadSignalReports:(NSArray<SNTStoredSignalReport*>*)reports;
 
 /// Force the push notification client to reconnect immediately.
 /// Use this when external conditions have changed (e.g., network interface reset by content filter)
