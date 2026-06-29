@@ -89,8 +89,15 @@ func networkFlowProtocolDescription(_ proto: Int32) -> String {
   }
 }
 
+// Render an address:port endpoint, bracketing IPv6 literals so "[addr]:port" stays unambiguous.
+func formatEndpoint(_ address: String?, _ port: UInt16?) -> String {
+  let host = (address?.isEmpty == false) ? address! : "<unknown>"
+  let isIPv6 = host.contains(":") && !(host.hasPrefix("[") && host.hasSuffix("]"))
+  return "\(isIPv6 ? "[\(host)]" : host):\(port ?? 0)"
+}
+
 func networkFlowRemote(_ e: SNTStoredNetworkFlowEvent?) -> String {
-  return "\(e?.remoteAddress ?? "<unknown>"):\(e?.remotePort ?? 0)"
+  return formatEndpoint(e?.remoteAddress, e?.remotePort)
 }
 
 // Build a plain-text dump of the event for an admin to paste alongside other telemetry.
@@ -115,7 +122,7 @@ func copyNetworkFlowDetailsToClipboard(e: SNTStoredNetworkFlowEvent?) {
   s += "\n  Remote         : \(networkFlowRemote(e))"
   if let host = e?.hostname, !host.isEmpty { s += "\n  Hostname       : \(host)" }
   if let local = e?.localAddress, !local.isEmpty {
-    s += "\n  Local          : \(local):\(e?.localPort ?? 0)"
+    s += "\n  Local          : \(formatEndpoint(local, e?.localPort))"
   }
   s += "\n  Address Family : \(networkFlowSocketFamilyDescription(e?.socketFamily ?? .unspecified))"
   if let flowTime = e?.flowTime { s += "\n  Time           : \(flowTime)" }
@@ -177,7 +184,7 @@ struct NetworkFlowMoreDetailsView: View {
         row("Remote", networkFlowRemote(e))
         if let host = e?.hostname, !host.isEmpty { row("Hostname", host) }
         if let localAddress = e?.localAddress, !localAddress.isEmpty {
-          row("Local", "\(localAddress):\(e?.localPort ?? 0)")
+          row("Local", formatEndpoint(localAddress, e?.localPort))
         }
         row("Address Family", networkFlowSocketFamilyDescription(e?.socketFamily ?? .unspecified))
         if let flowTime = e?.flowTime { row("Time", "\(flowTime)") }
@@ -217,7 +224,7 @@ struct NetworkFlowDetail: View {
   var destinationText: String {
     let host = e?.hostname ?? ""
     let dest = host.isEmpty ? (e?.remoteAddress ?? "<unknown>") : host
-    return "\(dest):\(e?.remotePort ?? 0)"
+    return formatEndpoint(dest, e?.remotePort)
   }
 
   var body: some View {

@@ -244,11 +244,14 @@ static const NSTimeInterval kNetworkFlowDialogDedupeInterval = 60;
     [self.syncdQueue addStoredEvent:event];
 
     // Loud denies (Block decision, not silent) get an informational dialog; audits and silent
-    // denies do not. The short-TTL uiDedupeKey cache suppresses repeat prompts for the same
-    // (process, rule, destination) within the window.
-    if (event.decision == SNTNetworkFlowDecisionBlock && !event.silent &&
+    // denies do not. Gate on a live GUI connection before the dedupe check: with none (e.g. at the
+    // loginwindow) the post is a no-op, and consuming the dedupe slot would suppress the first real
+    // dialog once a GUI connects within the window. The uiDedupeKey cache then collapses repeats
+    // for the same (process, rule, destination).
+    MOLXPCConnection* notifierConnection = self.notifierQueue.notifierConnection;
+    if (event.decision == SNTNetworkFlowDecisionBlock && !event.silent && notifierConnection &&
         [self shouldPostFlowDialogForKey:event.uiDedupeKey]) {
-      [[self.notifierQueue.notifierConnection remoteObjectProxy]
+      [[notifierConnection remoteObjectProxy]
           postNetworkFlowBlockNotification:event
                               configBundle:santa::NetworkFlowConfigBundle(
                                                [SNTConfigurator configurator])];

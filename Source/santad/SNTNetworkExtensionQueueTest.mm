@@ -492,6 +492,24 @@
   OCMVerifyAll(proxy);
 }
 
+- (void)testHandleNetworkFlowDecisionsNoGUIConnectionDoesNotConsumeDedupeSlot {
+  [self stubNetworkExtensionEnabled];
+
+  // No notifier connection yet (notifierQueue is nil): the post is skipped, and the dedupe slot
+  // must NOT be consumed so the dialog still shows once a GUI connects within the window.
+  SNTStoredNetworkFlowEvent* first = [self loudDenyEventWithUIKey:@"same-key"];
+  [self.sut handleNetworkFlowDecisions:@[ [self decisionForCacheMissWithEvent:first] ]];
+
+  // GUI connects; the same flow must still prompt (the earlier disconnected deny didn't burn it).
+  id proxy = [self setUpNotifierProxy];
+  SNTStoredNetworkFlowEvent* second = [self loudDenyEventWithUIKey:@"same-key"];
+  OCMExpect([proxy postNetworkFlowBlockNotification:second configBundle:[OCMArg isNotNil]]);
+
+  [self.sut handleNetworkFlowDecisions:@[ [self decisionForCacheMissWithEvent:second] ]];
+
+  OCMVerifyAll(proxy);
+}
+
 - (void)testHandleNetworkFlowDecisionsDistinctUIKeysBothPost {
   [self stubNetworkExtensionEnabled];
   id proxy = [self setUpNotifierProxy];
