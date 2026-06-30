@@ -95,7 +95,6 @@ jobs:
             bazel build \
               --verbose_failures \
               --sandbox_debug \
-              --apple_generate_dsym \
               --define=SANTA_BUILD_TYPE=adhoc \
               --remote_cache=https://storage.googleapis.com/santa-build-cache \
               --google_default_credentials \
@@ -104,7 +103,6 @@ jobs:
             bazel build \
               --verbose_failures \
               --sandbox_debug \
-              --apple_generate_dsym \
               --define=SANTA_BUILD_TYPE=adhoc \
               //Source/gui:Santa
           fi
