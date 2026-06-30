@@ -41,16 +41,6 @@
 #import "Source/santasyncservice/SNTSyncStage.h"
 #import "Source/santasyncservice/SNTSyncState.h"
 
-// Prevent Zlib compression during testing
-@implementation NSData (Zlib)
-- (NSData*)zlibCompressed {
-  return nil;
-}
-- (NSData*)gzipCompressed {
-  return nil;
-}
-@end
-
 @interface SNTSyncStage (XSSI)
 - (NSData*)stripXssi:(NSData*)data;
 @property double retryBackoffBase;

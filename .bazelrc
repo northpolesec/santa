@@ -1,6 +1,14 @@
-build --apple_generate_dsym
+# --apple_generate_dsym is intentionally NOT global: it forces -g onto every
+# compile and ~doubles build output, wasted on dev/test builds. Builds that ship
+# dSYMs pass it explicitly (Makefile release targets; santa-codesign's release.yml).
+# For local debugging use `-c dbg` (emits -g without the dSYM bundle).
+#
+# Keep apple.propagate_embedded_extra_outputs global: it is inert unless dSYMs are
+# being generated, but for release builds it is what puts the EMBEDDED binaries'
+# dSYMs (daemon, services, CLIs) into //Source/gui:Santa's default outputs for the
+# //:release genrule to collect. Without it, releases silently ship with only
+# Santa.app's dSYM -- the daemon and services lose their symbols.
 build --define=apple.propagate_embedded_extra_outputs=yes
-
 build --copt=-Werror
 build --copt=-Wall
 build --copt=-Wformat-security

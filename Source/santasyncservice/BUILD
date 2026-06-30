@@ -256,9 +256,11 @@ objc_library(
     ],
 )
 
-# Using :sync_lib breaks the Zlib category hack used in the tests to
-# disable compression, in turn failing the tests. Re-compile here to keep
-# the "override" category behavior.
+# This test drives the individual sync stages directly, so it recompiles the
+# sync sources here instead of depending on :sync_lib, which only exports
+# SNTSyncManager.h (the per-stage headers live in its srcs). De-duping these
+# compiles would mean exporting those headers from :sync_lib (or splitting the
+# stages into their own libraries) and switching the sync tests to deps.
 santa_unit_test(
     name = "SNTSyncTest",
     srcs = [
