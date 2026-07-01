@@ -14,7 +14,7 @@
 
 #import <Foundation/Foundation.h>
 
-#import "Source/common/SNTStoredEvent.h"
+#import "Source/common/SNTTimedSessionAuditEvent.h"
 
 // Reason for entering temporary Monitor Mode.
 typedef NS_ENUM(NSInteger, SNTTemporaryMonitorModeEnterReason) {
@@ -52,13 +52,7 @@ typedef NS_ENUM(NSInteger, SNTTemporaryMonitorModeLeaveReason) {
 
 // Represents a temporary Monitor Mode audit event stored in the events database.
 // This class is not meant to be directly instantiated. Use derived classes instead.
-@interface SNTStoredTemporaryMonitorModeAuditEvent : SNTStoredEvent <NSSecureCoding>
-
-@property(readonly) NSString* uuid;
-
-- (instancetype)initWithUUID:(NSString*)uuid;
-- (instancetype)init NS_UNAVAILABLE;
-
+@interface SNTStoredTemporaryMonitorModeAuditEvent : SNTTimedSessionAuditEvent <NSSecureCoding>
 @end
 
 //

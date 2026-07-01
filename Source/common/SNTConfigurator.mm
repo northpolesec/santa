@@ -31,6 +31,7 @@
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTSystemInfo.h"
+#import "Source/common/SNTTemporaryAdminPolicy.h"
 #import "Source/common/faa/WatchItems.h"
 #import "Source/common/ne/SNTSyncNetworkExtensionSettings.h"
 
@@ -112,6 +113,7 @@ NSString* const kStateFilePath = @"/var/db/santa/state.plist";
 
 /// Keys associated with the state file.
 static NSString* const kStateTempMonitorModeKey = @"TMM";
+static NSString* const kStateTempAdminModeKey = @"TempAdmin";
 static NSString* const kStateLastBootUUIDKey = @"LastBootUUID";
 
 /// User defaults key for user override of the menu item enabled setting.
@@ -266,6 +268,7 @@ static NSString* const kSyncCleanRequiredDeprecated = @"SyncCleanRequired";
 static NSString* const kSyncTypeRequired = @"SyncTypeRequired";
 static NSString* const kExportConfigurationKey = @"ExportConfiguration";
 static NSString* const kModeTransitionKey = @"ModeTransition";
+static NSString* const kTemporaryAdminPolicyKey = @"TemporaryAdminPolicy";
 static NSString* const kNetworkExtensionSettingsKey = @"NetworkExtensionSettings";
 static NSString* const kDNSUpstreamTimeoutSecondsKey = @"DNSUpstreamTimeoutSeconds";
 static NSString* const kPushTokenChainKey = @"PushTokenChain";
@@ -322,6 +325,7 @@ static NSString* const kPushTokenChainKey = @"PushTokenChain";
       kEnableBundlesKey : number,
       kExportConfigurationKey : data,
       kModeTransitionKey : data,
+      kTemporaryAdminPolicyKey : data,
       kNetworkExtensionSettingsKey : data,
       kPushTokenChainKey : array,
       kTelemetryFilterExpressionsKey : array,
@@ -931,6 +935,10 @@ static SNTConfigurator* sharedConfigurator = nil;
   return [self syncStateSet];
 }
 
++ (NSSet*)keyPathsForValuesAffectingTemporaryAdminPolicy {
+  return [self syncStateSet];
+}
+
 + (NSSet*)keyPathsForValuesAffectingSyncNetworkExtensionSettings {
   return [self syncStateSet];
 }
@@ -1046,6 +1054,19 @@ static SNTConfigurator* sharedConfigurator = nil;
     [self updateSyncStateForKey:kModeTransitionKey value:nil];
   } else {
     [self updateSyncStateForKey:kModeTransitionKey value:[modeTransition serialize]];
+  }
+}
+
+- (SNTTemporaryAdminPolicy*)temporaryAdminPolicy {
+  return [SNTTemporaryAdminPolicy deserialize:self.syncState[kTemporaryAdminPolicyKey]];
+}
+
+- (void)setSyncServerTemporaryAdminPolicy:(SNTTemporaryAdminPolicy*)temporaryAdminPolicy {
+  if (temporaryAdminPolicy.type == SNTTemporaryAdminPolicyTypeRevoke) {
+    // On revoke, set the value to nil to remove the key from the dictionary
+    [self updateSyncStateForKey:kTemporaryAdminPolicyKey value:nil];
+  } else {
+    [self updateSyncStateForKey:kTemporaryAdminPolicyKey value:[temporaryAdminPolicy serialize]];
   }
 }
 
@@ -2188,6 +2209,10 @@ static SNTConfigurator* sharedConfigurator = nil;
 
   if ([state[kStateTempMonitorModeKey] isKindOfClass:[NSDictionary class]]) {
     newState[kStateTempMonitorModeKey] = state[kStateTempMonitorModeKey];
+  }
+
+  if ([state[kStateTempAdminModeKey] isKindOfClass:[NSDictionary class]]) {
+    newState[kStateTempAdminModeKey] = state[kStateTempAdminModeKey];
   }
 
   if ([state[kStateLastBootUUIDKey] isKindOfClass:[NSString class]]) {

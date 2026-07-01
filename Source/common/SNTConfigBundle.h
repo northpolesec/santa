@@ -20,6 +20,7 @@
 @class SNTExportConfiguration;
 @class SNTModeTransition;
 @class SNTSyncNetworkExtensionSettings;
+@class SNTTemporaryAdminPolicy;
 
 @interface SNTConfigBundle : NSObject <NSSecureCoding>
 
@@ -44,6 +45,7 @@
 - (void)fullSyncLastSuccess:(void (^)(NSDate*))block;
 - (void)ruleSyncLastSuccess:(void (^)(NSDate*))block;
 - (void)modeTransition:(void (^)(SNTModeTransition*))block;
+- (void)temporaryAdminPolicy:(void (^)(SNTTemporaryAdminPolicy*))block;
 - (void)eventDetailURL:(void (^)(NSString*))block;
 - (void)eventDetailText:(void (^)(NSString*))block;
 - (void)fileAccessEventDetailURL:(void (^)(NSString*))block;
