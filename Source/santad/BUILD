@@ -385,6 +385,7 @@ objc_library(
         "//Source/common:SNTLogging",
         "//Source/common:SNTStoredTemporaryAdminModeAuditEvent",
         "//Source/common:SNTTemporaryAdminPolicy",
+        "//Source/common:SNTXPCNotifierInterface",
         "@abseil-cpp//absl/synchronization",
     ],
 )

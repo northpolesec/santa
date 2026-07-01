@@ -61,6 +61,17 @@ uint32_t TemporaryAdminMode::RequestMinutes(NSNumber* requested_duration, uid_t 
   // block the fast readers (SecondsRemaining / Available use lock_ only).
   absl::MutexLock grant_lock(grant_mutex_);
 
+  // uid 0 is already fully privileged, and RevertEffect / RestoreAndValidateExtraState
+  // treat a target_uid_ of 0 as "no session" -- so a session must never be stored for it
+  // (it could never be reverted). Reject before any state is touched.
+  if (uid == 0) {
+    [SNTError populateError:err
+                   withCode:SNTErrorCodeTAMAlreadyAdmin
+                     format:@"This user is already an administrator."];
+    EmitDenied(username, SNTTemporaryAdminModeDeniedReasonAlreadyAdmin);
+    return 0;
+  }
+
   if (!Available()) {
     [SNTError populateError:err
                    withCode:SNTErrorCodeTAMNoPolicy
