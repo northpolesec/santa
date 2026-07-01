@@ -163,30 +163,210 @@ objc_library(
 )
 
 objc_library(
-    name = "SantaGUI_lib",
-    srcs = [
-        "SNTAboutWindowController.h",
-        "SNTAboutWindowController.mm",
-        "SNTAppDelegate.h",
-        "SNTAppDelegate.mm",
-        "SNTBinaryMessageWindowController.h",
-        "SNTBinaryMessageWindowController.mm",
-        "SNTDeviceMessageWindowController.h",
-        "SNTDeviceMessageWindowController.mm",
-        "SNTFileAccessMessageWindowController.h",
-        "SNTFileAccessMessageWindowController.mm",
-        "SNTMessageWindowController.h",
-        "SNTMessageWindowController.mm",
-        "SNTNetworkFlowMessageWindowController.h",
-        "SNTNetworkFlowMessageWindowController.mm",
-        "SNTNetworkMountMessageWindowController.h",
-        "SNTNetworkMountMessageWindowController.mm",
-        "SNTNotificationManager.h",
-        "SNTNotificationManager.mm",
-        "SNTStatusItemManager.h",
-        "SNTStatusItemManager.mm",
-        "main.mm",
+    name = "SNTAboutWindowController",
+    srcs = ["SNTAboutWindowController.mm"],
+    hdrs = ["SNTAboutWindowController.h"],
+    deps = [
+        ":SNTAboutWindowView",
+        "//Source/common:SNTBlockMessage_SantaGUI",
+        "//Source/common:SNTConfigurator",
+        "//Source/common:SNTXPCControlInterface",
     ],
+)
+
+objc_library(
+    name = "SNTAppDelegate",
+    srcs = ["SNTAppDelegate.mm"],
+    hdrs = ["SNTAppDelegate.h"],
+    sdk_frameworks = [
+        "UserNotifications",
+    ],
+    deps = [
+        ":SNTAboutWindowController",
+        ":SNTFileInfoView",
+        ":SNTNotificationManager",
+        ":SNTStatusItemManager",
+        "//Source/common:MOLXPCConnection",
+        "//Source/common:SNTConfigurator",
+        "//Source/common:SNTFileInfo",
+        "//Source/common:SNTKVOManager",
+        "//Source/common:SNTLogging",
+        "//Source/common:SNTStrengthify",
+        "//Source/common:SNTXPCControlInterface",
+        "//Source/common:SNTXPCSyncServiceInterface",
+    ],
+)
+
+objc_library(
+    name = "SNTBinaryMessageWindowController",
+    srcs = ["SNTBinaryMessageWindowController.mm"],
+    hdrs = ["SNTBinaryMessageWindowController.h"],
+    sdk_frameworks = [
+        "SecurityInterface",
+    ],
+    deps = [
+        ":SNTAuthorizationHelper",
+        ":SNTBinaryMessageWindowView",
+        ":SNTMessageWindowController",
+        "//Source/common:CertificateHelpers",
+        "//Source/common:MOLCertificate",
+        "//Source/common:SNTBlockMessage_SantaGUI",
+        "//Source/common:SNTConfigState",
+        "//Source/common:SNTConfigurator",
+        "//Source/common:SNTStoredExecutionEvent",
+        "//Source/common:SNTXPCControlInterface",
+    ],
+)
+
+objc_library(
+    name = "SNTDeviceMessageWindowController",
+    srcs = ["SNTDeviceMessageWindowController.mm"],
+    hdrs = ["SNTDeviceMessageWindowController.h"],
+    deps = [
+        ":SNTDeviceMessageWindowView",
+        ":SNTMessageWindowController",
+        "//Source/common:SNTBlockMessage_SantaGUI",
+        "//Source/common:SNTConfigBundle",
+        "//Source/common:SNTConfigurator",
+        "//Source/common:SNTDeviceEvent",
+        "//Source/common:SNTStrengthify",
+        "//Source/common:SNTXPCControlInterface",
+    ],
+)
+
+objc_library(
+    name = "SNTFileAccessMessageWindowController",
+    srcs = ["SNTFileAccessMessageWindowController.mm"],
+    hdrs = ["SNTFileAccessMessageWindowController.h"],
+    deps = [
+        ":SNTFileAccessMessageWindowView",
+        ":SNTMessageWindowController",
+        "//Source/common:SNTBlockMessage_SantaGUI",
+        "//Source/common:SNTConfigState",
+        "//Source/common:SNTLogging",
+        "//Source/common:SNTStoredFileAccessEvent",
+        "//Source/common:SNTXPCControlInterface",
+    ],
+)
+
+objc_library(
+    name = "SNTMessageWindowController",
+    srcs = ["SNTMessageWindowController.mm"],
+    hdrs = ["SNTMessageWindowController.h"],
+    deps = [
+        "//Source/common:SNTBlockMessage_SantaGUI",
+        "//Source/common:SNTXPCControlInterface",
+    ],
+)
+
+objc_library(
+    name = "SNTNetworkFlowMessageWindowController",
+    srcs = ["SNTNetworkFlowMessageWindowController.mm"],
+    hdrs = ["SNTNetworkFlowMessageWindowController.h"],
+    deps = [
+        ":SNTMessageWindowController",
+        ":SNTNetworkFlowMessageWindowView",
+        "//Source/common:SNTConfigBundle",
+        "//Source/common:SNTStoredNetworkFlowEvent",
+        "//Source/common:SNTStrengthify",
+        "//Source/common:SNTXPCControlInterface",
+        "//Source/common:SigningIDHelpers",
+    ],
+)
+
+objc_library(
+    name = "SNTNetworkMountMessageWindowController",
+    srcs = ["SNTNetworkMountMessageWindowController.mm"],
+    hdrs = ["SNTNetworkMountMessageWindowController.h"],
+    deps = [
+        ":SNTMessageWindowController",
+        ":SNTNetworkMountMessageWindowView",
+        "//Source/common:SNTConfigBundle",
+        "//Source/common:SNTStoredNetworkMountEvent",
+        "//Source/common:SNTStrengthify",
+        "//Source/common:SNTXPCControlInterface",
+    ],
+)
+
+# Header-only target for SNTNotificationManager.h, used to break the
+# SNTNotificationManager <-> SNTStatusItemManager dependency cycle:
+# SNTStatusItemManager.mm has an unused #import of SNTNotificationManager.h,
+# while SNTNotificationManager.mm genuinely depends on SNTStatusItemManager.
+objc_library(
+    name = "SNTNotificationManager_hdr",
+    hdrs = ["SNTNotificationManager.h"],
+    deps = [
+        ":SNTMessageWindowController",
+        "//Source/common:SNTXPCBundleServiceInterface",
+        "//Source/common:SNTXPCNotifierInterface",
+    ],
+)
+
+objc_library(
+    name = "SNTNotificationManager",
+    srcs = ["SNTNotificationManager.mm"],
+    hdrs = ["SNTNotificationManager.h"],
+    sdk_frameworks = [
+        "UserNotifications",
+    ],
+    deps = [
+        ":SNTAuthorizationHelper",
+        ":SNTBinaryMessageWindowController",
+        ":SNTBinaryMessageWindowView",
+        ":SNTDeviceMessageWindowController",
+        ":SNTFileAccessMessageWindowController",
+        ":SNTMessageWindowController",
+        ":SNTNetworkFlowMessageWindowController",
+        ":SNTNetworkMountMessageWindowController",
+        ":SNTStatusItemManager",
+        "//Source/common:MOLCertificate",
+        "//Source/common:MOLXPCConnection",
+        "//Source/common:SNTBlockMessage_SantaGUI",
+        "//Source/common:SNTCommonEnums",
+        "//Source/common:SNTConfigState",
+        "//Source/common:SNTConfigurator",
+        "//Source/common:SNTDeviceEvent",
+        "//Source/common:SNTLogging",
+        "//Source/common:SNTStoredExecutionEvent",
+        "//Source/common:SNTStoredFileAccessEvent",
+        "//Source/common:SNTStoredNetworkFlowEvent",
+        "//Source/common:SNTStoredNetworkMountEvent",
+        "//Source/common:SNTStrengthify",
+        "//Source/common:SNTSyncConstants",
+        "//Source/common:SNTXPCBundleServiceInterface",
+        "//Source/common:SNTXPCControlInterface",
+        "//Source/common:SNTXPCNotifierInterface",
+        "//Source/common:SNTXPCSyncServiceInterface",
+        "@santanetd//src/santanetd:SNDFilterConfigurationHelper",
+    ],
+)
+
+objc_library(
+    name = "SNTStatusItemManager",
+    srcs = ["SNTStatusItemManager.mm"],
+    hdrs = ["SNTStatusItemManager.h"],
+    sdk_frameworks = [
+        "UserNotifications",
+    ],
+    deps = [
+        ":SNTAboutWindowController",
+        ":SNTNotificationManager_hdr",
+        "//Source/common:MOLXPCConnection",
+        "//Source/common:SNTBlockMessage_SantaGUI",
+        "//Source/common:SNTCommonEnums",
+        "//Source/common:SNTConfigurator",
+        "//Source/common:SNTError",
+        "//Source/common:SNTKVOManager",
+        "//Source/common:SNTLiteDetector",
+        "//Source/common:SNTStrengthify",
+        "//Source/common:SNTXPCControlInterface",
+        "//Source/common:SNTXPCSyncServiceInterface",
+    ],
+)
+
+objc_library(
+    name = "SantaGUI_lib",
+    srcs = ["main.mm"],
     sdk_frameworks = [
         "LocalAuthentication",
         "IOKit",
@@ -195,38 +375,20 @@ objc_library(
         "UserNotifications",
     ],
     deps = [
-        ":SNTAboutWindowView",
+        ":SNTAboutWindowController",
+        ":SNTAppDelegate",
         ":SNTAuthorizationHelper",
-        ":SNTBinaryMessageWindowView",
-        ":SNTDeviceMessageWindowView",
-        ":SNTFileAccessMessageWindowView",
-        ":SNTFileInfoView",
-        ":SNTNetworkFlowMessageWindowView",
-        ":SNTNetworkMountMessageWindowView",
+        ":SNTBinaryMessageWindowController",
+        ":SNTDeviceMessageWindowController",
+        ":SNTFileAccessMessageWindowController",
+        ":SNTMessageWindowController",
+        ":SNTNetworkFlowMessageWindowController",
+        ":SNTNetworkMountMessageWindowController",
+        ":SNTNotificationManager",
+        ":SNTStatusItemManager",
         ":SNTSystemExtensionDelegate",
-        "//Source/common:CertificateHelpers",
-        "//Source/common:MOLCertificate",
-        "//Source/common:MOLCodesignChecker",
-        "//Source/common:MOLXPCConnection",
-        "//Source/common:SNTBlockMessage_SantaGUI",
-        "//Source/common:SNTConfigBundle",
-        "//Source/common:SNTConfigState",
         "//Source/common:SNTConfigurator",
-        "//Source/common:SNTDeviceEvent",
-        "//Source/common:SNTFileInfo",
-        "//Source/common:SNTKVOManager",
-        "//Source/common:SNTLiteDetector",
         "//Source/common:SNTLogging",
-        "//Source/common:SNTStoredExecutionEvent",
-        "//Source/common:SNTStoredFileAccessEvent",
-        "//Source/common:SNTStoredNetworkFlowEvent",
-        "//Source/common:SNTStoredNetworkMountEvent",
-        "//Source/common:SNTStrengthify",
-        "//Source/common:SNTSyncConstants",
-        "//Source/common:SNTXPCControlInterface",
-        "//Source/common:SNTXPCNotifierInterface",
-        "//Source/common:SNTXPCSyncServiceInterface",
-        "//Source/common:SigningIDHelpers",
     ],
 )
 
@@ -313,7 +475,7 @@ santa_unit_test(
         "Cocoa",
     ],
     deps = [
-        ":SantaGUI_lib",
+        ":SNTNotificationManager",
         "//Source/common:SNTConfigBundle",
         "//Source/common:SNTStoredExecutionEvent",
         "//Source/common:SNTStoredNetworkFlowEvent",

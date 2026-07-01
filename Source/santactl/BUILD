@@ -100,67 +100,201 @@ objc_library(
 )
 
 objc_library(
+    name = "SNTCommandCheckCache",
+    srcs = ["Commands/SNTCommandCheckCache.mm"],
+    deps = [
+        ":santactl_cmd",
+        "//Source/common:MOLXPCConnection",
+        "//Source/common:SNTLogging",
+        "//Source/common:SNTXPCControlInterface",
+    ],
+)
+
+objc_library(
+    name = "SNTCommandDoctor",
+    srcs = ["Commands/SNTCommandDoctor.mm"],
+    sdk_frameworks = ["SystemConfiguration"],
+    deps = [
+        ":santactl_cmd",
+        "//Source/common:MOLCertificate",
+        "//Source/common:SNTConfigurator",
+        "//Source/common:SNTLogging",
+        "//Source/common:SNTXPCControlInterface",
+        "//Source/common:SNTXPCSyncServiceInterface",
+        "//Source/common:SNTXPCUnprivilegedControlInterface",
+        "//Source/common:SystemResources",
+        "//Source/common/faa:WatchItems",
+    ],
+)
+
+objc_library(
+    name = "SNTCommandFileInfo",
+    srcs = ["Commands/SNTCommandFileInfo.mm"],
+    deps = [
+        ":santactl_cmd",
+        "//Source/common:CertificateHelpers",
+        "//Source/common:MOLCertificate",
+        "//Source/common:MOLCodesignChecker",
+        "//Source/common:MOLXPCConnection",
+        "//Source/common:SNTCachedDecision",
+        "//Source/common:SNTFileInfo",
+        "//Source/common:SNTLogging",
+        "//Source/common:SNTRule",
+        "//Source/common:SNTRuleIdentifiers",
+        "//Source/common:SNTStoredExecutionEvent",
+        "//Source/common:SNTXPCBundleServiceInterface",
+        "//Source/common:SNTXPCControlInterface",
+        "//Source/common:SigningIDHelpers",
+    ],
+)
+
+objc_library(
+    name = "SNTCommandFlushCache",
+    srcs = ["Commands/SNTCommandFlushCache.mm"],
+    deps = [
+        ":santactl_cmd",
+        "//Source/common:MOLXPCConnection",
+        "//Source/common:SNTLogging",
+        "//Source/common:SNTXPCControlInterface",
+    ],
+)
+
+objc_library(
+    name = "SNTCommandInventory",
+    srcs = ["Commands/SNTCommandInventory.mm"],
+    deps = [
+        ":santactl_cmd",
+        "//Source/common:CertificateHelpers",
+        "//Source/common:MOLCodesignChecker",
+        "//Source/common:MOLXPCConnection",
+        "//Source/common:SNTConfigurator",
+        "//Source/common:SNTFileInfo",
+        "//Source/common:SNTLogging",
+        "//Source/common:SNTStoredExecutionEvent",
+        "//Source/common:SNTXPCBundleServiceInterface",
+        "//Source/common:SNTXPCControlInterface",
+        "//Source/common:SNTXPCSyncServiceInterface",
+        "//Source/common:SigningIDHelpers",
+    ],
+)
+
+objc_library(
+    name = "SNTCommandMetrics",
+    srcs = ["Commands/SNTCommandMetrics.mm"],
+    hdrs = ["Commands/SNTCommandMetrics.h"],
+    deps = [
+        ":santactl_cmd",
+        "//Source/common:MOLXPCConnection",
+        "//Source/common:SNTConfigurator",
+        "//Source/common:SNTLogging",
+        "//Source/common:SNTMetricSet",
+        "//Source/common:SNTXPCControlInterface",
+    ],
+)
+
+objc_library(
+    name = "SNTCommandRule",
+    srcs = ["Commands/SNTCommandRule.mm"],
+    deps = [
+        ":santactl_cmd",
+        "//Source/common:MOLCertificate",
+        "//Source/common:MOLCodesignChecker",
+        "//Source/common:MOLXPCConnection",
+        "//Source/common:SNTConfigurator",
+        "//Source/common:SNTDropRootPrivs",
+        "//Source/common:SNTFileInfo",
+        "//Source/common:SNTLogging",
+        "//Source/common:SNTRule",
+        "//Source/common:SNTRuleIdentifiers",
+        "//Source/common:SNTXPCControlInterface",
+        "//Source/common/faa:WatchItems",
+    ],
+)
+
+objc_library(
+    name = "SNTCommandStatus",
+    srcs = ["Commands/SNTCommandStatus.mm"],
+    deps = [
+        ":santactl_cmd",
+        "//Source/common:MOLXPCConnection",
+        "//Source/common:SNTConfigurator",
+        "//Source/common:SNTXPCControlInterface",
+        "//Source/common/faa:WatchItems",
+    ],
+)
+
+objc_library(
+    name = "SNTCommandSync",
+    srcs = ["Commands/SNTCommandSync.mm"],
+    deps = [
+        ":santactl_cmd",
+        "//Source/common:MOLXPCConnection",
+        "//Source/common:SNTConfigurator",
+        "//Source/common:SNTDropRootPrivs",
+        "//Source/common:SNTLogging",
+        "//Source/common:SNTXPCSyncServiceInterface",
+    ],
+)
+
+objc_library(
+    name = "SNTCommandVersion",
+    srcs = ["Commands/SNTCommandVersion.mm"],
+    deps = [
+        ":santactl_cmd",
+        "//Source/common:MOLXPCConnection",
+        "//Source/common:SNTConfigurator",
+        "//Source/common:SNTFileInfo",
+        "//Source/common:SNTLiteDetector",
+        "//Source/common:SNTXPCUnprivilegedControlInterface",
+    ],
+)
+
+objc_library(
+    name = "SNTCommandBundleInfo",
+    srcs = ["Commands/SNTCommandBundleInfo.mm"],
+    deps = [
+        ":santactl_cmd",
+        "//Source/common:MOLXPCConnection",
+        "//Source/common:SNTFileInfo",
+        "//Source/common:SNTLogging",
+        "//Source/common:SNTStoredExecutionEvent",
+        "//Source/common:SNTXPCBundleServiceInterface",
+    ],
+)
+
+objc_library(
     name = "santactl_lib",
-    srcs = [
-        "Commands/SNTCommandCheckCache.mm",
-        "Commands/SNTCommandDoctor.mm",
-        "Commands/SNTCommandFileInfo.mm",
-        "Commands/SNTCommandFlushCache.mm",
-        "Commands/SNTCommandInventory.mm",
-        "Commands/SNTCommandMetrics.h",
-        "Commands/SNTCommandMetrics.mm",
-        "Commands/SNTCommandRule.mm",
-        "Commands/SNTCommandStatus.mm",
-        "Commands/SNTCommandSync.mm",
-        "Commands/SNTCommandVersion.mm",
-        "main.mm",
-    ] + select({
-        "//:opt_build": [],
-        "//conditions:default": [
-            "Commands/SNTCommandBundleInfo.mm",
-        ],
-    }),
+    srcs = ["main.mm"],
     sdk_dylibs = ["libz"],
     sdk_frameworks = [
         "IOKit",
         "SystemConfiguration",
     ],
     deps = [
+        ":SNTCommandCheckCache",
         ":SNTCommandCommand",
+        ":SNTCommandDoctor",
+        ":SNTCommandFileInfo",
+        ":SNTCommandFlushCache",
         ":SNTCommandInstall",
+        ":SNTCommandInventory",
+        ":SNTCommandMetrics",
         ":SNTCommandMonitorMode",
         ":SNTCommandPrintLog",
+        ":SNTCommandRule",
         ":SNTCommandSandbox",
+        ":SNTCommandStatus",
+        ":SNTCommandSync",
         ":SNTCommandTelemetry",
+        ":SNTCommandVersion",
         ":santactl_cmd",
-        "//Source/common:CertificateHelpers",
         "//Source/common:MOLAuthenticatingURLSession",
-        "//Source/common:MOLCertificate",
-        "//Source/common:MOLCodesignChecker",
-        "//Source/common:MOLXPCConnection",
-        "//Source/common:SNTCachedDecision",
-        "//Source/common:SNTCommonEnums",
-        "//Source/common:SNTConfigurator",
-        "//Source/common:SNTDropRootPrivs",
-        "//Source/common:SNTFileInfo",
-        "//Source/common:SNTLiteDetector",
-        "//Source/common:SNTLogging",
-        "//Source/common:SNTMetricSet",
-        "//Source/common:SNTRule",
-        "//Source/common:SNTRuleIdentifiers",
-        "//Source/common:SNTStoredExecutionEvent",
-        "//Source/common:SNTStrengthify",
-        "//Source/common:SNTSystemInfo",
-        "//Source/common:SNTXPCBundleServiceInterface",
-        "//Source/common:SNTXPCControlInterface",
-        "//Source/common:SNTXPCSyncServiceInterface",
-        "//Source/common:SNTXPCUnprivilegedControlInterface",
-        "//Source/common:SigningIDHelpers",
-        "//Source/common:SystemResources",
-        "//Source/common/faa:WatchItems",
-        "@FMDB",
-        "@abseil-cpp//absl/cleanup:cleanup",
-    ],
+    ] + select({
+        "//:opt_build": [],
+        "//conditions:default": [
+            ":SNTCommandBundleInfo",
+        ],
+    }),
 )
 
 macos_command_line_application(
@@ -187,15 +321,10 @@ macos_command_line_application(
 
 santa_unit_test(
     name = "SNTCommandFileInfoTest",
-    srcs = [
-        "Commands/SNTCommandFileInfo.mm",
-        "Commands/SNTCommandFileInfoTest.mm",
-        "SNTCommand.h",
-        "SNTCommand.mm",
-        "SNTCommandController.h",
-        "SNTCommandController.mm",
-    ],
+    srcs = ["Commands/SNTCommandFileInfoTest.mm"],
     deps = [
+        ":SNTCommandFileInfo",
+        ":santactl_cmd",
         "//Source/common:MOLCertificate",
         "//Source/common:MOLCodesignChecker",
         "//Source/common:MOLXPCConnection",
@@ -215,16 +344,12 @@ santa_unit_test(
 
 santa_unit_test(
     name = "SNTCommandMetricsTest",
-    srcs = [
-        "Commands/SNTCommandMetrics.h",
-        "Commands/SNTCommandMetricsTest.mm",
-        "SNTCommand.h",
-        "SNTCommandController.h",
-    ],
+    srcs = ["Commands/SNTCommandMetricsTest.mm"],
     structured_resources = glob(["Commands/testdata/*"]),
     visibility = ["//:santa_package_group"],
     deps = [
-        ":santactl_lib",
+        ":SNTCommandMetrics",
+        ":santactl_cmd",
         "//Source/common:MOLXPCConnection",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
@@ -245,7 +370,7 @@ santa_unit_test(
     ],
     visibility = ["//:santa_package_group"],
     deps = [
-        ":santactl_lib",
+        ":SNTCommandDoctor",
         "//Source/common:MOLCertificate",
     ],
 )

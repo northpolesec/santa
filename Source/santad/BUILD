@@ -1326,17 +1326,13 @@ objc_library(
 
 santa_unit_test(
     name = "SNTEventTableTest",
-    srcs = [
-        "DataLayer/SNTDatabaseTable.h",
-        "DataLayer/SNTDatabaseTable.mm",
-        "DataLayer/SNTEventTable.h",
-        "DataLayer/SNTEventTable.mm",
-        "DataLayer/SNTEventTableTest.mm",
-    ],
+    srcs = ["DataLayer/SNTEventTableTest.mm"],
     structured_resources = [
         "//Source/santad/testdata:archive_testdata",
     ],
     deps = [
+        ":SNTDatabaseTable",
+        ":SNTEventTable",
         "//Source/common:MOLCertificate",
         "//Source/common:MOLCodesignChecker",
         "//Source/common:SNTFileInfo",
