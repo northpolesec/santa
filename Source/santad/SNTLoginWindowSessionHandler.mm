@@ -14,7 +14,11 @@
 
 #import "Source/santad/SNTLoginWindowSessionHandler.h"
 
+#include <errno.h>
 #include <pwd.h>
+#include <unistd.h>
+
+#include <vector>
 
 @implementation SNTLoginWindowSessionHandler {
   std::shared_ptr<santa::TemporaryAdminMode> _temporaryAdminMode;
@@ -61,9 +65,21 @@
   dispatch_async(_queue, ^{
     struct passwd pwd;
     struct passwd* result = NULL;
-    char buf[1024];
-    if (getpwnam_r(username.UTF8String, &pwd, buf, sizeof(buf), &result) != 0 || result == NULL ||
-        pwd.pw_uid == 0) {
+    long bufsize = sysconf(_SC_GETPW_R_SIZE_MAX);
+    if (bufsize <= 0) {
+      bufsize = 1024;
+    }
+    std::vector<char> buf(bufsize);
+    // getpwnam_r returns ERANGE when the entry doesn't fit; grow and retry so directory-backed
+    // (LDAP/AD) entries larger than the initial buffer still resolve. Cap the growth so a
+    // pathological entry can't drive unbounded allocation.
+    int rc;
+    while ((rc = getpwnam_r(username.UTF8String, &pwd, buf.data(), buf.size(), &result)) ==
+               ERANGE &&
+           buf.size() < (1 << 20)) {
+      buf.resize(buf.size() * 2);
+    }
+    if (rc != 0 || result == NULL || pwd.pw_uid == 0) {
       // Unresolved, or the loginwindow/root pseudo-user — never a TAM target. The timer remains
       // the backstop if a real revoke was somehow missed.
       return;
