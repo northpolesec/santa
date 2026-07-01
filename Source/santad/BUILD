@@ -347,6 +347,7 @@ objc_library(
         "//Source/common:PassKey",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTError",
+        "//Source/common:SNTLogging",
         "//Source/common:SNTModeTransition",
         "//Source/common:SNTStoredTemporaryMonitorModeAuditEvent",
         "@abseil-cpp//absl/synchronization",

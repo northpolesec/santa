@@ -132,7 +132,10 @@ uint64_t MakeDeadline(uint64_t want) {
       }]]);
   XCTAssertEqual(tmm.GetSecondsRemainingFromStateLocked(testState, testBootUUID, unpinnedURL), 0);
 
-  // Mismatched sync URL
+  // Mismatched sync URL. Re-enable Sync V2 so this case validates the URL-mismatch
+  // path specifically, rather than passing because Sync V2 is still disabled from the
+  // prior case.
+  syncV2Enabled = YES;
   testState = [goodTestState mutableCopy];
   testState[kTimedSessionSyncURLKey] = pinnedURL2.host;
   OCMExpect([self.mockConfigurator

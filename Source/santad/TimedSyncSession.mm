@@ -54,24 +54,54 @@ TimedSyncSession::~TimedSyncSession() = default;
 
 void TimedSyncSession::SetupFromState() {
   std::weak_ptr<TimedSyncSession> weak_self = weak_from_base<TimedSyncSession>();
-  kvo_ = @[ [[SNTKVOManager alloc]
-      initWithObject:configurator_
-            selector:@selector(syncBaseURL)
-                type:[NSURL class]
-            callback:^(NSURL* oldValue, NSURL* newValue) {
-              if ((!newValue && !oldValue) ||
-                  ([newValue.absoluteString isEqualToString:oldValue.absoluteString])) {
-                return;
-              }
-              if (auto strong_self = weak_self.lock()) {
-                if (strong_self->Revoke(strong_self->LeaveReasonSyncServerChanged())) {
-                  LOGI(@"Timed sync session revoked due to SyncBaseURL changing.");
+  kvo_ = @[
+    [[SNTKVOManager alloc]
+        initWithObject:configurator_
+              selector:@selector(syncBaseURL)
+                  type:[NSURL class]
+              callback:^(NSURL* oldValue, NSURL* newValue) {
+                if ((!newValue && !oldValue) ||
+                    ([newValue.absoluteString isEqualToString:oldValue.absoluteString])) {
+                  return;
                 }
-              }
-            }] ];
+                if (auto strong_self = weak_self.lock()) {
+                  if (strong_self->Revoke(strong_self->LeaveReasonSyncServerChanged())) {
+                    LOGI(@"Timed sync session revoked due to SyncBaseURL changing.");
+                  }
+                }
+              }],
+    // The sync-v2 gate (SyncServerGateSatisfied) is also satisfied by a valid push
+    // token chain, so a push-token-only deployment can hold a session with a nil
+    // syncBaseURL. Watching syncBaseURL alone would never revoke such a session when
+    // its token chain is lost. Watch the chain too and revoke as soon as the gate is
+    // no longer satisfied.
+    [[SNTKVOManager alloc]
+        initWithObject:configurator_
+              selector:@selector(pushTokenChain)
+                  type:[NSArray class]
+              callback:^(NSArray* oldValue, NSArray* newValue) {
+                if (auto strong_self = weak_self.lock()) {
+                  if (!strong_self->SyncServerGateSatisfied() &&
+                      strong_self->Revoke(strong_self->LeaveReasonSyncServerChanged())) {
+                    LOGI(@"Timed sync session revoked due to sync-v2 gate no longer being "
+                         @"satisfied.");
+                  }
+                }
+              }],
+  ];
 
   absl::MutexLock lock(lock_);
   NSDictionary* state = [configurator_ savedTimedSessionStateForKey:StateKey()];
+  if (!state) {
+    // Clean startup: no session was ever persisted. GetSecondsRemainingFromStateLocked
+    // would return 0 here just as it does for an expired/reboot session, so guard on
+    // the raw state to keep the no-state case a genuine no-op instead of emitting a
+    // spurious leave notification. There is nothing to revert (the in-memory effect is
+    // already clear on a fresh daemon start; a subclass whose effect outlives the
+    // daemon must reconcile that in ReapplyEffectOnRestart / its own startup path
+    // rather than rely on an incidental revert here).
+    return;
+  }
   uint32_t secs_remaining = static_cast<uint32_t>(
       std::min(GetSecondsRemainingFromStateLocked(state, [SNTSystemInfo bootSessionUUID],
                                                   configurator_.syncBaseURL),
