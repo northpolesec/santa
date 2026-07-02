@@ -20,6 +20,7 @@
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
 #import "Source/common/SNTStoredFileAccessEvent.h"
+#import "Source/common/SNTStoredNetworkFlowEvent.h"
 #import "Source/common/SNTSystemInfo.h"
 
 @interface SNTBlockMessageTest : XCTestCase
@@ -111,6 +112,33 @@
 
   XCTAssertNil([SNTBlockMessage eventDetailURLForFileAccessEvent:fae customURL:nil]);
   XCTAssertNil([SNTBlockMessage eventDetailURLForFileAccessEvent:fae customURL:@"null"]);
+}
+
+- (void)testEventDetailURLForNetworkFlowEvent {
+  SNTStoredNetworkFlowEvent* nfe = [[SNTStoredNetworkFlowEvent alloc] init];
+  nfe.ruleName = @"my_rn";
+  nfe.hostname = @"evil.example.com";
+  nfe.remoteAddress = @"93.184.216.34";
+  nfe.remotePort = 443;
+  nfe.process.fileSHA256 = @"my_fi";
+  nfe.process.cdhash = @"my_ch";
+  nfe.process.teamID = @"my_ti";
+  nfe.process.signingID = @"my_si";
+  nfe.process.executingUser = @"my_un";
+
+  NSString* url = @"http://localhost?rn=%rule_name%&rh=%remote_hostname%&ra=%remote_address%"
+                  @"&rp=%remote_port%&fi=%file_identifier%&ti=%team_id%&si=%signing_id%"
+                  @"&ch=%cdhash%&un=%username%&mid=%machine_id%&hn=%hostname%&u=%uuid%&s=%serial%";
+  NSString* wantUrl =
+      @"http://localhost?rn=my_rn&rh=evil.example.com&ra=93.184.216.34"
+      @"&rp=443&fi=my_fi&ti=my_ti&si=my_si&ch=my_ch&un=my_un&mid=my_mid&hn=my_hn&u=my_u&s=my_s";
+
+  NSURL* gotUrl = [SNTBlockMessage eventDetailURLForNetworkFlowEvent:nfe customURL:url];
+  XCTAssertEqualObjects(gotUrl.absoluteString, wantUrl);
+
+  // Empty/"null"/nil URLs resolve to nil (same guard as exec/FAA).
+  XCTAssertNil([SNTBlockMessage eventDetailURLForNetworkFlowEvent:nfe customURL:nil]);
+  XCTAssertNil([SNTBlockMessage eventDetailURLForNetworkFlowEvent:nfe customURL:@"null"]);
 }
 
 - (void)testEventDetailURLForFileAccessEventFallback {

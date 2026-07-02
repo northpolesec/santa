@@ -57,6 +57,8 @@
   e.eventDedupeKey = @"TEAM:com.apple.curl|7|example.com";
   e.uiDedupeKey = @"4242:1|7|example.com";
   e.silent = YES;
+  e.customMsg = @"Contact IT before reaching this host";
+  e.customURL = @"https://example.com/why?rule=%rule_name%";
   e.process.filePath = @"/usr/bin/curl";
   e.process.cdhash = @"deadbeef";
   e.process.parent = [[SNTStoredProcess alloc] init];
@@ -90,6 +92,8 @@
   XCTAssertEqualObjects(d.eventDedupeKey, @"TEAM:com.apple.curl|7|example.com");
   XCTAssertEqualObjects(d.uiDedupeKey, @"4242:1|7|example.com");
   XCTAssertTrue(d.silent);  // local field survives the round-trip
+  XCTAssertEqualObjects(d.customMsg, @"Contact IT before reaching this host");
+  XCTAssertEqualObjects(d.customURL, @"https://example.com/why?rule=%rule_name%");
   XCTAssertEqualObjects(d.process.filePath, @"/usr/bin/curl");
   XCTAssertEqualObjects(d.process.parent.pid, @(1));
   XCTAssertEqualObjects([d uniqueID],

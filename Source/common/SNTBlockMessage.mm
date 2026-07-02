@@ -20,6 +20,7 @@
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
 #import "Source/common/SNTStoredFileAccessEvent.h"
+#import "Source/common/SNTStoredNetworkFlowEvent.h"
 #import "Source/common/SNTSystemInfo.h"
 
 // Percent-encode a string so it is safe in both URL path and query positions.
@@ -372,6 +373,49 @@ static id EncodedValueOrNull(id value) {
       [self eventDetailURLForEvent:event
                          customURL:url ?: [[SNTConfigurator configurator] fileAccessEventDetailURL]
                    templateMapping:[self fileAccessEventDetailTemplateMappingForEvent:event]];
+}
+
+//
+//   Format strings replaced in the URL provided by
+//   `+eventDetailURLForNetworkFlowEvent:customURL:`.
+//
+//   %rule_name%       - Name of the rule that blocked the flow.
+//   %remote_hostname% - Destination hostname, if resolved.
+//   %remote_address%  - Remote IP address of the flow.
+//   %remote_port%     - Remote port of the flow.
+//   %file_identifier% - SHA-256 of the process that opened the flow.
+//   %team_id%         - Team ID from the signature, if present.
+//   %signing_id%      - Signing ID from the signature, if present.
+//   %cdhash%          - CDHash, if signed.
+//   %username%        - Executing user's name.
+//   %machine_id%      - Configured machine ID for this host.
+//   %hostname%        - This host's (machine) hostname.
+//   %uuid%            - Machine UUID.
+//   %serial%          - Machine serial number.
+//
++ (NSDictionary*)networkFlowEventDetailTemplateMappingForEvent:(SNTStoredNetworkFlowEvent*)event {
+  return @{
+    @"%rule_name%" : EncodedValueOrNull(event.ruleName),
+    @"%remote_hostname%" : EncodedValueOrNull(event.hostname),
+    @"%remote_address%" : EncodedValueOrNull(event.remoteAddress),
+    @"%remote_port%" : EncodedValueOrNull(@(event.remotePort).stringValue),
+    @"%file_identifier%" : EncodedValueOrNull(event.process.fileSHA256),
+    @"%team_id%" : EncodedValueOrNull(event.process.teamID),
+    @"%signing_id%" : EncodedValueOrNull(event.process.signingID),
+    @"%cdhash%" : EncodedValueOrNull(event.process.cdhash),
+    @"%username%" : EncodedValueOrNull(event.process.executingUser),
+    @"%machine_id%" : EncodedValueOrNull([[SNTConfigurator configurator] machineID]),
+    @"%hostname%" : EncodedValueOrNull([SNTSystemInfo longHostname]),
+    @"%uuid%" : EncodedValueOrNull([SNTSystemInfo hardwareUUID]),
+    @"%serial%" : EncodedValueOrNull([SNTSystemInfo serialNumber]),
+  };
+}
+
++ (NSURL*)eventDetailURLForNetworkFlowEvent:(SNTStoredNetworkFlowEvent*)event
+                                  customURL:(NSString*)url {
+  return [self eventDetailURLForEvent:event
+                            customURL:url
+                      templateMapping:[self networkFlowEventDetailTemplateMappingForEvent:event]];
 }
 
 @end

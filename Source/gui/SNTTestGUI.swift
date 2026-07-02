@@ -478,6 +478,8 @@ struct NetworkFlowView: View {
   @State private var teamID: String = "9X9633G7QW"
   @State private var pid: String = "12345"
   @State private var executingUser: String = NSUserName()
+  @State private var customMsg: String = ""
+  @State private var customURL: String = ""
   @State private var allowNotificationSilence: Bool = true
 
   @State private var brandingCompanyName: String = ""
@@ -501,6 +503,23 @@ struct NetworkFlowView: View {
           TextField(text: $remotePort, label: { Text(verbatim: "Remote Port") })
           TextField(text: $ruleName, label: { Text(verbatim: "Rule Name") })
           TextField(text: $ruleId, label: { Text(verbatim: "Rule ID") })
+          HStack {
+            TextField(text: $customMsg, label: { Text(verbatim: "Custom Message") })
+            Button(action: { customMsg = "Contact IT before reaching this host" }) {
+              Text(verbatim: "Populate").font(Font.subheadline)
+            }
+            Button(action: { customMsg = "" }) { Text(verbatim: "Clear").font(Font.subheadline) }
+          }
+          HStack {
+            TextField(text: $customURL, label: { Text(verbatim: "Custom URL") })
+            Button(action: {
+              customURL =
+                "http://sync-server-hostname/netflow?rule=%rule_name%&host=%remote_hostname%&port=%remote_port%"
+            }) {
+              Text(verbatim: "Populate").font(Font.subheadline)
+            }
+            Button(action: { customURL = "" }) { Text(verbatim: "Clear").font(Font.subheadline) }
+          }
           HStack {
             Picker(selection: $decisionTier, label: Text(verbatim: "Match (decisionTier)")) {
               Text(verbatim: "Exact IP").tag(SNTNetworkFlowTier.exactIP)
@@ -561,6 +580,8 @@ struct NetworkFlowView: View {
         event.ruleName = ruleName
         event.ruleId = Int64(ruleId) ?? 0
         event.decisionTier = decisionTier
+        event.customMsg = customMsg.isEmpty ? nil : customMsg
+        event.customURL = customURL.isEmpty ? nil : customURL
 
         let bundle = SNTConfigBundle()
         bundle.setValue(NSNumber(value: allowNotificationSilence), forKey: "enableNotificationSilences")

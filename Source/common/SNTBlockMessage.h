@@ -24,6 +24,7 @@
 @class SNTDeviceEvent;
 @class SNTStoredExecutionEvent;
 @class SNTStoredFileAccessEvent;
+@class SNTStoredNetworkFlowEvent;
 
 @interface SNTBlockMessage : NSObject
 
@@ -65,6 +66,8 @@ NS_ASSUME_NONNULL_BEGIN
                                 customURL:(nullable NSString*)url;
 + (nullable NSURL*)eventDetailURLForFileAccessEvent:(nullable SNTStoredFileAccessEvent*)event
                                           customURL:(nullable NSString*)url;
++ (nullable NSURL*)eventDetailURLForNetworkFlowEvent:(nullable SNTStoredNetworkFlowEvent*)event
+                                           customURL:(nullable NSString*)url;
 
 ///
 ///  Returns a human-readable string describing the block reason for the given event, including

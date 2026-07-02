@@ -1012,6 +1012,8 @@
   block.totalCompetingRuleCount = 12;
   block.eventDedupeKey = @"TEAM:com.apple.curl|7|example.com";  // santa-internal, never uploaded
   block.uiDedupeKey = @"4242:1|7|example.com";                  // santa-internal, never uploaded
+  block.customMsg = @"Contact IT before reaching this host";    // rule property, never uploaded
+  block.customURL = @"https://example.com/why";                 // rule property, never uploaded
   block.process.filePath = @"/usr/bin/curl";
   block.process.cdhash = @"deadbeef";
   block.process.fileSHA256 = @"abc123";
@@ -1080,6 +1082,10 @@
             // Internal dedup keys are never serialized to the proto.
             XCTAssertNil(f[@"eventDedupeKey"]);
             XCTAssertNil(f[@"uiDedupeKey"]);
+
+            // Rule block-feedback text is santad-local; never serialized to the proto.
+            XCTAssertNil(f[@"customMsg"]);
+            XCTAssertNil(f[@"customUrl"]);
 
             return YES;
           }];

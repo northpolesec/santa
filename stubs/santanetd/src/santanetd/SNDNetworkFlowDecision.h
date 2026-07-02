@@ -23,7 +23,10 @@ struct SantaVnode;
 // access to the Network Extension repo.
 @interface SNDNetworkFlowDecision : NSObject <NSSecureCoding>
 
-- (SNTStoredNetworkFlowEvent*)storedEvent;
+- (nullable SNTStoredNetworkFlowEvent*)storedEvent;
 - (SantaVnode)vnode;
+
+@property(nullable) NSString* customMsg;
+@property(nullable) NSString* customURL;
 
 @end
