@@ -313,6 +313,9 @@ NSInteger TemporaryAdminMode::LeaveReasonReboot() {
 NSInteger TemporaryAdminMode::LeaveReasonSyncServerChanged() {
   return SNTTemporaryAdminModeLeaveReasonSyncServerChanged;
 }
+NSInteger TemporaryAdminMode::LeaveReasonUnspecified() {
+  return SNTTemporaryAdminModeLeaveReasonUnspecified;
+}
 
 void TemporaryAdminMode::EmitAudit(id audit_event) {
   handle_audit_event_block_((SNTStoredTemporaryAdminModeAuditEvent*)audit_event);

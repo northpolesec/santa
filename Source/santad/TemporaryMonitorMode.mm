@@ -203,6 +203,9 @@ NSInteger TemporaryMonitorMode::LeaveReasonReboot() {
 NSInteger TemporaryMonitorMode::LeaveReasonSyncServerChanged() {
   return SNTTemporaryMonitorModeLeaveReasonSyncServerChanged;
 }
+NSInteger TemporaryMonitorMode::LeaveReasonUnspecified() {
+  return SNTTemporaryMonitorModeLeaveReasonUnspecified;
+}
 
 void TemporaryMonitorMode::EmitAudit(id audit_event) {
   handle_audit_event_block_((SNTStoredTemporaryMonitorModeAuditEvent*)audit_event);

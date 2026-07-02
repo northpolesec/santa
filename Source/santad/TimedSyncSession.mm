@@ -145,7 +145,12 @@ void TimedSyncSession::SetupFromState() {
     EmitAudit(BuildEnterAuditEvent([current_uuid_ UUIDString], secs_remaining, EnterReasonRestart(),
                                    @""));
   } else {
-    EmitAudit(BuildLeaveAuditEvent([current_uuid_ UUIDString], LeaveReasonReboot()));
+    // Still time-valid, but the subclass declined to re-apply its effect on
+    // restart (TAM: the user is no longer an admin-group member, i.e. the
+    // elevation was removed out of band). This is provably not a reboot -- a
+    // reboot mismatches the boot-session UUID and is handled above -- so it is
+    // recorded with an unattributed reason rather than Reboot.
+    EmitAudit(BuildLeaveAuditEvent([current_uuid_ UUIDString], LeaveReasonUnspecified()));
     [configurator_ persistTimedSessionState:nil forKey:StateKey()];
     NotifyLeave();
     ClearExtraState();

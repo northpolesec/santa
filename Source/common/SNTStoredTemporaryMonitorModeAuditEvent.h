@@ -48,6 +48,12 @@ typedef NS_ENUM(NSInteger, SNTTemporaryMonitorModeLeaveReason) {
 
   // The machine rebooted and the previous session is no longer applicable
   SNTTemporaryMonitorModeLeaveReasonReboot,
+
+  // A still-valid session's effect could not be re-applied at daemon restart.
+  // Not reachable for temporary Monitor Mode (its effect is always re-applied
+  // on restart); defined for symmetry with the shared TimedSyncSession restart
+  // path. Reported as REASON_UNSPECIFIED upstream.
+  SNTTemporaryMonitorModeLeaveReasonUnspecified,
 };
 
 // Represents a temporary Monitor Mode audit event stored in the events database.
