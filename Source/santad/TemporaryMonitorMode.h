@@ -16,26 +16,21 @@
 #define SANTA_SANTAD_TEMPORARYMONITORMODE_H
 
 #include <memory>
-#include <optional>
 
 #include "Source/common/PassKey.h"
 #import "Source/common/SNTConfigurator.h"
-#import "Source/common/SNTKVOManager.h"
 #import "Source/common/SNTModeTransition.h"
 #import "Source/common/SNTStoredTemporaryMonitorModeAuditEvent.h"
-#include "Source/common/Timer.h"
 #import "Source/santad/SNTNotificationQueue.h"
-#include "absl/synchronization/mutex.h"
-
-extern NSString* const kStateTempMonitorModeBootUUIDKey;
-extern NSString* const kStateTempMonitorModeDeadlineKey;
-extern NSString* const kStateTempMonitorModeSavedSyncURLKey;
-extern NSString* const kStateTempMonitorModeSessionUUIDKey;
+#include "Source/santad/TimedSyncSession.h"
 
 namespace santa {
 
-class TemporaryMonitorMode : public Timer<TemporaryMonitorMode>,
-                             public PassKey<TemporaryMonitorMode> {
+// Temporary Monitor Mode: a sync-blessed, timer-bounded override that puts the
+// client into Monitor mode for a requested duration. A thin subclass of
+// TimedSyncSession; the effect is an in-memory flag that the clientMode getter
+// reads.
+class TemporaryMonitorMode : public TimedSyncSession, public PassKey<TemporaryMonitorMode> {
  public:
   using HandleAuditEventBlock = void (^)(SNTStoredTemporaryMonitorModeAuditEvent*);
 
@@ -44,77 +39,52 @@ class TemporaryMonitorMode : public Timer<TemporaryMonitorMode>,
       SNTConfigurator* configurator, SNTNotificationQueue* notification_queue,
       HandleAuditEventBlock handle_audit_event_block);
 
-  // Construction and setup require a PassKey, can only be used internally.
+  // Construction requires a PassKey, can only be used internally / by tests.
   TemporaryMonitorMode(PassKey, SNTConfigurator* configurator,
                        SNTNotificationQueue* notification_queue,
                        HandleAuditEventBlock handle_audit_event_block);
-  void SetupFromState(PassKey, NSDictionary* tmm);
 
-  // No moves, no copies
-  TemporaryMonitorMode(TemporaryMonitorMode&& other) = delete;
-  TemporaryMonitorMode& operator=(TemporaryMonitorMode&& rhs) = delete;
-  TemporaryMonitorMode(const TemporaryMonitorMode& other) = delete;
-  TemporaryMonitorMode& operator=(const TemporaryMonitorMode& other) = delete;
-
-  // Enter Monitor Mode temporarily for the requested duration.
-  // Returns the actual number of minutes allowed, or 0 if error.
+  // Enter Monitor Mode temporarily for the requested duration. Returns the actual
+  // number of minutes allowed, or 0 on error (with `err` populated).
   uint32_t RequestMinutes(NSNumber* requested_duration, NSError** err);
 
-  // Cancel an existing temporary Monitor Mode session.
-  // Return true if a session was active, otherwise false.
-  bool Cancel();
-
-  // Cancel an existing temporary Monitor Mode session and revoke any
-  // stored mode transition sync setting to prevent future sessions.
-  // Return true if a session was active, otherwise false.
-  bool Revoke(SNTTemporaryMonitorModeLeaveReason reason);
-
-  // Requried method of Timer mixin derived classes. Will be called when
-  // a previously started timer expires.
-  bool OnTimer();
-
-  // Return whether temporary monitor mode is available: a policy is set,
-  // the sync domain is pinned and the current client mode can transition.
-  // When returning false, the optional err parameter may be populated.
-  bool Available(NSError** err);
-
-  // If a temporary Monitor Mode session is active, return the number of
-  // of seconds remaining. Otherwise nullopt.
-  std::optional<uint64_t> SecondsRemaining() const;
-  static std::optional<uint64_t> SecondsRemaining(uint64_t deadline_mach_time);
-
-  // If the mode transition was authorization was revoked, immediate cancel
-  // any existing session. The configurator sync settings are also updated.
+  // If the mode transition authorization was revoked, immediately cancel any
+  // existing session; always re-notify the GUI of availability.
   void NewModeTransitionReceived(SNTModeTransition* mode_transition);
 
   friend class TemporaryMonitorModePeer;
 
+ protected:
+  bool ApplyEffect(NSError** err) override;
+  bool RevertEffect() override;
+  bool ReapplyEffectOnRestart() override;
+  bool ExtraPreconditions() override;
+  NSString* StateKey() override;
+  bool HasOnDemandPolicy() override;
+  uint32_t ClampDuration(NSNumber* requested) override;
+  bool PolicyRequiresAuth() override;
+  bool PolicyRequiresJustification() override;
+  void WriteRevokePolicy() override;
+  void RequestAuthorization(void (^reply)(BOOL authenticated, NSString* reason)) override;
+  NSDictionary* ExtraStateToPersist() override;
+  bool RestoreAndValidateExtraState(NSDictionary* state) override;
+  void ClearExtraState() override;
+  id BuildEnterAuditEvent(NSString* session_uuid, uint32_t seconds, NSInteger enter_reason,
+                          NSString* user_justification) override;
+  id BuildLeaveAuditEvent(NSString* session_uuid, NSInteger leave_reason) override;
+  NSInteger EnterReasonOnDemand() override;
+  NSInteger EnterReasonRefresh() override;
+  NSInteger EnterReasonRestart() override;
+  NSInteger LeaveReasonCancelled() override;
+  NSInteger LeaveReasonSessionExpired() override;
+  NSInteger LeaveReasonReboot() override;
+  NSInteger LeaveReasonSyncServerChanged() override;
+  void EmitAudit(id audit_event) override;
+  void NotifyEnter(NSDate* expiration) override;
+  void NotifyLeave() override;
+
  private:
-  // Require at least 5 seconds left of Monitor Mode a previously authorized
-  // Temporary Monitor Mode session in order to re-enter. Otherwise don't bother.
-  static constexpr uint64_t kMinAllowedStateRemainingSeconds = 5;
-
-  bool BeginLocked(uint32_t seconds, bool gen_uuid_on_start) ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
-  bool EndLocked() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
-  uint64_t GetSecondsRemainingFromInitialStateLocked(NSDictionary* tmm,
-                                                     NSString* currentBootSessionUUID,
-                                                     NSURL* syncURL)
-      ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
-  bool RevokeLocked(SNTTemporaryMonitorModeLeaveReason reason) ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
-
-  // hide the base class Start/Stop methods
-  bool StartTimer();
-  bool StopTimer();
-  bool StartTimerWithInterval(uint32_t interval_seconds);
-
-  mutable absl::Mutex lock_;
-
-  SNTConfigurator* configurator_;
-  SNTNotificationQueue* notification_queue_;
   HandleAuditEventBlock handle_audit_event_block_;
-  uint64_t deadline_ ABSL_GUARDED_BY(lock_);
-  NSUUID* current_uuid_ ABSL_GUARDED_BY(lock_);
-  NSArray<SNTKVOManager*>* kvo_;
 };
 
 }  // namespace santa

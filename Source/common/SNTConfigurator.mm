@@ -978,24 +978,14 @@ static SNTConfigurator* sharedConfigurator = nil;
   }
 }
 
-- (void)enterTemporaryMonitorMode:(NSDictionary*)temporaryMonitorModeState {
+- (void)persistTimedSessionState:(NSDictionary*)state forKey:(NSString*)key {
   @synchronized(self) {
-    [self updateStateSynchronizedKey:kStateTempMonitorModeKey value:temporaryMonitorModeState];
-    self.inTemporaryMonitorMode = YES;
+    [self updateStateSynchronizedKey:key value:state];
   }
 }
 
-- (void)leaveTemporaryMonitorMode {
-  @synchronized(self) {
-    self.inTemporaryMonitorMode = NO;
-
-    // Clear the temporary Monitor Mode state now that it has ended
-    [self updateStateSynchronizedKey:kStateTempMonitorModeKey value:nil];
-  }
-}
-
-- (nullable NSDictionary*)savedTemporaryMonitorModeState {
-  return self.state[kStateTempMonitorModeKey];
+- (nullable NSDictionary*)savedTimedSessionStateForKey:(NSString*)key {
+  return self.state[key];
 }
 
 - (void)updateLastBootUUID:(NSString*)bootUUID {

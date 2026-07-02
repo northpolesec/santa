@@ -868,19 +868,24 @@ extern NSString* _Nonnull const kEnableMenuItemUserOverride;
 @property(readonly) BOOL inTemporaryMonitorMode;
 
 ///
-///  Set Santa to be in Monitor Mode temporarily
+///  Set / clear the in-memory temporary Monitor Mode effect (the flag the
+///  clientMode getter reads). The persisted session state is managed separately
+///  via the generic timed-session accessors below.
 ///
-- (void)enterTemporaryMonitorMode:(nullable NSDictionary*)temporaryMonitorModeState;
+- (void)setInTemporaryMonitorMode:(BOOL)enabled;
+
+#pragma mark - Timed Session State
 
 ///
-///  Set Santa as having left temporary Monitor Mode
+///  Persist (or clear, when `state` is nil) the session state for a timed-session
+///  feature (e.g. Temporary Monitor Mode, Temporary Admin Mode) under `key`.
 ///
-- (void)leaveTemporaryMonitorMode;
+- (void)persistTimedSessionState:(nullable NSDictionary*)state forKey:(nonnull NSString*)key;
 
 ///
-/// Returns the Temporary Monitor Mode state if it exists
+///  Returns the persisted timed-session state for `key`, if any.
 ///
-- (nullable NSDictionary*)savedTemporaryMonitorModeState;
+- (nullable NSDictionary*)savedTimedSessionStateForKey:(nonnull NSString*)key;
 
 #pragma mark - USB Settings
 

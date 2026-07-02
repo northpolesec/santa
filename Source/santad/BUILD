@@ -316,6 +316,25 @@ santa_unit_test(
 )
 
 objc_library(
+    name = "TimedSyncSession",
+    srcs = ["TimedSyncSession.mm"],
+    hdrs = ["TimedSyncSession.h"],
+    sdk_dylibs = [
+        "EndpointSecurity",
+    ],
+    deps = [
+        ":SNTNotificationQueue",
+        "//Source/common:SNTConfigurator",
+        "//Source/common:SNTKVOManager",
+        "//Source/common:SNTLogging",
+        "//Source/common:SNTSystemInfo",
+        "//Source/common:SystemResources",
+        "//Source/common:Timer",
+        "@abseil-cpp//absl/synchronization",
+    ],
+)
+
+objc_library(
     name = "TemporaryMonitorMode",
     srcs = ["TemporaryMonitorMode.mm"],
     hdrs = ["TemporaryMonitorMode.h"],
@@ -324,16 +343,13 @@ objc_library(
     ],
     deps = [
         ":SNTNotificationQueue",
+        ":TimedSyncSession",
         "//Source/common:PassKey",
-        "//Source/common:Pinning",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTError",
-        "//Source/common:SNTKVOManager",
+        "//Source/common:SNTLogging",
         "//Source/common:SNTModeTransition",
         "//Source/common:SNTStoredTemporaryMonitorModeAuditEvent",
-        "//Source/common:SNTSystemInfo",
-        "//Source/common:SystemResources",
-        "//Source/common:Timer",
         "@abseil-cpp//absl/synchronization",
     ],
 )
@@ -344,6 +360,7 @@ santa_unit_test(
     deps = [
         ":SNTNotificationQueue",
         ":TemporaryMonitorMode",
+        ":TimedSyncSession",
         "//Source/common:SNTModeTransition",
         "//Source/common:SystemResources",
         "@OCMock",

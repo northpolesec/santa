@@ -23,6 +23,7 @@
 #import "Source/common/SNTModeTransition.h"
 #include "Source/common/SystemResources.h"
 #import "Source/santad/SNTNotificationQueue.h"
+#include "Source/santad/TimedSyncSession.h"
 
 namespace santa {
 class TemporaryMonitorModePeer : public TemporaryMonitorMode {
@@ -31,7 +32,7 @@ class TemporaryMonitorModePeer : public TemporaryMonitorMode {
                            HandleAuditEventBlock block)
       : santa::TemporaryMonitorMode(MakeKey(), configurator, notQueue, block) {}
 
-  using TemporaryMonitorMode::GetSecondsRemainingFromInitialStateLocked;
+  using santa::TimedSyncSession::GetSecondsRemainingFromStateLocked;
 };
 }  // namespace santa
 
@@ -55,11 +56,12 @@ uint64_t MakeDeadline(uint64_t want) {
   self.mockConfigurator = OCMClassMock([SNTConfigurator class]);
   OCMStub([self.mockConfigurator configurator]).andReturn(self.mockConfigurator);
 
+  // Use the class mock directly as the notification-queue instance. (The previous
+  // alloc / initWithRingBuffer: dance did not reliably yield a usable mock: the
+  // designated initializer takes a C++ std::unique_ptr that OCMock cannot match, so
+  // instance-method stubs such as authorizeTemporaryMonitorMode: could not be
+  // recorded. The peer never calls the initializer, so a class mock stands in fine.)
   self.mockNotQueue = OCMClassMock([SNTNotificationQueue class]);
-  OCMStub([self.mockNotQueue alloc]).andReturn(self.mockNotQueue);
-
-  OCMStub([self.mockNotQueue initWithRingBuffer:nullptr]).andReturn(self.mockNotQueue);
-  self.mockNotQueue = [[SNTNotificationQueue alloc] initWithRingBuffer:nil];
 }
 
 - (void)testGetSecondsRemainingFromInitialState {
@@ -76,10 +78,10 @@ uint64_t MakeDeadline(uint64_t want) {
                                });
 
   NSDictionary* goodTestState = @{
-    kStateTempMonitorModeBootUUIDKey : testBootUUID,
-    kStateTempMonitorModeDeadlineKey : @(MakeDeadline(wantAtLeastSeconds)),
-    kStateTempMonitorModeSavedSyncURLKey : pinnedURL.host,
-    kStateTempMonitorModeSessionUUIDKey : testSessionUUID,
+    kTimedSessionBootUUIDKey : testBootUUID,
+    kTimedSessionDeadlineKey : @(MakeDeadline(wantAtLeastSeconds)),
+    kTimedSessionSyncURLKey : pinnedURL.host,
+    kTimedSessionSessionUUIDKey : testSessionUUID,
   };
 
   __block BOOL syncV2Enabled = YES;
@@ -88,66 +90,199 @@ uint64_t MakeDeadline(uint64_t want) {
   });
 
   NSMutableDictionary* testState = [goodTestState copy];
-  XCTAssertGreaterThan(
-      tmm.GetSecondsRemainingFromInitialStateLocked(testState, testBootUUID, pinnedURL),
-      wantAtLeastSeconds);
+  XCTAssertGreaterThan(tmm.GetSecondsRemainingFromStateLocked(testState, testBootUUID, pinnedURL),
+                       wantAtLeastSeconds);
 
   // Bad Boot Session UUID type
   testState = [goodTestState mutableCopy];
-  testState[kStateTempMonitorModeBootUUIDKey] = @(123);
-  XCTAssertEqual(tmm.GetSecondsRemainingFromInitialStateLocked(testState, testBootUUID, pinnedURL),
-                 0);
+  testState[kTimedSessionBootUUIDKey] = @(123);
+  XCTAssertEqual(tmm.GetSecondsRemainingFromStateLocked(testState, testBootUUID, pinnedURL), 0);
 
   // Bad Deadline type
   testState = [goodTestState mutableCopy];
-  testState[kStateTempMonitorModeDeadlineKey] = @"123";
-  XCTAssertEqual(tmm.GetSecondsRemainingFromInitialStateLocked(testState, testBootUUID, pinnedURL),
-                 0);
+  testState[kTimedSessionDeadlineKey] = @"123";
+  XCTAssertEqual(tmm.GetSecondsRemainingFromStateLocked(testState, testBootUUID, pinnedURL), 0);
 
   // Bad Session UUID type
   testState = [goodTestState mutableCopy];
-  testState[kStateTempMonitorModeSessionUUIDKey] = @(123);
-  XCTAssertEqual(tmm.GetSecondsRemainingFromInitialStateLocked(testState, testBootUUID, pinnedURL),
-                 0);
+  testState[kTimedSessionSessionUUIDKey] = @(123);
+  XCTAssertEqual(tmm.GetSecondsRemainingFromStateLocked(testState, testBootUUID, pinnedURL), 0);
 
   // Invalid Session UUID
   testState = [goodTestState mutableCopy];
-  testState[kStateTempMonitorModeSessionUUIDKey] = @"ZZZZZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZZZZZZZZZZZ";
-  XCTAssertEqual(tmm.GetSecondsRemainingFromInitialStateLocked(testState, testBootUUID, pinnedURL),
-                 0);
+  testState[kTimedSessionSessionUUIDKey] = @"ZZZZZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZZZZZZZZZZZ";
+  XCTAssertEqual(tmm.GetSecondsRemainingFromStateLocked(testState, testBootUUID, pinnedURL), 0);
 
   // Bad Sync URL type type
   testState = [goodTestState mutableCopy];
-  testState[kStateTempMonitorModeSavedSyncURLKey] = @(123);
-  XCTAssertEqual(tmm.GetSecondsRemainingFromInitialStateLocked(testState, testBootUUID, pinnedURL),
-                 0);
+  testState[kTimedSessionSyncURLKey] = @(123);
+  XCTAssertEqual(tmm.GetSecondsRemainingFromStateLocked(testState, testBootUUID, pinnedURL), 0);
 
   // Mismatched boot session UUID
   testState = [goodTestState mutableCopy];
-  XCTAssertEqual(tmm.GetSecondsRemainingFromInitialStateLocked(testState, @"xyz", pinnedURL), 0);
+  XCTAssertEqual(tmm.GetSecondsRemainingFromStateLocked(testState, @"xyz", pinnedURL), 0);
 
   // Sync V2 not enabled
   syncV2Enabled = NO;
   testState = [goodTestState mutableCopy];
-  testState[kStateTempMonitorModeSavedSyncURLKey] = unpinnedURL.host;
+  testState[kTimedSessionSyncURLKey] = unpinnedURL.host;
   OCMExpect([self.mockConfigurator
       setSyncServerModeTransition:[OCMArg checkWithBlock:^BOOL(SNTModeTransition* mt) {
         return mt.type == SNTModeTransitionTypeRevoke;
       }]]);
-  XCTAssertEqual(
-      tmm.GetSecondsRemainingFromInitialStateLocked(testState, testBootUUID, unpinnedURL), 0);
+  XCTAssertEqual(tmm.GetSecondsRemainingFromStateLocked(testState, testBootUUID, unpinnedURL), 0);
 
-  // Mismatched sync URL
+  // Mismatched sync URL. Re-enable Sync V2 so this case validates the URL-mismatch
+  // path specifically, rather than passing because Sync V2 is still disabled from the
+  // prior case.
+  syncV2Enabled = YES;
   testState = [goodTestState mutableCopy];
-  testState[kStateTempMonitorModeSavedSyncURLKey] = pinnedURL2.host;
+  testState[kTimedSessionSyncURLKey] = pinnedURL2.host;
   OCMExpect([self.mockConfigurator
       setSyncServerModeTransition:[OCMArg checkWithBlock:^BOOL(SNTModeTransition* mt) {
         return mt.type == SNTModeTransitionTypeRevoke;
       }]]);
-  XCTAssertEqual(tmm.GetSecondsRemainingFromInitialStateLocked(testState, testBootUUID, pinnedURL),
-                 0);
+  XCTAssertEqual(tmm.GetSecondsRemainingFromStateLocked(testState, testBootUUID, pinnedURL), 0);
 
   XCTAssertTrue(OCMVerifyAll(self.mockConfigurator));
+}
+
+// Characterization tests: lock in the grant / refresh / cancel / revoke / OnTimer
+// behavior of the CURRENT TemporaryMonitorMode before it is refactored onto the
+// shared TimedSyncSession base. They must pass against today's TMM unchanged.
+//
+// These construct the peer via std::make_shared so the Timer mixin's
+// shared_from_this() works when the timer starts (a stack-allocated peer would
+// throw bad_weak_ptr the moment RequestMinutes starts the timer). make_shared on
+// the peer also skips SetupFromState, so no KVO is registered on the mock.
+
+// Stub the configurator/notification-queue so Available() passes and the GUI auth
+// callback returns YES. Durations are minutes; the live timer (>= 1 minute) never
+// fires during a unit test, so expiry is driven explicitly via OnTimer().
+- (void)stubOnDemandAvailableMaxMinutes:(uint32_t)maxMinutes defaultDuration:(uint32_t)def {
+  OCMStub([self.mockConfigurator modeTransition])
+      .andReturn([[SNTModeTransition alloc] initOnDemandMinutes:maxMinutes defaultDuration:def]);
+  OCMStub([self.mockConfigurator isSyncV2Enabled]).andReturn(YES);
+  OCMStub([self.mockConfigurator clientMode]).andReturn(SNTClientModeLockdown);
+  OCMStub([self.mockConfigurator syncBaseURL])
+      .andReturn([NSURL URLWithString:@"https://foo.workshop.cloud"]);
+  OCMStub([self.mockNotQueue
+      authorizeTemporaryMonitorMode:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(YES), nil])]);
+}
+
+- (void)testGrantEntersAndEmitsOnDemandEnter {
+  [self stubOnDemandAvailableMaxMinutes:60 defaultDuration:5];
+  NSMutableArray<SNTStoredTemporaryMonitorModeAuditEvent*>* events = [NSMutableArray array];
+  auto tmm = std::make_shared<TemporaryMonitorModePeer>(
+      (SNTConfigurator*)self.mockConfigurator, (SNTNotificationQueue*)self.mockNotQueue,
+      ^(SNTStoredTemporaryMonitorModeAuditEvent* e) {
+        [events addObject:e];
+      });
+
+  NSError* err = nil;
+  XCTAssertEqual(tmm->RequestMinutes(@5, &err), 5u);
+  XCTAssertNil(err);
+
+  OCMVerify([self.mockConfigurator setInTemporaryMonitorMode:YES]);
+
+  std::optional<uint64_t> remaining = tmm->SecondsRemaining();
+  XCTAssertTrue(remaining.has_value());
+  XCTAssertGreaterThan(*remaining, 0u);
+
+  XCTAssertEqual(events.count, 1u);
+  XCTAssertTrue([events[0] isKindOfClass:[SNTStoredTemporaryMonitorModeEnterAuditEvent class]]);
+  XCTAssertEqual(((SNTStoredTemporaryMonitorModeEnterAuditEvent*)events[0]).reason,
+                 SNTTemporaryMonitorModeEnterReasonOnDemand);
+}
+
+- (void)testSecondRequestIsRefresh {
+  [self stubOnDemandAvailableMaxMinutes:60 defaultDuration:5];
+  NSMutableArray<SNTStoredTemporaryMonitorModeAuditEvent*>* events = [NSMutableArray array];
+  auto tmm = std::make_shared<TemporaryMonitorModePeer>(
+      (SNTConfigurator*)self.mockConfigurator, (SNTNotificationQueue*)self.mockNotQueue,
+      ^(SNTStoredTemporaryMonitorModeAuditEvent* e) {
+        [events addObject:e];
+      });
+
+  NSError* err = nil;
+  XCTAssertEqual(tmm->RequestMinutes(@5, &err), 5u);
+  XCTAssertEqual(tmm->RequestMinutes(@5, &err), 5u);
+
+  XCTAssertTrue(tmm->SecondsRemaining().has_value());
+  XCTAssertEqual(events.count, 2u);
+  XCTAssertEqual(((SNTStoredTemporaryMonitorModeEnterAuditEvent*)events[0]).reason,
+                 SNTTemporaryMonitorModeEnterReasonOnDemand);
+  XCTAssertTrue([events[1] isKindOfClass:[SNTStoredTemporaryMonitorModeEnterAuditEvent class]]);
+  XCTAssertEqual(((SNTStoredTemporaryMonitorModeEnterAuditEvent*)events[1]).reason,
+                 SNTTemporaryMonitorModeEnterReasonOnDemandRefresh);
+}
+
+- (void)testCancelEmitsCancelledLeave {
+  [self stubOnDemandAvailableMaxMinutes:60 defaultDuration:5];
+  NSMutableArray<SNTStoredTemporaryMonitorModeAuditEvent*>* events = [NSMutableArray array];
+  auto tmm = std::make_shared<TemporaryMonitorModePeer>(
+      (SNTConfigurator*)self.mockConfigurator, (SNTNotificationQueue*)self.mockNotQueue,
+      ^(SNTStoredTemporaryMonitorModeAuditEvent* e) {
+        [events addObject:e];
+      });
+
+  NSError* err = nil;
+  XCTAssertEqual(tmm->RequestMinutes(@5, &err), 5u);
+  XCTAssertTrue(tmm->Cancel());
+
+  OCMVerify([self.mockConfigurator setInTemporaryMonitorMode:NO]);
+  XCTAssertFalse(tmm->SecondsRemaining().has_value());
+
+  XCTAssertTrue(
+      [events.lastObject isKindOfClass:[SNTStoredTemporaryMonitorModeLeaveAuditEvent class]]);
+  XCTAssertEqual(((SNTStoredTemporaryMonitorModeLeaveAuditEvent*)events.lastObject).reason,
+                 SNTTemporaryMonitorModeLeaveReasonCancelled);
+}
+
+- (void)testRevokeWritesRevocationAndEmitsRevokedLeave {
+  [self stubOnDemandAvailableMaxMinutes:60 defaultDuration:5];
+  NSMutableArray<SNTStoredTemporaryMonitorModeAuditEvent*>* events = [NSMutableArray array];
+  auto tmm = std::make_shared<TemporaryMonitorModePeer>(
+      (SNTConfigurator*)self.mockConfigurator, (SNTNotificationQueue*)self.mockNotQueue,
+      ^(SNTStoredTemporaryMonitorModeAuditEvent* e) {
+        [events addObject:e];
+      });
+
+  NSError* err = nil;
+  XCTAssertEqual(tmm->RequestMinutes(@5, &err), 5u);
+  XCTAssertTrue(tmm->Revoke(SNTTemporaryMonitorModeLeaveReasonRevoked));
+
+  OCMVerify([self.mockConfigurator
+      setSyncServerModeTransition:[OCMArg checkWithBlock:^BOOL(SNTModeTransition* mt) {
+        return mt.type == SNTModeTransitionTypeRevoke;
+      }]]);
+  OCMVerify([self.mockConfigurator setInTemporaryMonitorMode:NO]);
+  XCTAssertFalse(tmm->SecondsRemaining().has_value());
+
+  XCTAssertEqual(((SNTStoredTemporaryMonitorModeLeaveAuditEvent*)events.lastObject).reason,
+                 SNTTemporaryMonitorModeLeaveReasonRevoked);
+}
+
+- (void)testOnTimerEmitsSessionExpiredLeave {
+  [self stubOnDemandAvailableMaxMinutes:60 defaultDuration:5];
+  NSMutableArray<SNTStoredTemporaryMonitorModeAuditEvent*>* events = [NSMutableArray array];
+  auto tmm = std::make_shared<TemporaryMonitorModePeer>(
+      (SNTConfigurator*)self.mockConfigurator, (SNTNotificationQueue*)self.mockNotQueue,
+      ^(SNTStoredTemporaryMonitorModeAuditEvent* e) {
+        [events addObject:e];
+      });
+
+  NSError* err = nil;
+  XCTAssertEqual(tmm->RequestMinutes(@5, &err), 5u);
+
+  // OnTimer returns false: the session expired, do not reschedule.
+  XCTAssertFalse(tmm->OnTimer());
+
+  OCMVerify([self.mockConfigurator setInTemporaryMonitorMode:NO]);
+  XCTAssertTrue(
+      [events.lastObject isKindOfClass:[SNTStoredTemporaryMonitorModeLeaveAuditEvent class]]);
+  XCTAssertEqual(((SNTStoredTemporaryMonitorModeLeaveAuditEvent*)events.lastObject).reason,
+                 SNTTemporaryMonitorModeLeaveReasonSessionExpired);
 }
 
 @end
