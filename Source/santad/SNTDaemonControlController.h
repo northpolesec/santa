@@ -25,6 +25,10 @@
 #include "Source/santad/SNTBinaryUploadController.h"
 #include "Source/santad/SandboxExpectations.h"
 
+namespace santa {
+class TemporaryAdminMode;
+}
+
 @class SNTNotificationQueue;
 @class SNTSyncdQueue;
 @class SNTNetworkExtensionQueue;
@@ -53,5 +57,9 @@
 /// When force is YES, delegates to installNetworkExtension: as long as installation is authorized.
 /// When force is NO, skips install if the loaded version already matches the on-disk version.
 - (void)installNetworkExtensionForce:(BOOL)force reply:(void (^)(BOOL))reply;
+
+// The Temporary Admin Mode orchestrator owned by this controller. Exposed so the ES login-window
+// session handler can drive lock/logout revocation through the same instance.
+- (std::shared_ptr<santa::TemporaryAdminMode>)temporaryAdminMode;
 
 @end
