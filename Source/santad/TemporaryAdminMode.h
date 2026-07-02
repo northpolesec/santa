@@ -73,7 +73,7 @@ class TemporaryAdminMode : public TimedSyncSession, public PassKey<TemporaryAdmi
 
  protected:
   bool ApplyEffect(NSError** err) override;
-  void RevertEffect() override;
+  bool RevertEffect() override;
   bool ReapplyEffectOnRestart() override;
   bool ExtraPreconditions() override;
   NSString* StateKey() override;

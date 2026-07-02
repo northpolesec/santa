@@ -173,15 +173,21 @@ bool TemporaryAdminMode::ApplyEffect(NSError** err) {
   return membership_->AddMember(target_uid_, err);
 }
 
-void TemporaryAdminMode::RevertEffect() {
+bool TemporaryAdminMode::RevertEffect() {
   if (target_uid_ == 0) {
-    return;
+    // No session target -> nothing to revert.
+    return true;
   }
   NSError* err = nil;
   if (!membership_->RemoveMember(target_uid_, &err)) {
+    // Report the failure so the base keeps an expired session record and retries the
+    // demotion on the next daemon start, rather than clearing state and leaving the
+    // user elevated past the intended window.
     LOGE(@"Temporary Admin Mode failed to demote uid %u: %@", target_uid_,
          err.localizedDescription);
+    return false;
   }
+  return true;
 }
 
 bool TemporaryAdminMode::ReapplyEffectOnRestart() {

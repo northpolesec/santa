@@ -317,6 +317,46 @@ static uint64_t MakeDeadline(uint64_t want) {
       [events.lastObject isKindOfClass:[SNTStoredTemporaryAdminModeLeaveAuditEvent class]]);
 }
 
+// If the demotion fails during reconciliation of an expired session, the session state
+// must NOT be cleared: the base keeps an already-expired record (deadline 0) so the next
+// daemon start retries the revert, rather than leaving the user elevated with nothing
+// tracking it. (The success case is covered by testReconcileExpiredRemovesMember; together
+// they exercise the retry loop.)
+- (void)testReconcileRevertFailureRetainsExpiredStateForRetry {
+  [self stubPolicyAvailable];
+  uid_t uid = getuid();
+  OCMStub([self.mockConfigurator savedTimedSessionStateForKey:@"TempAdmin"])
+      .andReturn([self stateWithBootUUID:[SNTSystemInfo bootSessionUUID]
+                                deadline:1  // already in the past
+                                syncHost:@"foo.workshop.cloud"
+                                     uid:uid]);
+  __block NSDictionary* lastPersisted = nil;
+  OCMStub([self.mockConfigurator persistTimedSessionState:[OCMArg any] forKey:@"TempAdmin"])
+      .andDo(^(NSInvocation* inv) {
+        __unsafe_unretained NSDictionary* s = nil;
+        [inv getArgument:&s atIndex:2];
+        lastPersisted = s;
+      });
+  auto fakeOwned = std::make_unique<FakeAdminGroupMembership>();
+  FakeAdminGroupMembership* fake = fakeOwned.get();
+  fake->members_.insert(uid);
+  fake->fail_remove_ = true;  // the demotion cannot be committed
+  NSMutableArray* events = [NSMutableArray array];
+  auto tam = santa::TemporaryAdminMode::Create(
+      (SNTConfigurator*)self.mockConfigurator, (SNTNotificationQueue*)self.mockNotQueue,
+      std::move(fakeOwned), ^(SNTStoredTemporaryAdminModeAuditEvent* e) {
+        [events addObject:e];
+      });
+
+  // Still elevated (removal failed) ...
+  XCTAssertTrue(fake->IsMember(uid));
+  XCTAssertFalse(tam->SecondsRemaining().has_value());
+  // ... and the state was NOT cleared: an already-expired record was persisted for retry.
+  XCTAssertNotNil(lastPersisted);
+  XCTAssertEqualObjects(lastPersisted[kTimedSessionDeadlineKey], @0);
+  XCTAssertEqualObjects(lastPersisted[@"TargetUID"], @(uid));
+}
+
 #pragma mark EndForUserEvent tests
 
 // After a successful grant, EndForUserEvent for the granted uid returns true, removes the uid
