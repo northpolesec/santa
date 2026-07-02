@@ -7,11 +7,20 @@
 /* Notification message shown when a known app has been unblocked */
 "%@ can now be run" = "%@ peut maintenant être exécuté";
 
+/* Reason shown when a justification is required but not given */
+"a justification is required" = "une justification est requise";
+
+/* Reason shown when another user already has an active session */
+"a session is already active for another user" = "une session est déjà active pour un autre utilisateur";
+
 /* The default message to show the user when access to a file is blocked */
 "Access to a file has been denied" = "L'accès à un fichier a été refusé";
 
 /* No comment provided by engineer. */
 "Accessed Path" = "Chemin d'accès";
+
+/* Reason shown when admin elevation fails with an unknown error */
+"an unknown error occurred" = "une erreur inconnue s'est produite";
 
 /* No comment provided by engineer. [QC] */
 "An unknown error occurred. Please try again." = "Une erreur inconnue s'est produite. Veuillez réessayer s.v.p.";
@@ -24,6 +33,9 @@
 
 /* Message for reset silences confirmation dialog [QC] */
 "Are you sure you want to reset all notification silences? You will start receiving notifications for previously silenced events." = "Êtes-vous certain de vouloir réinitialiser toutes les notifications en sourdine ? Vous allez recommencer à recevoir des notifications pour les événements précédemment mis en sourdine.";
+
+/* Reason shown when admin elevation authorization fails */
+"authorization failed" = "l'autorisation a échoué";
 
 /* Authorize execution of an application with Signing ID or Path */
 "authorize execution of %@" = "autoriser l'exécution de %@";
@@ -85,6 +97,9 @@
 /* No comment provided by engineer. */
 "Drop for application info" = "Déposer pour les informations de l'application";
 
+/* Temporary admin mode alert body */
+"Enter a justification for requesting admin privileges:" = "Saisissez une justification pour demander des privilèges d'administrateur :";
+
 /* No comment provided by engineer. [QC] */
 "Failed to connect to the sync service. Please try again later." = "Échec de la connexion au service de synchronisation. Veuillez réessayer plus tard s.v.p.";
 
@@ -103,11 +118,17 @@
 /* Error message shown when user tries to enter TMM mode without a policy [QC] */
 "Failed to enter temporary monitor mode: this machine does not currently have a policy allowing temporary monitor mode" = "Échec du passage en mode moniteur temporaire : cet ordinateur ne dispose pas présentement d'une politique autorisant le mode moniteur temporaire";
 
+/* Admin elevation failure; %@ is the specific reason */
+"Failed to request admin privileges: %@" = "Échec de la demande de privilèges d'administrateur : %@";
+
 /* No comment provided by engineer. */
 "Filename" = "Nom du fichier";
 
 /* No comment provided by engineer. */
 "FS Type" = "Type FS";
+
+/* Temporary admin mode justification placeholder */
+"Justification" = "Justification";
 
 /* No comment provided by engineer. */
 "Label after time period picker (application)" = "\U2800";
@@ -136,6 +157,9 @@
 /* Block reason when no rule matched in lockdown mode */
 "No matching rule" = "Aucune règle correspondante";
 
+/* OK button */
+"OK" = "OK";
+
 /* Default text for Open button */
 "Open..." = "Ouvrir...";
 
@@ -156,6 +180,12 @@
 
 /* No comment provided by engineer. */
 "Remount Mode" = "Mode de remontage";
+
+/* Temporary admin mode alert title */
+"Request Admin Privileges" = "Demander des privilèges d'administrateur";
+
+/* Authorize temporary Admin Mode exception */
+"request admin privileges" = "demander des privilèges d'administrateur";
 
 /* Notification message shown when an unknown app has been unblocked */
 "Requested application can now be run" = "L'application demandée peut maintenant être exécutée";
@@ -217,6 +247,9 @@
 /* Block reason for Team ID rule match */
 "Team ID rule" = "Règle de Team ID";
 
+/* Reason shown when the group membership change fails */
+"the admin group membership change failed" = "la modification de l'appartenance au groupe d'administrateurs a échoué";
+
 /* No comment provided by engineer. [QC] */
 "The event upload failed. Please check your network connection and try again." = "Le téléversement de l'événement a échoué. Veuillez vérifier votre connexion réseau et réessayer.";
 
@@ -253,6 +286,9 @@
 /* No comment provided by engineer. */
 "The sync operation failed. Please try again." = "L'opération de synchronisation a échoué. Veuillez réessayer.";
 
+/* Reason shown when requesting admin without a policy */
+"this machine does not currently allow temporary admin elevation" = "cet ordinateur ne permet pas présentement l'élévation temporaire des privilèges d'administrateur";
+
 /* No comment provided by engineer. [QC] */
 "Too many syncs are in progress. Please try again later." = "Trop de synchronisations sont en cours. Veuillez réessayer plus tard s.v.p.";
 
@@ -271,38 +307,5 @@
 /* Version in About view for Lite edition */
 "Version **%@** (Lite)" = "Version **%@** (Lite)";
 
-/* Temporary admin mode alert title */
-"Request Admin Privileges" = "Demander des privilèges d'administrateur";
-
-/* Temporary admin mode alert body */
-"Enter a justification for requesting admin privileges:" = "Saisissez une justification pour demander des privilèges d'administrateur :";
-
-/* Temporary admin mode justification placeholder */
-"Justification" = "Justification";
-
-/* OK button */
-"OK" = "OK";
-
-/* Authorize temporary Admin Mode exception */
-"request admin privileges" = "demander des privilèges d'administrateur";
-
-/* Error shown when requesting admin without a policy */
-"Failed to request admin privileges: this machine does not currently allow temporary admin elevation" = "Échec de la demande de privilèges d'administrateur : cet ordinateur ne permet pas présentement l'élévation temporaire des privilèges d'administrateur";
-
-/* Error shown when a natural admin requests elevation */
-"Failed to request admin privileges: you are already an administrator" = "Échec de la demande de privilèges d'administrateur : vous êtes déjà administrateur";
-
-/* Error shown when another user already has an active session */
-"Failed to request admin privileges: a session is already active for another user" = "Échec de la demande de privilèges d'administrateur : une session est déjà active pour un autre utilisateur";
-
-/* Error shown when a justification is required but not given */
-"Failed to request admin privileges: a justification is required" = "Échec de la demande de privilèges d'administrateur : une justification est requise";
-
-/* Error shown when admin elevation authorization fails */
-"Failed to request admin privileges: authorization failed" = "Échec de la demande de privilèges d'administrateur : l'autorisation a échoué";
-
-/* Error shown when the group membership change fails */
-"Failed to request admin privileges: the admin group membership change failed" = "Échec de la demande de privilèges d'administrateur : la modification de l'appartenance au groupe d'administrateurs a échoué";
-
-/* Error shown when admin elevation fails with an unknown error */
-"Failed to request admin privileges: an unknown error occurred" = "Échec de la demande de privilèges d'administrateur : une erreur inconnue s'est produite";
+/* Reason shown when a natural admin requests elevation */
+"you are already an administrator" = "vous êtes déjà administrateur";

@@ -4,11 +4,20 @@
 /* Notification message shown when a known app has been unblocked */
 "%@ can now be run" = "%@が実行できるようになった";
 
+/* Reason shown when a justification is required but not given */
+"a justification is required" = "理由の入力が必要です";
+
+/* Reason shown when another user already has an active session */
+"a session is already active for another user" = "別のユーザーのセッションがすでにアクティブです";
+
 /* The default message to show the user when access to a file is blocked */
 "Access to a file has been denied" = "ファイルへのアクセスが拒否されました";
 
 /* No comment provided by engineer. */
 "Accessed Path" = "アクセスパス";
+
+/* Reason shown when admin elevation fails with an unknown error */
+"an unknown error occurred" = "不明なエラーが発生しました";
 
 /* No comment provided by engineer. */
 "An unknown error occurred. Please try again." = "不明なエラーが発生しました。もう一度お試しください。";
@@ -21,6 +30,9 @@
 
 /* Message for reset silences confirmation dialog */
 "Are you sure you want to reset all notification silences? You will start receiving notifications for previously silenced events." = "すべての通知の停止設定をリセットしてもよろしいですか？以前停止した通知が再び届くようになります。";
+
+/* Reason shown when admin elevation authorization fails */
+"authorization failed" = "認証に失敗しました";
 
 /* Authorize execution fallback */
 "authorize execution" = "実行を許可する";
@@ -82,6 +94,9 @@
 /* No comment provided by engineer. */
 "Drop for application info" = "アプリ情報のためにドロップ";
 
+/* Temporary admin mode alert body */
+"Enter a justification for requesting admin privileges:" = "管理者権限をリクエストする理由を入力してください:";
+
 /* No comment provided by engineer. */
 "Failed to connect to the sync service. Please try again later." = "同期サービスへの接続に失敗しました。後ほどもう一度お試しください。";
 
@@ -100,11 +115,17 @@
 /* Error message shown when user tries to enter TMM mode without a policy */
 "Failed to enter temporary monitor mode: this machine does not currently have a policy allowing temporary monitor mode" = "一時的なモニターモードへの切り替えに失敗しました: このマシンには現在、一時的なモニターモードを許可するポリシーがありません";
 
+/* Admin elevation failure; %@ is the specific reason */
+"Failed to request admin privileges: %@" = "管理者権限のリクエストに失敗しました: %@";
+
 /* No comment provided by engineer. */
 "Filename" = "ファイル名";
 
 /* No comment provided by engineer. */
 "FS Type" = "ファイルシステム種別";
+
+/* Temporary admin mode justification placeholder */
+"Justification" = "理由";
 
 /* No comment provided by engineer. */
 "Label after time period picker (application)" = "停止します";
@@ -133,6 +154,9 @@
 /* Block reason when no rule matched in lockdown mode */
 "No matching rule" = "一致するルールなし";
 
+/* OK button */
+"OK" = "OK";
+
 /* Default text for Open button */
 "Open..." = "開く…";
 
@@ -153,6 +177,12 @@
 
 /* No comment provided by engineer. */
 "Remount Mode" = "再マウントモード";
+
+/* Temporary admin mode alert title */
+"Request Admin Privileges" = "管理者権限のリクエスト";
+
+/* Authorize temporary Admin Mode exception */
+"request admin privileges" = "管理者権限をリクエストする";
 
 /* Notification message shown when an unknown app has been unblocked */
 "Requested application can now be run" = "リクエストされたアプリケーションが実行できるようになりました。";
@@ -198,6 +228,9 @@
 
 /* Notification message shown when a sync fails */
 "Sync failed" = "同期に失敗しました";
+
+/* Reason shown when the group membership change fails */
+"the admin group membership change failed" = "管理者グループのメンバーシップの変更に失敗しました";
 
 /* No comment provided by engineer. */
 "The event upload failed. Please check your network connection and try again." = "イベントのアップロードに失敗しました。ネットワーク接続を確認して、もう一度お試しください。";
@@ -253,6 +286,9 @@
 /* The default message to show the user when a network share mount is blocked */
 "The following network share has been blocked from mounting" = "次のネットワーク共有のマウントがブロックされました";
 
+/* Reason shown when requesting admin without a policy */
+"this machine does not currently allow temporary admin elevation" = "このマシンは現在、一時的な管理者権限の昇格を許可していません";
+
 /* No comment provided by engineer. */
 "unknown" = "不明";
 
@@ -268,38 +304,5 @@
 /* Version in About view for Lite edition */
 "Version **%@** (Lite)" = "バージョン **%@** (Lite)";
 
-/* Temporary admin mode alert title */
-"Request Admin Privileges" = "管理者権限のリクエスト";
-
-/* Temporary admin mode alert body */
-"Enter a justification for requesting admin privileges:" = "管理者権限をリクエストする理由を入力してください:";
-
-/* Temporary admin mode justification placeholder */
-"Justification" = "理由";
-
-/* OK button */
-"OK" = "OK";
-
-/* Authorize temporary Admin Mode exception */
-"request admin privileges" = "管理者権限をリクエストする";
-
-/* Error shown when requesting admin without a policy */
-"Failed to request admin privileges: this machine does not currently allow temporary admin elevation" = "管理者権限のリクエストに失敗しました: このマシンは現在、一時的な管理者権限の昇格を許可していません";
-
-/* Error shown when a natural admin requests elevation */
-"Failed to request admin privileges: you are already an administrator" = "管理者権限のリクエストに失敗しました: すでに管理者です";
-
-/* Error shown when another user already has an active session */
-"Failed to request admin privileges: a session is already active for another user" = "管理者権限のリクエストに失敗しました: 別のユーザーのセッションがすでにアクティブです";
-
-/* Error shown when a justification is required but not given */
-"Failed to request admin privileges: a justification is required" = "管理者権限のリクエストに失敗しました: 理由の入力が必要です";
-
-/* Error shown when admin elevation authorization fails */
-"Failed to request admin privileges: authorization failed" = "管理者権限のリクエストに失敗しました: 認証に失敗しました";
-
-/* Error shown when the group membership change fails */
-"Failed to request admin privileges: the admin group membership change failed" = "管理者権限のリクエストに失敗しました: 管理者グループのメンバーシップの変更に失敗しました";
-
-/* Error shown when admin elevation fails with an unknown error */
-"Failed to request admin privileges: an unknown error occurred" = "管理者権限のリクエストに失敗しました: 不明なエラーが発生しました";
+/* Reason shown when a natural admin requests elevation */
+"you are already an administrator" = "すでに管理者です";

@@ -4,11 +4,20 @@
 /* Notification message shown when a known app has been unblocked */
 "%@ can now be run" = "%@ can now be run";
 
+/* Reason shown when a justification is required but not given */
+"a justification is required" = "a justification is required";
+
+/* Reason shown when another user already has an active session */
+"a session is already active for another user" = "a session is already active for another user";
+
 /* The default message to show the user when access to a file is blocked */
 "Access to a file has been denied" = "Access to a file has been denied";
 
 /* No comment provided by engineer. */
 "Accessed Path" = "Accessed Path";
+
+/* Reason shown when admin elevation fails with an unknown error */
+"an unknown error occurred" = "an unknown error occurred";
 
 /* No comment provided by engineer. */
 "An unknown error occurred. Please try again." = "An unknown error occurred. Please try again.";
@@ -21,6 +30,9 @@
 
 /* Message for reset silences confirmation dialog */
 "Are you sure you want to reset all notification silences? You will start receiving notifications for previously silenced events." = "Are you sure you want to reset all notification silences? You will start receiving notifications for previously silenced events.";
+
+/* Reason shown when admin elevation authorization fails */
+"authorization failed" = "authorization failed";
 
 /* Authorize execution */
 "authorize execution" = "authorize execution";
@@ -82,6 +94,9 @@
 /* No comment provided by engineer. */
 "Drop for application info" = "Drop for application info";
 
+/* Temporary admin mode alert body */
+"Enter a justification for requesting admin privileges:" = "Enter a justification for requesting admin privileges:";
+
 /* No comment provided by engineer. */
 "Failed to connect to the sync service. Please try again later." = "Failed to connect to the sync service. Please try again later.";
 
@@ -100,11 +115,17 @@
 /* Error message shown when user tries to enter TMM mode without a policy */
 "Failed to enter temporary monitor mode: this machine does not currently have a policy allowing temporary monitor mode" = "Failed to enter temporary monitor mode: this machine does not currently have a policy allowing temporary monitor mode";
 
+/* Admin elevation failure; %@ is the specific reason */
+"Failed to request admin privileges: %@" = "Failed to request admin privileges: %@";
+
 /* No comment provided by engineer. */
 "Filename" = "Filename";
 
 /* No comment provided by engineer. */
 "FS Type" = "FS Type";
+
+/* Temporary admin mode justification placeholder */
+"Justification" = "Justification";
 
 /* No comment provided by engineer. */
 "Label after time period picker (application)" = "\U2800";
@@ -133,6 +154,9 @@
 /* Block reason when no rule matched in lockdown mode */
 "No matching rule" = "No matching rule";
 
+/* OK button */
+"OK" = "OK";
+
 /* Default text for Open button */
 "Open..." = "Open...";
 
@@ -153,6 +177,12 @@
 
 /* No comment provided by engineer. */
 "Remount Mode" = "Remount Mode";
+
+/* Temporary admin mode alert title */
+"Request Admin Privileges" = "Request Admin Privileges";
+
+/* Authorize temporary Admin Mode exception */
+"request admin privileges" = "request admin privileges";
 
 /* Notification message shown when an unknown app has been unblocked */
 "Requested application can now be run" = "Requested application can now be run";
@@ -214,6 +244,9 @@
 /* Block reason for Team ID rule match */
 "Team ID rule" = "Team ID rule";
 
+/* Reason shown when the group membership change fails */
+"the admin group membership change failed" = "the admin group membership change failed";
+
 /* No comment provided by engineer. */
 "The event upload failed. Please check your network connection and try again." = "The event upload failed. Please check your network connection and try again.";
 
@@ -250,6 +283,9 @@
 /* No comment provided by engineer. */
 "The sync operation failed. Please try again." = "The sync operation failed. Please try again.";
 
+/* Reason shown when requesting admin without a policy */
+"this machine does not currently allow temporary admin elevation" = "this machine does not currently allow temporary admin elevation";
+
 /* No comment provided by engineer. */
 "Too many syncs are in progress. Please try again later." = "Too many syncs are in progress. Please try again later.";
 
@@ -268,38 +304,5 @@
 /* Version in About view for Lite edition */
 "Version **%@** (Lite)" = "Version **%@** (Lite)";
 
-/* Temporary admin mode alert title */
-"Request Admin Privileges" = "Request Admin Privileges";
-
-/* Temporary admin mode alert body */
-"Enter a justification for requesting admin privileges:" = "Enter a justification for requesting admin privileges:";
-
-/* Temporary admin mode justification placeholder */
-"Justification" = "Justification";
-
-/* OK button */
-"OK" = "OK";
-
-/* Authorize temporary Admin Mode exception */
-"request admin privileges" = "request admin privileges";
-
-/* Error shown when requesting admin without a policy */
-"Failed to request admin privileges: this machine does not currently allow temporary admin elevation" = "Failed to request admin privileges: this machine does not currently allow temporary admin elevation";
-
-/* Error shown when a natural admin requests elevation */
-"Failed to request admin privileges: you are already an administrator" = "Failed to request admin privileges: you are already an administrator";
-
-/* Error shown when another user already has an active session */
-"Failed to request admin privileges: a session is already active for another user" = "Failed to request admin privileges: a session is already active for another user";
-
-/* Error shown when a justification is required but not given */
-"Failed to request admin privileges: a justification is required" = "Failed to request admin privileges: a justification is required";
-
-/* Error shown when admin elevation authorization fails */
-"Failed to request admin privileges: authorization failed" = "Failed to request admin privileges: authorization failed";
-
-/* Error shown when the group membership change fails */
-"Failed to request admin privileges: the admin group membership change failed" = "Failed to request admin privileges: the admin group membership change failed";
-
-/* Error shown when admin elevation fails with an unknown error */
-"Failed to request admin privileges: an unknown error occurred" = "Failed to request admin privileges: an unknown error occurred";
+/* Reason shown when a natural admin requests elevation */
+"you are already an administrator" = "you are already an administrator";

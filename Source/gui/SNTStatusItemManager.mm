@@ -193,34 +193,44 @@ static NSString* const kNotificationSilencesKey = @"SilencedNotifications";
     [proxy cancelTemporaryAdminMode:reply];
   };
   d.messageForError = ^NSString*(NSInteger code) {
+    NSString* reason;
     switch (code) {
       case SNTErrorCodeTAMNoPolicy:
-        return NSLocalizedString(
-            @"Failed to request admin privileges: this machine does not currently allow "
-            @"temporary admin elevation",
-            @"Error shown when requesting admin without a policy");
+        reason =
+            NSLocalizedString(@"this machine does not currently allow temporary admin elevation",
+                              @"Reason shown when requesting admin without a policy");
+        break;
       case SNTErrorCodeTAMAlreadyAdmin:
-        return NSLocalizedString(
-            @"Failed to request admin privileges: you are already an administrator",
-            @"Error shown when a natural admin requests elevation");
+        reason = NSLocalizedString(@"you are already an administrator",
+                                   @"Reason shown when a natural admin requests elevation");
+        break;
       case SNTErrorCodeTAMAuthFailed:
-        return NSLocalizedString(@"Failed to request admin privileges: authorization failed",
-                                 @"Error shown when admin elevation authorization fails");
+        reason = NSLocalizedString(@"authorization failed",
+                                   @"Reason shown when admin elevation authorization fails");
+        break;
       case SNTErrorCodeTAMJustificationRequired:
-        return NSLocalizedString(@"Failed to request admin privileges: a justification is required",
-                                 @"Error shown when a justification is required but not given");
+        reason = NSLocalizedString(@"a justification is required",
+                                   @"Reason shown when a justification is required but not given");
+        break;
       case SNTErrorCodeTAMSessionAlreadyActive:
-        return NSLocalizedString(
-            @"Failed to request admin privileges: a session is already active for another user",
-            @"Error shown when another user already has an active session");
+        reason = NSLocalizedString(@"a session is already active for another user",
+                                   @"Reason shown when another user already has an active session");
+        break;
       case SNTErrorCodeTAMMembershipChangeFailed:
-        return NSLocalizedString(
-            @"Failed to request admin privileges: the admin group membership change failed",
-            @"Error shown when the group membership change fails");
+        reason = NSLocalizedString(@"the admin group membership change failed",
+                                   @"Reason shown when the group membership change fails");
+        break;
       default:
-        return NSLocalizedString(@"Failed to request admin privileges: an unknown error occurred",
-                                 @"Error shown when admin elevation fails with an unknown error");
+        reason =
+            NSLocalizedString(@"an unknown error occurred",
+                              @"Reason shown when admin elevation fails with an unknown error");
+        break;
     }
+    return [NSString
+        localizedStringWithFormat:NSLocalizedString(
+                                      @"Failed to request admin privileges: %@",
+                                      @"Admin elevation failure; %@ is the specific reason"),
+                                  reason];
   };
   return d;
 }

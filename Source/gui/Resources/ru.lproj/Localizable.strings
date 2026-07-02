@@ -4,11 +4,20 @@
 /* Notification message shown when a known app has been unblocked */
 "%@ can now be run" = "Теперь можно запустить %@";
 
+/* Reason shown when a justification is required but not given */
+"a justification is required" = "требуется обоснование";
+
+/* Reason shown when another user already has an active session */
+"a session is already active for another user" = "для другого пользователя уже активна сессия";
+
 /* The default message to show the user when access to a file is blocked */
 "Access to a file has been denied" = "Доступ к файлу запрещён";
 
 /* No comment provided by engineer. */
 "Accessed Path" = "Путь, к которому был получен доступ";
+
+/* Reason shown when admin elevation fails with an unknown error */
+"an unknown error occurred" = "произошла неизвестная ошибка";
 
 /* No comment provided by engineer. */
 "An unknown error occurred. Please try again." = "Произошла неизвестная ошибка. Пожалуйста, попробуйте снова.";
@@ -21,6 +30,9 @@
 
 /* Message for reset silences confirmation dialog */
 "Are you sure you want to reset all notification silences? You will start receiving notifications for previously silenced events." = "Вы уверены, что хотите сбросить все отключения уведомлений? Вы снова начнёте получать уведомления о событиях, для которых уведомления были ранее отключены.";
+
+/* Reason shown when admin elevation authorization fails */
+"authorization failed" = "ошибка авторизации";
 
 /* Authorize execution fallback */
 "authorize execution" = "разрешить запуск";
@@ -82,6 +94,9 @@
 /* No comment provided by engineer. */
 "Drop for application info" = "Перетащите сюда приложение, чтобы увидеть сведения о нём";
 
+/* Temporary admin mode alert body */
+"Enter a justification for requesting admin privileges:" = "Введите обоснование для запроса прав администратора:";
+
 /* No comment provided by engineer. */
 "Failed to connect to the sync service. Please try again later." = "Не удалось подключиться к службе синхронизации. Пожалуйста, попробуйте позже.";
 
@@ -100,11 +115,17 @@
 /* Error message shown when user tries to enter TMM mode without a policy */
 "Failed to enter temporary monitor mode: this machine does not currently have a policy allowing temporary monitor mode" = "Не удалось перейти во временный режим мониторинга: на этом компьютере сейчас нет политики, разрешающей временный режим мониторинга";
 
+/* Admin elevation failure; %@ is the specific reason */
+"Failed to request admin privileges: %@" = "Не удалось запросить права администратора: %@";
+
 /* No comment provided by engineer. */
 "Filename" = "Имя файла";
 
 /* No comment provided by engineer. */
 "FS Type" = "Тип файловой системы";
+
+/* Temporary admin mode justification placeholder */
+"Justification" = "Обоснование";
 
 /* No comment provided by engineer. */
 "Label after time period picker (application)" = "\U2800";
@@ -133,6 +154,9 @@
 /* Block reason when no rule matched in lockdown mode */
 "No matching rule" = "Совпадающее правило не найдено";
 
+/* OK button */
+"OK" = "OK";
+
 /* Default text for Open button */
 "Open..." = "Открыть...";
 
@@ -153,6 +177,12 @@
 
 /* No comment provided by engineer. */
 "Remount Mode" = "Режим перемонтирования";
+
+/* Temporary admin mode alert title */
+"Request Admin Privileges" = "Запрос прав администратора";
+
+/* Authorize temporary Admin Mode exception */
+"request admin privileges" = "запросить права администратора";
 
 /* Notification message shown when an unknown app has been unblocked */
 "Requested application can now be run" = "Запрошенное приложение теперь можно запустить";
@@ -214,6 +244,9 @@
 /* Block reason for Team ID rule match */
 "Team ID rule" = "Правило идентификатора команды";
 
+/* Reason shown when the group membership change fails */
+"the admin group membership change failed" = "не удалось изменить членство в группе администраторов";
+
 /* No comment provided by engineer. */
 "The event upload failed. Please check your network connection and try again." = "Не удалось отправить событие. Пожалуйста, проверьте подключение к сети и попробуйте снова.";
 
@@ -253,6 +286,9 @@
 /* The default message to show the user when a network share mount is blocked */
 "The following network share has been blocked from mounting" = "Монтирование следующего сетевого ресурса было заблокировано";
 
+/* Reason shown when requesting admin without a policy */
+"this machine does not currently allow temporary admin elevation" = "на этом компьютере сейчас не разрешено временное повышение прав администратора";
+
 /* No comment provided by engineer. */
 "unknown" = "неизвестно";
 
@@ -268,38 +304,5 @@
 /* Version in About view for Lite edition */
 "Version **%@** (Lite)" = "Версия **%@** (Lite)";
 
-/* Temporary admin mode alert title */
-"Request Admin Privileges" = "Запрос прав администратора";
-
-/* Temporary admin mode alert body */
-"Enter a justification for requesting admin privileges:" = "Введите обоснование для запроса прав администратора:";
-
-/* Temporary admin mode justification placeholder */
-"Justification" = "Обоснование";
-
-/* OK button */
-"OK" = "OK";
-
-/* Authorize temporary Admin Mode exception */
-"request admin privileges" = "запросить права администратора";
-
-/* Error shown when requesting admin without a policy */
-"Failed to request admin privileges: this machine does not currently allow temporary admin elevation" = "Не удалось запросить права администратора: на этом компьютере сейчас не разрешено временное повышение прав администратора";
-
-/* Error shown when a natural admin requests elevation */
-"Failed to request admin privileges: you are already an administrator" = "Не удалось запросить права администратора: вы уже являетесь администратором";
-
-/* Error shown when another user already has an active session */
-"Failed to request admin privileges: a session is already active for another user" = "Не удалось запросить права администратора: для другого пользователя уже активна сессия";
-
-/* Error shown when a justification is required but not given */
-"Failed to request admin privileges: a justification is required" = "Не удалось запросить права администратора: требуется обоснование";
-
-/* Error shown when admin elevation authorization fails */
-"Failed to request admin privileges: authorization failed" = "Не удалось запросить права администратора: ошибка авторизации";
-
-/* Error shown when the group membership change fails */
-"Failed to request admin privileges: the admin group membership change failed" = "Не удалось запросить права администратора: не удалось изменить членство в группе администраторов";
-
-/* Error shown when admin elevation fails with an unknown error */
-"Failed to request admin privileges: an unknown error occurred" = "Не удалось запросить права администратора: произошла неизвестная ошибка";
+/* Reason shown when a natural admin requests elevation */
+"you are already an administrator" = "вы уже являетесь администратором";
