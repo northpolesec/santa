@@ -298,4 +298,45 @@
   XCTAssertTrue(self.ringbuf->Empty());
 }
 
+// Patch 1: with no GUI connection, the TAM auth request must invoke its reply
+// synchronously with (NO, @"") rather than leaving it uninvoked — otherwise the
+// daemon-side grant stalls its full fail-closed timeout.
+- (void)testAuthorizeTemporaryAdminModeNoConnectionFailsClosed {
+  self.sut.notifierConnection = nil;
+
+  __block BOOL replied = NO;
+  __block BOOL gotAuthed = YES;
+  __block NSString* gotReason = nil;
+  [self.sut authorizeTemporaryAdminModeRequiringJustification:YES
+                                                        reply:^(BOOL authed, NSString* reason) {
+                                                          replied = YES;
+                                                          gotAuthed = authed;
+                                                          gotReason = reason;
+                                                        }];
+
+  XCTAssertTrue(replied);  // invoked synchronously, no stall
+  XCTAssertFalse(gotAuthed);
+  XCTAssertEqualObjects(gotReason, @"");
+}
+
+// Patch 1: if the synchronous proxy returns without ever invoking the reply block
+// (e.g. the GUI died mid-auth), the queue must still fail closed synchronously.
+- (void)testAuthorizeTemporaryAdminModeProxyNeverRepliesFailsClosed {
+  OCMStub([self.mockConnection synchronousRemoteObjectProxy]).andReturn(self.mockProxy);
+  // Proxy accepts the call but never runs the reply block.
+  OCMStub([self.mockProxy authorizeTemporaryAdminModeRequiringJustification:YES
+                                                                      reply:[OCMArg any]]);
+
+  __block BOOL replied = NO;
+  __block BOOL gotAuthed = YES;
+  [self.sut authorizeTemporaryAdminModeRequiringJustification:YES
+                                                        reply:^(BOOL authed, NSString* reason) {
+                                                          replied = YES;
+                                                          gotAuthed = authed;
+                                                        }];
+
+  XCTAssertTrue(replied);  // fail-fast via the replied guard
+  XCTAssertFalse(gotAuthed);
+}
+
 @end

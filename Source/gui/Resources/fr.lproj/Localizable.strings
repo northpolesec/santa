@@ -267,3 +267,39 @@
 
 /* Version in About view for Lite edition */
 "Version **%@** (Lite)" = "Version **%@** (Lite)";
+
+/* Temporary admin mode alert title */
+"Request Admin Privileges" = "Demander des privilèges d'administrateur";
+
+/* Temporary admin mode alert body */
+"Enter a justification for requesting admin privileges:" = "Saisissez une justification pour demander des privilèges d'administrateur :";
+
+/* Temporary admin mode justification placeholder */
+"Justification" = "Justification";
+
+/* OK button */
+"OK" = "OK";
+
+/* Authorize temporary Admin Mode exception */
+"request admin privileges" = "demander des privilèges d'administrateur";
+
+/* Error shown when requesting admin without a policy */
+"Failed to request admin privileges: this machine does not currently allow temporary admin elevation" = "Échec de la demande de privilèges d'administrateur : cette machine ne permet pas actuellement l'élévation temporaire des privilèges d'administrateur";
+
+/* Error shown when a natural admin requests elevation */
+"Failed to request admin privileges: you are already an administrator" = "Échec de la demande de privilèges d'administrateur : vous êtes déjà administrateur";
+
+/* Error shown when another user already has an active session */
+"Failed to request admin privileges: a session is already active for another user" = "Échec de la demande de privilèges d'administrateur : une session est déjà active pour un autre utilisateur";
+
+/* Error shown when a justification is required but not given */
+"Failed to request admin privileges: a justification is required" = "Échec de la demande de privilèges d'administrateur : une justification est requise";
+
+/* Error shown when admin elevation authorization fails */
+"Failed to request admin privileges: authorization failed" = "Échec de la demande de privilèges d'administrateur : l'autorisation a échoué";
+
+/* Error shown when the group membership change fails */
+"Failed to request admin privileges: the admin group membership change failed" = "Échec de la demande de privilèges d'administrateur : la modification de l'appartenance au groupe d'administrateurs a échoué";
+
+/* Error shown when admin elevation fails with an unknown error */
+"Failed to request admin privileges: an unknown error occurred" = "Échec de la demande de privilèges d'administrateur : une erreur inconnue s'est produite";

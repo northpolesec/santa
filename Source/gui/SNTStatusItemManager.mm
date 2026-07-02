@@ -28,7 +28,39 @@
 #import "Source/gui/SNTAboutWindowController.h"
 #import "Source/gui/SNTNotificationManager.h"
 
-@interface SNTStatusItemManager ()
+// Per-mode descriptor: the titles, the request/cancel XPC calls, and the
+// error-message map that differ between Temporary Monitor Mode and Temporary
+// Admin Mode. The shared menu/countdown code is driven by this.
+@interface SNTTimedModeDescriptor : NSObject
+@property(copy) NSString* enterTitle;
+@property(copy) NSString* leaveTitle;
+@property(copy) NSString* refreshTitle;
+// Short label used to disambiguate this mode's countdown in the status-bar title
+// when more than one timed mode is active simultaneously.
+@property(copy) NSString* statusLabel;
+@property(copy) void (^request)(id proxy, void (^reply)(uint32_t minutes, NSError* err));
+@property(copy) void (^cancel)(id proxy, void (^reply)(NSError* err));
+@property(copy) NSString* (^messageForError)(NSInteger code);
+@end
+
+@implementation SNTTimedModeDescriptor
+@end
+
+// Per-mode mutable state: the menu items, the countdown timer, and the current
+// expiration. One instance per mode; the shared code operates on whichever state
+// corresponds to the menu item that was clicked.
+@interface SNTTimedModeState : NSObject
+@property(strong) SNTTimedModeDescriptor* descriptor;
+@property NSMenuItem* menuItem;
+@property NSMenuItem* refreshItem;
+@property(atomic, strong) NSTimer* timer;
+@property(atomic, strong) NSDate* expiration;
+@end
+
+@implementation SNTTimedModeState
+@end
+
+@interface SNTStatusItemManager () <NSMenuDelegate>
 @property SNTAboutWindowController* aboutWindowController;
 @property(strong, nonatomic, readwrite) NSStatusItem* statusItem;
 @property SNTKVOManager* kvoEnableMenuItem;
@@ -36,18 +68,21 @@
 // Sync items
 @property NSMenuItem* syncMenuItem;
 
-// Temporary monitor mode items
-@property(atomic, strong) NSTimer* temporaryMonitorModeTimer;
-@property(atomic, strong) NSDate* temporaryMonitorModeExpiration;
+// Temporary mode (Monitor / Admin) state. One descriptor-backed state per mode;
+// the shared menu/countdown code operates on whichever the user interacts with.
+@property(strong) SNTTimedModeState* tmmState;
+@property(strong) SNTTimedModeState* tamState;
 @property(atomic, strong) NSTimer* iconTintTimer;
-@property NSMenuItem* temporaryMonitorModeMenuItem;
-@property NSMenuItem* temporaryMonitorModeRefreshItem;
 
 // Reset silences item
 @property NSMenuItem* resetSilencesMenuItem;
 
 // Countdown formatter
 @property(nonatomic, strong) NSDateComponentsFormatter* countdownFormatter;
+
+// Last status-bar title pushed via refreshStatusTitle, used to suppress redundant
+// updates (the per-mode timers fire every 5s but the displayed units change slowly).
+@property(copy) NSString* lastStatusTitle;
 @end
 
 static NSString* const kNotificationSilencesKey = @"SilencedNotifications";
@@ -61,6 +96,11 @@ static NSString* const kNotificationSilencesKey = @"SilencedNotifications";
     self.countdownFormatter.allowedUnits =
         NSCalendarUnitDay | NSCalendarUnitHour | NSCalendarUnitMinute;
     self.countdownFormatter.unitsStyle = NSDateComponentsFormatterUnitsStyleAbbreviated;
+
+    self.tmmState = [[SNTTimedModeState alloc] init];
+    self.tmmState.descriptor = [self monitorModeDescriptor];
+    self.tamState = [[SNTTimedModeState alloc] init];
+    self.tamState.descriptor = [self adminModeDescriptor];
 
     [self setupStatusBarItem];
 
@@ -98,6 +138,91 @@ static NSString* const kNotificationSilencesKey = @"SilencedNotifications";
                                                object:nil];
   }
   return self;
+}
+
+- (SNTTimedModeDescriptor*)monitorModeDescriptor {
+  SNTTimedModeDescriptor* d = [[SNTTimedModeDescriptor alloc] init];
+  d.enterTitle = @"Enter Temporary Monitor Mode";
+  d.leaveTitle = @"Leave Temporary Monitor Mode";
+  d.refreshTitle = @"Refresh Temporary Monitor Mode";
+  d.statusLabel = @"Monitor";
+  d.request = ^(id proxy, void (^reply)(uint32_t, NSError*)) {
+    [proxy requestTemporaryMonitorModeWithDurationMinutes:0 reply:reply];
+  };
+  d.cancel = ^(id proxy, void (^reply)(NSError*)) {
+    [proxy cancelTemporaryMonitorMode:reply];
+  };
+  d.messageForError = ^NSString*(NSInteger code) {
+    switch (code) {
+      case SNTErrorCodeTMMNoPolicy:
+        return NSLocalizedString(
+            @"Failed to enter temporary monitor mode: this machine does not currently have a "
+            @"policy allowing temporary monitor mode",
+            @"Error message shown when user tries to enter TMM mode without a policy");
+      case SNTErrorCodeTMMNotInLockdown:
+        return NSLocalizedString(
+            @"Failed to enter temporary monitor mode: not currently in lockdown",
+            @"Error message shown when user tries to enter TMM while not in lockdown");
+      case SNTErrorCodeTMMAuthFailed:
+        return NSLocalizedString(
+            @"Failed to enter temporary monitor mode: authorization failed",
+            @"Error message shown when user tries to enter TMM but authorization failed");
+      case SNTErrorCodeTMMInvalidSyncServer:
+        return NSLocalizedString(
+            @"Failed to enter temporary monitor mode: not using a supported sync server",
+            @"Error message shown when user tries to enter TMM while not using Workshop");
+      default:
+        return NSLocalizedString(
+            @"Failed to enter temporary monitor mode: an unknown error occurred",
+            @"Error shown when user tries to enter TMM and an unknown error occurred.");
+    }
+  };
+  return d;
+}
+
+- (SNTTimedModeDescriptor*)adminModeDescriptor {
+  SNTTimedModeDescriptor* d = [[SNTTimedModeDescriptor alloc] init];
+  d.enterTitle = @"Request Admin Privileges";
+  d.leaveTitle = @"Leave Admin Privileges";
+  d.refreshTitle = @"Refresh Admin Privileges";
+  d.statusLabel = @"Admin";
+  d.request = ^(id proxy, void (^reply)(uint32_t, NSError*)) {
+    [proxy requestTemporaryAdminModeWithDurationMinutes:0 reply:reply];
+  };
+  d.cancel = ^(id proxy, void (^reply)(NSError*)) {
+    [proxy cancelTemporaryAdminMode:reply];
+  };
+  d.messageForError = ^NSString*(NSInteger code) {
+    switch (code) {
+      case SNTErrorCodeTAMNoPolicy:
+        return NSLocalizedString(
+            @"Failed to request admin privileges: this machine does not currently allow "
+            @"temporary admin elevation",
+            @"Error shown when requesting admin without a policy");
+      case SNTErrorCodeTAMAlreadyAdmin:
+        return NSLocalizedString(
+            @"Failed to request admin privileges: you are already an administrator",
+            @"Error shown when a natural admin requests elevation");
+      case SNTErrorCodeTAMAuthFailed:
+        return NSLocalizedString(@"Failed to request admin privileges: authorization failed",
+                                 @"Error shown when admin elevation authorization fails");
+      case SNTErrorCodeTAMJustificationRequired:
+        return NSLocalizedString(@"Failed to request admin privileges: a justification is required",
+                                 @"Error shown when a justification is required but not given");
+      case SNTErrorCodeTAMSessionAlreadyActive:
+        return NSLocalizedString(
+            @"Failed to request admin privileges: a session is already active for another user",
+            @"Error shown when another user already has an active session");
+      case SNTErrorCodeTAMMembershipChangeFailed:
+        return NSLocalizedString(
+            @"Failed to request admin privileges: the admin group membership change failed",
+            @"Error shown when the group membership change fails");
+      default:
+        return NSLocalizedString(@"Failed to request admin privileges: an unknown error occurred",
+                                 @"Error shown when admin elevation fails with an unknown error");
+    }
+  };
+  return d;
 }
 
 - (void)setupStatusBarItem {
@@ -143,41 +268,141 @@ static NSString* const kNotificationSilencesKey = @"SilencedNotifications";
   // Add separator
   [menu addItem:[NSMenuItem separatorItem]];
 
-  // Add temporary monitor mode items (hidden by default until policy is verified)
-  self.temporaryMonitorModeMenuItem = [self menuItemWithTitle:@"Enter Temporary Monitor Mode"
-                                                    andAction:@selector(tmmMenuItemClicked:)];
-  self.temporaryMonitorModeMenuItem.hidden = YES;
-  [menu addItem:self.temporaryMonitorModeMenuItem];
+  // Add temporary-mode (Monitor / Admin) items, hidden by default until
+  // availability is verified.
+  [self addMenuItemsForState:self.tmmState toMenu:menu];
+  [self addMenuItemsForState:self.tamState toMenu:menu];
 
-  self.temporaryMonitorModeRefreshItem = [self menuItemWithTitle:@"Refresh Temporary Monitor Mode"
-                                                       andAction:@selector(tmmRefreshItemClicked:)];
-  self.temporaryMonitorModeRefreshItem.target = nil;
-  self.temporaryMonitorModeRefreshItem.hidden = YES;
-  [menu addItem:self.temporaryMonitorModeRefreshItem];
-
+  menu.delegate = self;
   self.statusItem.menu = menu;
 
+  [self refreshAllTimedModeStateAsync];
+}
+
+- (void)addMenuItemsForState:(SNTTimedModeState*)state toMenu:(NSMenu*)menu {
+  state.menuItem = [self menuItemWithTitle:state.descriptor.enterTitle
+                                 andAction:@selector(timedModeMenuItemClicked:)];
+  state.menuItem.hidden = YES;
+  [menu addItem:state.menuItem];
+
+  state.refreshItem = [self menuItemWithTitle:state.descriptor.refreshTitle
+                                    andAction:@selector(timedModeRefreshItemClicked:)];
+  state.refreshItem.target = nil;
+  state.refreshItem.hidden = YES;
+  [menu addItem:state.refreshItem];
+}
+
+// Resolve which mode's state a clicked menu item belongs to.
+- (SNTTimedModeState*)stateForSender:(id)sender {
+  if (sender == self.tamState.menuItem || sender == self.tamState.refreshItem) {
+    return self.tamState;
+  }
+  return self.tmmState;
+}
+
+// Vend a resumed synchronous control proxy to `block`, then invalidate the connection.
+// The synchronous proxy blocks until each reply runs, so the connection stays valid for
+// the duration of `block`; this centralizes the connect/resume/invalidate lifecycle.
+- (void)withControlProxy:(void (^)(id proxy))block {
+  MOLXPCConnection* daemonConn = [SNTXPCControlInterface configuredConnection];
+  [daemonConn resume];
+  block([daemonConn synchronousRemoteObjectProxy]);
+  [daemonConn invalidate];
+}
+
+// Re-query the daemon for live Monitor + Admin session/availability state off the main thread.
+- (void)refreshAllTimedModeStateAsync {
   dispatch_async(dispatch_get_global_queue(0, 0), ^{
-    [self retrieveTMMState];
+    [self retrieveMonitorModeState];
+    [self retrieveAdminModeState];
   });
 }
 
-- (void)retrieveTMMState {
-  // Check whether temporary monitor mode is available and if we're currently in it.
-  MOLXPCConnection* daemonConn = [SNTXPCControlInterface configuredConnection];
-  [daemonConn resume];
-  [[daemonConn synchronousRemoteObjectProxy]
-      checkTemporaryMonitorModePolicyAvailable:^(BOOL available) {
-        [self setTemporaryMonitorModePolicyAvailable:available];
-      }];
-  [[daemonConn synchronousRemoteObjectProxy]
-      temporaryMonitorModeSecondsRemaining:^(NSNumber* seconds) {
+- (void)retrieveMonitorModeState {
+  // The synchronous control proxy runs these reply blocks on this background queue, so every
+  // helper that mutates AppKit state (menu items, the countdown timer, the status title) must be
+  // marshaled to the main thread. Each block is enqueued in call order, so main-queue FIFO
+  // preserves the ordering the UI depends on.
+  [self withControlProxy:^(id proxy) {
+    [proxy checkTemporaryMonitorModePolicyAvailable:^(BOOL available) {
+      dispatch_async(dispatch_get_main_queue(), ^{
+        [self setAvailable:available forState:self.tmmState];
+      });
+    }];
+    [proxy temporaryMonitorModeSecondsRemaining:^(NSNumber* seconds) {
+      dispatch_async(dispatch_get_main_queue(), ^{
         if (seconds) {
-          NSDate* expiry = [NSDate dateWithTimeIntervalSinceNow:[seconds intValue]];
-          [self enterMonitorModeWithExpiration:expiry];
+          [self enterModeWithExpiration:[NSDate dateWithTimeIntervalSinceNow:[seconds intValue]]
+                               forState:self.tmmState];
+        } else if (self.tmmState.expiration) {
+          // The daemon reports no active session but the GUI still shows one (a leave
+          // notification can be missed while this session is inactive, e.g. fast user
+          // switching). Clear the stale countdown.
+          [self leaveModeForState:self.tmmState];
         }
-      }];
-  [daemonConn invalidate];
+      });
+    }];
+  }];
+}
+
+- (void)retrieveAdminModeState {
+  // See retrieveMonitorModeState: reply blocks run on a background queue, so AppKit mutations are
+  // marshaled to the main queue. Determine the active session first (sets the expiration / "Leave"
+  // title), then compute visibility (which depends on whether a session is active) -- main-queue
+  // FIFO keeps that ordering.
+  [self withControlProxy:^(id proxy) {
+    [proxy temporaryAdminModeSecondsRemaining:^(NSNumber* seconds) {
+      dispatch_async(dispatch_get_main_queue(), ^{
+        if (seconds) {
+          [self enterModeWithExpiration:[NSDate dateWithTimeIntervalSinceNow:[seconds intValue]]
+                               forState:self.tamState];
+        } else if (self.tamState.expiration) {
+          // The daemon reports no active session but the GUI still shows one (a leave
+          // notification can be missed while this session is inactive, e.g. fast user
+          // switching). Clear the stale countdown.
+          [self leaveModeForState:self.tamState];
+        }
+      });
+    }];
+    [proxy checkTemporaryAdminModeAvailable:^(BOOL available, BOOL alreadyAdmin) {
+      dispatch_async(dispatch_get_main_queue(), ^{
+        [self setAdminItemVisibleWhenAvailable:available alreadyAdmin:alreadyAdmin];
+      });
+    }];
+  }];
+}
+
+// The admin item is visible while a session is active (so it can be left — note an
+// active session makes the user a group-80 member, so `alreadyAdmin` is true) or
+// when elevation is available and the user is not already an admin.
+- (void)setAdminItemVisibleWhenAvailable:(BOOL)available alreadyAdmin:(BOOL)alreadyAdmin {
+  BOOL active = (self.tamState.expiration != nil);
+  [self setAvailable:(active || (available && !alreadyAdmin)) forState:self.tamState];
+}
+
+// Re-query Temporary Admin Mode availability against live state each time the menu
+// opens. The user's admin status and policy availability can change after launch
+// (e.g. dropping admin) between sync pushes. checkTemporaryAdminModeAvailable: does not
+// re-enter the GUI, so a synchronous call here is safe (unlike the request path, which is
+// dispatched off the main thread).
+- (void)menuNeedsUpdate:(NSMenu*)menu {
+  [self withControlProxy:^(id proxy) {
+    [proxy checkTemporaryAdminModeAvailable:^(BOOL available, BOOL alreadyAdmin) {
+      [self setAdminItemVisibleWhenAvailable:available alreadyAdmin:alreadyAdmin];
+    }];
+  }];
+}
+
+// Re-query the daemon for live Monitor/Admin session + availability state. Called when this
+// user's session becomes active again (e.g. returning from fast user switching), where daemon
+// push notifications (enter/leave/availability) sent while the session was inactive were missed.
+// Uses retrieve*ModeState's own short-lived control connection, so it does not depend on the
+// daemon->GUI notifier listener (which is torn down while the session is inactive).
+- (void)reconcileTimedModeState {
+  if (!self.statusItem) {
+    return;
+  }
+  [self refreshAllTimedModeStateAsync];
 }
 
 - (void)removeStatusBarItem {
@@ -186,8 +411,10 @@ static NSString* const kNotificationSilencesKey = @"SilencedNotifications";
     self.statusItem = nil;
     self.syncMenuItem = nil;
     self.resetSilencesMenuItem = nil;
-    self.temporaryMonitorModeMenuItem = nil;
-    self.temporaryMonitorModeRefreshItem = nil;
+    self.tmmState.menuItem = nil;
+    self.tmmState.refreshItem = nil;
+    self.tamState.menuItem = nil;
+    self.tamState.refreshItem = nil;
   }
 }
 
@@ -207,92 +434,49 @@ static NSString* const kNotificationSilencesKey = @"SilencedNotifications";
   [self showAboutWindow];
 }
 
-- (void)tmmRefreshItemClicked:(id)sender {
-  MOLXPCConnection* daemonConn = [SNTXPCControlInterface configuredConnection];
-  [daemonConn resume];
-  [[daemonConn synchronousRemoteObjectProxy]
-      requestTemporaryMonitorModeWithDurationMinutes:0
-                                               reply:^(uint32 minutes, NSError* err) {
-                                                 if (err) {
-                                                   // TODO: Handle this properly
-                                                   NSLog(@"Failed to refresh TMM");
-                                                 }
-                                               }];
-  [daemonConn invalidate];
+- (void)timedModeRefreshItemClicked:(id)sender {
+  SNTTimedModeState* state = [self stateForSender:sender];
+  SNTTimedModeDescriptor* descriptor = state.descriptor;
+  // Run off the main thread: the request re-enters the GUI synchronously (the daemon
+  // calls back to authorize, which must present UI on the main thread). Blocking the
+  // main thread here would deadlock against that callback.
+  dispatch_async(dispatch_get_global_queue(0, 0), ^{
+    [self withControlProxy:^(id proxy) {
+      descriptor.request(proxy, ^(uint32_t minutes, NSError* err) {
+        if (err) {
+          NSLog(@"Failed to refresh timed mode: %@", err.localizedDescription);
+        }
+      });
+    }];
+  });
 }
 
-- (void)tmmMenuItemClicked:(id)sender {
-  MOLXPCConnection* daemonConn = [SNTXPCControlInterface configuredConnection];
-  [daemonConn resume];
-
-  if (self.temporaryMonitorModeExpiration) {
-    [[daemonConn synchronousRemoteObjectProxy] cancelTemporaryMonitorMode:^(NSError* err) {
-      if (err) {
-        [self notificationWithIdentifier:@"tmm_cancel_failed_notification"
-                                 andBody:err.localizedDescription];
+- (void)timedModeMenuItemClicked:(id)sender {
+  SNTTimedModeState* state = [self stateForSender:sender];
+  SNTTimedModeDescriptor* descriptor = state.descriptor;
+  // Run off the main thread: the request re-enters the GUI synchronously (the daemon
+  // calls back to authorize, which must present UI on the main thread). Blocking the
+  // main thread here would deadlock against that callback.
+  dispatch_async(dispatch_get_global_queue(0, 0), ^{
+    [self withControlProxy:^(id proxy) {
+      if (state.expiration) {
+        descriptor.cancel(proxy, ^(NSError* err) {
+          if (err) {
+            [self notificationWithIdentifier:@"timed_mode_cancel_failed_notification"
+                                     andBody:err.localizedDescription];
+          }
+        });
+      } else {
+        descriptor.request(proxy, ^(uint32_t minutes, NSError* err) {
+          if (err) {
+            [self temporarilyTintIconWithColor:[NSColor colorNamed:@"SyncFailureColor"]];
+            [self notificationWithIdentifier:@"timed_mode_enter_failed_notification"
+                                     andBody:descriptor.messageForError(err.code)];
+          }
+        });
       }
     }];
-  } else {
-    [[daemonConn synchronousRemoteObjectProxy]
-        requestTemporaryMonitorModeWithDurationMinutes:0
-                                                 reply:^(uint32 minutes, NSError* err) {
-                                                   if (err) {
-                                                     [self temporarilyTintIconWithColor:
-                                                               [NSColor
-                                                                   colorNamed:@"SyncFailureColor"]];
-                                                     NSString* failureDescription;
-                                                     switch (err.code) {
-                                                       case SNTErrorCodeTMMNoPolicy:
-                                                         failureDescription = NSLocalizedString(
-                                                             @"Failed to enter temporary monitor "
-                                                             @"mode: this machine does not "
-                                                             @"currently have a policy allowing "
-                                                             @"temporary monitor mode",
-                                                             @"Error message shown when user tries "
-                                                             @"to enter TMM mode without a policy");
-                                                         break;
-                                                       case SNTErrorCodeTMMNotInLockdown:
-                                                         failureDescription = NSLocalizedString(
-                                                             @"Failed to enter temporary monitor "
-                                                             @"mode: not currently in lockdown",
-                                                             @"Error message shown when user tries "
-                                                             @"to enter TMM while not in lockdown");
-                                                         break;
-                                                       case SNTErrorCodeTMMAuthFailed:
-                                                         failureDescription = NSLocalizedString(
-                                                             @"Failed to enter temporary monitor "
-                                                             @"mode: authorization failed",
-                                                             @"Error message shown when user tries "
-                                                             @"to enter TMM but authorization "
-                                                             @"failed");
-                                                         break;
-                                                       case SNTErrorCodeTMMInvalidSyncServer:
-                                                         failureDescription = NSLocalizedString(
-                                                             @"Failed to enter temporary monitor "
-                                                             @"mode: not using a supported sync "
-                                                             @"server",
-                                                             @"Error message shown when user tries "
-                                                             @"to enter TMM while not using "
-                                                             @"Workshop");
-                                                         break;
-                                                       default:
-                                                         failureDescription = NSLocalizedString(
-                                                             @"Failed to enter temporary monitor "
-                                                             @"mode: an unknown error occurred",
-                                                             @"Error shown when user tries to "
-                                                             @"enter TMM and an unknown error "
-                                                             @"occurred.");
-                                                         break;
-                                                     }
-                                                     [self
-                                                         notificationWithIdentifier:
-                                                             @"tmm_enter_failed_notification"
-                                                                            andBody:
-                                                                                failureDescription];
-                                                   }
-                                                 }];
-  }
-  [daemonConn invalidate];
+  });
 }
 
 - (void)resetSilencesMenuItemClicked:(id)sender {
@@ -390,65 +574,128 @@ static NSString* const kNotificationSilencesKey = @"SilencedNotifications";
   });
 }
 
-- (void)enterMonitorModeWithExpiration:(NSDate*)expiration {
-  self.temporaryMonitorModeExpiration = expiration;
+- (void)enterModeWithExpiration:(NSDate*)expiration forState:(SNTTimedModeState*)state {
+  state.expiration = expiration;
 
   // Invalidate any existing timer
-  [self.temporaryMonitorModeTimer invalidate];
+  [state.timer invalidate];
 
   // Update menu options
-  self.temporaryMonitorModeMenuItem.title = @"Leave Temporary Monitor Mode";
-  self.temporaryMonitorModeRefreshItem.target = self;
+  state.menuItem.title = state.descriptor.leaveTitle;
+  state.refreshItem.target = self;
 
   // Create a timer that updates the countdown display. Using a 5 second interval is sufficient
-  // since the displayed units are days/hours/minutes which change infrequently.
+  // since the displayed units are days/hours/minutes which change infrequently. The timer only
+  // detects this mode's expiry; the title itself is composed from all active modes by
+  // refreshStatusTitle so concurrent TMM/TAM sessions are both shown.
   dispatch_async(dispatch_get_main_queue(), ^{
-    __block NSString* previousTitle = nil;
-
     // Fire immediately to set the initial title, then repeat every 5 seconds.
-    self.temporaryMonitorModeTimer = [NSTimer
-        scheduledTimerWithTimeInterval:5.0
-                               repeats:YES
-                                 block:^(NSTimer* timer) {
-                                   if (!self.temporaryMonitorModeExpiration) {
-                                     [self leaveMonitorMode];
-                                     return;
-                                   }
-
-                                   NSTimeInterval remainingSeconds =
-                                       [self.temporaryMonitorModeExpiration timeIntervalSinceNow];
-
-                                   // If time has expired, stop the timer
-                                   if (remainingSeconds <= 0) {
-                                     [self leaveMonitorMode];
-                                     return;
-                                   }
-
-                                   NSString* title = [self.countdownFormatter
-                                       stringFromDate:[NSDate now]
-                                               toDate:self.temporaryMonitorModeExpiration];
-                                   if (![title isEqualToString:previousTitle]) {
-                                     previousTitle = title;
-                                     [self updateTitle:title];
-                                   }
-                                 }];
-    [self.temporaryMonitorModeTimer fire];
+    state.timer =
+        [NSTimer scheduledTimerWithTimeInterval:5.0
+                                        repeats:YES
+                                          block:^(NSTimer* timer) {
+                                            if (!state.expiration ||
+                                                [state.expiration timeIntervalSinceNow] <= 0) {
+                                              [self leaveModeForState:state];
+                                              return;
+                                            }
+                                            [self refreshStatusTitle];
+                                          }];
+    [state.timer fire];
   });
 }
 
-- (void)leaveMonitorMode {
-  [self.temporaryMonitorModeTimer invalidate];
-  self.temporaryMonitorModeTimer = nil;
-  self.temporaryMonitorModeExpiration = nil;
+// Compose the status-bar title from every currently-active timed mode. With a single
+// active mode the bare countdown is shown (preserving the original single-mode display);
+// with more than one, each countdown is labeled (e.g. "Monitor 4m  ·  Admin 2m") so they
+// are distinguishable. This is the single writer of the status-bar title, so concurrent
+// modes no longer clobber each other and leaving one mode does not blank the survivor.
+- (void)refreshStatusTitle {
+  NSMutableArray<SNTTimedModeState*>* active = [NSMutableArray array];
+  for (SNTTimedModeState* state in @[ self.tmmState, self.tamState ]) {
+    if (state.expiration && [state.expiration timeIntervalSinceNow] > 0) {
+      [active addObject:state];
+    }
+  }
 
-  [self updateTitle:@""];
-  self.temporaryMonitorModeMenuItem.title = @"Enter Temporary Monitor Mode";
-  self.temporaryMonitorModeRefreshItem.target = nil;
+  NSString* title;
+  if (active.count == 0) {
+    title = @"";
+  } else if (active.count == 1) {
+    title = [self.countdownFormatter stringFromDate:[NSDate now]
+                                             toDate:active.firstObject.expiration];
+  } else {
+    NSMutableArray<NSString*>* parts = [NSMutableArray array];
+    for (SNTTimedModeState* state in active) {
+      NSString* countdown = [self.countdownFormatter stringFromDate:[NSDate now]
+                                                             toDate:state.expiration];
+      [parts
+          addObject:[NSString stringWithFormat:@"%@ %@", state.descriptor.statusLabel, countdown]];
+    }
+    title = [parts componentsJoinedByString:@"  ·  "];
+  }
+
+  if (![title isEqualToString:self.lastStatusTitle]) {
+    self.lastStatusTitle = title;
+    [self updateTitle:title];
+  }
+}
+
+- (void)leaveModeForState:(SNTTimedModeState*)state {
+  [state.timer invalidate];
+  state.timer = nil;
+  state.expiration = nil;
+
+  // Recompose rather than blanking: another mode may still be active and must keep
+  // showing its countdown.
+  [self refreshStatusTitle];
+  state.menuItem.title = state.descriptor.enterTitle;
+  state.refreshItem.target = nil;
+}
+
+- (void)setAvailable:(BOOL)available forState:(SNTTimedModeState*)state {
+  state.menuItem.hidden = !available;
+  state.refreshItem.hidden = !available;
+}
+
+// Public wrappers used by SNTNotificationManager (daemon-pushed enter/leave/availability).
+- (void)enterMonitorModeWithExpiration:(NSDate*)expiration {
+  [self enterModeWithExpiration:expiration forState:self.tmmState];
+}
+
+- (void)leaveMonitorMode {
+  [self leaveModeForState:self.tmmState];
 }
 
 - (void)setTemporaryMonitorModePolicyAvailable:(BOOL)available {
-  self.temporaryMonitorModeMenuItem.hidden = !available;
-  self.temporaryMonitorModeRefreshItem.hidden = !available;
+  [self setAvailable:available forState:self.tmmState];
+}
+
+- (void)enterAdminModeWithExpiration:(NSDate*)expiration {
+  [self enterModeWithExpiration:expiration forState:self.tamState];
+}
+
+- (void)leaveAdminMode {
+  [self leaveModeForState:self.tamState];
+}
+
+- (void)setTemporaryAdminModeAvailable:(BOOL)available {
+  [self setAvailable:available forState:self.tamState];
+}
+
+- (void)temporaryAdminModeSessionResignedActive {
+  // Always signal the daemon: the GUI's local view of the session (expiration) can be missing or
+  // stale (a leave/enter notification can be dropped while this session is inactive), so it must
+  // not gate the resign. The daemon's audit-token uid match against its own active session is
+  // authoritative and no-ops if there is nothing to end.
+  // Fire-and-forget on a background queue (must not block the main thread, especially during
+  // session teardown). The reply is ignored.
+  dispatch_async(dispatch_get_global_queue(0, 0), ^{
+    [self withControlProxy:^(id proxy) {
+      [proxy temporaryAdminModeSessionResignedActive:^(NSError*){
+      }];
+    }];
+  });
 }
 
 - (NSMenuItem*)menuItemWithTitle:(NSString*)title andAction:(SEL)action {

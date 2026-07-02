@@ -267,3 +267,39 @@
 
 /* Version in About view for Lite edition */
 "Version **%@** (Lite)" = "Версия **%@** (Lite)";
+
+/* Temporary admin mode alert title */
+"Request Admin Privileges" = "Запрос прав администратора";
+
+/* Temporary admin mode alert body */
+"Enter a justification for requesting admin privileges:" = "Введите обоснование для запроса прав администратора:";
+
+/* Temporary admin mode justification placeholder */
+"Justification" = "Обоснование";
+
+/* OK button */
+"OK" = "OK";
+
+/* Authorize temporary Admin Mode exception */
+"request admin privileges" = "запросить права администратора";
+
+/* Error shown when requesting admin without a policy */
+"Failed to request admin privileges: this machine does not currently allow temporary admin elevation" = "Не удалось запросить права администратора: на этом компьютере сейчас не разрешено временное повышение прав администратора";
+
+/* Error shown when a natural admin requests elevation */
+"Failed to request admin privileges: you are already an administrator" = "Не удалось запросить права администратора: вы уже являетесь администратором";
+
+/* Error shown when another user already has an active session */
+"Failed to request admin privileges: a session is already active for another user" = "Не удалось запросить права администратора: для другого пользователя уже активна сессия";
+
+/* Error shown when a justification is required but not given */
+"Failed to request admin privileges: a justification is required" = "Не удалось запросить права администратора: требуется обоснование";
+
+/* Error shown when admin elevation authorization fails */
+"Failed to request admin privileges: authorization failed" = "Не удалось запросить права администратора: ошибка авторизации";
+
+/* Error shown when the group membership change fails */
+"Failed to request admin privileges: the admin group membership change failed" = "Не удалось запросить права администратора: не удалось изменить членство в группе администраторов";
+
+/* Error shown when admin elevation fails with an unknown error */
+"Failed to request admin privileges: an unknown error occurred" = "Не удалось запросить права администратора: произошла неизвестная ошибка";
