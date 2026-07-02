@@ -14,16 +14,19 @@
 /// limitations under the License.
 
 #import "Source/santad/SNTDaemonControlController.h"
+#include <errno.h>
 #include <limits.h>
 #include <pwd.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 #import <Foundation/Foundation.h>
 #include <sys/qos.h>
 
 #include <memory>
+#include <vector>
 
 #import "Source/common/MOLCodesignChecker.h"
 #import "Source/common/MOLXPCConnection.h"
@@ -110,10 +113,30 @@ double watchdogRAMPeak = 0;
 @end
 
 // Resolve a username from a uid for the Temporary Admin Mode audit trail. Returns
-// an empty string when the uid does not resolve.
+// an empty string when the uid does not resolve. getpwuid_r is used because this
+// runs on concurrent XPC handler threads, where the process-wide static buffer
+// behind getpwuid could be clobbered by another lookup in flight.
 static NSString* TAMUsernameForUID(uid_t uid) {
-  struct passwd* pw = getpwuid(uid);
-  return (pw && pw->pw_name) ? @(pw->pw_name) : @"";
+  struct passwd pwd;
+  struct passwd* result = NULL;
+  long bufsize = sysconf(_SC_GETPW_R_SIZE_MAX);
+  if (bufsize <= 0) {
+    bufsize = 1024;
+  }
+  std::vector<char> buf(bufsize);
+  // getpwuid_r returns ERANGE when the entry doesn't fit; grow and retry so
+  // directory-backed (LDAP/AD) entries larger than the initial buffer still
+  // resolve. Cap the growth so a pathological entry can't drive unbounded
+  // allocation.
+  int rc;
+  while ((rc = getpwuid_r(uid, &pwd, buf.data(), buf.size(), &result)) == ERANGE &&
+         buf.size() < (1 << 20)) {
+    buf.resize(buf.size() * 2);
+  }
+  if (rc != 0 || result == NULL || !pwd.pw_name) {
+    return @"";
+  }
+  return @(pwd.pw_name);
 }
 
 @implementation SNTDaemonControlController {

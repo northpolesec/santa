@@ -17,7 +17,6 @@
 #import <Collaboration/Collaboration.h>
 #import <CoreServices/CoreServices.h>
 
-#include <pwd.h>
 #include <unistd.h>
 
 #import "Source/common/SNTError.h"
@@ -26,14 +25,6 @@
 namespace santa {
 
 namespace {
-
-NSString* UsernameForUID(uid_t uid) {
-  struct passwd* pw = getpwuid(uid);
-  if (!pw || !pw->pw_name) {
-    return nil;
-  }
-  return @(pw->pw_name);
-}
 
 // The admin group is always a local group, so it is resolved with the local
 // identity authority. The user, however, may be a network/directory (e.g. AD)
@@ -46,13 +37,17 @@ CBGroupIdentity* AdminGroupIdentity() {
                                           authority:[CBIdentityAuthority localIdentityAuthority]];
 }
 
+// Resolve the user by numeric POSIX UID rather than by name. The UID is the
+// stable, unambiguous directory key we already hold; resolving by name would put
+// a non-reentrant getpwuid on this privileged mutation path — where a clobbered
+// pw_name would change which account is added to or removed from the admin group
+// — and could disagree across the separate IsMember / ChangeMembership /
+// VerifyMembership lookups if the account were renamed between them. The default
+// authority is retained so network/directory users still resolve (see
+// AdminGroupIdentity for the group/user authority asymmetry).
 CBIdentity* UserIdentityForUID(uid_t uid) {
-  NSString* username = UsernameForUID(uid);
-  if (!username) {
-    return nil;
-  }
-  return [CBIdentity identityWithName:username
-                            authority:[CBIdentityAuthority defaultIdentityAuthority]];
+  return [CBUserIdentity userIdentityWithPosixUID:uid
+                                        authority:[CBIdentityAuthority defaultIdentityAuthority]];
 }
 
 // Delay between the two post-commit verification reads on the remove path, to
