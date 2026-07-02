@@ -266,12 +266,14 @@ struct SNTNetworkFlowMessageWindowView: View {
   let silenceable: Bool
   let uiStateCallback: ((TimeInterval) -> Void)?
 
+  @Environment(\.openURL) var openURL
+
   @State public var preventFutureNotifications = false
   @State public var preventFutureNotificationPeriod: TimeInterval = NotificationSilencePeriods[0]
 
   var body: some View {
     SNTMessageView(
-      SNTBlockMessage.attributedBlockMessageForNetworkFlowEvent(withCustomMessage: nil)
+      SNTBlockMessage.attributedBlockMessageForNetworkFlowEvent(withCustomMessage: event?.customMsg)
     ) {
       NetworkFlowDetail(e: event)
 
@@ -283,6 +285,9 @@ struct SNTNetworkFlowMessageWindowView: View {
       }
 
       HStack {
+        if shouldAddOpenButton() {
+          OpenEventButton(action: openButton)
+        }
         DismissButton(silence: preventFutureNotifications, action: dismissButton)
       }
     }
@@ -294,5 +299,24 @@ struct SNTNetworkFlowMessageWindowView: View {
       callback(preventFutureNotifications ? preventFutureNotificationPeriod : 0)
     }
     window?.close()
+  }
+
+  func shouldAddOpenButton() -> Bool {
+    guard let customURL = event?.customURL else { return false }
+    return !customURL.isEmpty && customURL != "null"
+  }
+
+  func openButton() {
+    if let callback = uiStateCallback {
+      callback(preventFutureNotifications ? preventFutureNotificationPeriod : 0)
+    }
+    let url = SNTBlockMessage.eventDetailURL(
+      for: event,
+      customURL: event?.customURL
+    )
+    window?.close()
+    if let url = url {
+      openURL(url)
+    }
   }
 }

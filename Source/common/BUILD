@@ -453,6 +453,7 @@ objc_library(
         ":SNTLogging",
         ":SNTStoredExecutionEvent",
         ":SNTStoredFileAccessEvent",
+        ":SNTStoredNetworkFlowEvent",
         ":SNTSystemInfo",
     ],
 )
@@ -469,6 +470,7 @@ objc_library(
         ":SNTLogging",
         ":SNTStoredExecutionEvent",
         ":SNTStoredFileAccessEvent",
+        ":SNTStoredNetworkFlowEvent",
         ":SNTSystemInfo",
     ],
 )
@@ -1255,6 +1257,7 @@ santa_unit_test(
         ":SNTConfigurator",
         ":SNTStoredExecutionEvent",
         ":SNTStoredFileAccessEvent",
+        ":SNTStoredNetworkFlowEvent",
         ":SNTSystemInfo",
         "@OCMock",
     ],

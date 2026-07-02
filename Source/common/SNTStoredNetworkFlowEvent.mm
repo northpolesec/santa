@@ -51,6 +51,8 @@
   ENCODE(coder, eventDedupeKey);
   ENCODE(coder, uiDedupeKey);
   ENCODE_BOXABLE(coder, silent);
+  ENCODE(coder, customMsg);
+  ENCODE(coder, customURL);
 }
 
 - (instancetype)initWithCoder:(NSCoder*)decoder {
@@ -75,6 +77,8 @@
     DECODE(decoder, eventDedupeKey, NSString);
     DECODE(decoder, uiDedupeKey, NSString);
     DECODE_SELECTOR(decoder, silent, NSNumber, boolValue);
+    DECODE(decoder, customMsg, NSString);
+    DECODE(decoder, customURL, NSString);
   }
   return self;
 }
