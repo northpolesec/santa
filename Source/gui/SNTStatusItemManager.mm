@@ -654,8 +654,15 @@ static NSString* const kNotificationSilencesKey = @"SilencedNotifications";
 }
 
 - (void)setAvailable:(BOOL)available forState:(SNTTimedModeState*)state {
-  state.menuItem.hidden = !available;
-  state.refreshItem.hidden = !available;
+  // Keep the item visible while a session is active so the user always retains an
+  // in-menu way to leave, even if a policy update pushes availability=false without
+  // cancelling the session (e.g. the policy type drops to Unspecified). The poll path
+  // (setAdminItemVisibleWhenAvailable:) already folds `active` into `available`; doing
+  // it here too covers the daemon-pushed availability updates, which carry no session
+  // state of their own.
+  BOOL active = (state.expiration != nil);
+  state.menuItem.hidden = !(available || active);
+  state.refreshItem.hidden = !(available || active);
 }
 
 // Public wrappers used by SNTNotificationManager (daemon-pushed enter/leave/availability).
