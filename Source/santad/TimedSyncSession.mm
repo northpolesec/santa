@@ -43,7 +43,10 @@ static constexpr NSUInteger kMaxReasonLength = 512;
 TimedSyncSession::TimedSyncSession(uint32_t min_minutes, uint32_t max_minutes, const char* label,
                                    SNTConfigurator* configurator,
                                    SNTNotificationQueue* notification_queue)
-    : Timer(min_minutes, max_minutes, Timer::OnStart::kWaitOneCycle, label,
+    // Session bounds are expressed in minutes; the Timer base clamps its interval
+    // in seconds. Convert here so the min/max clamp reflects the real bounds
+    // instead of treating a minute count as a second count.
+    : Timer(min_minutes * 60, max_minutes * 60, Timer::OnStart::kWaitOneCycle, label,
             Timer::RescheduleMode::kTrailingEdge, QOS_CLASS_USER_INITIATED),
       configurator_(configurator),
       notification_queue_(notification_queue),
@@ -80,6 +83,17 @@ void TimedSyncSession::SetupFromState() {
               selector:@selector(pushTokenChain)
                   type:[NSArray class]
               callback:^(NSArray* oldValue, NSArray* newValue) {
+                // Ignore no-op fires. pushTokenChain is a KVO dependent key on the
+                // whole syncState, so every syncState write fires this callback even
+                // when the chain itself is unchanged. Without this guard the Revoke()
+                // below -> WriteRevokePolicy() -> setSyncServerModeTransition: would
+                // rewrite syncState and synchronously re-enter this callback, re-taking
+                // lock_ and deadlocking. The re-entrant fire always carries an unchanged
+                // chain (old == new), so the equality check breaks the cycle while still
+                // acting on a genuine chain change.
+                if ((!newValue && !oldValue) || [newValue isEqualToArray:oldValue]) {
+                  return;
+                }
                 if (auto strong_self = weak_self.lock()) {
                   if (!strong_self->SyncServerGateSatisfied() &&
                       strong_self->Revoke(strong_self->LeaveReasonSyncServerChanged())) {

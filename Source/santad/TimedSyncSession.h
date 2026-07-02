@@ -144,7 +144,10 @@ class TimedSyncSession : public Timer<TimedSyncSession> {
   virtual void WriteRevokePolicy() = 0;
 
   // Authenticate the user; reply with success + (TAM) a reason string. The base
-  // wraps this with a fail-closed timeout.
+  // wraps this with a fail-closed timeout, but implementations MUST invoke `reply`
+  // exactly once, including on transport failure (e.g. an absent or dead GUI XPC
+  // connection). Otherwise the timeout becomes the only exit and the grant stalls
+  // for its full duration instead of failing fast.
   virtual void RequestAuthorization(void (^reply)(BOOL authenticated, NSString* reason)) = 0;
 
   // Persisted extra state (TAM: TargetUID/Username). Restore returns false if
