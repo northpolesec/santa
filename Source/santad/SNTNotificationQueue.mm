@@ -203,9 +203,25 @@
 - (void)authorizeTemporaryAdminModeRequiringJustification:(BOOL)requireJustification
                                                     reply:(void (^)(BOOL authenticated,
                                                                     NSString* reason))reply {
-  [[self.notifierConnection synchronousRemoteObjectProxy]
-      authorizeTemporaryAdminModeRequiringJustification:requireJustification
-                                                  reply:reply];
+  id rop = [self.notifierConnection synchronousRemoteObjectProxy];
+  if (!rop) {
+    // No GUI connection. Fail immediately rather than leaving the caller's reply
+    // uninvoked, which would stall its fail-closed timeout for the full duration.
+    reply(NO, @"");
+    return;
+  }
+  // The proxy is synchronous: if the reply block hasn't run by the time the call
+  // returns, the XPC transport failed (e.g. the GUI died mid-auth) and it never
+  // will. Convert that into an immediate NO so the caller fails fast.
+  __block BOOL replied = NO;
+  [rop authorizeTemporaryAdminModeRequiringJustification:requireJustification
+                                                   reply:^(BOOL authenticated, NSString* reason) {
+                                                     replied = YES;
+                                                     reply(authenticated, reason);
+                                                   }];
+  if (!replied) {
+    reply(NO, @"");
+  }
 }
 
 @end
