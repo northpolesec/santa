@@ -29,6 +29,7 @@
 #import "Source/common/SNTStoredNetworkFlowEvent.h"
 #import "Source/common/SNTStoredNetworkMountEvent.h"
 #import "Source/common/SNTStoredProcess.h"
+#import "Source/common/SNTStoredTemporaryAdminModeAuditEvent.h"
 #import "Source/common/SNTStoredTemporaryMonitorModeAuditEvent.h"
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTSystemInfo.h"
@@ -1028,6 +1029,7 @@
   audit.decision = SNTNetworkFlowDecisionAudit;
 
   NSArray* events = @[ exec, allow, block, audit ];
+
   OCMStub([self.daemonConnRop databaseEventsPending:([OCMArg invokeBlockWithArgs:events, nil])]);
 
   [self stubRequestBody:nil
@@ -1086,6 +1088,115 @@
             // Rule block-feedback text is santad-local; never serialized to the proto.
             XCTAssertNil(f[@"customMsg"]);
             XCTAssertNil(f[@"customUrl"]);
+
+            return YES;
+          }];
+
+  [sut sync];
+}
+
+- (void)testEventUploadTemporaryAdminMode {
+  SNTSyncEventUpload* sut = [[SNTSyncEventUpload alloc] initWithState:self.syncState];
+  self.syncState.eventBatchSize = 50;
+
+  NSArray* events = @[
+    [[SNTStoredTemporaryAdminModeEnterAuditEvent alloc]
+             initWithUUID:@"tam_enter_uuid"
+                 username:@"alice"
+                  seconds:300
+                   reason:SNTTemporaryAdminModeEnterReasonOnDemand
+        userJustification:@"installing software"],
+    [[SNTStoredTemporaryAdminModeLeaveAuditEvent alloc]
+        initWithUUID:@"tam_leave_uuid"
+            username:@"alice"
+              reason:SNTTemporaryAdminModeLeaveReasonSessionExpired],
+    [[SNTStoredTemporaryAdminModeDeniedAuditEvent alloc]
+        initWithUUID:@"tam_denied_uuid"
+            username:@"bob"
+              reason:SNTTemporaryAdminModeDeniedReasonJustificationRequired],
+  ];
+
+  OCMStub([self.daemonConnRop databaseEventsPending:([OCMArg invokeBlockWithArgs:events, nil])]);
+
+  [self stubRequestBody:nil
+               response:nil
+                  error:nil
+          validateBlock:^BOOL(NSURLRequest* req) {
+            NSArray* auditEvents = [self dictFromRequest:req][@"audit_events"];
+
+            // Audit events only upload on sync v2.
+            if (!self.syncState.isSyncV2) {
+              XCTAssertEqual(auditEvents.count, 0);
+              return YES;
+            }
+
+            XCTAssertEqual(auditEvents.count, 3);
+
+            NSDictionary* enter = auditEvents[0][@"temporary_admin_mode"];
+            XCTAssertEqualObjects(enter[@"session_id"], @"tam_enter_uuid");
+            XCTAssertEqualObjects(enter[@"enter"][@"reason"], @"REASON_ON_DEMAND");
+            XCTAssertEqualObjects(enter[@"enter"][@"seconds"], @"300");
+            XCTAssertEqualObjects(enter[@"enter"][@"username"], @"alice");
+            XCTAssertEqualObjects(enter[@"enter"][@"userJustification"], @"installing software");
+
+            NSDictionary* leave = auditEvents[1][@"temporary_admin_mode"];
+            XCTAssertEqualObjects(leave[@"session_id"], @"tam_leave_uuid");
+            XCTAssertEqualObjects(leave[@"leave"][@"reason"], @"REASON_EXPIRY");
+            XCTAssertEqualObjects(leave[@"leave"][@"username"], @"alice");
+
+            NSDictionary* denied = auditEvents[2][@"temporary_admin_mode"];
+            XCTAssertEqualObjects(denied[@"session_id"], @"tam_denied_uuid");
+            XCTAssertEqualObjects(denied[@"denied"][@"reason"], @"REASON_JUSTIFICATION_REQUIRED");
+            XCTAssertEqualObjects(denied[@"denied"][@"username"], @"bob");
+            // The denied event carries no justification (dropped from the proto).
+            XCTAssertNil(denied[@"denied"][@"userJustification"]);
+
+            return YES;
+          }];
+
+  [sut sync];
+}
+
+- (void)testEventUploadTemporaryAdminModeSessionPresenceLeaveReasons {
+  SNTSyncEventUpload* sut = [[SNTSyncEventUpload alloc] initWithState:self.syncState];
+  self.syncState.eventBatchSize = 50;
+
+  NSArray* events = @[
+    [[SNTStoredTemporaryAdminModeLeaveAuditEvent alloc]
+        initWithUUID:@"tam_lock_uuid"
+            username:@"alice"
+              reason:SNTTemporaryAdminModeLeaveReasonScreenLocked],
+    [[SNTStoredTemporaryAdminModeLeaveAuditEvent alloc]
+        initWithUUID:@"tam_session_end_uuid"
+            username:@"alice"
+              reason:SNTTemporaryAdminModeLeaveReasonSessionEnded],
+  ];
+
+  OCMStub([self.daemonConnRop databaseEventsPending:([OCMArg invokeBlockWithArgs:events, nil])]);
+
+  [self stubRequestBody:nil
+               response:nil
+                  error:nil
+          validateBlock:^BOOL(NSURLRequest* req) {
+            NSArray* auditEvents = [self dictFromRequest:req][@"audit_events"];
+
+            // Audit events only upload on sync v2.
+            if (!self.syncState.isSyncV2) {
+              XCTAssertEqual(auditEvents.count, 0);
+              return YES;
+            }
+
+            XCTAssertEqual(auditEvents.count, 2);
+
+            NSDictionary* lock = auditEvents[0][@"temporary_admin_mode"];
+            XCTAssertEqualObjects(lock[@"session_id"], @"tam_lock_uuid");
+            XCTAssertEqualObjects(lock[@"leave"][@"reason"], @"REASON_SCREEN_LOCKED");
+            XCTAssertEqualObjects(lock[@"leave"][@"username"], @"alice");
+
+            NSDictionary* sessionEnd = auditEvents[1][@"temporary_admin_mode"];
+            XCTAssertEqualObjects(sessionEnd[@"session_id"], @"tam_session_end_uuid");
+            XCTAssertEqualObjects(sessionEnd[@"leave"][@"reason"], @"REASON_SESSION_ENDED");
+            XCTAssertEqualObjects(sessionEnd[@"leave"][@"username"], @"alice");
 
             return YES;
           }];

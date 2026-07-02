@@ -27,6 +27,7 @@
 #import "Source/common/SNTSIPStatus.h"
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTSystemInfo.h"
+#import "Source/common/SNTTemporaryAdminPolicy.h"
 #import "Source/common/SNTXPCControlInterface.h"
 #import "Source/common/String.h"
 #import "Source/common/ne/SNTSyncNetworkExtensionSettings.h"
@@ -463,6 +464,31 @@ void HandleV2Responses(const ::pbv2::PreflightResponse& resp, SNTSyncState* sync
               [[SNTModeTransition alloc] initOnDemandMinutes:odmm.max_minutes()];
         }
 
+        break;
+      }
+
+      default: break;
+    }
+  }
+
+  if (resp.has_temporary_admin_policy()) {
+    const auto& tap = resp.temporary_admin_policy();
+    switch (tap.transition_case()) {
+      case ::pbv2::AdminModeTransition::kRevoke:
+        syncState.temporaryAdminPolicy = [[SNTTemporaryAdminPolicy alloc] initRevocation];
+        break;
+
+      case ::pbv2::AdminModeTransition::kOnDemandAdminMode: {
+        const auto& oda = tap.on_demand_admin_mode();
+        // A justification is required only when the server opts in via
+        // require_justification (defaults false when unset). Authentication and screen-lock
+        // revocation are always enforced and are not part of the policy.
+        uint32_t defaultDuration =
+            oda.has_default_duration_minutes() ? oda.default_duration_minutes() : 0;
+        syncState.temporaryAdminPolicy =
+            [[SNTTemporaryAdminPolicy alloc] initOnDemandMinutes:oda.max_minutes()
+                                                 defaultDuration:defaultDuration
+                                            requireJustification:oda.require_justification()];
         break;
       }
 

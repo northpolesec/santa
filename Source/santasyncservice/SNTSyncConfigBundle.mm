@@ -17,6 +17,7 @@
 #import "Source/common/SNTCELFallbackRule.h"
 #import "Source/common/SNTExportConfiguration.h"
 #import "Source/common/SNTModeTransition.h"
+#import "Source/common/SNTTemporaryAdminPolicy.h"
 #import "Source/common/ne/SNTSyncNetworkExtensionSettings.h"
 #import "Source/santasyncservice/SNTSyncConfigBundle.h"
 
@@ -42,6 +43,7 @@
 @property NSDate* fullSyncLastSuccess;
 @property NSDate* ruleSyncLastSuccess;
 @property SNTModeTransition* modeTransition;
+@property SNTTemporaryAdminPolicy* temporaryAdminPolicy;
 @property NSString* eventDetailURL;
 @property NSString* eventDetailText;
 @property NSString* fileAccessEventDetailURL;
@@ -87,6 +89,7 @@ SNTConfigBundle* PostflightConfigBundle(SNTSyncState* syncState) {
   bundle.overrideFileAccessAction = syncState.overrideFileAccessAction;
   bundle.exportConfiguration = syncState.exportConfig;
   bundle.modeTransition = syncState.modeTransition;
+  bundle.temporaryAdminPolicy = syncState.temporaryAdminPolicy;
   bundle.eventDetailURL = syncState.eventDetailURL;
   bundle.eventDetailText = syncState.eventDetailText;
   bundle.fileAccessEventDetailURL = syncState.fileAccessEventDetailURL;
