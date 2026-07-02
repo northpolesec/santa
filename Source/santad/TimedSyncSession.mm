@@ -239,8 +239,14 @@ TimedSyncSession::GrantOutcome TimedSyncSession::BeginGrant(NSNumber* requested_
     return GrantOutcome::kNotEligible;
   }
 
-  // Authorization runs OFF lock_ (Touch ID + typing a reason). Wrap it with a
-  // fail-closed timeout so a hung GUI cannot hold grant_mutex_ indefinitely.
+  // Authorization runs OFF lock_ (Touch ID + typing a reason) and reaches the GUI
+  // over a synchronous XPC proxy, so this call blocks until the GUI replies. The
+  // GUI bounds the interactive prompt with its own timeout (see
+  // SNTAuthorizationHelper), which is what keeps grant_mutex_ from being held
+  // indefinitely. The semaphore wait below is a secondary backstop: for a live GUI
+  // it is already signaled by the time it is reached, and it only bounds a wedged
+  // transport that returns without invoking the reply (a dead connection is
+  // already converted to an immediate NO in SNTNotificationQueue).
   __block BOOL authenticated = NO;
   __block NSString* reason = nil;
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);

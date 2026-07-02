@@ -20,6 +20,13 @@
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
 
+// Upper bound on how long the interactive Temporary Admin Mode justification
+// prompt may stay open. santad reaches this prompt over a synchronous XPC proxy
+// and holds grant_mutex_ plus a request-handler thread until the reply runs, so
+// an abandoned dialog must not wait on the user indefinitely. On timeout the
+// prompt is dismissed and authorization fails closed.
+static const NSTimeInterval kAdminJustificationPromptTimeoutSeconds = 120;
+
 @implementation SNTAuthorizationHelper
 
 + (LAPolicy)authorizationPolicy {
@@ -66,7 +73,21 @@
           NSLocalizedString(@"Justification", @"Temporary admin mode justification placeholder");
       alert.accessoryView = justificationField;
 
+      // Fail closed if the user never responds: dismiss the modal after a bounded
+      // interval so santad's synchronous auth call (which holds grant_mutex_ and a
+      // handler thread until this replies) cannot be pinned by an abandoned dialog.
+      // The timer must run in the modal-panel run-loop mode; runModal does not
+      // service the default mode.
+      NSTimer* timeoutTimer =
+          [NSTimer timerWithTimeInterval:kAdminJustificationPromptTimeoutSeconds
+                                 repeats:NO
+                                   block:^(NSTimer* _Nonnull timer) {
+                                     [NSApp stopModalWithCode:NSModalResponseCancel];
+                                   }];
+      [[NSRunLoop currentRunLoop] addTimer:timeoutTimer forMode:NSModalPanelRunLoopMode];
+
       NSModalResponse response = [alert runModal];
+      [timeoutTimer invalidate];
       if (response != NSAlertFirstButtonReturn) {
         replyBlock(NO, @"");
         return;
