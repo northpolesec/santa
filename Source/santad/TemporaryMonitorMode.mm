@@ -102,8 +102,10 @@ bool TemporaryMonitorMode::ApplyEffect(NSError** err) {
   return true;
 }
 
-void TemporaryMonitorMode::RevertEffect() {
+bool TemporaryMonitorMode::RevertEffect() {
+  // Clearing an in-memory flag cannot fail, so the revert always succeeds.
   [configurator_ setInTemporaryMonitorMode:NO];
+  return true;
 }
 
 bool TemporaryMonitorMode::ReapplyEffectOnRestart() {

@@ -126,8 +126,11 @@ void TimedSyncSession::SetupFromState() {
     // were already produced by GetSecondsRemainingFromStateLocked. Actively revert
     // the effect (TMM: clear the flag, a no-op on a fresh boot; TAM: remove the
     // user from the admin group), clear persisted + extra state, notify the GUI.
-    RevertEffect();
-    [configurator_ persistTimedSessionState:nil forKey:StateKey()];
+    if (RevertEffect()) {
+      [configurator_ persistTimedSessionState:nil forKey:StateKey()];
+    } else {
+      PersistExpiredForRetryLocked();
+    }
     NotifyLeave();
     ClearExtraState();
     return;
@@ -333,9 +336,33 @@ bool TimedSyncSession::EndSessionLocked() {
   return false;
 }
 
+void TimedSyncSession::PersistExpiredForRetryLocked() {
+  // The effect revert failed, so the effect (e.g. TAM admin-group membership) may
+  // still be in place. Rather than clearing the persisted state — which would leave
+  // the effect stuck on with nothing tracking it — persist an already-expired session
+  // record. On the next daemon start, reconciliation reads it, finds it non-resumable
+  // (deadline in the past, or a reboot/sync change), and calls RevertEffect again,
+  // retrying until the revert succeeds.
+  LOGE(@"Timed sync session revert failed; persisting an expired session record so the "
+       @"next daemon start retries the revert.");
+  NSMutableDictionary* state = [@{
+    kTimedSessionBootUUIDKey : [SNTSystemInfo bootSessionUUID],
+    kTimedSessionDeadlineKey : @0,  // already in the past -> non-resumable -> retry revert
+    kTimedSessionSyncURLKey : configurator_.syncBaseURL.host ?: @"",
+    kTimedSessionSessionUUIDKey : current_uuid_ ? [current_uuid_ UUIDString]
+                                                : [[NSUUID UUID] UUIDString],
+  } mutableCopy];
+  [state addEntriesFromDictionary:ExtraStateToPersist()];
+  [configurator_ persistTimedSessionState:state forKey:StateKey()];
+}
+
 bool TimedSyncSession::EndForReasonLocked(NSInteger leave_reason) {
   if (EndSessionLocked()) {
-    RevertEffect();
+    // EndSessionLocked already cleared the persisted state; if the revert fails,
+    // re-persist an expired record so the next daemon start retries the revert.
+    if (!RevertEffect()) {
+      PersistExpiredForRetryLocked();
+    }
     EmitAudit(BuildLeaveAuditEvent([current_uuid_ UUIDString], leave_reason));
     ClearExtraState();
     current_uuid_ = nil;
@@ -366,8 +393,11 @@ bool TimedSyncSession::OnTimer() {
   // OnTimer fires only for a running timer, so a session is active. The Timer
   // mixin (trailing edge) has already stopped the timer; just tear down the
   // session state here.
-  RevertEffect();
-  [configurator_ persistTimedSessionState:nil forKey:StateKey()];
+  if (RevertEffect()) {
+    [configurator_ persistTimedSessionState:nil forKey:StateKey()];
+  } else {
+    PersistExpiredForRetryLocked();
+  }
   active_ = false;
   NotifyLeave();
   EmitAudit(BuildLeaveAuditEvent([current_uuid_ UUIDString], LeaveReasonSessionExpired()));

@@ -125,8 +125,14 @@ class TimedSyncSession : public Timer<TimedSyncSession> {
   // for a still-valid session at daemon start: it returns true to keep the session
   // (the effect is re-established) or false to end it (e.g. TAM: the user is no
   // longer a group member, so the elevation was revoked out of band).
+  //
+  // RevertEffect returns true on success (or when there is nothing to revert) and
+  // false if the revert failed and the effect may still be in place. On false the
+  // base keeps an already-expired persisted session record instead of clearing it,
+  // so the next daemon start reconciles and retries the revert rather than leaving
+  // the effect stuck on with nothing tracking it.
   virtual bool ApplyEffect(NSError** err) ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) = 0;
-  virtual void RevertEffect() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) = 0;
+  virtual bool RevertEffect() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) = 0;
   virtual bool ReapplyEffectOnRestart() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) = 0;
 
   // Extra availability preconditions (TMM: client mode can transition; TAM: none).
@@ -200,6 +206,9 @@ class TimedSyncSession : public Timer<TimedSyncSession> {
   // subclass extra state (the leave audit/RevertEffect read it).
   bool EndSessionLocked() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
   bool RevokeLocked(NSInteger leave_reason) ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
+  // Persist an already-expired session record (used when RevertEffect fails) so the
+  // next daemon start reconciles the persisted state and retries the revert.
+  void PersistExpiredForRetryLocked() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   // Whether the sync-server gate is satisfied (`configurator_.isSyncV2Enabled`).
   bool SyncServerGateSatisfied();

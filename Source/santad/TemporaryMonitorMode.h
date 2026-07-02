@@ -56,7 +56,7 @@ class TemporaryMonitorMode : public TimedSyncSession, public PassKey<TemporaryMo
 
  protected:
   bool ApplyEffect(NSError** err) override;
-  void RevertEffect() override;
+  bool RevertEffect() override;
   bool ReapplyEffectOnRestart() override;
   bool ExtraPreconditions() override;
   NSString* StateKey() override;
