@@ -267,3 +267,39 @@
 
 /* Version in About view for Lite edition */
 "Version **%@** (Lite)" = "バージョン **%@** (Lite)";
+
+/* Temporary admin mode alert title */
+"Request Admin Privileges" = "管理者権限のリクエスト";
+
+/* Temporary admin mode alert body */
+"Enter a justification for requesting admin privileges:" = "管理者権限をリクエストする理由を入力してください:";
+
+/* Temporary admin mode justification placeholder */
+"Justification" = "理由";
+
+/* OK button */
+"OK" = "OK";
+
+/* Authorize temporary Admin Mode exception */
+"request admin privileges" = "管理者権限をリクエストする";
+
+/* Error shown when requesting admin without a policy */
+"Failed to request admin privileges: this machine does not currently allow temporary admin elevation" = "管理者権限のリクエストに失敗しました: このマシンは現在、一時的な管理者権限の昇格を許可していません";
+
+/* Error shown when a natural admin requests elevation */
+"Failed to request admin privileges: you are already an administrator" = "管理者権限のリクエストに失敗しました: すでに管理者です";
+
+/* Error shown when another user already has an active session */
+"Failed to request admin privileges: a session is already active for another user" = "管理者権限のリクエストに失敗しました: 別のユーザーのセッションがすでにアクティブです";
+
+/* Error shown when a justification is required but not given */
+"Failed to request admin privileges: a justification is required" = "管理者権限のリクエストに失敗しました: 理由の入力が必要です";
+
+/* Error shown when admin elevation authorization fails */
+"Failed to request admin privileges: authorization failed" = "管理者権限のリクエストに失敗しました: 認証に失敗しました";
+
+/* Error shown when the group membership change fails */
+"Failed to request admin privileges: the admin group membership change failed" = "管理者権限のリクエストに失敗しました: 管理者グループのメンバーシップの変更に失敗しました";
+
+/* Error shown when admin elevation fails with an unknown error */
+"Failed to request admin privileges: an unknown error occurred" = "管理者権限のリクエストに失敗しました: 不明なエラーが発生しました";

@@ -325,7 +325,7 @@
   OCMStub([self.mockConnection synchronousRemoteObjectProxy]).andReturn(self.mockProxy);
   // Proxy accepts the call but never runs the reply block.
   OCMStub([self.mockProxy authorizeTemporaryAdminModeRequiringJustification:YES
-                                                                     reply:[OCMArg any]]);
+                                                                      reply:[OCMArg any]]);
 
   __block BOOL replied = NO;
   __block BOOL gotAuthed = YES;

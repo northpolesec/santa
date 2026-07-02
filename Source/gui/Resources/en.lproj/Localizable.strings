@@ -267,3 +267,39 @@
 
 /* Version in About view for Lite edition */
 "Version **%@** (Lite)" = "Version **%@** (Lite)";
+
+/* Temporary admin mode alert title */
+"Request Admin Privileges" = "Request Admin Privileges";
+
+/* Temporary admin mode alert body */
+"Enter a justification for requesting admin privileges:" = "Enter a justification for requesting admin privileges:";
+
+/* Temporary admin mode justification placeholder */
+"Justification" = "Justification";
+
+/* OK button */
+"OK" = "OK";
+
+/* Authorize temporary Admin Mode exception */
+"request admin privileges" = "request admin privileges";
+
+/* Error shown when requesting admin without a policy */
+"Failed to request admin privileges: this machine does not currently allow temporary admin elevation" = "Failed to request admin privileges: this machine does not currently allow temporary admin elevation";
+
+/* Error shown when a natural admin requests elevation */
+"Failed to request admin privileges: you are already an administrator" = "Failed to request admin privileges: you are already an administrator";
+
+/* Error shown when another user already has an active session */
+"Failed to request admin privileges: a session is already active for another user" = "Failed to request admin privileges: a session is already active for another user";
+
+/* Error shown when a justification is required but not given */
+"Failed to request admin privileges: a justification is required" = "Failed to request admin privileges: a justification is required";
+
+/* Error shown when admin elevation authorization fails */
+"Failed to request admin privileges: authorization failed" = "Failed to request admin privileges: authorization failed";
+
+/* Error shown when the group membership change fails */
+"Failed to request admin privileges: the admin group membership change failed" = "Failed to request admin privileges: the admin group membership change failed";
+
+/* Error shown when admin elevation fails with an unknown error */
+"Failed to request admin privileges: an unknown error occurred" = "Failed to request admin privileges: an unknown error occurred";

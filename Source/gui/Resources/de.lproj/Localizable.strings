@@ -267,3 +267,39 @@
 
 /* Version in About view for Lite edition */
 "Version **%@** (Lite)" = "Version **%@** (Lite)";
+
+/* Temporary admin mode alert title */
+"Request Admin Privileges" = "Administratorrechte anfordern";
+
+/* Temporary admin mode alert body */
+"Enter a justification for requesting admin privileges:" = "Geben Sie eine Begründung für die Anforderung von Administratorrechten ein:";
+
+/* Temporary admin mode justification placeholder */
+"Justification" = "Begründung";
+
+/* OK button */
+"OK" = "OK";
+
+/* Authorize temporary Admin Mode exception */
+"request admin privileges" = "Administratorrechte anfordern";
+
+/* Error shown when requesting admin without a policy */
+"Failed to request admin privileges: this machine does not currently allow temporary admin elevation" = "Anforderung von Administratorrechten fehlgeschlagen: Dieses Gerät erlaubt derzeit keine temporären Administratorrechte";
+
+/* Error shown when a natural admin requests elevation */
+"Failed to request admin privileges: you are already an administrator" = "Anforderung von Administratorrechten fehlgeschlagen: Sie sind bereits Administrator";
+
+/* Error shown when another user already has an active session */
+"Failed to request admin privileges: a session is already active for another user" = "Anforderung von Administratorrechten fehlgeschlagen: Für einen anderen Benutzer ist bereits eine Sitzung aktiv";
+
+/* Error shown when a justification is required but not given */
+"Failed to request admin privileges: a justification is required" = "Anforderung von Administratorrechten fehlgeschlagen: Eine Begründung ist erforderlich";
+
+/* Error shown when admin elevation authorization fails */
+"Failed to request admin privileges: authorization failed" = "Anforderung von Administratorrechten fehlgeschlagen: Autorisierung fehlgeschlagen";
+
+/* Error shown when the group membership change fails */
+"Failed to request admin privileges: the admin group membership change failed" = "Anforderung von Administratorrechten fehlgeschlagen: Die Änderung der Administratorgruppen-Mitgliedschaft ist fehlgeschlagen";
+
+/* Error shown when admin elevation fails with an unknown error */
+"Failed to request admin privileges: an unknown error occurred" = "Anforderung von Administratorrechten fehlgeschlagen: Ein unbekannter Fehler ist aufgetreten";

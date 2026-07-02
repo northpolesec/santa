@@ -267,3 +267,39 @@
 
 /* Version in About view for Lite edition */
 "Version **%@** (Lite)" = "Versión **%@** (Lite)";
+
+/* Temporary admin mode alert title */
+"Request Admin Privileges" = "Solicitar privilegios de administrador";
+
+/* Temporary admin mode alert body */
+"Enter a justification for requesting admin privileges:" = "Introduzca una justificación para solicitar privilegios de administrador:";
+
+/* Temporary admin mode justification placeholder */
+"Justification" = "Justificación";
+
+/* OK button */
+"OK" = "OK";
+
+/* Authorize temporary Admin Mode exception */
+"request admin privileges" = "solicitar privilegios de administrador";
+
+/* Error shown when requesting admin without a policy */
+"Failed to request admin privileges: this machine does not currently allow temporary admin elevation" = "Error al solicitar privilegios de administrador: este equipo no permite actualmente la elevación temporal de administrador";
+
+/* Error shown when a natural admin requests elevation */
+"Failed to request admin privileges: you are already an administrator" = "Error al solicitar privilegios de administrador: ya es administrador";
+
+/* Error shown when another user already has an active session */
+"Failed to request admin privileges: a session is already active for another user" = "Error al solicitar privilegios de administrador: ya hay una sesión activa para otro usuario";
+
+/* Error shown when a justification is required but not given */
+"Failed to request admin privileges: a justification is required" = "Error al solicitar privilegios de administrador: se requiere una justificación";
+
+/* Error shown when admin elevation authorization fails */
+"Failed to request admin privileges: authorization failed" = "Error al solicitar privilegios de administrador: la autorización falló";
+
+/* Error shown when the group membership change fails */
+"Failed to request admin privileges: the admin group membership change failed" = "Error al solicitar privilegios de administrador: no se pudo cambiar la pertenencia al grupo de administradores";
+
+/* Error shown when admin elevation fails with an unknown error */
+"Failed to request admin privileges: an unknown error occurred" = "Error al solicitar privilegios de administrador: se produjo un error desconocido";
