@@ -63,6 +63,13 @@
   // ES handler thread. `username` is retained by the block; UTF8String is read on the queue.
   auto tam = _temporaryAdminMode;
   dispatch_async(_queue, ^{
+    // Short-circuit before the potentially slow (directory-backed) username resolution: if no
+    // session is active there is nothing to revoke. SecondsRemaining takes lock_, so this check
+    // runs here on the queue rather than on the ES handler thread. EndForUserEvent still re-checks
+    // authoritatively under the lock, so this is only an optimization, not the guard.
+    if (!tam->SecondsRemaining().has_value()) {
+      return;
+    }
     struct passwd pwd;
     struct passwd* result = NULL;
     long bufsize = sysconf(_SC_GETPW_R_SIZE_MAX);
