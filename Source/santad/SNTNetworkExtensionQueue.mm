@@ -247,12 +247,14 @@ static const NSTimeInterval kNetworkFlowDialogDedupeInterval = 60;
 
     [self.syncdQueue addStoredEvent:event];
 
+    // A "loud deny" (blocked, not silenced) drives both the TTY write and the dialog below.
+    const bool loudDeny = event.decision == SNTNetworkFlowDecisionBlock && !event.silent;
+
     // Loud deny with a known controlling TTY: write the block message to that terminal so
     // terminal/SSH users get feedback, mirroring exec/FAA. Independent of the GUI dialog (which
     // may be absent at the loginwindow) and its de-dup. ttyPath is nil for audit-token-resolved
     // processes (no ES exec seen) -> no write. WriteWithoutSignal (no SIGWINCH) matches FAA.
-    if (event.decision == SNTNetworkFlowDecisionBlock && !event.silent &&
-        event.ttyPath.length > 0 && _ttyWriter) {
+    if (loudDeny && event.ttyPath.length > 0 && _ttyWriter) {
       NSAttributedString* attrStr = [SNTBlockMessage
           attributedBlockMessageForNetworkFlowEventWithCustomMessage:event.customMsg];
 
@@ -283,8 +285,7 @@ static const NSTimeInterval kNetworkFlowDialogDedupeInterval = 60;
     // dialog once a GUI connects within the window. The uiDedupeKey cache then collapses repeats
     // for the same (process, rule, destination).
     MOLXPCConnection* notifierConnection = self.notifierQueue.notifierConnection;
-    if (event.decision == SNTNetworkFlowDecisionBlock && !event.silent && notifierConnection &&
-        [self shouldPostFlowDialogForKey:event.uiDedupeKey]) {
+    if (loudDeny && notifierConnection && [self shouldPostFlowDialogForKey:event.uiDedupeKey]) {
       [[notifierConnection remoteObjectProxy]
           postNetworkFlowBlockNotification:event
                               configBundle:santa::NetworkFlowConfigBundle(

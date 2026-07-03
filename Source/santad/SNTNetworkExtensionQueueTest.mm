@@ -570,6 +570,23 @@
   XCTBubbleMockVerifyAndClearExpectations(self.mockTTYWriter.get());
 }
 
+- (void)testHandleNetworkFlowDecisionsLoudDenyOmitsMoreInfoWhenNoURL {
+  [self stubNetworkExtensionEnabled];
+
+  SNTStoredNetworkFlowEvent* event = [self loudDenyEventWithUIKey:@"k"];
+  event.ttyPath = @"/dev/ttys003";
+  event.customURL = nil;  // no custom URL resolves -> no "More info:" line in the message
+
+  EXPECT_CALL(*self.mockTTYWriter, WriteWithoutSignal(testing::_, testing::Truly([](NSString* msg) {
+                                                        return ![msg containsString:@"More info:"];
+                                                      })))
+      .Times(1);
+
+  [self.sut handleNetworkFlowDecisions:@[ [self decisionForCacheMissWithEvent:event] ]];
+
+  XCTBubbleMockVerifyAndClearExpectations(self.mockTTYWriter.get());
+}
+
 - (void)testHandleNetworkFlowDecisionsLoudDenyWritesTTYWithoutGUIConnection {
   [self stubNetworkExtensionEnabled];
   // No setUpNotifierProxy: notifierQueue stays nil, so the dialog post is a no-op. The TTY
