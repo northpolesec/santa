@@ -17,6 +17,7 @@
 #include <memory>
 
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
+#include "Source/santad/TTYWriter.h"
 
 @class SNDNetworkFlowDecision;
 @class SNDProcessFlows;
@@ -36,6 +37,7 @@ extern NSString* const kSantaNetworkExtensionProtocolVersion;
                            syncdQueue:(SNTSyncdQueue*)syncdQueue
                             ruleTable:(SNTRuleTable*)ruleTable
                         decisionCache:(SNTDecisionCache*)decisionCache
+                            ttyWriter:(std::shared_ptr<santa::TTYWriter>)ttyWriter
                                logger:(std::shared_ptr<santa::Logger>)logger
     NS_DESIGNATED_INITIALIZER;
 

@@ -47,17 +47,17 @@ bool TTYWriter::CanWrite(const es_process_t* proc) {
   return proc && proc->tty && proc->tty->path.length > 0;
 }
 
-void TTYWriter::Write(const es_process_t* proc, bool send_signal,
-                      NSString* (^messageCreator)(void)) {
-  if (silent_tty_mode_.load(std::memory_order_relaxed) || !CanWrite(proc)) {
+bool TTYWriter::CanWrite(NSString* ttyPath) {
+  return ttyPath.length > 0;
+}
+
+void TTYWriter::Write(NSString* ttyPath, bool send_signal, NSString* (^messageCreator)(void)) {
+  if (silent_tty_mode_.load(std::memory_order_relaxed) || !CanWrite(ttyPath)) {
     return;
   }
 
-  // Copy the data from the es_process_t so the ES message doesn't
-  // need to be retained
-  NSString* tty = santa::StringToNSString(proc->tty->path.data);
-  // Realize the message string before going async so as not to need to worry about
-  // lifetimes of objects in the provided block.
+  // Copy the path so callers needn't keep it alive across the async hop.
+  NSString* tty = [ttyPath copy];
   NSString* msg = messageCreator();
   NSString* companyName = [[SNTConfigurator configurator] brandingCompanyName];
   if (companyName) {
@@ -92,6 +92,14 @@ void TTYWriter::Write(const es_process_t* proc, bool send_signal,
   });
 }
 
+void TTYWriter::Write(const es_process_t* proc, bool send_signal,
+                      NSString* (^messageCreator)(void)) {
+  if (!CanWrite(proc)) {
+    return;
+  }
+  Write(santa::StringToNSString(proc->tty->path.data), send_signal, messageCreator);
+}
+
 void TTYWriter::Write(const es_process_t* proc, NSString* (^messageCreator)(void)) {
   Write(proc, true, messageCreator);
 }
@@ -104,6 +112,12 @@ void TTYWriter::Write(const es_process_t* proc, NSString* msg) {
 
 void TTYWriter::WriteWithoutSignal(const es_process_t* proc, NSString* msg) {
   Write(proc, false, ^NSString* {
+    return msg;
+  });
+}
+
+void TTYWriter::WriteWithoutSignal(NSString* ttyPath, NSString* msg) {
+  Write(ttyPath, false, ^NSString* {
     return msg;
   });
 }

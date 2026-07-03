@@ -217,7 +217,9 @@ objc_library(
         ":SNTNotificationQueue",
         ":SNTRuleTable",
         ":SNTSyncdQueue",
+        ":TTYWriter",
         "//Source/common:MOLXPCConnection",
+        "//Source/common:SNTBlockMessage",
         "//Source/common:SNTCachedDecision",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
@@ -243,11 +245,13 @@ santa_unit_test(
     name = "SNTNetworkExtensionQueueTest",
     srcs = ["SNTNetworkExtensionQueueTest.mm"],
     deps = [
+        ":MockTTYWriter",
         ":SNTDecisionCache",
         ":SNTNetworkExtensionQueue",
         ":SNTNotificationQueue",
         ":SNTRuleTable",
         ":SNTSyncdQueue",
+        ":TTYWriter",
         "//Source/common:MOLXPCConnection",
         "//Source/common:SNTCachedDecision",
         "//Source/common:SNTConfigurator",
@@ -256,10 +260,12 @@ santa_unit_test(
         "//Source/common:SNTStoredProcess",
         "//Source/common:SNTXPCNotifierInterface",
         "//Source/common:SantaVnode",
+        "//Source/common:TestUtils",
         "//Source/common/ne:SNDXPCNetworkExtensionInterface",
         "//Source/common/ne:SNTNetworkExtensionSettings",
         "//Source/common/ne:SNTSyncNetworkExtensionSettings",
         "@OCMock",
+        "@googletest//:gtest",
         "@santanetd//src/santanetd:SNDNetworkFlowDecision",
     ],
 )
@@ -378,6 +384,14 @@ objc_library(
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTLogging",
         "//Source/common:String",
+    ],
+)
+
+santa_unit_test(
+    name = "TTYWriterTest",
+    srcs = ["TTYWriterTest.mm"],
+    deps = [
+        ":TTYWriter",
     ],
 )
 
@@ -1329,6 +1343,16 @@ objc_library(
 )
 
 objc_library(
+    name = "MockTTYWriter",
+    testonly = 1,
+    hdrs = ["MockTTYWriter.h"],
+    deps = [
+        ":TTYWriter",
+        "@googletest//:gtest",
+    ],
+)
+
+objc_library(
     name = "MockLogger",
     testonly = 1,
     hdrs = ["Logs/EndpointSecurity/MockLogger.h"],
@@ -1912,6 +1936,7 @@ test_suite(
         ":SandboxExpectationsTest",
         ":SantadTest",
         ":SleighLauncherTest",
+        ":TTYWriterTest",
         ":TemporaryMonitorModeTest",
         "//Source/common/es:EndpointSecurityClientTest",
         "//Source/common/es:EndpointSecurityEnricherTest",

@@ -59,6 +59,7 @@
   e.silent = YES;
   e.customMsg = @"Contact IT before reaching this host";
   e.customURL = @"https://example.com/why?rule=%rule_name%";
+  e.ttyPath = @"/dev/ttys003";
   e.process.filePath = @"/usr/bin/curl";
   e.process.cdhash = @"deadbeef";
   e.process.parent = [[SNTStoredProcess alloc] init];
@@ -94,6 +95,7 @@
   XCTAssertTrue(d.silent);  // local field survives the round-trip
   XCTAssertEqualObjects(d.customMsg, @"Contact IT before reaching this host");
   XCTAssertEqualObjects(d.customURL, @"https://example.com/why?rule=%rule_name%");
+  XCTAssertEqualObjects(d.ttyPath, @"/dev/ttys003");  // santad-local field survives the round-trip
   XCTAssertEqualObjects(d.process.filePath, @"/usr/bin/curl");
   XCTAssertEqualObjects(d.process.parent.pid, @(1));
   XCTAssertEqualObjects([d uniqueID],

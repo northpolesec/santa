@@ -19,6 +19,7 @@
 #include <utility>
 
 #import "Source/common/MOLXPCConnection.h"
+#import "Source/common/SNTBlockMessage.h"
 #import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
@@ -53,6 +54,7 @@ static const NSTimeInterval kNetworkFlowDialogDedupeInterval = 60;
 
 @interface SNTNetworkExtensionQueue () {
   std::shared_ptr<santa::Logger> _logger;
+  std::shared_ptr<santa::TTYWriter> _ttyWriter;
 }
 @property MOLXPCConnection* netExtConnection;
 @property(readwrite) NSString* connectedProtocolVersion;
@@ -79,6 +81,7 @@ static const NSTimeInterval kNetworkFlowDialogDedupeInterval = 60;
                            syncdQueue:(SNTSyncdQueue*)syncdQueue
                             ruleTable:(SNTRuleTable*)ruleTable
                         decisionCache:(SNTDecisionCache*)decisionCache
+                            ttyWriter:(std::shared_ptr<santa::TTYWriter>)ttyWriter
                                logger:(std::shared_ptr<santa::Logger>)logger {
   self = [super init];
   if (self) {
@@ -86,6 +89,7 @@ static const NSTimeInterval kNetworkFlowDialogDedupeInterval = 60;
     _syncdQueue = syncdQueue;
     _ruleTable = ruleTable;
     _decisionCache = decisionCache;
+    _ttyWriter = std::move(ttyWriter);
     _logger = std::move(logger);
     _flowDialogDedupeCache = [NSMutableDictionary dictionary];
 
@@ -242,6 +246,36 @@ static const NSTimeInterval kNetworkFlowDialogDedupeInterval = 60;
     }
 
     [self.syncdQueue addStoredEvent:event];
+
+    // Loud deny with a known controlling TTY: write the block message to that terminal so
+    // terminal/SSH users get feedback, mirroring exec/FAA. Independent of the GUI dialog (which
+    // may be absent at the loginwindow) and its de-dup. ttyPath is nil for audit-token-resolved
+    // processes (no ES exec seen) -> no write. WriteWithoutSignal (no SIGWINCH) matches FAA.
+    if (event.decision == SNTNetworkFlowDecisionBlock && !event.silent &&
+        event.ttyPath.length > 0 && _ttyWriter) {
+      NSAttributedString* attrStr = [SNTBlockMessage
+          attributedBlockMessageForNetworkFlowEventWithCustomMessage:event.customMsg];
+
+      NSMutableString* blockMsg = [NSMutableString stringWithCapacity:1024];
+      // \033[1m / \033[0m begin/end bold.
+      [blockMsg appendFormat:@"\n\033[1mSanta\033[0m\n\n%@\n\n", attrStr.string];
+      [blockMsg appendFormat:@"\033[1mRemote:\033[0m %@%@\n"
+                             @"\033[1mRule:  \033[0m %@\n"
+                             @"\033[1mPath:  \033[0m %@\n\n",
+                             event.hostname.length ? event.hostname : event.remoteAddress,
+                             event.remotePort
+                                 ? [NSString stringWithFormat:@":%hu", event.remotePort]
+                                 : @"",
+                             event.ruleName, event.process.filePath];
+
+      NSURL* detailURL = [SNTBlockMessage eventDetailURLForNetworkFlowEvent:event
+                                                                  customURL:event.customURL];
+      if (detailURL) {
+        [blockMsg appendFormat:@"More info:\n%@\n", detailURL.absoluteString];
+      }
+
+      _ttyWriter->WriteWithoutSignal(event.ttyPath, blockMsg);
+    }
 
     // Loud denies (Block decision, not silent) get an informational dialog; audits and silent
     // denies do not. Gate on a live GUI connection before the dedupe check: with none (e.g. at the

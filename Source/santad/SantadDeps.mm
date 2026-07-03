@@ -199,6 +199,7 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator* configurator,
                                                    syncdQueue:syncd_queue
                                                     ruleTable:rule_table
                                                 decisionCache:[SNTDecisionCache sharedCache]
+                                                    ttyWriter:tty_writer
                                                        logger:logger];
   if (!netext_queue) {
     LOGE(@"Failed to initialize network extension queue.");
