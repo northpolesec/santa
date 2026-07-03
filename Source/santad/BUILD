@@ -390,6 +390,24 @@ objc_library(
     ],
 )
 
+objc_library(
+    name = "SNTLoginWindowSessionHandlerProtocol",
+    hdrs = ["SNTLoginWindowSessionHandlerProtocol.h"],
+    sdk_dylibs = ["EndpointSecurity"],
+)
+
+objc_library(
+    name = "SNTLoginWindowSessionHandler",
+    srcs = ["SNTLoginWindowSessionHandler.mm"],
+    hdrs = ["SNTLoginWindowSessionHandler.h"],
+    sdk_dylibs = ["EndpointSecurity"],
+    deps = [
+        ":SNTLoginWindowSessionHandlerProtocol",
+        ":TemporaryAdminMode",
+        "//Source/common:SNTStoredTemporaryAdminModeAuditEvent",
+    ],
+)
+
 santa_unit_test(
     name = "TemporaryAdminModeTest",
     srcs = ["TemporaryAdminModeTest.mm"],
@@ -404,6 +422,22 @@ santa_unit_test(
         "//Source/common:SNTSystemInfo",
         "//Source/common:SNTTemporaryAdminPolicy",
         "//Source/common:SystemResources",
+        "@OCMock",
+    ],
+)
+
+santa_unit_test(
+    name = "SNTLoginWindowSessionHandlerTest",
+    srcs = ["SNTLoginWindowSessionHandlerTest.mm"],
+    deps = [
+        ":AdminGroupMembership",
+        ":SNTLoginWindowSessionHandler",
+        ":SNTNotificationQueue",
+        ":TemporaryAdminMode",
+        "//Source/common:SNTConfigurator",
+        "//Source/common:SNTError",
+        "//Source/common:SNTStoredTemporaryAdminModeAuditEvent",
+        "//Source/common:SNTTemporaryAdminPolicy",
         "@OCMock",
     ],
 )
@@ -568,6 +602,7 @@ objc_library(
         ":EndpointSecurityLogger",
         ":SNTCompilerController",
         ":SNTEndpointSecurityTreeAwareClient",
+        ":SNTLoginWindowSessionHandlerProtocol",
         "//Source/common:Platform",
         "//Source/common:PrefixTree",
         "//Source/common:SNTConfigurator",
@@ -1229,6 +1264,7 @@ objc_library(
         ":SNTEndpointSecurityTamperResistance",
         ":SNTEventTable",
         ":SNTExecutionController",
+        ":SNTLoginWindowSessionHandler",
         ":SNTNetworkExtensionQueue",
         ":SNTNotificationQueue",
         ":SNTRuleTable",
@@ -1964,6 +2000,7 @@ test_suite(
         ":SNTEndpointSecurityTreeAwareClientTest",
         ":SNTEventTableTest",
         ":SNTExecutionControllerTest",
+        ":SNTLoginWindowSessionHandlerTest",
         ":SNTNetworkExtensionQueueTest",
         ":SNTNotificationQueueTest",
         ":SNTPolicyProcessorTest",

@@ -51,6 +51,7 @@
 #import "Source/santad/SNTDaemonControlController.h"
 #import "Source/santad/SNTDatabaseController.h"
 #import "Source/santad/SNTDecisionCache.h"
+#import "Source/santad/SNTLoginWindowSessionHandler.h"
 #include "Source/santad/SleighLauncher.h"
 #include "Source/santad/TTYWriter.h"
 
@@ -160,12 +161,16 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                          [SNTConfigurator configurator])];
   };
 
+  SNTLoginWindowSessionHandler* lw_session_handler =
+      [[SNTLoginWindowSessionHandler alloc] initWithTemporaryAdminMode:[dc temporaryAdminMode]];
+
   SNTEndpointSecurityRecorder* monitor_client =
       [[SNTEndpointSecurityRecorder alloc] initWithESAPI:esapi
                                                  metrics:metrics
                                                   logger:logger
                                                 enricher:enricher
                                       compilerController:compiler_controller
+                               loginWindowSessionHandler:lw_session_handler
                                          authResultCache:auth_result_cache
                                               prefixTree:prefix_tree
                                              processTree:process_tree];

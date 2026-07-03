@@ -148,9 +148,22 @@ uint32_t TemporaryAdminMode::RequestMinutes(NSNumber* requested_duration, uid_t 
   }
 }
 
-bool TemporaryAdminMode::EndForUserEvent(uid_t uid, SNTTemporaryAdminModeLeaveReason reason) {
+bool TemporaryAdminMode::EndForUserEvent(uid_t uid, NSString* username,
+                                         SNTTemporaryAdminModeLeaveReason reason) {
   absl::MutexLock lock(lock_);
-  if (!IsStartedLocked() || target_uid_ != uid) {
+  if (!IsStartedLocked()) {
+    return false;
+  }
+  // Match on either key. Each trigger has one trustworthy identifier and one derived one: the ES
+  // lock/logout path has the login username but a getpwnam-derived (fallible) uid, while the
+  // fast-user-switch path has the audit-token uid but no username. Accepting either lets a session
+  // be ended even when the derived key is missing (uid 0) or collides (local vs directory account).
+  // The length guards must precede the compare: -[nil caseInsensitiveCompare:] returns
+  // NSOrderedSame and would otherwise false-match.
+  bool uid_match = (uid != 0 && uid == target_uid_);
+  bool name_match = (username.length > 0 && target_username_.length > 0 &&
+                     [username caseInsensitiveCompare:target_username_] == NSOrderedSame);
+  if (!uid_match && !name_match) {
     return false;
   }
   return EndForReasonLocked((NSInteger)reason);

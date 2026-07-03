@@ -25,6 +25,8 @@
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
 #import "Source/santad/SNTCompilerController.h"
 
+@protocol SNTLoginWindowSessionHandler;
+
 /// ES Client focused on subscribing to NOTIFY event variants with the intention of enriching
 /// received messages and logging the information.
 @interface SNTEndpointSecurityRecorder
@@ -35,6 +37,7 @@
                        logger:(std::shared_ptr<santa::Logger>)logger
                      enricher:(std::shared_ptr<santa::Enricher>)enricher
            compilerController:(SNTCompilerController*)compilerController
+    loginWindowSessionHandler:(id<SNTLoginWindowSessionHandler>)loginWindowSessionHandler
               authResultCache:(std::shared_ptr<santa::AuthResultCache>)authResultCache
                    prefixTree:(std::shared_ptr<santa::PrefixTree<santa::Unit>>)prefixTree
                   processTree:
