@@ -54,6 +54,13 @@ typedef NS_ENUM(NSInteger, SNTTemporaryAdminModeLeaveReason) {
 
   // The user's login session ended.
   SNTTemporaryAdminModeLeaveReasonSessionEnded,
+
+  // A still-valid session's elevation could not be re-applied at daemon
+  // restart because the user was no longer a member of the admin group --
+  // membership was removed out of band (an administrator, MDM, or another
+  // tool). Santa cannot attribute the cause and it is not a sync-server
+  // revocation, so it is reported as REASON_UNSPECIFIED upstream.
+  SNTTemporaryAdminModeLeaveReasonUnspecified,
 };
 
 // Reason a Temporary Admin Mode request was denied.

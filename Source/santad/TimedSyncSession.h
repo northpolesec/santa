@@ -177,6 +177,10 @@ class TimedSyncSession : public Timer<TimedSyncSession> {
   virtual NSInteger LeaveReasonSessionExpired() = 0;
   virtual NSInteger LeaveReasonReboot() = 0;
   virtual NSInteger LeaveReasonSyncServerChanged() = 0;
+  // Reason for a still-valid session whose effect the subclass declined to
+  // re-apply at daemon restart (not a reboot; the reboot case is handled by the
+  // boot-UUID check). Reported upstream as REASON_UNSPECIFIED.
+  virtual NSInteger LeaveReasonUnspecified() = 0;
 
   // Deliver the audit event + GUI notifications.
   virtual void EmitAudit(id audit_event) = 0;

@@ -14,15 +14,19 @@
 /// limitations under the License.
 
 #import "Source/santad/SNTDaemonControlController.h"
+#include <errno.h>
 #include <limits.h>
+#include <pwd.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 #import <Foundation/Foundation.h>
 #include <sys/qos.h>
 
 #include <memory>
+#include <vector>
 
 #import "Source/common/MOLCodesignChecker.h"
 #import "Source/common/MOLXPCConnection.h"
@@ -43,14 +47,17 @@
 #import "Source/common/SNTRuleIdentifiers.h"
 #import "Source/common/SNTSandboxExecRequest.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
+#import "Source/common/SNTStoredTemporaryAdminModeAuditEvent.h"
 #import "Source/common/SNTStoredTemporaryMonitorModeAuditEvent.h"
 #import "Source/common/SNTStrengthify.h"
+#import "Source/common/SNTTemporaryAdminPolicy.h"
 #import "Source/common/SNTTimer.h"
 #import "Source/common/SNTXPCNotifierInterface.h"
 #import "Source/common/SNTXPCSyncServiceInterface.h"
 #include "Source/common/String.h"
 #include "Source/common/faa/WatchItems.h"
 #import "Source/common/ne/SNTSyncNetworkExtensionSettings.h"
+#include "Source/santad/AdminGroupMembership.h"
 #import "Source/santad/DataLayer/SNTEventTable.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
 #include "Source/santad/KillingMachine.h"
@@ -58,6 +65,7 @@
 #import "Source/santad/SNTNetworkExtensionQueue.h"
 #import "Source/santad/SNTNotificationQueue.h"
 #import "Source/santad/SNTSyncdQueue.h"
+#include "Source/santad/TemporaryAdminMode.h"
 #include "Source/santad/TemporaryMonitorMode.h"
 #include "commands/v1.pb.h"
 #import "src/santanetd/SNDNetworkFlowDecision.h"
@@ -104,10 +112,38 @@ double watchdogRAMPeak = 0;
 
 @end
 
+// Resolve a username from a uid for the Temporary Admin Mode audit trail. Returns
+// an empty string when the uid does not resolve. getpwuid_r is used because this
+// runs on concurrent XPC handler threads, where the process-wide static buffer
+// behind getpwuid could be clobbered by another lookup in flight.
+static NSString* TAMUsernameForUID(uid_t uid) {
+  struct passwd pwd;
+  struct passwd* result = NULL;
+  long bufsize = sysconf(_SC_GETPW_R_SIZE_MAX);
+  if (bufsize <= 0) {
+    bufsize = 1024;
+  }
+  std::vector<char> buf(bufsize);
+  // getpwuid_r returns ERANGE when the entry doesn't fit; grow and retry so
+  // directory-backed (LDAP/AD) entries larger than the initial buffer still
+  // resolve. Cap the growth so a pathological entry can't drive unbounded
+  // allocation.
+  int rc;
+  while ((rc = getpwuid_r(uid, &pwd, buf.data(), buf.size(), &result)) == ERANGE &&
+         buf.size() < (1 << 20)) {
+    buf.resize(buf.size() * 2);
+  }
+  if (rc != 0 || result == NULL || !pwd.pw_name) {
+    return @"";
+  }
+  return @(pwd.pw_name);
+}
+
 @implementation SNTDaemonControlController {
   std::shared_ptr<Logger> _logger;
   std::shared_ptr<WatchItems> _watchItems;
   std::shared_ptr<santa::TemporaryMonitorMode> _temporaryMonitorMode;
+  std::shared_ptr<santa::TemporaryAdminMode> _temporaryAdminMode;
   std::shared_ptr<santa::SandboxExpectations> _sandboxExpectations;
   std::shared_ptr<santa::SNTBinaryUploadController> _binaryUploadController;
 }
@@ -159,6 +195,13 @@ double watchdogRAMPeak = 0;
     _temporaryMonitorMode = santa::TemporaryMonitorMode::Create(
         [SNTConfigurator configurator], _notQueue,
         ^(SNTStoredTemporaryMonitorModeAuditEvent* auditEvent) {
+          [[SNTDatabaseController eventTable] addStoredEvent:auditEvent];
+          [syncdQueue addStoredEvent:auditEvent];
+        });
+
+    _temporaryAdminMode = santa::TemporaryAdminMode::Create(
+        [SNTConfigurator configurator], _notQueue, santa::CreateAdminGroupMembership(),
+        ^(SNTStoredTemporaryAdminModeAuditEvent* auditEvent) {
           [[SNTDatabaseController eventTable] addStoredEvent:auditEvent];
           [syncdQueue addStoredEvent:auditEvent];
         });
@@ -558,6 +601,13 @@ double watchdogRAMPeak = 0;
       [configurator setSyncServerModeTransition:val];
     }];
 
+    // Persist the temporary admin policy in the same batch, for the same reason as
+    // modeTransition above. Its enforcement side effects (Revoke + GUI notify) run
+    // after the batch via NewPolicyReceived.
+    [result temporaryAdminPolicy:^(SNTTemporaryAdminPolicy* val) {
+      [configurator setSyncServerTemporaryAdminPolicy:val];
+    }];
+
     [result clientMode:^(SNTClientMode m) {
       [configurator setSyncServerClientMode:m];
     }];
@@ -689,6 +739,12 @@ double watchdogRAMPeak = 0;
   // modeTransition.
   [result modeTransition:^(SNTModeTransition* val) {
     _temporaryMonitorMode->NewModeTransitionReceived(val);
+  }];
+
+  // Same post-batch ordering as modeTransition: enforce revoke and re-notify GUI
+  // availability against just-committed state.
+  [result temporaryAdminPolicy:^(SNTTemporaryAdminPolicy* val) {
+    _temporaryAdminMode->NewPolicyReceived(val);
   }];
 
   if (committed) {
@@ -1157,6 +1213,56 @@ static const char* const kAllowedCanonicalBundlePaths[] = {
 
 - (void)checkTemporaryMonitorModePolicyAvailable:(void (^)(BOOL))reply {
   reply(_temporaryMonitorMode->Available());
+}
+
+#pragma mark Temporary Admin Mode Ops
+
+- (void)requestTemporaryAdminModeWithDurationMinutes:(NSNumber*)requestedDuration
+                                               reply:(void (^)(uint32_t, NSError*))reply {
+  // The target is the connecting peer (the console user's GUI), resolved from the
+  // XPC audit token — never trusted from the GUI payload.
+  audit_token_t peer = [MOLXPCConnection currentPeerAuditToken];
+  uid_t uid = audit_token_to_euid(peer);
+  NSError* err = nil;
+  uint32_t duration =
+      _temporaryAdminMode->RequestMinutes(requestedDuration, uid, TAMUsernameForUID(uid), &err);
+  reply(duration, err);
+}
+
+- (void)cancelTemporaryAdminMode:(void (^)(NSError*))reply {
+  NSError* err = nil;
+  if (!_temporaryAdminMode->Cancel()) {
+    err = [SNTError createErrorWithFormat:@"Machine is not currently in temporary Admin Mode"];
+  }
+  reply(err);
+}
+
+- (void)temporaryAdminModeSecondsRemaining:(void (^)(NSNumber*))reply {
+  std::optional<uint64_t> secsRemaining = _temporaryAdminMode->SecondsRemaining();
+  reply(secsRemaining.has_value() ? @(*secsRemaining) : nil);
+}
+
+- (void)checkTemporaryAdminModeAvailable:(void (^)(BOOL available, BOOL alreadyAdmin))reply {
+  // Resolve alreadyAdmin from the SAME peer euid the grant path uses so
+  // fast-user-switching cannot show/hide the menu item for the wrong user.
+  audit_token_t peer = [MOLXPCConnection currentPeerAuditToken];
+  uid_t uid = audit_token_to_euid(peer);
+  reply(_temporaryAdminMode->Available(), _temporaryAdminMode->IsCurrentlyAdmin(uid));
+}
+
+- (void)temporaryAdminModeSessionResignedActive:(void (^)(NSError*))reply {
+  // The GUI reports only that its own session resigned active (fast user switch). Resolve the
+  // target from the XPC peer's audit token — never trusted from the GUI payload — and set the
+  // leave reason here, so the GUI cannot author an audit reason. Silent no-op if it is not this
+  // user's active session.
+  audit_token_t peer = [MOLXPCConnection currentPeerAuditToken];
+  uid_t uid = audit_token_to_euid(peer);
+  _temporaryAdminMode->EndForUserEvent(uid, SNTTemporaryAdminModeLeaveReasonSessionEnded);
+  reply(nil);
+}
+
+- (std::shared_ptr<santa::TemporaryAdminMode>)temporaryAdminMode {
+  return _temporaryAdminMode;
 }
 
 #pragma mark Network Extension Ops
