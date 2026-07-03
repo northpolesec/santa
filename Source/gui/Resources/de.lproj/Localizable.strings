@@ -4,11 +4,20 @@
 /* Notification message shown when a known app has been unblocked */
 "%@ can now be run" = "%@ kann nun ausgeführt werden";
 
+/* Reason shown when a justification is required but not given */
+"a justification is required" = "Eine Begründung ist erforderlich";
+
+/* Reason shown when another user already has an active session */
+"a session is already active for another user" = "Für einen anderen Benutzer ist bereits eine Sitzung aktiv";
+
 /* The default message to show the user when access to a file is blocked */
 "Access to a file has been denied" = "Der Zugriff auf eine Datei wurde verweigert";
 
 /* No comment provided by engineer. */
 "Accessed Path" = "Aufgerufener Pfad";
+
+/* Reason shown when admin elevation fails with an unknown error */
+"an unknown error occurred" = "Ein unbekannter Fehler ist aufgetreten";
 
 /* No comment provided by engineer. */
 "An unknown error occurred. Please try again." = "Ein unbekannter Fehler ist aufgetreten. Bitte versuchen Sie es erneut.";
@@ -21,6 +30,9 @@
 
 /* Message for reset silences confirmation dialog */
 "Are you sure you want to reset all notification silences? You will start receiving notifications for previously silenced events." = "Möchten Sie wirklich alle Benachrichtigungsstummschaltungen zurücksetzen? Sie werden wieder Benachrichtigungen für zuvor stummgeschaltete Ereignisse erhalten.";
+
+/* Reason shown when admin elevation authorization fails */
+"authorization failed" = "Autorisierung fehlgeschlagen";
 
 /* Authorize execution fallback */
 "authorize execution" = "Ausführung genehmigen";
@@ -82,6 +94,9 @@
 /* No comment provided by engineer. */
 "Drop for application info" = "Zum Anzeigen der App-Informationen ablegen";
 
+/* Temporary admin mode alert body */
+"Enter a justification for requesting admin privileges:" = "Geben Sie eine Begründung für die Anforderung von Administratorrechten ein:";
+
 /* No comment provided by engineer. */
 "Failed to connect to the sync service. Please try again later." = "Verbindung zum Synchronisierungsdienst fehlgeschlagen. Bitte versuchen Sie es später erneut.";
 
@@ -100,11 +115,17 @@
 /* Error message shown when user tries to enter TMM mode without a policy */
 "Failed to enter temporary monitor mode: this machine does not currently have a policy allowing temporary monitor mode" = "Wechsel in den temporären Monitor-Modus fehlgeschlagen: Auf diesem Gerät ist keine Richtlinie vorhanden, die den temporären Monitor-Modus erlaubt";
 
+/* Admin elevation failure; %@ is the specific reason */
+"Failed to request admin privileges: %@" = "Anforderung von Administratorrechten fehlgeschlagen: %@";
+
 /* No comment provided by engineer. */
 "Filename" = "Dateiname";
 
 /* No comment provided by engineer. */
 "FS Type" = "FS-Typ";
+
+/* Temporary admin mode justification placeholder */
+"Justification" = "Begründung";
 
 /* No comment provided by engineer. */
 "Label after time period picker (application)" = "\U2800";
@@ -133,6 +154,9 @@
 /* Block reason when no rule matched in lockdown mode */
 "No matching rule" = "Keine passende Regel";
 
+/* OK button */
+"OK" = "OK";
+
 /* Default text for Open button */
 "Open..." = "Öffnen...";
 
@@ -153,6 +177,12 @@
 
 /* No comment provided by engineer. */
 "Remount Mode" = "Remount-Modus";
+
+/* Temporary admin mode alert title */
+"Request Admin Privileges" = "Administratorrechte anfordern";
+
+/* Authorize temporary Admin Mode exception */
+"request admin privileges" = "Administratorrechte anfordern";
 
 /* Notification message shown when an unknown app has been unblocked */
 "Requested application can now be run" = "Angefordert kann jetzt ausgeführt werden";
@@ -198,6 +228,9 @@
 
 /* Notification message shown when a sync fails */
 "Sync failed" = "Synchronisierung fehlgeschlagen";
+
+/* Reason shown when the group membership change fails */
+"the admin group membership change failed" = "Die Änderung der Administratorgruppen-Mitgliedschaft ist fehlgeschlagen";
 
 /* No comment provided by engineer. */
 "The event upload failed. Please check your network connection and try again." = "Der Upload des Ereignisses ist fehlgeschlagen. Bitte überprüfen Sie Ihre Netzwerkverbindung und versuchen Sie es erneut.";
@@ -253,6 +286,9 @@
 /* The default message to show the user when a network share mount is blocked */
 "The following network share has been blocked from mounting" = "Das Mounten der folgenden Netzwerkfreigabe wurde blockiert";
 
+/* Reason shown when requesting admin without a policy */
+"this machine does not currently allow temporary admin elevation" = "Dieses Gerät erlaubt derzeit keine temporären Administratorrechte";
+
 /* Block reason when decision state is unrecognized */
 "Unknown" = "Unbekannt";
 
@@ -267,3 +303,6 @@
 
 /* Version in About view for Lite edition */
 "Version **%@** (Lite)" = "Version **%@** (Lite)";
+
+/* Reason shown when a natural admin requests elevation */
+"you are already an administrator" = "Sie sind bereits Administrator";

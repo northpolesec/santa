@@ -129,6 +129,16 @@ struct RuleCounts {
 - (void)checkTemporaryMonitorModePolicyAvailable:(void (^)(BOOL))reply;
 
 ///
+/// Temporary Admin Mode Ops
+///
+- (void)requestTemporaryAdminModeWithDurationMinutes:(NSNumber*)requestedDuration
+                                               reply:(void (^)(uint32_t, NSError*))reply;
+- (void)cancelTemporaryAdminMode:(void (^)(NSError*))reply;
+- (void)temporaryAdminModeSecondsRemaining:(void (^)(NSNumber*))reply;
+- (void)checkTemporaryAdminModeAvailable:(void (^)(BOOL available, BOOL alreadyAdmin))reply;
+- (void)temporaryAdminModeSessionResignedActive:(void (^)(NSError*))reply;
+
+///
 /// Network Extension Ops
 ///
 /// Returns whether the network extension should be installed.

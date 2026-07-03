@@ -23,6 +23,7 @@
 #import "Source/common/SNTStoredExecutionEvent.h"
 #import "Source/common/SNTStoredFileAccessEvent.h"
 #import "Source/common/SNTStoredSignalReport.h"
+#import "Source/common/SNTStoredTemporaryAdminModeAuditEvent.h"
 #import "Source/common/SNTStoredTemporaryMonitorModeAuditEvent.h"
 #include "Source/common/SantaCache.h"
 #include "Source/common/String.h"
@@ -135,6 +136,9 @@ static const NSTimeInterval kSignalReportDedupWindowSeconds = (60 * 10);
   } else if ([event isKindOfClass:[SNTStoredTemporaryMonitorModeAuditEvent class]]) {
     SNTStoredTemporaryMonitorModeAuditEvent* se = (SNTStoredTemporaryMonitorModeAuditEvent*)event;
     return se.uuid != nil;
+  } else if ([event isKindOfClass:[SNTStoredTemporaryAdminModeAuditEvent class]]) {
+    SNTStoredTemporaryAdminModeAuditEvent* se = (SNTStoredTemporaryAdminModeAuditEvent*)event;
+    return se.uuid != nil;
   } else {
     return NO;
   }
@@ -225,7 +229,11 @@ static const NSTimeInterval kSignalReportDedupWindowSeconds = (60 * 10);
       [NSSet setWithObjects:[SNTStoredExecutionEvent class], [SNTStoredFileAccessEvent class],
                             [SNTStoredTemporaryMonitorModeAuditEvent class],
                             [SNTStoredTemporaryMonitorModeEnterAuditEvent class],
-                            [SNTStoredTemporaryMonitorModeLeaveAuditEvent class], nil];
+                            [SNTStoredTemporaryMonitorModeLeaveAuditEvent class],
+                            [SNTStoredTemporaryAdminModeAuditEvent class],
+                            [SNTStoredTemporaryAdminModeEnterAuditEvent class],
+                            [SNTStoredTemporaryAdminModeLeaveAuditEvent class],
+                            [SNTStoredTemporaryAdminModeDeniedAuditEvent class], nil];
   NSError* err;
   SNTStoredEvent* event = [NSKeyedUnarchiver unarchivedObjectOfClasses:allowedClasses
                                                               fromData:eventData

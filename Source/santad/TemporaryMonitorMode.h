@@ -79,6 +79,7 @@ class TemporaryMonitorMode : public TimedSyncSession, public PassKey<TemporaryMo
   NSInteger LeaveReasonSessionExpired() override;
   NSInteger LeaveReasonReboot() override;
   NSInteger LeaveReasonSyncServerChanged() override;
+  NSInteger LeaveReasonUnspecified() override;
   void EmitAudit(id audit_event) override;
   void NotifyEnter(NSDate* expiration) override;
   void NotifyLeave() override;

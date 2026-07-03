@@ -60,6 +60,7 @@ objc_library(
         "//Source/common:SNTStoredExecutionEvent",
         "//Source/common:SNTStoredFileAccessEvent",
         "//Source/common:SNTStoredSignalReport",
+        "//Source/common:SNTStoredTemporaryAdminModeAuditEvent",
         "//Source/common:SNTStoredTemporaryMonitorModeAuditEvent",
         "//Source/common:SantaCache",
         "//Source/common:String",
@@ -368,6 +369,46 @@ santa_unit_test(
         ":TemporaryMonitorMode",
         ":TimedSyncSession",
         "//Source/common:SNTModeTransition",
+        "//Source/common:SystemResources",
+        "@OCMock",
+    ],
+)
+
+objc_library(
+    name = "TemporaryAdminMode",
+    srcs = ["TemporaryAdminMode.mm"],
+    hdrs = ["TemporaryAdminMode.h"],
+    sdk_dylibs = [
+        "EndpointSecurity",
+    ],
+    deps = [
+        ":AdminGroupMembership",
+        ":SNTNotificationQueue",
+        ":TimedSyncSession",
+        "//Source/common:PassKey",
+        "//Source/common:SNTConfigurator",
+        "//Source/common:SNTError",
+        "//Source/common:SNTLogging",
+        "//Source/common:SNTStoredTemporaryAdminModeAuditEvent",
+        "//Source/common:SNTTemporaryAdminPolicy",
+        "//Source/common:SNTXPCNotifierInterface",
+        "@abseil-cpp//absl/synchronization",
+    ],
+)
+
+santa_unit_test(
+    name = "TemporaryAdminModeTest",
+    srcs = ["TemporaryAdminModeTest.mm"],
+    deps = [
+        ":AdminGroupMembership",
+        ":SNTNotificationQueue",
+        ":TemporaryAdminMode",
+        ":TimedSyncSession",
+        "//Source/common:SNTConfigurator",
+        "//Source/common:SNTError",
+        "//Source/common:SNTStoredTemporaryAdminModeAuditEvent",
+        "//Source/common:SNTSystemInfo",
+        "//Source/common:SNTTemporaryAdminPolicy",
         "//Source/common:SystemResources",
         "@OCMock",
     ],
@@ -1097,10 +1138,25 @@ santa_unit_test(
 )
 
 objc_library(
+    name = "AdminGroupMembership",
+    srcs = ["AdminGroupMembership.mm"],
+    hdrs = ["AdminGroupMembership.h"],
+    sdk_frameworks = [
+        "Collaboration",
+        "CoreServices",
+    ],
+    deps = [
+        "//Source/common:SNTError",
+        "//Source/common:SNTLogging",
+    ],
+)
+
+objc_library(
     name = "SNTDaemonControlController",
     srcs = ["SNTDaemonControlController.mm"],
     hdrs = ["SNTDaemonControlController.h"],
     deps = [
+        ":AdminGroupMembership",
         ":AuthResultCache",
         ":EndpointSecurityLogger",
         ":KillingMachine",
@@ -1112,6 +1168,7 @@ objc_library(
         ":SNTRuleTable",
         ":SNTSyncdQueue",
         ":SandboxExpectations",
+        ":TemporaryAdminMode",
         ":TemporaryMonitorMode",
         "//Source/common:MOLCodesignChecker",
         "//Source/common:MOLXPCConnection",
@@ -1131,7 +1188,9 @@ objc_library(
         "//Source/common:SNTRuleIdentifiers",
         "//Source/common:SNTSandboxExecRequest",
         "//Source/common:SNTStoredExecutionEvent",
+        "//Source/common:SNTStoredTemporaryAdminModeAuditEvent",
         "//Source/common:SNTStrengthify",
+        "//Source/common:SNTTemporaryAdminPolicy",
         "//Source/common:SNTTimer",
         "//Source/common:SNTXPCControlInterface",
         "//Source/common:SNTXPCNotifierInterface",
@@ -1386,6 +1445,7 @@ santa_unit_test(
         "//Source/common:SNTStoredFileAccessEvent",
         "//Source/common:SNTStoredProcess",
         "//Source/common:SNTStoredSignalReport",
+        "//Source/common:SNTStoredTemporaryAdminModeAuditEvent",
         "//Source/common:SNTStoredTemporaryMonitorModeAuditEvent",
         "//Source/common:SantaCache",
         "//Source/common:String",
@@ -1937,6 +1997,7 @@ test_suite(
         ":SantadTest",
         ":SleighLauncherTest",
         ":TTYWriterTest",
+        ":TemporaryAdminModeTest",
         ":TemporaryMonitorModeTest",
         "//Source/common/es:EndpointSecurityClientTest",
         "//Source/common/es:EndpointSecurityEnricherTest",
