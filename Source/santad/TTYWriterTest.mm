@@ -17,8 +17,6 @@
 #import <Foundation/Foundation.h>
 #import <XCTest/XCTest.h>
 
-#include <unistd.h>
-
 using santa::TTYWriter;
 
 @interface TTYWriterTest : XCTestCase
@@ -33,13 +31,7 @@ using santa::TTYWriter;
   return path;
 }
 
-// TTYWriter writes on a private serial queue; poll for content (~2s budget).
-- (NSString*)waitForContentsAtPath:(NSString*)path {
-  for (int i = 0; i < 200; i++) {
-    NSString* s = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:nil];
-    if (s.length > 0) return s;
-    usleep(10000);
-  }
+- (NSString*)contentsAtPath:(NSString*)path {
   return [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:nil];
 }
 
@@ -50,38 +42,50 @@ using santa::TTYWriter;
 }
 
 - (void)testWriteWithoutSignalPathWritesMessage {
-  auto writer = TTYWriter::Create(/*silent_tty_mode=*/false);
-  XCTAssertNotEqual(writer.get(), nullptr);
+  // Inject a serial queue we own so the async write can be flushed deterministically:
+  // dispatch_sync on the same serial queue runs only after the enqueued write completes.
+  dispatch_queue_t q =
+      dispatch_queue_create("com.northpolesec.santa.ttywritertest", DISPATCH_QUEUE_SERIAL);
+  TTYWriter writer(q, /*silent_tty_mode=*/false);
   NSString* path = [self tempPathNamed:@"ttywriter-write.txt"];
 
-  writer->WriteWithoutSignal(path, @"hello-from-flow-block");
+  writer.WriteWithoutSignal(path, @"hello-from-flow-block");
+  dispatch_sync(q, ^{
+                });  // wait for the write to land
 
-  NSString* got = [self waitForContentsAtPath:path];
+  NSString* got = [self contentsAtPath:path];
   XCTAssertTrue([got containsString:@"hello-from-flow-block"], @"got: %@", got);
 }
 
 - (void)testSilentModeSuppressesPathWrite {
-  auto writer = TTYWriter::Create(/*silent_tty_mode=*/true);
+  dispatch_queue_t q =
+      dispatch_queue_create("com.northpolesec.santa.ttywritertest", DISPATCH_QUEUE_SERIAL);
+  TTYWriter writer(q, /*silent_tty_mode=*/true);
   NSString* path = [self tempPathNamed:@"ttywriter-silent.txt"];
 
-  writer->WriteWithoutSignal(path, @"should-not-appear");
+  writer.WriteWithoutSignal(path, @"should-not-appear");
+  dispatch_sync(q, ^{
+                });  // silent mode enqueues no write; this drains immediately
 
-  usleep(200000);  // give any erroneous async write a chance to land
-  NSString* got = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:nil];
+  NSString* got = [self contentsAtPath:path];
   XCTAssertEqual(got.length, 0u, @"got: %@", got);
 }
 
 // Non-writable paths (nil, empty) are silent no-ops that leave the writer
 // functional; a subsequent valid write still lands.
 - (void)testNilPathIsNoOp {
-  auto writer = TTYWriter::Create(/*silent_tty_mode=*/false);
-  writer->WriteWithoutSignal((NSString*)nil, @"nope");
-  writer->WriteWithoutSignal(@"", @"nope");
+  dispatch_queue_t q =
+      dispatch_queue_create("com.northpolesec.santa.ttywritertest", DISPATCH_QUEUE_SERIAL);
+  TTYWriter writer(q, /*silent_tty_mode=*/false);
+  writer.WriteWithoutSignal((NSString*)nil, @"nope");
+  writer.WriteWithoutSignal(@"", @"nope");
 
   NSString* path = [self tempPathNamed:@"ttywriter-nil-then-valid.txt"];
-  writer->WriteWithoutSignal(path, @"still-works");
+  writer.WriteWithoutSignal(path, @"still-works");
+  dispatch_sync(q, ^{
+                });  // wait for the valid write to land
 
-  NSString* got = [self waitForContentsAtPath:path];
+  NSString* got = [self contentsAtPath:path];
   XCTAssertTrue([got containsString:@"still-works"], @"got: %@", got);
 }
 
