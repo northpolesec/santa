@@ -41,15 +41,25 @@ class TTYWriter {
   TTYWriter& operator=(const TTYWriter& other) = delete;
 
   static bool CanWrite(const es_process_t* proc);
+  static bool CanWrite(NSString* ttyPath);
 
   void Write(const es_process_t* proc, NSString* (^messageCreator)(void));
   void Write(const es_process_t* proc, NSString* msg);
   void WriteWithoutSignal(const es_process_t* proc, NSString* msg);
 
+  // Path-based entry point (network-flow blocks have a tty path, not an es_process_t).
+  virtual void WriteWithoutSignal(NSString* ttyPath, NSString* msg);
+
   void EnableSilentTTYMode(bool silent_tty_mode);
+
+  // Virtual so deleting a derived instance (e.g. a test double) through a TTYWriter* is
+  // well-defined once the class has virtual methods; public so unique_ptr/shared_ptr
+  // deleters can reach it.
+  virtual ~TTYWriter() = default;
 
  private:
   void Write(const es_process_t* proc, bool send_signal, NSString* (^messageCreator)(void));
+  void Write(NSString* ttyPath, bool send_signal, NSString* (^messageCreator)(void));
 
   dispatch_queue_t q_;
   std::atomic<bool> silent_tty_mode_;

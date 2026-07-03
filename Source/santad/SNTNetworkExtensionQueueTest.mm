@@ -29,10 +29,12 @@
 #import "Source/common/SNTStoredProcess.h"
 #import "Source/common/SNTXPCNotifierInterface.h"
 #import "Source/common/SantaVnode.h"
+#import "Source/common/TestUtils.h"
 #import "Source/common/ne/SNDXPCNetworkExtensionInterface.h"
 #import "Source/common/ne/SNTNetworkExtensionSettings.h"
 #import "Source/common/ne/SNTSyncNetworkExtensionSettings.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
+#include "Source/santad/MockTTYWriter.h"
 #import "Source/santad/SNTDecisionCache.h"
 #import "Source/santad/SNTNotificationQueue.h"
 #import "Source/santad/SNTSyncdQueue.h"
@@ -45,6 +47,12 @@
 @property SNTNetworkExtensionSettings* lastPushedSettings;
 @property NSString* lastPushedNetworkFlowRulesHash;
 @property(readwrite) NSString* connectedProtocolVersion;
+- (instancetype)initWithNotifierQueue:(SNTNotificationQueue*)notifierQueue
+                           syncdQueue:(SNTSyncdQueue*)syncdQueue
+                            ruleTable:(SNTRuleTable*)ruleTable
+                        decisionCache:(SNTDecisionCache*)decisionCache
+                            ttyWriter:(std::shared_ptr<santa::TTYWriter>)ttyWriter
+                               logger:(std::shared_ptr<santa::Logger>)logger;
 - (void)establishNetworkExtensionConnection;
 - (void)clearNetworkExtensionConnection;
 - (SNTNetworkExtensionSettings*)generateSettingsForProtocolVersion:(NSString*)protocolVersion;
@@ -61,6 +69,7 @@
 @property id mockNotifierQueue;
 @property id mockNotifierConnection;
 @property id mockNotifierProxy;
+@property std::shared_ptr<santa::MockTTYWriter> mockTTYWriter;
 @end
 
 @implementation SNTNetworkExtensionQueueTest
@@ -70,12 +79,15 @@
   self.mockSyncdQueue = OCMClassMock([SNTSyncdQueue class]);
   self.mockDecisionCache = OCMClassMock([SNTDecisionCache class]);
 
+  self.mockTTYWriter = std::make_shared<santa::MockTTYWriter>();
+
   // Construct the SUT before mocking the configurator so its init-time KVO watchers attach
   // to the real configurator singleton (KVO on a class mock is unreliable).
   self.sut = [[SNTNetworkExtensionQueue alloc] initWithNotifierQueue:nil
                                                           syncdQueue:self.mockSyncdQueue
                                                            ruleTable:self.mockRuleTable
                                                        decisionCache:self.mockDecisionCache
+                                                           ttyWriter:self.mockTTYWriter
                                                               logger:nullptr];
 
   self.mockConfigurator = OCMClassMock([SNTConfigurator class]);
@@ -91,6 +103,10 @@
 
 - (void)tearDown {
   [self.mockConfigurator stopMocking];
+  // Release the SUT and the injected mock so the gmock MockTTYWriter is destroyed here
+  // (verifying its expectations) rather than leaking to program exit under retained XCTest cases.
+  self.sut = nil;
+  self.mockTTYWriter = nullptr;
 }
 
 // Make the configurator report the given sync-side network extension settings.
@@ -524,6 +540,109 @@
   ]];
 
   OCMVerifyAll(proxy);
+}
+
+- (void)testHandleNetworkFlowDecisionsLoudDenyWritesTTYWhenPathPresent {
+  [self stubNetworkExtensionEnabled];
+  [self setUpNotifierProxy];  // loud-deny branch also posts the dialog
+
+  SNTStoredNetworkFlowEvent* event = [self loudDenyEventWithUIKey:@"k"];
+  event.ttyPath = @"/dev/ttys003";
+  event.process.filePath = @"/usr/bin/curl";
+  event.ruleName = @"block-example";
+  event.hostname = @"example.com";
+  event.remotePort = 443;
+  event.customURL = @"https://example.com/why";
+
+  EXPECT_CALL(*self.mockTTYWriter,
+              WriteWithoutSignal(
+                  testing::Truly([](NSString* p) { return [p isEqualToString:@"/dev/ttys003"]; }),
+                  testing::Truly([](NSString* msg) {
+                    return [msg containsString:@"block-example"] &&
+                           [msg containsString:@"/usr/bin/curl"] &&
+                           [msg containsString:@"example.com"] && [msg containsString:@":443"] &&
+                           [msg containsString:@"https://example.com/why"];
+                  })))
+      .Times(1);
+
+  [self.sut handleNetworkFlowDecisions:@[ [self decisionForCacheMissWithEvent:event] ]];
+
+  XCTBubbleMockVerifyAndClearExpectations(self.mockTTYWriter.get());
+}
+
+- (void)testHandleNetworkFlowDecisionsLoudDenyOmitsMoreInfoWhenNoURL {
+  [self stubNetworkExtensionEnabled];
+
+  SNTStoredNetworkFlowEvent* event = [self loudDenyEventWithUIKey:@"k"];
+  event.ttyPath = @"/dev/ttys003";
+  event.customURL = nil;  // no custom URL resolves -> no "More info:" line in the message
+
+  EXPECT_CALL(*self.mockTTYWriter, WriteWithoutSignal(testing::_, testing::Truly([](NSString* msg) {
+                                                        return ![msg containsString:@"More info:"];
+                                                      })))
+      .Times(1);
+
+  [self.sut handleNetworkFlowDecisions:@[ [self decisionForCacheMissWithEvent:event] ]];
+
+  XCTBubbleMockVerifyAndClearExpectations(self.mockTTYWriter.get());
+}
+
+- (void)testHandleNetworkFlowDecisionsLoudDenyWritesTTYWithoutGUIConnection {
+  [self stubNetworkExtensionEnabled];
+  // No setUpNotifierProxy: notifierQueue stays nil, so the dialog post is a no-op. The TTY
+  // write must still fire -- it's independent of the GUI connection (e.g. at the loginwindow).
+
+  SNTStoredNetworkFlowEvent* event = [self loudDenyEventWithUIKey:@"k"];
+  event.ttyPath = @"/dev/ttys003";
+  event.process.filePath = @"/usr/bin/curl";
+
+  EXPECT_CALL(*self.mockTTYWriter, WriteWithoutSignal(testing::Truly([](NSString* p) {
+                                                        return [p isEqualToString:@"/dev/ttys003"];
+                                                      }),
+                                                      testing::_))
+      .Times(1);
+
+  [self.sut handleNetworkFlowDecisions:@[ [self decisionForCacheMissWithEvent:event] ]];
+
+  XCTBubbleMockVerifyAndClearExpectations(self.mockTTYWriter.get());
+}
+
+- (void)testHandleNetworkFlowDecisionsLoudDenyNoTTYWhenPathNil {
+  [self stubNetworkExtensionEnabled];
+  [self setUpNotifierProxy];
+
+  SNTStoredNetworkFlowEvent* event = [self loudDenyEventWithUIKey:@"k"];  // ttyPath nil
+  EXPECT_CALL(*self.mockTTYWriter, WriteWithoutSignal(testing::_, testing::_)).Times(0);
+
+  [self.sut handleNetworkFlowDecisions:@[ [self decisionForCacheMissWithEvent:event] ]];
+
+  XCTBubbleMockVerifyAndClearExpectations(self.mockTTYWriter.get());
+}
+
+- (void)testHandleNetworkFlowDecisionsSilentDenyDoesNotWriteTTY {
+  [self stubNetworkExtensionEnabled];
+
+  SNTStoredNetworkFlowEvent* event = [self loudDenyEventWithUIKey:@"k"];
+  event.silent = YES;
+  event.ttyPath = @"/dev/ttys003";  // present but ignored on a silent deny
+  EXPECT_CALL(*self.mockTTYWriter, WriteWithoutSignal(testing::_, testing::_)).Times(0);
+
+  [self.sut handleNetworkFlowDecisions:@[ [self decisionForCacheMissWithEvent:event] ]];
+
+  XCTBubbleMockVerifyAndClearExpectations(self.mockTTYWriter.get());
+}
+
+- (void)testHandleNetworkFlowDecisionsAuditDoesNotWriteTTY {
+  [self stubNetworkExtensionEnabled];
+
+  SNTStoredNetworkFlowEvent* event = [self loudDenyEventWithUIKey:@"k"];
+  event.decision = SNTNetworkFlowDecisionAudit;
+  event.ttyPath = @"/dev/ttys003";
+  EXPECT_CALL(*self.mockTTYWriter, WriteWithoutSignal(testing::_, testing::_)).Times(0);
+
+  [self.sut handleNetworkFlowDecisions:@[ [self decisionForCacheMissWithEvent:event] ]];
+
+  XCTBubbleMockVerifyAndClearExpectations(self.mockTTYWriter.get());
 }
 
 @end

@@ -93,4 +93,8 @@ typedef NS_ENUM(int32_t, SNTNetworkFlowTier) {
 @property(nullable) NSString* customMsg;
 @property(nullable) NSString* customURL;
 
+// santad-local, NOT mapped to the proto: originating process's controlling TTY (from the
+// exec-time snapshot on the wire), used to write the loud-deny block message to that terminal.
+@property(nullable) NSString* ttyPath;
+
 @end

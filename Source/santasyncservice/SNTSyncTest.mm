@@ -1015,6 +1015,7 @@
   block.uiDedupeKey = @"4242:1|7|example.com";                  // santa-internal, never uploaded
   block.customMsg = @"Contact IT before reaching this host";    // rule property, never uploaded
   block.customURL = @"https://example.com/why";                 // rule property, never uploaded
+  block.ttyPath = @"/dev/ttys003";                              // santa-internal, never uploaded
   block.process.filePath = @"/usr/bin/curl";
   block.process.cdhash = @"deadbeef";
   block.process.fileSHA256 = @"abc123";
@@ -1088,6 +1089,7 @@
             // Rule block-feedback text is santad-local; never serialized to the proto.
             XCTAssertNil(f[@"customMsg"]);
             XCTAssertNil(f[@"customUrl"]);
+            XCTAssertNil(f[@"ttyPath"]);
 
             return YES;
           }];
