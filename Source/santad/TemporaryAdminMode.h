@@ -64,10 +64,12 @@ class TemporaryAdminMode : public TimedSyncSession, public PassKey<TemporaryAdmi
   // On a Revoke policy, cancel any active session; always re-notify GUI availability.
   void NewPolicyReceived(SNTTemporaryAdminPolicy* policy);
 
-  // End the active session iff it belongs to `uid`, with the given leave reason and no revoke
-  // policy. No-op (returns false) if no session is active or the uid does not match. Used by
-  // the session-presence triggers (screen lock / logout / fast-user-switch).
-  bool EndForUserEvent(uid_t uid, SNTTemporaryAdminModeLeaveReason reason);
+  // End the active session iff it belongs to the target user, with the given leave reason and no
+  // revoke policy. Matches on EITHER `uid` (when non-zero) OR `username` (case-insensitive), so a
+  // failed or colliding uid resolution on one trigger can still revoke via the other key. No-op
+  // (returns false) if no session is active or neither key matches. Used by the session-presence
+  // triggers (screen lock / logout / fast-user-switch).
+  bool EndForUserEvent(uid_t uid, NSString* username, SNTTemporaryAdminModeLeaveReason reason);
 
   friend class TemporaryAdminModePeer;
 

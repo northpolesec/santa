@@ -1257,7 +1257,9 @@ static const char* const kAllowedCanonicalBundlePaths[] = {
   // user's active session.
   audit_token_t peer = [MOLXPCConnection currentPeerAuditToken];
   uid_t uid = audit_token_to_euid(peer);
-  _temporaryAdminMode->EndForUserEvent(uid, SNTTemporaryAdminModeLeaveReasonSessionEnded);
+  // The audit-token uid is authoritative on this path, so match on uid only (no login username is
+  // available here); pass nil to skip the name match.
+  _temporaryAdminMode->EndForUserEvent(uid, nil, SNTTemporaryAdminModeLeaveReasonSessionEnded);
   reply(nil);
 }
 

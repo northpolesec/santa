@@ -70,6 +70,11 @@
     if (!tam->SecondsRemaining().has_value()) {
       return;
     }
+    // Best-effort resolve the login username to a uid. Resolution is NOT required: EndForUserEvent
+    // matches on the uid OR the stored username, so a transient directory failure or a
+    // local-vs-directory uid collision still revokes via the username. A uid of 0 (unresolved, or
+    // the root/loginwindow pseudo-user) never matches a real target uid.
+    uid_t uid = 0;
     struct passwd pwd;
     struct passwd* result = NULL;
     long bufsize = sysconf(_SC_GETPW_R_SIZE_MAX);
@@ -86,12 +91,10 @@
            buf.size() < (1 << 20)) {
       buf.resize(buf.size() * 2);
     }
-    if (rc != 0 || result == NULL || pwd.pw_uid == 0) {
-      // Unresolved, or the loginwindow/root pseudo-user — never a TAM target. The timer remains
-      // the backstop if a real revoke was somehow missed.
-      return;
+    if (rc == 0 && result != NULL && pwd.pw_uid != 0) {
+      uid = pwd.pw_uid;
     }
-    tam->EndForUserEvent(pwd.pw_uid, reason);
+    tam->EndForUserEvent(uid, username, reason);
   });
 }
 

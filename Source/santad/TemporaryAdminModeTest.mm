@@ -379,7 +379,7 @@ static uint64_t MakeDeadline(uint64_t want) {
   XCTAssertTrue(fake->IsMember(501));
 
   // EndForUserEvent with the matching uid must return true.
-  XCTAssertTrue(tam->EndForUserEvent(501, SNTTemporaryAdminModeLeaveReasonScreenLocked));
+  XCTAssertTrue(tam->EndForUserEvent(501, @"alice", SNTTemporaryAdminModeLeaveReasonScreenLocked));
 
   // The user must be removed from the admin group.
   XCTAssertFalse(fake->IsMember(501));
@@ -410,13 +410,14 @@ static uint64_t MakeDeadline(uint64_t want) {
   // Available() must be true before and after; EndForUserEvent must not call WriteRevokePolicy.
   XCTAssertTrue(tam->Available());
 
-  XCTAssertTrue(tam->EndForUserEvent(501, SNTTemporaryAdminModeLeaveReasonScreenLocked));
+  XCTAssertTrue(tam->EndForUserEvent(501, @"alice", SNTTemporaryAdminModeLeaveReasonScreenLocked));
 
   // The feature must still be available — no revoke policy was written.
   XCTAssertTrue(tam->Available());
 }
 
-// With an active session for uid 501, EndForUserEvent for a different uid is a no-op.
+// With an active session for uid 501 / "alice", EndForUserEvent for a different uid AND a
+// different username is a no-op.
 - (void)testEndForUserEventWrongUidIsNoOp {
   [self stubPolicyAvailable];
   [self stubAuthReply:YES reason:@"reason"];
@@ -434,8 +435,8 @@ static uint64_t MakeDeadline(uint64_t want) {
   XCTAssertNil(err);
   XCTAssertTrue(fake->IsMember(501));
 
-  // A different uid must be rejected.
-  XCTAssertFalse(tam->EndForUserEvent(502, SNTTemporaryAdminModeLeaveReasonScreenLocked));
+  // A different uid and a different username must be rejected.
+  XCTAssertFalse(tam->EndForUserEvent(502, @"bob", SNTTemporaryAdminModeLeaveReasonScreenLocked));
 
   // Session for 501 must remain intact.
   XCTAssertTrue(fake->IsMember(501));
@@ -459,7 +460,7 @@ static uint64_t MakeDeadline(uint64_t want) {
   // No session was started.
   XCTAssertFalse(tam->SecondsRemaining().has_value());
 
-  XCTAssertFalse(tam->EndForUserEvent(501, SNTTemporaryAdminModeLeaveReasonScreenLocked));
+  XCTAssertFalse(tam->EndForUserEvent(501, @"alice", SNTTemporaryAdminModeLeaveReasonScreenLocked));
 
   // No audit events must have been emitted.
   XCTAssertEqual(events.count, 0u);
@@ -482,11 +483,11 @@ static uint64_t MakeDeadline(uint64_t want) {
   XCTAssertNil(err);
 
   // First call succeeds.
-  XCTAssertTrue(tam->EndForUserEvent(501, SNTTemporaryAdminModeLeaveReasonScreenLocked));
+  XCTAssertTrue(tam->EndForUserEvent(501, @"alice", SNTTemporaryAdminModeLeaveReasonScreenLocked));
   NSUInteger countAfterFirst = events.count;
 
   // Second call must return false and must not emit another audit event.
-  XCTAssertFalse(tam->EndForUserEvent(501, SNTTemporaryAdminModeLeaveReasonScreenLocked));
+  XCTAssertFalse(tam->EndForUserEvent(501, @"alice", SNTTemporaryAdminModeLeaveReasonScreenLocked));
   XCTAssertEqual(events.count, countAfterFirst);
 }
 
@@ -506,13 +507,99 @@ static uint64_t MakeDeadline(uint64_t want) {
   XCTAssertEqual(tam->RequestMinutes(@5, 501, @"alice", &err), 5u);
   XCTAssertNil(err);
 
-  XCTAssertTrue(tam->EndForUserEvent(501, SNTTemporaryAdminModeLeaveReasonSessionEnded));
+  XCTAssertTrue(tam->EndForUserEvent(501, @"alice", SNTTemporaryAdminModeLeaveReasonSessionEnded));
 
   XCTAssertTrue(
       [events.lastObject isKindOfClass:[SNTStoredTemporaryAdminModeLeaveAuditEvent class]]);
   SNTStoredTemporaryAdminModeLeaveAuditEvent* leave =
       (SNTStoredTemporaryAdminModeLeaveAuditEvent*)events.lastObject;
   XCTAssertEqual(leave.reason, SNTTemporaryAdminModeLeaveReasonSessionEnded);
+}
+
+// uid unresolved (0) but the username matches the stored target -> revokes via the name. This is
+// the transient-directory-failure case where getpwnam yields no uid.
+- (void)testEndForUserEventNameMatchWhenUidUnresolved {
+  [self stubPolicyAvailable];
+  [self stubAuthReply:YES reason:@"reason"];
+  auto fakeOwned = std::make_unique<FakeAdminGroupMembership>();
+  FakeAdminGroupMembership* fake = fakeOwned.get();
+  NSMutableArray<SNTStoredTemporaryAdminModeAuditEvent*>* events = [NSMutableArray array];
+  auto tam = santa::TemporaryAdminMode::Create(
+      (SNTConfigurator*)self.mockConfigurator, (SNTNotificationQueue*)self.mockNotQueue,
+      std::move(fakeOwned), ^(SNTStoredTemporaryAdminModeAuditEvent* e) {
+        [events addObject:e];
+      });
+
+  NSError* err = nil;
+  XCTAssertEqual(tam->RequestMinutes(@5, 501, @"alice", &err), 5u);
+  XCTAssertNil(err);
+
+  XCTAssertTrue(tam->EndForUserEvent(0, @"alice", SNTTemporaryAdminModeLeaveReasonScreenLocked));
+  XCTAssertFalse(fake->IsMember(501));
+}
+
+// uid does not match but the username does (local-vs-directory uid collision) -> revokes.
+- (void)testEndForUserEventNameMatchWhenUidDiffers {
+  [self stubPolicyAvailable];
+  [self stubAuthReply:YES reason:@"reason"];
+  auto fakeOwned = std::make_unique<FakeAdminGroupMembership>();
+  FakeAdminGroupMembership* fake = fakeOwned.get();
+  NSMutableArray<SNTStoredTemporaryAdminModeAuditEvent*>* events = [NSMutableArray array];
+  auto tam = santa::TemporaryAdminMode::Create(
+      (SNTConfigurator*)self.mockConfigurator, (SNTNotificationQueue*)self.mockNotQueue,
+      std::move(fakeOwned), ^(SNTStoredTemporaryAdminModeAuditEvent* e) {
+        [events addObject:e];
+      });
+
+  NSError* err = nil;
+  XCTAssertEqual(tam->RequestMinutes(@5, 501, @"alice", &err), 5u);
+  XCTAssertNil(err);
+
+  XCTAssertTrue(tam->EndForUserEvent(999, @"alice", SNTTemporaryAdminModeLeaveReasonSessionEnded));
+  XCTAssertFalse(fake->IsMember(501));
+}
+
+// The username match is case-insensitive (login name vs canonical pw_name can differ in case).
+- (void)testEndForUserEventNameMatchIsCaseInsensitive {
+  [self stubPolicyAvailable];
+  [self stubAuthReply:YES reason:@"reason"];
+  auto fakeOwned = std::make_unique<FakeAdminGroupMembership>();
+  FakeAdminGroupMembership* fake = fakeOwned.get();
+  NSMutableArray<SNTStoredTemporaryAdminModeAuditEvent*>* events = [NSMutableArray array];
+  auto tam = santa::TemporaryAdminMode::Create(
+      (SNTConfigurator*)self.mockConfigurator, (SNTNotificationQueue*)self.mockNotQueue,
+      std::move(fakeOwned), ^(SNTStoredTemporaryAdminModeAuditEvent* e) {
+        [events addObject:e];
+      });
+
+  NSError* err = nil;
+  XCTAssertEqual(tam->RequestMinutes(@5, 501, @"alice", &err), 5u);
+  XCTAssertNil(err);
+
+  XCTAssertTrue(tam->EndForUserEvent(0, @"ALICE", SNTTemporaryAdminModeLeaveReasonScreenLocked));
+  XCTAssertFalse(fake->IsMember(501));
+}
+
+// Neither key resolvable/matching (uid 0, empty username) -> no-op even with an active session.
+- (void)testEndForUserEventNoKeyIsNoOp {
+  [self stubPolicyAvailable];
+  [self stubAuthReply:YES reason:@"reason"];
+  auto fakeOwned = std::make_unique<FakeAdminGroupMembership>();
+  FakeAdminGroupMembership* fake = fakeOwned.get();
+  NSMutableArray<SNTStoredTemporaryAdminModeAuditEvent*>* events = [NSMutableArray array];
+  auto tam = santa::TemporaryAdminMode::Create(
+      (SNTConfigurator*)self.mockConfigurator, (SNTNotificationQueue*)self.mockNotQueue,
+      std::move(fakeOwned), ^(SNTStoredTemporaryAdminModeAuditEvent* e) {
+        [events addObject:e];
+      });
+
+  NSError* err = nil;
+  XCTAssertEqual(tam->RequestMinutes(@5, 501, @"alice", &err), 5u);
+  XCTAssertNil(err);
+
+  XCTAssertFalse(tam->EndForUserEvent(0, @"", SNTTemporaryAdminModeLeaveReasonScreenLocked));
+  XCTAssertTrue(fake->IsMember(501));
+  XCTAssertTrue(tam->SecondsRemaining().has_value());
 }
 
 @end
