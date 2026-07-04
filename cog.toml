@@ -1,0 +1,5 @@
+# Cocogitto — conventional commit enforcement
+# https://docs.cocogitto.io/reference/config.html
+
+from_latest_tag = true
+ignore_merge_commits = true

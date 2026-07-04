@@ -1,0 +1,5 @@
+commit-msg:
+  commands:
+    commitlint:
+      run: cog verify --file {1}
+      fail_text: "commit message does not follow Conventional Commits"
