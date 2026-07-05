@@ -58,6 +58,7 @@
 #include "Source/common/faa/WatchItems.h"
 #import "Source/common/ne/SNTSyncNetworkExtensionSettings.h"
 #include "Source/santad/AdminGroupMembership.h"
+#include "Source/santad/AdminUserState.h"
 #import "Source/santad/DataLayer/SNTEventTable.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
 #include "Source/santad/KillingMachine.h"
@@ -144,6 +145,7 @@ static NSString* TAMUsernameForUID(uid_t uid) {
   std::shared_ptr<WatchItems> _watchItems;
   std::shared_ptr<santa::TemporaryMonitorMode> _temporaryMonitorMode;
   std::shared_ptr<santa::TemporaryAdminMode> _temporaryAdminMode;
+  std::unique_ptr<santa::AdminUserState> _adminUserState;
   std::shared_ptr<santa::SandboxExpectations> _sandboxExpectations;
   std::shared_ptr<santa::SNTBinaryUploadController> _binaryUploadController;
 }
@@ -205,6 +207,9 @@ static NSString* TAMUsernameForUID(uid_t uid) {
           [[SNTDatabaseController eventTable] addStoredEvent:auditEvent];
           [syncdQueue addStoredEvent:auditEvent];
         });
+
+    _adminUserState = std::make_unique<santa::AdminUserState>(
+        [SNTConfigurator configurator], santa::CreateAdminGroupMembership());
   }
   return self;
 }
@@ -745,6 +750,9 @@ static NSString* TAMUsernameForUID(uid_t uid) {
   // availability against just-committed state.
   [result temporaryAdminPolicy:^(SNTTemporaryAdminPolicy* val) {
     _temporaryAdminMode->NewPolicyReceived(val);
+    // After TAM's own teardown: on a revoke, TAM removes its elevated user
+    // before the natural admins recorded at the flip are restored.
+    _adminUserState->HandlePolicy(val);
   }];
 
   if (committed) {
