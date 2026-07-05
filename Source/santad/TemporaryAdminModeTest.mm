@@ -61,6 +61,16 @@ class FakeAdminGroupMembership : public AdminGroupMembership {
     return true;
   }
 
+  std::optional<std::vector<AdminGroupMember>> ListDirectUserMembers() override {
+    // Unused by these tests.
+    return std::nullopt;
+  }
+
+  NSString* UsernameForUID(uid_t uid) override {
+    // Unused by these tests.
+    return nil;
+  }
+
   std::set<uid_t> members_;
   bool fail_add_ = false;
   bool fail_remove_ = false;
