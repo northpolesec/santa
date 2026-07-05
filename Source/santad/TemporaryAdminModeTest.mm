@@ -254,9 +254,11 @@ static uint64_t MakeDeadline(uint64_t want) {
   [self stubAuthReply:YES reason:@"need to install"];
   auto fakeOwned = std::make_unique<FakeAdminGroupMembership>();
   FakeAdminGroupMembership* fake = fakeOwned.get();
-  auto tam = santa::TemporaryAdminMode::Create(
-      (SNTConfigurator*)self.mockConfigurator, (SNTNotificationQueue*)self.mockNotQueue,
-      std::move(fakeOwned), ^(SNTStoredTemporaryAdminModeAuditEvent* e){});
+  auto tam = santa::TemporaryAdminMode::Create((SNTConfigurator*)self.mockConfigurator,
+                                               (SNTNotificationQueue*)self.mockNotQueue,
+                                               std::move(fakeOwned),
+                                               ^(SNTStoredTemporaryAdminModeAuditEvent* e){
+                                               });
 
   // A deadline-0 record left by a failed teardown, owed to the next daemon
   // start. Stubbed after Create so startup reconciliation does not consume it.
@@ -648,9 +650,11 @@ static uint64_t MakeDeadline(uint64_t want) {
         [writes addObject:state ? (id)[state copy] : (id)[NSNull null]];
       });
   auto fakeOwned = std::make_unique<FakeAdminGroupMembership>();
-  auto tam = santa::TemporaryAdminMode::Create(
-      (SNTConfigurator*)self.mockConfigurator, (SNTNotificationQueue*)self.mockNotQueue,
-      std::move(fakeOwned), ^(SNTStoredTemporaryAdminModeAuditEvent* e){});
+  auto tam = santa::TemporaryAdminMode::Create((SNTConfigurator*)self.mockConfigurator,
+                                               (SNTNotificationQueue*)self.mockNotQueue,
+                                               std::move(fakeOwned),
+                                               ^(SNTStoredTemporaryAdminModeAuditEvent* e){
+                                               });
 
   NSError* err = nil;
   XCTAssertEqual(tam->RequestMinutes(@5, 501, @"alice", &err), 5u);
@@ -679,9 +683,11 @@ static uint64_t MakeDeadline(uint64_t want) {
   auto fakeOwned = std::make_unique<FakeAdminGroupMembership>();
   FakeAdminGroupMembership* fake = fakeOwned.get();
   fake->fail_add_ = true;
-  auto tam = santa::TemporaryAdminMode::Create(
-      (SNTConfigurator*)self.mockConfigurator, (SNTNotificationQueue*)self.mockNotQueue,
-      std::move(fakeOwned), ^(SNTStoredTemporaryAdminModeAuditEvent* e){});
+  auto tam = santa::TemporaryAdminMode::Create((SNTConfigurator*)self.mockConfigurator,
+                                               (SNTNotificationQueue*)self.mockNotQueue,
+                                               std::move(fakeOwned),
+                                               ^(SNTStoredTemporaryAdminModeAuditEvent* e){
+                                               });
 
   NSError* err = nil;
   XCTAssertEqual(tam->RequestMinutes(@5, 501, @"alice", &err), 0u);

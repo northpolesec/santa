@@ -208,8 +208,8 @@ static NSString* TAMUsernameForUID(uid_t uid) {
           [syncdQueue addStoredEvent:auditEvent];
         });
 
-    _adminUserState = std::make_unique<santa::AdminUserState>(
-        [SNTConfigurator configurator], santa::CreateAdminGroupMembership());
+    _adminUserState = std::make_unique<santa::AdminUserState>([SNTConfigurator configurator],
+                                                              santa::CreateAdminGroupMembership());
   }
   return self;
 }

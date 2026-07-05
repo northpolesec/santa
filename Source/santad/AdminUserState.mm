@@ -64,8 +64,7 @@ void AdminUserState::CaptureAndDemoteLocked() {
       // This membership is TAM's (an active grant, or a failed-teardown
       // residue pending its restart retry), not a natural admin. Recording it
       // would launder a temporary elevation into a permanent one at restore.
-      LOGI(@"DemotedAdmins: excluding TAM session target uid=%u from capture",
-           member.uid);
+      LOGI(@"DemotedAdmins: excluding TAM session target uid=%u from capture", member.uid);
       continue;
     }
     [record addObject:@{
@@ -113,8 +112,7 @@ void AdminUserState::RestoreAndClearLocked() {
   bool all_restored = true;
   NSMutableSet<NSNumber*>* restored_uids = [NSMutableSet set];
   for (NSDictionary* user in record) {
-    NSNumber* uid_number =
-        [user isKindOfClass:[NSDictionary class]] ? user[kDemotedAdminUID] : nil;
+    NSNumber* uid_number = [user isKindOfClass:[NSDictionary class]] ? user[kDemotedAdminUID] : nil;
     if (![uid_number isKindOfClass:[NSNumber class]]) {
       // Only possible via on-disk tampering or corruption. The entry can never
       // be restored, so it must not keep the whole record alive forever.
@@ -139,8 +137,8 @@ void AdminUserState::RestoreAndClearLocked() {
       // original was deleted and the uid reused. Never promote the new
       // account; like the deleted-account case, the entry is complete.
       [restored_uids addObject:@(uid)];
-      LOGW(@"DemotedAdmins: uid=%u now resolves to %@, not recorded %@; treating as removed",
-           uid, current_username, recorded_username);
+      LOGW(@"DemotedAdmins: uid=%u now resolves to %@, not recorded %@; treating as removed", uid,
+           current_username, recorded_username);
       continue;
     }
     NSError* err;

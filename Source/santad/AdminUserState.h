@@ -17,11 +17,10 @@
 
 #include <memory>
 
-#include "absl/synchronization/mutex.h"
-
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTTemporaryAdminPolicy.h"
 #include "Source/santad/AdminGroupMembership.h"
+#include "absl/synchronization/mutex.h"
 
 namespace santa {
 

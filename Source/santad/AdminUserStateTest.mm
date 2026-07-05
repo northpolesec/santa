@@ -253,7 +253,8 @@ static SNTTemporaryAdminPolicy* RevokePolicy() {
   // The write path recovers; the next delivery performs the full edge.
   self.persistFails = NO;
   state->HandlePolicy(OnDemandPolicy());
-  XCTAssertEqualObjects(self.storedRecord, (@[ @{@"Username" : @"jane", @"UID" : @501, @"Local" : @YES} ]));
+  XCTAssertEqualObjects(self.storedRecord,
+                        (@[ @{@"Username" : @"jane", @"UID" : @501, @"Local" : @YES} ]));
   XCTAssertFalse(fake->IsMember(501));
 }
 
@@ -361,7 +362,8 @@ static SNTTemporaryAdminPolicy* RevokePolicy() {
 
   state->HandlePolicy(OnDemandPolicy());
 
-  XCTAssertEqualObjects(self.storedRecord, (@[ @{@"Username" : @"jane", @"UID" : @501, @"Local" : @YES} ]));
+  XCTAssertEqualObjects(self.storedRecord,
+                        (@[ @{@"Username" : @"jane", @"UID" : @501, @"Local" : @YES} ]));
   XCTAssertFalse(fake->IsMember(501));
   XCTAssertTrue(fake->IsMember(503));  // left to TAM's own teardown/retry
 
@@ -374,9 +376,9 @@ static SNTTemporaryAdminPolicy* RevokePolicy() {
   state->HandlePolicy(OnDemandPolicy());
 
   XCTAssertEqualObjects(self.storedRecord, (@[
-    @{@"Username" : @"jane", @"UID" : @501, @"Local" : @YES},
-    @{@"Username" : @"tamuser", @"UID" : @503, @"Local" : @YES},
-  ]));
+                          @{@"Username" : @"jane", @"UID" : @501, @"Local" : @YES},
+                          @{@"Username" : @"tamuser", @"UID" : @503, @"Local" : @YES},
+                        ]));
   XCTAssertFalse(fake->IsMember(501));
   XCTAssertFalse(fake->IsMember(503));
 }
@@ -484,7 +486,8 @@ static SNTTemporaryAdminPolicy* RevokePolicy() {
   state->HandlePolicy(OnDemandPolicy());
   XCTAssertTrue(fake->IsMember(501));
   XCTAssertTrue(fake->IsMember(505));
-  XCTAssertEqualObjects(self.storedRecord, (@[ @{@"Username" : @"jane", @"UID" : @501, @"Local" : @YES} ]));
+  XCTAssertEqualObjects(self.storedRecord,
+                        (@[ @{@"Username" : @"jane", @"UID" : @501, @"Local" : @YES} ]));
 
   state->HandlePolicy(RevokePolicy());
   XCTAssertTrue(fake->IsMember(501));
