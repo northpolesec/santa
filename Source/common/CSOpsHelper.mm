@@ -15,6 +15,7 @@
 #include "Source/common/CSOpsHelper.h"
 
 #include <arpa/inet.h>
+#include <bsm/libbsm.h>
 
 #include <cstring>
 
@@ -39,6 +40,17 @@ std::optional<std::string> CSOpsGetBlobString(pid_t pid, unsigned int op, size_t
     return std::nullopt;
   }
   return std::string(blob->data, data_len - kBlobWrapperOverhead);
+}
+
+// Adapt a token-validated csops function to the pid-keyed CSOpsFunc shape by
+// binding `token`, so the token variants reuse the pid-based implementations
+// (and their blob parsing) unchanged. `token` must outlive the returned
+// callable; every caller below binds a local.
+CSOpsFunc BindToken(audit_token_t* token, CSOpsTokenFunc csops_func) {
+  return [token, csops_func = std::move(csops_func)](pid_t pid, unsigned int ops, void* addr,
+                                                     size_t size) {
+    return csops_func(pid, ops, addr, size, token);
+  };
 }
 
 }  // namespace
@@ -77,6 +89,26 @@ std::optional<std::string> CSOpsGetSigningID(pid_t pid, CSOpsFunc csops_func) {
     return std::nullopt;
   }
   return result;
+}
+
+std::optional<uint32_t> CSOpsStatusFlags(const audit_token_t& tok, CSOpsTokenFunc csops_func) {
+  audit_token_t token = tok;  // csops_audittoken takes a mutable pointer
+  return CSOpsStatusFlags(audit_token_to_pid(token), BindToken(&token, std::move(csops_func)));
+}
+
+std::optional<std::string> CSOpsGetCDHash(const audit_token_t& tok, CSOpsTokenFunc csops_func) {
+  audit_token_t token = tok;
+  return CSOpsGetCDHash(audit_token_to_pid(token), BindToken(&token, std::move(csops_func)));
+}
+
+std::optional<std::string> CSOpsGetTeamID(const audit_token_t& tok, CSOpsTokenFunc csops_func) {
+  audit_token_t token = tok;
+  return CSOpsGetTeamID(audit_token_to_pid(token), BindToken(&token, std::move(csops_func)));
+}
+
+std::optional<std::string> CSOpsGetSigningID(const audit_token_t& tok, CSOpsTokenFunc csops_func) {
+  audit_token_t token = tok;
+  return CSOpsGetSigningID(audit_token_to_pid(token), BindToken(&token, std::move(csops_func)));
 }
 
 }  // namespace santa

@@ -262,8 +262,18 @@ objc_library(
     name = "CSOpsHelper",
     srcs = ["CSOpsHelper.mm"],
     hdrs = ["CSOpsHelper.h"],
+    sdk_dylibs = ["bsm"],
     deps = [
         ":String",
+    ],
+)
+
+santa_unit_test(
+    name = "CSOpsHelperTest",
+    srcs = ["CSOpsHelperTest.mm"],
+    deps = [
+        ":AuditUtilities",
+        ":CSOpsHelper",
     ],
 )
 
@@ -1277,6 +1287,7 @@ test_suite(
     name = "unit_tests",
     tests = [
         ":AuditUtilitiesTest",
+        ":CSOpsHelperTest",
         ":CodeSigningIdentifierUtilsTest",
         ":EncodeEntitlementsTest",
         ":KeychainTest",

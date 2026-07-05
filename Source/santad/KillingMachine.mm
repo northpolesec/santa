@@ -82,17 +82,27 @@ class FlagsMatcher : public ProcessMatcher {
   CSOpsFunc csops_func_;
 };
 
+// CSOpsHelper.h now also declares audit_token_t-taking overloads of the
+// getters below with the same names, so the bare function name is ambiguous
+// as a make_unique<StringMatcher> argument (overload resolution needs a
+// target type, and make_unique's forwarding-reference deduction doesn't
+// provide one). Cast to the pid-based overload's exact type to disambiguate.
+using StringGetterFunc = std::optional<std::string> (*)(pid_t, CSOpsFunc);
+
 std::unique_ptr<ProcessMatcher> MakeCDHashMatcher(NSString* cdhash, CSOpsFunc csops_func = csops) {
-  return std::make_unique<StringMatcher>(cdhash, CSOpsGetCDHash, std::move(csops_func));
+  return std::make_unique<StringMatcher>(cdhash, static_cast<StringGetterFunc>(CSOpsGetCDHash),
+                                         std::move(csops_func));
 }
 
 std::unique_ptr<ProcessMatcher> MakeTeamIDMatcher(NSString* teamID, CSOpsFunc csops_func = csops) {
-  return std::make_unique<StringMatcher>(teamID, CSOpsGetTeamID, std::move(csops_func));
+  return std::make_unique<StringMatcher>(teamID, static_cast<StringGetterFunc>(CSOpsGetTeamID),
+                                         std::move(csops_func));
 }
 
 std::unique_ptr<ProcessMatcher> MakeSigningIDMatcher(NSString* signingID,
                                                      CSOpsFunc csops_func = csops) {
-  return std::make_unique<StringMatcher>(signingID, CSOpsGetSigningID, std::move(csops_func));
+  return std::make_unique<StringMatcher>(
+      signingID, static_cast<StringGetterFunc>(CSOpsGetSigningID), std::move(csops_func));
 }
 
 std::unique_ptr<ProcessMatcher> MakeStatusFlagsMatcher(uint32_t mask,

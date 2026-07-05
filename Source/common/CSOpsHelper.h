@@ -16,6 +16,7 @@
 #define SANTA_COMMON_CSOPSHELPER_H
 
 #include <Kernel/kern/cs_blobs.h>
+#include <bsm/libbsm.h>
 #include <sys/cdefs.h>
 #include <sys/types.h>
 
@@ -26,6 +27,8 @@
 
 __BEGIN_DECLS
 int csops(pid_t pid, unsigned int ops, void* useraddr, size_t usersize);
+int csops_audittoken(pid_t pid, unsigned int ops, void* useraddr,
+                     size_t usersize, audit_token_t* token);
 __END_DECLS
 
 namespace santa {
@@ -63,6 +66,20 @@ std::optional<std::string> CSOpsGetTeamID(pid_t pid,
 // error.
 std::optional<std::string> CSOpsGetSigningID(pid_t pid,
                                              CSOpsFunc csops_func = csops);
+
+// Injectable token-validated csops function signature for testing.
+using CSOpsTokenFunc =
+    std::function<int(pid_t, unsigned int, void*, size_t, audit_token_t*)>;
+
+// Token-validated variants of the getters above
+std::optional<uint32_t> CSOpsStatusFlags(
+    const audit_token_t& tok, CSOpsTokenFunc csops_func = csops_audittoken);
+std::optional<std::string> CSOpsGetCDHash(
+    const audit_token_t& tok, CSOpsTokenFunc csops_func = csops_audittoken);
+std::optional<std::string> CSOpsGetTeamID(
+    const audit_token_t& tok, CSOpsTokenFunc csops_func = csops_audittoken);
+std::optional<std::string> CSOpsGetSigningID(
+    const audit_token_t& tok, CSOpsTokenFunc csops_func = csops_audittoken);
 
 }  // namespace santa
 
