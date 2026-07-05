@@ -53,47 +53,6 @@ REGISTER_COMMAND_NAME(@"monitormode")
   return [NSSet setWithArray:@[ @"mm" ]];
 }
 
-// Parse a time interval string into a number of minutes.
-// e.g. "10m" -> 10, "2h" -> 120, "3d" -> 3600
-- (NSTimeInterval)parseTimeInterval:(NSString*)duration {
-  NSScanner* scanner = [NSScanner scannerWithString:duration];
-  scanner.charactersToBeSkipped = nil;
-  NSString* unit = nil;
-
-  NSInteger intValue = 0;
-  if ([scanner scanInteger:&intValue]) {
-    // Check if we're at the end (no unit specified)
-    if ([scanner isAtEnd]) {
-      return intValue;
-    }
-
-    // Scan exactly one character from the unit set
-    NSString* scannedUnit = nil;
-    if ([scanner scanCharactersFromSet:[NSCharacterSet characterSetWithCharactersInString:@"smhd"]
-                            intoString:&scannedUnit]) {
-      // Ensure unit is exactly one character and we're at the end
-      if (scannedUnit.length == 1 && [scanner isAtEnd]) {
-        unit = scannedUnit;
-      } else {
-        return 0;  // Invalid: unit is not exactly one char or there's more content
-      }
-    } else {
-      return 0;  // Invalid: characters after integer that aren't a valid unit
-    }
-
-    if ([unit isEqualToString:@"m"]) {
-      return intValue;
-    }
-    if ([unit isEqualToString:@"h"]) {
-      return intValue * 60;
-    }
-    if ([unit isEqualToString:@"d"]) {
-      return intValue * (60 * 24);
-    }
-  }
-  return 0;
-}
-
 - (void)runWithArguments:(NSArray*)arguments {
   NSTimeInterval requestedDuration;
   bool shouldCancel = false;
