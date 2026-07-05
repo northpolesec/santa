@@ -54,7 +54,7 @@ REGISTER_COMMAND_NAME(@"monitormode")
 }
 
 - (void)runWithArguments:(NSArray*)arguments {
-  NSTimeInterval requestedDuration;
+  NSTimeInterval requestedDuration = 0;
   bool shouldCancel = false;
 
   // Parse arguments
@@ -82,7 +82,7 @@ REGISTER_COMMAND_NAME(@"monitormode")
     }
   }
 
-  __block BOOL success;
+  __block BOOL success = NO;
 
   if (shouldCancel) {
     [[self.daemonConn synchronousRemoteObjectProxy] cancelTemporaryMonitorMode:^(NSError* err) {
