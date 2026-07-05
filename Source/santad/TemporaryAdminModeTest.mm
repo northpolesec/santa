@@ -239,6 +239,31 @@ static uint64_t MakeDeadline(uint64_t want) {
                  SNTTemporaryAdminModeDeniedReasonMembershipChangeFailed);
 }
 
+- (void)testGrantRefusedWhileTeardownRetryPending {
+  [self stubPolicyAvailable];
+  [self stubAuthReply:YES reason:@"need to install"];
+  auto fakeOwned = std::make_unique<FakeAdminGroupMembership>();
+  FakeAdminGroupMembership* fake = fakeOwned.get();
+  auto tam = santa::TemporaryAdminMode::Create(
+      (SNTConfigurator*)self.mockConfigurator, (SNTNotificationQueue*)self.mockNotQueue,
+      std::move(fakeOwned), ^(SNTStoredTemporaryAdminModeAuditEvent* e){});
+
+  // A deadline-0 record left by a failed teardown, owed to the next daemon
+  // start. Stubbed after Create so startup reconciliation does not consume it.
+  OCMStub([self.mockConfigurator savedTimedSessionStateForKey:@"TempAdmin"])
+      .andReturn([self stateWithBootUUID:@"boot"
+                                deadline:0
+                                syncHost:@"foo.workshop.cloud"
+                                     uid:501]);
+
+  // Granting now would overwrite the residue and orphan uid 501's stuck
+  // elevation forever; the grant must be refused instead.
+  NSError* err = nil;
+  XCTAssertEqual(tam->RequestMinutes(@5, 502, @"bob", &err), 0u);
+  XCTAssertNotNil(err);
+  XCTAssertFalse(fake->IsMember(502));
+}
+
 #pragma mark Reconciliation tests
 
 - (void)testReconcileRebootRemovesMember {
@@ -600,6 +625,66 @@ static uint64_t MakeDeadline(uint64_t want) {
   XCTAssertFalse(tam->EndForUserEvent(0, @"", SNTTemporaryAdminModeLeaveReasonScreenLocked));
   XCTAssertTrue(fake->IsMember(501));
   XCTAssertTrue(tam->SecondsRemaining().has_value());
+}
+
+- (void)testGrantPersistsTargetBeforeElevation {
+  [self stubPolicyAvailable];
+  [self stubAuthReply:YES reason:@"need to install"];
+  NSMutableArray* writes = [NSMutableArray array];
+  OCMStub([self.mockConfigurator persistTimedSessionState:[OCMArg any] forKey:@"TempAdmin"])
+      .andDo(^(NSInvocation* inv) {
+        __unsafe_unretained NSDictionary* state = nil;
+        [inv getArgument:&state atIndex:2];
+        [writes addObject:state ? (id)[state copy] : (id)[NSNull null]];
+      });
+  auto fakeOwned = std::make_unique<FakeAdminGroupMembership>();
+  auto tam = santa::TemporaryAdminMode::Create(
+      (SNTConfigurator*)self.mockConfigurator, (SNTNotificationQueue*)self.mockNotQueue,
+      std::move(fakeOwned), ^(SNTStoredTemporaryAdminModeAuditEvent* e){});
+
+  NSError* err = nil;
+  XCTAssertEqual(tam->RequestMinutes(@5, 501, @"alice", &err), 5u);
+
+  // Persist-before-flip: a provisional deadline-0 record names the target on
+  // disk BEFORE the elevation; the real session state follows.
+  XCTAssertEqual(writes.count, 2u);
+  NSDictionary* provisional = writes[0];
+  NSDictionary* session = writes[1];
+  XCTAssertEqualObjects(provisional[@"TargetUID"], @501);
+  XCTAssertEqualObjects(provisional[kTimedSessionDeadlineKey], @0);
+  XCTAssertEqualObjects(session[@"TargetUID"], @501);
+  XCTAssertTrue([session[kTimedSessionDeadlineKey] unsignedLongLongValue] > 0);
+}
+
+- (void)testFailedElevationClearsProvisionalState {
+  [self stubPolicyAvailable];
+  [self stubAuthReply:YES reason:@"need to install"];
+  NSMutableArray* writes = [NSMutableArray array];
+  OCMStub([self.mockConfigurator persistTimedSessionState:[OCMArg any] forKey:@"TempAdmin"])
+      .andDo(^(NSInvocation* inv) {
+        __unsafe_unretained NSDictionary* state = nil;
+        [inv getArgument:&state atIndex:2];
+        [writes addObject:state ? (id)[state copy] : (id)[NSNull null]];
+      });
+  auto fakeOwned = std::make_unique<FakeAdminGroupMembership>();
+  FakeAdminGroupMembership* fake = fakeOwned.get();
+  fake->fail_add_ = true;
+  auto tam = santa::TemporaryAdminMode::Create(
+      (SNTConfigurator*)self.mockConfigurator, (SNTNotificationQueue*)self.mockNotQueue,
+      std::move(fakeOwned), ^(SNTStoredTemporaryAdminModeAuditEvent* e){});
+
+  NSError* err = nil;
+  XCTAssertEqual(tam->RequestMinutes(@5, 501, @"alice", &err), 0u);
+  XCTAssertFalse(fake->IsMember(501));
+
+  // The elevation never happened, so nothing is owed: the provisional record
+  // is written, then cleared — it must not linger as a fake residue (which
+  // would block future grants via the Task 1 guard).
+  XCTAssertEqual(writes.count, 2u);
+  NSDictionary* provisional = writes[0];
+  XCTAssertEqualObjects(provisional[@"TargetUID"], @501);
+  XCTAssertEqualObjects(provisional[kTimedSessionDeadlineKey], @0);
+  XCTAssertEqualObjects(writes[1], [NSNull null]);
 }
 
 @end

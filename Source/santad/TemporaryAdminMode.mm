@@ -182,8 +182,25 @@ void TemporaryAdminMode::NewPolicyReceived(SNTTemporaryAdminPolicy* policy) {
 #pragma mark Hooks
 
 // Effect hooks run UNDER lock_ (the base invokes them while holding lock_).
-bool TemporaryAdminMode::ApplyEffect(NSError** err) {
-  return membership_->AddMember(target_uid_, err);
+// Annotated here (unlike the sibling hooks) because the body calls the
+// lock_-guarded PersistExpiredForRetryLocked(); the annotation matches the base
+// pure-virtual and lets thread-safety analysis see the lock is already held.
+bool TemporaryAdminMode::ApplyEffect(NSError** err) ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
+  // Persist-before-flip: name the target on disk before the elevation, so a
+  // crash between the two leaves a deadline-0 record the next daemon start
+  // reverts — never an elevated user with no on-disk state. It also
+  // guarantees AdminUserState's capture exclusion sees the target: capture
+  // reads membership first and TAM state second, so member-visible implies
+  // state-visible. BeginSessionLocked overwrites this record immediately
+  // after a successful add.
+  PersistExpiredForRetryLocked();
+  if (!membership_->AddMember(target_uid_, err)) {
+    // The elevation never happened; nothing is owed. Clear the provisional
+    // record so it cannot refuse future grants as a stale residue.
+    [configurator_ persistTimedSessionState:nil forKey:StateKey()];
+    return false;
+  }
+  return true;
 }
 
 bool TemporaryAdminMode::RevertEffect() {

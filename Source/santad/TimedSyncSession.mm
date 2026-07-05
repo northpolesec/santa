@@ -129,6 +129,8 @@ void TimedSyncSession::SetupFromState() {
     if (RevertEffect()) {
       [configurator_ persistTimedSessionState:nil forKey:StateKey()];
     } else {
+      LOGE(@"Timed sync session revert failed; persisting an expired session record so the "
+           @"next daemon start retries the revert.");
       PersistExpiredForRetryLocked();
     }
     NotifyLeave();
@@ -271,15 +273,28 @@ TimedSyncSession::GrantOutcome TimedSyncSession::BeginGrant(NSNumber* requested_
     return GrantOutcome::kJustificationRequired;
   }
 
-  // Re-check availability after the auth window: a sync Revoke that arrived while
-  // the user was authenticating must not be elevated against.
+  // Re-check availability after the auth window, under lock_: a sync Revoke
+  // tears down under lock_ after the policy commits, so whichever side wins
+  // this lock, the loser observes the winner — a grant can never be created
+  // on the losing side of a revoke, where it would survive the teardown and
+  // later expire into an untracked demotion.
+  absl::MutexLock lock(lock_);
   if (!Available()) {
+    return GrantOutcome::kNotEligible;
+  }
+
+  // A persisted session record with no live session is a teardown-retry
+  // residue: a previous elevation whose revert failed, owed to the next
+  // daemon start. Granting now would overwrite the single-slot record and
+  // permanently orphan that elevation. Refuse until the retry has run.
+  if (!active_ && [configurator_ savedTimedSessionStateForKey:StateKey()] != nil) {
+    LOGW(@"Timed sync session grant refused: a previous session's teardown is "
+         @"still pending retry.");
     return GrantOutcome::kNotEligible;
   }
 
   uint32_t minutes = ClampDuration(requested_duration);
 
-  absl::MutexLock lock(lock_);
   NSError* err = nil;
   if (!ApplyEffect(&err)) {
     LOGE(@"Timed sync session failed to apply effect: %@", err.localizedDescription);
@@ -354,8 +369,6 @@ void TimedSyncSession::PersistExpiredForRetryLocked() {
   // record. On the next daemon start, reconciliation reads it, finds it non-resumable
   // (deadline in the past, or a reboot/sync change), and calls RevertEffect again,
   // retrying until the revert succeeds.
-  LOGE(@"Timed sync session revert failed; persisting an expired session record so the "
-       @"next daemon start retries the revert.");
   NSMutableDictionary* state = [@{
     kTimedSessionBootUUIDKey : [SNTSystemInfo bootSessionUUID],
     kTimedSessionDeadlineKey : @0,  // already in the past -> non-resumable -> retry revert
@@ -372,6 +385,8 @@ bool TimedSyncSession::EndForReasonLocked(NSInteger leave_reason) {
     // EndSessionLocked already cleared the persisted state; if the revert fails,
     // re-persist an expired record so the next daemon start retries the revert.
     if (!RevertEffect()) {
+      LOGE(@"Timed sync session revert failed; persisting an expired session record so the "
+           @"next daemon start retries the revert.");
       PersistExpiredForRetryLocked();
     }
     EmitAudit(BuildLeaveAuditEvent([current_uuid_ UUIDString], leave_reason));
@@ -407,6 +422,8 @@ bool TimedSyncSession::OnTimer() {
   if (RevertEffect()) {
     [configurator_ persistTimedSessionState:nil forKey:StateKey()];
   } else {
+    LOGE(@"Timed sync session revert failed; persisting an expired session record so the "
+         @"next daemon start retries the revert.");
     PersistExpiredForRetryLocked();
   }
   active_ = false;
