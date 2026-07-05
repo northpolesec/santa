@@ -86,10 +86,11 @@ class TestableSleighLauncher : public santa::SleighLauncher {
   NSString* stub = [self writeStubWithBody:body];
 
   TestableSleighLauncher launcher(stub.UTF8String);
-  int fd = [self openTempFileWithBytes:std::string("\xfe\xed\xfa\xcf binary", 14)];
+  std::string binary("\xfe\xed\xfa\xcf binary");
+  int fd = [self openTempFileWithBytes:binary];
 
   ::santa::telemetry::v1::BinaryMetadata meta;
-  meta.set_file_size(14);
+  meta.set_file_size(binary.size());
   absl::StatusOr<::santa::commands::v1::BinaryUploadResponse> resp = launcher.LaunchBinaryUpload(
       fd, "https://example.com/post", {{"key", "objects/x"}}, "", meta, {}, /*timeout_seconds=*/10);
 
