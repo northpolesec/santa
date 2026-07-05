@@ -23,7 +23,6 @@
 
 namespace santa {
 
-static NSString* const kTAMTargetUIDKey = @"TargetUID";
 static NSString* const kTAMTargetUsernameKey = @"TargetUsername";
 
 std::shared_ptr<TemporaryAdminMode> TemporaryAdminMode::Create(
@@ -244,7 +243,7 @@ bool TemporaryAdminMode::ExtraPreconditions() {
 }
 
 NSString* TemporaryAdminMode::StateKey() {
-  return @"TempAdmin";
+  return kStateTempAdminModeKey;
 }
 
 bool TemporaryAdminMode::HasOnDemandPolicy() {
@@ -282,15 +281,18 @@ void TemporaryAdminMode::RequestAuthorization(void (^reply)(BOOL, NSString*)) {
 }
 
 NSDictionary* TemporaryAdminMode::ExtraStateToPersist() {
-  return @{kTAMTargetUIDKey : @(target_uid_), kTAMTargetUsernameKey : target_username_ ?: @""};
+  return @{
+    kStateTempAdminTargetUIDKey : @(target_uid_),
+    kTAMTargetUsernameKey : target_username_ ?: @""
+  };
 }
 
 bool TemporaryAdminMode::RestoreAndValidateExtraState(NSDictionary* state) {
-  if (![state[kTAMTargetUIDKey] isKindOfClass:[NSNumber class]] ||
+  if (![state[kStateTempAdminTargetUIDKey] isKindOfClass:[NSNumber class]] ||
       ![state[kTAMTargetUsernameKey] isKindOfClass:[NSString class]]) {
     return false;
   }
-  uid_t uid = [state[kTAMTargetUIDKey] unsignedIntValue];
+  uid_t uid = [state[kStateTempAdminTargetUIDKey] unsignedIntValue];
   // Reject uid 0 and any uid that no longer resolves to a user (deleted account).
   if (uid == 0 || getpwuid(uid) == NULL) {
     return false;

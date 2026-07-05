@@ -887,6 +887,33 @@ extern NSString* _Nonnull const kEnableMenuItemUserOverride;
 ///
 - (nullable NSDictionary*)savedTimedSessionStateForKey:(nonnull NSString*)key;
 
+#pragma mark - Demoted Admins State
+
+///
+///  Persist (or delete, when `demotedAdmins` is nil) the record of admin users
+///  demoted to standard while the Temporary Admin Mode policy is enabled. Each
+///  entry is a dictionary with Username (NSString) and UID (NSNumber). An
+///  empty array is a present record: it marks the demotion as applied.
+///  Returns NO — and leaves the in-memory record unchanged — when the record
+///  cannot be written to disk; callers must not demote on a NO.
+///
+- (BOOL)persistDemotedAdmins:(nullable NSArray<NSDictionary*>*)demotedAdmins;
+
+///
+///  Returns the persisted demoted-admins record, or nil if none exists.
+///
+- (nullable NSArray<NSDictionary*>*)savedDemotedAdmins;
+
+///
+///  State-file key under which Temporary Admin Mode persists its session state
+///  (an active session, or a deadline-0 demote-retry residue after a failed
+///  teardown), and the field within it naming the session's target uid.
+///  Exported so AdminUserState can cross-check TAM ownership at capture and
+///  restore.
+///
+extern NSString* _Nonnull const kStateTempAdminModeKey;
+extern NSString* _Nonnull const kStateTempAdminTargetUIDKey;
+
 #pragma mark - USB Settings
 
 ///
