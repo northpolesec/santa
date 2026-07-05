@@ -1195,6 +1195,11 @@ message NetworkActivity {
     optional string remote_address = 3;
     optional uint32 remote_port = 4;
 
+    // Remote endpoint hostname, when known. Set when the flow was created
+    // via Network.framework/NSURLSession, or when the remote address was
+    // resolved through the DNS cache.
+    optional string remote_hostname = 14;
+
     // Local endpoint address (IPv4 or IPv6 string representation)
     optional string local_address = 5;
     optional uint32 local_port = 6;
@@ -1229,6 +1234,8 @@ message NetworkActivity {
     // When the flow was closed
     // Only present if the flow closed during this window
     optional google.protobuf.Timestamp close_time = 13;
+
+    // next ID: 15
   }
 
   // Network activity for a single process
