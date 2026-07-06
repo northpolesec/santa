@@ -77,4 +77,14 @@
 - (void)runWithArguments:(NSArray*)arguments;
 
 - (void)printErrorUsageAndExit:(NSString*)error;
+
+///
+///  Parse a duration string into a whole number of minutes.
+///  Accepts a bare integer (interpreted as minutes) or an integer followed by a
+///  single unit suffix: 'm' (minutes), 'h' (hours), or 'd' (days). Any other
+///  suffix (including 's'), a multi-character suffix, trailing content, or a
+///  non-numeric string returns 0.
+///  e.g. "10" -> 10, "10m" -> 10, "2h" -> 120, "3d" -> 4320.
+///
+- (NSTimeInterval)parseTimeInterval:(NSString*)duration;
 @end

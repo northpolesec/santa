@@ -482,7 +482,7 @@ REGISTER_COMMAND_NAME(@"status")
 
     NSMutableDictionary* temporaryAdminMode = [@{
       @"available" : @(temporaryAdminModeAvailable),
-      @"current_user_is_admin" : @(currentUserIsAdmin),
+      @"current_user_type" : (currentUserIsAdmin ? @"administrator" : @"standard"),
     } mutableCopy];
     if (temporaryAdminModeSecondsRemaining != nil) {
       temporaryAdminMode[@"session_seconds_remaining"] = temporaryAdminModeSecondsRemaining;
@@ -531,7 +531,8 @@ REGISTER_COMMAND_NAME(@"status")
 
     printf(">>> Temporary Admin Mode\n");
     printf("  %-40s | %s\n", "Available", (temporaryAdminModeAvailable ? "Yes" : "No"));
-    printf("  %-40s | %s\n", "Current User Is Admin", (currentUserIsAdmin ? "Yes" : "No"));
+    printf("  %-40s | %s\n", "Current User Type",
+           (currentUserIsAdmin ? "Administrator" : "Standard"));
     if (temporaryAdminModeSecondsRemaining != nil) {
       printf("  %-40s | %s\n", "Session Time Remaining",
              [FormatTimeRemaining([temporaryAdminModeSecondsRemaining unsignedLongLongValue])
