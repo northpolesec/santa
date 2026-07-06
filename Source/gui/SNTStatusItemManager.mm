@@ -74,6 +74,13 @@
 @property(strong) SNTTimedModeState* tamState;
 @property(atomic, strong) NSTimer* iconTintTimer;
 
+// Separator between the Monitor and Admin sections, shown only when both are present.
+@property NSMenuItem* timedModeSeparator;
+// Greyed "Mode: …" line shown alongside the Enter/Leave Temporary Monitor Mode item.
+@property NSMenuItem* monitorModeMenuItem;
+// Greyed "User Type: …" line shown alongside the Request/Leave Admin Privileges item.
+@property NSMenuItem* userTypeMenuItem;
+
 // Reset silences item
 @property NSMenuItem* resetSilencesMenuItem;
 
@@ -280,7 +287,31 @@ static NSString* const kNotificationSilencesKey = @"SilencedNotifications";
 
   // Add temporary-mode (Monitor / Admin) items, hidden by default until
   // availability is verified.
+
+  // Mode header for Temporary Monitor Mode, shown immediately before the
+  // Enter/Leave Temporary Monitor Mode item. Disabled (greyed) via a nil action,
+  // mirroring the version line. Its title/visibility are driven by
+  // refreshMonitorModeHeaderWithClientMode:.
+  self.monitorModeMenuItem = [self menuItemWithTitle:@"" andAction:nil];
+  self.monitorModeMenuItem.hidden = YES;
+  [menu addItem:self.monitorModeMenuItem];
+
   [self addMenuItemsForState:self.tmmState toMenu:menu];
+
+  // Separator between the two timed-mode sections, shown only when both are
+  // present (see updateTimedModeSeparatorVisibility).
+  self.timedModeSeparator = [NSMenuItem separatorItem];
+  self.timedModeSeparator.hidden = YES;
+  [menu addItem:self.timedModeSeparator];
+
+  // User Type header for Temporary Admin Mode, shown immediately before the
+  // Request/Leave Admin Privileges item. Disabled (greyed) via a nil action,
+  // mirroring the version line. Its title/visibility are driven by
+  // setAdminItemVisibleWhenAvailable:.
+  self.userTypeMenuItem = [self menuItemWithTitle:@"" andAction:nil];
+  self.userTypeMenuItem.hidden = YES;
+  [menu addItem:self.userTypeMenuItem];
+
   [self addMenuItemsForState:self.tamState toMenu:menu];
 
   menu.delegate = self;
@@ -352,6 +383,13 @@ static NSString* const kNotificationSilencesKey = @"SilencedNotifications";
         }
       });
     }];
+    // Queried last so its main-queue block runs after the availability/session blocks
+    // above; the Mode header reads the item visibility + expiration they set.
+    [proxy clientMode:^(SNTClientMode mode) {
+      dispatch_async(dispatch_get_main_queue(), ^{
+        [self refreshMonitorModeHeaderWithClientMode:mode];
+      });
+    }];
   }];
 }
 
@@ -388,17 +426,64 @@ static NSString* const kNotificationSilencesKey = @"SilencedNotifications";
 - (void)setAdminItemVisibleWhenAvailable:(BOOL)available alreadyAdmin:(BOOL)alreadyAdmin {
   BOOL active = (self.tamState.expiration != nil);
   [self setAvailable:(active || (available && !alreadyAdmin)) forState:self.tamState];
+
+  // The User Type header tracks the Request/Leave Admin Privileges item exactly:
+  // shown only while that item is shown, greyed, and labeled with the user's current
+  // privilege level. This lines up by construction -- "Leave" only appears while the
+  // user is elevated (alreadyAdmin), "Request" only while standard -- and mirrors the
+  // "Current User Type" that `santactl status` reports.
+  self.userTypeMenuItem.hidden = self.tamState.menuItem.hidden;
+  self.userTypeMenuItem.title = alreadyAdmin ? @"User Type: Administrator" : @"User Type: Standard";
 }
 
-// Re-query Temporary Admin Mode availability against live state each time the menu
-// opens. The user's admin status and policy availability can change after launch
-// (e.g. dropping admin) between sync pushes. checkTemporaryAdminModeAvailable: does not
-// re-enter the GUI, so a synchronous call here is safe (unlike the request path, which is
-// dispatched off the main thread).
+// The Mode header tracks the Enter/Leave Temporary Monitor Mode item exactly:
+// shown only while that item is shown, greyed, and labeled with the current mode.
+// Mirrors `santactl status`, which reports "Temporary Monitor Mode" whenever a TMM
+// session is active and otherwise the real client mode.
+- (void)refreshMonitorModeHeaderWithClientMode:(SNTClientMode)mode {
+  self.monitorModeMenuItem.hidden = self.tmmState.menuItem.hidden;
+  self.monitorModeMenuItem.title = [self monitorModeHeaderTitleForClientMode:mode];
+}
+
+- (NSString*)monitorModeHeaderTitleForClientMode:(SNTClientMode)mode {
+  // An active TMM session takes precedence, matching santactl: while temporarily in
+  // Monitor Mode the client mode reads Monitor, but the header must say so is temporary.
+  if (self.tmmState.expiration != nil) {
+    return @"Mode: Temporary Monitor";
+  }
+  switch (mode) {
+    case SNTClientModeMonitor: return @"Mode: Monitor";
+    case SNTClientModeLockdown: return @"Mode: Lockdown";
+    case SNTClientModeStandalone: return @"Mode: Standalone";
+    default: return @"Mode: Unknown";
+  }
+}
+
+// The separator between the Monitor and Admin sections is shown only when both
+// sections are present, matching the role of the Sync separator. Keyed off the
+// live hidden state of each section's item so it stays correct regardless of which
+// path (background poll, daemon push, menu open) last updated visibility.
+- (void)updateTimedModeSeparatorVisibility {
+  if (!self.timedModeSeparator) {
+    return;
+  }
+  BOOL tmmVisible = !self.tmmState.menuItem.hidden;
+  BOOL tamVisible = !self.tamState.menuItem.hidden;
+  self.timedModeSeparator.hidden = !(tmmVisible && tamVisible);
+}
+
+// Re-query Temporary Admin Mode availability and the current client mode against live
+// state each time the menu opens. The user's admin status and policy availability can
+// change after launch (e.g. dropping admin) between sync pushes, and the client mode
+// drives the Mode header. Neither call re-enters the GUI, so synchronous calls here are
+// safe (unlike the request path, which is dispatched off the main thread).
 - (void)menuNeedsUpdate:(NSMenu*)menu {
   [self withControlProxy:^(id proxy) {
     [proxy checkTemporaryAdminModeAvailable:^(BOOL available, BOOL alreadyAdmin) {
       [self setAdminItemVisibleWhenAvailable:available alreadyAdmin:alreadyAdmin];
+    }];
+    [proxy clientMode:^(SNTClientMode mode) {
+      [self refreshMonitorModeHeaderWithClientMode:mode];
     }];
   }];
 }
@@ -421,6 +506,9 @@ static NSString* const kNotificationSilencesKey = @"SilencedNotifications";
     self.statusItem = nil;
     self.syncMenuItem = nil;
     self.resetSilencesMenuItem = nil;
+    self.timedModeSeparator = nil;
+    self.monitorModeMenuItem = nil;
+    self.userTypeMenuItem = nil;
     self.tmmState.menuItem = nil;
     self.tmmState.refreshItem = nil;
     self.tamState.menuItem = nil;
@@ -673,6 +761,8 @@ static NSString* const kNotificationSilencesKey = @"SilencedNotifications";
   BOOL active = (state.expiration != nil);
   state.menuItem.hidden = !(available || active);
   state.refreshItem.hidden = !(available || active);
+
+  [self updateTimedModeSeparatorVisibility];
 }
 
 // Public wrappers used by SNTNotificationManager (daemon-pushed enter/leave/availability).
