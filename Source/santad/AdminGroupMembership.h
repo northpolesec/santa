@@ -19,8 +19,20 @@
 
 #include <sys/types.h>
 #include <memory>
+#include <optional>
+#include <vector>
 
 namespace santa {
+
+// A direct user member of the admin group, as observed at enumeration time.
+struct AdminGroupMember {
+  uid_t uid;
+  NSString* username;
+  // Whether the account resolved from the local identity authority. Restore
+  // treats unresolvable directory (network) accounts as retryable, not
+  // deleted: off-network, "gone" and "unreachable" are indistinguishable.
+  bool local = true;
+};
 
 // Abstracts mutation of admin-group (GID 80) membership. The orchestrator depends
 // only on this interface so it can be unit-tested with a fake, and so the
@@ -38,6 +50,10 @@ class AdminGroupMembership {
   // Adds `uid` to the admin group and commits. A committed add is authoritative;
   // a post-commit verification mismatch (opendirectoryd cache latency) is logged,
   // not failed. Returns true on a committed change; populates `error` on failure.
+  // Failure to resolve the user identity itself (account no longer exists)
+  // populates SNTErrorCodeTAMNoConsoleUser; every other failure, including
+  // group resolution, uses SNTErrorCodeTAMMembershipChangeFailed. Restore
+  // callers branch on this distinction — keep it intact.
   virtual bool AddMember(uid_t uid, NSError** error) = 0;
 
   // Removes `uid` from the admin group and commits. Fails closed: a committed
@@ -46,6 +62,18 @@ class AdminGroupMembership {
   // revocation for a user who is still elevated. Returns true only on a verified
   // removal; populates `error` on failure.
   virtual bool RemoveMember(uid_t uid, NSError** error) = 0;
+
+  // Enumerates the direct user members of the admin group. Nested groups are
+  // not expanded, matching the known TAM nested-group gap. Returns
+  // std::nullopt if the group cannot be resolved; an empty vector means the
+  // group resolved but has no direct user members.
+  virtual std::optional<std::vector<AdminGroupMember>> ListDirectUserMembers() = 0;
+
+  // Returns the username (posixName) `uid` currently resolves to, or nil when
+  // the identity does not resolve. Restore callers use this to detect uid
+  // reuse: a recorded username that no longer matches means the uid now names
+  // a different account, which must never inherit the original's admin.
+  virtual NSString* UsernameForUID(uid_t uid) = 0;
 };
 
 // Returns the in-process CoreServices-backed implementation.

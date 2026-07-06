@@ -113,7 +113,9 @@ NSString* const kStateFilePath = @"/var/db/santa/state.plist";
 
 /// Keys associated with the state file.
 static NSString* const kStateTempMonitorModeKey = @"TMM";
-static NSString* const kStateTempAdminModeKey = @"TempAdmin";
+NSString* const kStateTempAdminModeKey = @"TempAdmin";
+NSString* const kStateTempAdminTargetUIDKey = @"TargetUID";
+static NSString* const kStateDemotedAdminsKey = @"DemotedAdmins";
 static NSString* const kStateLastBootUUIDKey = @"LastBootUUID";
 
 /// User defaults key for user override of the menu item enabled setting.
@@ -986,6 +988,24 @@ static SNTConfigurator* sharedConfigurator = nil;
 
 - (nullable NSDictionary*)savedTimedSessionStateForKey:(NSString*)key {
   return self.state[key];
+}
+
+- (BOOL)persistDemotedAdmins:(NSArray<NSDictionary*>*)demotedAdmins {
+  @synchronized(self) {
+    NSDictionary* previous = self.state;
+    if ([self updateStateSynchronizedKey:kStateDemotedAdminsKey value:demotedAdmins]) {
+      return YES;
+    }
+    // Roll back the in-memory record so callers (and a later restart) see the
+    // same state: a record that exists only in memory would let capture demote
+    // users whose restore list vanishes with the daemon.
+    self.state = previous;
+    return NO;
+  }
+}
+
+- (nullable NSArray<NSDictionary*>*)savedDemotedAdmins {
+  return self.state[kStateDemotedAdminsKey];
 }
 
 - (void)updateLastBootUUID:(NSString*)bootUUID {
@@ -2205,6 +2225,10 @@ static SNTConfigurator* sharedConfigurator = nil;
     newState[kStateTempAdminModeKey] = state[kStateTempAdminModeKey];
   }
 
+  if ([state[kStateDemotedAdminsKey] isKindOfClass:[NSArray class]]) {
+    newState[kStateDemotedAdminsKey] = state[kStateDemotedAdminsKey];
+  }
+
   if ([state[kStateLastBootUUIDKey] isKindOfClass:[NSString class]]) {
     _lastBootUUID = state[kStateLastBootUUIDKey];
     newState[kStateLastBootUUIDKey] = _lastBootUUID;
@@ -2213,13 +2237,13 @@ static SNTConfigurator* sharedConfigurator = nil;
   return newState;
 }
 
-- (void)updateStateSynchronizedKey:(NSString*)key value:(id)value {
-  NSMutableDictionary* newState = [self.state mutableCopy];
+- (BOOL)updateStateSynchronizedKey:(NSString*)key value:(id)value {
+  NSMutableDictionary* newState = [self.state mutableCopy] ?: [NSMutableDictionary dictionary];
 
   newState[key] = value;
   self.state = newState;
 
-  [self saveStateToDiskSynchronized:self.state];
+  return [self saveStateToDiskSynchronized:self.state];
 }
 
 - (BOOL)saveStateToDiskSynchronized:(NSDictionary*)state {

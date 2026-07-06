@@ -23,7 +23,6 @@
 
 namespace santa {
 
-static NSString* const kTAMTargetUIDKey = @"TargetUID";
 static NSString* const kTAMTargetUsernameKey = @"TargetUsername";
 
 std::shared_ptr<TemporaryAdminMode> TemporaryAdminMode::Create(
@@ -182,8 +181,36 @@ void TemporaryAdminMode::NewPolicyReceived(SNTTemporaryAdminPolicy* policy) {
 #pragma mark Hooks
 
 // Effect hooks run UNDER lock_ (the base invokes them while holding lock_).
-bool TemporaryAdminMode::ApplyEffect(NSError** err) {
-  return membership_->AddMember(target_uid_, err);
+// Annotated here (unlike the sibling hooks) because the body calls the
+// lock_-guarded PersistExpiredForRetryLocked(); the annotation matches the base
+// pure-virtual and lets thread-safety analysis see the lock is already held.
+bool TemporaryAdminMode::ApplyEffect(NSError** err) ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
+  // Persist-before-flip: name the target on disk before the elevation, so a
+  // crash between the two leaves a deadline-0 record the next daemon start
+  // reverts — never an elevated user with no on-disk state. It also
+  // guarantees AdminUserState's capture exclusion sees the target: capture
+  // reads membership first and TAM state second, so member-visible implies
+  // state-visible. BeginSessionLocked overwrites this record immediately
+  // after a successful add.
+  //
+  // A refresh already has all of that: the live session's record is on disk,
+  // and the elevation it tracks stays owed even if the refresh fails. Leave
+  // it alone — overwriting it and then clearing it on failure would leave an
+  // elevated user with no record, which a daemon restart would turn into a
+  // permanent untracked admin.
+  bool is_refresh = IsStartedLocked();
+  if (!is_refresh) {
+    PersistExpiredForRetryLocked();
+  }
+  if (!membership_->AddMember(target_uid_, err)) {
+    if (!is_refresh) {
+      // The elevation never happened; nothing is owed. Clear the provisional
+      // record so it cannot refuse future grants as a stale residue.
+      [configurator_ persistTimedSessionState:nil forKey:StateKey()];
+    }
+    return false;
+  }
+  return true;
 }
 
 bool TemporaryAdminMode::RevertEffect() {
@@ -227,7 +254,7 @@ bool TemporaryAdminMode::ExtraPreconditions() {
 }
 
 NSString* TemporaryAdminMode::StateKey() {
-  return @"TempAdmin";
+  return kStateTempAdminModeKey;
 }
 
 bool TemporaryAdminMode::HasOnDemandPolicy() {
@@ -265,15 +292,18 @@ void TemporaryAdminMode::RequestAuthorization(void (^reply)(BOOL, NSString*)) {
 }
 
 NSDictionary* TemporaryAdminMode::ExtraStateToPersist() {
-  return @{kTAMTargetUIDKey : @(target_uid_), kTAMTargetUsernameKey : target_username_ ?: @""};
+  return @{
+    kStateTempAdminTargetUIDKey : @(target_uid_),
+    kTAMTargetUsernameKey : target_username_ ?: @""
+  };
 }
 
 bool TemporaryAdminMode::RestoreAndValidateExtraState(NSDictionary* state) {
-  if (![state[kTAMTargetUIDKey] isKindOfClass:[NSNumber class]] ||
+  if (![state[kStateTempAdminTargetUIDKey] isKindOfClass:[NSNumber class]] ||
       ![state[kTAMTargetUsernameKey] isKindOfClass:[NSString class]]) {
     return false;
   }
-  uid_t uid = [state[kTAMTargetUIDKey] unsignedIntValue];
+  uid_t uid = [state[kStateTempAdminTargetUIDKey] unsignedIntValue];
   // Reject uid 0 and any uid that no longer resolves to a user (deleted account).
   if (uid == 0 || getpwuid(uid) == NULL) {
     return false;

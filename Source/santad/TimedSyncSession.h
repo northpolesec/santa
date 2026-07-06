@@ -118,6 +118,13 @@ class TimedSyncSession : public Timer<TimedSyncSession> {
   // feature stays available for immediate re-entry). Returns whether a session was active.
   bool EndForReasonLocked(NSInteger leave_reason) ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
+  // Persists an already-expired (deadline-0) session record carrying
+  // ExtraStateToPersist(). The next daemon start finds it non-resumable and
+  // retries RevertEffect. Used by teardown paths when a revert fails, and by
+  // subclasses to write a provisional record BEFORE applying an effect
+  // (persist-before-flip), which BeginSessionLocked then overwrites.
+  void PersistExpiredForRetryLocked() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
+
   // ---- Hooks (subclass provides) ----
 
   // Apply / revert / re-apply the effect. All run UNDER lock_. Apply may fail
@@ -210,9 +217,6 @@ class TimedSyncSession : public Timer<TimedSyncSession> {
   // subclass extra state (the leave audit/RevertEffect read it).
   bool EndSessionLocked() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
   bool RevokeLocked(NSInteger leave_reason) ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
-  // Persist an already-expired session record (used when RevertEffect fails) so the
-  // next daemon start reconciles the persisted state and retries the revert.
-  void PersistExpiredForRetryLocked() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   // Whether the sync-server gate is satisfied (`configurator_.isSyncV2Enabled`).
   bool SyncServerGateSatisfied();

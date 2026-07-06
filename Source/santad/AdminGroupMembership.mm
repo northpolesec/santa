@@ -80,11 +80,48 @@ class AdminGroupMembershipImpl : public AdminGroupMembership {
     return ChangeMembership(uid, /*add=*/false, error);
   }
 
+  std::optional<std::vector<AdminGroupMember>> ListDirectUserMembers() override {
+    CBGroupIdentity* group = AdminGroupIdentity();
+    if (!group) {
+      return std::nullopt;
+    }
+    std::vector<AdminGroupMember> members;
+    for (CBIdentity* identity in group.memberIdentities) {
+      if (![identity isKindOfClass:[CBUserIdentity class]]) {
+        continue;
+      }
+      CBUserIdentity* user = (CBUserIdentity*)identity;
+      members.push_back({user.posixUID, user.posixName ?: @"",
+                         [user.authority isEqual:[CBIdentityAuthority localIdentityAuthority]]});
+    }
+    return members;
+  }
+
+  NSString* UsernameForUID(uid_t uid) override {
+    CBIdentity* identity = UserIdentityForUID(uid);
+    if (![identity isKindOfClass:[CBUserIdentity class]]) {
+      return nil;
+    }
+    return ((CBUserIdentity*)identity).posixName;
+  }
+
  private:
   bool ChangeMembership(uid_t uid, bool add, NSError** error) {
     CBIdentity* user = UserIdentityForUID(uid);
     CBGroupIdentity* group = AdminGroupIdentity();
-    if (!user || !group) {
+    // The two resolution failures carry distinct codes because restore callers
+    // branch on them: an unresolvable group is a systemic directory-services
+    // failure (the local admin group always exists) and must read as
+    // retryable, while an unresolvable user with a healthy group means the
+    // account no longer exists. Merging these branches would let a transient
+    // opendirectoryd failure be misread as mass account deletion.
+    if (!group) {
+      [SNTError populateError:error
+                     withCode:SNTErrorCodeTAMMembershipChangeFailed
+                       format:@"Unable to resolve admin group identity"];
+      return false;
+    }
+    if (!user) {
       [SNTError populateError:error
                      withCode:SNTErrorCodeTAMNoConsoleUser
                        format:@"Unable to resolve identity for uid %u", uid];

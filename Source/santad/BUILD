@@ -433,6 +433,19 @@ santa_unit_test(
 )
 
 santa_unit_test(
+    name = "AdminUserStateTest",
+    srcs = ["AdminUserStateTest.mm"],
+    deps = [
+        ":AdminGroupMembership",
+        ":AdminUserState",
+        "//Source/common:SNTConfigurator",
+        "//Source/common:SNTError",
+        "//Source/common:SNTTemporaryAdminPolicy",
+        "@OCMock",
+    ],
+)
+
+santa_unit_test(
     name = "SNTLoginWindowSessionHandlerTest",
     srcs = ["SNTLoginWindowSessionHandlerTest.mm"],
     deps = [
@@ -1187,11 +1200,27 @@ objc_library(
 )
 
 objc_library(
+    name = "AdminUserState",
+    srcs = ["AdminUserState.mm"],
+    hdrs = ["AdminUserState.h"],
+    deps = [
+        ":AdminGroupMembership",
+        "//Source/common:SNTConfigurator",
+        "//Source/common:SNTError",
+        "//Source/common:SNTKVOManager",
+        "//Source/common:SNTLogging",
+        "//Source/common:SNTTemporaryAdminPolicy",
+        "@abseil-cpp//absl/synchronization",
+    ],
+)
+
+objc_library(
     name = "SNTDaemonControlController",
     srcs = ["SNTDaemonControlController.mm"],
     hdrs = ["SNTDaemonControlController.h"],
     deps = [
         ":AdminGroupMembership",
+        ":AdminUserState",
         ":AuthResultCache",
         ":EndpointSecurityLogger",
         ":KillingMachine",
@@ -1995,6 +2024,7 @@ santa_unit_test(
 test_suite(
     name = "unit_tests",
     tests = [
+        ":AdminUserStateTest",
         ":AuthResultCacheTest",
         ":DaemonConfigBundleTest",
         ":EndpointSecurityLoggerTest",

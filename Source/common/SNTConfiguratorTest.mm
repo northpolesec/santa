@@ -614,4 +614,66 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
   XCTAssertEqualWithAccuracy(sut.dnsUpstreamTimeoutSecs, 30.0, 0.0001);
 }
 
+- (void)testDemotedAdminsPersistReloadAndFilter {
+  NSString* syncStatePath = [NSString stringWithFormat:@"%@/sync-state.plist", self.testDir];
+  NSString* statePath = [NSString stringWithFormat:@"%@/state.plist", self.testDir];
+  SNTConfigurator* (^makeConfigurator)(void) = ^SNTConfigurator* {
+    return [[SNTConfigurator alloc] initWithSyncStateFile:syncStatePath
+        stateFile:statePath
+        syncStateAccessAuthorizer:^BOOL {
+          return YES;
+        }
+        stateAccessAuthorizer:^BOOL {
+          return YES;
+        }];
+  };
+
+  SNTConfigurator* cfg = makeConfigurator();
+  XCTAssertNil([cfg savedDemotedAdmins]);
+
+  // Persisted record round-trips in memory and across a re-read from disk.
+  NSArray<NSDictionary*>* record = @[ @{@"Username" : @"jane", @"UID" : @501} ];
+  XCTAssertTrue([cfg persistDemotedAdmins:record]);
+  XCTAssertEqualObjects([cfg savedDemotedAdmins], record);
+  XCTAssertEqualObjects([makeConfigurator() savedDemotedAdmins], record);
+
+  // An empty array is a present entry, distinct from nil.
+  XCTAssertTrue([cfg persistDemotedAdmins:@[]]);
+  XCTAssertNotNil([cfg savedDemotedAdmins]);
+  XCTAssertEqual([cfg savedDemotedAdmins].count, 0u);
+  XCTAssertNotNil([makeConfigurator() savedDemotedAdmins]);
+
+  // nil deletes the entry, on disk too.
+  XCTAssertTrue([cfg persistDemotedAdmins:nil]);
+  XCTAssertNil([cfg savedDemotedAdmins]);
+  XCTAssertNil([makeConfigurator() savedDemotedAdmins]);
+
+  // A non-array value on disk is stripped by the readStateFromDisk allowlist.
+  XCTAssertTrue([@{@"DemotedAdmins" : @"not-an-array"} writeToFile:statePath atomically:YES]);
+  XCTAssertNil([makeConfigurator() savedDemotedAdmins]);
+}
+
+- (void)testDemotedAdminsPersistFailureRollsBack {
+  NSString* syncStatePath = [NSString stringWithFormat:@"%@/sync-state-rb.plist", self.testDir];
+  NSString* statePath = [NSString stringWithFormat:@"%@/state-rb.plist", self.testDir];
+  __block BOOL allowStateWrites = NO;
+  SNTConfigurator* cfg = [[SNTConfigurator alloc] initWithSyncStateFile:syncStatePath
+      stateFile:statePath
+      syncStateAccessAuthorizer:^BOOL {
+        return YES;
+      }
+      stateAccessAuthorizer:^BOOL {
+        return allowStateWrites;
+      }];
+
+  // Blocked disk write: reports failure and rolls back the in-memory record.
+  XCTAssertFalse([cfg persistDemotedAdmins:(@[ @{@"Username" : @"jane", @"UID" : @501} ])]);
+  XCTAssertNil([cfg savedDemotedAdmins]);
+
+  // Write path recovers: the same persist succeeds and is visible.
+  allowStateWrites = YES;
+  XCTAssertTrue([cfg persistDemotedAdmins:(@[ @{@"Username" : @"jane", @"UID" : @501} ])]);
+  XCTAssertNotNil([cfg savedDemotedAdmins]);
+}
+
 @end
