@@ -192,11 +192,22 @@ bool TemporaryAdminMode::ApplyEffect(NSError** err) ABSL_EXCLUSIVE_LOCKS_REQUIRE
   // reads membership first and TAM state second, so member-visible implies
   // state-visible. BeginSessionLocked overwrites this record immediately
   // after a successful add.
-  PersistExpiredForRetryLocked();
+  //
+  // A refresh already has all of that: the live session's record is on disk,
+  // and the elevation it tracks stays owed even if the refresh fails. Leave
+  // it alone — overwriting it and then clearing it on failure would leave an
+  // elevated user with no record, which a daemon restart would turn into a
+  // permanent untracked admin.
+  bool is_refresh = IsStartedLocked();
+  if (!is_refresh) {
+    PersistExpiredForRetryLocked();
+  }
   if (!membership_->AddMember(target_uid_, err)) {
-    // The elevation never happened; nothing is owed. Clear the provisional
-    // record so it cannot refuse future grants as a stale residue.
-    [configurator_ persistTimedSessionState:nil forKey:StateKey()];
+    if (!is_refresh) {
+      // The elevation never happened; nothing is owed. Clear the provisional
+      // record so it cannot refuse future grants as a stale residue.
+      [configurator_ persistTimedSessionState:nil forKey:StateKey()];
+    }
     return false;
   }
   return true;

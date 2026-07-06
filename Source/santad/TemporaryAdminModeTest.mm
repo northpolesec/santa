@@ -249,6 +249,42 @@ static uint64_t MakeDeadline(uint64_t want) {
                  SNTTemporaryAdminModeDeniedReasonMembershipChangeFailed);
 }
 
+// A failed refresh must not destroy the live session's on-disk record: the
+// original elevation is still applied and still owed a revert, and clearing
+// the record would leave the user permanently elevated across a daemon restart.
+- (void)testFailedRefreshKeepsLiveSessionRecord {
+  [self stubPolicyAvailable];
+  [self stubAuthReply:YES reason:@"reason"];
+  __block NSDictionary* lastPersisted = nil;
+  OCMStub([self.mockConfigurator persistTimedSessionState:[OCMArg any] forKey:@"TempAdmin"])
+      .andDo(^(NSInvocation* inv) {
+        __unsafe_unretained NSDictionary* s = nil;
+        [inv getArgument:&s atIndex:2];
+        lastPersisted = s;
+      });
+  auto fakeOwned = std::make_unique<FakeAdminGroupMembership>();
+  FakeAdminGroupMembership* fake = fakeOwned.get();
+  auto tam = santa::TemporaryAdminMode::Create((SNTConfigurator*)self.mockConfigurator,
+                                               (SNTNotificationQueue*)self.mockNotQueue,
+                                               std::move(fakeOwned),
+                                               ^(SNTStoredTemporaryAdminModeAuditEvent* e){
+                                               });
+
+  NSError* err = nil;
+  XCTAssertEqual(tam->RequestMinutes(@5, 501, @"alice", &err), 5u);
+  NSDictionary* liveRecord = lastPersisted;
+  XCTAssertNotNil(liveRecord);
+
+  fake->fail_add_ = true;  // directory unreachable at refresh time
+  err = nil;
+  XCTAssertEqual(tam->RequestMinutes(@5, 501, @"alice", &err), 0u);
+  XCTAssertEqual(err.code, SNTErrorCodeTAMMembershipChangeFailed);
+
+  XCTAssertEqualObjects(lastPersisted, liveRecord);    // record never touched
+  XCTAssertTrue(fake->IsMember(501));                  // still elevated
+  XCTAssertTrue(tam->SecondsRemaining().has_value());  // original session still live
+}
+
 - (void)testGrantRefusedWhileTeardownRetryPending {
   [self stubPolicyAvailable];
   [self stubAuthReply:YES reason:@"need to install"];
