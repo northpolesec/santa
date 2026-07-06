@@ -35,6 +35,7 @@
 #include "Source/common/es/Enricher.h"
 #include "Source/common/faa/WatchItemPolicy.h"
 #include "Source/common/faa/WatchItems.h"
+#include "Source/santad/AdminUserState.h"
 #include "Source/santad/DaemonConfigBundle.h"
 #import "Source/santad/DataLayer/SNTEventTable.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
@@ -126,6 +127,12 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
             }
           }
           binaryUploadController:binary_upload_controller];
+
+  // Watch for the sync server being removed or replaced, and restore any
+  // recorded natural admins if that already happened while the daemon was not
+  // running. After the controller init, whose TemporaryAdminMode::Create has
+  // already settled any TAM teardown owed from before the restart.
+  [dc adminUserState]->SetupFromState();
 
   control_connection.exportedObject = dc;
   [control_connection resume];

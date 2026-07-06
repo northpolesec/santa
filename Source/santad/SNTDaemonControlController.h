@@ -26,8 +26,9 @@
 #include "Source/santad/SandboxExpectations.h"
 
 namespace santa {
+class AdminUserState;
 class TemporaryAdminMode;
-}
+}  // namespace santa
 
 @class SNTNotificationQueue;
 @class SNTSyncdQueue;
@@ -61,5 +62,9 @@ class TemporaryAdminMode;
 // The Temporary Admin Mode orchestrator owned by this controller. Exposed so the ES login-window
 // session handler can drive lock/logout revocation through the same instance.
 - (std::shared_ptr<santa::TemporaryAdminMode>)temporaryAdminMode;
+
+// The natural-admin reconciler owned by this controller. Exposed so daemon startup can run its
+// SetupFromState after TemporaryAdminMode's (which the controller init already guarantees).
+- (santa::AdminUserState*)adminUserState;
 
 @end

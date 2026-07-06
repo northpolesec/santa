@@ -18,6 +18,7 @@
 #include <memory>
 
 #import "Source/common/SNTConfigurator.h"
+#import "Source/common/SNTKVOManager.h"
 #import "Source/common/SNTTemporaryAdminPolicy.h"
 #include "Source/santad/AdminGroupMembership.h"
 #include "absl/synchronization/mutex.h"
@@ -41,8 +42,10 @@ class AdminUserState {
   // direct member of the admin group) are never demoted, recorded, or restored.
   static constexpr uid_t kMinDemotableUID = 500;
 
-  AdminUserState(SNTConfigurator* configurator,
-                 std::unique_ptr<AdminGroupMembership> membership);
+  // `revoke_tam` must synchronously revoke any active Temporary Admin Mode
+  // session; HandleSyncServerChange calls it before restoring (see there).
+  AdminUserState(SNTConfigurator* configurator, std::unique_ptr<AdminGroupMembership> membership,
+                 void (^revoke_tam)(void));
 
   // Reconciles local admin users against `policy`. Called after each sync
   // batch commits, after TemporaryAdminMode::NewPolicyReceived, so on a revoke
@@ -50,12 +53,28 @@ class AdminUserState {
   // policy or a type other than OnDemand/Revoke is a no-op.
   void HandlePolicy(SNTTemporaryAdminPolicy* policy);
 
+  // Watches for the sync server being removed or replaced and restores the
+  // recorded users when that happens: a machine that can no longer sync can
+  // never receive the Revoke that would otherwise restore them. Also runs one
+  // reconcile immediately, catching a server that went away while the daemon
+  // was not running; a restore that fails there is retried at the next daemon
+  // start. Called once at daemon startup, after TemporaryAdminMode's
+  // SetupFromState; not from the constructor because the sync-v2 gate read is
+  // daemon-only.
+  void SetupFromState();
+
+  // Restores the recorded users and deletes the record, revoking any active
+  // TAM session first. A no-op without a record. Public for tests.
+  void HandleSyncServerChange();
+
  private:
   void CaptureAndDemoteLocked() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
   void RestoreAndClearLocked() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   SNTConfigurator* configurator_;
   std::unique_ptr<AdminGroupMembership> membership_;
+  void (^revoke_tam_)(void);
+  NSArray<SNTKVOManager*>* kvo_;
   absl::Mutex lock_;
 };
 

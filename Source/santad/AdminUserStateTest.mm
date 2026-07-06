@@ -113,6 +113,8 @@ static SNTTemporaryAdminPolicy* RevokePolicy() {
 // In-memory stand-in for TAM's persisted session state under the TempAdmin
 // key: nil means no session/residue.
 @property(copy) NSDictionary* tamSessionState;
+// Number of times the injected revoke-TAM block was called.
+@property NSInteger revokeTAMCalls;
 @end
 
 @implementation AdminUserStateTest
@@ -147,11 +149,19 @@ static SNTTemporaryAdminPolicy* RevokePolicy() {
       });
 }
 
-- (std::unique_ptr<AdminUserState>)makeStateWithFake:(FakeAdminGroupMembership**)fakeOut {
+- (std::unique_ptr<AdminUserState>)makeStateWithFake:(FakeAdminGroupMembership**)fakeOut
+                                           revokeTAM:(void (^)(void))revokeTAM {
   auto fakeOwned = std::make_unique<FakeAdminGroupMembership>();
   *fakeOut = fakeOwned.get();
   return std::make_unique<AdminUserState>((SNTConfigurator*)self.mockConfigurator,
-                                          std::move(fakeOwned));
+                                          std::move(fakeOwned), revokeTAM);
+}
+
+- (std::unique_ptr<AdminUserState>)makeStateWithFake:(FakeAdminGroupMembership**)fakeOut {
+  return [self makeStateWithFake:fakeOut
+                       revokeTAM:^{
+                         self.revokeTAMCalls++;
+                       }];
 }
 
 #pragma mark Capture + demote
@@ -459,6 +469,99 @@ static SNTTemporaryAdminPolicy* RevokePolicy() {
 
   XCTAssertFalse(fake->IsMember(501));
   XCTAssertNil(self.storedRecord);  // entry is complete, not retried
+}
+
+#pragma mark Sync server change
+
+- (void)testSyncServerChangeRestoresAndDeletesRecord {
+  FakeAdminGroupMembership* fake = nullptr;
+  auto state = [self makeStateWithFake:&fake];
+  self.storedRecord = @[ @{@"Username" : @"jane", @"UID" : @501} ];
+
+  state->HandleSyncServerChange();
+
+  XCTAssertTrue(fake->IsMember(501));
+  XCTAssertNil(self.storedRecord);
+  XCTAssertEqual(self.revokeTAMCalls, 1);
+}
+
+- (void)testSyncServerChangeWithoutRecordIsNoOp {
+  FakeAdminGroupMembership* fake = nullptr;
+  auto state = [self makeStateWithFake:&fake];
+
+  state->HandleSyncServerChange();
+
+  XCTAssertNil(self.storedRecord);
+  XCTAssertEqual(self.revokeTAMCalls, 0);
+}
+
+- (void)testSyncServerChangeRevokesTAMBeforeRestoring {
+  // If the restore ran before TAM's teardown, an active TAM session whose
+  // target is also recorded would already be restored — and TAM's teardown
+  // would then re-demote it with the record gone. Assert the ordering the
+  // injected block guarantees: at revoke time, nobody has been restored yet.
+  __block FakeAdminGroupMembership* fake = nullptr;
+  __block BOOL memberAtRevoke = YES;
+  auto state = [self makeStateWithFake:&fake
+                             revokeTAM:^{
+                               memberAtRevoke = fake->IsMember(501);
+                             }];
+  self.storedRecord = @[ @{@"Username" : @"jane", @"UID" : @501} ];
+
+  state->HandleSyncServerChange();
+
+  XCTAssertFalse(memberAtRevoke);
+  XCTAssertTrue(fake->IsMember(501));
+  XCTAssertNil(self.storedRecord);
+}
+
+- (void)testSyncServerChangePartialRestoreKeepsRecordForRetry {
+  FakeAdminGroupMembership* fake = nullptr;
+  auto state = [self makeStateWithFake:&fake];
+  NSArray* record = @[
+    @{@"Username" : @"jane", @"UID" : @501},
+    @{@"Username" : @"adadmin", @"UID" : @503, @"Local" : @NO},
+  ];
+  self.storedRecord = record;
+  fake->gone_uids_ = {503};  // directory unreachable at unenroll time
+
+  state->HandleSyncServerChange();
+
+  // jane restored; the directory account is retried at the next daemon start.
+  XCTAssertTrue(fake->IsMember(501));
+  XCTAssertFalse(fake->IsMember(503));
+  XCTAssertEqualObjects(self.storedRecord, record);
+
+  fake->gone_uids_.clear();
+  state->HandleSyncServerChange();
+  XCTAssertTrue(fake->IsMember(503));
+  XCTAssertNil(self.storedRecord);
+}
+
+- (void)testSetupFromStateRestoresWhenSyncServerAlreadyGone {
+  FakeAdminGroupMembership* fake = nullptr;
+  auto state = [self makeStateWithFake:&fake];
+  OCMStub([self.mockConfigurator isSyncV2Enabled]).andReturn(NO);
+  self.storedRecord = @[ @{@"Username" : @"jane", @"UID" : @501} ];
+
+  state->SetupFromState();
+
+  XCTAssertTrue(fake->IsMember(501));
+  XCTAssertNil(self.storedRecord);
+  XCTAssertEqual(self.revokeTAMCalls, 1);
+}
+
+- (void)testSetupFromStateLeavesRecordWhileSyncServerPresent {
+  FakeAdminGroupMembership* fake = nullptr;
+  auto state = [self makeStateWithFake:&fake];
+  OCMStub([self.mockConfigurator isSyncV2Enabled]).andReturn(YES);
+  self.storedRecord = @[ @{@"Username" : @"jane", @"UID" : @501} ];
+
+  state->SetupFromState();
+
+  XCTAssertFalse(fake->IsMember(501));
+  XCTAssertNotNil(self.storedRecord);
+  XCTAssertEqual(self.revokeTAMCalls, 0);
 }
 
 #pragma mark Idempotency across the full cycle

@@ -34,17 +34,89 @@ static NSNumber* TAMOwnedUID(SNTConfigurator* configurator) {
 }
 
 AdminUserState::AdminUserState(SNTConfigurator* configurator,
-                               std::unique_ptr<AdminGroupMembership> membership)
-    : configurator_(configurator), membership_(std::move(membership)) {}
+                               std::unique_ptr<AdminGroupMembership> membership,
+                               void (^revoke_tam)(void))
+    : configurator_(configurator),
+      membership_(std::move(membership)),
+      revoke_tam_([revoke_tam copy]) {}
 
 void AdminUserState::HandlePolicy(SNTTemporaryAdminPolicy* policy) {
   absl::MutexLock lock(&lock_);
   bool have_record = [configurator_ savedDemotedAdmins] != nil;
+  // A record that survives a revoke (kept to retry a failed restore) also
+  // suppresses capture for the whole next enabled window: restored users keep
+  // admin, and new admins are never demoted, until the record drains and a
+  // later off-to-on edge captures fresh. Deliberate: the record cannot hold
+  // two capture generations, and re-capturing while one exists would turn the
+  // one-shot demotion into continuous enforcement that fights other
+  // user-management software.
   if (policy.type == SNTTemporaryAdminPolicyTypeOnDemand && !have_record) {
     CaptureAndDemoteLocked();
   } else if (policy.type == SNTTemporaryAdminPolicyTypeRevoke && have_record) {
     RestoreAndClearLocked();
   }
+}
+
+void AdminUserState::SetupFromState() {
+  // The callbacks capture `this` unretained: AdminUserState lives for the
+  // daemon's lifetime, and kvo_ (which owns the observations) dies with it.
+  kvo_ = @[
+    [[SNTKVOManager alloc]
+        initWithObject:configurator_
+              selector:@selector(syncBaseURL)
+                  type:[NSURL class]
+              callback:^(NSURL* oldValue, NSURL* newValue) {
+                if ((!newValue && !oldValue) ||
+                    [newValue.absoluteString isEqualToString:oldValue.absoluteString]) {
+                  return;
+                }
+                // Any change — removal or replacement — restores: the record
+                // was captured under the old server's policy, and a new
+                // server's first on-policy delivery finds no record and
+                // captures fresh.
+                HandleSyncServerChange();
+              }],
+    [[SNTKVOManager alloc] initWithObject:configurator_
+                                 selector:@selector(pushTokenChain)
+                                     type:[NSArray class]
+                                 callback:^(NSArray* oldValue, NSArray* newValue) {
+                                   // Ignore no-op fires. pushTokenChain is a KVO dependent key on
+                                   // the whole syncState, so every syncState write fires this
+                                   // callback even when the chain is unchanged — including the
+                                   // write revoke_tam_ makes while HandleSyncServerChange holds
+                                   // lock_. Without this guard that re-entrant fire would re-take
+                                   // lock_ on the same thread and deadlock.
+                                   if ((!newValue && !oldValue) ||
+                                       [newValue isEqualToArray:oldValue]) {
+                                     return;
+                                   }
+                                   if (!configurator_.isSyncV2Enabled) {
+                                     HandleSyncServerChange();
+                                   }
+                                 }],
+  ];
+
+  // The watchers only fire on changes: a sync server that went away while the
+  // daemon was not running is reconciled directly.
+  if (!configurator_.isSyncV2Enabled) {
+    HandleSyncServerChange();
+  }
+}
+
+void AdminUserState::HandleSyncServerChange() {
+  absl::MutexLock lock(&lock_);
+  if ([configurator_ savedDemotedAdmins] == nil) {
+    return;
+  }
+  // Tear down any active TAM session before restoring, mirroring the sync
+  // path's NewPolicyReceived-before-HandlePolicy ordering. TAM's own watchers
+  // also revoke on these events, but KVO observer order is unspecified: if the
+  // restore ran first it would mistake an active session for a demote-retry
+  // residue, clear its state, and TAM's later revoke would then demote a
+  // just-restored admin with the record already gone. Revoke is idempotent, so
+  // the extra call is safe in either observer order.
+  revoke_tam_();
+  RestoreAndClearLocked();
 }
 
 void AdminUserState::CaptureAndDemoteLocked() {

@@ -208,8 +208,14 @@ static NSString* TAMUsernameForUID(uid_t uid) {
           [syncdQueue addStoredEvent:auditEvent];
         });
 
-    _adminUserState = std::make_unique<santa::AdminUserState>([SNTConfigurator configurator],
-                                                              santa::CreateAdminGroupMembership());
+    // Captured as a local so the block does not retain self. The block gives
+    // AdminUserState the TAM-teardown-before-restore ordering on the
+    // sync-server-change path; see AdminUserState::HandleSyncServerChange.
+    std::shared_ptr<santa::TemporaryAdminMode> tam = _temporaryAdminMode;
+    _adminUserState = std::make_unique<santa::AdminUserState>(
+        [SNTConfigurator configurator], santa::CreateAdminGroupMembership(), ^{
+          tam->Revoke(SNTTemporaryAdminModeLeaveReasonSyncServerChanged);
+        });
   }
   return self;
 }
@@ -1273,6 +1279,10 @@ static const char* const kAllowedCanonicalBundlePaths[] = {
 
 - (std::shared_ptr<santa::TemporaryAdminMode>)temporaryAdminMode {
   return _temporaryAdminMode;
+}
+
+- (santa::AdminUserState*)adminUserState {
+  return _adminUserState.get();
 }
 
 #pragma mark Network Extension Ops

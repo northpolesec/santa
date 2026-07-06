@@ -1207,6 +1207,7 @@ objc_library(
         ":AdminGroupMembership",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTError",
+        "//Source/common:SNTKVOManager",
         "//Source/common:SNTLogging",
         "//Source/common:SNTTemporaryAdminPolicy",
         "@abseil-cpp//absl/synchronization",
