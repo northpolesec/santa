@@ -323,9 +323,18 @@ void SetKilledProcessError(SNTKilledProcessError error, ::pbv1::KillResponse::Pr
                                                  onArena:(google::protobuf::Arena*)arena {
   auto pbResponse = google::protobuf::Arena::Create<::pbv1::EventUploadResponse>(arena);
 
-  NSString* path = StringToNSString(eventUploadRequest.path());
-  if (path.length == 0) {
-    LOGE(@"NATS: EventUploadRequest has empty path");
+  // Collect the non-empty paths from the repeated `paths` field.
+  NSMutableArray<NSString*>* paths =
+      [NSMutableArray arrayWithCapacity:eventUploadRequest.paths_size()];
+  for (const std::string& path : eventUploadRequest.paths()) {
+    NSString* nsPath = StringToNSString(path);
+    if (nsPath.length > 0) {
+      [paths addObject:nsPath];
+    }
+  }
+
+  if (paths.count == 0) {
+    LOGE(@"NATS: EventUploadRequest has no valid paths");
     pbResponse->set_error(::pbv1::EventUploadResponse::ERROR_INVALID_PATH);
     return pbResponse;
   }
@@ -337,16 +346,16 @@ void SetKilledProcessError(SNTKilledProcessError error, ::pbv1::KillResponse::Pr
     return pbResponse;
   }
 
-  // Fire off the event upload asynchronously - don't wait for completion
-  [strongSyncDelegate
-      eventUploadForPath:path
-                   reply:^(NSError* error) {
-                     if (error) {
-                       LOGE(@"NATS: EventUploadRequest failed for path %@: %@", path, error);
-                     } else {
-                       LOGI(@"NATS: EventUploadRequest completed for path %@", path);
-                     }
-                   }];
+  // Fire off the event uploads asynchronously - don't wait for completion. The delegate
+  // processes the paths serially and invokes the reply block once per path.
+  [strongSyncDelegate eventUploadForPaths:paths
+                                    reply:^(NSError* error) {
+                                      if (error) {
+                                        LOGE(@"NATS: EventUploadRequest failed: %@", error);
+                                      } else {
+                                        LOGI(@"NATS: EventUploadRequest completed");
+                                      }
+                                    }];
 
   return pbResponse;
 }

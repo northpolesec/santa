@@ -1013,7 +1013,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   SNTPushClientNATS* clientWithoutDelegate = [[SNTPushClientNATS alloc] initWithSyncDelegate:nil];
 
   ::pbv1::EventUploadRequest eventUploadRequest;
-  eventUploadRequest.set_path("/Applications/Safari.app");
+  eventUploadRequest.add_paths("/Applications/Safari.app");
 
   // When: Handling the event upload request without a sync delegate
   ::pbv1::EventUploadResponse* response =
@@ -1031,11 +1031,11 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
 - (void)testHandleEventUploadRequestSuccess {
   // Given: An EventUploadRequest with a valid path
   ::pbv1::EventUploadRequest eventUploadRequest;
-  eventUploadRequest.set_path("/Applications/Safari.app");
+  eventUploadRequest.add_paths("/Applications/Safari.app");
 
   // Mock delegate - handler fires and forgets, so we just need the stub
-  OCMStub([self.mockSyncDelegate eventUploadForPath:@"/Applications/Safari.app"
-                                              reply:[OCMArg any]]);
+  OCMStub([self.mockSyncDelegate eventUploadForPaths:@[ @"/Applications/Safari.app" ]
+                                               reply:[OCMArg any]]);
 
   // When: Handling the event upload request
   ::pbv1::EventUploadResponse* response = [self.client handleEventUploadRequest:eventUploadRequest
@@ -1050,11 +1050,11 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
 - (void)testHandleEventUploadRequestFiresDelegate {
   // Given: An EventUploadRequest with a valid path
   ::pbv1::EventUploadRequest eventUploadRequest;
-  eventUploadRequest.set_path("/Applications/Safari.app");
+  eventUploadRequest.add_paths("/Applications/Safari.app");
 
   // Mock delegate to verify it gets called (fire-and-forget)
-  OCMExpect([self.mockSyncDelegate eventUploadForPath:@"/Applications/Safari.app"
-                                                reply:[OCMArg any]]);
+  OCMExpect([self.mockSyncDelegate eventUploadForPaths:@[ @"/Applications/Safari.app" ]
+                                                 reply:[OCMArg any]]);
 
   // When: Handling the event upload request
   ::pbv1::EventUploadResponse* response = [self.client handleEventUploadRequest:eventUploadRequest
@@ -1067,17 +1067,80 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
   OCMVerifyAll(self.mockSyncDelegate);
 }
 
+- (void)testHandleEventUploadRequestMultiplePaths {
+  // Given: An EventUploadRequest with multiple paths
+  ::pbv1::EventUploadRequest eventUploadRequest;
+  eventUploadRequest.add_paths("/Applications/Safari.app");
+  eventUploadRequest.add_paths("/Applications/Mail.app");
+
+  // Mock delegate - the handler passes all paths through in a single call.
+  // Hoisted into a local: a comma inside an @[] literal would be parsed as a
+  // separate macro argument by OCMExpect.
+  NSArray<NSString*>* expectedPaths = @[ @"/Applications/Safari.app", @"/Applications/Mail.app" ];
+  OCMExpect([self.mockSyncDelegate eventUploadForPaths:expectedPaths reply:[OCMArg any]]);
+
+  // When: Handling the event upload request
+  ::pbv1::EventUploadResponse* response = [self.client handleEventUploadRequest:eventUploadRequest
+                                                                withCommandUUID:@"uuid"
+                                                                        onArena:self.arena];
+
+  // Then: Should return a successful response and forward all paths to the delegate
+  XCTAssertNotEqual(response, nullptr, @"Should return non-nil response");
+  XCTAssertFalse(response->has_error(), @"Successful request should not have error");
+  OCMVerifyAll(self.mockSyncDelegate);
+}
+
+- (void)testHandleEventUploadRequestFiltersEmptyPaths {
+  // Given: An EventUploadRequest with a mix of empty and valid paths
+  ::pbv1::EventUploadRequest eventUploadRequest;
+  eventUploadRequest.add_paths("");
+  eventUploadRequest.add_paths("/Applications/Safari.app");
+  eventUploadRequest.add_paths("");
+
+  // Mock delegate - only the non-empty path should be forwarded
+  OCMExpect([self.mockSyncDelegate eventUploadForPaths:@[ @"/Applications/Safari.app" ]
+                                                 reply:[OCMArg any]]);
+
+  // When: Handling the event upload request
+  ::pbv1::EventUploadResponse* response = [self.client handleEventUploadRequest:eventUploadRequest
+                                                                withCommandUUID:@"uuid"
+                                                                        onArena:self.arena];
+
+  // Then: Should succeed and forward only the non-empty path
+  XCTAssertNotEqual(response, nullptr, @"Should return non-nil response");
+  XCTAssertFalse(response->has_error(), @"Successful request should not have error");
+  OCMVerifyAll(self.mockSyncDelegate);
+}
+
+- (void)testHandleEventUploadRequestOnlyEmptyPaths {
+  // Given: An EventUploadRequest whose paths are all empty
+  ::pbv1::EventUploadRequest eventUploadRequest;
+  eventUploadRequest.add_paths("");
+  eventUploadRequest.add_paths("");
+
+  // When: Handling the event upload request
+  ::pbv1::EventUploadResponse* response = [self.client handleEventUploadRequest:eventUploadRequest
+                                                                withCommandUUID:@"uuid"
+                                                                        onArena:self.arena];
+
+  // Then: Should return ERROR_INVALID_PATH since no valid paths remain
+  XCTAssertNotEqual(response, nullptr, @"Should return non-nil response");
+  XCTAssertTrue(response->has_error(), @"Should have error set");
+  XCTAssertEqual(response->error(), ::pbv1::EventUploadResponse::ERROR_INVALID_PATH,
+                 @"Only-empty paths should return ERROR_INVALID_PATH");
+}
+
 - (void)testDispatchSantaCommandToHandlerEventUpload {
   // Given: An EventUploadRequest command
   ::pbv1::SantaCommandRequest command;
   command.set_uuid([[NSUUID UUID] UUIDString].UTF8String);
-  command.mutable_event_upload()->set_path("/Applications/Safari.app");
+  command.mutable_event_upload()->add_paths("/Applications/Safari.app");
 
   [self signCommandRequest:&command];
 
   // Mock delegate - handler fires and forgets
-  OCMStub([self.mockSyncDelegate eventUploadForPath:@"/Applications/Safari.app"
-                                              reply:[OCMArg any]]);
+  OCMStub([self.mockSyncDelegate eventUploadForPaths:@[ @"/Applications/Safari.app" ]
+                                               reply:[OCMArg any]]);
 
   // When: Dispatching the command
   ::pbv1::SantaCommandResponse* response = [self.client dispatchSantaCommandToHandler:command
@@ -1092,7 +1155,7 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
 - (void)testHandleEventUploadRequestErrorDoesNotEnqueueSync {
   // Given: An EventUploadRequest with a valid path
   ::pbv1::EventUploadRequest eventUploadRequest;
-  eventUploadRequest.set_path("/Applications/Safari.app");
+  eventUploadRequest.add_paths("/Applications/Safari.app");
 
   // Mock delegate to invoke the reply block with an error
   NSError* uploadError =
@@ -1100,8 +1163,8 @@ static constexpr NSUInteger kMaxCommandNonceCacheCount = kMaxCommandAgeSeconds;
                           code:4
                       userInfo:@{NSLocalizedDescriptionKey : @"Failed to upload"}];
   OCMStub([self.mockSyncDelegate
-      eventUploadForPath:@"/Applications/Safari.app"
-                   reply:([OCMArg invokeBlockWithArgs:uploadError, nil])]);
+      eventUploadForPaths:@[ @"/Applications/Safari.app" ]
+                    reply:([OCMArg invokeBlockWithArgs:uploadError, nil])]);
   OCMReject([self.mockSyncDelegate sync]);
 
   // When: Handling the event upload request
