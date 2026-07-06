@@ -41,7 +41,7 @@ AdminUserState::AdminUserState(SNTConfigurator* configurator,
       revoke_tam_([revoke_tam copy]) {}
 
 void AdminUserState::HandlePolicy(SNTTemporaryAdminPolicy* policy) {
-  absl::MutexLock lock(&lock_);
+  absl::MutexLock lock(lock_);
   bool have_record = [configurator_ savedDemotedAdmins] != nil;
   // A record that survives a revoke (kept to retry a failed restore) also
   // suppresses capture for the whole next enabled window: restored users keep
@@ -104,7 +104,7 @@ void AdminUserState::SetupFromState() {
 }
 
 void AdminUserState::HandleSyncServerChange() {
-  absl::MutexLock lock(&lock_);
+  absl::MutexLock lock(lock_);
   if ([configurator_ savedDemotedAdmins] == nil) {
     return;
   }
