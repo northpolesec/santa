@@ -56,6 +56,12 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
 @property(nonatomic, readonly) dispatch_queue_t syncQueue;
 @property(nonatomic, readonly) dispatch_semaphore_t syncLimiter;
 
+// Serial queue for out-of-band event uploads (NATS EventUpload command). Kept
+// separate from syncQueue so uploads can't starve regular syncs, and serial so a
+// single command carrying many paths processes them one at a time instead of
+// fanning out into concurrent bundle-service connections and sync POSTs.
+@property(nonatomic, readonly) dispatch_queue_t eventUploadQueue;
+
 @property(nonatomic) MOLXPCConnection* daemonConn;
 
 @property(nonatomic) BOOL reachable;
@@ -130,6 +136,8 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
     }];
     _syncQueue = dispatch_queue_create("com.northpolesec.santa.syncservice", DISPATCH_QUEUE_SERIAL);
     _syncLimiter = dispatch_semaphore_create(kMaxEnqueuedSyncs);
+    _eventUploadQueue = dispatch_queue_create("com.northpolesec.santa.syncservice.eventupload",
+                                              DISPATCH_QUEUE_SERIAL);
 
     _eventBatchSize = kDefaultEventBatchSize;
     _metricsQueue = dispatch_queue_create_with_target(
@@ -487,6 +495,14 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   return self.daemonConn;
 }
 
+- (void)eventUploadForPaths:(NSArray<NSString*>*)paths reply:(void (^)(NSError* error))reply {
+  // Enqueue each path individually. eventUploadForPath: dispatches onto the serial
+  // eventUploadQueue, so the paths are processed one at a time rather than fanning out.
+  for (NSString* path in paths) {
+    [self eventUploadForPath:path reply:reply];
+  }
+}
+
 - (void)eventUploadForPath:(NSString*)path reply:(void (^)(NSError* error))reply {
   if (path.length == 0) {
     reply([NSError errorWithDomain:@"com.northpolesec.santa.syncservice"
@@ -495,9 +511,12 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
     return;
   }
 
-  // Run on a dedicated queue to avoid blocking syncQueue (which would starve regular syncs).
-  // postEventsToSyncServer: is thread-safe and doesn't require syncQueue serialization.
-  dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+  // Run on the dedicated serial event-upload queue: it avoids blocking syncQueue (which would
+  // starve regular syncs), and serializing here means a single EventUpload command carrying many
+  // paths processes them one at a time rather than fanning out into concurrent bundle-service
+  // connections and sync POSTs. postEventsToSyncServer: is thread-safe and doesn't require
+  // syncQueue serialization.
+  dispatch_async(self.eventUploadQueue, ^{
     auto replied = std::make_shared<std::atomic<bool>>(false);
     void (^guardedReply)(NSError*) = ^(NSError* e) {
       if (replied->exchange(true)) return;
