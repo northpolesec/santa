@@ -74,6 +74,11 @@
 @property(strong) SNTTimedModeState* tamState;
 @property(atomic, strong) NSTimer* iconTintTimer;
 
+// Separator between the Monitor and Admin sections, shown only when both are present.
+@property NSMenuItem* timedModeSeparator;
+// Greyed "User Type: …" line shown alongside the Request/Leave Admin Privileges item.
+@property NSMenuItem* userTypeMenuItem;
+
 // Reset silences item
 @property NSMenuItem* resetSilencesMenuItem;
 
@@ -281,6 +286,21 @@ static NSString* const kNotificationSilencesKey = @"SilencedNotifications";
   // Add temporary-mode (Monitor / Admin) items, hidden by default until
   // availability is verified.
   [self addMenuItemsForState:self.tmmState toMenu:menu];
+
+  // Separator between the two timed-mode sections, shown only when both are
+  // present (see updateTimedModeSeparatorVisibility).
+  self.timedModeSeparator = [NSMenuItem separatorItem];
+  self.timedModeSeparator.hidden = YES;
+  [menu addItem:self.timedModeSeparator];
+
+  // User Type header for Temporary Admin Mode, shown immediately before the
+  // Request/Leave Admin Privileges item. Disabled (greyed) via a nil action,
+  // mirroring the version line. Its title/visibility are driven by
+  // setAdminItemVisibleWhenAvailable:.
+  self.userTypeMenuItem = [self menuItemWithTitle:@"" andAction:nil];
+  self.userTypeMenuItem.hidden = YES;
+  [menu addItem:self.userTypeMenuItem];
+
   [self addMenuItemsForState:self.tamState toMenu:menu];
 
   menu.delegate = self;
@@ -388,6 +408,27 @@ static NSString* const kNotificationSilencesKey = @"SilencedNotifications";
 - (void)setAdminItemVisibleWhenAvailable:(BOOL)available alreadyAdmin:(BOOL)alreadyAdmin {
   BOOL active = (self.tamState.expiration != nil);
   [self setAvailable:(active || (available && !alreadyAdmin)) forState:self.tamState];
+
+  // The User Type header tracks the Request/Leave Admin Privileges item exactly:
+  // shown only while that item is shown, greyed, and labeled with the user's current
+  // privilege level. This lines up by construction -- "Leave" only appears while the
+  // user is elevated (alreadyAdmin), "Request" only while standard -- and mirrors the
+  // "Current User Type" that `santactl status` reports.
+  self.userTypeMenuItem.hidden = self.tamState.menuItem.hidden;
+  self.userTypeMenuItem.title = alreadyAdmin ? @"User Type: Administrator" : @"User Type: Standard";
+}
+
+// The separator between the Monitor and Admin sections is shown only when both
+// sections are present, matching the role of the Sync separator. Keyed off the
+// live hidden state of each section's item so it stays correct regardless of which
+// path (background poll, daemon push, menu open) last updated visibility.
+- (void)updateTimedModeSeparatorVisibility {
+  if (!self.timedModeSeparator) {
+    return;
+  }
+  BOOL tmmVisible = !self.tmmState.menuItem.hidden;
+  BOOL tamVisible = !self.tamState.menuItem.hidden;
+  self.timedModeSeparator.hidden = !(tmmVisible && tamVisible);
 }
 
 // Re-query Temporary Admin Mode availability against live state each time the menu
@@ -421,6 +462,8 @@ static NSString* const kNotificationSilencesKey = @"SilencedNotifications";
     self.statusItem = nil;
     self.syncMenuItem = nil;
     self.resetSilencesMenuItem = nil;
+    self.timedModeSeparator = nil;
+    self.userTypeMenuItem = nil;
     self.tmmState.menuItem = nil;
     self.tmmState.refreshItem = nil;
     self.tamState.menuItem = nil;
@@ -673,6 +716,8 @@ static NSString* const kNotificationSilencesKey = @"SilencedNotifications";
   BOOL active = (state.expiration != nil);
   state.menuItem.hidden = !(available || active);
   state.refreshItem.hidden = !(available || active);
+
+  [self updateTimedModeSeparatorVisibility];
 }
 
 // Public wrappers used by SNTNotificationManager (daemon-pushed enter/leave/availability).
