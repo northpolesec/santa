@@ -92,7 +92,8 @@ class AdminGroupMembershipImpl : public AdminGroupMembership {
       }
       CBUserIdentity* user = (CBUserIdentity*)identity;
       members.push_back({user.posixUID, user.posixName ?: @"",
-                         [user.authority isEqual:[CBIdentityAuthority localIdentityAuthority]]});
+                         static_cast<bool>([user.authority
+                             isEqual:[CBIdentityAuthority localIdentityAuthority]])});
     }
     return members;
   }
