@@ -503,16 +503,28 @@ static NSString* const silencedNotificationsKey = @"SilencedNotifications";
   [SNTAuthorizationHelper authorizeTemporaryMonitorModeWithReplyBlock:reply];
 }
 
+// Daemon-pushed timed-mode updates (enter/leave/availability, Monitor and Admin) arrive on the
+// notifier XPC connection's background delivery queue. Each forwards into SNTStatusItemManager,
+// which mutates AppKit menu state -- and mutating a menu item's visibility while the status menu is
+// open forces a live popup-window resize that traps ("Must only be used from the main thread") when
+// done off the main thread. Marshal them to the main thread, mirroring the notification-window
+// handlers above (queueMessage:/showQueuedWindow:).
 - (void)enterTemporaryMonitorMode:(NSDate*)expiration {
-  [self.statusItemManager enterMonitorModeWithExpiration:expiration];
+  dispatch_async(dispatch_get_main_queue(), ^{
+    [self.statusItemManager enterMonitorModeWithExpiration:expiration];
+  });
 }
 
 - (void)leaveTemporaryMonitorMode {
-  [self.statusItemManager leaveMonitorMode];
+  dispatch_async(dispatch_get_main_queue(), ^{
+    [self.statusItemManager leaveMonitorMode];
+  });
 }
 
 - (void)temporaryMonitorModePolicyAvailable:(BOOL)available {
-  [self.statusItemManager setTemporaryMonitorModePolicyAvailable:available];
+  dispatch_async(dispatch_get_main_queue(), ^{
+    [self.statusItemManager setTemporaryMonitorModePolicyAvailable:available];
+  });
 }
 
 - (void)authorizeTemporaryAdminModeRequiringJustification:(BOOL)requireJustification
@@ -526,15 +538,21 @@ static NSString* const silencedNotificationsKey = @"SilencedNotifications";
 }
 
 - (void)enterTemporaryAdminMode:(NSDate*)expiration {
-  [self.statusItemManager enterAdminModeWithExpiration:expiration];
+  dispatch_async(dispatch_get_main_queue(), ^{
+    [self.statusItemManager enterAdminModeWithExpiration:expiration];
+  });
 }
 
 - (void)leaveTemporaryAdminMode {
-  [self.statusItemManager leaveAdminMode];
+  dispatch_async(dispatch_get_main_queue(), ^{
+    [self.statusItemManager leaveAdminMode];
+  });
 }
 
 - (void)temporaryAdminModeAvailable:(BOOL)available {
-  [self.statusItemManager setTemporaryAdminModeAvailable:available];
+  dispatch_async(dispatch_get_main_queue(), ^{
+    [self.statusItemManager setTemporaryAdminModeAvailable:available];
+  });
 }
 
 - (void)setNetworkExtensionFilterEnabled:(BOOL)enabled reply:(void (^)(BOOL success))reply {

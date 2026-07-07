@@ -19,6 +19,7 @@
 #import "Source/gui/SNTMessageWindowController.h"
 #import "Source/gui/SNTNetworkFlowMessageWindowController.h"
 #import "Source/gui/SNTNotificationManager.h"
+#import "Source/gui/SNTStatusItemManager.h"
 
 #import "Source/common/SNTConfigBundle.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
@@ -186,6 +187,113 @@
 - (void)testQueueDedupeHashDefaultsToMessageHash {
   DedupeHashPassthroughController* controller = [[DedupeHashPassthroughController alloc] init];
   XCTAssertEqualObjects([controller queueDedupeHash], @"passthrough-key");
+}
+
+#pragma mark Timed-mode push threading
+
+// Regression tests for the status-menu main-thread-assert crash.
+//
+// The daemon->GUI notifier XPC connection delivers messages on a background queue, not the main
+// thread. Every daemon-pushed timed-mode handler forwards into SNTStatusItemManager, which mutates
+// AppKit menu state -- and mutating a menu item's visibility while the status menu is open forces a
+// live popup-window resize that traps ("Must only be used from the main thread") when done off the
+// main thread. Each handler must therefore hop to the main thread before touching the status item.
+//
+// The helper drives a push from a background queue (mimicking the XPC delivery queue) and asserts
+// the forwarded SNTStatusItemManager call lands on the main thread.
+- (void)verifyPush:(NSString*)name
+    hopsToMainThread:(void (^)(SNTNotificationManager* mgr))push
+             stubSIM:(void (^)(id sim, dispatch_block_t record))stubSIM {
+  SNTNotificationManager* mgr = [[SNTNotificationManager alloc] init];
+  id sim = OCMClassMock([SNTStatusItemManager class]);
+  mgr.statusItemManager = sim;
+
+  XCTestExpectation* called = [self expectationWithDescription:name];
+  __block BOOL onMainThread = NO;
+  stubSIM(sim, ^{
+    onMainThread = [NSThread isMainThread];
+    [called fulfill];
+  });
+
+  dispatch_async(dispatch_get_global_queue(0, 0), ^{
+    push(mgr);
+  });
+
+  [self waitForExpectationsWithTimeout:5.0 handler:nil];
+  XCTAssertTrue(onMainThread, @"%@ must reach SNTStatusItemManager on the main thread", name);
+  [sim stopMocking];
+}
+
+- (void)testTemporaryAdminModeAvailableHopsToMainThread {
+  [self verifyPush:@"temporaryAdminModeAvailable:"
+      hopsToMainThread:^(SNTNotificationManager* mgr) {
+        [mgr temporaryAdminModeAvailable:YES];
+      }
+      stubSIM:^(id sim, dispatch_block_t record) {
+        OCMStub([sim setTemporaryAdminModeAvailable:YES]).andDo(^(NSInvocation* i) {
+          record();
+        });
+      }];
+}
+
+- (void)testTemporaryMonitorModePolicyAvailableHopsToMainThread {
+  [self verifyPush:@"temporaryMonitorModePolicyAvailable:"
+      hopsToMainThread:^(SNTNotificationManager* mgr) {
+        [mgr temporaryMonitorModePolicyAvailable:YES];
+      }
+      stubSIM:^(id sim, dispatch_block_t record) {
+        OCMStub([sim setTemporaryMonitorModePolicyAvailable:YES]).andDo(^(NSInvocation* i) {
+          record();
+        });
+      }];
+}
+
+- (void)testEnterTemporaryAdminModeHopsToMainThread {
+  [self verifyPush:@"enterTemporaryAdminMode:"
+      hopsToMainThread:^(SNTNotificationManager* mgr) {
+        [mgr enterTemporaryAdminMode:[NSDate dateWithTimeIntervalSinceNow:600]];
+      }
+      stubSIM:^(id sim, dispatch_block_t record) {
+        OCMStub([sim enterAdminModeWithExpiration:OCMOCK_ANY]).andDo(^(NSInvocation* i) {
+          record();
+        });
+      }];
+}
+
+- (void)testLeaveTemporaryAdminModeHopsToMainThread {
+  [self verifyPush:@"leaveTemporaryAdminMode"
+      hopsToMainThread:^(SNTNotificationManager* mgr) {
+        [mgr leaveTemporaryAdminMode];
+      }
+      stubSIM:^(id sim, dispatch_block_t record) {
+        OCMStub([sim leaveAdminMode]).andDo(^(NSInvocation* i) {
+          record();
+        });
+      }];
+}
+
+- (void)testEnterTemporaryMonitorModeHopsToMainThread {
+  [self verifyPush:@"enterTemporaryMonitorMode:"
+      hopsToMainThread:^(SNTNotificationManager* mgr) {
+        [mgr enterTemporaryMonitorMode:[NSDate dateWithTimeIntervalSinceNow:600]];
+      }
+      stubSIM:^(id sim, dispatch_block_t record) {
+        OCMStub([sim enterMonitorModeWithExpiration:OCMOCK_ANY]).andDo(^(NSInvocation* i) {
+          record();
+        });
+      }];
+}
+
+- (void)testLeaveTemporaryMonitorModeHopsToMainThread {
+  [self verifyPush:@"leaveTemporaryMonitorMode"
+      hopsToMainThread:^(SNTNotificationManager* mgr) {
+        [mgr leaveTemporaryMonitorMode];
+      }
+      stubSIM:^(id sim, dispatch_block_t record) {
+        OCMStub([sim leaveMonitorMode]).andDo(^(NSInvocation* i) {
+          record();
+        });
+      }];
 }
 
 @end
