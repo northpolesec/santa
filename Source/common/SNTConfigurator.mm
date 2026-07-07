@@ -1051,7 +1051,12 @@ static SNTConfigurator* sharedConfigurator = nil;
 }
 
 - (void)setSyncServerExportConfig:(SNTExportConfiguration*)exportConfig {
-  [self updateSyncStateForKey:kExportConfigurationKey value:[exportConfig serialize]];
+  if (exportConfig.revoke) {
+    // On revoke, remove the key to discard any stored export configuration.
+    [self updateSyncStateForKey:kExportConfigurationKey value:nil];
+  } else {
+    [self updateSyncStateForKey:kExportConfigurationKey value:[exportConfig serialize]];
+  }
 }
 
 - (SNTModeTransition*)modeTransition {

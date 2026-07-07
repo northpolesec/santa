@@ -32,6 +32,22 @@
   XCTAssertEqualObjects(cfg.url, url);
   XCTAssertEqualObjects(cfg.formValues[@"key1"], @"value1");
   XCTAssertEqualObjects(cfg.formValues[@"key2"], @"value2");
+  XCTAssertFalse(cfg.revoke);
+}
+
+- (void)testRevocation {
+  SNTExportConfiguration* cfg = [[SNTExportConfiguration alloc] initRevocation];
+  XCTAssertTrue(cfg.revoke);
+  XCTAssertNil(cfg.url);
+
+  NSData* data = [NSKeyedArchiver archivedDataWithRootObject:cfg
+                                       requiringSecureCoding:YES
+                                                       error:nil];
+  NSSet* allowedClasses = [NSSet setWithObjects:[SNTExportConfiguration class], nil];
+  SNTExportConfiguration* decoded = [NSKeyedUnarchiver unarchivedObjectOfClasses:allowedClasses
+                                                                        fromData:data
+                                                                           error:nil];
+  XCTAssertTrue(decoded.revoke);
 }
 
 - (void)testEncodeDecodeSecureCoding {

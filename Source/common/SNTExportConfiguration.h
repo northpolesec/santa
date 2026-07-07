@@ -19,7 +19,12 @@
 @property(readonly) NSURL* url;
 @property(readonly) NSDictionary* formValues;
 
+// When YES, the sync server revoked export: any stored export configuration
+// must be discarded and telemetry export disabled.
+@property(readonly) BOOL revoke;
+
 - (instancetype)initWithURL:(NSURL*)url formValues:(NSDictionary*)formValues;
+- (instancetype)initRevocation;
 
 - (NSData*)serialize;
 + (instancetype)deserialize:(NSData*)data;

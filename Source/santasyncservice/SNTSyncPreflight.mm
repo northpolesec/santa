@@ -563,20 +563,35 @@ void HandleV2Responses(const ::pbv2::PreflightResponse& resp, SNTSyncState* sync
   }
 
   if (resp.has_export_configuration()) {
-    auto exportConfig = resp.export_configuration().signed_post();
-    if (!exportConfig.url().empty() && !exportConfig.form_values().empty()) {
-      NSMutableDictionary* formValues =
-          [NSMutableDictionary dictionaryWithCapacity:exportConfig.form_values().size()];
-      for (const auto& pair : exportConfig.form_values()) {
-        formValues[StringToNSString(pair.first)] = StringToNSString(pair.second);
+    const auto& exportConfiguration = resp.export_configuration();
+    switch (exportConfiguration.configuration_case()) {
+      case ::pbv2::ExportConfiguration::kSignedPost: {
+        const auto& signedPost = exportConfiguration.signed_post();
+        if (!signedPost.url().empty() && !signedPost.form_values().empty()) {
+          NSMutableDictionary* formValues =
+              [NSMutableDictionary dictionaryWithCapacity:signedPost.form_values().size()];
+          for (const auto& pair : signedPost.form_values()) {
+            formValues[StringToNSString(pair.first)] = StringToNSString(pair.second);
+          }
+          NSURL* url = [NSURL URLWithString:StringToNSString(signedPost.url())];
+          if (url) {
+            syncState.exportConfig = [[SNTExportConfiguration alloc] initWithURL:url
+                                                                      formValues:formValues];
+          } else {
+            SLOGE(@"Invalid export configuration URL: %@", StringToNSString(signedPost.url()));
+          }
+        }
+        break;
       }
-      NSURL* url = [NSURL URLWithString:StringToNSString(exportConfig.url())];
-      if (url) {
-        syncState.exportConfig = [[SNTExportConfiguration alloc] initWithURL:url
-                                                                  formValues:formValues];
-      } else {
-        SLOGE(@"Invalid export configuration URL: %@", StringToNSString(exportConfig.url()));
-      }
+
+      case ::pbv2::ExportConfiguration::kRevoke:
+        // Server disabled telemetry export: discard any stored export config.
+        if (exportConfiguration.revoke()) {
+          syncState.exportConfig = [[SNTExportConfiguration alloc] initRevocation];
+        }
+        break;
+
+      default: break;
     }
   }
 }

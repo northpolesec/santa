@@ -20,6 +20,7 @@
 @interface SNTExportConfiguration ()
 @property NSURL* url;
 @property NSDictionary* formValues;
+@property BOOL revoke;
 @end
 
 @implementation SNTExportConfiguration
@@ -31,6 +32,7 @@
 - (void)encodeWithCoder:(NSCoder*)coder {
   ENCODE(coder, url);
   ENCODE(coder, formValues);
+  ENCODE_BOXABLE(coder, revoke);
 }
 
 - (instancetype)initWithCoder:(NSCoder*)decoder {
@@ -38,6 +40,7 @@
   if (self) {
     DECODE(decoder, url, NSURL);
     DECODE_DICT(decoder, formValues);
+    DECODE_SELECTOR(decoder, revoke, NSNumber, boolValue);
   }
   return self;
 }
@@ -51,8 +54,16 @@
   return self;
 }
 
+- (instancetype)initRevocation {
+  self = [super init];
+  if (self) {
+    _revoke = YES;
+  }
+  return self;
+}
+
 - (NSString*)description {
-  return self.url.absoluteString;
+  return self.revoke ? @"<revoked>" : self.url.absoluteString;
 }
 
 - (NSData*)serialize {
