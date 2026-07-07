@@ -73,11 +73,40 @@ static const NSTimeInterval kAdminJustificationPromptTimeoutSeconds = 120;
           NSLocalizedString(@"Justification", @"Temporary admin mode justification placeholder");
       alert.accessoryView = justificationField;
 
-      // Fail closed if the user never responds: dismiss the modal after a bounded
-      // interval so santad's synchronous auth call (which holds grant_mutex_ and a
-      // handler thread until this replies) cannot be pinned by an abandoned dialog.
-      // The timer must run in the modal-panel run-loop mode; runModal does not
-      // service the default mode.
+      // The GUI is a background agent (LSUIElement). SNTAppDelegate promotes the app to
+      // .regular whenever it becomes active with a visible window and restores .accessory
+      // on NSWindowWillCloseNotification -- but a modal alert does not post that
+      // notification (see -[SNTStatusItemManager resetSilencesMenuItemClicked:]), so the
+      // policy is restored by hand once the alert dismisses. Otherwise the app lingers in
+      // the Dock and Cmd-Tab switcher. Only undo our own promotion: if another window
+      // already required .regular, leave it.
+      //
+      // Bring the alert to the front and activate the app so the user sees the prompt and
+      // can type into it. -activateIgnoringOtherApps: alone is a no-op for a backgrounded
+      // agent: the window must be ordered to the front regardless of activation policy
+      // first, and only then does activation take hold. Center before ordering front so
+      // the window is not displayed off-center.
+      BOOL restoreAccessoryPolicy =
+          (NSApp.activationPolicy == NSApplicationActivationPolicyAccessory);
+      [alert layout];
+      [alert.window center];
+      [alert.window orderFrontRegardless];
+      [NSApp activateIgnoringOtherApps:YES];
+
+      // NSAlert makes the OK button the first responder; move focus to the justification
+      // field once the modal loop is running. runModal services only
+      // NSModalPanelRunLoopMode, so schedule the focus change -- and the fail-closed
+      // timeout below -- in that mode. On timeout, -stopModalWithCode: cancels the prompt
+      // so santad's synchronous auth call is not pinned by an abandoned dialog (see
+      // kAdminJustificationPromptTimeoutSeconds above).
+      NSTimer* focusTimer =
+          [NSTimer timerWithTimeInterval:0
+                                 repeats:NO
+                                   block:^(NSTimer* _Nonnull timer) {
+                                     [alert.window makeFirstResponder:justificationField];
+                                   }];
+      [[NSRunLoop currentRunLoop] addTimer:focusTimer forMode:NSModalPanelRunLoopMode];
+
       NSTimer* timeoutTimer =
           [NSTimer timerWithTimeInterval:kAdminJustificationPromptTimeoutSeconds
                                  repeats:NO
@@ -87,7 +116,12 @@ static const NSTimeInterval kAdminJustificationPromptTimeoutSeconds = 120;
       [[NSRunLoop currentRunLoop] addTimer:timeoutTimer forMode:NSModalPanelRunLoopMode];
 
       NSModalResponse response = [alert runModal];
+      [focusTimer invalidate];
       [timeoutTimer invalidate];
+
+      if (restoreAccessoryPolicy) {
+        NSApp.activationPolicy = NSApplicationActivationPolicyAccessory;
+      }
       if (response != NSAlertFirstButtonReturn) {
         replyBlock(NO, @"");
         return;
