@@ -14,7 +14,7 @@ overrides:
   http-proxy-middleware@>=0.16.0 <2.0.10: 2.0.10
   joi@<18.2.1: 18.2.1
   js-yaml@<3.15.0: 3.15.0
-  js-yaml@>=4.0.0 <= 4.1.1: 4.2.0
+  js-yaml@>=4.0.0 <=4.1.1: 4.2.0
   launch-editor@<2.14.1: 2.14.1
   lodash-es@<=4.17.23: 4.18.1
   mermaid@<11.15.0: 11.15.0
