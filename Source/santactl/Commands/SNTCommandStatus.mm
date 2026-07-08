@@ -333,7 +333,16 @@ REGISTER_COMMAND_NAME(@"status")
   NSURL* metricsURLStr = configurator.metricURL;
   NSUInteger metricExportInterval = configurator.metricExportInterval;
 
-  BOOL telemetryExportEnabled = configurator.enableTelemetryExport;
+  // Export runs only when the MDM flag is set AND a non-revoked sync export config is present.
+  // exportConfig is nil after the sync server revokes it, so this reflects the real runtime state.
+  BOOL telemetryExportEnabled =
+      configurator.enableTelemetryExport && configurator.exportConfig != nil;
+  // When disabled, distinguish MDM (config flag off) from sync-server (revoked/absent) as the
+  // cause.
+  NSString* telemetryExportDisabledReason = telemetryExportEnabled ? nil
+                                            : !configurator.enableTelemetryExport
+                                                ? @"disabled by config"
+                                                : @"disabled by sync server";
   NSUInteger telemetryExportInterval = configurator.telemetryExportIntervalSec;
 
   NSArray<NSString*>* allowedCommands = configurator.allowedSantaCommands;
@@ -478,6 +487,8 @@ REGISTER_COMMAND_NAME(@"status")
     } mutableCopy];
     if (telemetryExportEnabled) {
       stats[@"telemetry"][@"export_interval_seconds"] = @(telemetryExportInterval);
+    } else {
+      stats[@"telemetry"][@"export_disabled_reason"] = telemetryExportDisabledReason;
     }
 
     NSMutableDictionary* temporaryAdminMode = [@{
@@ -578,7 +589,11 @@ REGISTER_COMMAND_NAME(@"status")
     }
 
     printf(">>> Telemetry\n");
-    printf("  %-40s | %s\n", "Export Enabled", telemetryExportEnabled ? "Yes" : "No");
+    printf(
+        "  %-40s | %s\n", "Export Enabled",
+        telemetryExportEnabled
+            ? "Yes"
+            : [[NSString stringWithFormat:@"No (%@)", telemetryExportDisabledReason] UTF8String]);
     if (telemetryExportEnabled) {
       printf("  %-40s | %s\n", "Export Interval",
              [FormatInterval(telemetryExportInterval) UTF8String]);
