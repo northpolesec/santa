@@ -1235,7 +1235,32 @@ message NetworkActivity {
     // Only present if the flow closed during this window
     optional google.protobuf.Timestamp close_time = 13;
 
-    // next ID: 15
+    // The filter's evaluation outcome. Set for every evaluated flow (allowed
+    // included); unset when evaluation did not run.
+    enum Decision {
+      DECISION_UNKNOWN = 0;
+      DECISION_ALLOW = 1;
+      DECISION_BLOCK = 2;
+      DECISION_AUDIT = 3;
+    }
+    optional Decision decision = 15;
+
+    // How the winning rule's remote matcher matched, most to least specific.
+    enum Tier {
+      TIER_UNKNOWN = 0;
+      TIER_EXACT_IP = 1;
+      TIER_CIDR = 2;
+      TIER_HOSTNAME = 3;
+      TIER_DOMAIN = 4;
+      TIER_ANY_REMOTE = 5;
+    }
+    optional Tier decision_tier = 16;
+
+    // Winning rule id (0 if no rule matched) and name (empty if none).
+    optional int64 rule_id = 17;
+    optional string rule_name = 18;
+
+    // next ID: 19
   }
 
   // Network activity for a single process
