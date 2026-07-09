@@ -85,6 +85,9 @@ struct RuleCounts {
 - (void)blockNetworkMount:(void (^)(NSNumber*))reply;
 - (void)fullSyncInterval:(void (^)(NSUInteger))reply;
 - (void)pushNotificationsFullSyncInterval:(void (^)(NSUInteger))reply;
+// Whether the daemon holds a (non-revoked) sync-server export config. Sync state is root-only, so
+// unprivileged callers can't read it directly and must ask the daemon.
+- (void)telemetryExportConfigured:(void (^)(BOOL))reply;
 
 ///
 /// FAA Retrieval ops
