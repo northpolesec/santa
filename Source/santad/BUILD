@@ -1028,6 +1028,7 @@ objc_library(
         "//Source/common:ScopedFile",
         "@abseil-cpp//absl/base:core_headers",
         "@abseil-cpp//absl/cleanup",
+        "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/synchronization",
         "@northpolesec_protos//telemetry:sleighconfig_cc_proto",
