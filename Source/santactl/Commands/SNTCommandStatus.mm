@@ -334,9 +334,12 @@ REGISTER_COMMAND_NAME(@"status")
   NSUInteger metricExportInterval = configurator.metricExportInterval;
 
   // Export runs only when the MDM flag is set AND a non-revoked sync export config is present.
-  // exportConfig is nil after the sync server revokes it, so this reflects the real runtime state.
-  BOOL telemetryExportEnabled =
-      configurator.enableTelemetryExport && configurator.exportConfig != nil;
+  // The sync export config lives in root-only sync state we can't read here, so ask the daemon.
+  __block BOOL telemetryExportConfigured = NO;
+  [rop telemetryExportConfigured:^(BOOL configured) {
+    telemetryExportConfigured = configured;
+  }];
+  BOOL telemetryExportEnabled = configurator.enableTelemetryExport && telemetryExportConfigured;
   // When disabled, distinguish MDM (config flag off) from sync-server (revoked/absent) as the
   // cause.
   NSString* telemetryExportDisabledReason = telemetryExportEnabled ? nil

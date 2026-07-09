@@ -571,6 +571,10 @@ static NSString* TAMUsernameForUID(uid_t uid) {
   reply([SNTConfigurator configurator].pushNotificationsFullSyncInterval);
 }
 
+- (void)telemetryExportConfigured:(void (^)(BOOL))reply {
+  reply([SNTConfigurator configurator].exportConfig != nil);
+}
+
 - (void)enableBundles:(void (^)(BOOL))reply {
   reply([SNTConfigurator configurator].enableBundles);
 }
