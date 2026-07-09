@@ -16,6 +16,7 @@
 
 #import "Source/common/SNTLogging.h"
 #include "absl/cleanup/cleanup.h"
+#include "absl/status/status.h"
 #include "telemetry/sleighconfig.pb.h"
 
 namespace santa {
@@ -97,8 +98,11 @@ void SignalScanner::ScanFile(std::string path, std::shared_ptr<ScopedFile> file)
         shared_this->sleigh_launcher_->LaunchSignalScan(file->UnsafeFD(), signals,
                                                         shared_this->timeout_secs_);
     if (!response.ok()) {
-      LOGW(@"Signal scan failed for %s: %s", path.c_str(),
-           std::string(response.status().message()).c_str());
+      // Sleigh not installed (e.g. lite package) is accepted; don't warn.
+      if (!absl::IsNotFound(response.status())) {
+        LOGW(@"Signal scan failed for %s: %s", path.c_str(),
+             std::string(response.status().message()).c_str());
+      }
       return;
     }
 
