@@ -246,4 +246,42 @@ using namespace santa::santad::process_tree;
   }
 }
 
+// A live child must remain able to walk up to an exited, map-evicted parent via
+// the shared_ptr chain. CEL's ancestors field relies on this: it anchors on the
+// (retained) exec'ing process and walks GetParent, rather than looking the
+// parent up by pid — which would miss a parent that has already exited.
+- (void)testParentReachableAfterParentEviction {
+  uint64_t event_id = 1;
+  const struct Pid parent_pid = {.pid = 2, .pidversion = 2};
+  const struct Pid child_pid = {.pid = 3, .pidversion = 3};
+
+  self.tree->HandleFork(event_id++, *self.initProc, parent_pid);
+  auto parent = *self.tree->Get(parent_pid);
+  self.tree->HandleFork(event_id++, *parent, child_pid);
+
+  // Parent exits, then churn enough events to evict it from the map. The child
+  // never exits, so it stays in the map.
+  self.tree->HandleExit(event_id++, *parent);
+  for (int i = 0; i < 33; i++) {
+    struct Pid churn_pid = {.pid = 100 + i, .pidversion = (uint64_t)(100 + i)};
+    self.tree->HandleFork(event_id++, *self.initProc, churn_pid);
+  }
+
+  // Parent is gone from the map...
+  XCTAssertFalse(self.tree->Get(parent_pid).has_value());
+
+  // ...but the child is still present and can walk up to it and beyond.
+  auto child = self.tree->Get(child_pid);
+  XCTAssertTrue(child.has_value());
+  auto walked_parent = self.tree->GetParent(**child);
+  XCTAssertEqual(walked_parent->pid_, parent_pid);
+  XCTAssertEqual(self.tree->GetParent(*walked_parent), self.initProc);
+
+  // RootSlice from the parent (as CELActivation does) yields parent -> init.
+  auto slice = self.tree->RootSlice(walked_parent);
+  XCTAssertEqual(slice.size(), 2u);
+  XCTAssertEqual(slice[0]->pid_, parent_pid);
+  XCTAssertEqual(slice[1], self.initProc);
+}
+
 @end

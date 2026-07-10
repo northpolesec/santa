@@ -46,14 +46,19 @@ std::vector<santa::cel::CELProtoTraits<true>::AncestorT> Ancestors<true>(
   using Traits = santa::cel::CELProtoTraits<true>;
   using AncestorT = typename Traits::AncestorT;
 
-  auto pid = santa::santad::process_tree::PidFromAuditToken(esMsg->process->parent_audit_token);
+  // Anchor on the exec'ing process itself, which is retained in the tree for
+  // the lifetime of the message (see SNTEndpointSecurityTreeAwareClient), then
+  // walk its parent_ chain. This is deliberately not a Get() on the parent pid:
+  // the parent may have already exited and been evicted from the map, but the
+  // child holds a live shared_ptr to it, so the ancestry stays walkable.
+  auto pid = santa::santad::process_tree::PidFromAuditToken(esMsg->process->audit_token);
   auto proc = processTree->Get(pid);
   if (!proc) {
     return {};
   }
 
   std::vector<santa::cel::CELProtoTraits<true>::AncestorT> ancestors;
-  for (const auto& p : processTree->RootSlice(*proc)) {
+  for (const auto& p : processTree->RootSlice(processTree->GetParent(**proc))) {
     if (!p->program_) {
       continue;
     }
