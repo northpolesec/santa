@@ -486,6 +486,7 @@ REGISTER_COMMAND_NAME(@"status")
 
     stats[@"telemetry"] = [@{
       @"signal_rules" : @(ruleCounts.signals),
+      @"filters" : @(configurator.telemetryFilterExpressions.count),
       @"export_enabled" : @(telemetryExportEnabled),
     } mutableCopy];
     if (telemetryExportEnabled) {
@@ -602,6 +603,8 @@ REGISTER_COMMAND_NAME(@"status")
              [FormatInterval(telemetryExportInterval) UTF8String]);
     }
     printf("  %-40s | %lld\n", "Signal Rules", ruleCounts.signals);
+    printf("  %-40s | %lu\n", "Filters",
+           (unsigned long)configurator.telemetryFilterExpressions.count);
 
     printf(">>> Sync\n");
     printf("  %-40s | %s\n", "Enabled", syncURLStr.length ? "Yes" : "No");
