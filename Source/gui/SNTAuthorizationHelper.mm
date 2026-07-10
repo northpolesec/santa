@@ -99,10 +99,20 @@ static const NSTimeInterval kAdminJustificationPromptTimeoutSeconds = 120;
       // timeout below -- in that mode. On timeout, -stopModalWithCode: cancels the prompt
       // so santad's synchronous auth call is not pinned by an abandoned dialog (see
       // kAdminJustificationPromptTimeoutSeconds above).
+      //
+      // Focus is cycled through nil rather than set once: this prompt is presented on
+      // the heels of a status-menu click (menu item -> santad XPC -> back here), and on
+      // macOS 26 a field editor that becomes first responder that soon after menu
+      // tracking inherits the system text cursor's "hidden during tracking" state -- the
+      // insertion point never appears, even though focus and key state are correct, and
+      // a presentation delay does not help. Resigning and re-becoming first responder
+      // rebuilds the insertion indicator in the normal state so the caret blinks.
       NSTimer* focusTimer =
           [NSTimer timerWithTimeInterval:0
                                  repeats:NO
                                    block:^(NSTimer* _Nonnull timer) {
+                                     [alert.window makeFirstResponder:justificationField];
+                                     [alert.window makeFirstResponder:nil];
                                      [alert.window makeFirstResponder:justificationField];
                                    }];
       [[NSRunLoop currentRunLoop] addTimer:focusTimer forMode:NSModalPanelRunLoopMode];
