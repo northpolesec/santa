@@ -403,6 +403,7 @@ objc_library(
     deps = [
         ":SNTPolicyProcessor",
         "//Source/common:MOLCodesignChecker",
+        "//Source/common:SNTLogging",
         "//Source/common:SigningIDHelpers",
         "//Source/common:String",
         "//Source/common/cel:CEL",

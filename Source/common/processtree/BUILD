@@ -65,6 +65,7 @@ objc_library(
     ],
     deps = [
         ":process_tree",
+        "//Source/common:SNTLogging",
         "//Source/common:String",
         "//Source/common/es:EndpointSecurityAPI",
         "//Source/common/es:EndpointSecurityMessage",

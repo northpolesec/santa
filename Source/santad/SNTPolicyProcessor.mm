@@ -78,6 +78,7 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
     std::shared_ptr<::google::api::expr::runtime::CelExpression> expression;
     NSString* customMsg;
     NSString* customURL;
+    NSString* celExpr;  // [CELFALLBACK] DEBUG-ONLY: source text kept for logging.
   };
   std::vector<CompiledFallbackRule> celFallbackRules_;
 }
@@ -163,7 +164,7 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
     auto result =
         celEvaluatorV2_->Compile(santa::NSStringToUTF8StringView(rule.celExpr), arena.get());
     if (result.ok()) {
-      compiled.push_back({std::move(*result), rule.customMsg, rule.customURL});
+      compiled.push_back({std::move(*result), rule.customMsg, rule.customURL, rule.celExpr});
     } else {
       LOGE(@"Failed to compile CEL fallback expression '%@': %s", rule.celExpr,
            std::string(result.status().message()).c_str());
@@ -185,6 +186,16 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
 
 - (BOOL)evaluateCELFallbackExpressions:(SNTCachedDecision*)cd
                     activationCallback:(ActivationCallbackBlock)activationCallback {
+  // [CELFALLBACK] DEBUG-ONLY: thin wrapper preserving the 2-arg selector used by
+  // the tests; the real work threads the binary path for logging.
+  return [self evaluateCELFallbackExpressions:cd
+                           activationCallback:activationCallback
+                                   binaryPath:nil];
+}
+
+- (BOOL)evaluateCELFallbackExpressions:(SNTCachedDecision*)cd
+                    activationCallback:(ActivationCallbackBlock)activationCallback
+                            binaryPath:(NSString*)binaryPath {
   if (!celEvaluatorV2_ || !activationCallback) {
     return NO;
   }
@@ -218,8 +229,19 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
 
     if (!celResult.succeeded) {
       if (celResult.decisionMade) {
+        // [CELFALLBACK] DEBUG-ONLY INSTRUMENTATION (revert before merge).
+        LOGW(@"[CELFALLBACK] path=%@ sha256=%@ rule[%zu] expr={%@}: eval failed, fail-closed "
+             @"decision made (decision=%ld)",
+             binaryPath, cd.sha256, i, rules[i].celExpr, (long)cd.decision);
         return YES;
       }
+      // [CELFALLBACK] Rule produced no decision (UNSPECIFIED) — fall through to
+      // the next rule. This is the branch the reporter's `ancestors.size() > 0`
+      // rule takes; pair it with the immediately-preceding [CELANCESTRY] line
+      // for the same exec.
+      LOGW(@"[CELFALLBACK] path=%@ sha256=%@ rule[%zu] expr={%@}: no decision (UNSPECIFIED / fell "
+           @"through)",
+           binaryPath, cd.sha256, i, rules[i].celExpr);
       continue;
     }
 
@@ -229,9 +251,18 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
                       : SNTEventStateBlockCELFallback;
     cd.customMsg = rules[i].customMsg;
     cd.customURL = rules[i].customURL;
+    // [CELFALLBACK] Rule matched — report the resolved state and decision.
+    LOGW(@"[CELFALLBACK] path=%@ sha256=%@ rule[%zu] expr={%@}: MATCHED resultState=%ld -> "
+         @"decision=%ld auditReturn=%d cacheable=%d",
+         binaryPath, cd.sha256, i, rules[i].celExpr, (long)celResult.resultState,
+         (long)cd.decision, cd.auditReturn ? 1 : 0, cd.cacheable ? 1 : 0);
     return YES;
   }
 
+  // [CELFALLBACK] Every fallback rule fell through; the caller continues to
+  // scope/clientMode handling (e.g. monitor-mode ALLOW_UNKNOWN).
+  LOGW(@"[CELFALLBACK] path=%@ sha256=%@: all %zu fallback rule(s) fell through (no match)",
+       binaryPath, cd.sha256, rules.size());
   return NO;
 }
 
@@ -629,7 +660,9 @@ static void UpdateCachedDecisionSigningInfo(
     return cd;
   }
 
-  if ([self evaluateCELFallbackExpressions:cd activationCallback:activationCallback]) {
+  if ([self evaluateCELFallbackExpressions:cd
+                        activationCallback:activationCallback
+                                binaryPath:fileInfo.path]) {
     return cd;
   }
 

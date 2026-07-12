@@ -23,6 +23,7 @@
 #include <vector>
 
 #import "Source/common/MOLCodesignChecker.h"
+#import "Source/common/SNTLogging.h"
 #import "Source/common/SigningIDHelpers.h"
 #include "Source/common/String.h"
 #include "Source/common/cel/Activation.h"
@@ -41,20 +42,52 @@ template <>
 std::vector<santa::cel::CELProtoTraits<true>::AncestorT> Ancestors<true>(
     const std::shared_ptr<santa::santad::process_tree::ProcessTree>& processTree,
     const santa::Message& esMsg) {
-  if (!processTree) return {};
+  namespace pt = santa::santad::process_tree;
+
+  // [CELANCESTRY] DEBUG-ONLY INSTRUMENTATION (revert before merge).
+  // Identify the exec being evaluated so log lines can be correlated with a
+  // specific probe. CEL activations are only built for AUTH_EXEC, so the exec
+  // union is valid here.
+  const char* targetPath = (esMsg->event.exec.target && esMsg->event.exec.target->executable)
+                               ? esMsg->event.exec.target->executable->path.data
+                               : "?";
+  pid_t execingPid = pt::PidFromAuditToken(esMsg->process->audit_token).pid;
+
+  if (!processTree) {
+    LOGW(@"[CELANCESTRY] target=%s execing_pid=%d: EMPTY (processTree is null)", targetPath,
+         execingPid);
+    return {};
+  }
 
   using Traits = santa::cel::CELProtoTraits<true>;
   using AncestorT = typename Traits::AncestorT;
 
-  auto pid = santa::santad::process_tree::PidFromAuditToken(esMsg->process->parent_audit_token);
+  auto pid = pt::PidFromAuditToken(esMsg->process->parent_audit_token);
   auto proc = processTree->Get(pid);
   if (!proc) {
+    // [CELANCESTRY] The parent could not be resolved. Distinguish "pid absent
+    // entirely" from "pid present under a different pidversion" — the latter
+    // would indict lookup/pidversion handling rather than a population gap.
+    bool samePidOtherVer = false;
+    uint64_t otherVer = 0;
+    processTree->Iterate([&](std::shared_ptr<const pt::Process> p) {
+      if (!samePidOtherVer && p->pid_.pid == pid.pid) {
+        samePidOtherVer = true;
+        otherVer = p->pid_.pidversion;
+      }
+    });
+    LOGW(@"[CELANCESTRY] target=%s execing_pid=%d: EMPTY — parent pid=%d pidver=%llu NOT resolved "
+         @"by Get(); same_pid_different_pidver=%d other_pidver=%llu",
+         targetPath, execingPid, pid.pid, (unsigned long long)pid.pidversion, samePidOtherVer,
+         (unsigned long long)otherVer);
     return {};
   }
 
   std::vector<santa::cel::CELProtoTraits<true>::AncestorT> ancestors;
+  int skippedNullProgram = 0;
   for (const auto& p : processTree->RootSlice(*proc)) {
     if (!p->program_) {
+      skippedNullProgram++;
       continue;
     }
 
@@ -77,6 +110,11 @@ std::vector<santa::cel::CELProtoTraits<true>::AncestorT> Ancestors<true>(
 
     ancestors.push_back(std::move(ancestor));
   }
+  // [CELANCESTRY] Success path: report how the walk turned out.
+  LOGW(@"[CELANCESTRY] target=%s execing_pid=%d: parent pid=%d pidver=%llu resolved; built %zu "
+       @"ancestors (skipped %d null-program)",
+       targetPath, execingPid, pid.pid, (unsigned long long)pid.pidversion, ancestors.size(),
+       skippedNullProgram);
   return ancestors;
 }
 

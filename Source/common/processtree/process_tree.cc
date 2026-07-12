@@ -15,6 +15,7 @@
 
 #include "Source/common/processtree/process_tree.h"
 
+#include <mach/mach_time.h>
 #include <sys/types.h>
 
 #include <algorithm>
@@ -37,6 +38,19 @@
 #include "absl/synchronization/mutex.h"
 
 namespace santa::santad::process_tree {
+
+namespace {
+// Convert nanoseconds to mach_time ticks (inverse of mach_time's numer/denom).
+uint64_t MachTicksFromNanos(uint64_t nanos) {
+  static const mach_timebase_info_data_t timebase = [] {
+    mach_timebase_info_data_t tb;
+    mach_timebase_info(&tb);
+    return tb;
+  }();
+  // Safe from overflow for the grace-scale magnitudes used here.
+  return nanos * timebase.denom / timebase.numer;
+}
+}  // namespace
 
 void ProcessTree::BackfillInsertChildren(
     absl::flat_hash_map<pid_t, std::vector<BackfilledProcess>>& parent_map,
@@ -71,79 +85,128 @@ void ProcessTree::BackfillInsertChildren(
 
 void ProcessTree::HandleFork(uint64_t timestamp, const Process& parent,
                              const Pid new_pid) {
-  if (Step(timestamp)) {
-    std::shared_ptr<Process> child;
-    {
-      absl::MutexLock lock(mtx_);
-      child = std::make_shared<Process>(new_pid, parent.effective_cred_,
-                                        parent.program_, map_[parent.pid_]);
-      map_.emplace(new_pid, child);
+  std::shared_ptr<Process> child;
+  {
+    // Dedup and the map insert are one critical section: if we released the
+    // lock between them, another client could see this event as a duplicate
+    // (skip it) and then read the tree before the child was inserted.
+    absl::MutexLock lock(mtx_);
+    if (!StepLocked({timestamp, EventKind::kFork, parent.pid_, new_pid})) {
+      return;
     }
-    for (const auto& annotator : annotators_) {
-      annotator->AnnotateFork(*this, parent, *child);
+    // Test seam (no-op in production): the claim just succeeded and mtx_ is
+    // still held; fire here, BEFORE the insert, so the concurrency test can
+    // verify a reader blocks at this boundary — i.e. claim and insert are a
+    // single lock hold. Placed in the handler (not StepLocked) on purpose: if
+    // the insert were ever moved to a separate critical section, this point
+    // would fall in the unlocked gap and the test would deterministically fail.
+    if (on_event_claimed_for_test_) {
+      on_event_claimed_for_test_();
     }
+    // Look up the parent rather than using map_[]: operator[] would insert a
+    // null entry (and orphan the child) if the parent were ever absent.
+    auto parent_proc = GetLocked(parent.pid_);
+    child = std::make_shared<Process>(new_pid, parent.effective_cred_,
+                                      parent.program_,
+                                      parent_proc ? *parent_proc : nullptr);
+    map_.emplace(new_pid, child);
+    // Reap AFTER applying, so a late event can never reap the actor it needs.
+    DrainRemovals();
+  }
+  // Annotators run outside the lock (they re-enter the tree). Annotation
+  // propagation is therefore NOT atomic with the structural insert above; that
+  // is intentional and does not affect CEL ancestry (see StepLocked).
+  for (const auto& annotator : annotators_) {
+    annotator->AnnotateFork(*this, parent, *child);
   }
 }
 
 void ProcessTree::HandleExec(uint64_t timestamp, const Process& p,
                              const Pid new_pid, const Program prog,
                              const Cred c) {
-  if (Step(timestamp)) {
-    // TODO(nickmg): should struct pid be reworked and only pid_version be
-    // passed?
-    assert(new_pid.pid == p.pid_.pid);
+  // TODO(nickmg): should struct pid be reworked and only pid_version be passed?
+  assert(new_pid.pid == p.pid_.pid);
 
-    auto new_proc = std::make_shared<Process>(
-        new_pid, c, std::make_shared<const Program>(prog), p.parent_);
-    {
-      absl::MutexLock lock(mtx_);
-      remove_at_.push_back({timestamp, p.pid_});
-      map_.emplace(new_proc->pid_, new_proc);
+  // Expected double-apply: a tree-aware auth client (the Authorizer) subscribes
+  // to both AUTH_EXEC and NOTIFY_EXEC, so an uncached exec reaches here twice.
+  // The two ES messages carry different mach_time, so they form distinct
+  // EventKeys and both pass dedup; the second is a first-wins no-op (the
+  // map_.emplace below). This is intentional and benign — it costs one extra
+  // emplace/remove_at_/drain on the auth path per uncached exec (accepted).
+
+  // Construct the new process (copies program/args/signing) OUTSIDE the lock to
+  // keep the shared tree lock short on the serial ES handler path. A duplicate
+  // wastes this allocation, which is cheaper than lengthening the lock hold.
+  auto new_proc = std::make_shared<Process>(
+      new_pid, c, std::make_shared<const Program>(prog), p.parent_);
+  {
+    absl::MutexLock lock(mtx_);
+    if (!StepLocked({timestamp, EventKind::kExec, p.pid_, new_pid})) {
+      return;
     }
-    for (const auto& annotator : annotators_) {
-      annotator->AnnotateExec(*this, p, *new_proc);
-    }
+    remove_at_.push_back({timestamp, p.pid_});
+    map_.emplace(new_proc->pid_, new_proc);
+    DrainRemovals();
+  }
+  for (const auto& annotator : annotators_) {
+    annotator->AnnotateExec(*this, p, *new_proc);
   }
 }
 
 void ProcessTree::HandleExit(uint64_t timestamp, const Process& p) {
-  if (Step(timestamp)) {
-    absl::MutexLock lock(mtx_);
-    remove_at_.push_back({timestamp, p.pid_});
+  absl::MutexLock lock(mtx_);
+  if (!StepLocked({timestamp, EventKind::kExit, p.pid_, Pid{}})) {
+    return;
   }
+  remove_at_.push_back({timestamp, p.pid_});
+  DrainRemovals();
 }
 
-bool ProcessTree::Step(uint64_t timestamp) {
-  absl::MutexLock lock(mtx_);
-  uint64_t new_cutoff = seen_timestamps_.front();
-  if (timestamp < new_cutoff) {
-    // Event timestamp is before the rolling list of seen events.
-    // This event may or may not have been processed, but be conservative and
-    // do not reprocess.
+bool ProcessTree::StepLocked(const EventKey& key) {
+  latest_ts_ = std::max(latest_ts_, key.mach_time);
+
+  // Dedup on the event's identity: the same kernel event is delivered to every
+  // tree-aware client, and each informs the tree, so apply it exactly once. A
+  // genuinely-novel event that arrives out of mach_time order is NEVER dropped
+  // (this is the fix for the "too-old" drop that lost reordered fork/exec events
+  // under load); only an exact duplicate is skipped. The key carries the event's
+  // identity, not just mach_time, so two distinct events sharing a coarse
+  // mach_time stamp are not mistaken for one and dropped.
+  if (seen_.contains(key)) {
     return false;
   }
-
-  // seen_timestamps_ is sorted, so only look for the value if it's possibly
-  // within the array.
-  if (timestamp < seen_timestamps_.back()) {
-    // TODO(nickmg): If array is made bigger, replace with a binary search.
-    for (const auto seen_ts : seen_timestamps_) {
-      if (seen_ts == timestamp) {
-        // Event seen, signal it should not be reprocessed.
-        return false;
-      }
-    }
+  seen_.insert(key);
+  seen_order_.push_back(key);
+  if (seen_order_.size() > kSeenCap) {
+    // seen_/seen_order_ are bounded ONLY here — DrainRemovals never touches
+    // them. So the dedup window is exactly the last kSeenCap events: steady
+    // state is kSeenCap and this evicts on every insert after warmup. A client
+    // lagging more than kSeenCap events behind the newest event finds its
+    // duplicates already evicted and re-applies them. That is self-healing in
+    // the common case (map_.emplace is first-wins, and a laggard replays a
+    // whole lifecycle so re-created nodes are re-reaped by its own replayed
+    // exec/exit), with one accepted edge: if a fork duplicate has aged out
+    // while its matching exec duplicate has not, the re-inserted pre-exec node
+    // never gets a removal scheduled and leaks (pidversion-distinct, bounded;
+    // NOT wrong ancestry). The proper fix is the deferred delivery watermark;
+    // kSeenCap (16384) is sized so lag beyond it is rare under real load.
+    seen_.erase(seen_order_.front());
+    seen_order_.pop_front();
   }
+  return true;
+}
 
-  auto insert_point =
-      std::find_if(seen_timestamps_.rbegin(), seen_timestamps_.rend(),
-                   [&](uint64_t x) { return x < timestamp; });
-  std::move(seen_timestamps_.begin() + 1, insert_point.base(),
-            seen_timestamps_.begin());
-  *insert_point = timestamp;
+void ProcessTree::DrainRemovals() {
+  // Reap deferred removals once `grace` mach_time ticks have elapsed past the
+  // scheduling event (measured against the newest timestamp seen). The grace
+  // must comfortably exceed worst-case cross-thread/-client delivery reordering
+  // so a straggler cannot reference a process after it is reaped.
+  static const uint64_t kDefaultGrace = MachTicksFromNanos(5000000000ull);  // 5s
+  const uint64_t grace = removal_grace_ticks_ ? removal_grace_ticks_ : kDefaultGrace;
+  const uint64_t cutoff = latest_ts_ > grace ? latest_ts_ - grace : 0;
 
   for (auto it = remove_at_.begin(); it != remove_at_.end();) {
-    if (it->first < new_cutoff) {
+    if (it->first < cutoff) {
       if (auto target = GetLocked(it->second);
           target && (*target)->refcnt_.load(std::memory_order_relaxed) > 0) {
         (*target)->tombstoned_ = true;
@@ -155,8 +218,6 @@ bool ProcessTree::Step(uint64_t timestamp) {
       it++;
     }
   }
-
-  return true;
 }
 
 void ProcessTree::RetainProcess(const PidList& pids) {

@@ -20,6 +20,7 @@
 #include <Kernel/kern/cs_blobs.h>
 #include <bsm/libbsm.h>
 
+#include "Source/common/SNTLogging.h"
 #include "Source/common/String.h"
 #include "Source/common/es/EndpointSecurityAPI.h"
 #include "Source/common/es/Message.h"
@@ -37,6 +38,18 @@ void InformFromESEvent(ProcessTree& tree, const Message& msg) {
   auto proc = tree.Get(event_pid);
 
   if (!proc) {
+    // [CELANCESTRY-DROP] DEBUG-ONLY INSTRUMENTATION (revert before merge).
+    // The acting process isn't in the tree, so this lifecycle event is dropped
+    // and any process it would create/transform never gets tracked. Log EXEC
+    // drops (they carry a target path, so they're greppable) to catch the
+    // "java server exec was dropped -> server never tracked" signature.
+    if (msg->event_type == ES_EVENT_TYPE_NOTIFY_EXEC ||
+        msg->event_type == ES_EVENT_TYPE_AUTH_EXEC) {
+      const es_process_t* t = msg->event.exec.target;
+      LOGW(@"[CELANCESTRY-DROP] exec dropped: execing pid=%d pidver=%llu not in tree; target=%s",
+           event_pid.pid, (unsigned long long)event_pid.pidversion,
+           (t && t->executable) ? t->executable->path.data : "?");
+    }
     return;
   }
 
