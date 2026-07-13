@@ -16,7 +16,9 @@
 #ifndef SANTA_COMMON_PROCESSTREE_PROCESSTREETESTHELPERS_H
 #define SANTA_COMMON_PROCESSTREE_PROCESSTREETESTHELPERS_H
 
+#include <functional>
 #include <memory>
+#include <utility>
 
 #include "Source/common/processtree/process_tree.h"
 
@@ -25,9 +27,16 @@ namespace santa::santad::process_tree {
 class ProcessTreeTestPeer : public ProcessTree {
  public:
   explicit ProcessTreeTestPeer(
-      std::vector<std::unique_ptr<Annotator>>&& annotators)
-      : ProcessTree(std::move(annotators)) {}
+      std::vector<std::unique_ptr<Annotator>>&& annotators,
+      uint64_t removal_grace_ticks = 0)
+      : ProcessTree(std::move(annotators), removal_grace_ticks) {}
   std::shared_ptr<const Process> InsertInit();
+
+  // Install the StepLocked test seam (ProcessTreeTestPeer is a friend of
+  // ProcessTree, so it can reach the private member).
+  void SetOnEventClaimedForTest(std::function<void()> hook) {
+    on_event_claimed_for_test_ = std::move(hook);
+  }
 };
 
 }  // namespace santa::santad::process_tree

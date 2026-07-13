@@ -61,8 +61,16 @@ using santa::Processor;
     eventsWithLifecycle.insert(ES_EVENT_TYPE_NOTIFY_FORK);
     _addedEvents[ES_EVENT_TYPE_NOTIFY_FORK] = true;
   }
-  if (events.find(ES_EVENT_TYPE_NOTIFY_EXEC) == events.end() &&
-      events.find(ES_EVENT_TYPE_AUTH_EXEC) == events.end()) {
+  // NOTIFY_EXEC is required for complete tree population even when the client
+  // already subscribes to AUTH_EXEC. ES suppresses AUTH_EXEC delivery for a
+  // binary whose auth result is cached at the ES layer, so an AUTH_EXEC-only
+  // feed silently misses every exec of a cached binary (e.g. a long-lived
+  // build server) — leaving holes in the tree and, because a fork whose actor
+  // is absent is dropped, whole missing subtrees. NOTIFY_EXEC is not
+  // cache-suppressed, so subscribing to it guarantees the client sees every
+  // exec in its own (causally-ordered) stream. It is consumed for tree
+  // population and filtered out before the client's own message handling.
+  if (events.find(ES_EVENT_TYPE_NOTIFY_EXEC) == events.end()) {
     eventsWithLifecycle.insert(ES_EVENT_TYPE_NOTIFY_EXEC);
     _addedEvents[ES_EVENT_TYPE_NOTIFY_EXEC] = true;
   }

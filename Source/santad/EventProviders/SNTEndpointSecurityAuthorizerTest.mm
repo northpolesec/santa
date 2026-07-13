@@ -103,12 +103,16 @@ class MockAuthResultCache : public AuthResultCache {
 - (void)testEnable {
   // Ensure the client subscribes to expected event types. As a tree-aware
   // client, the authorizer additionally subscribes to the process-tree
-  // lifecycle events (NOTIFY_FORK and NOTIFY_EXIT) so the tree stays consistent
-  // for the lineage of processes it authorizes. NOTIFY_EXEC is not added because
-  // AUTH_EXEC already supplies exec info to the tree.
-  std::set<es_event_type_t> expectedEventSubs{ES_EVENT_TYPE_AUTH_EXEC,
-                                              ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME,
-                                              ES_EVENT_TYPE_NOTIFY_FORK, ES_EVENT_TYPE_NOTIFY_EXIT};
+  // lifecycle events (NOTIFY_FORK, NOTIFY_EXEC, NOTIFY_EXIT) so the tree stays
+  // consistent for the lineage of processes it authorizes. NOTIFY_EXEC is
+  // required even though the authorizer sees AUTH_EXEC: ES suppresses AUTH_EXEC
+  // delivery for binaries whose auth result is cached, so relying on AUTH_EXEC
+  // alone would miss cached execs (e.g. a long-lived build server) from the
+  // tree. The force-added NOTIFY_EXEC feeds the tree and is filtered out before
+  // the authorizer's own message handling.
+  std::set<es_event_type_t> expectedEventSubs{
+      ES_EVENT_TYPE_AUTH_EXEC, ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME, ES_EVENT_TYPE_NOTIFY_FORK,
+      ES_EVENT_TYPE_NOTIFY_EXEC, ES_EVENT_TYPE_NOTIFY_EXIT};
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   mockESApi->SetExpectationsESNewClient();
 

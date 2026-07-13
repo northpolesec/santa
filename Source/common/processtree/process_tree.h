@@ -16,12 +16,16 @@
 #ifndef SANTA_COMMON_PROCESSTREE_PROCESSTREE_H
 #define SANTA_COMMON_PROCESSTREE_PROCESSTREE_H
 
+#include <cstdint>
+#include <deque>
+#include <functional>
 #include <memory>
 #include <typeinfo>
 #include <vector>
 
 #include "Source/common/processtree/process.h"
 #include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
 #include "absl/container/inlined_vector.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
@@ -40,8 +44,10 @@ class ProcessTreeTestPeer;
 
 class ProcessTree {
  public:
-  explicit ProcessTree(std::vector<std::unique_ptr<Annotator>>&& annotators)
-      : annotators_(std::move(annotators)), seen_timestamps_({}) {}
+  explicit ProcessTree(std::vector<std::unique_ptr<Annotator>>&& annotators,
+                       uint64_t removal_grace_ticks = 0)
+      : annotators_(std::move(annotators)),
+        removal_grace_ticks_(removal_grace_ticks) {}
   ProcessTree(const ProcessTree&) = delete;
   ProcessTree& operator=(const ProcessTree&) = delete;
   ProcessTree(ProcessTree&&) = delete;
@@ -121,10 +127,29 @@ class ProcessTree {
       std::shared_ptr<Process> parent,
       const BackfilledProcess& backfilled_proc);
 
-  // Mark that an event with the given timestamp is being processed.
-  // Returns whether the given timestamp is "novel", and the tree should be
-  // updated with the results of the event.
-  bool Step(uint64_t timestamp);
+  // Record that the event identified by `key` is being processed and report
+  // whether it is "novel" (caller should apply it). A novel event is applied
+  // even if it arrives out of mach_time order (ES does not guarantee global
+  // ordering); only an exact duplicate (the same event redelivered to another
+  // client) is skipped. The key includes the event's identity (not just
+  // mach_time) so two distinct events sharing a coarse mach_time stamp are not
+  // mistaken for one.
+  //
+  // MUST be called with mtx_ held, and the caller MUST perform the resulting
+  // map_/remove_at_ mutation before releasing mtx_. Dedup and mutation are one
+  // atomic step on purpose: the same kernel event is delivered to multiple
+  // clients, and once one client records it as seen, another client will skip
+  // it as a duplicate — so the tree mutation must already be visible when that
+  // skip happens, or the second client (and its subsequent causal reads) would
+  // observe a missing node. "Applied" here means the tree *structure* (the
+  // map_ entry and parent_ chain that CEL ancestry walks); annotation
+  // propagation runs outside the lock and is NOT part of this atomicity
+  // guarantee (see HandleFork/HandleExec).
+  bool StepLocked(const struct EventKey& key)
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mtx_);
+
+  // Reap deferred removals whose grace has elapsed. Caller must hold mtx_.
+  void DrainRemovals() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mtx_);
 
   std::optional<std::shared_ptr<Process>> GetLocked(struct Pid target) const
       ABSL_SHARED_LOCKS_REQUIRED(mtx_);
@@ -136,15 +161,37 @@ class ProcessTree {
   mutable absl::Mutex mtx_;
   absl::flat_hash_map<const struct Pid, std::shared_ptr<Process>> map_
       ABSL_GUARDED_BY(mtx_);
-  // List of pids which should be removed from map_, and at the timestamp at
-  // which they should be.
-  // Elements are removed when the timestamp falls out of the seen_timestamps_
-  // list below, signifying that all clients have synced past the timestamp.
+  // List of pids which should be removed from map_, and the timestamp (the
+  // originating exit/exec event's mach_time) at which the removal was
+  // scheduled. An entry is reaped once removal_grace_ticks_ have elapsed past
+  // its timestamp (measured against latest_ts_), so a reordered straggler
+  // cannot reference a process after it is reaped. See DrainRemovals().
   std::vector<std::pair<uint64_t, struct Pid>> remove_at_ ABSL_GUARDED_BY(mtx_);
-  // Rolling list of event timestamps processed by the tree.
-  // This is used to ensure an event only gets processed once, even if events
-  // come out of order.
-  std::array<uint64_t, 32> seen_timestamps_ ABSL_GUARDED_BY(mtx_);
+
+  // Dedup of processed events. The same kernel event is delivered to every
+  // tree-aware client; each informs the tree, so an event must be applied
+  // exactly once. seen_ answers "already applied?" in O(1); seen_order_ ages
+  // entries out in insertion order once seen_ exceeds kSeenCap. Unlike the
+  // previous fixed rolling window, an out-of-order novel event is NEVER
+  // dropped. Keyed on the full EventKey so distinct events sharing a coarse
+  // mach_time stamp do not collide (see EventKey).
+  static constexpr size_t kSeenCap = 16384;
+  absl::flat_hash_set<struct EventKey> seen_ ABSL_GUARDED_BY(mtx_);
+  std::deque<struct EventKey> seen_order_ ABSL_GUARDED_BY(mtx_);
+  // Newest event timestamp seen (monotone); drives the removal grace cutoff.
+  uint64_t latest_ts_ ABSL_GUARDED_BY(mtx_) = 0;
+  // Mach-time ticks an exited process is retained after its removal is
+  // scheduled. 0 => production default (~5 s), computed lazily in
+  // DrainRemovals. Injectable so tests can exercise reaping with small
+  // synthetic timestamps.
+  uint64_t removal_grace_ticks_;
+
+  // Test-only seam (empty in production): invoked by HandleFork at the
+  // claim->apply boundary — after StepLocked reports the event novel and while
+  // mtx_ is still held, just before the map insert. Lets the concurrency
+  // regression test interpose there. Set via ProcessTreeTestPeer (a friend).
+  // The per-event null check is negligible.
+  std::function<void()> on_event_claimed_for_test_;
 };
 
 template <typename T>
