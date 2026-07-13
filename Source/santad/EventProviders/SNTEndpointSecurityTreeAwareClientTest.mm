@@ -70,7 +70,11 @@ using santa::Processor;
   XCTAssertFalse([treeClient eventWasAdded:ES_EVENT_TYPE_NOTIFY_EXEC]);
   XCTAssertTrue([treeClient eventWasAdded:ES_EVENT_TYPE_NOTIFY_EXIT]);
 
-  // EXEC event is not forced for both AUTH and NOTIFY variants
+  // A client subscribing to AUTH_EXEC still gets NOTIFY_EXEC force-added: ES
+  // suppresses AUTH_EXEC delivery for binaries whose auth result is cached, so
+  // AUTH_EXEC alone would miss those (cached) execs from the tree. NOTIFY_EXEC
+  // is not cache-suppressed. The force-added NOTIFY_EXEC feeds the tree and is
+  // filtered out before the client's own message handling.
   treeClient = [[SNTEndpointSecurityTreeAwareClient alloc] initWithESAPI:mockESApi
                                                                  metrics:nullptr
                                                                processor:Processor::kUnknown
@@ -78,7 +82,7 @@ using santa::Processor;
   [treeClient subscribe:{ES_EVENT_TYPE_AUTH_EXEC}];
 
   XCTAssertTrue([treeClient eventWasAdded:ES_EVENT_TYPE_NOTIFY_FORK]);
-  XCTAssertFalse([treeClient eventWasAdded:ES_EVENT_TYPE_NOTIFY_EXEC]);
+  XCTAssertTrue([treeClient eventWasAdded:ES_EVENT_TYPE_NOTIFY_EXEC]);
   XCTAssertTrue([treeClient eventWasAdded:ES_EVENT_TYPE_NOTIFY_EXIT]);
 
   XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());

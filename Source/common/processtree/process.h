@@ -48,6 +48,32 @@ H AbslHashValue(H h, const struct Pid& p) {
   return H::combine(std::move(h), p.pid, p.pidversion);
 }
 
+enum class EventKind : uint32_t { kFork, kExec, kExit };
+
+// Identity of a tree-mutating event, used to dedup redelivery across clients.
+// Keying on the full identity (not bare mach_time) is required because
+// mach_time has coarse (~41 ns) granularity on a system-wide counter, so two
+// distinct events on different cores can share a stamp; keying on mach_time
+// alone would silently drop one of them.
+struct EventKey {
+  uint64_t mach_time;
+  EventKind kind;
+  struct Pid actor;  // parent (fork) / execing proc (exec) / exiting proc (exit)
+  struct Pid other;  // child (fork) / target (exec) / {} for exit
+
+  friend bool operator==(const struct EventKey& lhs,
+                         const struct EventKey& rhs) {
+    return lhs.mach_time == rhs.mach_time && lhs.kind == rhs.kind &&
+           lhs.actor == rhs.actor && lhs.other == rhs.other;
+  }
+};
+
+template <typename H>
+H AbslHashValue(H h, const struct EventKey& k) {
+  return H::combine(std::move(h), k.mach_time, static_cast<uint32_t>(k.kind),
+                    k.actor, k.other);
+}
+
 struct Cred {
   uid_t uid;
   gid_t gid;
