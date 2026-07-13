@@ -58,8 +58,10 @@ enum class EventKind : uint32_t { kFork, kExec, kExit };
 struct EventKey {
   uint64_t mach_time;
   EventKind kind;
-  struct Pid actor;  // parent (fork) / execing proc (exec) / exiting proc (exit)
-  struct Pid other;  // child (fork) / target (exec) / {} for exit
+  // parent (fork) / execing proc (exec) / exiting proc (exit)
+  struct Pid actor;
+  // child (fork) / target (exec) / {} for exit
+  struct Pid other;
 
   friend bool operator==(const struct EventKey& lhs,
                          const struct EventKey& rhs) {

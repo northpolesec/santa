@@ -145,7 +145,8 @@ class ProcessTree {
   // map_ entry and parent_ chain that CEL ancestry walks); annotation
   // propagation runs outside the lock and is NOT part of this atomicity
   // guarantee (see HandleFork/HandleExec).
-  bool StepLocked(const struct EventKey& key) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mtx_);
+  bool StepLocked(const struct EventKey& key)
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mtx_);
 
   // Reap deferred removals whose grace has elapsed. Caller must hold mtx_.
   void DrainRemovals() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mtx_);
@@ -161,19 +162,19 @@ class ProcessTree {
   absl::flat_hash_map<const struct Pid, std::shared_ptr<Process>> map_
       ABSL_GUARDED_BY(mtx_);
   // List of pids which should be removed from map_, and the timestamp (the
-  // originating exit/exec event's mach_time) at which the removal was scheduled.
-  // An entry is reaped once removal_grace_ticks_ have elapsed past its timestamp
-  // (measured against latest_ts_), so a reordered straggler cannot reference a
-  // process after it is reaped. See DrainRemovals().
+  // originating exit/exec event's mach_time) at which the removal was
+  // scheduled. An entry is reaped once removal_grace_ticks_ have elapsed past
+  // its timestamp (measured against latest_ts_), so a reordered straggler
+  // cannot reference a process after it is reaped. See DrainRemovals().
   std::vector<std::pair<uint64_t, struct Pid>> remove_at_ ABSL_GUARDED_BY(mtx_);
 
   // Dedup of processed events. The same kernel event is delivered to every
   // tree-aware client; each informs the tree, so an event must be applied
   // exactly once. seen_ answers "already applied?" in O(1); seen_order_ ages
   // entries out in insertion order once seen_ exceeds kSeenCap. Unlike the
-  // previous fixed rolling window, an out-of-order novel event is NEVER dropped.
-  // Keyed on the full EventKey so distinct events sharing a coarse mach_time
-  // stamp do not collide (see EventKey).
+  // previous fixed rolling window, an out-of-order novel event is NEVER
+  // dropped. Keyed on the full EventKey so distinct events sharing a coarse
+  // mach_time stamp do not collide (see EventKey).
   static constexpr size_t kSeenCap = 16384;
   absl::flat_hash_set<struct EventKey> seen_ ABSL_GUARDED_BY(mtx_);
   std::deque<struct EventKey> seen_order_ ABSL_GUARDED_BY(mtx_);

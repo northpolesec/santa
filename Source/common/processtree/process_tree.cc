@@ -168,10 +168,10 @@ bool ProcessTree::StepLocked(const EventKey& key) {
   // Dedup on the event's identity: the same kernel event is delivered to every
   // tree-aware client, and each informs the tree, so apply it exactly once. A
   // genuinely-novel event that arrives out of mach_time order is NEVER dropped
-  // (this is the fix for the "too-old" drop that lost reordered fork/exec events
-  // under load); only an exact duplicate is skipped. The key carries the event's
-  // identity, not just mach_time, so two distinct events sharing a coarse
-  // mach_time stamp are not mistaken for one and dropped.
+  // (this is the fix for the "too-old" drop that lost reordered fork/exec
+  // events under load); only an exact duplicate is skipped. The key carries the
+  // event's identity, not just mach_time, so two distinct events sharing a
+  // coarse mach_time stamp are not mistaken for one and dropped.
   if (seen_.contains(key)) {
     return false;
   }
@@ -201,8 +201,9 @@ void ProcessTree::DrainRemovals() {
   // scheduling event (measured against the newest timestamp seen). The grace
   // must comfortably exceed worst-case cross-thread/-client delivery reordering
   // so a straggler cannot reference a process after it is reaped.
-  static const uint64_t kDefaultGrace = MachTicksFromNanos(5000000000ull);  // 5s
-  const uint64_t grace = removal_grace_ticks_ ? removal_grace_ticks_ : kDefaultGrace;
+  static const uint64_t kDefaultGrace = MachTicksFromNanos(5 * NSEC_PER_SEC);
+  const uint64_t grace =
+      removal_grace_ticks_ ? removal_grace_ticks_ : kDefaultGrace;
   const uint64_t cutoff = latest_ts_ > grace ? latest_ts_ - grace : 0;
 
   for (auto it = remove_at_.begin(); it != remove_at_.end();) {

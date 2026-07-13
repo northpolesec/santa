@@ -111,8 +111,8 @@ class MockAuthResultCache : public AuthResultCache {
   // tree. The force-added NOTIFY_EXEC feeds the tree and is filtered out before
   // the authorizer's own message handling.
   std::set<es_event_type_t> expectedEventSubs{
-      ES_EVENT_TYPE_AUTH_EXEC, ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME,
-      ES_EVENT_TYPE_NOTIFY_FORK, ES_EVENT_TYPE_NOTIFY_EXEC, ES_EVENT_TYPE_NOTIFY_EXIT};
+      ES_EVENT_TYPE_AUTH_EXEC, ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME, ES_EVENT_TYPE_NOTIFY_FORK,
+      ES_EVENT_TYPE_NOTIFY_EXEC, ES_EVENT_TYPE_NOTIFY_EXIT};
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   mockESApi->SetExpectationsESNewClient();
 
