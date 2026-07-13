@@ -192,13 +192,13 @@ absl::Status ProcessTree::Backfill() {
       // Determine ppid
       // Alternatively, there's a sysctl interface:
       //  https://chromium.googlesource.com/chromium/chromium/+/master/base/process_util_openbsd.cc#32
-      struct proc_bsdinfo bsdinfo;
-      if (proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &bsdinfo, sizeof(bsdinfo)) !=
-          PROC_PIDTBSDINFO_SIZE) {
+      struct proc_bsdshortinfo bsdinfo;
+      if (proc_pidinfo(pid, PROC_PIDT_SHORTBSDINFO, 0, &bsdinfo, sizeof(bsdinfo)) !=
+          PROC_PIDT_SHORTBSDINFO_SIZE) {
         continue;
       };
 
-      parent_map[bsdinfo.pbi_ppid].push_back(std::move(backfilled_proc));
+      parent_map[bsdinfo.pbsi_ppid].push_back(std::move(backfilled_proc));
     }
   }
 
