@@ -47,9 +47,11 @@
     rawJSONFormatter = [[SNTMetricRawJSONFormat alloc] init];
     monarchJSONFormatter = [[SNTMetricMonarchJSONFormat alloc] init];
 
+    SNTMetricHTTPWriter* httpWriter = [[SNTMetricHTTPWriter alloc] init];
     metricWriters = @{
       @"file" : [[SNTMetricFileWriter alloc] init],
-      @"http" : [[SNTMetricHTTPWriter alloc] init],
+      @"http" : httpWriter,
+      @"https" : httpWriter,
     };
 
     _queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_BACKGROUND, 0);
@@ -130,7 +132,7 @@
     return;
   }
 
-  const id writer = metricWriters[config.metricURL.scheme];
+  const id writer = metricWriters[config.metricURL.scheme.lowercaseString];
 
   if (writer) {
     BOOL ok = [writer write:formattedMetrics toURL:config.metricURL error:&err];
