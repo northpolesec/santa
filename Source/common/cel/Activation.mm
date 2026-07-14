@@ -163,25 +163,23 @@ std::optional<cel_runtime::CelValue> Activation<IsV2>::FindValue(
 
   // Handle the V2 specific fields
   if constexpr (IsV2) {
+    // The wrapped protos below are stored in the Memoizers, which guarantee
+    // reference stability for the lifetime of the activation. The activation
+    // outlives evaluation, so no arena copy is needed (same lifetime contract
+    // as `target` above).
     if (name == "ancestors") {
       // Convert ancestors to CEL list of proto messages
       std::vector<cel_runtime::CelValue> ancestorValues;
       for (const auto& ancestor : ancestors_()) {
-        // Create a copy of the proto on the arena and wrap it
-        auto* proto = arena->Create<AncestorT>(arena);
-        proto->CopyFrom(ancestor);
-        ancestorValues.push_back(cel_runtime::CelProtoWrapper::CreateMessage(proto, arena));
+        ancestorValues.push_back(cel_runtime::CelProtoWrapper::CreateMessage(&ancestor, arena));
       }
       return cel_runtime::CelValue::CreateList(
           arena->Create<cel_runtime::ContainerBackedListImpl>(arena, ancestorValues));
     }
     if (name == "fds") {
-      using FileDescriptorT = typename Traits::FileDescriptorT;
       std::vector<cel_runtime::CelValue> fdValues;
       for (const auto& fd : fds_()) {
-        auto* proto = arena->Create<FileDescriptorT>(arena);
-        proto->CopyFrom(fd);
-        fdValues.push_back(cel_runtime::CelProtoWrapper::CreateMessage(proto, arena));
+        fdValues.push_back(cel_runtime::CelProtoWrapper::CreateMessage(&fd, arena));
       }
       return cel_runtime::CelValue::CreateList(
           arena->Create<cel_runtime::ContainerBackedListImpl>(arena, fdValues));
