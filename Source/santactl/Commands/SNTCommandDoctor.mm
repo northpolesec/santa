@@ -89,10 +89,9 @@ static constexpr uint32_t CSR_ALLOW_UNRESTRICTED_NVRAM = (1u << 6);
 // bits are set, SIP is reported as fully disabled; any other non-zero configuration is reported as
 // partially disabled with the raw bitmask. This is a best-effort label; the raw csr_config_t value
 // shown to the user is authoritative.
-static constexpr uint32_t kSIPFullDisableMask = CSR_ALLOW_UNTRUSTED_KEXTS |
-                                                CSR_ALLOW_UNRESTRICTED_FS | CSR_ALLOW_TASK_FOR_PID |
-                                                CSR_ALLOW_UNRESTRICTED_DTRACE |
-                                                CSR_ALLOW_UNRESTRICTED_NVRAM;
+static constexpr uint32_t kSIPFullDisableMask =
+    CSR_ALLOW_UNTRUSTED_KEXTS | CSR_ALLOW_UNRESTRICTED_FS | CSR_ALLOW_TASK_FOR_PID |
+    CSR_ALLOW_UNRESTRICTED_DTRACE | CSR_ALLOW_UNRESTRICTED_NVRAM;
 
 typedef NS_ENUM(NSInteger, SNTDoctorSIPStatus) {
   SNTDoctorSIPStatusEnabled,
@@ -238,12 +237,8 @@ REGISTER_COMMAND_NAME(@"doctor")
 
   uint32_t status = [SNTSIPStatus currentStatus];
   switch (SNTDoctorClassifySIPStatus(status)) {
-    case SNTDoctorSIPStatusEnabled:
-      print(@"[+] System Integrity Protection is enabled");
-      break;
-    case SNTDoctorSIPStatusDisabled:
-      print(@"[-] System Integrity Protection is disabled");
-      break;
+    case SNTDoctorSIPStatusEnabled: print(@"[+] System Integrity Protection is enabled"); break;
+    case SNTDoctorSIPStatusDisabled: print(@"[-] System Integrity Protection is disabled"); break;
     case SNTDoctorSIPStatusPartiallyDisabled:
       print(@"[-] System Integrity Protection is partially disabled (0x%x)", status);
       break;
