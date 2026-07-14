@@ -306,3 +306,6 @@
 
 /* Reason shown when a natural admin requests elevation */
 "you are already an administrator" = "すでに管理者です";
+
+/* Notification shown when a temporary admin session ends and the user reverts to standard */
+"Switching to Standard User" = "標準ユーザーに切り替えます";

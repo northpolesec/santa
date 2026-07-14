@@ -306,3 +306,6 @@
 
 /* Reason shown when a natural admin requests elevation */
 "you are already an administrator" = "you are already an administrator";
+
+/* Notification shown when a temporary admin session ends and the user reverts to standard */
+"Switching to Standard User" = "Switching to Standard User";
