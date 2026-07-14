@@ -784,6 +784,11 @@ static NSString* const kNotificationSilencesKey = @"SilencedNotifications";
 
 - (void)leaveAdminMode {
   [self leaveModeForState:self.tamState];
+  [self notificationWithIdentifier:@"tam_leave_notification"
+                           andBody:NSLocalizedString(
+                                       @"Switching to Standard User",
+                                       @"Notification shown when a temporary admin "
+                                       @"session ends and the user reverts to standard")];
 }
 
 - (void)setTemporaryAdminModeAvailable:(BOOL)available {
