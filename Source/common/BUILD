@@ -248,6 +248,12 @@ objc_library(
     hdrs = ["Memoizer.h"],
 )
 
+santa_unit_test(
+    name = "MemoizerTest",
+    srcs = ["MemoizerTest.mm"],
+    deps = [":Memoizer"],
+)
+
 objc_library(
     name = "Platform",
     hdrs = ["Platform.h"],
@@ -1295,6 +1301,7 @@ test_suite(
         ":MOLCertificateTest",
         ":MOLCodesignCheckerTest",
         ":MOLXPCConnectionTest",
+        ":MemoizerTest",
         ":NKeyTokenValidatorTest",
         ":NSDataZlibTest",
         ":PowerMonitorTest",

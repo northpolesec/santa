@@ -974,6 +974,8 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
               AncestorT curl;
               curl.set_path("/usr/bin/curl");
+              curl.add_args("curl");
+              curl.add_args("-fsSL");
               curl.set_signing_id("platform:com.apple.curl");
               curl.set_team_id("");
               curl.set_cdhash("deadbeefdeadbeefdeadbeefdeadbeefdeadbeef");
@@ -1099,6 +1101,19 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   {
     SNTRule* r = createCELRule(
         @"ancestors.exists(a, a.cdhash == 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef')", true);
+    SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+    cd.sha256 = r.identifier;
+    [self.processor decision:cd
+                         forRule:r
+             withTransitiveRules:YES
+        andCELActivationCallback:activation];
+    XCTAssertEqual(cd.decision, SNTEventStateAllowBinary);
+    XCTAssertFalse(cd.cacheable);
+  }
+
+  // Test: Index into a repeated field nested within an ancestor (ancestors[0] is curl).
+  {
+    SNTRule* r = createCELRule(@"ancestors[0].args[1] == '-fsSL'", true);
     SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
     cd.sha256 = r.identifier;
     [self.processor decision:cd
