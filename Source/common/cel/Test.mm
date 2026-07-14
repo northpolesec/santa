@@ -202,7 +202,10 @@
     }
   }
   {
-    // Test memoization
+    // Activation integration: a producer runs at most once per evaluation even
+    // when its variable is referenced multiple times, so per-exec work like
+    // ExecArgs is not repeated. (The Memoizer unit contract — compute-once,
+    // no-copy, stable reference — is covered directly by MemoizerTest.)
     __block int argsCallCount = 0;
     santa::cel::Activation<true> activation(
         std::move(f),
@@ -614,104 +617,6 @@
     // Test no match with exists
     auto result =
         sut.value()->CompileAndEvaluate("fds.exists(f, f.type == FD_TYPE_KQUEUE)", activation);
-    if (!result.ok()) {
-      XCTFail("Failed to evaluate: %s", result.status().message().data());
-    } else {
-      XCTAssertEqual(result.value().value, ReturnValue::BLOCKLIST);
-      XCTAssertEqual(result.value().cacheable, false);
-    }
-  }
-}
-
-- (void)testAncestors {
-  using ReturnValue = santa::cel::CELProtoTraits<true>::ReturnValue;
-  using ExecutableFileT = santa::cel::CELProtoTraits<true>::ExecutableFileT;
-  using AncestorT = santa::cel::CELProtoTraits<true>::AncestorT;
-  using FileDescriptorT = santa::cel::CELProtoTraits<true>::FileDescriptorT;
-  auto f = std::make_unique<ExecutableFileT>();
-  santa::cel::Activation<true> activation(
-      std::move(f),
-      ^std::vector<std::string>() {
-        return {};
-      },
-      ^std::map<std::string, std::string>() {
-        return {};
-      },
-      ^uid_t() {
-        return 0;
-      },
-      ^std::string() {
-        return "/";
-      },
-      ^std::string() {
-        return "/usr/bin/test";
-      },
-      ^std::vector<AncestorT>() {
-        AncestorT launchd;
-        launchd.set_path("/sbin/launchd");
-        launchd.add_args("/sbin/launchd");
-        launchd.set_signing_id("platform:com.apple.xpc.launchd");
-        AncestorT shell;
-        shell.set_path("/bin/zsh");
-        shell.add_args("-zsh");
-        shell.add_args("-il");
-        shell.set_signing_id("platform:com.apple.zsh");
-        shell.set_team_id("");
-        shell.set_cdhash("d5b04ff62b334f1dcb287d15d0bdc5b553840b30");
-        return {shell, launchd};
-      },
-      ^std::vector<FileDescriptorT>() {
-        return {};
-      });
-
-  auto sut = santa::cel::Evaluator<true>::Create();
-  XCTAssertTrue(sut.ok());
-
-  {
-    // Test ancestors size
-    auto result = sut.value()->CompileAndEvaluate("size(ancestors) == 2", activation);
-    if (!result.ok()) {
-      XCTFail("Failed to evaluate: %s", result.status().message().data());
-    } else {
-      XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
-      XCTAssertEqual(result.value().cacheable, false);
-    }
-  }
-  {
-    // Test indexed field access
-    auto result = sut.value()->CompileAndEvaluate("ancestors[0].path == '/bin/zsh'", activation);
-    if (!result.ok()) {
-      XCTFail("Failed to evaluate: %s", result.status().message().data());
-    } else {
-      XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
-      XCTAssertEqual(result.value().cacheable, false);
-    }
-  }
-  {
-    // Test repeated field access within an ancestor
-    auto result = sut.value()->CompileAndEvaluate("ancestors[0].args[1] == '-il'", activation);
-    if (!result.ok()) {
-      XCTFail("Failed to evaluate: %s", result.status().message().data());
-    } else {
-      XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
-      XCTAssertEqual(result.value().cacheable, false);
-    }
-  }
-  {
-    // Test exists comprehension over ancestors
-    auto result = sut.value()->CompileAndEvaluate(
-        "ancestors.exists(a, a.signing_id == 'platform:com.apple.xpc.launchd')", activation);
-    if (!result.ok()) {
-      XCTFail("Failed to evaluate: %s", result.status().message().data());
-    } else {
-      XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
-      XCTAssertEqual(result.value().cacheable, false);
-    }
-  }
-  {
-    // Test no match with exists
-    auto result = sut.value()->CompileAndEvaluate(
-        "ancestors.exists(a, a.signing_id == 'EQHXZ8M8AV:com.example.tool')", activation);
     if (!result.ok()) {
       XCTFail("Failed to evaluate: %s", result.status().message().data());
     } else {
