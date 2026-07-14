@@ -22,24 +22,34 @@ namespace santa {
 
 // Memoizer is a template class that memoizes the result of a function call that
 // requires no arguments, to avoid expensive recalculations.
+//
+// Not thread-safe: a given instance must only be accessed from one thread.
 template <typename T>
 class Memoizer {
  public:
   // Constructor takes the function to be memoized
   Memoizer(std::function<T()> func) : func_(func) {}
 
+  // References returned by operator() are tied to this instance; copying or
+  // moving would let them silently outlive the storage they point into.
+  Memoizer(const Memoizer&) = delete;
+  Memoizer& operator=(const Memoizer&) = delete;
+  Memoizer(Memoizer&&) = delete;
+  Memoizer& operator=(Memoizer&&) = delete;
+
   // Overload the operator() to enable calling the Memoizer like a function
   // Mark this as const to allow it to be called from const methods. It
   // technically isn't const given that cache_ is updated but we mark that field
   // as mutable.
-  T operator()() const {
-    if (cache_.has_value()) {
-      return *cache_;
+  //
+  // The returned reference is valid for the lifetime of the Memoizer and is
+  // never invalidated; callers may hold pointers into the returned value for
+  // as long as the Memoizer is alive.
+  const T& operator()() const {
+    if (!cache_.has_value()) {
+      cache_ = func_();
     }
-
-    T result = func_();
-    cache_ = result;
-    return result;
+    return *cache_;
   }
 
   bool HasValue() const { return cache_.has_value(); }
