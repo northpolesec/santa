@@ -1448,16 +1448,20 @@ santa_unit_test(
 )
 
 objc_library(
+    name = "MOLDERDecoder",
+    srcs = ["MOLDERDecoder.mm"],
+    hdrs = ["MOLDERDecoder.h"],
+    sdk_frameworks = ["Security"],
+)
+
+objc_library(
     name = "MOLAuthenticatingURLSession",
-    srcs = [
-        "MOLAuthenticatingURLSession.mm",
-        "MOLDERDecoder.h",
-        "MOLDERDecoder.mm",
-    ],
+    srcs = ["MOLAuthenticatingURLSession.mm"],
     hdrs = ["MOLAuthenticatingURLSession.h"],
     sdk_frameworks = ["Security"],
     deps = [
         ":MOLCertificate",
+        ":MOLDERDecoder",
         ":ScopedCFTypeRef",
     ],
 )
@@ -1466,7 +1470,6 @@ santa_unit_test(
     name = "MOLAuthenticatingURLSessionTest",
     srcs = [
         "MOLAuthenticatingURLSessionTest.mm",
-        "MOLDERDecoder.h",
         "MOLDERDecoderTest.mm",
     ],
     resources = [
@@ -1477,5 +1480,6 @@ santa_unit_test(
     ],
     deps = [
         ":MOLAuthenticatingURLSession",
+        ":MOLDERDecoder",
     ],
 )
