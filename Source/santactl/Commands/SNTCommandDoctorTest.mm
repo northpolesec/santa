@@ -25,6 +25,14 @@ typedef NS_ENUM(NSInteger, SNTDoctorClientCertValidity) {
 extern SNTDoctorClientCertValidity SNTDoctorClassifyClientCertificate(MOLCertificate* cert,
                                                                       NSDate* now);
 
+typedef NS_ENUM(NSInteger, SNTDoctorSIPStatus) {
+  SNTDoctorSIPStatusEnabled,
+  SNTDoctorSIPStatusDisabled,
+  SNTDoctorSIPStatusPartiallyDisabled,
+  SNTDoctorSIPStatusUnknown,
+};
+extern SNTDoctorSIPStatus SNTDoctorClassifySIPStatus(uint32_t status);
+
 @interface SNTCommandDoctorTest : XCTestCase
 @end
 
@@ -69,6 +77,26 @@ extern SNTDoctorClientCertValidity SNTDoctorClassifyClientCertificate(MOLCertifi
                  SNTDoctorClientCertValidityValid);
   XCTAssertEqual(SNTDoctorClassifyClientCertificate(cert, cert.validFrom),
                  SNTDoctorClientCertValidityValid);
+}
+
+- (void)testSIPStatusZeroIsEnabled {
+  XCTAssertEqual(SNTDoctorClassifySIPStatus(0), SNTDoctorSIPStatusEnabled);
+}
+
+- (void)testSIPStatusMaxIsUnknown {
+  XCTAssertEqual(SNTDoctorClassifySIPStatus(UINT32_MAX), SNTDoctorSIPStatusUnknown);
+}
+
+// 0x6f and 0x77 are the csr_config_t values produced by `csrutil disable` on
+// different macOS versions; both must classify as fully disabled.
+- (void)testSIPStatusFullDisableValuesAreDisabled {
+  XCTAssertEqual(SNTDoctorClassifySIPStatus(0x6f), SNTDoctorSIPStatusDisabled);
+  XCTAssertEqual(SNTDoctorClassifySIPStatus(0x77), SNTDoctorSIPStatusDisabled);
+}
+
+// CSR_ALLOW_APPLE_INTERNAL (0x10) alone is not part of the full-disable mask.
+- (void)testSIPStatusSingleNonCoreBitIsPartiallyDisabled {
+  XCTAssertEqual(SNTDoctorClassifySIPStatus(0x10), SNTDoctorSIPStatusPartiallyDisabled);
 }
 
 @end
