@@ -25,14 +25,8 @@ objc_library(
 
 objc_library(
     name = "SNTMetricRawJSONFormat",
-    srcs = [
-        "SNTMetricFormat.h",
-        "SNTMetricRawJSONFormat.h",
-        "SNTMetricRawJSONFormat.mm",
-    ],
-    hdrs = [
-        "SNTMetricRawJSONFormat.h",
-    ],
+    srcs = ["SNTMetricRawJSONFormat.mm"],
+    hdrs = ["SNTMetricRawJSONFormat.h"],
     deps = [
         ":SNTMetricFormat",
         "//Source/common:SNTLogging",
@@ -41,14 +35,8 @@ objc_library(
 
 objc_library(
     name = "SNTMetricMonarchJSONFormat",
-    srcs = [
-        "SNTMetricFormat.h",
-        "SNTMetricMonarchJSONFormat.h",
-        "SNTMetricMonarchJSONFormat.mm",
-    ],
-    hdrs = [
-        "SNTMetricMonarchJSONFormat.h",
-    ],
+    srcs = ["SNTMetricMonarchJSONFormat.mm"],
+    hdrs = ["SNTMetricMonarchJSONFormat.h"],
     deps = [
         ":SNTMetricFormat",
         "//Source/common:SNTLogging",

@@ -152,6 +152,9 @@ objc_library(
     srcs = ["AuditUtilities.mm"],
     hdrs = ["AuditUtilities.h"],
     sdk_dylibs = ["bsm"],
+    deps = [
+        ":ScopedMachPort",
+    ],
 )
 
 santa_unit_test(
@@ -213,6 +216,22 @@ santa_unit_test(
 )
 
 objc_library(
+    name = "ScopedMachPort",
+    hdrs = ["ScopedMachPort.h"],
+    deps = [
+        ":ScopedTypeRef",
+    ],
+)
+
+santa_unit_test(
+    name = "ScopedMachPortTest",
+    srcs = ["ScopedMachPortTest.mm"],
+    deps = [
+        ":ScopedMachPort",
+    ],
+)
+
+objc_library(
     name = "ScopedFile",
     hdrs = ["ScopedFile.h"],
     deps = [
@@ -246,6 +265,12 @@ objc_library(
 objc_library(
     name = "Memoizer",
     hdrs = ["Memoizer.h"],
+)
+
+santa_unit_test(
+    name = "MemoizerTest",
+    srcs = ["MemoizerTest.mm"],
+    deps = [":Memoizer"],
 )
 
 objc_library(
@@ -1295,6 +1320,7 @@ test_suite(
         ":MOLCertificateTest",
         ":MOLCodesignCheckerTest",
         ":MOLXPCConnectionTest",
+        ":MemoizerTest",
         ":NKeyTokenValidatorTest",
         ":NSDataZlibTest",
         ":PowerMonitorTest",
@@ -1331,6 +1357,7 @@ test_suite(
         ":ScopedCFTypeRefTest",
         ":ScopedFileTest",
         ":ScopedIOObjectRefTest",
+        ":ScopedMachPortTest",
         ":TelemetryEventMapTest",
         "//Source/common/cel:ArenaGrowthTest",
         "//Source/common/cel:CELTest",
@@ -1441,16 +1468,20 @@ santa_unit_test(
 )
 
 objc_library(
+    name = "MOLDERDecoder",
+    srcs = ["MOLDERDecoder.mm"],
+    hdrs = ["MOLDERDecoder.h"],
+    sdk_frameworks = ["Security"],
+)
+
+objc_library(
     name = "MOLAuthenticatingURLSession",
-    srcs = [
-        "MOLAuthenticatingURLSession.mm",
-        "MOLDERDecoder.h",
-        "MOLDERDecoder.mm",
-    ],
+    srcs = ["MOLAuthenticatingURLSession.mm"],
     hdrs = ["MOLAuthenticatingURLSession.h"],
     sdk_frameworks = ["Security"],
     deps = [
         ":MOLCertificate",
+        ":MOLDERDecoder",
         ":ScopedCFTypeRef",
     ],
 )
@@ -1459,7 +1490,6 @@ santa_unit_test(
     name = "MOLAuthenticatingURLSessionTest",
     srcs = [
         "MOLAuthenticatingURLSessionTest.mm",
-        "MOLDERDecoder.h",
         "MOLDERDecoderTest.mm",
     ],
     resources = [
@@ -1470,5 +1500,6 @@ santa_unit_test(
     ],
     deps = [
         ":MOLAuthenticatingURLSession",
+        ":MOLDERDecoder",
     ],
 )

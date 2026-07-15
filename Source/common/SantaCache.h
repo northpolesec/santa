@@ -80,7 +80,7 @@ class SantaCache {
   /**
     Get an element from the cache. Returns zero_ if item doesn't exist.
   */
-  ValueT get(KeyT key) const {
+  ValueT get(const KeyT& key) const {
     struct bucket* bucket = &buckets_[hash(key)];
     lock(bucket);
     struct entry* entry = bucket->head;
@@ -506,7 +506,7 @@ class SantaCache {
   /**
     Hash a key to determine which bucket it belongs in.
   */
-  inline uint64_t hash(KeyT input) const {
+  inline uint64_t hash(const KeyT& input) const {
     return Hasher{}(input) % bucket_count_;
   }
 };

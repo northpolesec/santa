@@ -202,7 +202,10 @@
     }
   }
   {
-    // Test memoization
+    // Activation integration: a producer runs at most once per evaluation even
+    // when its variable is referenced multiple times, so per-exec work like
+    // ExecArgs is not repeated. (The Memoizer unit contract — compute-once,
+    // no-copy, stable reference — is covered directly by MemoizerTest.)
     __block int argsCallCount = 0;
     santa::cel::Activation<true> activation(
         std::move(f),

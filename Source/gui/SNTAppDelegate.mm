@@ -80,38 +80,49 @@
   [self createDaemonConnection];
 }
 
-- (void)applicationDidBecomeActive:(NSNotification*)notification {
-  // Only show the dock icon if the app has visible windows (excluding status bar windows).
-  // Without this guard, events such as virtual desktop switches can reactivate the app and
-  // cause the dock icon to reappear when there are no windows to display.
+// Any visible window other than those backing the status bar item. The status bar windows should
+// never keep the dock icon alive.
+- (BOOL)hasVisibleNonStatusWindows {
   __block BOOL hasVisibleWindows = NO;
   [NSApp enumerateWindowsWithOptions:0
                           usingBlock:^(NSWindow* _Nonnull window, BOOL* _Nonnull stop) {
                             if ([window isKindOfClass:NSClassFromString(@"NSStatusBarWindow")]) {
                               return;
                             }
-                            *stop = hasVisibleWindows = window.visible;
+                            if (window.visible) {
+                              hasVisibleWindows = YES;
+                              *stop = YES;
+                            }
                           }];
-  if (hasVisibleWindows) {
+  return hasVisibleWindows;
+}
+
+- (void)applicationDidBecomeActive:(NSNotification*)notification {
+  // Only show the dock icon if the app has visible windows (excluding status bar windows).
+  // Without this guard, events such as virtual desktop switches can reactivate the app and
+  // cause the dock icon to reappear when there are no windows to display.
+  if ([self hasVisibleNonStatusWindows]) {
     NSApp.activationPolicy = NSApplicationActivationPolicyRegular;
   }
 }
 
+// Debounce interval before hiding the dock icon. Notifications are shown serially from a queue, so
+// closing one is immediately followed (next runloop hop) by the next one appearing. This just needs
+// to comfortably exceed that hop; it is not perceptible when the last window truly closes.
+static const NSTimeInterval kHideDockIconDelay = 0.25;
+
 - (void)aWindowWillClose:(NSNotification*)notification {
-  NSWindow* closingWindow = notification.object;
-  __block BOOL hasVisibleWindows = NO;
-  [NSApp enumerateWindowsWithOptions:0
-                          usingBlock:^(NSWindow* _Nonnull window, BOOL* _Nonnull stop) {
-                            if (window == closingWindow) return;
-                            // There are windows associated with the status bar item, these should
-                            // not prevent hiding the dock icon.
-                            if ([window isKindOfClass:NSClassFromString(@"NSStatusBarWindow")])
-                              return;
-                            *stop = hasVisibleWindows = window.visible;
-                          }];
-  if (!hasVisibleWindows) {
-    NSApp.activationPolicy = NSApplicationActivationPolicyAccessory;
-  }
+  // Don't drop to Accessory the instant a window closes. When notifications are shown back-to-back,
+  // the closing window's Accessory switch would race the next queued window's Regular switch, and
+  // rapidly toggling the activation policy makes macOS leave behind duplicate/ghost dock icons.
+  // Defer the check so any replacement window can appear first, and only hide the dock icon once
+  // nothing is left on screen. The just-closed window is gone by the time this runs.
+  dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(kHideDockIconDelay * NSEC_PER_SEC)),
+                 dispatch_get_main_queue(), ^{
+                   if (![self hasVisibleNonStatusWindows]) {
+                     NSApp.activationPolicy = NSApplicationActivationPolicyAccessory;
+                   }
+                 });
 }
 
 - (BOOL)applicationShouldHandleReopen:(NSApplication*)sender hasVisibleWindows:(BOOL)flag {
