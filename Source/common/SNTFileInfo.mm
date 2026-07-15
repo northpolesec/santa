@@ -70,8 +70,11 @@
 
 - (instancetype)initWithResolvedPath:(NSString*)path error:(NSError**)error {
   struct stat fileStat;
-  if (path.length) {
-    lstat(path.UTF8String, &fileStat);
+  if (path.length && lstat(path.UTF8String, &fileStat) != 0) {
+    [SNTError populateError:error
+                   withCode:SNTErrorCodeFailedToOpen
+                     format:@"Unable to stat file: %s", strerror(errno)];
+    return nil;
   }
   return [self initWithResolvedPath:path stat:&fileStat error:error];
 }
