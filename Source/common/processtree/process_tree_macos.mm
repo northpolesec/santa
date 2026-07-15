@@ -27,6 +27,7 @@
 #include <vector>
 
 #include "Source/common/CSOpsHelper.h"
+#include "Source/common/ScopedMachPort.h"
 #include "Source/common/SystemResources.h"
 #include "Source/common/processtree/process.h"
 #include "absl/container/flat_hash_map.h"
@@ -143,18 +144,19 @@ struct Pid PidFromAuditToken(const audit_token_t& tok) {
 }
 
 absl::StatusOr<BackfilledProcess> LoadPID(pid_t pid) {
-  task_name_t task;
   mach_msg_type_number_t size = TASK_AUDIT_TOKEN_COUNT;
   audit_token_t token;
 
-  if (task_name_for_pid(mach_task_self(), pid, &task) != KERN_SUCCESS) {
+  // ScopedMachPort deallocates the task port on every return path below.
+  auto [kr, task] = ScopedMachPort::AssumeFrom(
+      [pid](mach_port_t* out) { return task_name_for_pid(mach_task_self(), pid, out); });
+  if (kr != KERN_SUCCESS) {
     return absl::InternalError("task_name_for_pid");
   }
 
-  if (task_info(task, TASK_AUDIT_TOKEN, (task_info_t)&token, &size) != KERN_SUCCESS) {
+  if (task_info(task.Unsafe(), TASK_AUDIT_TOKEN, (task_info_t)&token, &size) != KERN_SUCCESS) {
     return absl::InternalError("task_info(TASK_AUDIT_TOKEN)");
   }
-  mach_port_deallocate(mach_task_self(), task);
 
   char path[PROC_PIDPATHINFO_MAXSIZE];
   if (proc_pidpath_audittoken(&token, path, sizeof(path)) <= 0) {
