@@ -231,6 +231,13 @@ bool WaitForBufferSize(std::shared_ptr<FilePeer> file, size_t expectedSize) {
   XCTAssertEqual(file->InternalBufferCapacity(), initialCapacity * 2);
 }
 
+- (void)testEnsureCapacityBeyondDoubleInitialSize {
+  const size_t initialCapacity = 300;
+  auto file = std::make_shared<FilePeer>(self.logPath, 100, 200, self.q, self.timer);
+  file->EnsureCapacitySerialized((initialCapacity * 2) + 1);
+  XCTAssertGreaterThan(file->InternalBufferCapacity(), initialCapacity * 2);
+}
+
 - (void)testCopyData {
   const size_t batchSize = 100;
   // Use a buffer to copy that's slightly larger than the batch size
