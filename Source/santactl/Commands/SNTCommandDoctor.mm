@@ -184,7 +184,7 @@ REGISTER_COMMAND_NAME(@"doctor")
 - (void)runWithArguments:(NSArray*)arguments {
   BOOL err = NO;
   err |= [self validateProcesses];
-  [self reportSystemIntegrityProtection];
+  err |= [self reportSystemIntegrityProtection];
   err |= [self validateConfiguration];
   err |= [self validateSync];
   exit(err);
@@ -232,15 +232,22 @@ REGISTER_COMMAND_NAME(@"doctor")
   return (!foundSanta || !foundSantad || !foundSantaSyncService);
 }
 
-- (void)reportSystemIntegrityProtection {
+// Reports the host's System Integrity Protection status. Returns YES if SIP is a problem (fully or
+// partially disabled). An undeterminable status is reported but not treated as a failure.
+- (BOOL)reportSystemIntegrityProtection {
   print(@"=> Validating system integrity...");
 
+  BOOL err = NO;
   uint32_t status = [SNTSIPStatus currentStatus];
   switch (SNTDoctorClassifySIPStatus(status)) {
     case SNTDoctorSIPStatusEnabled: print(@"[+] System Integrity Protection is enabled"); break;
-    case SNTDoctorSIPStatusDisabled: print(@"[-] System Integrity Protection is disabled"); break;
+    case SNTDoctorSIPStatusDisabled:
+      print(@"[-] System Integrity Protection is disabled");
+      err = YES;
+      break;
     case SNTDoctorSIPStatusPartiallyDisabled:
       print(@"[-] System Integrity Protection is partially disabled (0x%x)", status);
+      err = YES;
       break;
     case SNTDoctorSIPStatusUnknown:
       print(@"[?] Unable to determine System Integrity Protection status");
@@ -248,6 +255,7 @@ REGISTER_COMMAND_NAME(@"doctor")
   }
 
   print(@"");
+  return err;
 }
 
 - (BOOL)validateConfiguration {
