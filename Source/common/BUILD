@@ -152,6 +152,9 @@ objc_library(
     srcs = ["AuditUtilities.mm"],
     hdrs = ["AuditUtilities.h"],
     sdk_dylibs = ["bsm"],
+    deps = [
+        ":ScopedMachPort",
+    ],
 )
 
 santa_unit_test(
@@ -209,6 +212,22 @@ santa_unit_test(
     ],
     deps = [
         ":ScopedIOObjectRef",
+    ],
+)
+
+objc_library(
+    name = "ScopedMachPort",
+    hdrs = ["ScopedMachPort.h"],
+    deps = [
+        ":ScopedTypeRef",
+    ],
+)
+
+santa_unit_test(
+    name = "ScopedMachPortTest",
+    srcs = ["ScopedMachPortTest.mm"],
+    deps = [
+        ":ScopedMachPort",
     ],
 )
 
@@ -1338,6 +1357,7 @@ test_suite(
         ":ScopedCFTypeRefTest",
         ":ScopedFileTest",
         ":ScopedIOObjectRefTest",
+        ":ScopedMachPortTest",
         ":TelemetryEventMapTest",
         "//Source/common/cel:ArenaGrowthTest",
         "//Source/common/cel:CELTest",

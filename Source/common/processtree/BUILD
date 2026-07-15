@@ -35,6 +35,7 @@ objc_library(
         ":process",
         ":process_tree_cc_proto",
         "//Source/common:CSOpsHelper",
+        "//Source/common:ScopedMachPort",
         "//Source/common:SystemResources",
         "//Source/common/processtree/annotations:annotator",
         "@abseil-cpp//absl/container:flat_hash_map",
