@@ -15,6 +15,7 @@
 
 #include "Source/santad/Logs/EndpointSecurity/Writers/File.h"
 
+#include <algorithm>
 #include <memory>
 
 #include "Source/common/BranchPrediction.h"
@@ -123,7 +124,7 @@ void File::Flush() {
 // IMPORTANT: Not thread safe.
 void File::EnsureCapacitySerialized(size_t additional_bytes) {
   if ((buffer_offset_ + additional_bytes) > buffer_.capacity()) {
-    buffer_.resize(buffer_.capacity() * 2);
+    buffer_.resize(std::max(buffer_.capacity() * 2, buffer_offset_ + additional_bytes));
   }
 }
 
