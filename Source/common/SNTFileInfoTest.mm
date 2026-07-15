@@ -45,6 +45,18 @@
   XCTAssertEqualObjects(sut.path, @"/usr/libexec/dspluginhelperd");
 }
 
+- (void)testResolvedPathStatFailure {
+  NSString* path = [NSTemporaryDirectory()
+      stringByAppendingPathComponent:[NSString stringWithFormat:@"SNTFileInfo-%@",
+                                                                NSUUID.UUID.UUIDString]];
+  NSError* error;
+  SNTFileInfo* sut = [[SNTFileInfo alloc] initWithResolvedPath:path error:&error];
+
+  XCTAssertNil(sut);
+  XCTAssertNotNil(error);
+  XCTAssertTrue([error.localizedDescription containsString:@"Unable to stat file"]);
+}
+
 - (void)testSHA1 {
   NSString* path = [[NSBundle bundleForClass:[self class]] pathForResource:@"missing_pagezero"
                                                                     ofType:@""];

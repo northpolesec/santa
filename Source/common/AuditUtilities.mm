@@ -20,6 +20,8 @@
 
 #include <cstring>
 
+#include "Source/common/ScopedMachPort.h"
+
 namespace santa {
 
 std::optional<audit_token_t> AuditTokenFromData(NSData* tokenData) {
@@ -46,16 +48,15 @@ std::optional<audit_token_t> GetMyAuditToken() {
 
 bool AuditTokenForPid(pid_t pid, audit_token_t* token) {
   assert(token);
-  task_name_t task;
   mach_msg_type_number_t size = TASK_AUDIT_TOKEN_COUNT;
 
-  if (task_name_for_pid(mach_task_self(), pid, &task) != KERN_SUCCESS) {
+  auto [kr, task] = ScopedMachPort::AssumeFrom(
+      [pid](mach_port_t* out) { return task_name_for_pid(mach_task_self(), pid, out); });
+  if (kr != KERN_SUCCESS) {
     return false;
   }
 
-  kern_return_t result = task_info(task, TASK_AUDIT_TOKEN, (task_info_t)token, &size);
-  mach_port_deallocate(mach_task_self(), task);
-  return result == KERN_SUCCESS;
+  return task_info(task.Unsafe(), TASK_AUDIT_TOKEN, (task_info_t)token, &size) == KERN_SUCCESS;
 }
 
 }  // namespace santa
