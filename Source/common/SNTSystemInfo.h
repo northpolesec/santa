@@ -78,4 +78,10 @@
 ///
 + (NSString*)santaFullVersion;
 
+///
+///  @return The CFBundleVersion of the santanetd system extension bundled on
+///      disk at kSantaNetdPath, e.g. 2025.1.80, or nil if it cannot be read.
+///
++ (NSString*)santanetdBundledVersion;
+
 @end
