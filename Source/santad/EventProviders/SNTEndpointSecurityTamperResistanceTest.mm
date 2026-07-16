@@ -63,11 +63,17 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
 - (void)testEnable {
   // Ensure the client subscribes to expected event types
   std::set<es_event_type_t> expectedEventSubs{
-      ES_EVENT_TYPE_AUTH_SIGNAL, ES_EVENT_TYPE_AUTH_EXEC,
-      ES_EVENT_TYPE_AUTH_CLONE,  ES_EVENT_TYPE_AUTH_UNLINK,
-      ES_EVENT_TYPE_AUTH_RENAME, ES_EVENT_TYPE_AUTH_OPEN,
-      ES_EVENT_TYPE_AUTH_CREATE, ES_EVENT_TYPE_AUTH_TRUNCATE,
-      ES_EVENT_TYPE_AUTH_LINK,   ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME,
+      ES_EVENT_TYPE_AUTH_SIGNAL,
+      ES_EVENT_TYPE_AUTH_EXEC,
+      ES_EVENT_TYPE_AUTH_CLONE,
+      ES_EVENT_TYPE_AUTH_COPYFILE,
+      ES_EVENT_TYPE_AUTH_UNLINK,
+      ES_EVENT_TYPE_AUTH_RENAME,
+      ES_EVENT_TYPE_AUTH_OPEN,
+      ES_EVENT_TYPE_AUTH_CREATE,
+      ES_EVENT_TYPE_AUTH_TRUNCATE,
+      ES_EVENT_TYPE_AUTH_LINK,
+      ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME,
   };
 
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
@@ -109,11 +115,17 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
 
 - (void)testEnableWithAntiSuspendSigningIDs {
   std::set<es_event_type_t> expectedEventSubs{
-      ES_EVENT_TYPE_AUTH_SIGNAL, ES_EVENT_TYPE_AUTH_EXEC,
-      ES_EVENT_TYPE_AUTH_CLONE,  ES_EVENT_TYPE_AUTH_UNLINK,
-      ES_EVENT_TYPE_AUTH_RENAME, ES_EVENT_TYPE_AUTH_OPEN,
-      ES_EVENT_TYPE_AUTH_CREATE, ES_EVENT_TYPE_AUTH_TRUNCATE,
-      ES_EVENT_TYPE_AUTH_LINK,   ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME,
+      ES_EVENT_TYPE_AUTH_SIGNAL,
+      ES_EVENT_TYPE_AUTH_EXEC,
+      ES_EVENT_TYPE_AUTH_CLONE,
+      ES_EVENT_TYPE_AUTH_COPYFILE,
+      ES_EVENT_TYPE_AUTH_UNLINK,
+      ES_EVENT_TYPE_AUTH_RENAME,
+      ES_EVENT_TYPE_AUTH_OPEN,
+      ES_EVENT_TYPE_AUTH_CREATE,
+      ES_EVENT_TYPE_AUTH_TRUNCATE,
+      ES_EVENT_TYPE_AUTH_LINK,
+      ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME,
   };
 
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
@@ -154,11 +166,17 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
 
 - (void)testSetAntiSuspendSigningIDsAfterEnable {
   std::set<es_event_type_t> expectedEventSubs{
-      ES_EVENT_TYPE_AUTH_SIGNAL, ES_EVENT_TYPE_AUTH_EXEC,
-      ES_EVENT_TYPE_AUTH_CLONE,  ES_EVENT_TYPE_AUTH_UNLINK,
-      ES_EVENT_TYPE_AUTH_RENAME, ES_EVENT_TYPE_AUTH_OPEN,
-      ES_EVENT_TYPE_AUTH_CREATE, ES_EVENT_TYPE_AUTH_TRUNCATE,
-      ES_EVENT_TYPE_AUTH_LINK,   ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME,
+      ES_EVENT_TYPE_AUTH_SIGNAL,
+      ES_EVENT_TYPE_AUTH_EXEC,
+      ES_EVENT_TYPE_AUTH_CLONE,
+      ES_EVENT_TYPE_AUTH_COPYFILE,
+      ES_EVENT_TYPE_AUTH_UNLINK,
+      ES_EVENT_TYPE_AUTH_RENAME,
+      ES_EVENT_TYPE_AUTH_OPEN,
+      ES_EVENT_TYPE_AUTH_CREATE,
+      ES_EVENT_TYPE_AUTH_TRUNCATE,
+      ES_EVENT_TYPE_AUTH_LINK,
+      ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME,
   };
 
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
@@ -380,8 +398,7 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
 
       XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
       XCTAssertEqual(gotAuthResult, kv.second);
-      // CLONE events do not support caching.
-      XCTAssertFalse(gotCachable);
+      XCTAssertEqual(gotCachable, kv.second == ES_AUTH_RESULT_ALLOW);
     }
   }
 
@@ -414,7 +431,94 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
 
       XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
       XCTAssertEqual(gotAuthResult, kv.second);
-      XCTAssertFalse(gotCachable);
+      XCTAssertEqual(gotCachable, kv.second == ES_AUTH_RESULT_ALLOW);
+    }
+  }
+
+  // Check COPYFILE `source` tamper events. Copying a protected source to a benign destination must
+  // be denied to prevent protected data from being copied outside the protected path set.
+  {
+    esMsg.event_type = ES_EVENT_TYPE_AUTH_COPYFILE;
+    es_file_t copyfileBenignDir = MakeESFile("/tmp");
+    es_string_token_t copyfileBenignFilename = MakeESStringToken("benign");
+    for (const auto& kv : pathToResult) {
+      Message msg(mockESApi, &esMsg);
+      esMsg.event.copyfile.source = kv.first;
+      esMsg.event.copyfile.target_file = NULL;
+      esMsg.event.copyfile.target_dir = &copyfileBenignDir;
+      esMsg.event.copyfile.target_name = copyfileBenignFilename;
+
+      [mockTamperClient
+               handleMessage:std::move(msg)
+          recordEventMetrics:^(EventDisposition d) {
+            XCTAssertEqual(d, kv.second == ES_AUTH_RESULT_DENY ? EventDisposition::kProcessed
+                                                               : EventDisposition::kDropped);
+            dispatch_semaphore_signal(semaMetrics);
+          }];
+
+      XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
+      XCTAssertEqual(gotAuthResult, kv.second);
+      XCTAssertEqual(gotCachable, kv.second == ES_AUTH_RESULT_ALLOW);
+    }
+  }
+
+  // Check COPYFILE `dest` tamper events targeting a new path (target_dir + target_name).
+  {
+    esMsg.event_type = ES_EVENT_TYPE_AUTH_COPYFILE;
+    esMsg.event.copyfile.source = &fileBenign;
+    esMsg.event.copyfile.target_file = NULL;
+
+    es_file_t copyfileDestDirProtected = MakeESFile("/Applications/Santa.app/Contents");
+    es_file_t copyfileDestDirBenign = MakeESFile("/some/other");
+    es_string_token_t copyfileDestFilename = MakeESStringToken("test");
+
+    std::map<es_file_t*, es_auth_result_t> copyfileDestToResult{
+        {&copyfileDestDirProtected, ES_AUTH_RESULT_DENY},
+        {&copyfileDestDirBenign, ES_AUTH_RESULT_ALLOW},
+    };
+
+    for (const auto& kv : copyfileDestToResult) {
+      Message msg(mockESApi, &esMsg);
+      esMsg.event.copyfile.target_dir = kv.first;
+      esMsg.event.copyfile.target_name = copyfileDestFilename;
+
+      [mockTamperClient
+               handleMessage:std::move(msg)
+          recordEventMetrics:^(EventDisposition d) {
+            XCTAssertEqual(d, kv.second == ES_AUTH_RESULT_DENY ? EventDisposition::kProcessed
+                                                               : EventDisposition::kDropped);
+            dispatch_semaphore_signal(semaMetrics);
+          }];
+
+      XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
+      XCTAssertEqual(gotAuthResult, kv.second);
+      XCTAssertEqual(gotCachable, kv.second == ES_AUTH_RESULT_ALLOW);
+    }
+  }
+
+  // Check COPYFILE `dest` tamper events overwriting an existing file (target_file). Unlike
+  // clonefile, copyfile can overwrite an existing destination, so copying a benign source over a
+  // protected file must be denied.
+  {
+    esMsg.event_type = ES_EVENT_TYPE_AUTH_COPYFILE;
+    esMsg.event.copyfile.source = &fileBenign;
+    esMsg.event.copyfile.target_dir = NULL;
+    esMsg.event.copyfile.target_name = MakeESStringToken("");
+    for (const auto& kv : pathToResult) {
+      Message msg(mockESApi, &esMsg);
+      esMsg.event.copyfile.target_file = kv.first;
+
+      [mockTamperClient
+               handleMessage:std::move(msg)
+          recordEventMetrics:^(EventDisposition d) {
+            XCTAssertEqual(d, kv.second == ES_AUTH_RESULT_DENY ? EventDisposition::kProcessed
+                                                               : EventDisposition::kDropped);
+            dispatch_semaphore_signal(semaMetrics);
+          }];
+
+      XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
+      XCTAssertEqual(gotAuthResult, kv.second);
+      XCTAssertEqual(gotCachable, kv.second == ES_AUTH_RESULT_ALLOW);
     }
   }
 
@@ -470,8 +574,7 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
       XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
 
       XCTAssertEqual(gotAuthResult, kv.second);
-      // CREATE events are never cached
-      XCTAssertFalse(gotCachable);
+      XCTAssertEqual(gotCachable, kv.second == ES_AUTH_RESULT_ALLOW);
     }
   }
 
@@ -492,7 +595,8 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
 
     XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
     XCTAssertEqual(gotAuthResult, ES_AUTH_RESULT_ALLOW);
-    XCTAssertFalse(gotCachable);
+    // CREATE with an unexpected EXISTING_FILE destination falls through to a cacheable ALLOW.
+    XCTAssertTrue(gotCachable);
   }
 
   // Check RENAME `source` tamper events
@@ -933,6 +1037,37 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
     esMsg.event.clone.source = cloneCase.source;
     esMsg.event.clone.target_dir = cloneCase.targetDir;
     esMsg.event.clone.target_name = cloneFilename;
+
+    [mockTamperClient handleMessage:std::move(msg)
+                 recordEventMetrics:^(EventDisposition d) {
+                   XCTAssertEqual(d, EventDisposition::kProcessed);
+                   dispatch_semaphore_signal(semaMetrics);
+                 }];
+
+    XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
+    XCTAssertEqual(gotAuthResult, ES_AUTH_RESULT_DENY);
+    XCTAssertFalse(gotCachable);
+  }
+
+  // A truncated path on any COPYFILE target (source, new-path dest, or existing-file dest) is
+  // unreliable and must be denied.
+  struct CopyfileCase {
+    es_file_t* source;
+    es_file_t* targetFile;
+    es_file_t* targetDir;
+  } copyfileCases[] = {
+      {&fileBenignTruncated, NULL, &dirBenign},
+      {&fileBenign, NULL, &dirBenignTruncated},
+      {&fileBenign, &fileBenignTruncated, NULL},
+  };
+
+  esMsg.event_type = ES_EVENT_TYPE_AUTH_COPYFILE;
+  for (const auto& copyfileCase : copyfileCases) {
+    Message msg(mockESApi, &esMsg);
+    esMsg.event.copyfile.source = copyfileCase.source;
+    esMsg.event.copyfile.target_file = copyfileCase.targetFile;
+    esMsg.event.copyfile.target_dir = copyfileCase.targetDir;
+    esMsg.event.copyfile.target_name = cloneFilename;
 
     [mockTamperClient handleMessage:std::move(msg)
                  recordEventMetrics:^(EventDisposition d) {
