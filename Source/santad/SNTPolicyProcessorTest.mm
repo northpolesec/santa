@@ -1524,13 +1524,13 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 // Concurrent evaluation while another thread repeatedly recompiles/swaps the
-// fallback rule set. Reader threads must never observe a crash, a UAF, or a
-// garbage decision value — a `handled == NO` result is acceptable (the writer
-// may momentarily install a rule set that doesn't match, or interleave with
-// the swap) and is not treated as a failure. This is a safety net for the
-// upcoming refactor from queue-guarded ivars to an atomically-swapped
-// shared_ptr<const FallbackBatch>; it must pass against the current
-// (dispatch-queue-serialized) implementation.
+// fallback rule set (held in the atomically-swapped shared_ptr<const
+// FallbackBatch>). Every rule set installed here is non-empty and matches
+// unconditionally (ALLOWLIST/BLOCKLIST), and the initial set is published before
+// any thread starts, so a correct swap always yields a fallback decision. A
+// handled == NO result, a decision that is neither allow nor block, a crash, or
+// a UAF would each mean a reader observed a torn/lost/empty batch (a broken
+// swap), so all are treated as failures.
 - (void)testCELFallbackConcurrentEvalDuringRecompile {
   // Sanity: install rules directly through the writer entry point and confirm
   // the eval path is wired before introducing any concurrency.
@@ -1573,8 +1573,10 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
         BOOL handled =
             [processor evaluateCELFallbackExpressions:cd
                                    activationCallback:[self fallbackTestActivationCallback]];
-        if (handled && cd.decision != SNTEventStateAllowCELFallback &&
-            cd.decision != SNTEventStateBlockCELFallback) {
+        // A correct swap always yields a fallback decision (see the test's doc
+        // comment), so NO — or any other decision — is a failure.
+        if (!handled || (cd.decision != SNTEventStateAllowCELFallback &&
+                         cd.decision != SNTEventStateBlockCELFallback)) {
           failures.fetch_add(1);
         }
       }
