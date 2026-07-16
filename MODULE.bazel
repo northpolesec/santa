@@ -16,10 +16,9 @@ bazel_dep(name = "boringssl", version = "0.20260211.0")
 
 # North Pole Protos
 bazel_dep(name = "protos", version = "1.0.1", repo_name = "northpolesec_protos")
-git_override(
+local_path_override(
     module_name = "protos",
-    commit = "2ce18c169ea3f76c136e5a8b2d4b2b31f073abf0",
-    remote = "https://github.com/northpolesec/protos",
+    path = "../protos",
 )
 
 # Profiles

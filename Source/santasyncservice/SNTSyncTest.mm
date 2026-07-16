@@ -209,6 +209,9 @@
   OCMStub([self.daemonConnRop
       databaseRulesHash:([OCMArg invokeBlockWithArgs:@"the-hash", @"the-faa-hash", @"the-nf-hash",
                                                      @"the-signal-hash", nil])]);
+  OCMStub([self.daemonConnRop
+      networkExtensionLoadedBundleVersionInfo:
+          ([OCMArg invokeBlockWithArgs:@{@"CFBundleVersion" : @"2025.7.700000000"}, nil])]);
 }
 
 #pragma mark - SNTSyncStage Tests
@@ -553,6 +556,10 @@
 
   OCMStub([self.daemonConnRop
       databaseRuleCounts:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(ruleCounts), nil])]);
+  // Report santanetd as not loaded so preflight's bounded version query returns
+  // immediately rather than waiting out its 2s timeout.
+  OCMStub([self.daemonConnRop
+      networkExtensionLoadedBundleVersionInfo:([OCMArg invokeBlockWithArgs:[NSNull null], nil])]);
 
   [self stubRequestBody:nil
                response:nil
@@ -573,6 +580,47 @@
               XCTAssertNil(requestDict[kFileAccessRuleCount]);
               XCTAssertNil(requestDict[kNetworkFlowRuleCount]);
             }
+            return YES;
+          }];
+
+  [sut sync];
+}
+
+- (void)testPreflightSantanetdVersion {
+  SNTSyncPreflight* sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
+
+  OCMStub([self.daemonConnRop
+      networkExtensionLoadedBundleVersionInfo:
+          ([OCMArg invokeBlockWithArgs:@{@"CFBundleVersion" : @"2025.7.700000000"}, nil])]);
+
+  [self stubRequestBody:nil
+               response:nil
+                  error:nil
+          validateBlock:^BOOL(NSURLRequest* req) {
+            NSDictionary* requestDict = [self dictFromRequest:req];
+            if (self.syncState.isSyncV2) {
+              XCTAssertEqualObjects(requestDict[@"santanetd_version"], @"2025.7.700000000");
+            } else {
+              XCTAssertNil(requestDict[@"santanetd_version"]);
+            }
+            return YES;
+          }];
+
+  [sut sync];
+}
+
+- (void)testPreflightSantanetdVersionOmittedWhenUnavailable {
+  SNTSyncPreflight* sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
+
+  OCMStub([self.daemonConnRop
+      networkExtensionLoadedBundleVersionInfo:([OCMArg invokeBlockWithArgs:[NSNull null], nil])]);
+
+  [self stubRequestBody:nil
+               response:nil
+                  error:nil
+          validateBlock:^BOOL(NSURLRequest* req) {
+            NSDictionary* requestDict = [self dictFromRequest:req];
+            XCTAssertNil(requestDict[@"santanetd_version"]);
             return YES;
           }];
 
@@ -617,6 +665,10 @@
       clientMode:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(SNTClientModeMonitor), nil])]);
   OCMStub([self.daemonConnRop
       syncTypeRequired:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(requestedSyncType), nil])]);
+  // Report santanetd as not loaded so preflight's bounded version query returns
+  // immediately rather than waiting out its 2s timeout.
+  OCMStub([self.daemonConnRop
+      networkExtensionLoadedBundleVersionInfo:([OCMArg invokeBlockWithArgs:[NSNull null], nil])]);
 
   NSData* respData = [self dataFromDict:resp];
   [self stubRequestBody:respData
