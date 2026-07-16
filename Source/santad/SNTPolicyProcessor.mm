@@ -34,11 +34,14 @@
 #import "Source/common/SNTRule.h"
 #import "Source/common/SigningIDHelpers.h"
 #include "Source/common/String.h"
+#include "Source/common/cel/CELPlanCache.h"
 #include "Source/common/cel/Evaluator.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/statusor.h"
 #include "cel/v1.pb.h"
+
+static constexpr uint64_t kCELPlanCacheMaxSize = 128;
 
 enum class PlatformBinaryState {
   kRuntimeTrue = 0,
@@ -82,6 +85,8 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
     NSString* customURL;
   };
   std::vector<CompiledFallbackRule> celFallbackRules_;
+  std::unique_ptr<santa::cel::CELPlanCache<false>> celPlanCacheV1_;
+  std::unique_ptr<santa::cel::CELPlanCache<true>> celPlanCacheV2_;
 }
 @property SNTRuleTable* ruleTable;
 @property SNTConfigurator* configurator;
@@ -99,6 +104,8 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
     auto evaluatorV1 = santa::cel::Evaluator<false>::Create();
     if (evaluatorV1.ok()) {
       celEvaluatorV1_ = std::move(*evaluatorV1);
+      celPlanCacheV1_ = std::make_unique<santa::cel::CELPlanCache<false>>(celEvaluatorV1_.get(),
+                                                                          kCELPlanCacheMaxSize);
     } else {
       LOGW(@"Failed to create CEL v1 evaluator: %s",
            std::string(evaluatorV1.status().message()).c_str());
@@ -109,6 +116,8 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
     auto evaluatorV2 = santa::cel::Evaluator<true>::Create(/*allowUnspecified=*/true);
     if (evaluatorV2.ok()) {
       celEvaluatorV2_ = std::move(*evaluatorV2);
+      celPlanCacheV2_ = std::make_unique<santa::cel::CELPlanCache<true>>(celEvaluatorV2_.get(),
+                                                                         kCELPlanCacheMaxSize);
     } else {
       LOGW(@"Failed to create CEL v2 evaluator: %s",
            std::string(evaluatorV2.status().message()).c_str());
@@ -373,9 +382,7 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
   bool useV2 = (rule.state == SNTRuleStateCELv2);
   auto activation = activationCallback(useV2);
 
-  google::protobuf::Arena arena;
-
-  if ((useV2 && !celEvaluatorV2_) || (!useV2 && !celEvaluatorV1_)) {
+  if ((useV2 && !celPlanCacheV2_) || (!useV2 && !celPlanCacheV1_)) {
     LOGE(@"CEL v%d evaluator unavailable", useV2 ? 2 : 1);
     if ([SNTConfigurator configurator].failClosed) {
       cd.decision = SNTEventStateBlockUnknown;
@@ -384,18 +391,13 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
     return {.succeeded = false, .decisionMade = false, .resultState = {}};
   }
 
-  absl::StatusOr<std::unique_ptr<::google::api::expr::runtime::CelExpression>> compileResult;
-  if (useV2) {
-    assert(dynamic_cast<santa::cel::Activation<true>*>(activation.get()) != nullptr);
-    compileResult = celEvaluatorV2_->Compile(santa::NSStringToUTF8StringView(rule.celExpr), &arena);
-  } else {
-    assert(dynamic_cast<santa::cel::Activation<false>*>(activation.get()) != nullptr);
-    compileResult = celEvaluatorV1_->Compile(santa::NSStringToUTF8StringView(rule.celExpr), &arena);
-  }
+  std::string expr = santa::NSStringToUTF8String(rule.celExpr);
+  absl::StatusOr<santa::cel::PlanPtr> planResult =
+      useV2 ? celPlanCacheV2_->GetOrCompile(expr) : celPlanCacheV1_->GetOrCompile(expr);
 
-  if (!compileResult.ok()) {
+  if (!planResult.ok()) {
     LOGE(@"Failed to compile CEL rule (%@): %s", rule.celExpr,
-         std::string(compileResult.status().message()).c_str());
+         std::string(planResult.status().message()).c_str());
     if ([SNTConfigurator configurator].failClosed) {
       cd.decision = SNTEventStateBlockUnknown;
       return {.succeeded = false, .decisionMade = true, .resultState = {}};
@@ -403,11 +405,14 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
     return {.succeeded = false, .decisionMade = false, .resultState = {}};
   }
 
-  return [self evaluateCompiledCELExpression:compileResult->get()
+  // Per-exec evaluation temporaries live on a stack arena; the plan's own
+  // (cached) constant arena is long-lived and read-only here.
+  google::protobuf::Arena evalArena;
+  return [self evaluateCompiledCELExpression:(*planResult)->expression.get()
                                        useV2:useV2
                               cachedDecision:cd
                                   activation:*activation
-                                   evalArena:&arena
+                                   evalArena:&evalArena
                            inFallbackContext:NO];
 }
 

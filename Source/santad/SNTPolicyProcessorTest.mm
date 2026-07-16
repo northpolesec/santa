@@ -923,6 +923,92 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   }
 }
 
+// A DB CEL rule (state CELv2) allows a matching binary, and repeated
+// evaluation of the same identity yields the same decision (exercises the
+// compiled-plan cache reuse path introduced in SNTPolicyProcessor).
+- (void)testDBCELRuleCachedAcrossEvaluations {
+  ActivationCallbackBlock activation =
+      ^std::unique_ptr<::google::api::expr::runtime::BaseActivation>(bool useV2) {
+    auto makeActivation =
+        [&]<bool IsV2>() -> std::unique_ptr<::google::api::expr::runtime::BaseActivation> {
+      using ExecutableFileT = typename santa::cel::CELProtoTraits<IsV2>::ExecutableFileT;
+      using AncestorT = typename santa::cel::CELProtoTraits<IsV2>::AncestorT;
+      using FileDescriptorT = typename santa::cel::CELProtoTraits<IsV2>::FileDescriptorT;
+      auto ef = std::make_unique<ExecutableFileT>();
+      ef->mutable_signing_time()->set_seconds(1717987200);
+      ef->mutable_secure_signing_time()->set_seconds(1717987200);
+
+      return std::make_unique<santa::cel::Activation<IsV2>>(
+          std::move(ef),
+          ^std::vector<std::string>() {
+            return std::vector<std::string>{"arg1", "arg2"};
+          },
+          ^std::map<std::string, std::string>() {
+            return std::map<std::string, std::string>{{"ENV_VARIABLE1", "value1"},
+                                                      {"OTHER_ENV_VAR", "value2"}};
+          },
+          ^uid_t() {
+            return 0;
+          },
+          ^std::string() {
+            return "/";
+          },
+          ^std::string() {
+            return "/usr/bin/test";
+          },
+          ^std::vector<AncestorT>() {
+            return {};
+          },
+          ^std::vector<FileDescriptorT>() {
+            return {};
+          });
+    };
+
+    if (useV2) {
+      return makeActivation.operator()<true>();
+    } else {
+      return makeActivation.operator()<false>();
+    }
+  };
+
+  SNTRule* (^createCELRule)(NSString*, BOOL) = ^SNTRule*(NSString* celExpr, BOOL v2) {
+    return [[SNTRule alloc]
+        initWithIdentifier:@"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+                     state:v2 ? SNTRuleStateCELv2 : SNTRuleStateCEL
+                      type:SNTRuleTypeBinary
+                 customMsg:nil
+                 customURL:nil
+                 timestamp:0
+                   comment:nil
+                   celExpr:celExpr
+            seatbeltPolicy:nil
+                    ruleId:0
+                     error:NULL];
+  };
+
+  SNTRule* r = createCELRule(@"target.signing_time > timestamp(1717987100)", true);
+
+  // First evaluation: compile-on-miss populates the plan cache.
+  SNTCachedDecision* cd1 = [[SNTCachedDecision alloc] init];
+  cd1.sha256 = r.identifier;
+  [self.processor decision:cd1
+                       forRule:r
+           withTransitiveRules:YES
+      andCELActivationCallback:activation];
+  XCTAssertEqual(cd1.decision, SNTEventStateAllowBinary);
+
+  // Second evaluation of the same rule/identity: cache hit path.
+  SNTCachedDecision* cd2 = [[SNTCachedDecision alloc] init];
+  cd2.sha256 = r.identifier;
+  [self.processor decision:cd2
+                       forRule:r
+           withTransitiveRules:YES
+      andCELActivationCallback:activation];
+  XCTAssertEqual(cd2.decision, SNTEventStateAllowBinary);
+
+  XCTAssertEqual(cd1.decision, cd2.decision);
+}
+
 - (void)testCELAncestors {
   using AncestorT = santa::cel::CELProtoTraits<true>::AncestorT;
 
