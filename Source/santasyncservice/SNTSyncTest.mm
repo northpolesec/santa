@@ -211,8 +211,10 @@
       databaseRulesHash:([OCMArg invokeBlockWithArgs:@"the-hash", @"the-faa-hash", @"the-nf-hash",
                                                      @"the-signal-hash", nil])]);
   OCMStub([self.daemonConnRop
-      networkExtensionLoadedBundleVersionInfo:
-          ([OCMArg invokeBlockWithArgs:@{@"CFBundleVersion" : @"2025.7.700000000"}, nil])]);
+      networkExtensionLoadedBundleVersionInfo:([OCMArg invokeBlockWithArgs:@{
+        @"CFBundleVersion" : @"2025.7.700000000"
+      },
+                                                                           nil])]);
 }
 
 #pragma mark - SNTSyncStage Tests
@@ -591,8 +593,10 @@
   SNTSyncPreflight* sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
 
   OCMStub([self.daemonConnRop
-      networkExtensionLoadedBundleVersionInfo:
-          ([OCMArg invokeBlockWithArgs:@{@"CFBundleVersion" : @"2025.7.700000000"}, nil])]);
+      networkExtensionLoadedBundleVersionInfo:([OCMArg invokeBlockWithArgs:@{
+        @"CFBundleVersion" : @"2025.7.700000000"
+      },
+                                                                           nil])]);
 
   [self stubRequestBody:nil
                response:nil
@@ -632,8 +636,10 @@
   SNTSyncPreflight* sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
 
   OCMStub([self.daemonConnRop
-      networkExtensionLoadedBundleVersionInfo:
-          ([OCMArg invokeBlockWithArgs:@{@"CFBundleVersion" : @"2025.7.700000000"}, nil])]);
+      networkExtensionLoadedBundleVersionInfo:([OCMArg invokeBlockWithArgs:@{
+        @"CFBundleVersion" : @"2025.7.700000000"
+      },
+                                                                           nil])]);
   OCMStub([self.siMock santanetdBundledVersion]).andReturn(@"2025.7.700000000");
 
   [self stubRequestBody:nil
@@ -656,8 +662,10 @@
   SNTSyncPreflight* sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
 
   OCMStub([self.daemonConnRop
-      networkExtensionLoadedBundleVersionInfo:
-          ([OCMArg invokeBlockWithArgs:@{@"CFBundleVersion" : @"2025.7.700000000"}, nil])]);
+      networkExtensionLoadedBundleVersionInfo:([OCMArg invokeBlockWithArgs:@{
+        @"CFBundleVersion" : @"2025.7.700000000"
+      },
+                                                                           nil])]);
   OCMStub([self.siMock santanetdBundledVersion]).andReturn(@"2025.8.800000000");
 
   [self stubRequestBody:nil
