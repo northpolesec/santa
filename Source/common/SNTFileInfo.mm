@@ -22,10 +22,10 @@
 #include <mach-o/loader.h>
 #include <mach-o/swap.h>
 #include <mach-o/utils.h>
-#include <pwd.h>
 #include <sys/stat.h>
 #include <sys/xattr.h>
 
+#import "Source/common/AccountLookup.h"
 #import "Source/common/CertificateHelpers.h"
 #import "Source/common/MOLCodesignChecker.h"
 #import "Source/common/SNTError.h"
@@ -115,9 +115,9 @@
     if (_fileSize == 0) return nil;
 
     if (fileStat->st_uid != 0) {
-      struct passwd* pwd = getpwuid(fileStat->st_uid);
-      if (pwd) {
-        _fileOwnerHomeDir = @(pwd->pw_dir);
+      std::optional<std::string> homeDir = santa::account::HomeDirForUID(fileStat->st_uid);
+      if (homeDir.has_value()) {
+        _fileOwnerHomeDir = @(homeDir->c_str());
       }
     }
 
@@ -710,9 +710,9 @@
           struct stat fileStat;
           stat([d[@"LSQuarantineDiskImageURL"] fileSystemRepresentation], &fileStat);
           if (fileStat.st_uid != 0) {
-            struct passwd* pwd = getpwuid(fileStat.st_uid);
-            if (pwd) {
-              fileOwnerHomeDir = @(pwd->pw_dir);
+            std::optional<std::string> homeDir = santa::account::HomeDirForUID(fileStat.st_uid);
+            if (homeDir.has_value()) {
+              fileOwnerHomeDir = @(homeDir->c_str());
             }
           }
         }

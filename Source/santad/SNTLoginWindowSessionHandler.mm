@@ -14,11 +14,9 @@
 
 #import "Source/santad/SNTLoginWindowSessionHandler.h"
 
-#include <errno.h>
-#include <pwd.h>
-#include <unistd.h>
+#include <memory>
 
-#include <vector>
+#import "Source/common/AccountLookup.h"
 
 @implementation SNTLoginWindowSessionHandler {
   std::shared_ptr<santa::TemporaryAdminMode> _temporaryAdminMode;
@@ -75,24 +73,9 @@
     // local-vs-directory uid collision still revokes via the username. A uid of 0 (unresolved, or
     // the root/loginwindow pseudo-user) never matches a real target uid.
     uid_t uid = 0;
-    struct passwd pwd;
-    struct passwd* result = NULL;
-    long bufsize = sysconf(_SC_GETPW_R_SIZE_MAX);
-    if (bufsize <= 0) {
-      bufsize = 1024;
-    }
-    std::vector<char> buf(bufsize);
-    // getpwnam_r returns ERANGE when the entry doesn't fit; grow and retry so directory-backed
-    // (LDAP/AD) entries larger than the initial buffer still resolve. Cap the growth so a
-    // pathological entry can't drive unbounded allocation.
-    int rc;
-    while ((rc = getpwnam_r(username.UTF8String, &pwd, buf.data(), buf.size(), &result)) ==
-               ERANGE &&
-           buf.size() < (1 << 20)) {
-      buf.resize(buf.size() * 2);
-    }
-    if (rc == 0 && result != NULL && pwd.pw_uid != 0) {
-      uid = pwd.pw_uid;
+    std::optional<uid_t> resolved = santa::account::UIDForUsername(username.UTF8String);
+    if (resolved.has_value() && *resolved != 0) {
+      uid = *resolved;
     }
     tam->EndForUserEvent(uid, username, reason);
   });
