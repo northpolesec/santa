@@ -65,6 +65,9 @@ static constexpr uid_t kAbsentUID = 4000000000;
     return;
   }
   XCTAssertFalse(home->empty());
+  if (home->empty()) {
+    return;
+  }
   XCTAssertEqual(home->front(), '/');
 }
 
