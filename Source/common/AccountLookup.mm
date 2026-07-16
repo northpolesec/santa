@@ -19,6 +19,7 @@
 #include <pwd.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -36,13 +37,12 @@ namespace {
 // into it) stay valid while the caller copies out the field it needs.
 template <typename Fn>
 int LookupWithGrowingBuffer(std::vector<char>& buf, long initial_size, Fn&& lookup) {
-  if (initial_size <= 0) {
-    initial_size = 1024;
-  }
-  buf.resize(static_cast<size_t>(initial_size));
+  static constexpr size_t kMaxSize = 1 << 20;  // 1 MiB ceiling (see comment above).
+  size_t size = initial_size > 0 ? static_cast<size_t>(initial_size) : 1024;
+  buf.resize(std::min(size, kMaxSize));
   int rc;
-  while ((rc = lookup(buf.data(), buf.size())) == ERANGE && buf.size() < (1 << 20)) {
-    buf.resize(buf.size() * 2);
+  while ((rc = lookup(buf.data(), buf.size())) == ERANGE && buf.size() < kMaxSize) {
+    buf.resize(std::min(buf.size() * 2, kMaxSize));
   }
   return rc;
 }

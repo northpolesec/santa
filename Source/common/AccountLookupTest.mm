@@ -48,6 +48,9 @@ static constexpr uid_t kAbsentUID = 4000000000;
 - (void)testUsernameForUIDResolvesRoot {
   std::optional<std::string> name = UsernameForUID(0);
   XCTAssertTrue(name.has_value());
+  if (!name.has_value()) {
+    return;
+  }
   XCTAssertTrue(*name == "root");
 }
 
@@ -58,6 +61,9 @@ static constexpr uid_t kAbsentUID = 4000000000;
 - (void)testHomeDirForUIDResolvesRoot {
   std::optional<std::string> home = HomeDirForUID(0);
   XCTAssertTrue(home.has_value());
+  if (!home.has_value()) {
+    return;
+  }
   XCTAssertFalse(home->empty());
   XCTAssertEqual(home->front(), '/');
 }
@@ -65,12 +71,18 @@ static constexpr uid_t kAbsentUID = 4000000000;
 - (void)testGroupNameForGIDResolvesWheel {
   std::optional<std::string> group = GroupNameForGID(0);
   XCTAssertTrue(group.has_value());
+  if (!group.has_value()) {
+    return;
+  }
   XCTAssertTrue(*group == "wheel");
 }
 
 - (void)testUIDForUsernameResolvesRoot {
   std::optional<uid_t> uid = UIDForUsername("root");
   XCTAssertTrue(uid.has_value());
+  if (!uid.has_value()) {
+    return;
+  }
   XCTAssertEqual(*uid, (uid_t)0);
 }
 
@@ -90,6 +102,9 @@ static constexpr uid_t kAbsentUID = 4000000000;
   std::string_view view(backing.data(), 4);  // "root"
   std::optional<uid_t> uid = UIDForUsername(view);
   XCTAssertTrue(uid.has_value());
+  if (!uid.has_value()) {
+    return;
+  }
   XCTAssertEqual(*uid, (uid_t)0);
 }
 
@@ -97,8 +112,14 @@ static constexpr uid_t kAbsentUID = 4000000000;
   uid_t me = getuid();
   std::optional<std::string> name = UsernameForUID(me);
   XCTAssertTrue(name.has_value());
+  if (!name.has_value()) {
+    return;
+  }
   std::optional<uid_t> resolved = UIDForUsername(*name);
   XCTAssertTrue(resolved.has_value());
+  if (!resolved.has_value()) {
+    return;
+  }
   XCTAssertEqual(*resolved, me);
 }
 
