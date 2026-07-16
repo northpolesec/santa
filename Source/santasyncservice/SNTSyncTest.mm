@@ -215,6 +215,9 @@
         @"CFBundleVersion" : @"2025.7.700000000"
       },
                                                                            nil])]);
+  // Report no on-disk bundled version so preflight does not read kSantaNetdPath
+  // from the test host (which would make the reported version host-dependent).
+  OCMStub([self.siMock santanetdBundledVersion]).andReturn(nil);
 }
 
 #pragma mark - SNTSyncStage Tests
@@ -597,6 +600,9 @@
         @"CFBundleVersion" : @"2025.7.700000000"
       },
                                                                            nil])]);
+  // No on-disk bundled version, so the reported value is the loaded version
+  // alone (and independent of what is installed on the test host).
+  OCMStub([self.siMock santanetdBundledVersion]).andReturn(nil);
 
   [self stubRequestBody:nil
                response:nil
