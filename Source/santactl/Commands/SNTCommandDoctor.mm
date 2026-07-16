@@ -76,23 +76,6 @@ SNTDoctorClientCertValidity SNTDoctorClassifyClientCertificate(MOLCertificate* c
   return SNTDoctorClientCertValidityValid;
 }
 
-// CSR (System Integrity Protection) configuration flags. A csr_config_t of 0 means every
-// protection is enforced; each set bit disables one protection. See bsd/sys/csr.h in the XNU
-// sources.
-static constexpr uint32_t CSR_ALLOW_UNTRUSTED_KEXTS = (1u << 0);
-static constexpr uint32_t CSR_ALLOW_UNRESTRICTED_FS = (1u << 1);
-static constexpr uint32_t CSR_ALLOW_TASK_FOR_PID = (1u << 2);
-static constexpr uint32_t CSR_ALLOW_UNRESTRICTED_DTRACE = (1u << 5);
-static constexpr uint32_t CSR_ALLOW_UNRESTRICTED_NVRAM = (1u << 6);
-
-// Protections that `csrutil disable` clears on every macOS version we support. When all of these
-// bits are set, SIP is reported as fully disabled; any other non-zero configuration is reported as
-// partially disabled with the raw bitmask. This is a best-effort label; the raw csr_config_t value
-// shown to the user is authoritative.
-static constexpr uint32_t kSIPFullDisableMask =
-    CSR_ALLOW_UNTRUSTED_KEXTS | CSR_ALLOW_UNRESTRICTED_FS | CSR_ALLOW_TASK_FOR_PID |
-    CSR_ALLOW_UNRESTRICTED_DTRACE | CSR_ALLOW_UNRESTRICTED_NVRAM;
-
 typedef NS_ENUM(NSInteger, SNTDoctorSIPStatus) {
   SNTDoctorSIPStatusEnabled,
   SNTDoctorSIPStatusDisabled,
@@ -100,9 +83,9 @@ typedef NS_ENUM(NSInteger, SNTDoctorSIPStatus) {
   SNTDoctorSIPStatusUnknown,
 };
 
-// Classifies a raw csr_config_t bitmask into a SIP status. UINT32_MAX is the sentinel for an
-// undeterminable status, 0 means fully enabled, a value containing all of kSIPFullDisableMask means
-// fully disabled, and any other non-zero value is a partial/custom configuration. Exposed
+// Classifies a raw SIP status bitmask (see SNTSIPStatusFlags). UINT32_MAX is the sentinel for an
+// undeterminable status, 0 means fully enabled, a value containing all of kSNTSIPFullDisableMask
+// means fully disabled, and any other non-zero value is a partial/custom configuration. Exposed
 // (non-static) so it can be unit tested.
 SNTDoctorSIPStatus SNTDoctorClassifySIPStatus(uint32_t status) {
   if (status == UINT32_MAX) {
@@ -111,7 +94,7 @@ SNTDoctorSIPStatus SNTDoctorClassifySIPStatus(uint32_t status) {
   if (status == 0) {
     return SNTDoctorSIPStatusEnabled;
   }
-  if ((status & kSIPFullDisableMask) == kSIPFullDisableMask) {
+  if ((status & kSNTSIPFullDisableMask) == kSNTSIPFullDisableMask) {
     return SNTDoctorSIPStatusDisabled;
   }
   return SNTDoctorSIPStatusPartiallyDisabled;
