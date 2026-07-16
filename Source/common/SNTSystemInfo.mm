@@ -14,6 +14,10 @@
 /// limitations under the License.
 
 #import "Source/common/SNTSystemInfo.h"
+
+#import "Source/common/SNTCommonEnums.h"
+#import "Source/common/SNTFileInfo.h"
+
 #include <sys/sysctl.h>
 
 @implementation SNTSystemInfo
@@ -109,6 +113,11 @@
 + (NSString*)santaFullVersion {
   NSDictionary* info_dict = [[NSBundle mainBundle] infoDictionary];
   return info_dict[@"CFBundleVersion"];
+}
+
++ (NSString*)santanetdBundledVersion {
+  SNTFileInfo* netdInfo = [[SNTFileInfo alloc] initWithPath:@(kSantaNetdPath)];
+  return [netdInfo bundleVersion];
 }
 
 #pragma mark - Internal

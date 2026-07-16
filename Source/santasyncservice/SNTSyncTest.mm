@@ -66,6 +66,7 @@
 @property SNTSyncState* syncState;
 @property id<SNTDaemonControlXPC> daemonConnRop;
 @property id configMock;
+@property id siMock;
 @end
 
 // The SNTSyncTestV2 subclass will re-run all tests with `self.syncState.isSyncV2 == YES`
@@ -97,13 +98,13 @@
   OCMStub([self.configMock configurator]).andReturn(self.configMock);
   OCMStub([self.configMock syncEnableProtoTransfer]).andReturn(NO);
 
-  id siMock = OCMClassMock([SNTSystemInfo class]);
-  OCMStub([siMock serialNumber]).andReturn(@"QYGF4QM373");
-  OCMStub([siMock longHostname]).andReturn(@"full-hostname.example.com");
-  OCMStub([siMock osVersion]).andReturn(@"14.5");
-  OCMStub([siMock osBuild]).andReturn(@"23F79");
-  OCMStub([siMock modelIdentifier]).andReturn(@"MacBookPro18,3");
-  OCMStub([siMock santaFullVersion]).andReturn(@"2024.6.655965194");
+  self.siMock = OCMClassMock([SNTSystemInfo class]);
+  OCMStub([self.siMock serialNumber]).andReturn(@"QYGF4QM373");
+  OCMStub([self.siMock longHostname]).andReturn(@"full-hostname.example.com");
+  OCMStub([self.siMock osVersion]).andReturn(@"14.5");
+  OCMStub([self.siMock osBuild]).andReturn(@"23F79");
+  OCMStub([self.siMock modelIdentifier]).andReturn(@"MacBookPro18,3");
+  OCMStub([self.siMock santaFullVersion]).andReturn(@"2024.6.655965194");
 
   id sipMock = OCMClassMock([SNTSIPStatus class]);
   OCMStub([sipMock currentStatus]).andReturn(0x6f);
@@ -621,6 +622,55 @@
           validateBlock:^BOOL(NSURLRequest* req) {
             NSDictionary* requestDict = [self dictFromRequest:req];
             XCTAssertNil(requestDict[@"santanetd_version"]);
+            return YES;
+          }];
+
+  [sut sync];
+}
+
+- (void)testPreflightSantanetdVersionWithMatchingBundle {
+  SNTSyncPreflight* sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
+
+  OCMStub([self.daemonConnRop
+      networkExtensionLoadedBundleVersionInfo:
+          ([OCMArg invokeBlockWithArgs:@{@"CFBundleVersion" : @"2025.7.700000000"}, nil])]);
+  OCMStub([self.siMock santanetdBundledVersion]).andReturn(@"2025.7.700000000");
+
+  [self stubRequestBody:nil
+               response:nil
+                  error:nil
+          validateBlock:^BOOL(NSURLRequest* req) {
+            NSDictionary* requestDict = [self dictFromRequest:req];
+            if (self.syncState.isSyncV2) {
+              XCTAssertEqualObjects(requestDict[@"santanetd_version"], @"2025.7.700000000");
+            } else {
+              XCTAssertNil(requestDict[@"santanetd_version"]);
+            }
+            return YES;
+          }];
+
+  [sut sync];
+}
+
+- (void)testPreflightSantanetdVersionWithBundledMismatch {
+  SNTSyncPreflight* sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
+
+  OCMStub([self.daemonConnRop
+      networkExtensionLoadedBundleVersionInfo:
+          ([OCMArg invokeBlockWithArgs:@{@"CFBundleVersion" : @"2025.7.700000000"}, nil])]);
+  OCMStub([self.siMock santanetdBundledVersion]).andReturn(@"2025.8.800000000");
+
+  [self stubRequestBody:nil
+               response:nil
+                  error:nil
+          validateBlock:^BOOL(NSURLRequest* req) {
+            NSDictionary* requestDict = [self dictFromRequest:req];
+            if (self.syncState.isSyncV2) {
+              XCTAssertEqualObjects(requestDict[@"santanetd_version"],
+                                    @"2025.7.700000000 (bundled: 2025.8.800000000)");
+            } else {
+              XCTAssertNil(requestDict[@"santanetd_version"]);
+            }
             return YES;
           }];
 

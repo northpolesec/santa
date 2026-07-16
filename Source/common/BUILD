@@ -1093,6 +1093,10 @@ objc_library(
         "Foundation",
         "IOKit",
     ],
+    deps = [
+        ":SNTCommonEnums",
+        ":SNTFileInfo",
+    ],
 )
 
 objc_library(

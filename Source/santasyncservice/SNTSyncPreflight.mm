@@ -124,9 +124,19 @@ BOOL Preflight(SNTSyncPreflight* self, google::protobuf::Arena* arena,
   req->set_model_identifier(NSStringToUTF8String([SNTSystemInfo modelIdentifier]));
   req->set_santa_version(NSStringToUTF8String([SNTSystemInfo santaFullVersion]));
   if constexpr (IsV2) {
-    NSString* netdVersion = LoadedSantanetdVersion(self.daemonConn);
-    if (netdVersion.length > 0) {
-      req->set_santanetd_version(NSStringToUTF8String(netdVersion));
+    NSString* loadedNetdVersion = LoadedSantanetdVersion(self.daemonConn);
+    if (loadedNetdVersion.length > 0) {
+      // Mirror `santactl version`: report the running version, annotating the
+      // on-disk bundled version when it differs (an update staged but not yet
+      // activated). Left unset entirely when santanetd is not loaded.
+      NSString* reportedVersion = loadedNetdVersion;
+      NSString* bundledNetdVersion = [SNTSystemInfo santanetdBundledVersion];
+      if (bundledNetdVersion.length > 0 &&
+          ![bundledNetdVersion isEqualToString:loadedNetdVersion]) {
+        reportedVersion =
+            [NSString stringWithFormat:@"%@ (bundled: %@)", loadedNetdVersion, bundledNetdVersion];
+      }
+      req->set_santanetd_version(NSStringToUTF8String(reportedVersion));
     }
   }
   req->set_primary_user(NSStringToUTF8String(self.syncState.machineOwner));
