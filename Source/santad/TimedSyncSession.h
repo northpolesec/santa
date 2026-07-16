@@ -44,9 +44,22 @@ namespace santa {
 // Threading: `grant_mutex_` serializes a whole grant (pre-checks + auth + apply)
 // against other grants; `lock_` guards the session fields. Ordering is always
 // `grant_mutex_` then `lock_`; nothing takes `grant_mutex_` while holding `lock_`,
-// so there is no inversion. Fast readers (SecondsRemaining/Available) take only
-// `lock_` and read the `active_` flag rather than Timer::IsStarted(), which
-// dispatch_syncs to the timer queue and would deadlock against a firing OnTimer.
+// so the two mutexes cannot invert.
+//
+// The Timer mixin's serial queue is a third lock in the graph: OnTimer runs on
+// that queue and takes `lock_`, so a thread holding `lock_` must never BLOCK on
+// the timer queue — the blocking Timer methods (StartTimer/StopTimer/
+// StartTimerWithInterval/IsStarted/SetTimerInterval) all dispatch_sync onto it
+// and would deadlock against a firing OnTimer. Timer management under `lock_`
+// uses the non-blocking *Async variants instead. The async calls are made WHILE
+// `lock_` is held: enqueue order on the serial queue then matches lock order,
+// so a teardown's stop can never land after (and cancel) a successor session's
+// timer. Moving the calls outside `lock_` would introduce exactly that race.
+//
+// `active_` and `deadline_` are the authority on session state; the dispatch
+// timer is only a best-effort alarm. OnTimer validates against `deadline_`
+// before tearing down, and readers (SecondsRemaining/Available) consult
+// `active_`, never Timer::IsStarted().
 class TimedSyncSession : public Timer<TimedSyncSession> {
  public:
   ~TimedSyncSession() override;
@@ -66,6 +79,8 @@ class TimedSyncSession : public Timer<TimedSyncSession> {
   bool Revoke(NSInteger leave_reason);
 
   // Timer<> expiry callback (base implements; subclasses do not override).
+  // Validates against active_/deadline_: no-ops after a cancel/revoke, returns
+  // true (re-arm) on a stale fire from a raced refresh, tears down otherwise.
   bool OnTimer();
 
   // Whether the feature is currently available: an on-demand policy is set, the
@@ -207,24 +222,31 @@ class TimedSyncSession : public Timer<TimedSyncSession> {
   NSArray<SNTKVOManager*>* kvo_;
 
  private:
-  // Persist the common session state (merged with ExtraStateToPersist), start the
-  // timer, notify the GUI, set `active_`. Returns whether a NEW timer was started
-  // (false on a refresh of an already-running session).
+  // Persist the common session state (merged with ExtraStateToPersist), arm the
+  // timer (async), notify the GUI, set `active_`. Returns whether this began a
+  // NEW session (false on a refresh of an active one); keyed on `active_`.
   bool BeginSessionLocked(uint32_t seconds, bool gen_uuid_on_start)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
-  // Stop the timer, clear the persisted state, notify the GUI, clear `active_`.
-  // Returns whether a genuinely-active session was ended. Does NOT clear the
-  // subclass extra state (the leave audit/RevertEffect read it).
+  // End the active session: request async timer cancellation, clear the
+  // persisted state, notify the GUI, clear `active_`. Returns whether a session
+  // was active (keyed on `active_`, not timer state: near expiry the fire has
+  // already consumed the timer while the session is still live). Does NOT clear
+  // the subclass extra state (the leave audit/RevertEffect read it).
   bool EndSessionLocked() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
   bool RevokeLocked(NSInteger leave_reason) ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   // Whether the sync-server gate is satisfied (`configurator_.isSyncV2Enabled`).
   bool SyncServerGateSatisfied();
 
-  // hide the base class Start/Stop methods
+  // Hide the base-class timer methods from subclasses and external callers.
+  // The blocking trio dispatch_syncs onto the timer queue: never call them
+  // while holding lock_ (see the class threading comment). Session code uses
+  // the *Async shims, always invoked with lock_ held.
   bool StartTimer();
   bool StopTimer();
   bool StartTimerWithInterval(uint32_t interval_seconds);
+  void StopTimerAsync();
+  void StartTimerWithIntervalAsync(uint32_t interval_seconds);
 };
 
 }  // namespace santa

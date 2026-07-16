@@ -325,8 +325,14 @@ std::optional<uint64_t> TimedSyncSession::SecondsRemaining(uint64_t deadline_mac
 }
 
 bool TimedSyncSession::BeginSessionLocked(uint32_t seconds, bool gen_uuid_on_start) {
-  bool did_start_new_timer = StartTimerWithInterval(seconds);
-  if (did_start_new_timer && gen_uuid_on_start) {
+  // New-vs-refresh keys on active_, not on timer state: at expiry the
+  // trailing-edge callback stops the dispatch source before the session state
+  // is torn down, so a live session can momentarily have no timer. The async
+  // start is enqueued while lock_ is held so timer operations execute in lock
+  // order.
+  bool new_session = !active_;
+  StartTimerWithIntervalAsync(seconds);
+  if (new_session && gen_uuid_on_start) {
     current_uuid_ = [NSUUID UUID];
   }
 
@@ -349,17 +355,22 @@ bool TimedSyncSession::BeginSessionLocked(uint32_t seconds, bool gen_uuid_on_sta
 
   NotifyEnter([NSDate dateWithTimeIntervalSinceNow:seconds]);
 
-  return did_start_new_timer;
+  return new_session;
 }
 
 bool TimedSyncSession::EndSessionLocked() {
-  if (StopTimer()) {
-    [configurator_ persistTimedSessionState:nil forKey:StateKey()];
-    active_ = false;
-    NotifyLeave();
-    return true;
+  // Decide from active_, not from the timer: at expiry the trailing-edge
+  // callback has already stopped the source while the session is still live.
+  // The stop is enqueued while lock_ is held so it cannot land after (and
+  // cancel) a successor session's timer.
+  if (!active_) {
+    return false;
   }
-  return false;
+  StopTimerAsync();
+  [configurator_ persistTimedSessionState:nil forKey:StateKey()];
+  active_ = false;
+  NotifyLeave();
+  return true;
 }
 
 void TimedSyncSession::PersistExpiredForRetryLocked() {
@@ -415,10 +426,20 @@ bool TimedSyncSession::RevokeLocked(NSInteger leave_reason) {
 }
 
 bool TimedSyncSession::OnTimer() {
+  // Runs on the timer queue. Taking lock_ here is safe because no thread
+  // blocks on the timer queue while holding lock_ (all timer management under
+  // lock_ is async); see the threading comment in the header.
   absl::MutexLock lock(lock_);
-  // OnTimer fires only for a running timer, so a session is active. The Timer
-  // mixin (trailing edge) has already stopped the timer; just tear down the
-  // session state here.
+  if (!active_) {
+    // A cancel/revoke won the race with this fire and already tore down.
+    return false;
+  }
+  if (SecondsRemaining(deadline_).has_value()) {
+    // Stale fire: a refresh moved deadline_ after this fire was scheduled.
+    // Return true so the trailing-edge callback re-arms; the fire that
+    // eventually lands past deadline_ takes the teardown path below.
+    return true;
+  }
   if (RevertEffect()) {
     [configurator_ persistTimedSessionState:nil forKey:StateKey()];
   } else {
@@ -446,6 +467,14 @@ bool TimedSyncSession::StartTimerWithInterval(uint32_t interval_seconds) {
 
 bool TimedSyncSession::StopTimer() {
   return Timer<TimedSyncSession>::StopTimer();
+}
+
+void TimedSyncSession::StopTimerAsync() {
+  Timer<TimedSyncSession>::StopTimerAsync();
+}
+
+void TimedSyncSession::StartTimerWithIntervalAsync(uint32_t interval_seconds) {
+  Timer<TimedSyncSession>::StartTimerWithIntervalAsync(interval_seconds);
 }
 
 }  // namespace santa
