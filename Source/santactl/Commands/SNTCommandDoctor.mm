@@ -18,12 +18,14 @@
 #include <libproc.h>
 #include <unistd.h>
 
+#include <cstdint>
 #include <optional>
 #include <vector>
 
 #import "Source/common/MOLCertificate.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTLogging.h"
+#import "Source/common/SNTSIPStatus.h"
 #import "Source/common/SNTXPCControlInterface.h"
 #import "Source/common/SNTXPCSyncServiceInterface.h"
 #import "Source/common/SNTXPCUnprivilegedControlInterface.h"
@@ -72,6 +74,30 @@ SNTDoctorClientCertValidity SNTDoctorClassifyClientCertificate(MOLCertificate* c
     return SNTDoctorClientCertValidityNotYetValid;
   }
   return SNTDoctorClientCertValidityValid;
+}
+
+typedef NS_ENUM(NSInteger, SNTDoctorSIPStatus) {
+  SNTDoctorSIPStatusEnabled,
+  SNTDoctorSIPStatusDisabled,
+  SNTDoctorSIPStatusPartiallyDisabled,
+  SNTDoctorSIPStatusUnknown,
+};
+
+// Classifies a raw SIP status bitmask (see SNTSIPStatusFlags). UINT32_MAX is the sentinel for an
+// undeterminable status, 0 means fully enabled, a value containing all of kSNTSIPFullDisableMask
+// means fully disabled, and any other non-zero value is a partial/custom configuration. Exposed
+// (non-static) so it can be unit tested.
+SNTDoctorSIPStatus SNTDoctorClassifySIPStatus(uint32_t status) {
+  if (status == UINT32_MAX) {
+    return SNTDoctorSIPStatusUnknown;
+  }
+  if (status == 0) {
+    return SNTDoctorSIPStatusEnabled;
+  }
+  if ((status & kSNTSIPFullDisableMask) == kSNTSIPFullDisableMask) {
+    return SNTDoctorSIPStatusDisabled;
+  }
+  return SNTDoctorSIPStatusPartiallyDisabled;
 }
 
 static NSString* FormatCertificateDate(NSDate* date) {
@@ -141,6 +167,7 @@ REGISTER_COMMAND_NAME(@"doctor")
 - (void)runWithArguments:(NSArray*)arguments {
   BOOL err = NO;
   err |= [self validateProcesses];
+  err |= [self reportSystemIntegrityProtection];
   err |= [self validateConfiguration];
   err |= [self validateSync];
   exit(err);
@@ -186,6 +213,32 @@ REGISTER_COMMAND_NAME(@"doctor")
   print(@"");
 
   return (!foundSanta || !foundSantad || !foundSantaSyncService);
+}
+
+// Reports the host's System Integrity Protection status. Returns YES if SIP is a problem (fully or
+// partially disabled). An undeterminable status is reported but not treated as a failure.
+- (BOOL)reportSystemIntegrityProtection {
+  print(@"=> Validating system integrity...");
+
+  BOOL err = NO;
+  uint32_t status = [SNTSIPStatus currentStatus];
+  switch (SNTDoctorClassifySIPStatus(status)) {
+    case SNTDoctorSIPStatusEnabled: print(@"[+] System Integrity Protection is enabled"); break;
+    case SNTDoctorSIPStatusDisabled:
+      print(@"[-] System Integrity Protection is disabled");
+      err = YES;
+      break;
+    case SNTDoctorSIPStatusPartiallyDisabled:
+      print(@"[-] System Integrity Protection is partially disabled (0x%x)", status);
+      err = YES;
+      break;
+    case SNTDoctorSIPStatusUnknown:
+      print(@"[?] Unable to determine System Integrity Protection status");
+      break;
+  }
+
+  print(@"");
+  return err;
 }
 
 - (BOOL)validateConfiguration {

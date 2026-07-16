@@ -130,6 +130,7 @@ objc_library(
         "//Source/common:MOLCertificate",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTLogging",
+        "//Source/common:SNTSIPStatus",
         "//Source/common:SNTXPCControlInterface",
         "//Source/common:SNTXPCSyncServiceInterface",
         "//Source/common:SNTXPCUnprivilegedControlInterface",

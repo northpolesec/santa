@@ -14,6 +14,25 @@
 
 #import <Foundation/Foundation.h>
 
+// System Integrity Protection configuration flags, matching the CSR_ALLOW_* flags in bsd/sys/csr.h
+// in the XNU sources. A status of 0 means every protection is enforced (SIP fully enabled); each
+// set bit disables one protection.
+typedef NS_OPTIONS(uint32_t, SNTSIPStatusFlags) {
+  SNTSIPStatusFlagAllowUntrustedKexts = (1u << 0),
+  SNTSIPStatusFlagAllowUnrestrictedFS = (1u << 1),
+  SNTSIPStatusFlagAllowTaskForPID = (1u << 2),
+  SNTSIPStatusFlagAllowUnrestrictedDtrace = (1u << 5),
+  SNTSIPStatusFlagAllowUnrestrictedNVRAM = (1u << 6),
+};
+
+// The set of protections that `csrutil disable` clears on every macOS version we support. Compare a
+// status against this mask to distinguish a full disable from a partial/custom configuration. This
+// is a best-effort label; the raw status value is authoritative.
+static const uint32_t kSNTSIPFullDisableMask =
+    SNTSIPStatusFlagAllowUntrustedKexts | SNTSIPStatusFlagAllowUnrestrictedFS |
+    SNTSIPStatusFlagAllowTaskForPID | SNTSIPStatusFlagAllowUnrestrictedDtrace |
+    SNTSIPStatusFlagAllowUnrestrictedNVRAM;
+
 ///
 ///  Simple class for fetching SIP status
 ///
