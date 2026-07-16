@@ -45,9 +45,7 @@ class TemporaryMonitorModePeer : public TemporaryMonitorMode {
   // dispatch source is stopped while the session state is still active. Uses a
   // qualified call because TimedSyncSession hides the blocking Timer methods;
   // the queue is idle in tests, so the blocking call is safe here.
-  bool StopTimerDirectForTesting() {
-    return santa::Timer<santa::TimedSyncSession>::StopTimer();
-  }
+  bool StopTimerDirectForTesting() { return santa::Timer<santa::TimedSyncSession>::StopTimer(); }
 };
 }  // namespace santa
 
