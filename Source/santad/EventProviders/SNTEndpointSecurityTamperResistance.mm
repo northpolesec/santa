@@ -122,6 +122,7 @@ void RemoveLegacyLaunchdPlists() {
 static NSString* TamperEventName(es_event_type_t type) {
   switch (type) {
     case ES_EVENT_TYPE_AUTH_CLONE: return @"clone";
+    case ES_EVENT_TYPE_AUTH_COPYFILE: return @"copyfile";
     case ES_EVENT_TYPE_AUTH_UNLINK: return @"unlink";
     case ES_EVENT_TYPE_AUTH_TRUNCATE: return @"truncate";
     case ES_EVENT_TYPE_AUTH_CREATE: return @"create";
@@ -261,6 +262,7 @@ TamperAuthResult ValidateLaunchctlExec(const Message& esMsg) {
 - (TamperAuthResult)processAuthMessage:(Message)esMsg {
   switch (esMsg->event_type) {
     case ES_EVENT_TYPE_AUTH_CLONE:
+    case ES_EVENT_TYPE_AUTH_COPYFILE:
     case ES_EVENT_TYPE_AUTH_UNLINK:
     case ES_EVENT_TYPE_AUTH_TRUNCATE:
     case ES_EVENT_TYPE_AUTH_CREATE:
@@ -285,16 +287,14 @@ TamperAuthResult ValidateLaunchctlExec(const Message& esMsg) {
                             (int)target.Path().size(), target.Path().data()]);
         }
       }
-      // CLONE events do not support caching. CREATE destinations may not exist yet, so caching an
-      // ALLOW by vnode has no effect.
-      // OPEN responses cannot currently convey a subset of allowed flags, so they can't be cached
-      // either without risking later opens of different flag combinations being incorrectly
-      // allowed.
-      return (esMsg->event_type == ES_EVENT_TYPE_AUTH_CLONE ||
-              esMsg->event_type == ES_EVENT_TYPE_AUTH_OPEN ||
-              esMsg->event_type == ES_EVENT_TYPE_AUTH_CREATE)
-                 ? TamperAuthResult::AllowNotCacheable()
-                 : TamperAuthResult::AllowCacheable();
+      // OPEN is the only event that must opt out of caching here: its response is delivered as a
+      // flags result (all-or-nothing 0xffffffff), so a cached ALLOW would incorrectly authorize
+      // later opens whose flags differ (e.g. a write open of a protected path following a read
+      // open). Every other event type's decision is a pure function of the target path(s), which
+      // is exactly what ES keys its cache on, so caching is safe. ES ignores the cache flag for
+      // event types that don't support caching, so there's no need to enumerate them.
+      return (esMsg->event_type == ES_EVENT_TYPE_AUTH_OPEN) ? TamperAuthResult::AllowNotCacheable()
+                                                            : TamperAuthResult::AllowCacheable();
     }
 
     case ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME: {
@@ -415,6 +415,7 @@ TamperAuthResult ValidateLaunchctlExec(const Message& esMsg) {
                                     ES_EVENT_TYPE_AUTH_SIGNAL,
                                     ES_EVENT_TYPE_AUTH_EXEC,
                                     ES_EVENT_TYPE_AUTH_CLONE,
+                                    ES_EVENT_TYPE_AUTH_COPYFILE,
                                     ES_EVENT_TYPE_AUTH_UNLINK,
                                     ES_EVENT_TYPE_AUTH_RENAME,
                                     ES_EVENT_TYPE_AUTH_OPEN,
