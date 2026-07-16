@@ -121,6 +121,7 @@ void RemoveLegacyLaunchdPlists() {
 /// so future additions to the switch don't silently lose log fidelity.
 static NSString* TamperEventName(es_event_type_t type) {
   switch (type) {
+    case ES_EVENT_TYPE_AUTH_CLONE: return @"clone";
     case ES_EVENT_TYPE_AUTH_UNLINK: return @"unlink";
     case ES_EVENT_TYPE_AUTH_TRUNCATE: return @"truncate";
     case ES_EVENT_TYPE_AUTH_CREATE: return @"create";
@@ -259,6 +260,7 @@ TamperAuthResult ValidateLaunchctlExec(const Message& esMsg) {
 
 - (TamperAuthResult)processAuthMessage:(Message)esMsg {
   switch (esMsg->event_type) {
+    case ES_EVENT_TYPE_AUTH_CLONE:
     case ES_EVENT_TYPE_AUTH_UNLINK:
     case ES_EVENT_TYPE_AUTH_TRUNCATE:
     case ES_EVENT_TYPE_AUTH_CREATE:
@@ -283,11 +285,13 @@ TamperAuthResult ValidateLaunchctlExec(const Message& esMsg) {
                             (int)target.Path().size(), target.Path().data()]);
         }
       }
-      // CREATE destinations may not exist yet, so caching an ALLOW by vnode has no effect.
+      // CLONE events do not support caching. CREATE destinations may not exist yet, so caching an
+      // ALLOW by vnode has no effect.
       // OPEN responses cannot currently convey a subset of allowed flags, so they can't be cached
       // either without risking later opens of different flag combinations being incorrectly
       // allowed.
-      return (esMsg->event_type == ES_EVENT_TYPE_AUTH_OPEN ||
+      return (esMsg->event_type == ES_EVENT_TYPE_AUTH_CLONE ||
+              esMsg->event_type == ES_EVENT_TYPE_AUTH_OPEN ||
               esMsg->event_type == ES_EVENT_TYPE_AUTH_CREATE)
                  ? TamperAuthResult::AllowNotCacheable()
                  : TamperAuthResult::AllowCacheable();
@@ -410,6 +414,7 @@ TamperAuthResult ValidateLaunchctlExec(const Message& esMsg) {
   [super subscribeAndClearCache:{
                                     ES_EVENT_TYPE_AUTH_SIGNAL,
                                     ES_EVENT_TYPE_AUTH_EXEC,
+                                    ES_EVENT_TYPE_AUTH_CLONE,
                                     ES_EVENT_TYPE_AUTH_UNLINK,
                                     ES_EVENT_TYPE_AUTH_RENAME,
                                     ES_EVENT_TYPE_AUTH_OPEN,

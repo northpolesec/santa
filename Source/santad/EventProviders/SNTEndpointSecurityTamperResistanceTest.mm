@@ -63,9 +63,11 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
 - (void)testEnable {
   // Ensure the client subscribes to expected event types
   std::set<es_event_type_t> expectedEventSubs{
-      ES_EVENT_TYPE_AUTH_SIGNAL,   ES_EVENT_TYPE_AUTH_EXEC, ES_EVENT_TYPE_AUTH_UNLINK,
-      ES_EVENT_TYPE_AUTH_RENAME,   ES_EVENT_TYPE_AUTH_OPEN, ES_EVENT_TYPE_AUTH_CREATE,
-      ES_EVENT_TYPE_AUTH_TRUNCATE, ES_EVENT_TYPE_AUTH_LINK, ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME,
+      ES_EVENT_TYPE_AUTH_SIGNAL, ES_EVENT_TYPE_AUTH_EXEC,
+      ES_EVENT_TYPE_AUTH_CLONE,  ES_EVENT_TYPE_AUTH_UNLINK,
+      ES_EVENT_TYPE_AUTH_RENAME, ES_EVENT_TYPE_AUTH_OPEN,
+      ES_EVENT_TYPE_AUTH_CREATE, ES_EVENT_TYPE_AUTH_TRUNCATE,
+      ES_EVENT_TYPE_AUTH_LINK,   ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME,
   };
 
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
@@ -107,9 +109,11 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
 
 - (void)testEnableWithAntiSuspendSigningIDs {
   std::set<es_event_type_t> expectedEventSubs{
-      ES_EVENT_TYPE_AUTH_SIGNAL,   ES_EVENT_TYPE_AUTH_EXEC, ES_EVENT_TYPE_AUTH_UNLINK,
-      ES_EVENT_TYPE_AUTH_RENAME,   ES_EVENT_TYPE_AUTH_OPEN, ES_EVENT_TYPE_AUTH_CREATE,
-      ES_EVENT_TYPE_AUTH_TRUNCATE, ES_EVENT_TYPE_AUTH_LINK, ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME,
+      ES_EVENT_TYPE_AUTH_SIGNAL, ES_EVENT_TYPE_AUTH_EXEC,
+      ES_EVENT_TYPE_AUTH_CLONE,  ES_EVENT_TYPE_AUTH_UNLINK,
+      ES_EVENT_TYPE_AUTH_RENAME, ES_EVENT_TYPE_AUTH_OPEN,
+      ES_EVENT_TYPE_AUTH_CREATE, ES_EVENT_TYPE_AUTH_TRUNCATE,
+      ES_EVENT_TYPE_AUTH_LINK,   ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME,
   };
 
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
@@ -150,9 +154,11 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
 
 - (void)testSetAntiSuspendSigningIDsAfterEnable {
   std::set<es_event_type_t> expectedEventSubs{
-      ES_EVENT_TYPE_AUTH_SIGNAL,   ES_EVENT_TYPE_AUTH_EXEC, ES_EVENT_TYPE_AUTH_UNLINK,
-      ES_EVENT_TYPE_AUTH_RENAME,   ES_EVENT_TYPE_AUTH_OPEN, ES_EVENT_TYPE_AUTH_CREATE,
-      ES_EVENT_TYPE_AUTH_TRUNCATE, ES_EVENT_TYPE_AUTH_LINK, ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME,
+      ES_EVENT_TYPE_AUTH_SIGNAL, ES_EVENT_TYPE_AUTH_EXEC,
+      ES_EVENT_TYPE_AUTH_CLONE,  ES_EVENT_TYPE_AUTH_UNLINK,
+      ES_EVENT_TYPE_AUTH_RENAME, ES_EVENT_TYPE_AUTH_OPEN,
+      ES_EVENT_TYPE_AUTH_CREATE, ES_EVENT_TYPE_AUTH_TRUNCATE,
+      ES_EVENT_TYPE_AUTH_LINK,   ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME,
   };
 
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
@@ -349,6 +355,66 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
 
       XCTAssertEqual(gotAuthResult, kv.second);
       XCTAssertEqual(gotCachable, kv.second == ES_AUTH_RESULT_ALLOW);
+    }
+  }
+
+  // Check CLONE `source` tamper events. Cloning a protected source to a benign destination must be
+  // denied to prevent protected data from being copied outside the protected path set.
+  {
+    esMsg.event_type = ES_EVENT_TYPE_AUTH_CLONE;
+    es_file_t cloneBenignDir = MakeESFile("/tmp");
+    es_string_token_t cloneBenignFilename = MakeESStringToken("benign");
+    for (const auto& kv : pathToResult) {
+      Message msg(mockESApi, &esMsg);
+      esMsg.event.clone.source = kv.first;
+      esMsg.event.clone.target_dir = &cloneBenignDir;
+      esMsg.event.clone.target_name = cloneBenignFilename;
+
+      [mockTamperClient
+               handleMessage:std::move(msg)
+          recordEventMetrics:^(EventDisposition d) {
+            XCTAssertEqual(d, kv.second == ES_AUTH_RESULT_DENY ? EventDisposition::kProcessed
+                                                               : EventDisposition::kDropped);
+            dispatch_semaphore_signal(semaMetrics);
+          }];
+
+      XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
+      XCTAssertEqual(gotAuthResult, kv.second);
+      // CLONE events do not support caching.
+      XCTAssertFalse(gotCachable);
+    }
+  }
+
+  // Check CLONE `dest` tamper events.
+  {
+    esMsg.event_type = ES_EVENT_TYPE_AUTH_CLONE;
+    esMsg.event.clone.source = &fileBenign;
+
+    es_file_t cloneDestDirProtected = MakeESFile("/Applications/Santa.app/Contents");
+    es_file_t cloneDestDirBenign = MakeESFile("/some/other");
+    es_string_token_t cloneDestFilename = MakeESStringToken("test");
+
+    std::map<es_file_t*, es_auth_result_t> cloneDestToResult{
+        {&cloneDestDirProtected, ES_AUTH_RESULT_DENY},
+        {&cloneDestDirBenign, ES_AUTH_RESULT_ALLOW},
+    };
+
+    for (const auto& kv : cloneDestToResult) {
+      Message msg(mockESApi, &esMsg);
+      esMsg.event.clone.target_dir = kv.first;
+      esMsg.event.clone.target_name = cloneDestFilename;
+
+      [mockTamperClient
+               handleMessage:std::move(msg)
+          recordEventMetrics:^(EventDisposition d) {
+            XCTAssertEqual(d, kv.second == ES_AUTH_RESULT_DENY ? EventDisposition::kProcessed
+                                                               : EventDisposition::kDropped);
+            dispatch_semaphore_signal(semaMetrics);
+          }];
+
+      XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
+      XCTAssertEqual(gotAuthResult, kv.second);
+      XCTAssertFalse(gotCachable);
     }
   }
 
@@ -804,9 +870,21 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
   es_process_t proc = MakeESProcess(&file);
   es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_UNLINK, &proc, ActionType::Auth);
 
-  // A benign target path that would normally ALLOW, but with path_truncated set.
   es_file_t fileBenign = MakeESFile(kBenignPath.data());
-  fileBenign.path_truncated = true;
+  es_file_t fileBenignTruncated = MakeESFile(kBenignPath.data());
+  fileBenignTruncated.path_truncated = true;
+  es_file_t dirBenign = MakeESFile("/some/other");
+  es_file_t dirBenignTruncated = MakeESFile("/some/other");
+  dirBenignTruncated.path_truncated = true;
+  es_string_token_t cloneFilename = MakeESStringToken("path");
+
+  struct CloneCase {
+    es_file_t* source;
+    es_file_t* targetDir;
+  } cloneCases[] = {
+      {&fileBenignTruncated, &dirBenign},
+      {&fileBenign, &dirBenignTruncated},
+  };
 
   dispatch_semaphore_t semaMetrics = dispatch_semaphore_create(0);
 
@@ -834,19 +912,38 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
         [inv getArgument:&gotCachable atIndex:4];
       });
 
-  Message msg(mockESApi, &esMsg);
-  esMsg.event.unlink.target = &fileBenign;
+  {
+    Message msg(mockESApi, &esMsg);
+    esMsg.event.unlink.target = &fileBenignTruncated;
 
-  [mockTamperClient handleMessage:std::move(msg)
-               recordEventMetrics:^(EventDisposition d) {
-                 XCTAssertEqual(d, EventDisposition::kProcessed);
-                 dispatch_semaphore_signal(semaMetrics);
-               }];
+    [mockTamperClient handleMessage:std::move(msg)
+                 recordEventMetrics:^(EventDisposition d) {
+                   XCTAssertEqual(d, EventDisposition::kProcessed);
+                   dispatch_semaphore_signal(semaMetrics);
+                 }];
 
-  XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
+    XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
+    XCTAssertEqual(gotAuthResult, ES_AUTH_RESULT_DENY);
+    XCTAssertFalse(gotCachable);
+  }
 
-  XCTAssertEqual(gotAuthResult, ES_AUTH_RESULT_DENY);
-  XCTAssertFalse(gotCachable);
+  esMsg.event_type = ES_EVENT_TYPE_AUTH_CLONE;
+  for (const auto& cloneCase : cloneCases) {
+    Message msg(mockESApi, &esMsg);
+    esMsg.event.clone.source = cloneCase.source;
+    esMsg.event.clone.target_dir = cloneCase.targetDir;
+    esMsg.event.clone.target_name = cloneFilename;
+
+    [mockTamperClient handleMessage:std::move(msg)
+                 recordEventMetrics:^(EventDisposition d) {
+                   XCTAssertEqual(d, EventDisposition::kProcessed);
+                   dispatch_semaphore_signal(semaMetrics);
+                 }];
+
+    XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
+    XCTAssertEqual(gotAuthResult, ES_AUTH_RESULT_DENY);
+    XCTAssertFalse(gotCachable);
+  }
 
   [mockTamperClient stopMocking];
 }
