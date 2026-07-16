@@ -32,6 +32,7 @@ objc_library(
     ],
     hdrs = [
         "Activation.h",
+        "CELPlanCache.h",
         "CELProtoTraits.h",
         "Evaluator.h",
         "RelativeTimeFunction.h",
@@ -40,6 +41,7 @@ objc_library(
     deps = [
         ":result_cc_proto",
         "//Source/common:Memoizer",
+        "//Source/common:SantaCache",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings",
@@ -97,6 +99,19 @@ santa_unit_test(
     deps = [
         ":CEL",
         "@abseil-cpp//absl/status:statusor",
+        "@northpolesec_protos//celv2:v2_cc_proto",
+    ],
+)
+
+santa_unit_test(
+    name = "CELPlanCacheTest",
+    srcs = ["CELPlanCacheTest.mm"],
+    deps = [
+        ":CEL",
+        ":result_cc_proto",
+        "//Source/common:SantaCache",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
         "@northpolesec_protos//celv2:v2_cc_proto",
     ],
 )

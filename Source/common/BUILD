@@ -1364,6 +1364,7 @@ test_suite(
         ":ScopedMachPortTest",
         ":TelemetryEventMapTest",
         "//Source/common/cel:ArenaGrowthTest",
+        "//Source/common/cel:CELPlanCacheTest",
         "//Source/common/cel:CELTest",
         "//Source/common/faa:unit_tests",
         "//Source/common/ne:unit_tests",
