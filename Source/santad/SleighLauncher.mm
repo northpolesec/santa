@@ -121,6 +121,14 @@ absl::StatusOr<::santa::commands::v1::BinaryUploadResponse> SleighLauncher::Laun
 
 absl::StatusOr<::santa::telemetry::v1::SleighSignalScanResponse> SleighLauncher::LaunchSignalScan(
     int input_fd, const std::vector<std::string>& serialized_signals, uint32_t timeout_secs) {
+  // Bail out with the same NotFound RunSleigh would return when Sleigh isn't installed (e.g. the
+  // lite package). Checked up front so an unavailable/read-only /var/db/santa can't turn the
+  // absent-Sleigh case into an InternalError from the state-db open below — callers rely on
+  // NotFound to distinguish "no Sleigh" (accepted, silent) from a real scan failure (warned).
+  if (access(sleigh_path_.c_str(), X_OK) != 0) {
+    return absl::NotFoundError("Sleigh binary not executable: " + sleigh_path_);
+  }
+
   // Scan a dup: RunSleigh closes the fds it is handed, but the caller owns input_fd (it keeps the
   // spool file's inode alive for the duration of the scan). The dup shares input_fd's offset,
   // which the caller guarantees is at 0.
