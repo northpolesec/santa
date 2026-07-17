@@ -18,7 +18,7 @@ bazel_dep(name = "boringssl", version = "0.20260211.0")
 bazel_dep(name = "protos", version = "1.0.1", repo_name = "northpolesec_protos")
 git_override(
     module_name = "protos",
-    commit = "e825068179512af0189fed82a5b0ad3a75c9a273",
+    commit = "35c9c780b4a05b96b07556b45e32a1cd5c120ded",
     remote = "https://github.com/northpolesec/protos",
 )
 
