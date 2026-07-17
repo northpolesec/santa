@@ -16,8 +16,8 @@
 
 /// A signal report produced by a Sleigh signal scan, stored in the events
 /// database (signal_reports table) pending upload to the sync server.
-/// `reportData` is a serialized santa.telemetry.v1.SignalReport proto (which is
-/// wire-compatible with santa.sync.v2.SignalReport).
+/// `reportData` is a serialized santa.common.v1.SignalReport proto (the same
+/// message the sync server upload carries).
 @interface SNTStoredSignalReport : NSObject <NSSecureCoding>
 
 /// An index for this report, randomly generated during initialization.

@@ -21,12 +21,14 @@
 #include "Source/common/String.h"
 #import "Source/santasyncservice/SNTSyncLogging.h"
 #import "Source/santasyncservice/SNTSyncState.h"
+#include "common/signals.pb.h"
 #include "google/protobuf/arena.h"
 #include "syncv2/v2.pb.h"
 
 using santa::NSStringToUTF8String;
 
 namespace pbv2 = ::santa::sync::v2;
+namespace pbcommon = ::santa::common::v1;
 
 @interface SNTSyncSignalUpload ()
 /// Upload the given signal reports. On success, removes them from the database.
@@ -71,9 +73,9 @@ namespace pbv2 = ::santa::sync::v2;
   for (SNTStoredSignalReport* report in reports) {
     [idsToRemove addObject:report.idx];
 
-    // The stored bytes are a santa.telemetry.v1.SignalReport, which is wire-compatible with
-    // santa.sync.v2.SignalReport (identical field numbers and types), so they parse directly.
-    pbv2::SignalReport* r = req->add_signal_reports();
+    // The stored bytes are a santa.common.v1.SignalReport, the same message the sync upload
+    // carries, so they parse directly.
+    pbcommon::SignalReport* r = req->add_signal_reports();
     if (report.reportData.length > INT_MAX) {
       // ParseFromArray takes an int length; avoid a silent 64->32 bit truncation.
       SLOGE(@"Signal report too large (%lu bytes); dropping",
