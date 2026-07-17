@@ -113,6 +113,10 @@ class TemporaryAdminMode : public TimedSyncSession, public PassKey<TemporaryAdmi
   NSString* target_username_;
   NSString* target_uuid_;
   bool target_is_local_;
+  // Consecutive failed revert attempts for the current expired-session record,
+  // persisted across daemon starts. Gates the bounded give-up in RevertEffect
+  // for an unresolvable directory account.
+  uint32_t revert_retries_;
 };
 
 }  // namespace santa

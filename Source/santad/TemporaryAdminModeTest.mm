@@ -98,7 +98,8 @@ class FakeAdminGroupMembership : public AdminGroupMembership {
       return nil;
     }
     auto it = uuids_.find(uid);
-    NSString* result = it != uuids_.end() ? it->second : [NSString stringWithFormat:@"uuid-%u", uid];
+    NSString* result =
+        it != uuids_.end() ? it->second : [NSString stringWithFormat:@"uuid-%u", uid];
     // Sequencing knob: this call still resolves, then the directory goes
     // down before the NEXT call -- modeling a flap between two resolutions
     // in the same reconcile pass rather than an outage present from the start.
@@ -724,38 +725,114 @@ static uint64_t MakeDeadline(uint64_t want) {
   XCTAssertEqualObjects(writes.lastObject, [NSNull null]);  // consumed, no residue
 }
 
-// An unresolvable DIRECTORY account is ambiguous: deleted or merely
-// off-network. Consuming on an outage would strand a real admin, so the
-// record is retried instead.
-- (void)testReconcileExpiredDeletedDirectoryAccountRetries {
+// Row 5 bounded retry: a genuinely-deleted directory account is
+// indistinguishable from an off-network one through this seam, so its revert is
+// retried for a bounded number of daemon starts and then the record is consumed
+// -- otherwise a permanently-deleted account would wedge every future grant on
+// the machine forever. Each Create is one daemon start; the persisted record
+// (which now carries the retry count) is fed back into the next start.
+- (void)testReconcileExpiredDeletedDirectoryAccountConsumesAfterMaxRetries {
   [self stubPolicyAvailable];
+  // Mirrors kMaxRevertRetries in TemporaryAdminMode.mm: the initial failure plus
+  // (kMaxRetries - 1) restarts, then the consume.
+  constexpr int kMaxRetries = 5;
+  __block NSDictionary* current = [self stateWithBootUUID:[SNTSystemInfo bootSessionUUID]
+                                                 deadline:1
+                                                 syncHost:@"foo.workshop.cloud"
+                                                      uid:501
+                                                     uuid:@"uuid-alice"
+                                                    local:NO];
   OCMStub([self.mockConfigurator savedTimedSessionStateForKey:@"TempAdmin"])
-      .andReturn([self stateWithBootUUID:[SNTSystemInfo bootSessionUUID]
-                                deadline:1
-                                syncHost:@"foo.workshop.cloud"
-                                     uid:501
-                                    uuid:@"uuid-alice"
-                                   local:NO]);
+      .andDo(^(NSInvocation* inv) {
+        NSDictionary* s = current;
+        [inv setReturnValue:&s];
+      });
   NSMutableArray* writes = [NSMutableArray array];
   OCMStub([self.mockConfigurator persistTimedSessionState:[OCMArg any] forKey:@"TempAdmin"])
       .andDo(^(NSInvocation* inv) {
         __unsafe_unretained NSDictionary* s = nil;
         [inv getArgument:&s atIndex:2];
+        current = s ? [s copy] : nil;
         [writes addObject:s ? (id)[s copy] : (id)[NSNull null]];
       });
+
+  for (int attempt = 1; attempt <= kMaxRetries; attempt++) {
+    auto fakeOwned = std::make_unique<FakeAdminGroupMembership>();
+    FakeAdminGroupMembership* fake = fakeOwned.get();
+    fake->deleted_uids_.insert(501);  // never resolves (deleted, or off-network)
+    fake->members_.insert(501);       // group record persists; RemoveMember cannot scrub it
+    auto tam = santa::TemporaryAdminMode::Create((SNTConfigurator*)self.mockConfigurator,
+                                                 (SNTNotificationQueue*)self.mockNotQueue,
+                                                 std::move(fakeOwned),
+                                                 ^(SNTStoredTemporaryAdminModeAuditEvent* e){
+                                                 });
+    if (attempt < kMaxRetries) {
+      NSDictionary* last = writes.lastObject;
+      XCTAssertTrue([last isKindOfClass:[NSDictionary class]], @"attempt %d must retain the record",
+                    attempt);
+      XCTAssertEqualObjects(last[kTimedSessionDeadlineKey], @0);
+      XCTAssertEqualObjects(last[@"TargetUID"], @501);
+    } else {
+      XCTAssertEqualObjects(writes.lastObject, [NSNull null],
+                            @"the record must be consumed at the retry cap");
+    }
+  }
+}
+
+// Recovery before the cap: an account that is merely unreachable for a few
+// daemon starts and then resolves again (same UUID) is demoted cleanly. The
+// accumulated retry count must not trigger a premature consume, and the
+// successful revert clears the record (discarding the count).
+- (void)testReconcileExpiredDirectoryAccountRecoversBeforeCapDemotes {
+  [self stubPolicyAvailable];
+  __block NSDictionary* current = [self stateWithBootUUID:[SNTSystemInfo bootSessionUUID]
+                                                 deadline:1
+                                                 syncHost:@"foo.workshop.cloud"
+                                                      uid:501
+                                                     uuid:@"uuid-alice"
+                                                    local:NO];
+  OCMStub([self.mockConfigurator savedTimedSessionStateForKey:@"TempAdmin"])
+      .andDo(^(NSInvocation* inv) {
+        NSDictionary* s = current;
+        [inv setReturnValue:&s];
+      });
+  NSMutableArray* writes = [NSMutableArray array];
+  OCMStub([self.mockConfigurator persistTimedSessionState:[OCMArg any] forKey:@"TempAdmin"])
+      .andDo(^(NSInvocation* inv) {
+        __unsafe_unretained NSDictionary* s = nil;
+        [inv getArgument:&s atIndex:2];
+        current = s ? [s copy] : nil;
+        [writes addObject:s ? (id)[s copy] : (id)[NSNull null]];
+      });
+
+  // Two daemon starts with the account unreachable: the record is retained.
+  for (int i = 0; i < 2; i++) {
+    auto fakeOwned = std::make_unique<FakeAdminGroupMembership>();
+    FakeAdminGroupMembership* fake = fakeOwned.get();
+    fake->deleted_uids_.insert(501);
+    fake->members_.insert(501);
+    auto tam = santa::TemporaryAdminMode::Create((SNTConfigurator*)self.mockConfigurator,
+                                                 (SNTNotificationQueue*)self.mockNotQueue,
+                                                 std::move(fakeOwned),
+                                                 ^(SNTStoredTemporaryAdminModeAuditEvent* e){
+                                                 });
+    XCTAssertTrue([writes.lastObject isKindOfClass:[NSDictionary class]]);
+  }
+
+  // Third daemon start: the account resolves again, same UUID -> demoted, and
+  // the record is cleared rather than left as a residue.
   auto fakeOwned = std::make_unique<FakeAdminGroupMembership>();
   FakeAdminGroupMembership* fake = fakeOwned.get();
-  fake->deleted_uids_.insert(501);
+  fake->uuids_[501] = @"uuid-alice";  // same account (matches the recorded UUID)
+  fake->members_.insert(501);
   auto tam = santa::TemporaryAdminMode::Create((SNTConfigurator*)self.mockConfigurator,
                                                (SNTNotificationQueue*)self.mockNotQueue,
                                                std::move(fakeOwned),
                                                ^(SNTStoredTemporaryAdminModeAuditEvent* e){
                                                });
 
-  NSDictionary* last = writes.lastObject;
-  XCTAssertTrue([last isKindOfClass:[NSDictionary class]]);  // residue kept
-  XCTAssertEqualObjects(last[kTimedSessionDeadlineKey], @0);
-  XCTAssertEqualObjects(last[@"TargetUID"], @501);
+  XCTAssertEqual(fake->members_.count(501), 0u);            // demoted
+  XCTAssertEqualObjects(writes.lastObject, [NSNull null]);  // record cleared, count discarded
 }
 
 // I2: the uid-reuse guard can resolve the account (same UUID -- it provably
@@ -1138,42 +1215,12 @@ static uint64_t MakeDeadline(uint64_t want) {
   XCTAssertTrue(tam->SecondsRemaining().has_value());
 }
 
-- (void)testGrantPersistsTargetBeforeElevation {
-  [self stubPolicyAvailable];
-  [self stubAuthReply:YES reason:@"need to install"];
-  NSMutableArray* writes = [NSMutableArray array];
-  OCMStub([self.mockConfigurator persistTimedSessionState:[OCMArg any] forKey:@"TempAdmin"])
-      .andDo(^(NSInvocation* inv) {
-        __unsafe_unretained NSDictionary* state = nil;
-        [inv getArgument:&state atIndex:2];
-        [writes addObject:state ? (id)[state copy] : (id)[NSNull null]];
-      });
-  auto fakeOwned = std::make_unique<FakeAdminGroupMembership>();
-  auto tam = santa::TemporaryAdminMode::Create((SNTConfigurator*)self.mockConfigurator,
-                                               (SNTNotificationQueue*)self.mockNotQueue,
-                                               std::move(fakeOwned),
-                                               ^(SNTStoredTemporaryAdminModeAuditEvent* e){
-                                               });
-
-  NSError* err = nil;
-  XCTAssertEqual(tam->RequestMinutes(@5, 501, @"alice", &err), 5u);
-
-  // Persist-before-flip: a provisional deadline-0 record names the target on
-  // disk BEFORE the elevation; the real session state follows.
-  XCTAssertEqual(writes.count, 2u);
-  NSDictionary* provisional = writes[0];
-  NSDictionary* session = writes[1];
-  XCTAssertEqualObjects(provisional[@"TargetUID"], @501);
-  XCTAssertEqualObjects(provisional[kTimedSessionDeadlineKey], @0);
-  XCTAssertEqualObjects(session[@"TargetUID"], @501);
-  XCTAssertTrue([session[kTimedSessionDeadlineKey] unsignedLongLongValue] > 0);
-}
-
-// Grant-time identity capture: both the provisional (persist-before-flip)
-// record and the session record carry the account's UUID and Local bit, so
-// the revert paths can distinguish uid reuse and deleted-local after a
-// daemon restart.
-- (void)testGrantCapturesAccountIdentity {
+// Persist-before-flip with identity capture: a provisional deadline-0 record
+// names the target on disk BEFORE the elevation, the real session record
+// follows, and BOTH records carry the account's UUID and Local bit so the
+// revert paths can distinguish uid reuse and deleted-local after a daemon
+// restart.
+- (void)testGrantPersistsTargetAndIdentityBeforeElevation {
   [self stubPolicyAvailable];
   [self stubAuthReply:YES reason:@"need to install"];
   NSMutableArray* writes = [NSMutableArray array];
@@ -1196,7 +1243,16 @@ static uint64_t MakeDeadline(uint64_t want) {
   NSError* err = nil;
   XCTAssertEqual(tam->RequestMinutes(@5, 501, @"alice", &err), 5u);
 
+  // A provisional deadline-0 record names the target on disk BEFORE the
+  // elevation; the real session record (deadline > 0) follows. Both carry the
+  // captured identity.
   XCTAssertEqual(writes.count, 2u);
+  NSDictionary* provisional = writes[0];
+  NSDictionary* session = writes[1];
+  XCTAssertEqualObjects(provisional[@"TargetUID"], @501);
+  XCTAssertEqualObjects(provisional[kTimedSessionDeadlineKey], @0);
+  XCTAssertEqualObjects(session[@"TargetUID"], @501);
+  XCTAssertTrue([session[kTimedSessionDeadlineKey] unsignedLongLongValue] > 0);
   for (NSDictionary* record in writes) {
     XCTAssertEqualObjects(record[@"TargetUUID"], @"uuid-alice");
     XCTAssertEqualObjects(record[@"TargetLocal"], @YES);
