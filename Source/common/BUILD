@@ -148,6 +148,18 @@ santa_unit_test(
 )
 
 objc_library(
+    name = "AccountLookup",
+    srcs = ["AccountLookup.mm"],
+    hdrs = ["AccountLookup.h"],
+)
+
+santa_unit_test(
+    name = "AccountLookupTest",
+    srcs = ["AccountLookupTest.mm"],
+    deps = [":AccountLookup"],
+)
+
+objc_library(
     name = "AuditUtilities",
     srcs = ["AuditUtilities.mm"],
     hdrs = ["AuditUtilities.h"],
@@ -689,6 +701,7 @@ objc_library(
     hdrs = ["SNTFileInfo.h"],
     module_name = "santa_common_SNTFileInfo",
     deps = [
+        ":AccountLookup",
         ":CertificateHelpers",
         ":MOLCodesignChecker",
         ":SNTError",
@@ -1315,6 +1328,7 @@ santa_unit_test(
 test_suite(
     name = "unit_tests",
     tests = [
+        ":AccountLookupTest",
         ":AuditUtilitiesTest",
         ":CSOpsHelperTest",
         ":CodeSigningIdentifierUtilsTest",

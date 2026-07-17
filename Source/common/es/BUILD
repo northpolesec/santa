@@ -67,6 +67,7 @@ objc_library(
     hdrs = ["Enricher.h"],
     deps = [
         ":EndpointSecurityEnrichedTypes",
+        "//Source/common:AccountLookup",
         "//Source/common:Platform",
         "//Source/common:SNTLogging",
         "//Source/common:SantaCache",

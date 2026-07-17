@@ -15,8 +15,10 @@
 #include "Source/santad/EventProviders/FAAPolicyProcessor.h"
 
 #include <bsm/libbsm.h>
-#include <pwd.h>
 
+#include <vector>
+
+#include "Source/common/AccountLookup.h"
 #include "Source/common/AuditUtilities.h"
 #include "Source/common/BranchPrediction.h"
 #import "Source/common/MOLCertificate.h"
@@ -535,8 +537,9 @@ FileAccessPolicyDecision FAAPolicyProcessor::ProcessTargetAndPolicy(
             : nil;
     event.process.pid = @(audit_token_to_pid(msg->process->audit_token));
     event.process.signingChain = cd.certChain;
-    struct passwd* user = getpwuid(audit_token_to_ruid(msg->process->audit_token));
-    if (user) event.process.executingUser = @(user->pw_name);
+    std::optional<std::string> user =
+        santa::account::UsernameForUID(audit_token_to_ruid(msg->process->audit_token));
+    if (user.has_value()) event.process.executingUser = @(user->c_str());
     event.process.parent = [[SNTStoredProcess alloc] init];
     event.process.parent.pid = @(audit_token_to_pid(msg->process->parent_audit_token));
     event.process.parent.filePath = StringToNSString(msg.ParentProcessPath());

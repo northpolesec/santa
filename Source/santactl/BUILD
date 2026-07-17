@@ -89,6 +89,7 @@ objc_library(
     srcs = ["Commands/SNTCommandSandbox.mm"],
     deps = [
         ":santactl_cmd",
+        "//Source/common:AccountLookup",
         "//Source/common:MOLCodesignChecker",
         "//Source/common:MOLXPCConnection",
         "//Source/common:SNTFileInfo",

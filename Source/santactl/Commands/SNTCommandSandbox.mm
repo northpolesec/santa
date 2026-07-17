@@ -16,7 +16,6 @@
 
 #include <errno.h>
 #include <fcntl.h>
-#include <pwd.h>
 #include <sandbox.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -31,6 +30,7 @@ extern "C" int sandbox_init_with_parameters(const char* profile, uint64_t flags,
 #include <memory>
 #include <vector>
 
+#import "Source/common/AccountLookup.h"
 #import "Source/common/MOLCodesignChecker.h"
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTFileInfo.h"
@@ -252,10 +252,13 @@ REGISTER_COMMAND_NAME(@"sandbox")
   }
   // Look up HOME from the password database rather than $HOME so the placeholder
   // resolves to the calling uid's canonical home (e.g. /var/root under sudo)
-  // instead of whatever the shell happened to inherit.
-  if (struct passwd* pw = getpwuid(getuid()); pw && pw->pw_dir) {
+  // instead of whatever the shell happened to inherit. `homeDir` is held for the
+  // rest of the function so the c_str() pushed into `params` stays valid until
+  // sandbox_init_with_parameters consumes it below.
+  std::optional<std::string> homeDir = santa::account::HomeDirForUID(getuid());
+  if (homeDir.has_value()) {
     params.push_back("HOME");
-    params.push_back(pw->pw_dir);
+    params.push_back(homeDir->c_str());
   }
   // Read the per-user darwin temp dir directly rather than $TMPDIR so the
   // placeholder is consistent under sudo / inherited environments.

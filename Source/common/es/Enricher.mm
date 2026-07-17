@@ -17,13 +17,12 @@
 
 #include <EndpointSecurity/ESTypes.h>
 #include <bsm/libbsm.h>
-#include <grp.h>
-#include <pwd.h>
 #include <sys/types.h>
 
 #include <memory>
 #include <optional>
 
+#include "Source/common/AccountLookup.h"
 #include "Source/common/Platform.h"
 #include "Source/common/SNTLogging.h"
 #include "Source/common/String.h"
@@ -241,12 +240,9 @@ std::optional<std::shared_ptr<std::string>> Enricher::UsernameForUID(uid_t uid,
     // If `kLocalOnly` option is set, do not attempt a lookup
     return std::nullopt;
   } else {
-    struct passwd* pw = getpwuid(uid);
-    if (pw) {
-      username = std::make_shared<std::string>(pw->pw_name);
-    } else {
-      username = std::nullopt;
-    }
+    std::optional<std::string> name = account::UsernameForUID(uid);
+    username =
+        name.has_value() ? std::make_optional(std::make_shared<std::string>(*name)) : std::nullopt;
 
     username_cache_.set(uid, username);
 
@@ -264,12 +260,9 @@ std::optional<std::shared_ptr<std::string>> Enricher::UsernameForGID(gid_t gid,
     // If `kLocalOnly` option is set, do not attempt a lookup
     return std::nullopt;
   } else {
-    struct group* gr = getgrgid(gid);
-    if (gr) {
-      groupname = std::make_shared<std::string>(gr->gr_name);
-    } else {
-      groupname = std::nullopt;
-    }
+    std::optional<std::string> name = account::GroupNameForGID(gid);
+    groupname =
+        name.has_value() ? std::make_optional(std::make_shared<std::string>(*name)) : std::nullopt;
 
     groupname_cache_.set(gid, groupname);
 
@@ -283,8 +276,7 @@ std::optional<uid_t> Enricher::UIDForUsername(std::string_view username, EnrichO
     return std::nullopt;
   }
 
-  struct passwd* pw = getpwnam(username.data());
-  return pw ? std::make_optional(pw->pw_uid) : std::nullopt;
+  return account::UIDForUsername(username);
 }
 
 }  // namespace santa

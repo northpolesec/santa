@@ -14,8 +14,7 @@
 
 #include "Source/santad/TemporaryAdminMode.h"
 
-#include <pwd.h>
-
+#import "Source/common/AccountLookup.h"
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTError.h"
 #import "Source/common/SNTLogging.h"
@@ -304,8 +303,16 @@ bool TemporaryAdminMode::RestoreAndValidateExtraState(NSDictionary* state) {
     return false;
   }
   uid_t uid = [state[kStateTempAdminTargetUIDKey] unsignedIntValue];
-  // Reject uid 0 and any uid that no longer resolves to a user (deleted account).
-  if (uid == 0 || getpwuid(uid) == NULL) {
+  // Reject uid 0. For a nonzero uid, drop the session only on a *confirmed* "no
+  // such account" (kNotFound): the account was deleted, so there is nothing to
+  // revert. A lookup that could not complete (kError -- opendirectoryd not yet
+  // reachable at boot, common for the AD/LDAP accounts TAM supports) must NOT be
+  // read as deletion: dropping the session here would strand the still-elevated
+  // user as an untracked admin. Keep the target so the normal reconcile path
+  // (RevertEffect, which persists an expired record and retries a failed demotion)
+  // resolves it once the directory is reachable -- mirroring AdminUserState's
+  // deleted-vs-unreachable handling.
+  if (uid == 0 || santa::account::StatusForUID(uid) == santa::account::LookupStatus::kNotFound) {
     return false;
   }
   target_uid_ = uid;

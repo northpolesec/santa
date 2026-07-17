@@ -19,7 +19,6 @@
 
 #include <bsm/libbsm.h>
 #include <libproc.h>
-#include <pwd.h>
 #include <sys/param.h>
 #include <utmpx.h>
 
@@ -29,6 +28,7 @@
 #include <string>
 #include <utility>
 
+#include "Source/common/AccountLookup.h"
 #include "Source/common/BranchPrediction.h"
 #include "Source/common/CodeSigningIdentifierUtils.h"
 #import "Source/common/MOLCodesignChecker.h"
@@ -546,8 +546,9 @@ static bool SameBinary(const es_process_t* a, NSString* aSHA256, const es_proces
     }
 
     // User data
-    struct passwd* user = getpwuid(audit_token_to_ruid(targetProc->audit_token));
-    if (user) se.executingUser = @(user->pw_name);
+    std::optional<std::string> user =
+        santa::account::UsernameForUID(audit_token_to_ruid(targetProc->audit_token));
+    if (user.has_value()) se.executingUser = @(user->c_str());
     NSArray *loggedInUsers, *currentSessions;
     [self loggedInUsers:&loggedInUsers sessions:&currentSessions];
     se.currentSessions = currentSessions;
