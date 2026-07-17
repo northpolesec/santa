@@ -14,7 +14,6 @@
 
 #include "Source/santad/TemporaryAdminMode.h"
 
-#import "Source/common/AccountLookup.h"
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTError.h"
 #import "Source/common/SNTLogging.h"
@@ -23,6 +22,8 @@
 namespace santa {
 
 static NSString* const kTAMTargetUsernameKey = @"TargetUsername";
+static NSString* const kTAMTargetUUIDKey = @"TargetUUID";
+static NSString* const kTAMTargetLocalKey = @"TargetLocal";
 
 std::shared_ptr<TemporaryAdminMode> TemporaryAdminMode::Create(
     SNTConfigurator* configurator, SNTNotificationQueue* notification_queue,
@@ -45,7 +46,8 @@ TemporaryAdminMode::TemporaryAdminMode(PassKey, SNTConfigurator* configurator,
                        configurator, notification_queue),
       membership_(std::move(membership)),
       handle_audit_event_block_([handle_audit_event_block copy]),
-      target_uid_(0) {}
+      target_uid_(0),
+      target_is_local_(false) {}
 
 bool TemporaryAdminMode::IsCurrentlyAdmin(uid_t uid) {
   return membership_->IsMember(uid);
@@ -184,6 +186,17 @@ void TemporaryAdminMode::NewPolicyReceived(SNTTemporaryAdminPolicy* policy) {
 // lock_-guarded PersistExpiredForRetryLocked(); the annotation matches the base
 // pure-virtual and lets thread-safety analysis see the lock is already held.
 bool TemporaryAdminMode::ApplyEffect(NSError** err) ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
+  // The pre-checked target can vanish while BeginGrant's authorization window
+  // runs off lock_: an expiry, screen lock, or revoke ends the session and
+  // zeroes target_uid_. uid 0 is never a valid session target (RevertEffect
+  // treats it as "no session"), so refuse the grant rather than elevating
+  // root under a record that could never be reverted.
+  if (target_uid_ == 0) {
+    [SNTError populateError:err
+                   withCode:SNTErrorCodeTAMMembershipChangeFailed
+                     format:@"The session ended during authorization."];
+    return false;
+  }
   // Persist-before-flip: name the target on disk before the elevation, so a
   // crash between the two leaves a deadline-0 record the next daemon start
   // reverts — never an elevated user with no on-disk state. It also
@@ -199,6 +212,14 @@ bool TemporaryAdminMode::ApplyEffect(NSError** err) ABSL_EXCLUSIVE_LOCKS_REQUIRE
   // permanent untracked admin.
   bool is_refresh = IsStartedLocked();
   if (!is_refresh) {
+    // Capture the account's stable identity BEFORE the provisional record is
+    // written: the UUID is the rename-proof key the revert paths use to detect
+    // uid reuse, and the Local bit is what lets the revert of a deleted LOCAL
+    // account terminate instead of retrying forever. Best-effort — if the
+    // identity does not resolve here, the record carries no UUID and the
+    // revert paths fall back to always attempting the demotion.
+    target_uuid_ = membership_->UUIDForUID(target_uid_);
+    target_is_local_ = membership_->IsLocalAccount(target_uid_);
     PersistExpiredForRetryLocked();
   }
   if (!membership_->AddMember(target_uid_, err)) {
@@ -217,11 +238,49 @@ bool TemporaryAdminMode::RevertEffect() {
     // No session target -> nothing to revert.
     return true;
   }
+  // Single up-front resolution probe. Both the uid-reuse guard and the
+  // deleted-local consume below key off this one piece of evidence, so the
+  // consume can never fire for an account this same pass proved to exist.
+  NSString* current_uuid = membership_->UUIDForUID(target_uid_);
+  // uid-reuse guard: if the uid now resolves to a DIFFERENT account than was
+  // elevated (unique identifiers differ), the elevated account was deleted
+  // and its uid reallocated. There is no elevation left to revert, and the
+  // new holder of the uid must never be demoted by this record. Matching on
+  // the GeneratedUID rather than the username makes this rename-resistant: a
+  // rename preserves the UUID, and rewriting a GeneratedUID requires root —
+  // an actor who could equally re-add themselves after any demotion.
+  if (target_uuid_.length && current_uuid.length &&
+      ![current_uuid isEqualToString:target_uuid_]) {
+    LOGW(@"Temporary Admin Mode: uid %u now resolves to a different account "
+         @"(recorded UUID %@, current UUID %@); treating the recorded "
+         @"elevation as already removed.",
+         target_uid_, target_uuid_, current_uuid);
+    return true;
+  }
   NSError* err = nil;
   if (!membership_->RemoveMember(target_uid_, &err)) {
-    // Report the failure so the base keeps an expired session record and retries the
-    // demotion on the next daemon start, rather than clearing state and leaving the
-    // user elevated past the intended window.
+    if (err.code == SNTErrorCodeTAMNoConsoleUser && target_is_local_ &&
+        current_uuid == nil) {
+      // RemoveMember reports group-resolution failures as
+      // MembershipChangeFailed, so NoConsoleUser means the admin group
+      // resolved but this LOCAL account did not: it was deleted. The probe
+      // above agreeing (nil) rules out a flap inside RemoveMember's own
+      // resolution. Nothing left to demote; consume the record so it cannot
+      // block future grants forever.
+      //
+      // Deleting the user does not scrub group records (they hold members by
+      // name and UUID), so a stale name entry can persist past this consume;
+      // that artifact is not reachable through this seam.
+      LOGW(@"Temporary Admin Mode: local uid %u (recorded UUID %@) no longer "
+           @"resolves; treating the recorded elevation as already removed.",
+           target_uid_, target_uuid_);
+      return true;
+    }
+    // Report the failure so the base keeps an expired session record and
+    // retries the demotion on the next daemon start, rather than clearing
+    // state and leaving the user elevated past the intended window. This
+    // covers both a systemic directory failure and an unresolvable DIRECTORY
+    // account, which off-network is indistinguishable from a deleted one.
     LOGE(@"Temporary Admin Mode failed to demote uid %u: %@", target_uid_,
          err.localizedDescription);
     return false;
@@ -230,9 +289,42 @@ bool TemporaryAdminMode::RevertEffect() {
 }
 
 bool TemporaryAdminMode::ReapplyEffectOnRestart() {
+  // IsMember() cannot distinguish "resolved and not a member" from "identity
+  // did not resolve" (directory outage / off-network directory account), and
+  // only the former proves an out-of-band revocation. Probe resolution first:
+  // an unresolvable identity resumes the session so the elevation stays
+  // tracked, and the timer (or the next daemon start) reverts it once the
+  // directory answers.
+  NSString* current_uuid = membership_->UUIDForUID(target_uid_);
+  if (current_uuid == nil) {
+    LOGW(@"Temporary Admin Mode: uid %u did not resolve at restart; resuming the "
+         @"session without membership verification.",
+         target_uid_);
+    return true;
+  }
+  if (target_uuid_.length && ![current_uuid isEqualToString:target_uuid_]) {
+    // The uid was reallocated to a different account: the elevated account no
+    // longer exists, so there is nothing to track — and the new holder must
+    // not inherit (or be demoted out of) this session. Declining routes
+    // through the base's no-revert teardown.
+    LOGI(@"Temporary Admin Mode: uid %u now resolves to a different account "
+         @"(recorded UUID %@, current UUID %@); ending the persisted session.",
+         target_uid_, target_uuid_, current_uuid);
+    return false;
+  }
   // If the user is no longer a member, the elevation was revoked out of band
   // (admin/MDM/another tool). Do not re-add — end the session instead.
   if (!membership_->IsMember(target_uid_)) {
+    // IsMember resolves the identity again, and it has no error channel: a
+    // directory flap between the probe above and this query also reads as
+    // "not a member". Only trust the negative while the identity still
+    // resolves; otherwise resume so the elevation stays tracked.
+    if (membership_->UUIDForUID(target_uid_) == nil) {
+      LOGW(@"Temporary Admin Mode: uid %u stopped resolving during restart "
+           @"verification; resuming the session without membership verification.",
+           target_uid_);
+      return true;
+    }
     LOGI(@"Temporary Admin Mode: persisted session for uid %u is no longer a group member; "
          @"treating as revoked out of band and ending the session.",
          target_uid_);
@@ -293,7 +385,9 @@ void TemporaryAdminMode::RequestAuthorization(void (^reply)(BOOL, NSString*)) {
 NSDictionary* TemporaryAdminMode::ExtraStateToPersist() {
   return @{
     kStateTempAdminTargetUIDKey : @(target_uid_),
-    kTAMTargetUsernameKey : target_username_ ?: @""
+    kTAMTargetUsernameKey : target_username_ ?: @"",
+    kTAMTargetUUIDKey : target_uuid_ ?: @"",
+    kTAMTargetLocalKey : @(target_is_local_),
   };
 }
 
@@ -303,26 +397,38 @@ bool TemporaryAdminMode::RestoreAndValidateExtraState(NSDictionary* state) {
     return false;
   }
   uid_t uid = [state[kStateTempAdminTargetUIDKey] unsignedIntValue];
-  // Reject uid 0. For a nonzero uid, drop the session only on a *confirmed* "no
-  // such account" (kNotFound): the account was deleted, so there is nothing to
-  // revert. A lookup that could not complete (kError -- opendirectoryd not yet
-  // reachable at boot, common for the AD/LDAP accounts TAM supports) must NOT be
-  // read as deletion: dropping the session here would strand the still-elevated
-  // user as an untracked admin. Keep the target so the normal reconcile path
-  // (RevertEffect, which persists an expired record and retries a failed demotion)
-  // resolves it once the directory is reachable -- mirroring AdminUserState's
-  // deleted-vs-unreachable handling.
-  if (uid == 0 || santa::account::StatusForUID(uid) == santa::account::LookupStatus::kNotFound) {
+  // Reject only uid 0 (never a valid session target; RevertEffect treats it
+  // as "no session"). Deliberately NO account-existence probe here: a Darwin
+  // passwd lookup has no error channel — a directory outage and a deleted
+  // account both surface as "no such account" — so any probe that drops the
+  // session on "not found" turns a boot-time outage into a permanently
+  // stranded admin. Deleted-vs-unreachable is instead resolved where an error
+  // channel exists: RevertEffect / ReapplyEffectOnRestart, through the
+  // AdminGroupMembership seam.
+  if (uid == 0) {
     return false;
   }
   target_uid_ = uid;
   target_username_ = state[kTAMTargetUsernameKey];
+  // Records written before the UUID/Local keys existed restore without them:
+  // an empty UUID skips the uid-reuse guard, and Local defaults to NO so an
+  // unresolvable account stays retryable. (Deliberately the opposite default
+  // from AdminUserState's EntryIsLocal: a missing key there is tampering;
+  // here it is also the upgrade path, and defaulting to local would let an
+  // off-network directory account's revert be consumed as "deleted".)
+  NSString* uuid =
+      [state[kTAMTargetUUIDKey] isKindOfClass:[NSString class]] ? state[kTAMTargetUUIDKey] : nil;
+  target_uuid_ = uuid.length ? uuid : nil;
+  NSNumber* local = state[kTAMTargetLocalKey];
+  target_is_local_ = [local isKindOfClass:[NSNumber class]] && local.boolValue;
   return true;
 }
 
 void TemporaryAdminMode::ClearExtraState() {
   target_uid_ = 0;
   target_username_ = nil;
+  target_uuid_ = nil;
+  target_is_local_ = false;
 }
 
 id TemporaryAdminMode::BuildEnterAuditEvent(NSString* session_uuid, uint32_t seconds,

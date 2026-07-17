@@ -74,6 +74,21 @@ class AdminGroupMembership {
   // reuse: a recorded username that no longer matches means the uid now names
   // a different account, which must never inherit the original's admin.
   virtual NSString* UsernameForUID(uid_t uid) = 0;
+
+  // Returns the stable unique identifier (GeneratedUID) `uid` currently
+  // resolves to, or nil when the identity does not resolve. Unlike the
+  // username, the unique identifier survives an account rename and changes
+  // when a freed uid is reallocated, so revert callers use it to tell "same
+  // account" from "uid reused" without a rename escape hatch.
+  virtual NSString* UUIDForUID(uid_t uid) = 0;
+
+  // Returns whether `uid` resolves against the LOCAL identity authority.
+  // Directory (network) accounts return false, as does any account that does
+  // not currently resolve. Captured at grant time: a local account that later
+  // fails to resolve against a healthy local node was deleted (terminal),
+  // while an unresolvable directory account may merely be off-network
+  // (retryable).
+  virtual bool IsLocalAccount(uid_t uid) = 0;
 };
 
 // Returns the in-process CoreServices-backed implementation.
