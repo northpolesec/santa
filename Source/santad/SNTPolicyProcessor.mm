@@ -71,26 +71,65 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
   return [ri toStruct];
 }
 
+namespace {
+
+// A compiled CEL fallback rule: the plan plus the customMsg/URL to report when
+// it matches.
+struct CompiledFallbackRule {
+  // unique_ptr: the batch is the sole owner (the vector is never copied, only
+  // the batch pointer is shared). Removes N control blocks.
+  std::unique_ptr<::google::api::expr::runtime::CelExpression> expression;
+  NSString* customMsg;
+  NSString* customURL;
+};
+
+// Immutable once published. arena declared FIRST -> destroyed LAST, because the
+// compiled plans point into its constant-folding data (same rule as
+// CompiledCELPlan and the old celFallbackArena_-before-celFallbackRules_ order).
+struct FallbackBatch {
+  std::unique_ptr<google::protobuf::Arena> arena;
+  std::vector<CompiledFallbackRule> rules;
+
+  FallbackBatch(std::unique_ptr<google::protobuf::Arena> a, std::vector<CompiledFallbackRule> r)
+      : arena(std::move(a)), rules(std::move(r)) {}
+
+  // Compiles each rule's expression with `evaluator` into a fresh shared arena
+  // and returns an immutable batch. Returns nullptr if any expression fails to
+  // compile (logging which); the caller then keeps its currently-published batch.
+  static std::shared_ptr<const FallbackBatch> Create(santa::cel::Evaluator<true>* evaluator,
+                                                     NSArray<SNTCELFallbackRule*>* rules) {
+    auto arena = std::make_unique<google::protobuf::Arena>();
+    std::vector<CompiledFallbackRule> compiled;
+    compiled.reserve(rules.count);
+    for (SNTCELFallbackRule* rule in rules) {
+      auto result = evaluator->Compile(santa::NSStringToUTF8StringView(rule.celExpr), arena.get());
+      if (!result.ok()) {
+        LOGE(@"Failed to compile CEL fallback expression '%@': %s", rule.celExpr,
+             std::string(result.status().message()).c_str());
+        return nullptr;
+      }
+      compiled.push_back({std::move(*result), rule.customMsg, rule.customURL});
+    }
+    return std::make_shared<FallbackBatch>(std::move(arena), std::move(compiled));
+  }
+};
+
+}  // namespace
+
 @interface SNTPolicyProcessor () {
   std::unique_ptr<santa::cel::Evaluator<false>> celEvaluatorV1_;
   std::unique_ptr<santa::cel::Evaluator<true>> celEvaluatorV2_;
   std::shared_ptr<santa::EntitlementsFilter> entitlementsFilter_;
-  // Arena used for constant folding during compilation of fallback rules.
-  // Declared before celFallbackRules_ so that C++ reverse destruction
-  // order destroys rules first, then the arena they reference.
-  std::shared_ptr<google::protobuf::Arena> celFallbackArena_;
-  struct CompiledFallbackRule {
-    std::shared_ptr<::google::api::expr::runtime::CelExpression> expression;
-    NSString* customMsg;
-    NSString* customURL;
-  };
-  std::vector<CompiledFallbackRule> celFallbackRules_;
+  // Immutable, atomically-swapped batch of compiled fallback rules
+  // (CompiledFallbackRule / FallbackBatch are defined in the anonymous namespace
+  // above). Accessed ONLY via the std::atomic_*_explicit shared_ptr free
+  // functions (see compileFallbackRules: / evaluateCELFallbackExpressions:).
+  std::shared_ptr<const FallbackBatch> celFallbackBatch_;
   std::unique_ptr<santa::cel::CELPlanCache<false>> celPlanCacheV1_;
   std::unique_ptr<santa::cel::CELPlanCache<true>> celPlanCacheV2_;
 }
 @property SNTRuleTable* ruleTable;
 @property SNTConfigurator* configurator;
-@property dispatch_queue_t celFallbackQueue;
 @property SNTKVOManager* celFallbackRulesObserver;
 @end
 
@@ -122,9 +161,6 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
       LOGW(@"Failed to create CEL v2 evaluator: %s",
            std::string(evaluatorV2.status().message()).c_str());
     }
-
-    _celFallbackQueue =
-        dispatch_queue_create("com.northpolesec.santa.cel_fallback", DISPATCH_QUEUE_SERIAL);
 
     // Pre-compile any existing fallback rules
     [self compileFallbackRules:_configurator.celFallbackRules];
@@ -165,35 +201,15 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
     return;
   }
 
-  // Create a fresh arena for this batch of compiled rules.
-  // The arena must outlive the compiled plans since constant folding stores
-  // data on it.
-  __block auto arena = std::make_shared<google::protobuf::Arena>();
-  __block std::vector<CompiledFallbackRule> compiled;
-  compiled.reserve(rules.count);
-  bool compileFailed = false;
-  for (SNTCELFallbackRule* rule in rules) {
-    auto result =
-        celEvaluatorV2_->Compile(santa::NSStringToUTF8StringView(rule.celExpr), arena.get());
-    if (result.ok()) {
-      compiled.push_back({std::move(*result), rule.customMsg, rule.customURL});
-    } else {
-      LOGE(@"Failed to compile CEL fallback expression '%@': %s", rule.celExpr,
-           std::string(result.status().message()).c_str());
-      compileFailed = true;
-      break;
-    }
+  std::shared_ptr<const FallbackBatch> batch = FallbackBatch::Create(celEvaluatorV2_.get(), rules);
+  if (!batch) {
+    return;  // compile failure already logged; keep the currently-published batch
   }
 
-  if (compileFailed) {
-    return;
-  }
-
-  dispatch_sync(self.celFallbackQueue, ^{
-    // Release old rules before the old arena (order matters).
-    celFallbackRules_ = std::move(compiled);
-    celFallbackArena_ = std::move(arena);
-  });
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+  std::atomic_store_explicit(&celFallbackBatch_, std::move(batch), std::memory_order_release);
+#pragma clang diagnostic pop
 }
 
 - (BOOL)evaluateCELFallbackExpressions:(SNTCachedDecision*)cd
@@ -202,17 +218,17 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
     return NO;
   }
 
-  // Snapshot the compiled rules and arena under the lock so their
-  // lifetimes extend through evaluation even if compileFallbackRules
-  // swaps them concurrently.
-  __block std::vector<CompiledFallbackRule> rules;
-  __block std::shared_ptr<google::protobuf::Arena> arenaRef;
-  dispatch_sync(self.celFallbackQueue, ^{
-    rules = celFallbackRules_;
-    arenaRef = celFallbackArena_;
-  });
+  // Snapshot the published batch with a single atomic load + refcount bump
+  // (O(1) regardless of rule count). The snapshot co-owns the arena and all
+  // compiled plans, so this stays valid even if compileFallbackRules: swaps
+  // in a new batch concurrently.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+  std::shared_ptr<const FallbackBatch> batch =
+      std::atomic_load_explicit(&celFallbackBatch_, std::memory_order_acquire);
+#pragma clang diagnostic pop
 
-  if (rules.empty()) {
+  if (!batch || batch->rules.empty()) {
     return NO;
   }
 
@@ -221,8 +237,8 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
   // Use a stack-local arena for evaluation temporaries.
   google::protobuf::Arena evalArena;
 
-  for (size_t i = 0; i < rules.size(); ++i) {
-    CELEvaluationResult celResult = [self evaluateCompiledCELExpression:rules[i].expression.get()
+  for (const CompiledFallbackRule& rule : batch->rules) {
+    CELEvaluationResult celResult = [self evaluateCompiledCELExpression:rule.expression.get()
                                                                   useV2:true
                                                          cachedDecision:cd
                                                              activation:*activation
@@ -240,8 +256,8 @@ struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
                    celResult.resultState == SNTRuleStateAllowCompiler)
                       ? SNTEventStateAllowCELFallback
                       : SNTEventStateBlockCELFallback;
-    cd.customMsg = rules[i].customMsg;
-    cd.customURL = rules[i].customURL;
+    cd.customMsg = rule.customMsg;
+    cd.customURL = rule.customURL;
     return YES;
   }
 

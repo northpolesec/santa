@@ -21,6 +21,10 @@
 #import <OCMock/OCMock.h>
 #import <XCTest/XCTest.h>
 
+#include <atomic>
+#include <thread>
+#include <vector>
+
 #import "Source/common/SNTCELFallbackRule.h"
 #import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTCommonEnums.h"
@@ -41,6 +45,7 @@ extern struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd);
 @interface SNTPolicyProcessor (Testing)
 - (BOOL)evaluateCELFallbackExpressions:(SNTCachedDecision*)cd
                     activationCallback:(ActivationCallbackBlock)activationCallback;
+- (void)compileFallbackRules:(NSArray<SNTCELFallbackRule*>*)rules;
 @end
 
 BOOL CompareMaybeNilStrings(NSString* s1, NSString* s2) {
@@ -1516,6 +1521,74 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   XCTAssertEqual(cd.decision, SNTEventStateBlockCELFallback);
   XCTAssertEqualObjects(cd.customMsg, @"Custom block message");
   XCTAssertEqualObjects(cd.customURL, @"https://example.com/details");
+}
+
+// Concurrent evaluation while another thread repeatedly recompiles/swaps the
+// fallback rule set (held in the atomically-swapped shared_ptr<const
+// FallbackBatch>). Every rule set installed here is non-empty and matches
+// unconditionally (ALLOWLIST/BLOCKLIST), and the initial set is published before
+// any thread starts, so a correct swap always yields a fallback decision. A
+// handled == NO result, a decision that is neither allow nor block, a crash, or
+// a UAF would each mean a reader observed a torn/lost/empty batch (a broken
+// swap), so all are treated as failures.
+- (void)testCELFallbackConcurrentEvalDuringRecompile {
+  // Sanity: install rules directly through the writer entry point and confirm
+  // the eval path is wired before introducing any concurrency.
+  [self.processor compileFallbackRules:@[ [self ruleWithExpr:@"ALLOWLIST"] ]];
+  SNTCachedDecision* sanityCD = [[SNTCachedDecision alloc] init];
+  sanityCD.sha256 = @"aabbccdd";
+  BOOL sanityHandled =
+      [self.processor evaluateCELFallbackExpressions:sanityCD
+                                  activationCallback:[self fallbackTestActivationCallback]];
+  XCTAssertTrue(sanityHandled);
+  XCTAssertEqual(sanityCD.decision, SNTEventStateAllowCELFallback);
+
+  // Three distinct non-empty rule sets the writer thread cycles through.
+  NSArray<NSArray<SNTCELFallbackRule*>*>* ruleSets = @[
+    @[ [self ruleWithExpr:@"ALLOWLIST"] ],
+    @[ [self ruleWithExpr:@"BLOCKLIST"] ],
+    @[ [self ruleWithExpr:@"BLOCKLIST"], [self ruleWithExpr:@"ALLOWLIST"] ],
+  ];
+
+  constexpr int kWriterIters = 500;
+  constexpr int kReaderThreads = 8;
+  constexpr int kReaderIters = 1500;
+  std::atomic<int> failures{0};
+
+  SNTPolicyProcessor* processor = self.processor;
+
+  std::thread writer([processor, ruleSets]() {
+    for (int i = 0; i < kWriterIters; i++) {
+      [processor compileFallbackRules:ruleSets[i % 3]];
+    }
+  });
+
+  std::vector<std::thread> readers;
+  readers.reserve(kReaderThreads);
+  for (int t = 0; t < kReaderThreads; t++) {
+    readers.emplace_back([self, processor, &failures]() {
+      for (int i = 0; i < kReaderIters; i++) {
+        SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+        cd.sha256 = @"aabbccdd";
+        BOOL handled =
+            [processor evaluateCELFallbackExpressions:cd
+                                   activationCallback:[self fallbackTestActivationCallback]];
+        // A correct swap always yields a fallback decision (see the test's doc
+        // comment), so NO — or any other decision — is a failure.
+        if (!handled || (cd.decision != SNTEventStateAllowCELFallback &&
+                         cd.decision != SNTEventStateBlockCELFallback)) {
+          failures.fetch_add(1);
+        }
+      }
+    });
+  }
+
+  writer.join();
+  for (auto& th : readers) {
+    th.join();
+  }
+
+  XCTAssertEqual(failures.load(), 0);
 }
 
 - (void)testRuleIdPropagation {
