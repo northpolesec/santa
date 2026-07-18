@@ -20,6 +20,7 @@
 #include <deque>
 #include <functional>
 #include <memory>
+#include <queue>
 #include <typeinfo>
 #include <vector>
 
@@ -161,12 +162,25 @@ class ProcessTree {
   mutable absl::Mutex mtx_;
   absl::flat_hash_map<const struct Pid, std::shared_ptr<Process>> map_
       ABSL_GUARDED_BY(mtx_);
-  // List of pids which should be removed from map_, and the timestamp (the
-  // originating exit/exec event's mach_time) at which the removal was
-  // scheduled. An entry is reaped once removal_grace_ticks_ have elapsed past
-  // its timestamp (measured against latest_ts_), so a reordered straggler
-  // cannot reference a process after it is reaped. See DrainRemovals().
-  std::vector<std::pair<uint64_t, struct Pid>> remove_at_ ABSL_GUARDED_BY(mtx_);
+  // Pending removals: pids to erase from map_, each paired with the mach_time
+  // of the exit/exec event that scheduled it. An entry is reaped once
+  // removal_grace_ticks_ have elapsed past that timestamp (measured against
+  // latest_ts_), so a reordered straggler cannot reference a process after it
+  // is reaped. Held as a MIN-heap on the timestamp so DrainRemovals reaps only
+  // the entries that have expired (smallest timestamps) rather than scanning
+  // every pending one — ES delivers events out of order, so timestamps are not
+  // appended monotonically and the earliest deadline is not necessarily the
+  // oldest insertion. See DrainRemovals().
+  struct ReapEarliestFirst {
+    bool operator()(const std::pair<uint64_t, struct Pid>& a,
+                    const std::pair<uint64_t, struct Pid>& b) const {
+      return a.first > b.first;  // priority_queue is a max-heap; invert for min
+    }
+  };
+  std::priority_queue<std::pair<uint64_t, struct Pid>,
+                      std::vector<std::pair<uint64_t, struct Pid>>,
+                      ReapEarliestFirst>
+      remove_at_ ABSL_GUARDED_BY(mtx_);
 
   // Dedup of processed events. The same kernel event is delivered to every
   // tree-aware client; each informs the tree, so an event must be applied
