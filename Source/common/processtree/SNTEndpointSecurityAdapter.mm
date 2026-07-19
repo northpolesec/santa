@@ -45,9 +45,10 @@ void InformFromESEvent(ProcessTree& tree, const Message& msg) {
   switch (msg->event_type) {
     case ES_EVENT_TYPE_AUTH_EXEC:
     case ES_EVENT_TYPE_NOTIFY_EXEC: {
+      uint32_t arg_count = esapi->ExecArgCount(&msg->event.exec);
       std::vector<std::string> args;
-      args.reserve(esapi->ExecArgCount(&msg->event.exec));
-      for (int i = 0; i < esapi->ExecArgCount(&msg->event.exec); i++) {
+      args.reserve(arg_count);
+      for (uint32_t i = 0; i < arg_count; i++) {
         es_string_token_t arg = esapi->ExecArg(&msg->event.exec, i);
         args.push_back(StringTokenToString(arg));
       }
@@ -69,7 +70,7 @@ void InformFromESEvent(ProcessTree& tree, const Message& msg) {
 
       tree.HandleExec(msg->mach_time, **proc, PidFromAuditToken(target->audit_token),
                       (struct Program){.executable = StringTokenToString(executable),
-                                       .arguments = args,
+                                       .arguments = std::move(args),
                                        .code_signing = cs_info},
                       (struct Cred){
                           .uid = audit_token_to_euid(target->audit_token),

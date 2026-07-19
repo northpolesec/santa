@@ -114,6 +114,34 @@ using namespace santa::santad::process_tree;
   XCTAssertEqual(child->effective_cred_, self.initProc->effective_cred_);
 }
 
+// A given exec is delivered to every tree-aware client, so HandleExec sees the
+// same exec (identical EventKey) more than once. A duplicate delivery must be a
+// no-op: the process is applied exactly once and its program is unchanged.
+// HandleExec skips the expensive Process/Program rebuild on the duplicate via a
+// seen_ fast path; StepLocked remains the authoritative dedup gate either way.
+- (void)testDuplicateExecDeliveryIsIdempotent {
+  uint64_t event_id = 1;
+  const struct Pid child_pid = {.pid = 2, .pidversion = 2};
+  self.tree->HandleFork(event_id++, *self.initProc, child_pid);
+  auto child = *self.tree->Get(child_pid);
+
+  const struct Pid exec_pid = {.pid = 2, .pidversion = 3};
+  const struct Program prog = {.executable = "/bin/bash", .arguments = {"/bin/bash", "-i"}};
+  const uint64_t exec_ts = event_id++;
+
+  // Deliver the same exec (identical EventKey) twice.
+  self.tree->HandleExec(exec_ts, *child, exec_pid, prog, child->effective_cred_);
+  self.tree->HandleExec(exec_ts, *child, exec_pid, prog, child->effective_cred_);
+
+  auto post = self.tree->Get(exec_pid);
+  XCTAssertTrue(post.has_value());
+  XCTAssertEqual(*(*post)->program_, prog);  // program intact, not corrupted
+  // Applied exactly once and reachable to init.
+  auto slice = self.tree->RootSlice(*post);
+  XCTAssertEqual(slice.size(), 2u);  // [exec, init]
+  XCTAssertEqual(slice.back(), self.initProc);
+}
+
 // We can't test the full backfill process, as retrieving information on
 // processes (with task_name_for_pid) requires privileges.
 // Test what we can by LoadPID'ing ourselves.

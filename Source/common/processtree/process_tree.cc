@@ -122,26 +122,36 @@ void ProcessTree::HandleFork(uint64_t timestamp, const Process& parent,
 }
 
 void ProcessTree::HandleExec(uint64_t timestamp, const Process& p,
-                             const Pid new_pid, const Program prog,
-                             const Cred c) {
+                             const Pid new_pid, Program prog, const Cred c) {
   // TODO(nickmg): should struct pid be reworked and only pid_version be passed?
   assert(new_pid.pid == p.pid_.pid);
 
-  // Expected double-apply: a tree-aware auth client (the Authorizer) subscribes
-  // to both AUTH_EXEC and NOTIFY_EXEC, so an uncached exec reaches here twice.
-  // The two ES messages carry different mach_time, so they form distinct
-  // EventKeys and both pass dedup; the second is a first-wins no-op (the
-  // map_.emplace below). This is intentional and benign — it costs one extra
-  // emplace/remove_at_/drain on the auth path per uncached exec (accepted).
+  const struct EventKey key = {timestamp, EventKind::kExec, p.pid_, new_pid};
 
-  // Construct the new process (copies program/args/signing) OUTSIDE the lock to
-  // keep the shared tree lock short on the serial ES handler path. A duplicate
-  // wastes this allocation, which is cheaper than lengthening the lock hold.
+  // The same exec is delivered to every tree-aware client, and the Authorizer
+  // also sees it as both AUTH_EXEC and NOTIFY_EXEC, so HandleExec runs
+  // repeatedly for a single exec. Constructing the new Process/Program below
+  // copies the args and signing info and is the expensive part, so peek under a
+  // read lock and skip the build entirely when this exact event was already
+  // applied. Best-effort only: StepLocked (under the write lock) remains the
+  // authoritative dedup gate, and skipping here is behavior-preserving because
+  // a seen key has already advanced latest_ts_ past its timestamp. Distinct
+  // deliveries that share a pid but carry a different mach_time still fall
+  // through to the first-wins map_.emplace below.
+  {
+    absl::ReaderMutexLock lock(mtx_);
+    if (seen_.contains(key)) {
+      return;
+    }
+  }
+
+  // Construct the new process (copies program/args/signing) OUTSIDE the write
+  // lock to keep the shared tree lock short on the serial ES handler path.
   auto new_proc = std::make_shared<Process>(
-      new_pid, c, std::make_shared<const Program>(prog), p.parent_);
+      new_pid, c, std::make_shared<const Program>(std::move(prog)), p.parent_);
   {
     absl::MutexLock lock(mtx_);
-    if (!StepLocked({timestamp, EventKind::kExec, p.pid_, new_pid})) {
+    if (!StepLocked(key)) {
       return;
     }
     remove_at_.push({timestamp, p.pid_});
