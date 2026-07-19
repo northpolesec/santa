@@ -132,9 +132,8 @@ using namespace santa::santad::process_tree;
 // A given exec is delivered to every tree-aware client, so HandleExec sees the
 // same exec (identical EventKey) more than once. A duplicate delivery must be
 // deduped: the exec is applied — and thus annotated — exactly once, with the
-// program unchanged. HandleExec skips the expensive Process/Program rebuild on
-// the duplicate via a seen_ fast path; StepLocked remains the authoritative
-// dedup gate either way.
+// program unchanged. StepLocked is the authoritative dedup gate. (Callers skip
+// the build for known duplicates up front via HasSeenExec; see the adapter.)
 - (void)testDuplicateExecDeliveryIsIdempotent {
   auto exec_count = std::make_shared<int>(0);
   std::vector<std::unique_ptr<Annotator>> annotators{};
@@ -166,6 +165,31 @@ using namespace santa::santad::process_tree;
   auto slice = tree->RootSlice(*post);
   XCTAssertEqual(slice.size(), 2u);  // [exec, init]
   XCTAssertEqual(slice.back(), init);
+}
+
+// HasSeenExec lets the ES adapter skip building the Program for an exec the tree
+// has already recorded. It must report true for exactly the event identity that
+// HandleExec dedups on, and false for anything else.
+- (void)testHasSeenExec {
+  uint64_t event_id = 1;
+  const struct Pid child_pid = {.pid = 2, .pidversion = 2};
+  self.tree->HandleFork(event_id++, *self.initProc, child_pid);
+  auto child = *self.tree->Get(child_pid);
+
+  const struct Pid exec_pid = {.pid = 2, .pidversion = 3};
+  const struct Program prog = {.executable = "/bin/bash", .arguments = {}};
+  const uint64_t exec_ts = 100;
+
+  // Unknown before the exec is applied.
+  XCTAssertFalse(self.tree->HasSeenExec(exec_ts, child_pid, exec_pid));
+
+  self.tree->HandleExec(exec_ts, *child, exec_pid, prog, child->effective_cred_);
+
+  // Recorded after — matching the identity HandleExec deduped on.
+  XCTAssertTrue(self.tree->HasSeenExec(exec_ts, child_pid, exec_pid));
+  // A different timestamp or pid is a distinct event.
+  XCTAssertFalse(self.tree->HasSeenExec(exec_ts + 1, child_pid, exec_pid));
+  XCTAssertFalse(self.tree->HasSeenExec(exec_ts, child_pid, child_pid));
 }
 
 // We can't test the full backfill process, as retrieving information on

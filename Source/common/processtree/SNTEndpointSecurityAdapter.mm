@@ -45,6 +45,18 @@ void InformFromESEvent(ProcessTree& tree, const Message& msg) {
   switch (msg->event_type) {
     case ES_EVENT_TYPE_AUTH_EXEC:
     case ES_EVENT_TYPE_NOTIFY_EXEC: {
+      const es_process_t* target = msg->event.exec.target;
+      struct Pid target_pid = PidFromAuditToken(target->audit_token);
+
+      // The same exec is delivered to every tree-aware client (and to the
+      // Authorizer as both AUTH_EXEC and NOTIFY_EXEC). Building the arg list and
+      // Program below is the expensive part, so skip it when the tree has
+      // already recorded this exact exec. HandleExec re-checks under the write
+      // lock, so a racing novel exec is never dropped.
+      if (tree.HasSeenExec(msg->mach_time, event_pid, target_pid)) {
+        break;
+      }
+
       uint32_t arg_count = esapi->ExecArgCount(&msg->event.exec);
       std::vector<std::string> args;
       args.reserve(arg_count);
@@ -53,7 +65,6 @@ void InformFromESEvent(ProcessTree& tree, const Message& msg) {
         args.push_back(StringTokenToString(arg));
       }
 
-      const es_process_t* target = msg->event.exec.target;
       es_string_token_t executable = target->executable->path;
 
       // Extract code signing info from the target process
@@ -68,7 +79,7 @@ void InformFromESEvent(ProcessTree& tree, const Message& msg) {
         cs_info.signing_id = StringTokenToString(target->signing_id);
       }
 
-      tree.HandleExec(msg->mach_time, **proc, PidFromAuditToken(target->audit_token),
+      tree.HandleExec(msg->mach_time, **proc, target_pid,
                       (struct Program){.executable = StringTokenToString(executable),
                                        .arguments = std::move(args),
                                        .code_signing = cs_info},

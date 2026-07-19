@@ -76,6 +76,13 @@ class ProcessTree {
   // Inform the tree of a process exit.
   void HandleExit(uint64_t timestamp, const Process& p);
 
+  // Returns whether an exec event with this identity has already been recorded
+  // by the tree. Lets a caller skip building the (expensive) Program before
+  // calling HandleExec for a duplicate delivery. Best-effort: HandleExec
+  // re-checks under the write lock, so a racing novel exec is never dropped.
+  bool HasSeenExec(uint64_t timestamp, struct Pid actor,
+                   struct Pid target) const;
+
   // Mark the given pids as needing to be retained in the tree's map for future
   // access. Normally, Processes are removed once all clients process past the
   // event which would remove the Process (e.g. exit), however in cases where
