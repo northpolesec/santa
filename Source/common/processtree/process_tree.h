@@ -206,6 +206,11 @@ class ProcessTree {
   // regression test interpose there. Set via ProcessTreeTestPeer (a friend).
   // The per-event null check is negligible.
   std::function<void()> on_event_claimed_for_test_;
+
+  // Test-only seam (empty in production): invoked by ReleaseProcess between
+  // the reader-lock collect and the exclusive-lock erase — the window the
+  // erase re-verify guards. Set via ProcessTreeTestPeer.
+  std::function<void()> on_release_collected_for_test_;
 };
 
 template <typename T>

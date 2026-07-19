@@ -236,16 +236,37 @@ void ProcessTree::RetainProcess(const PidList& pids) {
 }
 
 void ProcessTree::ReleaseProcess(const PidList& pids) {
-  absl::MutexLock lock(mtx_);
-  for (const struct Pid& p : pids) {
-    auto proc = GetLocked(p);
-    if (proc) {
-      // relaxed is safe: the exclusive lock provides ordering for
-      // tombstoned_ and map_.erase().
-      if ((*proc)->refcnt_.fetch_sub(1, std::memory_order_relaxed) == 1 &&
+  // Fast path under the reader lock: the decrement is atomic, and tombstoned_
+  // is stable here (written only in DrainRemovals under the exclusive lock).
+  // Only the rare erase of a tombstoned process needs the exclusive lock.
+  PidList to_erase;
+  {
+    absl::ReaderMutexLock lock(mtx_);
+    for (const struct Pid& p : pids) {
+      auto proc = GetLocked(p);
+      if (proc &&
+          (*proc)->refcnt_.fetch_sub(1, std::memory_order_relaxed) == 1 &&
           (*proc)->tombstoned_) {
-        map_.erase(p);
+        to_erase.push_back(p);
       }
+    }
+  }
+  if (to_erase.empty()) {
+    return;
+  }
+  if (on_release_collected_for_test_) {
+    on_release_collected_for_test_();
+  }
+
+  absl::MutexLock lock(mtx_);
+  for (const struct Pid& p : to_erase) {
+    // Re-verify: between the two lock holds the process may have been
+    // retained again, already erased by a concurrent releaser, or erased
+    // and a fresh process re-inserted under the same pid.
+    auto proc = GetLocked(p);
+    if (proc && (*proc)->refcnt_.load(std::memory_order_relaxed) == 0 &&
+        (*proc)->tombstoned_) {
+      map_.erase(p);
     }
   }
 }

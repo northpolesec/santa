@@ -37,6 +37,12 @@ class ProcessTreeTestPeer : public ProcessTree {
   void SetOnEventClaimedForTest(std::function<void()> hook) {
     on_event_claimed_for_test_ = std::move(hook);
   }
+
+  // Install the ReleaseProcess test seam (ProcessTreeTestPeer is a friend of
+  // ProcessTree, so it can reach the private member).
+  void SetOnReleaseCollectedForTest(std::function<void()> hook) {
+    on_release_collected_for_test_ = std::move(hook);
+  }
 };
 
 }  // namespace santa::santad::process_tree
