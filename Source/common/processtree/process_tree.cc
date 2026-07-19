@@ -144,7 +144,7 @@ void ProcessTree::HandleExec(uint64_t timestamp, const Process& p,
     if (!StepLocked({timestamp, EventKind::kExec, p.pid_, new_pid})) {
       return;
     }
-    remove_at_.push_back({timestamp, p.pid_});
+    remove_at_.push({timestamp, p.pid_});
     map_.emplace(new_proc->pid_, new_proc);
     DrainRemovals();
   }
@@ -158,7 +158,7 @@ void ProcessTree::HandleExit(uint64_t timestamp, const Process& p) {
   if (!StepLocked({timestamp, EventKind::kExit, p.pid_, Pid{}})) {
     return;
   }
-  remove_at_.push_back({timestamp, p.pid_});
+  remove_at_.push({timestamp, p.pid_});
   DrainRemovals();
 }
 
@@ -206,17 +206,18 @@ void ProcessTree::DrainRemovals() {
       removal_grace_ticks_ ? removal_grace_ticks_ : kDefaultGrace;
   const uint64_t cutoff = latest_ts_ > grace ? latest_ts_ - grace : 0;
 
-  for (auto it = remove_at_.begin(); it != remove_at_.end();) {
-    if (it->first < cutoff) {
-      if (auto target = GetLocked(it->second);
-          target && (*target)->refcnt_.load(std::memory_order_relaxed) > 0) {
-        (*target)->tombstoned_ = true;
-      } else {
-        map_.erase(it->second);
-      }
-      it = remove_at_.erase(it);
+  // remove_at_ is a min-heap on the scheduling timestamp, so the earliest
+  // deadline is always on top. Reap only the entries that have expired and stop
+  // at the first that has not — every deeper entry is newer. This is O(K log R)
+  // in the number reaped, not O(R) in the number pending.
+  while (!remove_at_.empty() && remove_at_.top().first < cutoff) {
+    const struct Pid pid = remove_at_.top().second;
+    remove_at_.pop();
+    if (auto target = GetLocked(pid);
+        target && (*target)->refcnt_.load(std::memory_order_relaxed) > 0) {
+      (*target)->tombstoned_ = true;
     } else {
-      it++;
+      map_.erase(pid);
     }
   }
 }
