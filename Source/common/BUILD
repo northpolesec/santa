@@ -311,6 +311,7 @@ santa_unit_test(
     deps = [
         ":AuditUtilities",
         ":CSOpsHelper",
+        ":String",
     ],
 )
 

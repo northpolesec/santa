@@ -50,8 +50,8 @@ std::optional<CodeSigningInfo> LoadCodeSigningInfoForPID(pid_t pid) {
   CodeSigningInfo info;
   info.is_platform_binary = (*flags & CS_PLATFORM_BINARY) != 0;
 
-  auto cdhash = santa::CSOpsGetCDHash(pid);
-  if (cdhash) {
+  auto cdhash = santa::CSOpsGetCDHashBytes(pid);
+  if (cdhash && cdhash->size() == CS_CDHASH_LEN) {
     info.cdhash = *cdhash;
   }
 

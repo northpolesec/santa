@@ -16,6 +16,7 @@
 #import <Foundation/Foundation.h>
 #import <XCTest/XCTest.h>
 
+#include <Kernel/kern/cs_blobs.h>
 #include <bsm/libbsm.h>
 
 #include <atomic>
@@ -139,6 +140,12 @@ using namespace santa::santad::process_tree;
           XCTAssertEqualObjects(@(program->executable.c_str()), obj);
         }
       }];
+
+  // The backfill path stores cdhash as raw bytes, not a hex string. The test
+  // binary is code signed, so its cdhash is present and exactly CS_CDHASH_LEN.
+  if (program->code_signing.has_value() && !program->code_signing->cdhash.empty()) {
+    XCTAssertEqual(program->code_signing->cdhash.size(), (size_t)CS_CDHASH_LEN);
+  }
 }
 
 - (void)testAnnotation {

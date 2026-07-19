@@ -91,7 +91,7 @@ struct Cred {
 struct CodeSigningInfo {
   std::string signing_id;
   std::string team_id;
-  std::string cdhash;  // hex string
+  std::string cdhash;  // raw CS_CDHASH_LEN bytes; hex-encoded lazily at use
   bool is_platform_binary;
 
   friend bool operator==(const struct CodeSigningInfo& lhs,

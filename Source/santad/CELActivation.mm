@@ -72,7 +72,9 @@ std::vector<santa::cel::CELProtoTraits<true>::AncestorT> Ancestors<true>(
         ancestor.set_signing_id(cs.team_id + ":" + cs.signing_id);
       }
       ancestor.set_team_id(cs.team_id);
-      ancestor.set_cdhash(cs.cdhash);
+      // The tree stores cdhash as raw bytes; CEL exposes it as a hex string.
+      ancestor.set_cdhash(santa::BufToHexString(reinterpret_cast<const uint8_t*>(cs.cdhash.data()),
+                                                cs.cdhash.size()));
     }
 
     ancestors.push_back(std::move(ancestor));
