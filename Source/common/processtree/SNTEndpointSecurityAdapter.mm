@@ -55,9 +55,11 @@ void InformFromESEvent(ProcessTree& tree, const Message& msg) {
       const es_process_t* target = msg->event.exec.target;
       es_string_token_t executable = target->executable->path;
 
-      // Extract code signing info from the target process
+      // Extract code signing info from the target process. cdhash is stored as
+      // raw bytes; it is hex-encoded lazily where it is consumed (CEL).
       CodeSigningInfo cs_info{
-          .cdhash = santa::BufToHexString(target->cdhash, sizeof(target->cdhash)),
+          .cdhash =
+              std::string(reinterpret_cast<const char*>(target->cdhash), sizeof(target->cdhash)),
           .is_platform_binary = target->is_platform_binary,
       };
 

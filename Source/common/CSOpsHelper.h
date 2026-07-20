@@ -57,6 +57,11 @@ std::optional<uint32_t> CSOpsStatusFlags(pid_t pid,
 std::optional<std::string> CSOpsGetCDHash(pid_t pid,
                                           CSOpsFunc csops_func = csops);
 
+// Retrieve the raw (unencoded) CDHash bytes, exactly CS_CDHASH_LEN long.
+// Callers that need the hex form should use CSOpsGetCDHash instead.
+std::optional<std::string> CSOpsGetCDHashBytes(pid_t pid,
+                                               CSOpsFunc csops_func = csops);
+
 // Retrieve the Team ID string. Returns nullopt for unsigned, adhoc, or on
 // error.
 std::optional<std::string> CSOpsGetTeamID(pid_t pid,
