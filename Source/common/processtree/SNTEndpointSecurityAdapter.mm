@@ -34,13 +34,6 @@ namespace santa::santad::process_tree {
 
 void InformFromESEvent(ProcessTree& tree, const Message& msg) {
   struct Pid event_pid = PidFromAuditToken(msg->process->audit_token);
-  auto proc = tree.Get(event_pid);
-
-  if (!proc) {
-    return;
-  }
-
-  std::shared_ptr<EndpointSecurityAPI> esapi = msg.ESAPI();
 
   switch (msg->event_type) {
     case ES_EVENT_TYPE_AUTH_EXEC:
@@ -48,15 +41,21 @@ void InformFromESEvent(ProcessTree& tree, const Message& msg) {
       const es_process_t* target = msg->event.exec.target;
       struct Pid target_pid = PidFromAuditToken(target->audit_token);
 
-      // The same exec is delivered to every tree-aware client (and to the
-      // Authorizer as both AUTH_EXEC and NOTIFY_EXEC). Building the arg list and
-      // Program below is the expensive part, so skip it when the tree has
-      // already recorded this exact exec. HandleExec re-checks under the write
-      // lock, so a racing novel exec is never dropped.
-      if (tree.HasSeenExec(msg->mach_time, event_pid, target_pid)) {
+      // One reader lock: learn whether this exact exec was already recorded and,
+      // if not, fetch the execing process. The same exec is delivered to every
+      // tree-aware client (and to the Authorizer as both AUTH_EXEC and
+      // NOTIFY_EXEC); building the arg list and Program below is the expensive
+      // part, so skip it for a duplicate delivery. HandleExec re-checks under
+      // the write lock, so a racing novel exec is never dropped.
+      auto [proc, already_seen] = tree.GetExecActor(msg->mach_time, event_pid, target_pid);
+      if (already_seen) {
         break;
       }
+      if (!proc) {
+        return;
+      }
 
+      std::shared_ptr<EndpointSecurityAPI> esapi = msg.ESAPI();
       uint32_t arg_count = esapi->ExecArgCount(&msg->event.exec);
       std::vector<std::string> args;
       args.reserve(arg_count);
@@ -84,20 +83,29 @@ void InformFromESEvent(ProcessTree& tree, const Message& msg) {
       tree.HandleExec(msg->mach_time, **proc, target_pid,
                       (struct Program){.executable = StringTokenToString(executable),
                                        .arguments = std::move(args),
-                                       .code_signing = cs_info},
+                                       .code_signing = std::move(cs_info)},
                       (struct Cred){
                           .uid = audit_token_to_euid(target->audit_token),
                           .gid = audit_token_to_egid(target->audit_token),
                       });
-
       break;
     }
     case ES_EVENT_TYPE_NOTIFY_FORK: {
-      tree.HandleFork(msg->mach_time, **proc,
-                      PidFromAuditToken(msg->event.fork.child->audit_token));
+      auto proc = tree.Get(event_pid);
+      if (!proc) {
+        return;
+      }
+      tree.HandleFork(msg->mach_time, *proc, PidFromAuditToken(msg->event.fork.child->audit_token));
       break;
     }
-    case ES_EVENT_TYPE_NOTIFY_EXIT: tree.HandleExit(msg->mach_time, **proc); break;
+    case ES_EVENT_TYPE_NOTIFY_EXIT: {
+      auto proc = tree.Get(event_pid);
+      if (!proc) {
+        return;
+      }
+      tree.HandleExit(msg->mach_time, **proc);
+      break;
+    }
     default: return;
   }
 }

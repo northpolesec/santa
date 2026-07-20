@@ -44,7 +44,7 @@ namespace ptpb = ::santa::pb::v1::process_tree;
 
   // PID 1.1: fork() -> PID 2.2
   const struct Pid login_pid = {.pid = 2, .pidversion = 2};
-  self.tree->HandleFork(event_id++, *self.initProc, login_pid);
+  self.tree->HandleFork(event_id++, self.initProc, login_pid);
 
   // PID 2.2: exec("/usr/bin/login") -> PID 2.3
   const struct Pid login_exec_pid = {.pid = 2, .pidversion = 3};
@@ -63,7 +63,7 @@ namespace ptpb = ::santa::pb::v1::process_tree;
 
   // PID 2.3: fork() -> PID 3.3
   const struct Pid shell_pid = {.pid = 3, .pidversion = 3};
-  self.tree->HandleFork(event_id++, *login, shell_pid);
+  self.tree->HandleFork(event_id++, login, shell_pid);
   // PID 3.3: exec("/bin/zsh") -> PID 3.4
   const struct Pid shell_exec_pid = {.pid = 3, .pidversion = 4};
   const struct Program shell_prog = {.executable = "/bin/zsh", .arguments = {}};

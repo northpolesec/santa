@@ -83,32 +83,28 @@ void ProcessTree::BackfillInsertChildren(
   }
 }
 
-void ProcessTree::HandleFork(uint64_t timestamp, const Process& parent,
+void ProcessTree::HandleFork(uint64_t timestamp,
+                             const std::shared_ptr<const Process>& parent,
                              const Pid new_pid) {
-  std::shared_ptr<Process> child;
+  // Allocate the child OUTSIDE the write lock (as HandleExec does): the caller
+  // supplies the parent handle, so no lock-held lookup is needed to build it.
+  auto child = std::make_shared<Process>(new_pid, parent->effective_cred_,
+                                         parent->program_, parent);
   {
     // Dedup and the map insert are one critical section: if we released the
     // lock between them, another client could see this event as a duplicate
     // (skip it) and then read the tree before the child was inserted.
     absl::MutexLock lock(mtx_);
-    if (!StepLocked({timestamp, EventKind::kFork, parent.pid_, new_pid})) {
+    if (!StepLocked({timestamp, EventKind::kFork, parent->pid_, new_pid})) {
       return;
     }
     // Test seam (no-op in production): the claim just succeeded and mtx_ is
     // still held; fire here, BEFORE the insert, so the concurrency test can
     // verify a reader blocks at this boundary — i.e. claim and insert are a
-    // single lock hold. Placed in the handler (not StepLocked) on purpose: if
-    // the insert were ever moved to a separate critical section, this point
-    // would fall in the unlocked gap and the test would deterministically fail.
+    // single lock hold.
     if (on_event_claimed_for_test_) {
       on_event_claimed_for_test_();
     }
-    // Look up the parent rather than using map_[]: operator[] would insert a
-    // null entry (and orphan the child) if the parent were ever absent.
-    auto parent_proc = GetLocked(parent.pid_);
-    child = std::make_shared<Process>(new_pid, parent.effective_cred_,
-                                      parent.program_,
-                                      parent_proc ? *parent_proc : nullptr);
     map_.emplace(new_pid, child);
     // Reap AFTER applying, so a late event can never reap the actor it needs.
     DrainRemovals();
@@ -117,7 +113,7 @@ void ProcessTree::HandleFork(uint64_t timestamp, const Process& parent,
   // propagation is therefore NOT atomic with the structural insert above; that
   // is intentional and does not affect CEL ancestry (see StepLocked).
   for (const auto& annotator : annotators_) {
-    annotator->AnnotateFork(*this, parent, *child);
+    annotator->AnnotateFork(*this, *parent, *child);
   }
 }
 
@@ -132,7 +128,7 @@ void ProcessTree::HandleExec(uint64_t timestamp, const Process& p,
   // exact-duplicate delivery is rejected, while distinct deliveries that share
   // a pid but carry a different mach_time both pass and the later one is a
   // first-wins map_.emplace no-op. Callers building the Program eagerly can
-  // skip known duplicates up front via HasSeenExec (see InformFromESEvent).
+  // skip known duplicates up front via GetExecActor (see InformFromESEvent).
 
   // Allocate the new process OUTSIDE the write lock to keep the shared tree
   // lock short on the serial ES handler path; prog is moved in, not copied.
@@ -161,10 +157,14 @@ void ProcessTree::HandleExit(uint64_t timestamp, const Process& p) {
   DrainRemovals();
 }
 
-bool ProcessTree::HasSeenExec(uint64_t timestamp, const Pid actor,
-                              const Pid target) const {
+ProcessTree::ExecActor ProcessTree::GetExecActor(uint64_t timestamp,
+                                                 const Pid actor,
+                                                 const Pid target) const {
   absl::ReaderMutexLock lock(mtx_);
-  return seen_.contains({timestamp, EventKind::kExec, actor, target});
+  if (seen_.contains({timestamp, EventKind::kExec, actor, target})) {
+    return {std::nullopt, /*already_seen=*/true};
+  }
+  return {GetLocked(actor), /*already_seen=*/false};
 }
 
 bool ProcessTree::StepLocked(const EventKey& key) {

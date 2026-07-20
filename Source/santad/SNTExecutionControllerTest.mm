@@ -1543,13 +1543,13 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   uint64_t eventId = 1;
   // B (600, 1): the sandboxed seatbelt process.
   struct Pid bPid = {.pid = 600, .pidversion = 1};
-  tree->HandleFork(eventId++, *init, bPid);
+  tree->HandleFork(eventId++, init, bPid);
   // B fork -> C (601, 2).
   struct Pid cPid = {.pid = 601, .pidversion = 2};
-  tree->HandleFork(eventId++, **tree->Get(bPid), cPid);
+  tree->HandleFork(eventId++, *tree->Get(bPid), cPid);
   // C fork -> D (602, 3).
   struct Pid dPid = {.pid = 602, .pidversion = 3};
-  tree->HandleFork(eventId++, **tree->Get(cPid), dPid);
+  tree->HandleFork(eventId++, *tree->Get(cPid), dPid);
 
   self.sut = [self makeControllerWithProcessTree:tree];
 
@@ -1601,9 +1601,9 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
 
   uint64_t eventId = 1;
   struct Pid bPid = {.pid = 700, .pidversion = 1};
-  tree->HandleFork(eventId++, *init, bPid);
+  tree->HandleFork(eventId++, init, bPid);
   struct Pid cPid = {.pid = 701, .pidversion = 2};
-  tree->HandleFork(eventId++, **tree->Get(bPid), cPid);
+  tree->HandleFork(eventId++, *tree->Get(bPid), cPid);
 
   self.sut = [self makeControllerWithProcessTree:tree];
 

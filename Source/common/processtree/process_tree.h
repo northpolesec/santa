@@ -58,8 +58,11 @@ class ProcessTree {
   absl::Status Backfill();
 
   // Inform the tree of a fork event, in which the parent process spawns a child
-  // with the only difference between the two being the pid.
-  void HandleFork(uint64_t timestamp, const Process& parent,
+  // with the only difference between the two being the pid. `parent` is the
+  // handle to the forking process (e.g. from Get); it becomes the child's
+  // parent link directly, so no lookup is needed under the write lock.
+  void HandleFork(uint64_t timestamp,
+                  const std::shared_ptr<const Process>& parent,
                   struct Pid new_pid);
 
   // Inform the tree of an exec event, in which the program and potentially cred
@@ -76,12 +79,24 @@ class ProcessTree {
   // Inform the tree of a process exit.
   void HandleExit(uint64_t timestamp, const Process& p);
 
-  // Returns whether an exec event with this identity has already been recorded
-  // by the tree. Lets a caller skip building the (expensive) Program before
-  // calling HandleExec for a duplicate delivery. Best-effort: HandleExec
-  // re-checks under the write lock, so a racing novel exec is never dropped.
-  bool HasSeenExec(uint64_t timestamp, struct Pid actor,
-                   struct Pid target) const;
+  // Result of GetExecActor. `proc` is the execing (actor) process; it is
+  // populated only when `already_seen` is false (and may still be empty then if
+  // the actor is unknown to the tree), so callers must check `already_seen`
+  // first.
+  struct ExecActor {
+    std::optional<std::shared_ptr<const Process>> proc;
+    bool already_seen;
+  };
+
+  // Single reader-lock lookup for the exec ingest path: reports whether this
+  // exact exec (timestamp+actor+target identity) was already recorded and, if
+  // not, returns the execing (actor) process. Checks the dedup set first and
+  // short-circuits, so a duplicate delivery does no map lookup. Lets a caller
+  // skip building the (expensive) Program for a duplicate delivery.
+  // Best-effort: HandleExec re-checks under the write lock, so a racing novel
+  // exec is never dropped.
+  ExecActor GetExecActor(uint64_t timestamp, struct Pid actor,
+                         struct Pid target) const;
 
   // Mark the given pids as needing to be retained in the tree's map for future
   // access. Normally, Processes are removed once all clients process past the
