@@ -27,6 +27,7 @@
 #include "eval/public/cel_function_adapter.h"
 #include "eval/public/transform_utility.h"
 #include "extensions/strings.h"
+#include "google/protobuf/message_lite.h"
 #include "parser/parser.h"
 
 #include "Source/common/cel/Activation.h"
@@ -193,7 +194,7 @@ absl::StatusOr<typename Evaluator<IsV2>::EvaluationResultT> Evaluator<IsV2>::Eva
     if (result->IsMessage()) {
       const auto* msg = result->MessageOrDie();
       if (msg->GetDescriptor()->full_name() == "santa.cel.Result") {
-        const auto* cel_result = dynamic_cast<const ::santa::cel::Result*>(msg);
+        const auto* cel_result = google::protobuf::DynamicCastMessage<::santa::cel::Result>(msg);
         if (cel_result) {
           auto rv = static_cast<ReturnValue>(cel_result->value());
           // Check if cooldown was explicitly set (distinguishes constants from functions)
