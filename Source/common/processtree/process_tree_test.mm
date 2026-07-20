@@ -16,6 +16,7 @@
 #import <Foundation/Foundation.h>
 #import <XCTest/XCTest.h>
 
+#include <Kernel/kern/cs_blobs.h>
 #include <bsm/libbsm.h>
 
 #include <atomic>
@@ -139,6 +140,12 @@ using namespace santa::santad::process_tree;
           XCTAssertEqualObjects(@(program->executable.c_str()), obj);
         }
       }];
+
+  // The backfill path stores cdhash as raw bytes, not a hex string. The test
+  // binary is code signed, so its cdhash is present and exactly CS_CDHASH_LEN.
+  if (program->code_signing.has_value() && !program->code_signing->cdhash.empty()) {
+    XCTAssertEqual(program->code_signing->cdhash.size(), (size_t)CS_CDHASH_LEN);
+  }
 }
 
 - (void)testAnnotation {
@@ -261,6 +268,185 @@ using namespace santa::santad::process_tree;
     auto child = tree->Get(child_pid);
     XCTAssertFalse(child.has_value());
   }
+}
+
+// Regression: ReleaseProcess collects erase candidates under a reader lock,
+// then re-verifies under the exclusive lock before erasing. If a retain lands
+// in that window, the re-verify must see it and skip the erase.
+- (void)testReleaseRaceRetainInWindowSkipsErase {
+  std::vector<std::unique_ptr<Annotator>> annotators{};
+  auto tree = std::make_shared<ProcessTreeTestPeer>(std::move(annotators),
+                                                    /*removal_grace_ticks=*/10);
+  auto init = tree->InsertInit();
+
+  uint64_t event_id = 1;
+  const struct Pid child_pid = {.pid = 2, .pidversion = 2};
+  {
+    tree->HandleFork(event_id++, *init, child_pid);
+    auto child = *tree->Get(child_pid);
+    tree->HandleExit(event_id++, *child);
+  }
+
+  {
+    auto child = tree->Get(child_pid);
+    XCTAssertTrue(child.has_value());
+    PidList pids = {(*child)->pid_};
+    tree->RetainProcess(pids);
+  }
+
+  struct Pid churn_pid = {.pid = 100, .pidversion = 100};
+  for (int i = 0; i < 100; i++) {
+    tree->HandleFork(event_id++, *init, churn_pid);
+    churn_pid.pid++;
+    churn_pid.pidversion++;
+    auto child = tree->Get(child_pid);
+    XCTAssertTrue(child.has_value());
+  }
+
+  PidList pids = {child_pid};
+  int fired = 0;
+  tree->SetOnReleaseCollectedForTest([&] {
+    fired++;
+    tree->RetainProcess(pids);
+  });
+  tree->ReleaseProcess(pids);
+  XCTAssertEqual(fired, 1);
+  // The re-verify must observe the resurrection and skip the erase.
+  XCTAssertTrue(tree->Get(child_pid).has_value());
+
+  // Releasing the resurrected retain erases it.
+  tree->SetOnReleaseCollectedForTest(nullptr);
+  tree->ReleaseProcess(pids);
+  XCTAssertFalse(tree->Get(child_pid).has_value());
+}
+
+// Regression: if a concurrent releaser erases the entry first, the outer
+// release's re-verify must find it gone and skip gracefully rather than
+// double-erasing or crashing.
+- (void)testReleaseRaceConcurrentEraseIsSafe {
+  std::vector<std::unique_ptr<Annotator>> annotators{};
+  auto tree = std::make_shared<ProcessTreeTestPeer>(std::move(annotators),
+                                                    /*removal_grace_ticks=*/10);
+  auto init = tree->InsertInit();
+
+  uint64_t event_id = 1;
+  const struct Pid child_pid = {.pid = 2, .pidversion = 2};
+  {
+    tree->HandleFork(event_id++, *init, child_pid);
+    auto child = *tree->Get(child_pid);
+    tree->HandleExit(event_id++, *child);
+  }
+
+  {
+    auto child = tree->Get(child_pid);
+    XCTAssertTrue(child.has_value());
+    PidList pids = {(*child)->pid_};
+    tree->RetainProcess(pids);
+  }
+
+  struct Pid churn_pid = {.pid = 100, .pidversion = 100};
+  for (int i = 0; i < 100; i++) {
+    tree->HandleFork(event_id++, *init, churn_pid);
+    churn_pid.pid++;
+    churn_pid.pidversion++;
+    auto child = tree->Get(child_pid);
+    XCTAssertTrue(child.has_value());
+  }
+
+  PidList pids = {child_pid};
+  int fired = 0;
+  tree->SetOnReleaseCollectedForTest([&] {
+    // The nested ReleaseProcess re-enters this seam; only act on the first fire.
+    if (++fired > 1) return;
+    tree->RetainProcess(pids);
+    tree->ReleaseProcess(pids);
+  });
+  tree->ReleaseProcess(pids);
+  XCTAssertEqual(fired, 2);
+  XCTAssertFalse(tree->Get(child_pid).has_value());
+}
+
+// Regression: if the entry is erased and a fresh process re-inserted under the
+// same pid within the window, the outer release's re-verify must not erase the
+// newcomer. tombstoned_ is the only conjunct that distinguishes it from the
+// stale entry it replaced (refcnt is 0 either way).
+- (void)testReleaseRaceReinsertInWindowKeepsFreshProcess {
+  std::vector<std::unique_ptr<Annotator>> annotators{};
+  auto tree = std::make_shared<ProcessTreeTestPeer>(std::move(annotators),
+                                                    /*removal_grace_ticks=*/10);
+  auto init = tree->InsertInit();
+
+  uint64_t event_id = 1;
+  const struct Pid child_pid = {.pid = 2, .pidversion = 2};
+  {
+    tree->HandleFork(event_id++, *init, child_pid);
+    auto child = *tree->Get(child_pid);
+    tree->HandleExit(event_id++, *child);
+  }
+
+  {
+    auto child = tree->Get(child_pid);
+    XCTAssertTrue(child.has_value());
+    PidList pids = {(*child)->pid_};
+    tree->RetainProcess(pids);
+  }
+
+  struct Pid churn_pid = {.pid = 100, .pidversion = 100};
+  for (int i = 0; i < 100; i++) {
+    tree->HandleFork(event_id++, *init, churn_pid);
+    churn_pid.pid++;
+    churn_pid.pidversion++;
+    auto child = tree->Get(child_pid);
+    XCTAssertTrue(child.has_value());
+  }
+
+  PidList pids = {child_pid};
+  int fired = 0;
+  tree->SetOnReleaseCollectedForTest([&] {
+    // The nested ReleaseProcess re-enters this seam; only act on the first fire.
+    if (++fired > 1) return;
+    tree->RetainProcess(pids);
+    tree->ReleaseProcess(pids);
+    tree->HandleFork(event_id++, *init, child_pid);
+  });
+  tree->ReleaseProcess(pids);
+  XCTAssertEqual(fired, 2);
+  // The outer re-verify must not erase the freshly re-inserted process.
+  XCTAssertTrue(tree->Get(child_pid).has_value());
+}
+
+// Regression: reaping must be a per-entry decision keyed on each removal's own
+// timestamp, independent of the order removals were scheduled in. ES delivers
+// events out of mach_time order, so a still-within-grace removal can sit AHEAD
+// of an already-expired one in the pending set. A reaper that stops at the first
+// not-yet-expired entry (e.g. a naive front-popping deque) would leak the
+// expired entry behind it; the reaper must consider every pending removal (or be
+// ordered by timestamp, as a min-heap is).
+- (void)testOutOfOrderRemovalsReapedByOwnTimestamp {
+  std::vector<std::unique_ptr<Annotator>> annotators{};
+  auto tree = std::make_shared<ProcessTreeTestPeer>(std::move(annotators),
+                                                    /*removal_grace_ticks=*/10);
+  auto init = tree->InsertInit();
+
+  // Survivor: forked at ts=50, exits at ts=100. Its removal is scheduled FIRST,
+  // at the newest timestamp seen, so it stays within the grace (cutoff = 90).
+  const struct Pid survivor_pid = {.pid = 2, .pidversion = 2};
+  tree->HandleFork(50, *init, survivor_pid);
+  auto survivor = *tree->Get(survivor_pid);
+  tree->HandleExit(100, *survivor);  // schedules survivor@100, latest_ts=100
+
+  // Reaped: a reordered straggler forked/exited in the past. Its removal is
+  // scheduled SECOND (behind the survivor) but at an old timestamp (20 < 90), so
+  // it is already expired the moment it is scheduled.
+  const struct Pid reaped_pid = {.pid = 3, .pidversion = 3};
+  tree->HandleFork(10, *init, reaped_pid);  // novel out-of-order fork, tracked
+  auto reaped = *tree->Get(reaped_pid);
+  tree->HandleExit(20, *reaped);  // schedules reaped@20 -> already expired
+
+  // The expired straggler is reaped even though a not-yet-expired removal sits
+  // ahead of it; the survivor (still within grace) is untouched.
+  XCTAssertFalse(tree->Get(reaped_pid).has_value());
+  XCTAssertTrue(tree->Get(survivor_pid).has_value());
 }
 
 // Regression: ES does not guarantee global mach_time ordering across threads or

@@ -551,6 +551,27 @@ objc_library(
     ],
 )
 
+santa_unit_test(
+    name = "CELActivationTest",
+    srcs = ["CELActivationTest.mm"],
+    sdk_dylibs = [
+        "EndpointSecurity",
+        "bsm",
+    ],
+    deps = [
+        ":CELActivation",
+        "//Source/common:TestUtils",
+        "//Source/common/cel:CEL",
+        "//Source/common/es:EndpointSecurityMessage",
+        "//Source/common/es:MockEndpointSecurityAPI",
+        "//Source/common/processtree:SNTEndpointSecurityAdapter",
+        "//Source/common/processtree:process",
+        "//Source/common/processtree:process_tree",
+        "//Source/common/processtree:process_tree_test_helpers",
+        "@googletest//:gtest",
+    ],
+)
+
 objc_library(
     name = "SNTExecutionController",
     srcs = ["SNTExecutionController.mm"],
@@ -2028,6 +2049,7 @@ test_suite(
     tests = [
         ":AdminUserStateTest",
         ":AuthResultCacheTest",
+        ":CELActivationTest",
         ":DaemonConfigBundleTest",
         ":EndpointSecurityLoggerTest",
         ":EndpointSecuritySanitizableStringTest",

@@ -20,6 +20,7 @@
 
 #include "Source/common/AuditUtilities.h"
 #include "Source/common/CSOpsHelper.h"
+#include "Source/common/String.h"
 
 @interface CSOpsHelperTest : XCTestCase
 @end
@@ -33,6 +34,21 @@
   std::optional<uint32_t> flags = santa::CSOpsStatusFlags(*selfTok);
   XCTAssertTrue(flags.has_value());
   XCTAssertNotEqual(*flags, 0u);
+}
+
+- (void)testCDHashBytesForSelfIsRawAndHexIsItsEncoding {
+  // The raw variant returns the unencoded csops cdhash (CS_CDHASH_LEN bytes),
+  // and the shared hex variant must be exactly its lowercase-hex encoding.
+  pid_t pid = getpid();
+
+  std::optional<std::string> raw = santa::CSOpsGetCDHashBytes(pid);
+  XCTAssertTrue(raw.has_value());
+  XCTAssertEqual(raw->size(), (size_t)CS_CDHASH_LEN);
+
+  std::optional<std::string> hex = santa::CSOpsGetCDHash(pid);
+  XCTAssertTrue(hex.has_value());
+  XCTAssertEqual(*hex,
+                 santa::BufToHexString(reinterpret_cast<const uint8_t*>(raw->data()), raw->size()));
 }
 
 - (void)testTokenValidatedReadsRefuseMismatchedPidversion {
