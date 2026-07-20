@@ -43,7 +43,7 @@
 			<key>LSItemContentTypes</key>
 			<array>
 				<string>public.application</string>
-				<string>public.executable</string>
+				<string>public.unix-executable</string>
 				<string>com.apple.application-bundle</string>
 			</array>
 		</dict>
