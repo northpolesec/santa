@@ -396,6 +396,7 @@ REGISTER_COMMAND_NAME(@"status")
         @"teamid_rules" : @(ruleCounts.teamID),
         @"signingid_rules" : @(ruleCounts.signingID),
         @"cdhash_rules" : @(ruleCounts.cdhash),
+        @"signal_rules" : @(ruleCounts.signals),
       },
     } mutableCopy];
 
@@ -576,6 +577,7 @@ REGISTER_COMMAND_NAME(@"status")
     printf("  %-40s | %lld\n", "TeamID Rules", ruleCounts.teamID);
     printf("  %-40s | %lld\n", "SigningID Rules", ruleCounts.signingID);
     printf("  %-40s | %lld\n", "CDHash Rules", ruleCounts.cdhash);
+    printf("  %-40s | %lld\n", "Signal Rules", ruleCounts.signals);
 
     printf(">>> Watch Items\n");
     printf("  %-40s | %s\n", "Enabled", (watchItemsEnabled ? "Yes" : "No"));
