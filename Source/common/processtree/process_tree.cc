@@ -122,23 +122,22 @@ void ProcessTree::HandleFork(uint64_t timestamp, const Process& parent,
 }
 
 void ProcessTree::HandleExec(uint64_t timestamp, const Process& p,
-                             const Pid new_pid, const Program prog,
-                             const Cred c) {
+                             const Pid new_pid, Program prog, const Cred c) {
   // TODO(nickmg): should struct pid be reworked and only pid_version be passed?
   assert(new_pid.pid == p.pid_.pid);
 
-  // Expected double-apply: a tree-aware auth client (the Authorizer) subscribes
-  // to both AUTH_EXEC and NOTIFY_EXEC, so an uncached exec reaches here twice.
-  // The two ES messages carry different mach_time, so they form distinct
-  // EventKeys and both pass dedup; the second is a first-wins no-op (the
-  // map_.emplace below). This is intentional and benign — it costs one extra
-  // emplace/remove_at_/drain on the auth path per uncached exec (accepted).
+  // The same exec is delivered to every tree-aware client, and the Authorizer
+  // sees it as both AUTH_EXEC and NOTIFY_EXEC, so HandleExec may run more than
+  // once per exec. StepLocked is the authoritative dedup gate: an
+  // exact-duplicate delivery is rejected, while distinct deliveries that share
+  // a pid but carry a different mach_time both pass and the later one is a
+  // first-wins map_.emplace no-op. Callers building the Program eagerly can
+  // skip known duplicates up front via HasSeenExec (see InformFromESEvent).
 
-  // Construct the new process (copies program/args/signing) OUTSIDE the lock to
-  // keep the shared tree lock short on the serial ES handler path. A duplicate
-  // wastes this allocation, which is cheaper than lengthening the lock hold.
+  // Allocate the new process OUTSIDE the write lock to keep the shared tree
+  // lock short on the serial ES handler path; prog is moved in, not copied.
   auto new_proc = std::make_shared<Process>(
-      new_pid, c, std::make_shared<const Program>(prog), p.parent_);
+      new_pid, c, std::make_shared<const Program>(std::move(prog)), p.parent_);
   {
     absl::MutexLock lock(mtx_);
     if (!StepLocked({timestamp, EventKind::kExec, p.pid_, new_pid})) {
@@ -160,6 +159,12 @@ void ProcessTree::HandleExit(uint64_t timestamp, const Process& p) {
   }
   remove_at_.push({timestamp, p.pid_});
   DrainRemovals();
+}
+
+bool ProcessTree::HasSeenExec(uint64_t timestamp, const Pid actor,
+                              const Pid target) const {
+  absl::ReaderMutexLock lock(mtx_);
+  return seen_.contains({timestamp, EventKind::kExec, actor, target});
 }
 
 bool ProcessTree::StepLocked(const EventKey& key) {
