@@ -173,7 +173,7 @@ absl::StatusOr<BackfilledProcess> LoadPID(pid_t pid) {
       .cred = {.uid = audit_token_to_euid(token), .gid = audit_token_to_egid(token)},
       .program = std::make_shared<struct Program>((struct Program){
           .executable = path,
-          .arguments = args,
+          .arguments = std::move(args),
           .code_signing = LoadCodeSigningInfoForPID(pid),
       }),
   };

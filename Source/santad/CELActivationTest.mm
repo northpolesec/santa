@@ -82,7 +82,7 @@ std::string MakeRawCDHash() {
   // Parent P: fork from init, then exec a code-signed binary whose cdhash is
   // stored as raw bytes (the new tree representation).
   Pid pPid = {.pid = 20, .pidversion = 1};
-  tree->HandleFork(1, *init, pPid);
+  tree->HandleFork(1, init, pPid);
 
   std::string rawCdhash = MakeRawCDHash();
   std::string expectedHex = HexEncode(rawCdhash);
@@ -132,7 +132,7 @@ std::string MakeRawCDHash() {
 
   // Execing process E, forked from init and present in the tree.
   Pid ePid = {.pid = 10, .pidversion = 1};
-  tree->HandleFork(1, *init, ePid);
+  tree->HandleFork(1, init, ePid);
 
   es_file_t procFile = MakeESFile("/bin/e");
   es_process_t proc = MakeESProcess(&procFile, MakeAuditToken(10, 1), MakeAuditToken(1, 1));

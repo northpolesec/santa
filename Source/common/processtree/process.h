@@ -24,6 +24,7 @@
 #include <optional>
 #include <string>
 #include <typeindex>
+#include <utility>
 #include <vector>
 
 #include "Source/common/processtree/annotations/annotator.h"
@@ -131,9 +132,9 @@ class Process {
                    std::shared_ptr<const Process> parent)
       : pid_(pid),
         effective_cred_(cred),
-        program_(program),
+        program_(std::move(program)),
         annotations_(),
-        parent_(parent),
+        parent_(std::move(parent)),
         refcnt_(0),
         tombstoned_(false) {}
   Process(const Process&) = delete;
