@@ -38,6 +38,12 @@
 
 - (instancetype)initWithRuleIdentifiers:(struct RuleIdentifiers)ri
                        andSigningStatus:(SNTSigningStatus)signingStatus {
+  return [self initWithRuleIdentifiers:[SNTRuleIdentifiers filterIdentifiers:ri
+                                                            forSigningStatus:signingStatus]];
+}
+
++ (struct RuleIdentifiers)filterIdentifiers:(struct RuleIdentifiers)ri
+                           forSigningStatus:(SNTSigningStatus)signingStatus {
   NSString* cdhash;
   NSString* binarySHA256;
   NSString* signingID;
@@ -75,13 +81,13 @@
   }
   // clang-format on
 
-  return [self initWithRuleIdentifiers:(struct RuleIdentifiers){
-                                           .cdhash = cdhash,
-                                           .binarySHA256 = binarySHA256,
-                                           .signingID = signingID,
-                                           .certificateSHA256 = certificateSHA256,
-                                           .teamID = teamID,
-                                       }];
+  return (struct RuleIdentifiers){
+      .cdhash = cdhash,
+      .binarySHA256 = binarySHA256,
+      .signingID = signingID,
+      .certificateSHA256 = certificateSHA256,
+      .teamID = teamID,
+  };
 }
 
 - (NSData*)cdhashBytes {

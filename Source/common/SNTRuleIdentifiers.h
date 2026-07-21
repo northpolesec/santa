@@ -62,6 +62,13 @@ struct RuleIdentifiers {
 - (instancetype)initWithRuleIdentifiers:(struct RuleIdentifiers)ri
                        andSigningStatus:(SNTSigningStatus)signingStatus;
 
+/// Returns a copy of `ri` with only the identifiers valid for policy matching
+/// at the given signing status; the rest are cleared. This is the struct-level
+/// primitive behind initWithRuleIdentifiers:andSigningStatus:, exposed so hot
+/// callers can filter identifiers without allocating a short-lived object.
++ (struct RuleIdentifiers)filterIdentifiers:(struct RuleIdentifiers)ri
+                           forSigningStatus:(SNTSigningStatus)signingStatus;
+
 - (struct RuleIdentifiers)toStruct;
 
 @end

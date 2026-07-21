@@ -43,9 +43,12 @@
 extern struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd);
 
 @interface SNTPolicyProcessor (Testing)
+@property SNTConfigurator* configurator;
 - (BOOL)evaluateCELFallbackExpressions:(SNTCachedDecision*)cd
                     activationCallback:(ActivationCallbackBlock)activationCallback;
 - (void)compileFallbackRules:(NSArray<SNTCELFallbackRule*>*)rules;
+- (NSString*)fileIsScopeAllowed:(SNTFileInfo*)fi;
+- (NSString*)fileIsScopeBlocked:(SNTFileInfo*)fi;
 @end
 
 BOOL CompareMaybeNilStrings(NSString* s1, NSString* s2) {
@@ -717,6 +720,37 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
                                                                .certificateSHA256 = nil,
                                                                .teamID = nil,
                                                            })));
+}
+
+- (void)testDecisionBuildsSigningIDAndTeamIDFromProcess {
+  // The cached decision's teamID/signingID are built from the target process's
+  // team_id/signing_id string tokens, with signingID formatted as
+  // "teamID:signingID". Characterizes that format across the token conversion.
+  id mockRuleTable = OCMClassMock([SNTRuleTable class]);
+  SNTPolicyProcessor* processor =
+      [[SNTPolicyProcessor alloc] initWithRuleTable:mockRuleTable
+                                 entitlementsFilter:santa::EntitlementsFilter::Create(@[], @[])];
+
+  SNTFileInfo* fi = [[SNTFileInfo alloc] initWithPath:@"/bin/ls"];
+  XCTAssertNotNil(fi);
+
+  es_file_t file = MakeESFile("/bin/ls");
+  es_process_t proc = MakeESProcess(&file);
+  proc.codesigning_flags = CS_SIGNED | CS_VALID;
+  proc.signing_id = MakeESStringToken("com.apple.ls");
+  proc.team_id = MakeESStringToken("EQHXZ8M8AV");
+
+  SNTConfigState* configState =
+      [[SNTConfigState alloc] initWithConfig:[SNTConfigurator configurator]];
+
+  SNTCachedDecision* cd = [processor decisionForFileInfo:fi
+                                           targetProcess:&proc
+                                             configState:configState
+                                      activationCallback:nil
+                                          cachedDecision:nil];
+
+  XCTAssertEqualObjects(cd.teamID, @"EQHXZ8M8AV");
+  XCTAssertEqualObjects(cd.signingID, @"EQHXZ8M8AV:com.apple.ls");
 }
 
 - (void)testCELDecisions {
@@ -1661,6 +1695,66 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   SNTCachedDecision* cd = [self decisionForPlatformBinary:NO];
   XCTAssertNotEqual(cd.decision, SNTEventStateAllowPlatform);
   XCTAssertNotEqualObjects(cd.decisionExtra, @"Platform Binary");
+}
+
+#pragma mark fileIsScopeAllowed:/fileIsScopeBlocked:
+
+// /bin/ls is an Apple-signed Mach-O executable (with a __PAGEZERO segment)
+// present on every macOS host, so it exercises the Mach-O and page-zero paths
+// without needing a fixture.
+- (SNTFileInfo*)lsFileInfo {
+  SNTFileInfo* fi = [[SNTFileInfo alloc] initWithPath:@"/bin/ls"];
+  XCTAssertNotNil(fi);
+  return fi;
+}
+
+- (void)testFileIsScopeAllowedWithNoRegexReturnsNilForMachO {
+  id mockConfigurator = OCMClassMock([SNTConfigurator class]);
+  OCMStub([mockConfigurator allowedPathRegex]).andReturn(nil);
+  self.processor.configurator = mockConfigurator;
+
+  // No allowed-path regex: a Mach-O must not be reported as allowed-by-path.
+  // (Guards against a nil regex being treated as a match.)
+  XCTAssertNil([self.processor fileIsScopeAllowed:[self lsFileInfo]]);
+
+  [mockConfigurator stopMocking];
+}
+
+- (void)testFileIsScopeAllowedWithMatchingRegexReturnsReason {
+  id mockConfigurator = OCMClassMock([SNTConfigurator class]);
+  OCMStub([mockConfigurator allowedPathRegex])
+      .andReturn([NSRegularExpression regularExpressionWithPattern:@"^/bin/" options:0 error:NULL]);
+  self.processor.configurator = mockConfigurator;
+
+  XCTAssertEqualObjects([self.processor fileIsScopeAllowed:[self lsFileInfo]],
+                        @"Allowed Path Regex");
+
+  [mockConfigurator stopMocking];
+}
+
+- (void)testFileIsScopeBlockedWithNoRegexReturnsNil {
+  id mockConfigurator = OCMClassMock([SNTConfigurator class]);
+  OCMStub([mockConfigurator blockedPathRegex]).andReturn(nil);
+  OCMStub([mockConfigurator enablePageZeroProtection]).andReturn(NO);
+  self.processor.configurator = mockConfigurator;
+
+  // No blocked-path regex: a normal Mach-O must not be reported as
+  // blocked-by-path. (Guards against a nil regex being treated as a match.)
+  XCTAssertNil([self.processor fileIsScopeBlocked:[self lsFileInfo]]);
+
+  [mockConfigurator stopMocking];
+}
+
+- (void)testFileIsScopeBlockedWithMatchingRegexReturnsReason {
+  id mockConfigurator = OCMClassMock([SNTConfigurator class]);
+  OCMStub([mockConfigurator blockedPathRegex])
+      .andReturn([NSRegularExpression regularExpressionWithPattern:@"^/bin/" options:0 error:NULL]);
+  self.processor.configurator = mockConfigurator;
+
+  XCTAssertEqualObjects([self.processor fileIsScopeBlocked:[self lsFileInfo]],
+                        @"Blocked Path Regex");
+
+  [mockConfigurator stopMocking];
 }
 
 @end
