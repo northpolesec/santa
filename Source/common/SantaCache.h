@@ -245,8 +245,9 @@ class SantaCache {
   */
   template <typename PredicateT>
   uint64_t remove_if(PredicateT predicate) {
-    static_assert(std::is_invocable_r_v<bool, PredicateT&, const KeyT&, ValueT&>,
-                  "predicate must be callable as bool(const KeyT&, ValueT&)");
+    static_assert(
+        std::is_invocable_r_v<bool, PredicateT&, const KeyT&, ValueT&>,
+        "predicate must be callable as bool(const KeyT&, ValueT&)");
     uint64_t removed = 0;
 
     for (uint32_t i = 0; i < bucket_count_; ++i) {
