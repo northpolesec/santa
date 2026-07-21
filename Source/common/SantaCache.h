@@ -22,9 +22,12 @@
 #include <sys/cdefs.h>
 
 #include <atomic>
+#include <cassert>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <type_traits>
+#include <utility>
 
 #include "Source/common/BranchPrediction.h"
 #include "absl/hash/hash.h"
@@ -62,7 +65,8 @@ class SantaCache {
     bucket_count_ =
         (1 << (32 -
                __builtin_clz((((uint32_t)max_size_ / per_bucket) - 1) ?: 1)));
-    if (unlikely(bucket_count_ > UINT32_MAX)) bucket_count_ = UINT32_MAX;
+    // hash() relies on bucket_count_ being a power of two.
+    assert(bucket_count_ > 0 && (bucket_count_ & (bucket_count_ - 1)) == 0);
     buckets_ = (struct bucket*)calloc(bucket_count_, sizeof(struct bucket));
     for (uint32_t i = 0; i < bucket_count_; ++i) {
       buckets_[i].lock = OS_UNFAIR_LOCK_INIT;
@@ -108,7 +112,7 @@ class SantaCache {
     @return true if the value was set.
   */
   bool set(const KeyT& key, const ValueT& value) {
-    return set(key, value, nullptr, {}, false);
+    return set(key, value, NoOpUpdate{}, false, {}, false);
   }
 
   /**
@@ -126,7 +130,7 @@ class SantaCache {
     @return true if the value was set
   */
   bool set(const KeyT& key, const ValueT& value, const ValueT& previous_value) {
-    return set(key, value, nullptr, previous_value, true);
+    return set(key, value, NoOpUpdate{}, false, previous_value, true);
   }
 
   /**
@@ -141,8 +145,11 @@ class SantaCache {
     @param update_block The block that will be called to give
         the caller the opportunity to update the value.
   */
-  bool update(const KeyT& key, std::function<void(ValueT&)> update_block) {
-    return set(key, zero_, update_block, {}, false);
+  template <typename UpdateBlockT>
+  bool update(const KeyT& key, UpdateBlockT update_block) {
+    static_assert(std::is_invocable_r_v<void, UpdateBlockT&, ValueT&>,
+                  "update_block must be callable as void(ValueT&)");
+    return set(key, zero_, update_block, true, {}, false);
   }
 
   /**
@@ -150,9 +157,10 @@ class SantaCache {
 
     @param foreach_block Called for all key and value pairs.
   */
-  void foreach(std::function<void(KeyT&, ValueT&)> foreach_block) {
-    assert(foreach_block != nullptr);
-
+  template <typename ForeachBlockT>
+  void foreach(ForeachBlockT foreach_block) {
+    static_assert(std::is_invocable_r_v<void, ForeachBlockT&, KeyT&, ValueT&>,
+                  "foreach_block must be callable as void(KeyT&, ValueT&)");
     // Lock all buckets
     // NB: The clear_bucket_ lock isn't necessary since both foreach and
     // clear methods lock all buckets sequentially from index 0.
@@ -189,18 +197,19 @@ class SantaCache {
     @param contains_block Block to be called with the value at the
         given key while under lock.
 
-    @return If the key exists, return true if the contains_block
-        is NOT provided, otherwise return the result of the call to
-        the contains_block.
+    @return If the key exists, the result of the call to the
+        contains_block, otherwise false.
   */
-  bool contains(const KeyT& key,
-                std::function<bool(const ValueT&)> contains_block) const {
+  template <typename ContainsBlockT>
+  bool contains(const KeyT& key, ContainsBlockT contains_block) const {
+    static_assert(std::is_invocable_r_v<bool, ContainsBlockT&, const ValueT&>,
+                  "contains_block must be callable as bool(const ValueT&)");
     struct bucket* bucket = &buckets_[hash(key)];
     lock(bucket);
     struct entry* entry = bucket->head;
     while (entry != nullptr) {
       if (entry->key == key) {
-        bool result = contains_block ? contains_block(entry->value) : true;
+        bool result = contains_block(entry->value);
         unlock(bucket);
         return result;
       }
@@ -211,9 +220,11 @@ class SantaCache {
   }
 
   /**
-    An alias for `contains(key, nullptr)`
+    Check if a given key exists in the cache.
   */
-  bool contains(const KeyT& key) const { return contains(key, nullptr); }
+  bool contains(const KeyT& key) const {
+    return contains(key, [](const ValueT&) { return true; });
+  }
 
   /**
     Remove entries matching a predicate. The predicate receives each key
@@ -232,9 +243,11 @@ class SantaCache {
 
     @return The number of entries removed.
   */
-  uint64_t remove_if(std::function<bool(const KeyT&, ValueT&)> predicate) {
-    assert(predicate != nullptr);
-
+  template <typename PredicateT>
+  uint64_t remove_if(PredicateT predicate) {
+    static_assert(
+        std::is_invocable_r_v<bool, PredicateT&, const KeyT&, ValueT&>,
+        "predicate must be callable as bool(const KeyT&, ValueT&)");
     uint64_t removed = 0;
 
     for (uint32_t i = 0; i < bucket_count_; ++i) {
@@ -272,7 +285,10 @@ class SantaCache {
     @param clear_block If not NULL, will be called for all key
         and value pairs just prior to deletion.
   */
-  void clear(std::function<void(KeyT&, ValueT&)> clear_block) {
+  template <typename ClearBlockT>
+  void clear(ClearBlockT clear_block) {
+    static_assert(std::is_invocable_r_v<void, ClearBlockT&, KeyT&, ValueT&>,
+                  "clear_block must be callable as void(KeyT&, ValueT&)");
     for (uint32_t i = 0; i < bucket_count_; ++i) {
       struct bucket* bucket = &buckets_[i];
       // We grab the lock so nothing can use this bucket while we're erasing it.
@@ -281,9 +297,7 @@ class SantaCache {
       // Free the bucket's entries, if there are any.
       struct entry* entry = bucket->head;
       while (entry != nullptr) {
-        if (clear_block) {
-          clear_block(entry->key, entry->value);
-        }
+        clear_block(entry->key, entry->value);
         struct entry* next_entry = entry->next;
         delete entry;
         entry = next_entry;
@@ -302,9 +316,11 @@ class SantaCache {
   }
 
   /**
-    An alias for `clear(nullptr)`
+    Remove all entries.
   */
-  void clear() { clear(nullptr); }
+  void clear() {
+    clear([](KeyT&, ValueT&) {});
+  }
 
   /**
     Return number of entries currently in cache.
@@ -369,6 +385,14 @@ class SantaCache {
   };
 
   /**
+    Callable placeholder for set() paths that assign a value rather than
+    update in place.
+  */
+  struct NoOpUpdate {
+    void operator()(ValueT&) const {}
+  };
+
+  /**
     Set an element in the cache.
 
     @note If the cache is full when this is called, this will
@@ -378,6 +402,8 @@ class SantaCache {
     @param value The value with parameterized type
     @param update_block The block that will be called to give
         the caller the opportunity to update the value.
+    @param update_only Pass true if update_block should be used to mutate
+        the value in place instead of assigning value.
     @param previous_value If has_prev_value is true, the new value will only
         be set if this parameter is equal to the existing value in the cache.
         This allows set to become a CAS operation.
@@ -385,13 +411,10 @@ class SantaCache {
 
     @return true if the entry was set, false if it was not
   */
-  bool set(const KeyT& key, const ValueT& value,
-           std::function<void(ValueT&)> update_block,
-           const ValueT& previous_value, bool has_prev_value) {
-    // Only either value or update block can be set
-    assert(!(value != zero_ && update_block != nullptr));
-    bool update_only = (update_block != nullptr);
-
+  template <typename UpdateBlockT>
+  bool set(const KeyT& key, const ValueT& value, UpdateBlockT update_block,
+           bool update_only, const ValueT& previous_value,
+           bool has_prev_value) {
     struct bucket* bucket = &buckets_[hash(key)];
 
     while (true) {
@@ -456,7 +479,7 @@ class SantaCache {
 
       // Key not found and cache has capacity. Insert at head.
       struct entry* new_entry = new struct entry(key);
-      if (update_block) {
+      if (update_only) {
         update_block(new_entry->value);
       } else {
         new_entry->value = value;
@@ -486,6 +509,15 @@ class SantaCache {
 
   std::atomic<uint64_t> count_ = 0;
 
+  // count_ is written on every insert/remove while the members below are
+  // read on every cache operation. The padding keeps them on separate cache
+  // lines to avoid false sharing between mutators and readers. Explicit
+  // padding (rather than alignas) is used because instances embedded as
+  // Objective-C ivars don't get over-aligned storage; a 128-byte gap works
+  // at any object alignment (the coherence granule is 128 bytes on Apple
+  // Silicon, 64-byte lines fetched in adjacent pairs on x86_64).
+  char count_padding_[128];
+
   uint64_t max_size_;
   uint32_t bucket_count_;
 
@@ -507,7 +539,9 @@ class SantaCache {
     Hash a key to determine which bucket it belongs in.
   */
   inline uint64_t hash(const KeyT& input) const {
-    return Hasher{}(input) % bucket_count_;
+    // bucket_count_ is a power of two, so masking is equivalent to modulo
+    // but avoids an integer division.
+    return Hasher{}(input) & (bucket_count_ - 1);
   }
 };
 
