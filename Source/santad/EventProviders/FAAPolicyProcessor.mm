@@ -528,7 +528,7 @@ FileAccessPolicyDecision FAAPolicyProcessor::ProcessTargetAndPolicy(
     event.ruleId = policy->rule_id;
     event.decision = decision;
     event.process.fileSHA256 = cd.sha256 ?: @"<unknown sha>";
-    event.process.filePath = StringToNSString(msg->process->executable->path.data);
+    event.process.filePath = StringTokenToNSString(msg->process->executable->path);
     event.process.teamID = StringTokenToNSString(msg->process->team_id);
     event.process.signingID = StringTokenToNSString(msg->process->signing_id);
     event.process.cdhash =

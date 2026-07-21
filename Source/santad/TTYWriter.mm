@@ -97,7 +97,7 @@ void TTYWriter::Write(const es_process_t* proc, bool send_signal,
   if (!CanWrite(proc)) {
     return;
   }
-  Write(santa::StringToNSString(proc->tty->path.data), send_signal, messageCreator);
+  Write(santa::StringTokenToNSString(proc->tty->path), send_signal, messageCreator);
 }
 
 void TTYWriter::Write(const es_process_t* proc, NSString* (^messageCreator)(void)) {

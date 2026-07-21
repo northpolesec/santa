@@ -36,24 +36,31 @@ static inline std::string NSStringToUTF8String(NSString* str) {
 }
 
 static inline NSString* StringToNSString(const std::string& str) {
-  return [NSString stringWithUTF8String:str.c_str()];
+  return [[NSString alloc] initWithBytes:str.data()
+                                  length:str.length()
+                                encoding:NSUTF8StringEncoding];
 }
 
 static inline NSString* StringToNSString(const char* str) {
+  if (!str) {
+    return nil;
+  }
   return [NSString stringWithUTF8String:str];
 }
 
 static inline NSString* StringToNSString(std::string_view str) {
-  return [NSString stringWithUTF8String:str.data()];
+  // string_view is not guaranteed NUL-terminated, so pass an explicit length
+  // rather than letting NSString scan past the view's end.
+  return [[NSString alloc] initWithBytes:str.data()
+                                  length:str.length()
+                                encoding:NSUTF8StringEncoding];
 }
 
 static inline NSString* OptionalStringToNSString(const std::optional<std::string>& optional_str) {
-  std::string str = optional_str.value_or("");
-  if (str.length() == 0) {
+  if (!optional_str || optional_str->empty()) {
     return nil;
-  } else {
-    return StringToNSString(str);
   }
+  return StringToNSString(*optional_str);
 }
 
 static inline std::string_view StringTokenToStringView(es_string_token_t es_str) {
