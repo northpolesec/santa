@@ -174,16 +174,22 @@ es_file_t* GetTargetFileForPrefixTree(const es_message_t* msg) {
         break;
       }
 
-      // Only log file changes that match the given regex
-      NSString* targetPath = santa::StringTokenToNSString(targetFile->path);
-      if (![[self.configurator fileChangesRegex]
-              numberOfMatchesInString:targetPath
-                              options:0
-                                range:NSMakeRange(0, targetPath.length)]) {
+      // Only log file changes that match the given regex. When no regex is
+      // configured these events are never logged, so bail before transcoding
+      // the path to an NSString.
+      NSRegularExpression* fileChangesRegex = [self.configurator fileChangesRegex];
+      if (!fileChangesRegex) {
         // Note: Do not record metrics in this case. These are not considered "drops"
         // because this is not a failure case.
         // TODO(mlw): Consider changes to configuration that would allow muting paths
         // to filter on the kernel side rather than in user space.
+        return;
+      }
+      NSString* targetPath = santa::StringTokenToNSString(targetFile->path);
+      if ([fileChangesRegex rangeOfFirstMatchInString:targetPath
+                                              options:0
+                                                range:NSMakeRange(0, targetPath.length)]
+              .location == NSNotFound) {
         return;
       }
 
