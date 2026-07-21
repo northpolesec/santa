@@ -35,6 +35,8 @@
 #import "Source/santasyncservice/SNTPushClientFCM.h"
 #import "Source/santasyncservice/SNTPushClientNATS.h"
 #import "Source/santasyncservice/SNTPushNotifications.h"
+#import "Source/santasyncservice/SNTSantaCommandHandler.h"
+#import "Source/santasyncservice/SNTSyncCommands.h"
 #import "Source/santasyncservice/SNTSyncConfigBundle.h"
 #import "Source/santasyncservice/SNTSyncEventUpload.h"
 #import "Source/santasyncservice/SNTSyncLogging.h"
@@ -74,6 +76,10 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
 
 // If set, push notifications are being used.
 @property id<SNTPushNotificationsClientDelegate> pushNotifications;
+
+// Transport-agnostic command execution shared with the NATS push client. Used
+// by the end-of-sync command drain stage.
+@property(nonatomic) SNTSantaCommandHandler* commandHandler;
 
 @property NSUInteger eventBatchSize;
 
@@ -138,6 +144,8 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
     _syncLimiter = dispatch_semaphore_create(kMaxEnqueuedSyncs);
     _eventUploadQueue = dispatch_queue_create("com.northpolesec.santa.syncservice.eventupload",
                                               DISPATCH_QUEUE_SERIAL);
+
+    _commandHandler = [[SNTSantaCommandHandler alloc] initWithSyncDelegate:self];
 
     _eventBatchSize = kDefaultEventBatchSize;
     _metricsQueue = dispatch_queue_create_with_target(
@@ -759,11 +767,32 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   SNTSyncPostflight* p = [[SNTSyncPostflight alloc] initWithState:syncState];
   if ([p sync]) {
     SLOGD(@"Postflight complete");
+    [self commandsWithSyncState:syncState];
     SLOGI(@"Sync completed successfully");
     return SNTSyncStatusTypeSuccess;
   }
   SLOGE(@"Postflight failed");
   return SNTSyncStatusTypePostflightFailed;
+}
+
+// Drain any commands the server has queued for this host. Runs after a
+// successful postflight; a failure (or partial drain) must not affect the
+// sync result. Undrained commands stay queued server-side and are picked up
+// on the next sync.
+- (void)commandsWithSyncState:(SNTSyncState*)syncState {
+  // Queued commands are only supported in sync v2. Skip on v1.
+  if (!syncState.isSyncV2) {
+    return;
+  }
+
+  SLOGD(@"Commands starting");
+  SNTSyncCommands* p = [[SNTSyncCommands alloc] initWithState:syncState
+                                               commandHandler:self.commandHandler];
+  if ([p sync]) {
+    SLOGD(@"Commands complete");
+  } else {
+    SLOGE(@"Commands failed; queued commands will be retried on next sync");
+  }
 }
 
 #pragma mark internal helpers
