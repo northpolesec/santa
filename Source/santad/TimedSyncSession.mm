@@ -469,6 +469,14 @@ bool TimedSyncSession::StopTimer() {
   return Timer<TimedSyncSession>::StopTimer();
 }
 
+bool TimedSyncSession::IsStarted() const {
+  return Timer<TimedSyncSession>::IsStarted();
+}
+
+void TimedSyncSession::SetTimerInterval(uint32_t interval_seconds) {
+  Timer<TimedSyncSession>::SetTimerInterval(interval_seconds);
+}
+
 void TimedSyncSession::StopTimerAsync() {
   Timer<TimedSyncSession>::StopTimerAsync();
 }

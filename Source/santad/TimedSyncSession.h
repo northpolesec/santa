@@ -239,12 +239,14 @@ class TimedSyncSession : public Timer<TimedSyncSession> {
   bool SyncServerGateSatisfied();
 
   // Hide the base-class timer methods from subclasses and external callers.
-  // The blocking trio dispatch_syncs onto the timer queue: never call them
+  // The blocking methods dispatch_sync onto the timer queue: never call them
   // while holding lock_ (see the class threading comment). Session code uses
   // the *Async shims, always invoked with lock_ held.
   bool StartTimer();
   bool StopTimer();
   bool StartTimerWithInterval(uint32_t interval_seconds);
+  bool IsStarted() const;
+  void SetTimerInterval(uint32_t interval_seconds);
   void StopTimerAsync();
   void StartTimerWithIntervalAsync(uint32_t interval_seconds);
 };
