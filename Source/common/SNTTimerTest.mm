@@ -15,8 +15,33 @@
 #import <Foundation/Foundation.h>
 #import <XCTest/XCTest.h>
 
+#include <memory>
+
 #import "Source/common/SNTTimer.h"
 #import "Source/common/TestUtils.h"
+#include "Source/common/Timer.h"
+
+namespace {
+
+// Minimal CRTP Timer subclass for exercising the async variants directly.
+// Must be owned by a shared_ptr: starting the timer takes shared_from_this().
+class AsyncTestTimer : public santa::Timer<AsyncTestTimer> {
+ public:
+  AsyncTestTimer()
+      : Timer(1, 60, OnStart::kWaitOneCycle, "AsyncTestTimer", RescheduleMode::kTrailingEdge,
+              QOS_CLASS_USER_INTERACTIVE) {}
+
+  bool OnTimer() {
+    if (on_timer_entered_) dispatch_semaphore_signal(on_timer_entered_);
+    if (on_timer_block_) dispatch_semaphore_wait(on_timer_block_, DISPATCH_TIME_FOREVER);
+    return false;
+  }
+
+  dispatch_semaphore_t on_timer_entered_;
+  dispatch_semaphore_t on_timer_block_;
+};
+
+}  // namespace
 
 @interface SNTTimerTest : XCTestCase
 @end
@@ -385,6 +410,36 @@
 
   // Brief sleep to let any async cleanup settle
   SleepMS(100);
+}
+
+- (void)testAsyncStartStop {
+  auto timer = std::make_shared<AsyncTestTimer>();
+
+  // IsStarted() dispatch_syncs onto the serial timer queue, so it doubles as a
+  // barrier: the pending async operation is guaranteed to have executed first.
+  timer->StartTimerWithIntervalAsync(60);
+  XCTAssertTrue(timer->IsStarted());
+
+  timer->StopTimerAsync();
+  XCTAssertFalse(timer->IsStarted());
+}
+
+- (void)testAsyncStopDoesNotBlockWhileOnTimerRuns {
+  // A blocking stop here would deadlock: OnTimer holds the timer queue until
+  // this test signals on_timer_block_, and that signal is sent only after the
+  // stop call returns. StopTimerAsync must return without waiting.
+  auto timer = std::make_shared<AsyncTestTimer>();
+  timer->on_timer_entered_ = dispatch_semaphore_create(0);
+  timer->on_timer_block_ = dispatch_semaphore_create(0);
+
+  timer->StartTimerWithIntervalAsync(1);
+  XCTAssertSemaTrue(timer->on_timer_entered_, 5, "OnTimer did not start");
+
+  // OnTimer is now parked on the timer queue. This must not block.
+  timer->StopTimerAsync();
+
+  dispatch_semaphore_signal(timer->on_timer_block_);
+  XCTAssertFalse(timer->IsStarted());
 }
 
 @end

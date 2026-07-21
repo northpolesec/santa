@@ -20,6 +20,7 @@
 #include <sys/qos.h>
 
 #include <algorithm>
+#include <memory>
 #include <string>
 
 #import "Source/common/SNTLogging.h"
@@ -125,6 +126,51 @@ class Timer : public std::enable_shared_from_this<Timer<T>> {
       did_start_new_timer = StartTimerSerialized();
     });
     return did_start_new_timer;
+  }
+
+  /// Stop the timer if running. Unlike StopTimer(), this never waits for the
+  /// timer queue: the stop is enqueued (or runs inline when already on the
+  /// timer queue) and the call returns immediately.
+  ///
+  /// Use this variant when holding a lock that OnTimer() acquires. In that
+  /// situation the blocking StopTimer() can deadlock: it waits for the timer
+  /// queue, but the queue may be running OnTimer(), which is waiting for the
+  /// caller's lock. Enqueuing instead of waiting breaks that cycle.
+  ///
+  /// Ordering: the timer queue is serial, so operations enqueued under a lock
+  /// execute in the order the lock was acquired.
+  ///
+  /// Lifetime: the enqueued block holds a weak_ptr and no-ops if the Timer is
+  /// destroyed before the block runs (the destructor already stops the timer).
+  void StopTimerAsync() {
+    if (OnTimerQueue()) {
+      StopTimerSerialized();
+      return;
+    }
+    std::weak_ptr<Timer<T>> weak_self = this->weak_from_this();
+    dispatch_async(timer_queue_, ^{
+      if (auto strong_self = weak_self.lock()) {
+        strong_self->StopTimerSerialized();
+      }
+    });
+  }
+
+  /// Set the interval and start (or re-arm) the timer, without waiting for the
+  /// timer queue. See StopTimerAsync for the locking, ordering, and lifetime
+  /// rationale.
+  void StartTimerWithIntervalAsync(uint32_t interval_seconds) {
+    if (OnTimerQueue()) {
+      SetTimerIntervalSerialized(interval_seconds);
+      StartTimerSerialized();
+      return;
+    }
+    std::weak_ptr<Timer<T>> weak_self = this->weak_from_this();
+    dispatch_async(timer_queue_, ^{
+      if (auto strong_self = weak_self.lock()) {
+        strong_self->SetTimerIntervalSerialized(interval_seconds);
+        strong_self->StartTimerSerialized();
+      }
+    });
   }
 
   /// Set new timer parameters. If the timer is running, the new parameters will take effect

@@ -461,6 +461,7 @@ santa_unit_test(
     deps = [
         ":SNTTimer",
         ":TestUtils",
+        ":Timer",
     ],
 )
 
