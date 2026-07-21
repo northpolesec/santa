@@ -123,6 +123,8 @@ static const NSUInteger kMaxCommandsPerSync = 50;
       return NO;
     }
 
+    SLOGI(@"Running command %lld...", (long long)command.command_id());
+
     // Execute the command, then post its result back. The server responds
     // with the next queued command until its queue is drained.
     pbv1::CommandResult* result = [self.commandHandler executeQueuedCommand:command onArena:&arena];
