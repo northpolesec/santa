@@ -27,6 +27,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <type_traits>
+#include <utility>
 
 #include "Source/common/BranchPrediction.h"
 #include "absl/hash/hash.h"
@@ -146,7 +147,7 @@ class SantaCache {
   */
   template <typename UpdateBlockT>
   bool update(const KeyT& key, UpdateBlockT update_block) {
-    static_assert(std::is_invocable_r_v<void, UpdateBlockT, ValueT&>,
+    static_assert(std::is_invocable_r_v<void, UpdateBlockT&, ValueT&>,
                   "update_block must be callable as void(ValueT&)");
     return set(key, zero_, update_block, true, {}, false);
   }
@@ -158,7 +159,7 @@ class SantaCache {
   */
   template <typename ForeachBlockT>
   void foreach(ForeachBlockT foreach_block) {
-    static_assert(std::is_invocable_r_v<void, ForeachBlockT, KeyT&, ValueT&>,
+    static_assert(std::is_invocable_r_v<void, ForeachBlockT&, KeyT&, ValueT&>,
                   "foreach_block must be callable as void(KeyT&, ValueT&)");
     // Lock all buckets
     // NB: The clear_bucket_ lock isn't necessary since both foreach and
@@ -201,7 +202,7 @@ class SantaCache {
   */
   template <typename ContainsBlockT>
   bool contains(const KeyT& key, ContainsBlockT contains_block) const {
-    static_assert(std::is_invocable_r_v<bool, ContainsBlockT, const ValueT&>,
+    static_assert(std::is_invocable_r_v<bool, ContainsBlockT&, const ValueT&>,
                   "contains_block must be callable as bool(const ValueT&)");
     struct bucket* bucket = &buckets_[hash(key)];
     lock(bucket);
@@ -244,7 +245,7 @@ class SantaCache {
   */
   template <typename PredicateT>
   uint64_t remove_if(PredicateT predicate) {
-    static_assert(std::is_invocable_r_v<bool, PredicateT, const KeyT&, ValueT&>,
+    static_assert(std::is_invocable_r_v<bool, PredicateT&, const KeyT&, ValueT&>,
                   "predicate must be callable as bool(const KeyT&, ValueT&)");
     uint64_t removed = 0;
 
@@ -285,7 +286,7 @@ class SantaCache {
   */
   template <typename ClearBlockT>
   void clear(ClearBlockT clear_block) {
-    static_assert(std::is_invocable_r_v<void, ClearBlockT, KeyT&, ValueT&>,
+    static_assert(std::is_invocable_r_v<void, ClearBlockT&, KeyT&, ValueT&>,
                   "clear_block must be callable as void(KeyT&, ValueT&)");
     for (uint32_t i = 0; i < bucket_count_; ++i) {
       struct bucket* bucket = &buckets_[i];
