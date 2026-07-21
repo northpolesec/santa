@@ -354,6 +354,47 @@ static uint64_t MakeDeadline(uint64_t want) {
   XCTAssertTrue(tam->SecondsRemaining().has_value());  // original session still live
 }
 
+// A refresh re-adds the live session's uid without recapturing identity. If the
+// uid was reused mid-session (it now resolves to a DIFFERENT account), re-adding
+// would elevate the new holder, whom RevertEffect's uid-reuse guard then refuses
+// to demote -- a permanent untracked admin. The refresh must be refused, leaving
+// the live record (with the ORIGINAL uuid) intact to revert at its own deadline.
+// AddMember is deliberately left able to succeed: without the guard the refresh
+// would be granted (returns 5), so the refusal below is the guard and nothing else.
+- (void)testRefreshRefusedWhenUidReusedMidSession {
+  [self stubPolicyAvailable];
+  [self stubAuthReply:YES reason:@"reason"];
+  __block NSDictionary* lastPersisted = nil;
+  OCMStub([self.mockConfigurator persistTimedSessionState:[OCMArg any] forKey:@"TempAdmin"])
+      .andDo(^(NSInvocation* inv) {
+        __unsafe_unretained NSDictionary* s = nil;
+        [inv getArgument:&s atIndex:2];
+        lastPersisted = s;
+      });
+  auto fakeOwned = std::make_unique<FakeAdminGroupMembership>();
+  FakeAdminGroupMembership* fake = fakeOwned.get();
+  auto tam = santa::TemporaryAdminMode::Create((SNTConfigurator*)self.mockConfigurator,
+                                               (SNTNotificationQueue*)self.mockNotQueue,
+                                               std::move(fakeOwned),
+                                               ^(SNTStoredTemporaryAdminModeAuditEvent* e){
+                                               });
+
+  NSError* err = nil;
+  XCTAssertEqual(tam->RequestMinutes(@5, 501, @"alice", &err), 5u);  // grant records uuid-501
+  NSDictionary* liveRecord = lastPersisted;
+  XCTAssertNotNil(liveRecord);
+
+  // The elevated account is deleted and uid 501 reallocated to a different
+  // account (new GeneratedUID) while the session is live.
+  fake->uuids_[501] = @"uuid-reused";
+  err = nil;
+  XCTAssertEqual(tam->RequestMinutes(@5, 501, @"alice", &err), 0u);  // refresh refused by the guard
+  XCTAssertEqual(err.code, SNTErrorCodeTAMMembershipChangeFailed);
+
+  XCTAssertEqualObjects(lastPersisted, liveRecord);    // record never overwritten (keeps uuid-501)
+  XCTAssertTrue(tam->SecondsRemaining().has_value());  // original session still live
+}
+
 - (void)testGrantRefusedWhileTeardownRetryPending {
   [self stubPolicyAvailable];
   [self stubAuthReply:YES reason:@"need to install"];

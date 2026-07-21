@@ -230,6 +230,21 @@ bool TemporaryAdminMode::ApplyEffect(NSError** err) ABSL_EXCLUSIVE_LOCKS_REQUIRE
     target_uuid_ = membership_->UUIDForUID(target_uid_);
     target_is_local_ = membership_->IsLocalAccount(target_uid_);
     PersistExpiredForRetryLocked();
+  } else if (target_uuid_.length) {
+    // A refresh re-adds the live session's uid without recapturing identity. If
+    // the uid now resolves to a DIFFERENT account (unique identifiers differ),
+    // the elevated account was deleted and its uid reused; re-adding would
+    // elevate the new holder, whom RevertEffect's uid-reuse guard would then
+    // refuse to demote -- a permanent untracked admin. Refuse the refresh and
+    // leave the live record intact so it reverts at its own deadline. A
+    // non-resolving uid (nil) falls through to AddMember, which fails closed.
+    NSString* current_uuid = membership_->UUIDForUID(target_uid_);
+    if (current_uuid.length && ![current_uuid isEqualToString:target_uuid_]) {
+      [SNTError populateError:err
+                     withCode:SNTErrorCodeTAMMembershipChangeFailed
+                       format:@"The elevated account changed during the session."];
+      return false;
+    }
   }
   if (!membership_->AddMember(target_uid_, err)) {
     if (!is_refresh) {
