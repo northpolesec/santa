@@ -617,6 +617,10 @@ void ProcessDeprecatedBundleNotificationsForRule(
     SLOGI(@"Processed %lu network flow rules", newRules.networkRules.count);
   }
 
+  if (newRules.signals.count) {
+    SLOGI(@"Processed %lu signal rules", newRules.signals.count);
+  }
+
   // Send out push notifications about any newly allowed binaries
   // that had been previously blocked by santad.
   [self announceUnblockingRules:newRules.executionRules];

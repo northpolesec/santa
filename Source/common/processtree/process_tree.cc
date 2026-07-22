@@ -83,32 +83,28 @@ void ProcessTree::BackfillInsertChildren(
   }
 }
 
-void ProcessTree::HandleFork(uint64_t timestamp, const Process& parent,
+void ProcessTree::HandleFork(uint64_t timestamp,
+                             const std::shared_ptr<const Process>& parent,
                              const Pid new_pid) {
-  std::shared_ptr<Process> child;
+  // Allocate the child OUTSIDE the write lock (as HandleExec does): the caller
+  // supplies the parent handle, so no lock-held lookup is needed to build it.
+  auto child = std::make_shared<Process>(new_pid, parent->effective_cred_,
+                                         parent->program_, parent);
   {
     // Dedup and the map insert are one critical section: if we released the
     // lock between them, another client could see this event as a duplicate
     // (skip it) and then read the tree before the child was inserted.
     absl::MutexLock lock(mtx_);
-    if (!StepLocked({timestamp, EventKind::kFork, parent.pid_, new_pid})) {
+    if (!StepLocked({timestamp, EventKind::kFork, parent->pid_, new_pid})) {
       return;
     }
     // Test seam (no-op in production): the claim just succeeded and mtx_ is
     // still held; fire here, BEFORE the insert, so the concurrency test can
     // verify a reader blocks at this boundary — i.e. claim and insert are a
-    // single lock hold. Placed in the handler (not StepLocked) on purpose: if
-    // the insert were ever moved to a separate critical section, this point
-    // would fall in the unlocked gap and the test would deterministically fail.
+    // single lock hold.
     if (on_event_claimed_for_test_) {
       on_event_claimed_for_test_();
     }
-    // Look up the parent rather than using map_[]: operator[] would insert a
-    // null entry (and orphan the child) if the parent were ever absent.
-    auto parent_proc = GetLocked(parent.pid_);
-    child = std::make_shared<Process>(new_pid, parent.effective_cred_,
-                                      parent.program_,
-                                      parent_proc ? *parent_proc : nullptr);
     map_.emplace(new_pid, child);
     // Reap AFTER applying, so a late event can never reap the actor it needs.
     DrainRemovals();
@@ -117,34 +113,33 @@ void ProcessTree::HandleFork(uint64_t timestamp, const Process& parent,
   // propagation is therefore NOT atomic with the structural insert above; that
   // is intentional and does not affect CEL ancestry (see StepLocked).
   for (const auto& annotator : annotators_) {
-    annotator->AnnotateFork(*this, parent, *child);
+    annotator->AnnotateFork(*this, *parent, *child);
   }
 }
 
 void ProcessTree::HandleExec(uint64_t timestamp, const Process& p,
-                             const Pid new_pid, const Program prog,
-                             const Cred c) {
+                             const Pid new_pid, Program prog, const Cred c) {
   // TODO(nickmg): should struct pid be reworked and only pid_version be passed?
   assert(new_pid.pid == p.pid_.pid);
 
-  // Expected double-apply: a tree-aware auth client (the Authorizer) subscribes
-  // to both AUTH_EXEC and NOTIFY_EXEC, so an uncached exec reaches here twice.
-  // The two ES messages carry different mach_time, so they form distinct
-  // EventKeys and both pass dedup; the second is a first-wins no-op (the
-  // map_.emplace below). This is intentional and benign — it costs one extra
-  // emplace/remove_at_/drain on the auth path per uncached exec (accepted).
+  // The same exec is delivered to every tree-aware client, and the Authorizer
+  // sees it as both AUTH_EXEC and NOTIFY_EXEC, so HandleExec may run more than
+  // once per exec. StepLocked is the authoritative dedup gate: an
+  // exact-duplicate delivery is rejected, while distinct deliveries that share
+  // a pid but carry a different mach_time both pass and the later one is a
+  // first-wins map_.emplace no-op. Callers building the Program eagerly can
+  // skip known duplicates up front via GetExecActor (see InformFromESEvent).
 
-  // Construct the new process (copies program/args/signing) OUTSIDE the lock to
-  // keep the shared tree lock short on the serial ES handler path. A duplicate
-  // wastes this allocation, which is cheaper than lengthening the lock hold.
+  // Allocate the new process OUTSIDE the write lock to keep the shared tree
+  // lock short on the serial ES handler path; prog is moved in, not copied.
   auto new_proc = std::make_shared<Process>(
-      new_pid, c, std::make_shared<const Program>(prog), p.parent_);
+      new_pid, c, std::make_shared<const Program>(std::move(prog)), p.parent_);
   {
     absl::MutexLock lock(mtx_);
     if (!StepLocked({timestamp, EventKind::kExec, p.pid_, new_pid})) {
       return;
     }
-    remove_at_.push_back({timestamp, p.pid_});
+    remove_at_.push({timestamp, p.pid_});
     map_.emplace(new_proc->pid_, new_proc);
     DrainRemovals();
   }
@@ -158,8 +153,18 @@ void ProcessTree::HandleExit(uint64_t timestamp, const Process& p) {
   if (!StepLocked({timestamp, EventKind::kExit, p.pid_, Pid{}})) {
     return;
   }
-  remove_at_.push_back({timestamp, p.pid_});
+  remove_at_.push({timestamp, p.pid_});
   DrainRemovals();
+}
+
+ProcessTree::ExecActor ProcessTree::GetExecActor(uint64_t timestamp,
+                                                 const Pid actor,
+                                                 const Pid target) const {
+  absl::ReaderMutexLock lock(mtx_);
+  if (seen_.contains({timestamp, EventKind::kExec, actor, target})) {
+    return {std::nullopt, /*already_seen=*/true};
+  }
+  return {GetLocked(actor), /*already_seen=*/false};
 }
 
 bool ProcessTree::StepLocked(const EventKey& key) {
@@ -206,17 +211,18 @@ void ProcessTree::DrainRemovals() {
       removal_grace_ticks_ ? removal_grace_ticks_ : kDefaultGrace;
   const uint64_t cutoff = latest_ts_ > grace ? latest_ts_ - grace : 0;
 
-  for (auto it = remove_at_.begin(); it != remove_at_.end();) {
-    if (it->first < cutoff) {
-      if (auto target = GetLocked(it->second);
-          target && (*target)->refcnt_.load(std::memory_order_relaxed) > 0) {
-        (*target)->tombstoned_ = true;
-      } else {
-        map_.erase(it->second);
-      }
-      it = remove_at_.erase(it);
+  // remove_at_ is a min-heap on the scheduling timestamp, so the earliest
+  // deadline is always on top. Reap only the entries that have expired and stop
+  // at the first that has not — every deeper entry is newer. This is O(K log R)
+  // in the number reaped, not O(R) in the number pending.
+  while (!remove_at_.empty() && remove_at_.top().first < cutoff) {
+    const struct Pid pid = remove_at_.top().second;
+    remove_at_.pop();
+    if (auto target = GetLocked(pid);
+        target && (*target)->refcnt_.load(std::memory_order_relaxed) > 0) {
+      (*target)->tombstoned_ = true;
     } else {
-      it++;
+      map_.erase(pid);
     }
   }
 }
@@ -235,16 +241,37 @@ void ProcessTree::RetainProcess(const PidList& pids) {
 }
 
 void ProcessTree::ReleaseProcess(const PidList& pids) {
-  absl::MutexLock lock(mtx_);
-  for (const struct Pid& p : pids) {
-    auto proc = GetLocked(p);
-    if (proc) {
-      // relaxed is safe: the exclusive lock provides ordering for
-      // tombstoned_ and map_.erase().
-      if ((*proc)->refcnt_.fetch_sub(1, std::memory_order_relaxed) == 1 &&
+  // Fast path under the reader lock: the decrement is atomic, and tombstoned_
+  // is stable here (written only in DrainRemovals under the exclusive lock).
+  // Only the rare erase of a tombstoned process needs the exclusive lock.
+  PidList to_erase;
+  {
+    absl::ReaderMutexLock lock(mtx_);
+    for (const struct Pid& p : pids) {
+      auto proc = GetLocked(p);
+      if (proc &&
+          (*proc)->refcnt_.fetch_sub(1, std::memory_order_relaxed) == 1 &&
           (*proc)->tombstoned_) {
-        map_.erase(p);
+        to_erase.push_back(p);
       }
+    }
+  }
+  if (to_erase.empty()) {
+    return;
+  }
+  if (on_release_collected_for_test_) {
+    on_release_collected_for_test_();
+  }
+
+  absl::MutexLock lock(mtx_);
+  for (const struct Pid& p : to_erase) {
+    // Re-verify: between the two lock holds the process may have been
+    // retained again, already erased by a concurrent releaser, or erased
+    // and a fresh process re-inserted under the same pid.
+    auto proc = GetLocked(p);
+    if (proc && (*proc)->refcnt_.load(std::memory_order_relaxed) == 0 &&
+        (*proc)->tombstoned_) {
+      map_.erase(p);
     }
   }
 }

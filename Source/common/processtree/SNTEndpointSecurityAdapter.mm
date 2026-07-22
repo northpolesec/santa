@@ -34,30 +34,43 @@ namespace santa::santad::process_tree {
 
 void InformFromESEvent(ProcessTree& tree, const Message& msg) {
   struct Pid event_pid = PidFromAuditToken(msg->process->audit_token);
-  auto proc = tree.Get(event_pid);
-
-  if (!proc) {
-    return;
-  }
-
-  std::shared_ptr<EndpointSecurityAPI> esapi = msg.ESAPI();
 
   switch (msg->event_type) {
     case ES_EVENT_TYPE_AUTH_EXEC:
     case ES_EVENT_TYPE_NOTIFY_EXEC: {
+      const es_process_t* target = msg->event.exec.target;
+      struct Pid target_pid = PidFromAuditToken(target->audit_token);
+
+      // One reader lock: learn whether this exact exec was already recorded and,
+      // if not, fetch the execing process. The same exec is delivered to every
+      // tree-aware client (and to the Authorizer as both AUTH_EXEC and
+      // NOTIFY_EXEC); building the arg list and Program below is the expensive
+      // part, so skip it for a duplicate delivery. HandleExec re-checks under
+      // the write lock, so a racing novel exec is never dropped.
+      auto [proc, already_seen] = tree.GetExecActor(msg->mach_time, event_pid, target_pid);
+      if (already_seen) {
+        break;
+      }
+      if (!proc) {
+        return;
+      }
+
+      std::shared_ptr<EndpointSecurityAPI> esapi = msg.ESAPI();
+      uint32_t arg_count = esapi->ExecArgCount(&msg->event.exec);
       std::vector<std::string> args;
-      args.reserve(esapi->ExecArgCount(&msg->event.exec));
-      for (int i = 0; i < esapi->ExecArgCount(&msg->event.exec); i++) {
+      args.reserve(arg_count);
+      for (uint32_t i = 0; i < arg_count; i++) {
         es_string_token_t arg = esapi->ExecArg(&msg->event.exec, i);
         args.push_back(StringTokenToString(arg));
       }
 
-      const es_process_t* target = msg->event.exec.target;
       es_string_token_t executable = target->executable->path;
 
-      // Extract code signing info from the target process
+      // Extract code signing info from the target process. cdhash is stored as
+      // raw bytes; it is hex-encoded lazily where it is consumed (CEL).
       CodeSigningInfo cs_info{
-          .cdhash = santa::BufToHexString(target->cdhash, sizeof(target->cdhash)),
+          .cdhash =
+              std::string(reinterpret_cast<const char*>(target->cdhash), sizeof(target->cdhash)),
           .is_platform_binary = target->is_platform_binary,
       };
 
@@ -67,23 +80,32 @@ void InformFromESEvent(ProcessTree& tree, const Message& msg) {
         cs_info.signing_id = StringTokenToString(target->signing_id);
       }
 
-      tree.HandleExec(msg->mach_time, **proc, PidFromAuditToken(target->audit_token),
+      tree.HandleExec(msg->mach_time, **proc, target_pid,
                       (struct Program){.executable = StringTokenToString(executable),
-                                       .arguments = args,
-                                       .code_signing = cs_info},
+                                       .arguments = std::move(args),
+                                       .code_signing = std::move(cs_info)},
                       (struct Cred){
                           .uid = audit_token_to_euid(target->audit_token),
                           .gid = audit_token_to_egid(target->audit_token),
                       });
-
       break;
     }
     case ES_EVENT_TYPE_NOTIFY_FORK: {
-      tree.HandleFork(msg->mach_time, **proc,
-                      PidFromAuditToken(msg->event.fork.child->audit_token));
+      auto proc = tree.Get(event_pid);
+      if (!proc) {
+        return;
+      }
+      tree.HandleFork(msg->mach_time, *proc, PidFromAuditToken(msg->event.fork.child->audit_token));
       break;
     }
-    case ES_EVENT_TYPE_NOTIFY_EXIT: tree.HandleExit(msg->mach_time, **proc); break;
+    case ES_EVENT_TYPE_NOTIFY_EXIT: {
+      auto proc = tree.Get(event_pid);
+      if (!proc) {
+        return;
+      }
+      tree.HandleExit(msg->mach_time, **proc);
+      break;
+    }
     default: return;
   }
 }

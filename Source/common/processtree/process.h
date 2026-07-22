@@ -24,6 +24,7 @@
 #include <optional>
 #include <string>
 #include <typeindex>
+#include <utility>
 #include <vector>
 
 #include "Source/common/processtree/annotations/annotator.h"
@@ -91,7 +92,7 @@ struct Cred {
 struct CodeSigningInfo {
   std::string signing_id;
   std::string team_id;
-  std::string cdhash;  // hex string
+  std::string cdhash;  // raw CS_CDHASH_LEN bytes; hex-encoded lazily at use
   bool is_platform_binary;
 
   friend bool operator==(const struct CodeSigningInfo& lhs,
@@ -131,9 +132,9 @@ class Process {
                    std::shared_ptr<const Process> parent)
       : pid_(pid),
         effective_cred_(cred),
-        program_(program),
+        program_(std::move(program)),
         annotations_(),
-        parent_(parent),
+        parent_(std::move(parent)),
         refcnt_(0),
         tombstoned_(false) {}
   Process(const Process&) = delete;

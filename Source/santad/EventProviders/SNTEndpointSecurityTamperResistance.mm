@@ -70,6 +70,7 @@ struct TamperAuthResult {
 constexpr std::pair<std::string_view, WatchItemPathType> kProtectedFiles[] = {
     {"/private/var/db/santa/rules.db", WatchItemPathType::kLiteral},
     {"/private/var/db/santa/events.db", WatchItemPathType::kLiteral},
+    {"/private/var/db/santa/sleigh_state.db", WatchItemPathType::kLiteral},
     {"/private/var/db/santa/sync-state.plist", WatchItemPathType::kLiteral},
     {"/private/var/db/santa/state.plist", WatchItemPathType::kLiteral},
     {"/Applications/Santa.app", WatchItemPathType::kPrefix},

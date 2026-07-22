@@ -77,6 +77,7 @@ objc_library(
         "@cel-cpp//runtime:function_adapter",
         "@northpolesec_protos//cel:v1_cc_proto",
         "@northpolesec_protos//celv2:v2_cc_proto",
+        "@protobuf//:protobuf_lite",
     ],
 )
 

@@ -121,6 +121,14 @@ absl::StatusOr<::santa::commands::v1::BinaryUploadResponse> SleighLauncher::Laun
 
 absl::StatusOr<::santa::telemetry::v1::SleighSignalScanResponse> SleighLauncher::LaunchSignalScan(
     int input_fd, const std::vector<std::string>& serialized_signals, uint32_t timeout_secs) {
+  // Bail out with the same NotFound RunSleigh would return when Sleigh isn't installed (e.g. the
+  // lite package). Checked up front so an unavailable/read-only /var/db/santa can't turn the
+  // absent-Sleigh case into an InternalError from the state-db open below — callers rely on
+  // NotFound to distinguish "no Sleigh" (accepted, silent) from a real scan failure (warned).
+  if (access(sleigh_path_.c_str(), X_OK) != 0) {
+    return absl::NotFoundError("Sleigh binary not executable: " + sleigh_path_);
+  }
+
   // Scan a dup: RunSleigh closes the fds it is handed, but the caller owns input_fd (it keeps the
   // spool file's inode alive for the duration of the scan). The dup shares input_fd's offset,
   // which the caller guarantees is at 0.
@@ -130,16 +138,30 @@ absl::StatusOr<::santa::telemetry::v1::SleighSignalScanResponse> SleighLauncher:
     return absl::InternalError("Failed to dup signal scan input fd");
   }
 
-  absl::StatusOr<std::string> serialized = SerializeSignalScanConfig(fd, serialized_signals);
-  if (!serialized.ok()) {
-    // RunSleigh closes fd on all later paths; on this pre-RunSleigh early return
-    // we still own it, so close it here to avoid leaking the descriptor.
+  // Open Sleigh's state db (as root; /var/db/santa is root-owned). Read-write, created if absent —
+  // a zero-length file is a valid empty boltdb (sleigh initializes it on first open). Sleigh drops
+  // privileges after fork but keeps this inherited fd.
+  std::string state_db_path(kSignalScanStateDbPath);
+  int state_fd = open(state_db_path.c_str(), O_RDWR | O_CREAT, 0600);
+  if (state_fd < 0) {
+    LOGD(@"SleighLauncher::LaunchSignalScan(): Failed to open state db %s: %d",
+         state_db_path.c_str(), errno);
     close(fd);
+    return absl::InternalError("Failed to open signal scan state db");
+  }
+
+  absl::StatusOr<std::string> serialized =
+      SerializeSignalScanConfig(fd, state_fd, serialized_signals);
+  if (!serialized.ok()) {
+    // RunSleigh closes the fds on all later paths; on this pre-RunSleigh early return
+    // we still own them, so close them here to avoid leaking the descriptors.
+    close(fd);
+    close(state_fd);
     return serialized.status();
   }
 
   absl::StatusOr<std::string> output =
-      RunSleigh(*serialized, {fd}, timeout_secs, /*capture_stdout=*/true);
+      RunSleigh(*serialized, {fd, state_fd}, timeout_secs, /*capture_stdout=*/true);
   if (!output.ok()) {
     return output.status();
   }
@@ -413,12 +435,13 @@ absl::StatusOr<std::string> SleighLauncher::SerializeBinaryUploadConfig(
 }
 
 absl::StatusOr<std::string> SleighLauncher::SerializeSignalScanConfig(
-    int input_fd, const std::vector<std::string>& serialized_signals) {
+    int input_fd, int state_db_fd, const std::vector<std::string>& serialized_signals) {
   ::santa::telemetry::v1::SleighConfig config;
   PopulateHostInfo(&config);
 
   auto* signal_scan = config.mutable_signal_scan();
   signal_scan->add_input_fds(input_fd);
+  signal_scan->set_state_db_fd(state_db_fd);
 
   for (const auto& serialized_signal : serialized_signals) {
     ::santa::common::v1::Signal* signal = signal_scan->add_signals();

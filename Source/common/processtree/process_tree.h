@@ -20,6 +20,7 @@
 #include <deque>
 #include <functional>
 #include <memory>
+#include <queue>
 #include <typeinfo>
 #include <vector>
 
@@ -57,8 +58,11 @@ class ProcessTree {
   absl::Status Backfill();
 
   // Inform the tree of a fork event, in which the parent process spawns a child
-  // with the only difference between the two being the pid.
-  void HandleFork(uint64_t timestamp, const Process& parent,
+  // with the only difference between the two being the pid. `parent` is the
+  // handle to the forking process (e.g. from Get); it becomes the child's
+  // parent link directly, so no lookup is needed under the write lock.
+  void HandleFork(uint64_t timestamp,
+                  const std::shared_ptr<const Process>& parent,
                   struct Pid new_pid);
 
   // Inform the tree of an exec event, in which the program and potentially cred
@@ -74,6 +78,25 @@ class ProcessTree {
 
   // Inform the tree of a process exit.
   void HandleExit(uint64_t timestamp, const Process& p);
+
+  // Result of GetExecActor. `proc` is the execing (actor) process; it is
+  // populated only when `already_seen` is false (and may still be empty then if
+  // the actor is unknown to the tree), so callers must check `already_seen`
+  // first.
+  struct ExecActor {
+    std::optional<std::shared_ptr<const Process>> proc;
+    bool already_seen;
+  };
+
+  // Single reader-lock lookup for the exec ingest path: reports whether this
+  // exact exec (timestamp+actor+target identity) was already recorded and, if
+  // not, returns the execing (actor) process. Checks the dedup set first and
+  // short-circuits, so a duplicate delivery does no map lookup. Lets a caller
+  // skip building the (expensive) Program for a duplicate delivery.
+  // Best-effort: HandleExec re-checks under the write lock, so a racing novel
+  // exec is never dropped.
+  ExecActor GetExecActor(uint64_t timestamp, struct Pid actor,
+                         struct Pid target) const;
 
   // Mark the given pids as needing to be retained in the tree's map for future
   // access. Normally, Processes are removed once all clients process past the
@@ -161,12 +184,25 @@ class ProcessTree {
   mutable absl::Mutex mtx_;
   absl::flat_hash_map<const struct Pid, std::shared_ptr<Process>> map_
       ABSL_GUARDED_BY(mtx_);
-  // List of pids which should be removed from map_, and the timestamp (the
-  // originating exit/exec event's mach_time) at which the removal was
-  // scheduled. An entry is reaped once removal_grace_ticks_ have elapsed past
-  // its timestamp (measured against latest_ts_), so a reordered straggler
-  // cannot reference a process after it is reaped. See DrainRemovals().
-  std::vector<std::pair<uint64_t, struct Pid>> remove_at_ ABSL_GUARDED_BY(mtx_);
+  // Pending removals: pids to erase from map_, each paired with the mach_time
+  // of the exit/exec event that scheduled it. An entry is reaped once
+  // removal_grace_ticks_ have elapsed past that timestamp (measured against
+  // latest_ts_), so a reordered straggler cannot reference a process after it
+  // is reaped. Held as a MIN-heap on the timestamp so DrainRemovals reaps only
+  // the entries that have expired (smallest timestamps) rather than scanning
+  // every pending one — ES delivers events out of order, so timestamps are not
+  // appended monotonically and the earliest deadline is not necessarily the
+  // oldest insertion. See DrainRemovals().
+  struct ReapEarliestFirst {
+    bool operator()(const std::pair<uint64_t, struct Pid>& a,
+                    const std::pair<uint64_t, struct Pid>& b) const {
+      return a.first > b.first;  // priority_queue is a max-heap; invert for min
+    }
+  };
+  std::priority_queue<std::pair<uint64_t, struct Pid>,
+                      std::vector<std::pair<uint64_t, struct Pid>>,
+                      ReapEarliestFirst>
+      remove_at_ ABSL_GUARDED_BY(mtx_);
 
   // Dedup of processed events. The same kernel event is delivered to every
   // tree-aware client; each informs the tree, so an event must be applied
@@ -192,6 +228,11 @@ class ProcessTree {
   // regression test interpose there. Set via ProcessTreeTestPeer (a friend).
   // The per-event null check is negligible.
   std::function<void()> on_event_claimed_for_test_;
+
+  // Test-only seam (empty in production): invoked by ReleaseProcess between
+  // the reader-lock collect and the exclusive-lock erase — the window the
+  // erase re-verify guards. Set via ProcessTreeTestPeer.
+  std::function<void()> on_release_collected_for_test_;
 };
 
 template <typename T>

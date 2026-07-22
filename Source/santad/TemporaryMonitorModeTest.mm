@@ -33,6 +33,19 @@ class TemporaryMonitorModePeer : public TemporaryMonitorMode {
       : santa::TemporaryMonitorMode(MakeKey(), configurator, notQueue, block) {}
 
   using santa::TimedSyncSession::GetSecondsRemainingFromStateLocked;
+
+  // Force the session deadline into the past so a subsequent OnTimer() observes
+  // a genuinely expired session (mach_continuous_time is far past 1).
+  void ExpireDeadlineForTesting() {
+    absl::MutexLock lock(lock_);
+    deadline_ = 1;
+  }
+
+  // Simulate the trailing-edge TimerCallback having consumed the fire: the
+  // dispatch source is stopped while the session state is still active. Uses a
+  // qualified call because TimedSyncSession hides the blocking Timer methods;
+  // the queue is idle in tests, so the blocking call is safe here.
+  bool StopTimerDirectForTesting() { return santa::Timer<santa::TimedSyncSession>::StopTimer(); }
 };
 }  // namespace santa
 
@@ -275,6 +288,8 @@ uint64_t MakeDeadline(uint64_t want) {
   NSError* err = nil;
   XCTAssertEqual(tmm->RequestMinutes(@5, &err), 5u);
 
+  tmm->ExpireDeadlineForTesting();
+
   // OnTimer returns false: the session expired, do not reschedule.
   XCTAssertFalse(tmm->OnTimer());
 
@@ -283,6 +298,91 @@ uint64_t MakeDeadline(uint64_t want) {
       [events.lastObject isKindOfClass:[SNTStoredTemporaryMonitorModeLeaveAuditEvent class]]);
   XCTAssertEqual(((SNTStoredTemporaryMonitorModeLeaveAuditEvent*)events.lastObject).reason,
                  SNTTemporaryMonitorModeLeaveReasonSessionExpired);
+}
+
+- (void)testOnTimerWithTimeRemainingIsStaleFire {
+  [self stubOnDemandAvailableMaxMinutes:60 defaultDuration:5];
+  NSMutableArray<SNTStoredTemporaryMonitorModeAuditEvent*>* events = [NSMutableArray array];
+  auto tmm = std::make_shared<TemporaryMonitorModePeer>(
+      (SNTConfigurator*)self.mockConfigurator, (SNTNotificationQueue*)self.mockNotQueue,
+      ^(SNTStoredTemporaryMonitorModeAuditEvent* e) {
+        [events addObject:e];
+      });
+
+  NSError* err = nil;
+  XCTAssertEqual(tmm->RequestMinutes(@5, &err), 5u);
+
+  // The deadline is ~5 minutes out, so this fire is stale (a refresh raced the
+  // expiry). OnTimer must re-arm (return true) and preserve the session.
+  XCTAssertTrue(tmm->OnTimer());
+  XCTAssertTrue(tmm->SecondsRemaining().has_value());
+  XCTAssertEqual(events.count, 1u);
+}
+
+- (void)testOnTimerAfterCancelIsNoOp {
+  [self stubOnDemandAvailableMaxMinutes:60 defaultDuration:5];
+  NSMutableArray<SNTStoredTemporaryMonitorModeAuditEvent*>* events = [NSMutableArray array];
+  auto tmm = std::make_shared<TemporaryMonitorModePeer>(
+      (SNTConfigurator*)self.mockConfigurator, (SNTNotificationQueue*)self.mockNotQueue,
+      ^(SNTStoredTemporaryMonitorModeAuditEvent* e) {
+        [events addObject:e];
+      });
+
+  NSError* err = nil;
+  XCTAssertEqual(tmm->RequestMinutes(@5, &err), 5u);
+  XCTAssertTrue(tmm->Cancel());
+  XCTAssertEqual(events.count, 2u);
+
+  // A fire that lost the race to Cancel must not tear down again or emit a
+  // second leave audit.
+  XCTAssertFalse(tmm->OnTimer());
+  XCTAssertEqual(events.count, 2u);
+}
+
+- (void)testCancelWhenFireAlreadyConsumedTimer {
+  [self stubOnDemandAvailableMaxMinutes:60 defaultDuration:5];
+  NSMutableArray<SNTStoredTemporaryMonitorModeAuditEvent*>* events = [NSMutableArray array];
+  auto tmm = std::make_shared<TemporaryMonitorModePeer>(
+      (SNTConfigurator*)self.mockConfigurator, (SNTNotificationQueue*)self.mockNotQueue,
+      ^(SNTStoredTemporaryMonitorModeAuditEvent* e) {
+        [events addObject:e];
+      });
+
+  NSError* err = nil;
+  XCTAssertEqual(tmm->RequestMinutes(@5, &err), 5u);
+
+  // Race window at expiry: the trailing-edge callback stopped the dispatch
+  // source, but the session state is still active. Cancel decides from
+  // active_, so it must still end the session.
+  XCTAssertTrue(tmm->StopTimerDirectForTesting());
+  XCTAssertTrue(tmm->Cancel());
+
+  XCTAssertFalse(tmm->SecondsRemaining().has_value());
+  XCTAssertEqual(((SNTStoredTemporaryMonitorModeLeaveAuditEvent*)events.lastObject).reason,
+                 SNTTemporaryMonitorModeLeaveReasonCancelled);
+}
+
+- (void)testRefreshWhenFireAlreadyConsumedTimer {
+  [self stubOnDemandAvailableMaxMinutes:60 defaultDuration:5];
+  NSMutableArray<SNTStoredTemporaryMonitorModeAuditEvent*>* events = [NSMutableArray array];
+  auto tmm = std::make_shared<TemporaryMonitorModePeer>(
+      (SNTConfigurator*)self.mockConfigurator, (SNTNotificationQueue*)self.mockNotQueue,
+      ^(SNTStoredTemporaryMonitorModeAuditEvent* e) {
+        [events addObject:e];
+      });
+
+  NSError* err = nil;
+  XCTAssertEqual(tmm->RequestMinutes(@5, &err), 5u);
+
+  // Same race window: a grant landing here is a refresh of the still-active
+  // session (keyed on active_), not a new session with a new UUID.
+  XCTAssertTrue(tmm->StopTimerDirectForTesting());
+  XCTAssertEqual(tmm->RequestMinutes(@5, &err), 5u);
+
+  XCTAssertEqual(events.count, 2u);
+  XCTAssertEqual(((SNTStoredTemporaryMonitorModeEnterAuditEvent*)events[1]).reason,
+                 SNTTemporaryMonitorModeEnterReasonOnDemandRefresh);
+  XCTAssertEqualObjects(events[0].uuid, events[1].uuid);
 }
 
 @end

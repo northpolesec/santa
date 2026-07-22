@@ -309,7 +309,9 @@ objc_library(
         "//Source/common:MOLXPCConnection",
         "//Source/common:SNTXPCControlInterface",
         "//Source/common:String",
+        "@northpolesec_protos//common:signals_cc_proto",
         "@northpolesec_protos//syncv2:v2_cc_proto",
+        "@protobuf",
         "@protobuf//src/google/protobuf/json",
     ],
 )

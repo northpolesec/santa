@@ -58,17 +58,14 @@ struct CELEvaluationResult {
 static void ApplySilentBlock(SNTCachedDecision* cd, SNTRuleState state);
 
 struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
-  SNTRuleIdentifiers* ri =
-      [[SNTRuleIdentifiers alloc] initWithRuleIdentifiers:{
-                                                              .cdhash = cd.cdhash,
-                                                              .binarySHA256 = cd.sha256,
-                                                              .signingID = cd.signingID,
-                                                              .certificateSHA256 = cd.certSHA256,
-                                                              .teamID = cd.teamID,
-                                                          }
-                                         andSigningStatus:cd.signingStatus];
-
-  return [ri toStruct];
+  return [SNTRuleIdentifiers filterIdentifiers:{
+                                                   .cdhash = cd.cdhash,
+                                                   .binarySHA256 = cd.sha256,
+                                                   .signingID = cd.signingID,
+                                                   .certificateSHA256 = cd.certSHA256,
+                                                   .teamID = cd.teamID,
+                                               }
+                              forSigningStatus:cd.signingStatus];
 }
 
 namespace {
@@ -283,7 +280,7 @@ struct FallbackBatch {
     if (!evalResult.ok()) {
       LOGE(@"Failed to evaluate CEL expression: %s",
            std::string(evalResult.status().message()).c_str());
-      if ([SNTConfigurator configurator].failClosed) {
+      if (self.configurator.failClosed) {
         cd.decision = SNTEventStateBlockUnknown;
         return {.succeeded = false, .decisionMade = true, .resultState = {}};
       }
@@ -301,7 +298,7 @@ struct FallbackBatch {
     if (!evalResult.ok()) {
       LOGE(@"Failed to evaluate CEL expression: %s",
            std::string(evalResult.status().message()).c_str());
-      if ([SNTConfigurator configurator].failClosed) {
+      if (self.configurator.failClosed) {
         cd.decision = SNTEventStateBlockUnknown;
         return {.succeeded = false, .decisionMade = true, .resultState = {}};
       }
@@ -400,7 +397,7 @@ struct FallbackBatch {
 
   if ((useV2 && !celPlanCacheV2_) || (!useV2 && !celPlanCacheV1_)) {
     LOGE(@"CEL v%d evaluator unavailable", useV2 ? 2 : 1);
-    if ([SNTConfigurator configurator].failClosed) {
+    if (self.configurator.failClosed) {
       cd.decision = SNTEventStateBlockUnknown;
       return {.succeeded = false, .decisionMade = true, .resultState = {}};
     }
@@ -414,7 +411,7 @@ struct FallbackBatch {
   if (!planResult.ok()) {
     LOGE(@"Failed to compile CEL rule (%@): %s", rule.celExpr,
          std::string(planResult.status().message()).c_str());
-    if ([SNTConfigurator configurator].failClosed) {
+    if (self.configurator.failClosed) {
       cd.decision = SNTEventStateBlockUnknown;
       return {.succeeded = false, .decisionMade = true, .resultState = {}};
     }
@@ -676,7 +673,7 @@ static void UpdateCachedDecisionSigningInfo(
     }
   }
 
-  if ([[SNTConfigurator configurator] enableBadSignatureProtection] && csInfoError &&
+  if ([self.configurator enableBadSignatureProtection] && csInfoError &&
       csInfoError.code != errSecCSUnsigned) {
     cd.decisionExtra =
         [NSString stringWithFormat:@"Blocked due to signature error: %ld", (long)csInfoError.code];
@@ -746,15 +743,15 @@ static void UpdateCachedDecisionSigningInfo(
       if (targetProc->signing_id.length > 0) {
         if (targetProc->team_id.length > 0) {
           entitlementsFilterTeamID = targetProc->team_id.data;
-          cd.teamID = [NSString stringWithUTF8String:targetProc->team_id.data];
-          cd.signingID = [NSString
-              stringWithFormat:@"%@:%@", cd.teamID,
-                               [NSString stringWithUTF8String:targetProc->signing_id.data]];
+          cd.teamID = santa::StringTokenToNSString(targetProc->team_id);
+          cd.signingID =
+              [NSString stringWithFormat:@"%@:%@", cd.teamID,
+                                         santa::StringTokenToNSString(targetProc->signing_id)];
         } else if (targetProc->is_platform_binary) {
           entitlementsFilterTeamID = "platform";
-          cd.signingID = [NSString
-              stringWithFormat:@"platform:%@",
-                               [NSString stringWithUTF8String:targetProc->signing_id.data]];
+          cd.signingID =
+              [NSString stringWithFormat:@"platform:%@",
+                                         santa::StringTokenToNSString(targetProc->signing_id)];
         }
       }
 
@@ -810,10 +807,17 @@ static void UpdateCachedDecisionSigningInfo(
 - (NSString*)fileIsScopeAllowed:(SNTFileInfo*)fi {
   if (!fi) return nil;
 
-  // Determine if file is within an allowed path
-  NSRegularExpression* re = [[SNTConfigurator configurator] allowedPathRegex];
-  if ([re numberOfMatchesInString:fi.path options:0 range:NSMakeRange(0, fi.path.length)]) {
-    return @"Allowed Path Regex";
+  // Determine if file is within an allowed path. Guard on a non-nil regex:
+  // rangeOfFirstMatchInString: returns a zeroed NSRange (location 0, not
+  // NSNotFound) when messaged on a nil regex, which would otherwise read as a
+  // spurious match.
+  NSRegularExpression* re = [self.configurator allowedPathRegex];
+  if (re) {
+    NSString* path = fi.path;
+    if ([re rangeOfFirstMatchInString:path options:0 range:NSMakeRange(0, path.length)].location !=
+        NSNotFound) {
+      return @"Allowed Path Regex";
+    }
   }
 
   // If file is not a Mach-O file, we're not interested.
@@ -827,12 +831,18 @@ static void UpdateCachedDecisionSigningInfo(
 - (NSString*)fileIsScopeBlocked:(SNTFileInfo*)fi {
   if (!fi) return nil;
 
-  NSRegularExpression* re = [[SNTConfigurator configurator] blockedPathRegex];
-  if ([re numberOfMatchesInString:fi.path options:0 range:NSMakeRange(0, fi.path.length)]) {
-    return @"Blocked Path Regex";
+  // Guard on a non-nil regex; see fileIsScopeAllowed: for why the nil case
+  // must be handled explicitly with rangeOfFirstMatchInString:.
+  NSRegularExpression* re = [self.configurator blockedPathRegex];
+  if (re) {
+    NSString* path = fi.path;
+    if ([re rangeOfFirstMatchInString:path options:0 range:NSMakeRange(0, path.length)].location !=
+        NSNotFound) {
+      return @"Blocked Path Regex";
+    }
   }
 
-  if ([[SNTConfigurator configurator] enablePageZeroProtection] && fi.isMissingPageZero) {
+  if ([self.configurator enablePageZeroProtection] && fi.isMissingPageZero) {
     return @"Missing __PAGEZERO";
   }
 

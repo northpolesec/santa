@@ -311,6 +311,7 @@ santa_unit_test(
     deps = [
         ":AuditUtilities",
         ":CSOpsHelper",
+        ":String",
     ],
 )
 
@@ -460,6 +461,7 @@ santa_unit_test(
     deps = [
         ":SNTTimer",
         ":TestUtils",
+        ":Timer",
     ],
 )
 

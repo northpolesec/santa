@@ -32,6 +32,11 @@ class SleighLauncher {
   static constexpr std::string_view kDefaultSleighPath =
       "/Applications/Santa.app/Contents/MacOS/sleigh";
 
+  // Sleigh's persistent signal-scan state database. Opened (as root) and handed
+  // to Sleigh as an fd on every signal scan.
+  static constexpr std::string_view kSignalScanStateDbPath =
+      "/var/db/santa/sleigh_state.db";
+
   static std::unique_ptr<SleighLauncher> Create(std::string sleigh_path);
   SleighLauncher(std::string sleigh_path);
 
@@ -103,7 +108,8 @@ class SleighLauncher {
       const std::vector<std::string>& filter_expressions);
 
   absl::StatusOr<std::string> SerializeSignalScanConfig(
-      int input_fd, const std::vector<std::string>& serialized_signals);
+      int input_fd, int state_db_fd,
+      const std::vector<std::string>& serialized_signals);
 
   // Forks Sleigh, writes the serialized config to its stdin, optionally
   // captures its stdout, and waits up to timeout_secs (SIGKILL on timeout).

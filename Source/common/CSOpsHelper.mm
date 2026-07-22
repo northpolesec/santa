@@ -63,12 +63,21 @@ std::optional<uint32_t> CSOpsStatusFlags(pid_t pid, CSOpsFunc csops_func) {
   return flags;
 }
 
-std::optional<std::string> CSOpsGetCDHash(pid_t pid, CSOpsFunc csops_func) {
-  std::vector<uint8_t> cdhash(CS_CDHASH_LEN);
+std::optional<std::string> CSOpsGetCDHashBytes(pid_t pid, CSOpsFunc csops_func) {
+  std::string cdhash(CS_CDHASH_LEN, '\0');
   if (csops_func(pid, kCsopCDHash, cdhash.data(), cdhash.size()) != 0) {
     return std::nullopt;
   }
-  std::string hex = BufToHexString(cdhash.data(), cdhash.size());
+  return cdhash;
+}
+
+std::optional<std::string> CSOpsGetCDHash(pid_t pid, CSOpsFunc csops_func) {
+  auto cdhash = CSOpsGetCDHashBytes(pid, std::move(csops_func));
+  if (!cdhash) {
+    return std::nullopt;
+  }
+  std::string hex =
+      BufToHexString(reinterpret_cast<const uint8_t*>(cdhash->data()), cdhash->size());
   if (hex.size() != CS_CDHASH_LEN * 2) {
     return std::nullopt;
   }
