@@ -35,6 +35,8 @@
 #import "Source/santasyncservice/SNTPushClientFCM.h"
 #import "Source/santasyncservice/SNTPushClientNATS.h"
 #import "Source/santasyncservice/SNTPushNotifications.h"
+#import "Source/santasyncservice/SNTSantaCommandHandler.h"
+#import "Source/santasyncservice/SNTSyncCommands.h"
 #import "Source/santasyncservice/SNTSyncConfigBundle.h"
 #import "Source/santasyncservice/SNTSyncEventUpload.h"
 #import "Source/santasyncservice/SNTSyncLogging.h"
@@ -62,6 +64,13 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
 // fanning out into concurrent bundle-service connections and sync POSTs.
 @property(nonatomic, readonly) dispatch_queue_t eventUploadQueue;
 
+// Serial queue for the end-of-sync command drain. The drain can block for a long
+// time (event-upload commands wait for the upload to complete), so it runs off
+// the syncQueue to let the sync finish. Serial so only one drain runs at a time;
+// a redundant drain dispatched while one is running finds the server queue
+// already emptied and returns after a single fetch.
+@property(nonatomic, readonly) dispatch_queue_t commandsQueue;
+
 @property(nonatomic) MOLXPCConnection* daemonConn;
 
 @property(nonatomic) BOOL reachable;
@@ -74,6 +83,10 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
 
 // If set, push notifications are being used.
 @property id<SNTPushNotificationsClientDelegate> pushNotifications;
+
+// Transport-agnostic command execution shared with the NATS push client. Used
+// by the end-of-sync command drain stage.
+@property(nonatomic) SNTSantaCommandHandler* commandHandler;
 
 @property NSUInteger eventBatchSize;
 
@@ -138,6 +151,10 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
     _syncLimiter = dispatch_semaphore_create(kMaxEnqueuedSyncs);
     _eventUploadQueue = dispatch_queue_create("com.northpolesec.santa.syncservice.eventupload",
                                               DISPATCH_QUEUE_SERIAL);
+    _commandsQueue =
+        dispatch_queue_create("com.northpolesec.santa.syncservice.commands", DISPATCH_QUEUE_SERIAL);
+
+    _commandHandler = [[SNTSantaCommandHandler alloc] initWithSyncDelegate:self];
 
     _eventBatchSize = kDefaultEventBatchSize;
     _metricsQueue = dispatch_queue_create_with_target(
@@ -759,11 +776,39 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
   SNTSyncPostflight* p = [[SNTSyncPostflight alloc] initWithState:syncState];
   if ([p sync]) {
     SLOGD(@"Postflight complete");
+    [self commandsWithSyncState:syncState];
     SLOGI(@"Sync completed successfully");
     return SNTSyncStatusTypeSuccess;
   }
   SLOGE(@"Postflight failed");
   return SNTSyncStatusTypePostflightFailed;
+}
+
+// Drain any commands the server has queued for this host. Runs after a
+// successful postflight but off the syncQueue: the drain can block for a long
+// time (event-upload commands wait for the upload to finish), so it must not
+// hold up completion of the sync. A failure (or partial drain) does not affect
+// the sync result; undrained commands stay queued server-side for a later drain.
+//
+// The drain runs on the serial commandsQueue, so only one runs at a time. It is
+// fine for overlapping syncs to each dispatch here: a drain that runs after
+// another has emptied the server queue simply returns after a single fetch.
+- (void)commandsWithSyncState:(SNTSyncState*)syncState {
+  // Queued commands are only supported in sync v2. Skip on v1.
+  if (!syncState.isSyncV2) {
+    return;
+  }
+
+  dispatch_async(self.commandsQueue, ^{
+    LOGD(@"Commands starting");
+    SNTSyncCommands* p = [[SNTSyncCommands alloc] initWithState:syncState
+                                                 commandHandler:self.commandHandler];
+    if ([p sync]) {
+      LOGD(@"Commands complete");
+    } else {
+      LOGE(@"Commands failed; queued commands will be retried on next sync");
+    }
+  });
 }
 
 #pragma mark internal helpers

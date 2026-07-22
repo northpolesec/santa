@@ -27,6 +27,7 @@
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTSystemInfo.h"
+#import "Source/santasyncservice/SNTSantaCommandHandler.h"
 #import "Source/santasyncservice/SNTSyncState.h"
 
 __BEGIN_DECLS
@@ -133,6 +134,8 @@ static int NATSSSLVerifyCallback(int preverifyOk, void* ctx) {
 
 @interface SNTPushClientNATS ()
 @property(weak) id<SNTPushNotificationsSyncDelegate> syncDelegate;
+// Transport-agnostic command execution shared with the HTTP sync command drain.
+@property(nonatomic) SNTSantaCommandHandler* commandHandler;
 @property(nonatomic) natsConnection* conn;
 // Array of natsSubscription pointers wrapped in NSValue
 @property(nonatomic) NSMutableArray<NSValue*>* tagSubscriptions;
@@ -172,6 +175,7 @@ static int NATSSSLVerifyCallback(int preverifyOk, void* ctx) {
   self = [super init];
   if (self) {
     _syncDelegate = syncDelegate;
+    _commandHandler = [[SNTSantaCommandHandler alloc] initWithSyncDelegate:syncDelegate];
     _fullSyncInterval = kDefaultPushNotificationsFullSyncInterval;
     _connectionQueue =
         dispatch_queue_create("com.northpolesec.santa.nats.connection", DISPATCH_QUEUE_SERIAL);
