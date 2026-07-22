@@ -32,11 +32,6 @@ static constexpr int64_t kEventUploadPerPathTimeoutSeconds = 660;
 // regardless of how many paths it carries.
 static constexpr int64_t kEventUploadMaxWaitSeconds = 3600;
 
-// Forward declaration of private interface to access private properties
-@interface SNTSantaCommandHandler ()
-@property(weak) id<SNTPushNotificationsSyncDelegate> syncDelegate;
-@end
-
 @implementation SNTSantaCommandHandler (EventUpload)
 
 - (::pbv1::EventUploadResponse*)handleEventUploadRequest:

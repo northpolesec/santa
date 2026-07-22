@@ -23,10 +23,6 @@
 namespace pbv1 = ::santa::commands::v1;
 using santa::NSStringToUTF8String;
 
-@interface SNTSantaCommandHandler ()
-@property(weak) id<SNTPushNotificationsSyncDelegate> syncDelegate;
-@end
-
 @implementation SNTSantaCommandHandler
 
 - (instancetype)initWithSyncDelegate:(id<SNTPushNotificationsSyncDelegate>)syncDelegate {

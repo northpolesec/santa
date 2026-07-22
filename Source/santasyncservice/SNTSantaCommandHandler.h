@@ -28,6 +28,10 @@
 /// SNTSantaCommandHandler+Kill and SNTSantaCommandHandler+EventUpload.
 @interface SNTSantaCommandHandler : NSObject
 
+/// The delegate providing the daemon connection and event-upload machinery.
+/// Held weakly; set at init.
+@property(weak, readonly) id<SNTPushNotificationsSyncDelegate> syncDelegate;
+
 - (instancetype)initWithSyncDelegate:(id<SNTPushNotificationsSyncDelegate>)syncDelegate;
 
 /// Returns YES if the named command is permitted by the AllowedSantaCommands

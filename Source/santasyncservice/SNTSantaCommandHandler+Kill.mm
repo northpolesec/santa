@@ -70,11 +70,6 @@ void SetKilledProcessError(SNTKilledProcessError error, ::pbv1::KillResponse::Pr
 
 }  // namespace
 
-// Forward declaration of private interface to access private properties
-@interface SNTSantaCommandHandler ()
-@property(weak) id<SNTPushNotificationsSyncDelegate> syncDelegate;
-@end
-
 @implementation SNTSantaCommandHandler (Kill)
 
 - (::pbv1::KillResponse*)handleKillRequest:(const ::pbv1::KillRequest&)pbKillReq
