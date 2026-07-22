@@ -549,6 +549,12 @@ static SNTConfigurator* sharedConfigurator = nil;
       setByAddingObject:NSStringFromSelector(@selector(inTemporaryMonitorMode))];
 }
 
++ (NSSet*)keyPathsForValuesAffectingClientModeIgnoringTemporaryMonitorMode {
+  // Deliberately excludes inTemporaryMonitorMode: this accessor reports the base
+  // (policy) mode, which an active session must not affect.
+  return [self syncAndConfigStateSet];
+}
+
 + (NSSet*)keyPathsForValuesAffectingAllowedPathRegex {
   return [self syncAndConfigStateSet];
 }
