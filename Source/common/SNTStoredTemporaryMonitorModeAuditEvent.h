@@ -54,6 +54,13 @@ typedef NS_ENUM(NSInteger, SNTTemporaryMonitorModeLeaveReason) {
   // on restart); defined for symmetry with the shared TimedSyncSession restart
   // path. Reported as REASON_UNSPECIFIED upstream.
   SNTTemporaryMonitorModeLeaveReasonUnspecified,
+
+  // The base (policy) client mode changed to something other than Lockdown,
+  // making an active temporary Monitor Mode session redundant. Ends the session
+  // without revoking eligibility. Appended after the values above (rather than
+  // inserted) so their raw ordinals stay stable across upgrades: the reason is
+  // persisted as an integer in the on-disk events database.
+  SNTTemporaryMonitorModeLeaveReasonClientModeChanged,
 };
 
 // Represents a temporary Monitor Mode audit event stored in the events database.

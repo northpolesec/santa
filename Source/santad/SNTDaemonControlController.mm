@@ -735,6 +735,16 @@ static NSString* TAMUsernameForUID(uid_t uid) {
     _temporaryMonitorMode->NewModeTransitionReceived(val);
   }];
 
+  // A synced client-mode change can make an active Temporary Monitor Mode session
+  // redundant (base mode is now Monitor) or overridden (Standalone). While TMM
+  // masks the effective clientMode to Monitor, that change is invisible to the
+  // clientMode KVO and may arrive with no mode transition, so reconcile explicitly
+  // here against the just-committed base mode. Gated on the bundle carrying a
+  // client mode so it does not push availability on every sync.
+  [result clientMode:^(SNTClientMode m) {
+    _temporaryMonitorMode->ReconcileWithClientMode();
+  }];
+
   // Same post-batch ordering as modeTransition: enforce revoke and re-notify GUI
   // availability against just-committed state.
   [result temporaryAdminPolicy:^(SNTTemporaryAdminPolicy* val) {

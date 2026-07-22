@@ -959,7 +959,10 @@ static SNTConfigurator* sharedConfigurator = nil;
   if ([self inTemporaryMonitorMode]) {
     return SNTClientModeMonitor;
   }
+  return [self clientModeIgnoringTemporaryMonitorMode];
+}
 
+- (SNTClientMode)clientModeIgnoringTemporaryMonitorMode {
   SNTClientMode cm = static_cast<SNTClientMode>([self.syncState[kClientModeKey] integerValue]);
   if (cm == SNTClientModeMonitor || cm == SNTClientModeLockdown || cm == SNTClientModeStandalone) {
     return cm;
