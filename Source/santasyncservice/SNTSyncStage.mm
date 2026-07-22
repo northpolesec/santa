@@ -143,6 +143,7 @@ using santa::NSStringToUTF8String;
 
 - (NSData*)dataFromRequest:(NSURLRequest*)request
                    timeout:(NSTimeInterval)timeout
+                statusCode:(NSInteger*)statusCode
                      error:(NSError**)error {
   NSHTTPURLResponse* response;
   NSError* requestError;
@@ -186,6 +187,11 @@ using santa::NSStringToUTF8String;
     }
   }
 
+  // Report the final HTTP status (0 if no HTTP response was received) so callers
+  // can special-case specific codes, e.g. a 404 for an endpoint an older server
+  // does not implement.
+  if (statusCode) *statusCode = response.statusCode;
+
   // If the final attempt resulted in an error, log the error and return nil.
   if (response.statusCode != 200) {
     long code = response.statusCode;
@@ -204,8 +210,15 @@ using santa::NSStringToUTF8String;
 - (NSError*)performRequest:(NSURLRequest*)request
                intoMessage:(google::protobuf::Message*)message
                    timeout:(NSTimeInterval)timeout {
+  return [self performRequest:request intoMessage:message timeout:timeout statusCode:NULL];
+}
+
+- (NSError*)performRequest:(NSURLRequest*)request
+               intoMessage:(google::protobuf::Message*)message
+                   timeout:(NSTimeInterval)timeout
+                statusCode:(NSInteger*)statusCode {
   NSError* error;
-  NSData* data = [self dataFromRequest:request timeout:timeout error:&error];
+  NSData* data = [self dataFromRequest:request timeout:timeout statusCode:statusCode error:&error];
   if (error) {
     SLOGE(@"Error performing request: %@", error.localizedDescription);
     return error;

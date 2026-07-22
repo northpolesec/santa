@@ -309,6 +309,19 @@ static NSString* const kMachineID = @"50C7E1EB-2EF5-42D4-A084-A7966FC45A95";
   XCTAssertEqual(self.fakeSyncDelegate.uploadedPaths.count, 0u);
 }
 
+- (void)testCommandsEndpointNotFoundStopsQuietly {
+  // A 404 means the sync server predates the command-queue endpoint (Santa was
+  // upgraded ahead of the server). The stage must treat this as "nothing to
+  // drain" and succeed, so it doesn't log an error on every sync.
+  [self stubRequestBody:[self dataFromDict:@{}]
+               response:[self responseWithCode:404]
+                  error:nil
+          validateBlock:nil];
+
+  XCTAssertTrue([self.stage sync]);
+  XCTAssertEqual(self.fakeSyncDelegate.uploadedPaths.count, 0u);
+}
+
 - (void)testDrainStopsAtCommandCap {
   // Server misbehaves and always returns a command. The stage must bail out
   // after its per-sync cap rather than looping forever.

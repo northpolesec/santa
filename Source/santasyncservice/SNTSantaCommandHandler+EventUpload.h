@@ -36,10 +36,11 @@
                   completion:(void (^)(NSError* error))completion;
 
 /// Blocking variant used for queued (HTTP) command delivery: starts the upload
-/// and waits until every path has been processed, bounded per path and capped
-/// overall. On upload failure or timeout the returned response carries
-/// ERROR_INTERNAL and `errorMessage` (when non-null) receives free-text
-/// context for the command result.
+/// and waits until every path has been processed. Each path is bounded by the
+/// sync delegate's per-path timeouts, so this returns in bounded time without a
+/// separate overall deadline. On upload failure the returned response carries
+/// ERROR_INTERNAL and `errorMessage` (when non-null) receives free-text context
+/// for the command result.
 - (santa::commands::v1::EventUploadResponse*)
     handleEventUploadRequestAndWait:(const santa::commands::v1::EventUploadRequest&)request
                             onArena:(google::protobuf::Arena*)arena

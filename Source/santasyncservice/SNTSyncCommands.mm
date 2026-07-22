@@ -14,9 +14,9 @@
 
 #import "Source/santasyncservice/SNTSyncCommands.h"
 
+#import "Source/common/SNTLogging.h"
 #include "Source/common/String.h"
 #import "Source/santasyncservice/SNTSantaCommandHandler.h"
-#import "Source/santasyncservice/SNTSyncLogging.h"
 #import "Source/santasyncservice/SNTSyncState.h"
 #include "commands/v1.pb.h"
 #include "google/protobuf/arena.h"
@@ -67,7 +67,7 @@ static const NSUInteger kMaxCommandsPerSync = 50;
                           intoMessage:&response
                               timeout:30];
   if (err) {
-    SLOGE(@"Failed to post delivered ack for command %lld: %@", (long long)commandId, err);
+    LOGE(@"Failed to post delivered ack for command %lld: %@", (long long)commandId, err);
     return NO;
   }
   return YES;
@@ -84,17 +84,27 @@ static const NSUInteger kMaxCommandsPerSync = 50;
   NSUInteger executed = 0;
   while (true) {
     pbv2::CommandsResponse response;
+    NSInteger statusCode = 0;
     NSError* err = [self performRequest:[self requestWithMessage:req]
                             intoMessage:&response
-                                timeout:30];
+                                timeout:30
+                             statusCode:&statusCode];
     if (err) {
-      SLOGE(@"Failed to fetch queued commands: %@", err);
+      // A 404 means this sync server predates the command-queue endpoint (e.g.
+      // Santa was upgraded ahead of the server). There is nothing to drain, so
+      // stop quietly instead of logging an error on every sync until the server
+      // catches up.
+      if (statusCode == 404) {
+        LOGD(@"Command queue endpoint unavailable (HTTP 404); server does not support commands");
+        return YES;
+      }
+      LOGE(@"Failed to fetch queued commands: %@", err);
       return NO;
     }
 
     if (!response.has_command()) {
       if (executed) {
-        SLOGI(@"Executed %lu queued command(s)", (unsigned long)executed);
+        LOGI(@"Executed %lu queued command(s)", (unsigned long)executed);
       }
       return YES;
     }
@@ -102,8 +112,8 @@ static const NSUInteger kMaxCommandsPerSync = 50;
     if (executed >= kMaxCommandsPerSync) {
       // The unexecuted command was never acknowledged, so it remains queued
       // server-side and is delivered again on the next sync.
-      SLOGW(@"Queued command limit (%lu) reached; remaining commands deferred to next sync",
-            (unsigned long)kMaxCommandsPerSync);
+      LOGW(@"Queued command limit (%lu) reached; remaining commands deferred to next sync",
+           (unsigned long)kMaxCommandsPerSync);
       return YES;
     }
 
@@ -123,7 +133,7 @@ static const NSUInteger kMaxCommandsPerSync = 50;
       return NO;
     }
 
-    SLOGI(@"Running command %lld...", (long long)command.command_id());
+    LOGI(@"Running command %lld...", (long long)command.command_id());
 
     // Execute the command, then post its result back. The server responds
     // with the next queued command until its queue is drained.

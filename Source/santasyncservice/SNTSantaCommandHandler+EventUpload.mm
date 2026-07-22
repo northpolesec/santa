@@ -14,23 +14,12 @@
 
 #import "Source/santasyncservice/SNTSantaCommandHandler+EventUpload.h"
 
-#include <algorithm>
-
 #import "Source/common/SNTLogging.h"
 #include "Source/common/String.h"
 
 namespace pbv1 = ::santa::commands::v1;
 using santa::NSStringToUTF8String;
 using santa::StringToNSString;
-
-// Per-path budget when waiting for an event upload command to finish. Each path
-// is bounded by the delegate's bundle-service timeout (600s) plus upload time,
-// and paths are processed serially.
-static constexpr int64_t kEventUploadPerPathTimeoutSeconds = 660;
-
-// Absolute ceiling on how long a single event upload command is waited on,
-// regardless of how many paths it carries.
-static constexpr int64_t kEventUploadMaxWaitSeconds = 3600;
 
 @implementation SNTSantaCommandHandler (EventUpload)
 
@@ -103,14 +92,12 @@ static constexpr int64_t kEventUploadMaxWaitSeconds = 3600;
     return pbResponse;
   }
 
-  int64_t timeoutSeconds =
-      std::min(kEventUploadPerPathTimeoutSeconds * eventUploadRequest.paths_size(),
-               kEventUploadMaxWaitSeconds);
-  if (dispatch_semaphore_wait(
-          sema, dispatch_time(DISPATCH_TIME_NOW, timeoutSeconds * NSEC_PER_SEC)) != 0) {
-    pbResponse->set_error(::pbv1::EventUploadResponse::ERROR_INTERNAL);
-    if (errorMessage) *errorMessage = "timed out waiting for event upload to complete";
-  } else if (uploadError) {
+  // Each path is bounded by the delegate's per-path timeouts (bundle-service
+  // generation plus upload retries), so the aggregate completion is guaranteed
+  // to fire in bounded time. Wait for it and report the real outcome — there is
+  // no separate outer deadline for the serial per-path work to outlast.
+  dispatch_semaphore_wait(sema, DISPATCH_TIME_FOREVER);
+  if (uploadError) {
     pbResponse->set_error(::pbv1::EventUploadResponse::ERROR_INTERNAL);
     if (errorMessage) *errorMessage = NSStringToUTF8String(uploadError.localizedDescription);
   }

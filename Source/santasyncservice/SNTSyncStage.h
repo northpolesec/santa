@@ -72,6 +72,20 @@
 - (nullable NSError*)performRequest:(nonnull NSURLRequest*)request
                         intoMessage:(nullable google::protobuf::Message*)message
                             timeout:(NSTimeInterval)timeout;
+
+/**
+  Like performRequest:intoMessage:timeout: but also reports the HTTP status code
+  of the final response via `statusCode`. This is 0 when no HTTP response was
+  received (e.g. a transport-level error). Lets a caller distinguish a specific
+  status — such as a 404 for an endpoint an older sync server does not implement
+  — from other failures.
+
+  @param statusCode Out param for the HTTP status code; pass NULL to ignore.
+*/
+- (nullable NSError*)performRequest:(nonnull NSURLRequest*)request
+                        intoMessage:(nullable google::protobuf::Message*)message
+                            timeout:(NSTimeInterval)timeout
+                         statusCode:(nullable NSInteger*)statusCode;
 #endif
 
 @end

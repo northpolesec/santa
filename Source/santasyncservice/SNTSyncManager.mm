@@ -64,6 +64,13 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
 // fanning out into concurrent bundle-service connections and sync POSTs.
 @property(nonatomic, readonly) dispatch_queue_t eventUploadQueue;
 
+// Serial queue for the end-of-sync command drain. The drain can block for a long
+// time (event-upload commands wait for the upload to complete), so it runs off
+// the syncQueue to let the sync finish. Serial so only one drain runs at a time;
+// a redundant drain dispatched while one is running finds the server queue
+// already emptied and returns after a single fetch.
+@property(nonatomic, readonly) dispatch_queue_t commandsQueue;
+
 @property(nonatomic) MOLXPCConnection* daemonConn;
 
 @property(nonatomic) BOOL reachable;
@@ -144,6 +151,8 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
     _syncLimiter = dispatch_semaphore_create(kMaxEnqueuedSyncs);
     _eventUploadQueue = dispatch_queue_create("com.northpolesec.santa.syncservice.eventupload",
                                               DISPATCH_QUEUE_SERIAL);
+    _commandsQueue =
+        dispatch_queue_create("com.northpolesec.santa.syncservice.commands", DISPATCH_QUEUE_SERIAL);
 
     _commandHandler = [[SNTSantaCommandHandler alloc] initWithSyncDelegate:self];
 
@@ -776,23 +785,30 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
 }
 
 // Drain any commands the server has queued for this host. Runs after a
-// successful postflight; a failure (or partial drain) must not affect the
-// sync result. Undrained commands stay queued server-side and are picked up
-// on the next sync.
+// successful postflight but off the syncQueue: the drain can block for a long
+// time (event-upload commands wait for the upload to finish), so it must not
+// hold up completion of the sync. A failure (or partial drain) does not affect
+// the sync result; undrained commands stay queued server-side for a later drain.
+//
+// The drain runs on the serial commandsQueue, so only one runs at a time. It is
+// fine for overlapping syncs to each dispatch here: a drain that runs after
+// another has emptied the server queue simply returns after a single fetch.
 - (void)commandsWithSyncState:(SNTSyncState*)syncState {
   // Queued commands are only supported in sync v2. Skip on v1.
   if (!syncState.isSyncV2) {
     return;
   }
 
-  SLOGD(@"Commands starting");
-  SNTSyncCommands* p = [[SNTSyncCommands alloc] initWithState:syncState
-                                               commandHandler:self.commandHandler];
-  if ([p sync]) {
-    SLOGD(@"Commands complete");
-  } else {
-    SLOGE(@"Commands failed; queued commands will be retried on next sync");
-  }
+  dispatch_async(self.commandsQueue, ^{
+    LOGD(@"Commands starting");
+    SNTSyncCommands* p = [[SNTSyncCommands alloc] initWithState:syncState
+                                                 commandHandler:self.commandHandler];
+    if ([p sync]) {
+      LOGD(@"Commands complete");
+    } else {
+      LOGE(@"Commands failed; queued commands will be retried on next sync");
+    }
+  });
 }
 
 #pragma mark internal helpers
