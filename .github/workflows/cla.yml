@@ -11,7 +11,7 @@ on:
   # (no actions/checkout of the PR head) — it only reads PR metadata via the API, so the
   # secret-bearing context is never exposed to attacker-controlled code.
   pull_request_target:
-    types: [opened, synchronize]
+    types: [opened, synchronize, reopened]
 
 jobs:
   cla:
