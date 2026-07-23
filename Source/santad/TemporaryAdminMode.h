@@ -33,10 +33,11 @@ namespace santa {
 // (GID 80) membership to a single user. A thin subclass of TimedSyncSession; the
 // effect is real OS state (group membership) mutated through AdminGroupMembership.
 //
-// target_uid_ / target_username_ identify the elevated user. They are accessed
-// only under the base's lock_ (set in RequestMinutes / RestoreAndValidateExtraState,
-// read by the effect/audit/persist hooks, all of which the base invokes under
-// lock_), so they are not separately annotated.
+// target_uid_ / target_username_ / target_uuid_ / target_is_local_ identify
+// the elevated user. They are accessed only under the base's lock_ (set in
+// RequestMinutes / ApplyEffect / RestoreAndValidateExtraState, read by the
+// effect/audit/persist hooks, all of which the base invokes under lock_), so
+// they are not separately annotated.
 class TemporaryAdminMode : public TimedSyncSession, public PassKey<TemporaryAdminMode> {
  public:
   using HandleAuditEventBlock = void (^)(SNTStoredTemporaryAdminModeAuditEvent*);
@@ -110,6 +111,12 @@ class TemporaryAdminMode : public TimedSyncSession, public PassKey<TemporaryAdmi
   HandleAuditEventBlock handle_audit_event_block_;
   uid_t target_uid_;
   NSString* target_username_;
+  NSString* target_uuid_;
+  bool target_is_local_;
+  // Consecutive failed revert attempts for the current expired-session record,
+  // persisted across daemon starts. Gates the bounded give-up in RevertEffect
+  // for an unresolvable directory account.
+  uint32_t revert_retries_;
 };
 
 }  // namespace santa

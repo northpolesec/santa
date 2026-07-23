@@ -385,7 +385,6 @@ objc_library(
         ":AdminGroupMembership",
         ":SNTNotificationQueue",
         ":TimedSyncSession",
-        "//Source/common:AccountLookup",
         "//Source/common:PassKey",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTError",

@@ -70,6 +70,16 @@ class FakeAdminGroupMembership : public AdminGroupMembership {
     return nil;
   }
 
+  NSString* UUIDForUID(uid_t uid) override {
+    // Unused by these tests.
+    return nil;
+  }
+
+  bool IsLocalAccount(uid_t uid) override {
+    // Unused by these tests.
+    return false;
+  }
+
   std::set<uid_t> members_;
   bool fail_add_ = false;
   bool fail_remove_ = false;

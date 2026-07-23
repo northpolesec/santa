@@ -102,21 +102,5 @@ std::optional<uid_t> UIDForUsername(std::string_view username) {
   return pwd.pw_uid;
 }
 
-LookupStatus StatusForUID(uid_t uid) {
-  struct passwd pwd;
-  struct passwd* result = nullptr;
-  std::vector<char> buf;
-  int rc = LookupWithGrowingBuffer(buf, sysconf(_SC_GETPW_R_SIZE_MAX), [&](char* b, size_t n) {
-    return getpwuid_r(uid, &pwd, b, n, &result);
-  });
-  if (rc != 0) {
-    // The lookup could not complete (directory unreachable, resource error, or an
-    // entry that exceeds the buffer cap): existence is unknown. Callers must not
-    // treat this as a confirmed absence.
-    return LookupStatus::kError;
-  }
-  return result != nullptr ? LookupStatus::kFound : LookupStatus::kNotFound;
-}
-
 }  // namespace account
 }  // namespace santa
