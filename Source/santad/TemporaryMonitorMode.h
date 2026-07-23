@@ -52,6 +52,13 @@ class TemporaryMonitorMode : public TimedSyncSession, public PassKey<TemporaryMo
   // existing session; always re-notify the GUI of availability.
   void NewModeTransitionReceived(SNTModeTransition* mode_transition);
 
+  // Reconcile an active session against the current base (policy) client mode.
+  // When the base mode is no longer Lockdown, an active session is redundant
+  // (Monitor) or overridden (Standalone), so end it — without writing a revoke
+  // policy, so eligibility survives a later return to Lockdown. Always re-notify
+  // the GUI of availability. Call after a sync commits a client-mode change.
+  void ReconcileWithClientMode();
+
   friend class TemporaryMonitorModePeer;
 
  protected:

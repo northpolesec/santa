@@ -580,10 +580,17 @@ static NSString* TAMUsernameForUID(uid_t uid) {
   // and rules-newly-added cases.
   NSData* oldCELData = [SNTCELFallbackRule serializeArray:[configurator celFallbackRules]];
 
+  // A clean sync that clears synced state drops any previously synced client
+  // mode, which can change the base (policy) client mode without the bundle
+  // carrying a clientMode field. Track it so Temporary Monitor Mode is still
+  // reconciled after the batch in that case.
+  __block BOOL syncStateCleared = NO;
+
   BOOL committed = [configurator performSyncStateBatch:^{
     [result clearSyncStateBeforeApply:^(BOOL clear) {
       if (clear) {
         [configurator clearSyncState];
+        syncStateCleared = YES;
       }
     }];
 
@@ -734,6 +741,22 @@ static NSString* TAMUsernameForUID(uid_t uid) {
   [result modeTransition:^(SNTModeTransition* val) {
     _temporaryMonitorMode->NewModeTransitionReceived(val);
   }];
+
+  // A synced client-mode change -- or a clean sync that cleared a previously
+  // synced client mode -- can make an active Temporary Monitor Mode session
+  // redundant (base mode is now Monitor) or overridden (Standalone). While TMM
+  // masks the effective clientMode to Monitor, that change is invisible to the
+  // clientMode KVO and may arrive with no mode transition, so reconcile
+  // explicitly here against the just-committed base mode. Triggered only when the
+  // bundle carries a client mode or a clean sync cleared synced state, so
+  // unrelated syncs do not reconcile.
+  __block BOOL reconcileClientMode = syncStateCleared;
+  [result clientMode:^(SNTClientMode m) {
+    reconcileClientMode = YES;
+  }];
+  if (reconcileClientMode) {
+    _temporaryMonitorMode->ReconcileWithClientMode();
+  }
 
   // Same post-batch ordering as modeTransition: enforce revoke and re-notify GUI
   // availability against just-committed state.

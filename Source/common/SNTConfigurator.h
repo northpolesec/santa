@@ -39,6 +39,13 @@
 @property(readonly, nonatomic) SNTClientMode clientMode;
 
 ///
+///  The client mode as set by policy (sync state, then config state), ignoring
+///  any active Temporary Monitor Mode override. `clientMode` returns Monitor
+///  while a session is active; this returns what the mode would be without it.
+///
+@property(readonly, nonatomic) SNTClientMode clientModeIgnoringTemporaryMonitorMode;
+
+///
 ///  Set the operating mode as received from a sync server.
 ///
 - (void)setSyncServerClientMode:(SNTClientMode)newMode;

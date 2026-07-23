@@ -408,6 +408,11 @@ bool TimedSyncSession::EndForReasonLocked(NSInteger leave_reason) {
   return false;
 }
 
+bool TimedSyncSession::End(NSInteger leave_reason) {
+  absl::MutexLock lock(lock_);
+  return EndForReasonLocked(leave_reason);
+}
+
 bool TimedSyncSession::Cancel() {
   absl::MutexLock lock(lock_);
   return EndForReasonLocked(LeaveReasonCancelled());
