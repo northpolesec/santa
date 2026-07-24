@@ -159,7 +159,8 @@ struct BinaryView: View {
 
   @State var customMsg: String = ""
   @State var customURL: String = ""
-  @State var eventDetailText: String = ""
+  @State private var eventDetailText: String = ""
+  @State private var eventDetailButtonText: String = ""
 
   var body: some View {
     VStack(spacing: 15.0) {
@@ -211,6 +212,18 @@ struct BinaryView: View {
               Text("Populate").font(Font.subheadline)
             }
             Button(action: { eventDetailText = "" }) {
+              Text(verbatim: "Clear").font(Font.subheadline)
+            }
+          }
+          HStack {
+            TextField(
+              text: $eventDetailButtonText,
+              label: { Text(verbatim: "Event Detail Button Text (per-event)") }
+            )
+            Button(action: { eventDetailButtonText = "Request Access" }) {
+              Text("Populate").font(Font.subheadline)
+            }
+            Button(action: { eventDetailButtonText = "" }) {
               Text(verbatim: "Clear").font(Font.subheadline)
             }
           }
@@ -302,7 +315,7 @@ struct BinaryView: View {
             event: event,
             customMsg: customMsg as NSString?,
             customURL: effectiveURL.isEmpty ? nil : (effectiveURL as NSString),
-            eventDetailButtonText: nil,
+            eventDetailButtonText: eventDetailButtonText.isEmpty ? nil : (eventDetailButtonText as NSString),
             configState: SNTConfigState(config: SNTConfigurator.configurator()),
             bundleProgress: SNTBundleProgress(),
             silenceable: true,

@@ -1434,16 +1434,24 @@
             return requestDict[@"cursor"] != nil;
           }];
 
-  // Stub out the call to invoke the block, verification of the input is later
+  // Stub out the call to invoke the block, verification of the input is later.
+  // Also capture the execution rules so we can assert on fields that SNTRule's
+  // -isEqual: ignores (e.g. the truncated eventDetailButtonText below).
+  __block NSArray<SNTRule*>* capturedExecutionRules;
   OCMStub([self.daemonConnRop
-      databaseRuleAddExecutionRules:OCMOCK_ANY
-                    fileAccessRules:OCMOCK_ANY
-                   networkFlowRules:OCMOCK_ANY
-                            signals:OCMOCK_ANY
-                        ruleCleanup:SNTRuleCleanupNone
-                             source:SNTRuleAddSourceSyncService
-                              reply:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(YES), [NSNull null],
-                                                                 nil])]);
+              databaseRuleAddExecutionRules:OCMOCK_ANY
+                            fileAccessRules:OCMOCK_ANY
+                           networkFlowRules:OCMOCK_ANY
+                                    signals:OCMOCK_ANY
+                                ruleCleanup:SNTRuleCleanupNone
+                                     source:SNTRuleAddSourceSyncService
+                                      reply:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(YES),
+                                                                         [NSNull null], nil])])
+      .andDo(^(NSInvocation* inv) {
+        __unsafe_unretained NSArray<SNTRule*>* arg;
+        [inv getArgument:&arg atIndex:2];
+        capturedExecutionRules = arg;
+      });
   OCMStub([self.daemonConnRop postRuleSyncNotificationForApplication:[OCMArg any]
                                                                reply:([OCMArg invokeBlock])]);
   // Invoke the reply immediately; otherwise sync blocks on the 5s reply timeout.
@@ -1491,6 +1499,23 @@
                                                        source:SNTRuleAddSourceSyncService
                                                         reply:OCMOCK_ANY]);
   OCMVerify([self.daemonConnRop postRuleSyncNotificationForApplication:@"yes" reply:OCMOCK_ANY]);
+
+  // The cert rule's event_detail_button_label in the fixture exceeds the max
+  // length, so the synced SNTRule must carry the truncated label. (SNTRule's
+  // -isEqual: ignores this field, so it is asserted off the captured rules.)
+  NSString* longLabel = @"Contact the Security Team before running this blocked binary";
+  XCTAssertGreaterThan(longLabel.length, kEventDetailButtonTextMaxLength);
+  SNTRule* certRule;
+  for (SNTRule* r in capturedExecutionRules) {
+    if ([r.identifier
+            isEqualToString:@"7846698e47ef41be80b83fb9e2b98fa6dc46c9188b068bff323c302955a00142"]) {
+      certRule = r;
+      break;
+    }
+  }
+  XCTAssertNotNil(certRule);
+  XCTAssertEqualObjects(certRule.eventDetailButtonText,
+                        [longLabel substringToIndex:kEventDetailButtonTextMaxLength]);
 }
 
 - (void)testRuleDownloadCel {
