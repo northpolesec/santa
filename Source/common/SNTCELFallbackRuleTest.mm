@@ -23,7 +23,10 @@
 @implementation SNTCELFallbackRuleTest
 
 - (SNTCELFallbackRule*)ruleWithExpr:(NSString*)expr {
-  return [[SNTCELFallbackRule alloc] initWithCELExpr:expr customMsg:@"msg" customURL:@"https://x"];
+  return [[SNTCELFallbackRule alloc] initWithCELExpr:expr
+                                           customMsg:@"msg"
+                                           customURL:@"https://x"
+                               eventDetailButtonText:@"Open"];
 }
 
 - (void)testEqualRulesAreEqualAndShareHash {
@@ -37,33 +40,48 @@
 - (void)testDifferingFieldsAreNotEqual {
   SNTCELFallbackRule* base = [[SNTCELFallbackRule alloc] initWithCELExpr:@"true"
                                                                customMsg:@"msg"
-                                                               customURL:@"https://x"];
+                                                               customURL:@"https://x"
+                                                   eventDetailButtonText:@"Open"];
 
   XCTAssertNotEqualObjects(base, [[SNTCELFallbackRule alloc] initWithCELExpr:@"false"
                                                                    customMsg:@"msg"
-                                                                   customURL:@"https://x"]);
+                                                                   customURL:@"https://x"
+                                                       eventDetailButtonText:@"Open"]);
   XCTAssertNotEqualObjects(base, [[SNTCELFallbackRule alloc] initWithCELExpr:@"true"
                                                                    customMsg:@"other"
-                                                                   customURL:@"https://x"]);
+                                                                   customURL:@"https://x"
+                                                       eventDetailButtonText:@"Open"]);
   XCTAssertNotEqualObjects(base, [[SNTCELFallbackRule alloc] initWithCELExpr:@"true"
                                                                    customMsg:@"msg"
-                                                                   customURL:@"https://y"]);
+                                                                   customURL:@"https://y"
+                                                       eventDetailButtonText:@"Open"]);
+  XCTAssertNotEqualObjects(base, [[SNTCELFallbackRule alloc] initWithCELExpr:@"true"
+                                                                   customMsg:@"msg"
+                                                                   customURL:@"https://x"
+                                                       eventDetailButtonText:@"Different"]);
 }
 
 - (void)testNilOptionalFields {
   SNTCELFallbackRule* a = [[SNTCELFallbackRule alloc] initWithCELExpr:@"true"
                                                             customMsg:nil
-                                                            customURL:nil];
+                                                            customURL:nil
+                                                eventDetailButtonText:nil];
   SNTCELFallbackRule* b = [[SNTCELFallbackRule alloc] initWithCELExpr:@"true"
                                                             customMsg:nil
-                                                            customURL:nil];
+                                                            customURL:nil
+                                                eventDetailButtonText:nil];
   XCTAssertEqualObjects(a, b);
   XCTAssertEqual(a.hash, b.hash);
 
   // A nil optional field is not equal to a populated one.
   XCTAssertNotEqualObjects(a, [[SNTCELFallbackRule alloc] initWithCELExpr:@"true"
                                                                 customMsg:@"msg"
-                                                                customURL:nil]);
+                                                                customURL:nil
+                                                    eventDetailButtonText:nil]);
+  XCTAssertNotEqualObjects(a, [[SNTCELFallbackRule alloc] initWithCELExpr:@"true"
+                                                                customMsg:nil
+                                                                customURL:nil
+                                                    eventDetailButtonText:@"Open"]);
 }
 
 - (void)testNotEqualToOtherTypesOrNil {
@@ -78,8 +96,14 @@
 // serialize/deserialize round trip, so lock that in.
 - (void)testEqualitySurvivesSerializationRoundTrip {
   NSArray<SNTCELFallbackRule*>* original = @[
-    [[SNTCELFallbackRule alloc] initWithCELExpr:@"true" customMsg:@"msg" customURL:@"https://x"],
-    [[SNTCELFallbackRule alloc] initWithCELExpr:@"false" customMsg:nil customURL:nil],
+    [[SNTCELFallbackRule alloc] initWithCELExpr:@"true"
+                                      customMsg:@"msg"
+                                      customURL:@"https://x"
+                          eventDetailButtonText:@"Open"],
+    [[SNTCELFallbackRule alloc] initWithCELExpr:@"false"
+                                      customMsg:nil
+                                      customURL:nil
+                          eventDetailButtonText:nil],
   ];
 
   NSData* data = [SNTCELFallbackRule serializeArray:original];
@@ -94,8 +118,14 @@
 
   // A genuine change is detected.
   NSArray<SNTCELFallbackRule*>* changed = @[
-    [[SNTCELFallbackRule alloc] initWithCELExpr:@"true" customMsg:@"msg" customURL:@"https://x"],
-    [[SNTCELFallbackRule alloc] initWithCELExpr:@"1 == 2" customMsg:nil customURL:nil],
+    [[SNTCELFallbackRule alloc] initWithCELExpr:@"true"
+                                      customMsg:@"msg"
+                                      customURL:@"https://x"
+                          eventDetailButtonText:@"Open"],
+    [[SNTCELFallbackRule alloc] initWithCELExpr:@"1 == 2"
+                                      customMsg:nil
+                                      customURL:nil
+                          eventDetailButtonText:nil],
   ];
   XCTAssertFalse([changed isEqualToArray:roundTripped]);
 }

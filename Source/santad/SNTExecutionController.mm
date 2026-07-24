@@ -688,6 +688,7 @@ static bool SameBinary(const es_process_t* a, NSString* aSHA256, const es_proces
         [self.notifierQueue addEvent:se
                    withCustomMessage:cd.customMsg
                            customURL:cd.customURL ?: config.eventDetailURL
+               eventDetailButtonText:cd.eventDetailButtonText
                          configState:configState
                             andReply:replyBlock];
       }
@@ -764,6 +765,7 @@ static bool SameBinary(const es_process_t* a, NSString* aSHA256, const es_proces
                                                     type:ruleType
                                                customMsg:nil
                                                customURL:nil
+                                   eventDetailButtonText:nil
                                                timestamp:[[NSDate now] timeIntervalSince1970]
                                                  comment:commentStr
                                                  celExpr:nil

@@ -88,10 +88,11 @@ typedef NS_ENUM(int32_t, SNTNetworkFlowTier) {
 // santad-local, NOT mapped to the proto: drives the loud-deny dialog only.
 @property BOOL silent;
 
-// Block-feedback text from the winning rule (custom_msg / custom_url).
-// santad-local, NOT uploaded.
+// Block-feedback text from the winning rule (custom_msg / custom_url /
+// event_detail_button_label). santad-local, NOT uploaded.
 @property(nullable) NSString* customMsg;
 @property(nullable) NSString* customURL;
+@property(nullable) NSString* eventDetailButtonText;
 
 // santad-local, NOT mapped to the proto: originating process's controlling TTY (from the
 // exec-time snapshot on the wire), used to write the loud-deny block message to that terminal.

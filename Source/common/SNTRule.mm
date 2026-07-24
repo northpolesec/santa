@@ -32,6 +32,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
 @property(readwrite) SNTRuleType type;
 @property(readwrite) NSString* customMsg;
 @property(readwrite) NSString* customURL;
+@property(readwrite) NSString* eventDetailButtonText;
 @property(readwrite) NSString* comment;
 @property(readwrite) NSString* identifier;
 @property(readwrite) NSString* celExpr;
@@ -46,6 +47,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
                               type:(SNTRuleType)type
                          customMsg:(NSString*)customMsg
                          customURL:(NSString*)customURL
+             eventDetailButtonText:(NSString*)eventDetailButtonText
                          timestamp:(NSUInteger)timestamp
                            comment:(NSString*)comment
                            celExpr:(NSString*)celExpr
@@ -189,6 +191,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     _type = type;
     _customMsg = customMsg;
     _customURL = customURL;
+    _eventDetailButtonText = eventDetailButtonText;
     _timestamp = timestamp;
     _comment = comment;
     _celExpr = celExpr;
@@ -203,6 +206,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
                               type:(SNTRuleType)type
                          customMsg:(NSString*)customMsg
                          customURL:(NSString*)customURL
+             eventDetailButtonText:(NSString*)eventDetailButtonText
                            celExpr:(NSString*)celExpr
                     seatbeltPolicy:(NSString*)seatbeltPolicy
                             ruleId:(int64_t)ruleId {
@@ -211,6 +215,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
                              type:type
                         customMsg:customMsg
                         customURL:customURL
+            eventDetailButtonText:eventDetailButtonText
                         timestamp:0
                           comment:nil
                           celExpr:celExpr
@@ -232,6 +237,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
                              type:type
                         customMsg:nil
                         customURL:nil
+            eventDetailButtonText:nil
                         timestamp:0
                           comment:nil
                           celExpr:nil
@@ -366,6 +372,12 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     customURL = nil;
   }
 
+  NSString* eventDetailButtonText = dict[kRuleEventDetailButtonText];
+  if (![eventDetailButtonText isKindOfClass:[NSString class]] ||
+      eventDetailButtonText.length == 0) {
+    eventDetailButtonText = nil;
+  }
+
   NSString* comment = dict[kRuleComment];
   if (![comment isKindOfClass:[NSString class]] || comment.length == 0) {
     comment = nil;
@@ -381,6 +393,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
                              type:type
                         customMsg:customMsg
                         customURL:customURL
+            eventDetailButtonText:eventDetailButtonText
                         timestamp:0
                           comment:comment
                           celExpr:celExpr
@@ -409,6 +422,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
   ENCODE_BOXABLE(coder, type);
   ENCODE(coder, customMsg);
   ENCODE(coder, customURL);
+  ENCODE(coder, eventDetailButtonText);
   ENCODE_BOXABLE(coder, timestamp);
   ENCODE(coder, comment);
   ENCODE(coder, celExpr);
@@ -425,6 +439,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     DECODE_SELECTOR(decoder, type, NSNumber, intValue);
     DECODE(decoder, customMsg, NSString);
     DECODE(decoder, customURL, NSString);
+    DECODE(decoder, eventDetailButtonText, NSString);
     DECODE_SELECTOR(decoder, timestamp, NSNumber, unsignedIntegerValue);
     DECODE(decoder, comment, NSString);
     DECODE(decoder, celExpr, NSString);
@@ -475,6 +490,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     kRuleType : [self ruleTypeToString:self.type],
     kRuleCustomMsg : self.customMsg ?: @"",
     kRuleCustomURL : self.customURL ?: @"",
+    kRuleEventDetailButtonText : self.eventDetailButtonText ?: @"",
     kRuleComment : self.comment ?: @"",
     kRuleCELExpr : self.celExpr ?: @"",
   };

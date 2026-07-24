@@ -468,6 +468,14 @@ SNTRule* RuleFromProtoRule(const typename santa::ProtoTraits<IsV2>::RuleT& rule)
   const std::string& custom_url = rule.custom_url();
   NSString* customURL = (!custom_url.empty()) ? StringToNSString(custom_url) : nil;
 
+  // The button label has to fit on a button, so cap it (kEventDetailButtonTextMaxLength).
+  const std::string& button_label = rule.event_detail_button_label();
+  NSString* eventDetailButtonText = (!button_label.empty()) ? StringToNSString(button_label) : nil;
+  if (eventDetailButtonText.length > kEventDetailButtonTextMaxLength) {
+    eventDetailButtonText =
+        [eventDetailButtonText substringToIndex:kEventDetailButtonTextMaxLength];
+  }
+
   const std::string& cel_expr = rule.cel_expr();
   NSString* celExpr = (!cel_expr.empty()) ? StringToNSString(cel_expr) : nil;
 
@@ -485,6 +493,7 @@ SNTRule* RuleFromProtoRule(const typename santa::ProtoTraits<IsV2>::RuleT& rule)
                                         type:type
                                    customMsg:customMsg
                                    customURL:customURL
+                       eventDetailButtonText:eventDetailButtonText
                                      celExpr:celExpr
                               seatbeltPolicy:seatbeltPolicy
                                       ruleId:ruleId];

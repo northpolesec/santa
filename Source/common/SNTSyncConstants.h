@@ -138,6 +138,7 @@ extern NSString* const kRuleTypeSigningID;
 extern NSString* const kRuleTypeCDHash;
 extern NSString* const kRuleCustomMsg;
 extern NSString* const kRuleCustomURL;
+extern NSString* const kRuleEventDetailButtonText;
 extern NSString* const kRuleComment;
 extern NSString* const kRuleCELExpr;
 extern NSString* const kCursor;
@@ -148,6 +149,11 @@ extern NSString* const kFullSync;
 extern NSString* const kRuleSync;
 extern NSString* const kConfigSync;
 extern NSString* const kLogSync;
+
+// Maximum length of a rule's event_detail_button_label. The text has to fit on
+// a button, so it is capped when synced (matches the FileAccess EventDetailText
+// limit, kWatchItemConfigEventDetailTextMaxLength).
+extern const NSUInteger kEventDetailButtonTextMaxLength;
 
 extern const NSUInteger kDefaultEventBatchSize;
 

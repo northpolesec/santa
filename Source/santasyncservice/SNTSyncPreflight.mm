@@ -585,9 +585,18 @@ void HandleV2Responses(const ::pbv2::PreflightResponse& resp, SNTSyncState* sync
       NSString* celExpr = StringToNSString(rule.cel_expr());
       NSString* customMsg = !rule.custom_msg().empty() ? StringToNSString(rule.custom_msg()) : nil;
       NSString* customURL = !rule.custom_url().empty() ? StringToNSString(rule.custom_url()) : nil;
+      // The button label has to fit on a button, so cap it (kEventDetailButtonTextMaxLength).
+      NSString* eventDetailButtonText = !rule.event_detail_button_label().empty()
+                                            ? StringToNSString(rule.event_detail_button_label())
+                                            : nil;
+      if (eventDetailButtonText.length > kEventDetailButtonTextMaxLength) {
+        eventDetailButtonText =
+            [eventDetailButtonText substringToIndex:kEventDetailButtonTextMaxLength];
+      }
       [rules addObject:[[SNTCELFallbackRule alloc] initWithCELExpr:celExpr
                                                          customMsg:customMsg
-                                                         customURL:customURL]];
+                                                         customURL:customURL
+                                             eventDetailButtonText:eventDetailButtonText]];
     }
     syncState.celFallbackRules = [rules copy];
   }

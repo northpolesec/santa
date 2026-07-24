@@ -838,11 +838,12 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   OCMStub([mockNotifierQueue addEvent:OCMOCK_ANY
                     withCustomMessage:OCMOCK_ANY
                             customURL:OCMOCK_ANY
+                eventDetailButtonText:OCMOCK_ANY
                           configState:OCMOCK_ANY
                              andReply:OCMOCK_ANY])
       .andDo(^(NSInvocation* invocation) {
         __unsafe_unretained NotificationReplyBlock block;
-        [invocation getArgument:&block atIndex:6];
+        [invocation getArgument:&block atIndex:7];
         capturedReplyBlock = [block copy];
       });
 
@@ -957,11 +958,12 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   OCMStub([mockNotifierQueue addEvent:OCMOCK_ANY
                     withCustomMessage:OCMOCK_ANY
                             customURL:OCMOCK_ANY
+                eventDetailButtonText:OCMOCK_ANY
                           configState:OCMOCK_ANY
                              andReply:OCMOCK_ANY])
       .andDo(^(NSInvocation* invocation) {
         __unsafe_unretained NotificationReplyBlock block;
-        [invocation getArgument:&block atIndex:6];
+        [invocation getArgument:&block atIndex:7];
         capturedReplyBlock = [block copy];
       });
 

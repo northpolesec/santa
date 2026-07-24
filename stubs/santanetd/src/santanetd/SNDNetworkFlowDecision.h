@@ -28,5 +28,6 @@ struct SantaVnode;
 
 @property(nullable) NSString* customMsg;
 @property(nullable) NSString* customURL;
+@property(nullable) NSString* eventDetailButtonText;
 
 @end

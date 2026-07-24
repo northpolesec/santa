@@ -35,7 +35,7 @@
 #include "Source/common/String.h"
 #include "Source/common/cel/Evaluator.h"
 
-static const uint32_t kRuleTableCurrentVersion = 15;
+static const uint32_t kRuleTableCurrentVersion = 16;
 
 // How many rules must be in database before we start trying to remove transitive rules.
 static const int64_t kTransitiveRuleCullingThreshold = 500000;
@@ -386,6 +386,11 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
     newVersion = 15;
   }
 
+  if (version < 16) {
+    [db executeUpdate:@"ALTER TABLE 'execution_rules' ADD 'event_detail_button_text' TEXT"];
+    newVersion = 16;
+  }
+
   // Save signing info for launchd and santad. Used to ensure they are always allowed.
   self.santadCSInfo = [[MOLCodesignChecker alloc] initWithSelf];
   self.launchdCSInfo = [[MOLCodesignChecker alloc] initWithPID:1];
@@ -529,6 +534,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
                                         type:static_cast<SNTRuleType>([rs intForColumn:@"type"])
                                    customMsg:[rs stringForColumn:@"custommsg"]
                                    customURL:[rs stringForColumn:@"customurl"]
+                       eventDetailButtonText:[rs stringForColumn:@"event_detail_button_text"]
                                    timestamp:[rs intForColumn:@"timestamp"]
                                      comment:[rs stringForColumn:@"comment"]
                                      celExpr:[rs stringForColumn:@"cel_expr"]
@@ -739,12 +745,13 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
       }
     } else {
       if (![db executeUpdate:@"INSERT OR REPLACE INTO execution_rules "
-                             @"(identifier, state, type, custommsg, customurl, timestamp, "
+                             @"(identifier, state, type, custommsg, customurl, "
+                             @"event_detail_button_text, timestamp, "
                              @"comment, cel_expr, seatbelt_policy, rule_id) "
-                             @"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
+                             @"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
                              rule.identifier, @(rule.state), @(rule.type), rule.customMsg,
-                             rule.customURL, @(rule.timestamp), rule.comment, rule.celExpr,
-                             rule.seatbeltPolicy, @(rule.ruleId)]) {
+                             rule.customURL, rule.eventDetailButtonText, @(rule.timestamp),
+                             rule.comment, rule.celExpr, rule.seatbeltPolicy, @(rule.ruleId)]) {
         [errors addObject:[SNTError createErrorWithCode:SNTErrorCodeInsertOrReplaceRuleFailed
                                                 message:@"A database error occurred while "
                                                         @"inserting/replacing a rule"

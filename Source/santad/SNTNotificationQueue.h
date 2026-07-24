@@ -36,10 +36,11 @@ using NotificationReplyBlock = void (^)(BOOL);
 - (instancetype)init NS_UNAVAILABLE;
 
 - (void)addEvent:(SNTStoredExecutionEvent*)event
-    withCustomMessage:(NSString*)message
-            customURL:(NSString*)url
-          configState:(SNTConfigState*)configState
-             andReply:(void (^)(BOOL authenticated))reply;
+        withCustomMessage:(NSString*)message
+                customURL:(NSString*)url
+    eventDetailButtonText:(NSString*)eventDetailButtonText
+              configState:(SNTConfigState*)configState
+                 andReply:(void (^)(BOOL authenticated))reply;
 
 - (void)authorizeTemporaryMonitorMode:(void (^)(BOOL authenticated))reply;
 

@@ -1463,19 +1463,21 @@
                                   state:SNTRuleStateAllow
                                    type:SNTRuleTypeSigningID],
     [[SNTRule alloc]
-        initWithIdentifier:@"7846698e47ef41be80b83fb9e2b98fa6dc46c9188b068bff323c302955a00142"
-                     state:SNTRuleStateBlock
-                      type:SNTRuleTypeCertificate
-                 customMsg:@"Hi There"
-                 customURL:@"http://northpole.security"
-                   celExpr:nil
-            seatbeltPolicy:nil
-                    ruleId:0],
+           initWithIdentifier:@"7846698e47ef41be80b83fb9e2b98fa6dc46c9188b068bff323c302955a00142"
+                        state:SNTRuleStateBlock
+                         type:SNTRuleTypeCertificate
+                    customMsg:@"Hi There"
+                    customURL:@"http://northpole.security"
+        eventDetailButtonText:nil
+                      celExpr:nil
+               seatbeltPolicy:nil
+                       ruleId:0],
     [[SNTRule alloc] initWithIdentifier:@"AAAAAAAAAA"
                                   state:SNTRuleStateBlock
                                    type:SNTRuleTypeTeamID
                               customMsg:@"Banned team ID"
                               customURL:@"http://northpole.security"
+                  eventDetailButtonText:nil
                                 celExpr:nil
                          seatbeltPolicy:nil
                                  ruleId:0],
@@ -1522,6 +1524,7 @@
                                    type:SNTRuleTypeTeamID
                               customMsg:nil
                               customURL:nil
+                  eventDetailButtonText:nil
                                 celExpr:@"target.signing_time >= timestamp('2025-05-31T00:00:00Z')"
                          seatbeltPolicy:nil
                                  ruleId:0],
@@ -1530,6 +1533,7 @@
                                    type:SNTRuleTypeTeamID
                               customMsg:nil
                               customURL:nil
+                  eventDetailButtonText:nil
                                 celExpr:@"this is an invalid expression"
                          seatbeltPolicy:nil
                                  ruleId:0],
@@ -1575,6 +1579,7 @@
                                    type:SNTRuleTypeSigningID
                               customMsg:nil
                               customURL:nil
+                  eventDetailButtonText:nil
                                 celExpr:nil
                          seatbeltPolicy:@"(version 1)(deny default)"
                                  ruleId:0],
