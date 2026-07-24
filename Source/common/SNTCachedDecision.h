@@ -63,6 +63,7 @@
 
 @property NSString* customMsg;
 @property NSString* customURL;
+@property NSString* eventDetailButtonText;
 @property BOOL silentBlockGUI;
 @property BOOL silentBlockTTY;
 @property BOOL seatbeltRequired;

@@ -288,6 +288,7 @@
     @"rule_type" : @"TEAMID",
     @"custom_msg" : @"A custom block message",
     @"custom_url" : @"https://example.com",
+    @"event_detail_button_label" : @"",
     @"comment" : @"",
     @"cel_expr" : @"",
   };
@@ -302,6 +303,7 @@
     @"rule_type" : @"BINARY",
     @"custom_msg" : @"",
     @"custom_url" : @"",
+    @"event_detail_button_label" : @"",
     @"comment" : @"",
     @"cel_expr" : @"",
   };
@@ -346,6 +348,7 @@
       @"rule_type" : @"BINARY",
       @"custom_msg" : @"A custom block message",
       @"custom_url" : @"https://example.com",
+      @"event_detail_button_label" : @"",
       @"comment" : @"",
     };
 

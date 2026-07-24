@@ -48,6 +48,12 @@
 @property(readonly, copy) NSString* customURL;
 
 ///
+///  Text that overrides the "Open" button label in the block notification.
+///  Overrides the EventDetailText configuration value. Length-limited when synced.
+///
+@property(readonly, copy) NSString* eventDetailButtonText;
+
+///
 ///  The time when this rule was last retrieved from the rules database, if rule is transitive.
 ///  Stored as number of seconds since 00:00:00 UTC on 1 January 2001.
 ///
@@ -86,6 +92,7 @@
                               type:(SNTRuleType)type
                          customMsg:(NSString*)customMsg
                          customURL:(NSString*)customURL
+             eventDetailButtonText:(NSString*)eventDetailButtonText
                          timestamp:(NSUInteger)timestamp
                            comment:(NSString*)comment
                            celExpr:(NSString*)celExpr
@@ -101,6 +108,7 @@
                               type:(SNTRuleType)type
                          customMsg:(NSString*)customMsg
                          customURL:(NSString*)customURL
+             eventDetailButtonText:(NSString*)eventDetailButtonText
                            celExpr:(NSString*)celExpr
                     seatbeltPolicy:(NSString*)seatbeltPolicy
                             ruleId:(int64_t)ruleId;

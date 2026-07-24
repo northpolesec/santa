@@ -48,10 +48,11 @@
 }
 
 - (void)addEvent:(SNTStoredExecutionEvent*)event
-    withCustomMessage:(NSString*)message
-            customURL:(NSString*)url
-          configState:(SNTConfigState*)configState
-             andReply:(NotificationReplyBlock)replyBlock {
+        withCustomMessage:(NSString*)message
+                customURL:(NSString*)url
+    eventDetailButtonText:(NSString*)eventDetailButtonText
+              configState:(SNTConfigState*)configState
+                 andReply:(NotificationReplyBlock)replyBlock {
   if (!event) {
     if (replyBlock) {
       replyBlock(NO);
@@ -63,6 +64,7 @@
   [d setValue:event forKey:@"event"];
   [d setValue:message forKey:@"message"];
   [d setValue:url forKey:@"url"];
+  [d setValue:eventDetailButtonText forKey:@"buttonText"];
   [d setValue:configState forKey:@"config"];
   // Copy the block to the heap so it can be called later.
   // This is necessary because the block is allocated on the stack in the
@@ -155,6 +157,7 @@
     [rop postBlockNotification:d[@"event"]
              withCustomMessage:d[@"message"]
                      customURL:d[@"url"]
+         eventDetailButtonText:d[@"buttonText"]
                    configState:d[@"config"]
                       andReply:wrappedReplyBlock];
   }

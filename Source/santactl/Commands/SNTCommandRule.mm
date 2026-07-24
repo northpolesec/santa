@@ -394,6 +394,7 @@ REGISTER_COMMAND_NAME(@"rule")
                                                     type:type
                                                customMsg:customMsg
                                                customURL:customURL
+                                   eventDetailButtonText:nil
                                                timestamp:0
                                                  comment:comment
                                                  celExpr:celExpr

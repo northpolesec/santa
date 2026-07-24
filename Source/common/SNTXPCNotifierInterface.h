@@ -31,6 +31,7 @@
 - (void)postBlockNotification:(SNTStoredExecutionEvent*)event
             withCustomMessage:(NSString*)message
                     customURL:(NSString*)url
+        eventDetailButtonText:(NSString*)eventDetailButtonText
                   configState:(SNTConfigState*)configState
                      andReply:(void (^)(BOOL authenticated))reply;
 - (void)postUSBBlockNotification:(SNTDeviceEvent*)event configBundle:(SNTConfigBundle*)configBundle;

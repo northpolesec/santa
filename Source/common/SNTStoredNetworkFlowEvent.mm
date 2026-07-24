@@ -53,6 +53,7 @@
   ENCODE_BOXABLE(coder, silent);
   ENCODE(coder, customMsg);
   ENCODE(coder, customURL);
+  ENCODE(coder, eventDetailButtonText);
   ENCODE(coder, ttyPath);
 }
 
@@ -80,6 +81,7 @@
     DECODE_SELECTOR(decoder, silent, NSNumber, boolValue);
     DECODE(decoder, customMsg, NSString);
     DECODE(decoder, customURL, NSString);
+    DECODE(decoder, eventDetailButtonText, NSString);
     DECODE(decoder, ttyPath, NSString);
   }
   return self;

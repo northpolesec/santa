@@ -286,7 +286,7 @@ struct SNTNetworkFlowMessageWindowView: View {
 
       HStack {
         if shouldAddOpenButton() {
-          OpenEventButton(action: openButton)
+          OpenEventButton(customText: event?.eventDetailButtonText, action: openButton)
         }
         DismissButton(silence: preventFutureNotifications, action: dismissButton)
       }
