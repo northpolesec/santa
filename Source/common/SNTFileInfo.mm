@@ -31,6 +31,10 @@
 #import "Source/common/SNTError.h"
 #import "Source/common/SNTLogging.h"
 
+// Largest architecture count Santa will read from a universal header. Real
+// universal binaries carry a handful; matches the limit in HeaderParser.
+static const uint32_t kMaxFatArchCount = 64;
+
 // Simple class to hold the data of a mach_header and the offset within the file
 // in which that header was found.
 @interface MachHeaderWithOffset : NSObject
@@ -512,14 +516,23 @@
     struct fat_header* fh = (struct fat_header*)[fatHeader bytes];
 
     if (fatHeader && (fh->magic == FAT_CIGAM || fh->magic == FAT_MAGIC)) {
-      int nfat_arch = OSSwapBigToHostInt32(fh->nfat_arch);
-      range = NSMakeRange(sizeof(struct fat_header), sizeof(struct fat_arch) * nfat_arch);
-      NSMutableData* fatArchs = [[self safeSubdataWithRange:range] mutableCopy];
+      // These fields are unsigned on disk; keep them unsigned so high-bit
+      // values are not narrowed.
+      uint32_t nfat_arch = OSSwapBigToHostInt32(fh->nfat_arch);
+
+      // Bound the count before using it as a read length: safeSubdataWithRange:
+      // compares against the logical file size, which a sparse file inflates
+      // cheaply. Matches the limit in HeaderParser.
+      NSMutableData* fatArchs;
+      if (nfat_arch <= kMaxFatArchCount) {
+        range = NSMakeRange(sizeof(struct fat_header), sizeof(struct fat_arch) * nfat_arch);
+        fatArchs = [[self safeSubdataWithRange:range] mutableCopy];
+      }
       if (fatArchs) {
         struct fat_arch* fat_arch = (struct fat_arch*)[fatArchs mutableBytes];
-        for (int i = 0; i < nfat_arch; ++i) {
-          int offset = OSSwapBigToHostInt32(fat_arch[i].offset);
-          int size = OSSwapBigToHostInt32(fat_arch[i].size);
+        for (uint32_t i = 0; i < nfat_arch; ++i) {
+          uint32_t offset = OSSwapBigToHostInt32(fat_arch[i].offset);
+          uint32_t size = OSSwapBigToHostInt32(fat_arch[i].size);
           int cputype = OSSwapBigToHostInt(fat_arch[i].cputype);
           int cpusubtype = OSSwapBigToHostInt(fat_arch[i].cpusubtype);
 

@@ -14,8 +14,13 @@
 /// limitations under the License.
 
 #import <XCTest/XCTest.h>
+#include <libkern/OSByteOrder.h>
+#include <mach-o/fat.h>
+#include <mach-o/loader.h>
 
 #import "Source/common/SNTFileInfo.h"
+
+static const uint32_t kFatTestSliceSize = 8192;
 
 @interface SNTFileInfoTest : XCTestCase
 @end
@@ -101,6 +106,134 @@
 
   sut = [[SNTFileInfo alloc] initWithPath:@"/usr/sbin/bless"];
   XCTAssertFalse(sut.isMissingPageZero);
+}
+
+#pragma mark Universal (fat) binary slice offsets
+
+///  Writes a universal binary wrapping one x86_64 slice at |sliceOffset|, with
+///  the architecture record declaring |recordOffset| and |recordSize|. Header
+///  fields are written big-endian as Apple's tools emit them. The slice is
+///  written via seek, so the file is sparse and an offset above 2 GiB costs only
+///  a few allocated blocks.
+- (NSString*)writeFatFixtureWithRecordOffset:(uint32_t)recordOffset
+                                  recordSize:(uint32_t)recordSize
+                                 sliceOffset:(uint32_t)sliceOffset {
+  NSString* path = [NSTemporaryDirectory()
+      stringByAppendingPathComponent:[NSString stringWithFormat:@"SNTFileInfoFat-%@",
+                                                                NSUUID.UUID.UUIDString]];
+
+  struct fat_header fh = {
+      .magic = OSSwapHostToBigInt32(FAT_MAGIC),
+      .nfat_arch = OSSwapHostToBigInt32(1),
+  };
+  struct fat_arch fa = {
+      .cputype = (cpu_type_t)OSSwapHostToBigInt32((uint32_t)CPU_TYPE_X86_64),
+      .cpusubtype = (cpu_subtype_t)OSSwapHostToBigInt32((uint32_t)CPU_SUBTYPE_X86_64_ALL),
+      .offset = OSSwapHostToBigInt32(recordOffset),
+      .size = OSSwapHostToBigInt32(recordSize),
+      .align = OSSwapHostToBigInt32(12),
+  };
+  NSMutableData* contents = [NSMutableData dataWithBytes:&fh length:sizeof(fh)];
+  [contents appendBytes:&fa length:sizeof(fa)];
+  XCTAssertTrue([[NSFileManager defaultManager] createFileAtPath:path
+                                                        contents:contents
+                                                      attributes:nil]);
+  [self addTeardownBlock:^{
+    [[NSFileManager defaultManager] removeItemAtPath:path error:nil];
+  }];
+
+  NSMutableData* slice = [NSMutableData dataWithLength:kFatTestSliceSize];
+  struct mach_header_64* mh = (struct mach_header_64*)slice.mutableBytes;
+  mh->magic = MH_MAGIC_64;
+  mh->cputype = CPU_TYPE_X86_64;
+  mh->cpusubtype = CPU_SUBTYPE_X86_64_ALL;
+  mh->filetype = MH_EXECUTE;
+
+  NSFileHandle* handle = [NSFileHandle fileHandleForWritingAtPath:path];
+  XCTAssertNotNil(handle);
+  [handle seekToFileOffset:sliceOffset];
+  [handle writeData:slice];
+  [handle closeFile];
+
+  return path;
+}
+
+- (void)testFatSliceOffsetBelowIntMax {
+  NSString* path = [self writeFatFixtureWithRecordOffset:0x1000
+                                              recordSize:kFatTestSliceSize
+                                             sliceOffset:0x1000];
+  SNTFileInfo* sut = [[SNTFileInfo alloc] initWithPath:path];
+  XCTAssertNotNil(sut);
+  XCTAssertTrue(sut.isMachO);
+  XCTAssertEqualObjects(sut.architectures, @[ @"x86_64" ]);
+}
+
+- (void)testFatSliceOffsetAboveIntMax {
+  // A slice offset with the high bit set is valid and must still resolve.
+  NSString* path = [self writeFatFixtureWithRecordOffset:0x80001000
+                                              recordSize:kFatTestSliceSize
+                                             sliceOffset:0x80001000];
+  SNTFileInfo* sut = [[SNTFileInfo alloc] initWithPath:path];
+  XCTAssertNotNil(sut);
+  XCTAssertTrue(sut.isMachO, @"a slice offset above INT_MAX must still resolve");
+  XCTAssertEqualObjects(sut.architectures, @[ @"x86_64" ]);
+}
+
+- (void)testFatSliceOffsetPlusSizeDoesNotWrap {
+  // offset + size exceeds UINT32_MAX and must be rejected, not wrapped.
+  NSString* path = [self writeFatFixtureWithRecordOffset:0xFFFFF000
+                                              recordSize:0xFFFFF000
+                                             sliceOffset:0x1000];
+  SNTFileInfo* sut = [[SNTFileInfo alloc] initWithPath:path];
+  XCTAssertNotNil(sut);
+  XCTAssertFalse(sut.isMachO);
+}
+
+- (void)testFatArchCountTooLargeIsRejectedWithoutHugeRead {
+  // An arch count far past anything real, on a file whose logical size is large
+  // enough that the arch table appears to fit. The file is sparse, so it costs a
+  // few blocks while the declared table is 40MB. Parsing must reject the count up
+  // front rather than reading the table and iterating over it.
+  const uint32_t kArchCount = 2000000;  // 20 bytes each -> 40MB table
+  NSString* path = [NSTemporaryDirectory()
+      stringByAppendingPathComponent:[NSString stringWithFormat:@"SNTFileInfoFat-%@",
+                                                                NSUUID.UUID.UUIDString]];
+  struct fat_header fh = {
+      .magic = OSSwapHostToBigInt32(FAT_MAGIC),
+      .nfat_arch = OSSwapHostToBigInt32(kArchCount),
+  };
+  XCTAssertTrue([[NSFileManager defaultManager] createFileAtPath:path
+                                                        contents:[NSData dataWithBytes:&fh
+                                                                                length:sizeof(fh)]
+                                                      attributes:nil]);
+  [self addTeardownBlock:^{
+    [[NSFileManager defaultManager] removeItemAtPath:path error:nil];
+  }];
+
+  // Extend logically without allocating, so the declared table fits inside the
+  // reported file size.
+  NSFileHandle* handle = [NSFileHandle fileHandleForWritingAtPath:path];
+  XCTAssertNotNil(handle);
+  [handle truncateFileAtOffset:(sizeof(struct fat_header) +
+                                sizeof(struct fat_arch) * (uint64_t)kArchCount + 4096)];
+  [handle closeFile];
+
+  NSDate* start = [NSDate date];
+  SNTFileInfo* sut = [[SNTFileInfo alloc] initWithPath:path];
+  XCTAssertNotNil(sut);
+  XCTAssertFalse(sut.isMachO);
+  // Rejecting up front should be immediate. Reading and walking a 2M-entry table
+  // would take far longer than this.
+  XCTAssertLessThan(-[start timeIntervalSinceNow], 1.0);
+}
+
+- (void)testRealUniversalBinaryStillParses {
+  NSString* path = [[NSBundle bundleForClass:[self class]] pathForResource:@"cal-yikes-universal"
+                                                                    ofType:@""];
+  SNTFileInfo* sut = [[SNTFileInfo alloc] initWithPath:path];
+  XCTAssertNotNil(sut);
+  XCTAssertTrue(sut.isMachO);
+  XCTAssertTrue(sut.isFat);
 }
 
 - (void)testDylibs {
