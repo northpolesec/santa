@@ -236,6 +236,73 @@ static const uint32_t kFatTestSliceSize = 8192;
   XCTAssertTrue(sut.isFat);
 }
 
+#pragma mark Thin Mach-O identification
+
+///  Writes a thin little-endian 64-bit MH_EXECUTE of exactly |totalSize| bytes.
+///  Only the header is meaningful; the remainder is padding.
+- (NSString*)writeThinMachOFixtureOfSize:(NSUInteger)totalSize {
+  XCTAssertGreaterThanOrEqual(totalSize, sizeof(struct mach_header_64));
+
+  NSMutableData* contents = [NSMutableData dataWithLength:totalSize];
+  struct mach_header_64* mh = (struct mach_header_64*)contents.mutableBytes;
+  mh->magic = MH_MAGIC_64;
+  mh->cputype = CPU_TYPE_X86_64;
+  mh->cpusubtype = CPU_SUBTYPE_X86_64_ALL;
+  mh->filetype = MH_EXECUTE;
+
+  NSString* path = [NSTemporaryDirectory()
+      stringByAppendingPathComponent:[NSString stringWithFormat:@"SNTFileInfoThin-%@",
+                                                                NSUUID.UUID.UUIDString]];
+  XCTAssertTrue([[NSFileManager defaultManager] createFileAtPath:path
+                                                        contents:contents
+                                                      attributes:nil]);
+  [self addTeardownBlock:^{
+    [[NSFileManager defaultManager] removeItemAtPath:path error:nil];
+  }];
+  return path;
+}
+
+- (void)testThinMachOSmallerThanOnePage {
+  // A complete image can be well under a page. Identification must not depend on
+  // the file being large enough to satisfy a fixed-size read.
+  for (NSUInteger size : {sizeof(struct mach_header_64), (size_t)64, (size_t)715, (size_t)2048}) {
+    NSString* path = [self writeThinMachOFixtureOfSize:size];
+    SNTFileInfo* sut = [[SNTFileInfo alloc] initWithPath:path];
+    XCTAssertNotNil(sut);
+    XCTAssertTrue(sut.isMachO, @"a %lu byte Mach-O must be recognized", (unsigned long)size);
+    XCTAssertEqualObjects(sut.architectures, @[ @"x86_64" ]);
+  }
+}
+
+- (void)testThinMachOAtPageBoundary {
+  for (NSUInteger size : {(size_t)4095, (size_t)4096, (size_t)4097}) {
+    NSString* path = [self writeThinMachOFixtureOfSize:size];
+    SNTFileInfo* sut = [[SNTFileInfo alloc] initWithPath:path];
+    XCTAssertNotNil(sut);
+    XCTAssertTrue(sut.isMachO, @"a %lu byte Mach-O must be recognized", (unsigned long)size);
+  }
+}
+
+- (void)testShortNonMachOIsNotRecognized {
+  // The reverse guard: reading a short prefix must not start classifying small
+  // non-executable files as Mach-O.
+  NSString* path = [NSTemporaryDirectory()
+      stringByAppendingPathComponent:[NSString stringWithFormat:@"SNTFileInfoShort-%@",
+                                                                NSUUID.UUID.UUIDString]];
+  NSMutableData* contents = [NSMutableData dataWithLength:512];
+  memcpy(contents.mutableBytes, "not a mach-o at all", 19);
+  XCTAssertTrue([[NSFileManager defaultManager] createFileAtPath:path
+                                                        contents:contents
+                                                      attributes:nil]);
+  [self addTeardownBlock:^{
+    [[NSFileManager defaultManager] removeItemAtPath:path error:nil];
+  }];
+
+  SNTFileInfo* sut = [[SNTFileInfo alloc] initWithPath:path];
+  XCTAssertNotNil(sut);
+  XCTAssertFalse(sut.isMachO);
+}
+
 - (void)testDylibs {
   SNTFileInfo* sut = [[SNTFileInfo alloc] initWithPath:@"/usr/lib/system/libsystem_platform.dylib"];
 

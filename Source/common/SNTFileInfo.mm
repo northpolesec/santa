@@ -25,6 +25,8 @@
 #include <sys/stat.h>
 #include <sys/xattr.h>
 
+#include <algorithm>
+
 #import "Source/common/AccountLookup.h"
 #import "Source/common/CertificateHelpers.h"
 #import "Source/common/MOLCodesignChecker.h"
@@ -504,8 +506,11 @@ static const uint32_t kMaxFatArchCount = 64;
 
   NSMutableDictionary* machHeaders = [NSMutableDictionary dictionary];
 
-  NSData* machHeader =
-      [self parseSingleMachHeader:[self safeSubdataWithRange:NSMakeRange(0, 4096)]];
+  // Read up to a page for identification, but never past EOF: a fixed range
+  // fails outright on a complete image smaller than that range.
+  NSData* machHeader = [self
+      parseSingleMachHeader:[self safeSubdataWithRange:NSMakeRange(0, std::min<NSUInteger>(
+                                                                          self.fileSize, 4096))]];
   if (machHeader) {
     struct mach_header* mh = (struct mach_header*)[machHeader bytes];
     MachHeaderWithOffset* mhwo = [[MachHeaderWithOffset alloc] initWithData:machHeader offset:0];
