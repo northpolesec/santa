@@ -230,6 +230,7 @@ objc_library(
     deps = [
         ":santactl_cmd",
         "//Source/common:MOLXPCConnection",
+        "//Source/common:Platform",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTXPCControlInterface",
         "//Source/common/faa:WatchItems",

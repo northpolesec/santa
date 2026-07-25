@@ -16,4 +16,7 @@ would be useful to others.
   a hard control. It operates at the mount level. It cannot block:
    - Directly writing to an unmounted, but attached device
 
+- **Network Mount Blocking:** Santa's network mount blocking feature requires
+  macOS 15 or later. This feature is limited to Workshop customers.
+
 - Metrics reported by Santa are not _currently_ in a format that is friendly to open-source solutions
