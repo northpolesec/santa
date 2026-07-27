@@ -34,6 +34,14 @@ typedef NS_ENUM(NSInteger, SNTAction) {
   SNTActionRespondDeny,
   SNTActionRespondAllowCompiler,
 
+  // Allow this execution and mark the executing process as a compiler, but do
+  // not allow the authorization to be reused. Emitted when a compiler decision
+  // came from a non-cacheable (context-dependent) policy evaluation, such as a
+  // CEL rule that read argv, the environment, the working directory or the
+  // time of day. The compiler grant applies to the process that was just
+  // authorized, never to the vnode.
+  SNTActionRespondAllowCompilerNoCache,
+
   // If an operation is awaiting a cache decision via hold-an-ask, additional
   // executions will be automatically blocked.
   SNTActionRespondHold,
@@ -44,8 +52,26 @@ typedef NS_ENUM(NSInteger, SNTAction) {
   SNTActionHoldDenied,
 };
 
+// Actions representing a terminal, reusable authorization: a cached entry
+// holding one of these is applied directly to a later execution of the same
+// vnode without re-evaluating policy.
+//
+// Context-dependent authorizations must NEVER appear here. In particular, do
+// not add SNTActionRespondAllowCompilerNoCache: such a decision describes the
+// invocation that was evaluated, not the executable, so reusing it would apply
+// an answer to invocations the policy never considered. AuthResultCache narrows
+// that action to SNTActionRespondAllowNoCache on write specifically so it can
+// never reach this macro.
 #define RESPONSE_VALID(x) \
   (x == SNTActionRespondAllow || x == SNTActionRespondDeny || x == SNTActionRespondAllowCompiler)
+
+// Actions that permit the execution to proceed, whether or not the
+// authorization may be reused later. This is a strictly weaker property than
+// RESPONSE_VALID; keeping them distinct is what stops a non-cacheable compiler
+// allow from becoming a terminal cache entry.
+#define ACTION_IS_ALLOW(x)                                             \
+  (x == SNTActionRespondAllow || x == SNTActionRespondAllowCompiler || \
+   x == SNTActionRespondAllowNoCache || x == SNTActionRespondAllowCompilerNoCache)
 
 // Supported Rule Types
 //

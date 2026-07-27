@@ -65,6 +65,14 @@ REGISTER_COMMAND_NAME(@"checkcache")
                    } else if (action == SNTActionRespondDeny) {
                      TEE_LOGI(@"File exists in [blocklist] cache");
                      exit(0);
+                   } else if (action == SNTActionRespondAllowNoCache) {
+                     // Identity data is cached but policy is re-evaluated on every
+                     // execution. SNTActionRespondAllowCompilerNoCache deliberately has
+                     // no branch here: AuthResultCache narrows it to this action on
+                     // write, so it can never be returned.
+                     TEE_LOGI(@"File exists in [allowlist, policy re-evaluated per execution] "
+                              @"cache");
+                     exit(0);
                    } else if (action == SNTActionRespondAllowCompiler) {
                      TEE_LOGI(@"File exists in [allowlist compiler] cache");
                      exit(0);

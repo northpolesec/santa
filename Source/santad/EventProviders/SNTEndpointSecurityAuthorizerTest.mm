@@ -428,8 +428,14 @@ class MockAuthResultCache : public AuthResultCache {
       .WillOnce(testing::Return(true));
   EXPECT_CALL(*mockAuthCache, AddToCache(&execFile, SNTActionRespondAllowNoCache, testing::_))
       .WillOnce(testing::Return(true));
+  EXPECT_CALL(*mockAuthCache,
+              AddToCache(&execFile, SNTActionRespondAllowCompilerNoCache, testing::_))
+      .WillOnce(testing::Return(true));
 
   id mockCompilerController = OCMStrictClassMock([SNTCompilerController class]);
+  // Both SNTActionRespondAllowCompiler and SNTActionRespondAllowCompilerNoCache
+  // mark the just-authorized process as a compiler.
+  OCMExpect([mockCompilerController setProcess:execProc.audit_token isCompiler:true]);
   OCMExpect([mockCompilerController setProcess:execProc.audit_token isCompiler:true]);
 
   SNTEndpointSecurityAuthorizer* authClient =
@@ -449,6 +455,7 @@ class MockAuthResultCache : public AuthResultCache {
 
     std::map<SNTAction, es_auth_result_t> actions = {
         {SNTActionRespondAllowCompiler, ES_AUTH_RESULT_ALLOW},
+        {SNTActionRespondAllowCompilerNoCache, ES_AUTH_RESULT_ALLOW},
         {SNTActionRespondAllow, ES_AUTH_RESULT_ALLOW},
         {SNTActionRespondDeny, ES_AUTH_RESULT_DENY},
         {SNTActionRespondHold, ES_AUTH_RESULT_ALLOW},
@@ -473,7 +480,8 @@ class MockAuthResultCache : public AuthResultCache {
       XCTAssertEqual(gotCachable, kv.second == ES_AUTH_RESULT_ALLOW &&
                                       (kv.first != SNTActionRespondHold &&
                                        kv.first != SNTActionRespondAllowCompiler &&
-                                       kv.first != SNTActionRespondAllowNoCache));
+                                       kv.first != SNTActionRespondAllowNoCache &&
+                                       kv.first != SNTActionRespondAllowCompilerNoCache));
     }
   }
 

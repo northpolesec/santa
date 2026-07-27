@@ -1836,6 +1836,39 @@ santa_unit_test(
 )
 
 santa_unit_test(
+    name = "CompilerAuthorizationScopeTest",
+    srcs = ["CompilerAuthorizationScopeTest.mm"],
+    sdk_dylibs = [
+        "EndpointSecurity",
+    ],
+    deps = [
+        ":AuthResultCache",
+        ":EntitlementsFilter",
+        ":ProcessControl",
+        ":SNTCompilerController",
+        ":SNTDecisionCache",
+        ":SNTEndpointSecurityAuthorizer",
+        ":SNTEventTable",
+        ":SNTExecutionController",
+        ":SNTPolicyProcessor",
+        ":SNTRuleTable",
+        ":SandboxExpectations",
+        ":TTYWriter",
+        "//Source/common:MOLCodesignChecker",
+        "//Source/common:SNTCommonEnums",
+        "//Source/common:SNTConfigurator",
+        "//Source/common:SNTFileInfo",
+        "//Source/common:SNTMetricSet",
+        "//Source/common:SNTRule",
+        "//Source/common:SNTRuleIdentifiers",
+        "//Source/common:TestUtils",
+        "//Source/common/es:EndpointSecurityMessage",
+        "//Source/common/es:MockEndpointSecurityAPI",
+        "@OCMock",
+    ],
+)
+
+santa_unit_test(
     name = "SNTExecutionControllerTest",
     srcs = ["SNTExecutionControllerTest.mm"],
     sdk_dylibs = [
@@ -2054,6 +2087,7 @@ test_suite(
         ":AdminUserStateTest",
         ":AuthResultCacheTest",
         ":CELActivationTest",
+        ":CompilerAuthorizationScopeTest",
         ":DaemonConfigBundleTest",
         ":EndpointSecurityLoggerTest",
         ":EndpointSecuritySanitizableStringTest",

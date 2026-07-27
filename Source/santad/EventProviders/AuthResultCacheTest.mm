@@ -292,6 +292,38 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
   XCTAssertNil(cache->CheckCache(&rootFile).cached_decision);
 }
 
+- (void)testCompilerNoCacheIsNarrowedAndNeverTerminal {
+  auto esapi = std::make_shared<MockEndpointSecurityAPI>();
+  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(esapi, nil);
+
+  es_file_t rootFile = MakeCacheableFile(RootDevno(), 222);
+
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+  cd.sha256 = @"deadbeef";
+  cd.certSHA256 = @"cert789";
+
+  // Transitions out of RequestBinary exactly like SNTActionRespondAllowNoCache.
+  XCTAssertTrue(cache->AddToCache(&rootFile, SNTActionRequestBinary));
+  XCTAssertTrue(cache->AddToCache(&rootFile, SNTActionRespondAllowCompilerNoCache, cd));
+
+  santa::CachedAuthResult entry = cache->CheckCache(&rootFile);
+
+  // The compiler grant applied to the process that was just authorized, not to
+  // this vnode, so it must not be observable from the cache at all.
+  XCTAssertNotEqual(entry.action, SNTActionRespondAllowCompilerNoCache);
+  XCTAssertEqual(entry.action, SNTActionRespondAllowNoCache);
+
+  // The stored entry must never be a terminal (reusable) result: policy has to
+  // run again on the next execution of this vnode.
+  XCTAssertFalse(RESPONSE_VALID(entry.action));
+
+  // Identity data is retained so the next execution can skip re-hashing while
+  // still re-running policy.
+  XCTAssertNotNil(entry.cached_decision);
+  XCTAssertEqualObjects(entry.cached_decision.sha256, @"deadbeef");
+  XCTAssertEqualObjects(entry.cached_decision.certSHA256, @"cert789");
+}
+
 - (void)testCacheExpiry {
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   // Create a cache with a lowered cache expiry value

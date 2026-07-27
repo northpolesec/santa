@@ -231,6 +231,17 @@ using santa::Message;
       cacheable = false;
       authResult = ES_AUTH_RESULT_ALLOW;
       break;
+    case SNTActionRespondAllowCompilerNoCache:
+      // Mark the process that was just authorized as a compiler, exactly as for
+      // SNTActionRespondAllowCompiler. Unlike that action the authorization is
+      // not reusable: the policy that produced it depended on per-execution
+      // context, so AuthResultCache narrows this to
+      // SNTActionRespondAllowNoCache and the next execution of this vnode
+      // re-runs policy. ES framework caching is suppressed for the same reason.
+      [self.compilerController setProcess:esMsg->event.exec.target->audit_token isCompiler:true];
+      cacheable = false;
+      authResult = ES_AUTH_RESULT_ALLOW;
+      break;
     case SNTActionRespondHold:
       // Do not allow caching when the action is SNTActionRespondHold. Santa will
       // allow the current exec because the process was first suspended so no code
