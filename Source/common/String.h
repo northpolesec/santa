@@ -63,6 +63,26 @@ static inline NSString* OptionalStringToNSString(const std::optional<std::string
   return StringToNSString(*optional_str);
 }
 
+// Returns `str` capped at `maxLength` UTF-16 code units, cutting only on a
+// character boundary. -substringToIndex: slices on a raw UTF-16 index, so it
+// will happily split a surrogate pair (emoji), an emoji ZWJ sequence, or a base
+// character and its combining marks; the orphaned half becomes U+FFFD the next
+// time the string is encoded as UTF-8. When the cut point lands inside such a
+// sequence the whole sequence is dropped, so the result may be shorter than
+// `maxLength`. Strings already within the limit (including nil) are returned
+// unchanged.
+static inline NSString* TruncateNSStringToLength(NSString* str, NSUInteger maxLength) {
+  if (str.length <= maxLength) {
+    return str;
+  }
+
+  // `maxLength` is a valid index because the string is longer than it. If the
+  // sequence covering that index starts earlier, cutting at `maxLength` would
+  // split it, so cut at the start of the sequence instead.
+  NSRange sequence = [str rangeOfComposedCharacterSequenceAtIndex:maxLength];
+  return [str substringToIndex:MIN(sequence.location, maxLength)];
+}
+
 static inline std::string_view StringTokenToStringView(es_string_token_t es_str) {
   return std::string_view(es_str.data, es_str.length);
 }

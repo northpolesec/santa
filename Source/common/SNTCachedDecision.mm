@@ -79,6 +79,7 @@
   copy.quarantineURL = _quarantineURL;
   copy.customMsg = _customMsg;
   copy.customURL = _customURL;
+  copy.eventDetailButtonText = _eventDetailButtonText;
   copy.silentBlockGUI = _silentBlockGUI;
   copy.silentBlockTTY = _silentBlockTTY;
   copy.seatbeltRequired = _seatbeltRequired;

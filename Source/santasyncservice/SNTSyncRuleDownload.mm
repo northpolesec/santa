@@ -470,11 +470,10 @@ SNTRule* RuleFromProtoRule(const typename santa::ProtoTraits<IsV2>::RuleT& rule)
 
   // The button label has to fit on a button, so cap it (kEventDetailButtonTextMaxLength).
   const std::string& button_label = rule.event_detail_button_label();
-  NSString* eventDetailButtonText = (!button_label.empty()) ? StringToNSString(button_label) : nil;
-  if (eventDetailButtonText.length > kEventDetailButtonTextMaxLength) {
-    eventDetailButtonText =
-        [eventDetailButtonText substringToIndex:kEventDetailButtonTextMaxLength];
-  }
+  NSString* eventDetailButtonText =
+      (!button_label.empty()) ? santa::TruncateNSStringToLength(StringToNSString(button_label),
+                                                                kEventDetailButtonTextMaxLength)
+                              : nil;
 
   const std::string& cel_expr = rule.cel_expr();
   NSString* celExpr = (!cel_expr.empty()) ? StringToNSString(cel_expr) : nil;
