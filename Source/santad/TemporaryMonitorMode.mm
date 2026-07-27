@@ -95,6 +95,23 @@ void TemporaryMonitorMode::NewModeTransitionReceived(SNTModeTransition* mode_tra
       temporaryMonitorModePolicyAvailable:Available()];
 }
 
+void TemporaryMonitorMode::ReconcileWithClientMode() {
+  // A synced base client-mode change to anything other than Lockdown makes an
+  // active session redundant/overridden. Ending via End() (not Revoke()) leaves
+  // the on-demand policy intact so the machine can re-enter if it returns to
+  // Lockdown. End() is a no-op when no session is active, which also clears a
+  // stale "available" for the no-session case. The availability push is
+  // idempotent with NewModeTransitionReceived's push earlier this sync.
+  if ([configurator_ clientModeIgnoringTemporaryMonitorMode] != SNTClientModeLockdown) {
+    if (End(SNTTemporaryMonitorModeLeaveReasonClientModeChanged)) {
+      LOGI(@"Temporary Monitor Mode session ended: client mode is no longer Lockdown.");
+    }
+  }
+
+  [[notification_queue_.notifierConnection remoteObjectProxy]
+      temporaryMonitorModePolicyAvailable:Available()];
+}
+
 #pragma mark Hooks
 
 bool TemporaryMonitorMode::ApplyEffect(NSError** err) {
@@ -117,9 +134,11 @@ bool TemporaryMonitorMode::ReapplyEffectOnRestart() {
 }
 
 bool TemporaryMonitorMode::ExtraPreconditions() {
-  SNTClientMode clientMode = [configurator_ clientMode];
-  return clientMode == SNTClientModeLockdown ||
-         (clientMode == SNTClientModeMonitor && [configurator_ inTemporaryMonitorMode]);
+  // Temporary Monitor Mode only makes sense while the base (policy) client mode
+  // is Lockdown: from Monitor it is redundant, from Standalone it is overridden.
+  // Read the base mode rather than [configurator_ clientMode], which reports
+  // Monitor while a session is active and would mask a base-mode change.
+  return [configurator_ clientModeIgnoringTemporaryMonitorMode] == SNTClientModeLockdown;
 }
 
 NSString* TemporaryMonitorMode::StateKey() {

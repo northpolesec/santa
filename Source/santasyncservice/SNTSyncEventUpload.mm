@@ -551,6 +551,11 @@ void MessageForTemporaryMonitorModeLeaveAuditEvent(
     case SNTTemporaryMonitorModeLeaveReasonReboot:
       pbLeave->set_reason(::pbv2::TemporaryMonitorModeLeave::REASON_REBOOT);
       break;
+    case SNTTemporaryMonitorModeLeaveReasonClientModeChanged:
+      // The syncv2 TemporaryMonitorModeLeave proto has no dedicated reason for a
+      // client-mode change yet; report UNSPECIFIED until one is added upstream.
+      pbLeave->set_reason(::pbv2::TemporaryMonitorModeLeave::REASON_UNSPECIFIED);
+      break;
     default: pbLeave->set_reason(::pbv2::TemporaryMonitorModeLeave::REASON_UNSPECIFIED); break;
   }
 }

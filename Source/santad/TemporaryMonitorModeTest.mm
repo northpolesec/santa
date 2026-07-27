@@ -177,6 +177,10 @@ uint64_t MakeDeadline(uint64_t want) {
       .andReturn([[SNTModeTransition alloc] initOnDemandMinutes:maxMinutes defaultDuration:def]);
   OCMStub([self.mockConfigurator isSyncV2Enabled]).andReturn(YES);
   OCMStub([self.mockConfigurator clientMode]).andReturn(SNTClientModeLockdown);
+  // ExtraPreconditions reads the unmasked base mode; keep it Lockdown so the
+  // feature is available (clientMode above is masked to Monitor during a session).
+  OCMStub([self.mockConfigurator clientModeIgnoringTemporaryMonitorMode])
+      .andReturn(SNTClientModeLockdown);
   OCMStub([self.mockConfigurator syncBaseURL])
       .andReturn([NSURL URLWithString:@"https://foo.workshop.cloud"]);
   OCMStub([self.mockNotQueue
@@ -383,6 +387,84 @@ uint64_t MakeDeadline(uint64_t want) {
   XCTAssertEqual(((SNTStoredTemporaryMonitorModeEnterAuditEvent*)events[1]).reason,
                  SNTTemporaryMonitorModeEnterReasonOnDemandRefresh);
   XCTAssertEqualObjects(events[0].uuid, events[1].uuid);
+}
+
+- (void)testReconcileEndsSessionWhenBaseModeLeavesLockdown {
+  __block SNTClientMode baseMode = SNTClientModeLockdown;
+  OCMStub([self.mockConfigurator modeTransition])
+      .andReturn([[SNTModeTransition alloc] initOnDemandMinutes:60 defaultDuration:5]);
+  OCMStub([self.mockConfigurator isSyncV2Enabled]).andReturn(YES);
+  OCMStub([self.mockConfigurator clientModeIgnoringTemporaryMonitorMode])
+      .andDo(^(NSInvocation* inv) {
+        [inv setReturnValue:&baseMode];
+      });
+  OCMStub([self.mockConfigurator syncBaseURL])
+      .andReturn([NSURL URLWithString:@"https://foo.workshop.cloud"]);
+  OCMStub([self.mockNotQueue
+      authorizeTemporaryMonitorMode:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(YES), nil])]);
+
+  NSMutableArray<SNTStoredTemporaryMonitorModeAuditEvent*>* events = [NSMutableArray array];
+  auto tmm = std::make_shared<TemporaryMonitorModePeer>(
+      (SNTConfigurator*)self.mockConfigurator, (SNTNotificationQueue*)self.mockNotQueue,
+      ^(SNTStoredTemporaryMonitorModeAuditEvent* e) {
+        [events addObject:e];
+      });
+
+  NSError* err = nil;
+  XCTAssertEqual(tmm->RequestMinutes(@5, &err), 5u);
+  XCTAssertTrue(tmm->SecondsRemaining().has_value());
+  XCTAssertTrue(tmm->Available());
+
+  // Arm the rejection BEFORE the action: OCMReject only traps invocations made
+  // after it is registered. Ending because the mode changed must NOT write a
+  // revoke policy (eligibility is preserved for a later return to Lockdown).
+  OCMReject([self.mockConfigurator
+      setSyncServerModeTransition:[OCMArg checkWithBlock:^BOOL(SNTModeTransition* mt) {
+        return mt.type == SNTModeTransitionTypeRevoke;
+      }]]);
+
+  // Admin flips the machine to real Monitor Mode; the sync commits it with no
+  // revoke transition. Reconcile must end the now-redundant session.
+  baseMode = SNTClientModeMonitor;
+  tmm->ReconcileWithClientMode();
+
+  OCMVerify([self.mockConfigurator setInTemporaryMonitorMode:NO]);
+  XCTAssertFalse(tmm->SecondsRemaining().has_value());
+  XCTAssertFalse(tmm->Available());
+
+  XCTAssertTrue(
+      [events.lastObject isKindOfClass:[SNTStoredTemporaryMonitorModeLeaveAuditEvent class]]);
+  XCTAssertEqual(((SNTStoredTemporaryMonitorModeLeaveAuditEvent*)events.lastObject).reason,
+                 SNTTemporaryMonitorModeLeaveReasonClientModeChanged);
+}
+
+- (void)testReconcileLeavesSessionUntouchedWhileLockdown {
+  __block SNTClientMode baseMode = SNTClientModeLockdown;
+  OCMStub([self.mockConfigurator modeTransition])
+      .andReturn([[SNTModeTransition alloc] initOnDemandMinutes:60 defaultDuration:5]);
+  OCMStub([self.mockConfigurator isSyncV2Enabled]).andReturn(YES);
+  OCMStub([self.mockConfigurator clientModeIgnoringTemporaryMonitorMode])
+      .andDo(^(NSInvocation* inv) {
+        [inv setReturnValue:&baseMode];
+      });
+  OCMStub([self.mockConfigurator syncBaseURL])
+      .andReturn([NSURL URLWithString:@"https://foo.workshop.cloud"]);
+  OCMStub([self.mockNotQueue
+      authorizeTemporaryMonitorMode:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(YES), nil])]);
+
+  auto tmm = std::make_shared<TemporaryMonitorModePeer>((SNTConfigurator*)self.mockConfigurator,
+                                                        (SNTNotificationQueue*)self.mockNotQueue,
+                                                        ^(SNTStoredTemporaryMonitorModeAuditEvent*){
+                                                        });
+
+  NSError* err = nil;
+  XCTAssertEqual(tmm->RequestMinutes(@5, &err), 5u);
+
+  // A sync arrives but the base mode is still Lockdown: the session must survive.
+  tmm->ReconcileWithClientMode();
+
+  XCTAssertTrue(tmm->SecondsRemaining().has_value());
+  XCTAssertTrue(tmm->Available());
 }
 
 @end

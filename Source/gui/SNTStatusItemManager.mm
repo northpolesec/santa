@@ -762,6 +762,17 @@ static NSString* const kNotificationSilencesKey = @"SilencedNotifications";
   state.menuItem.hidden = !(available || active);
   state.refreshItem.hidden = !(available || active);
 
+  // The greyed "Mode:" header tracks the TMM item's visibility (see
+  // refreshMonitorModeHeaderWithClientMode:), but only the poll / menu-open paths
+  // refresh it — the daemon-pushed leave+availability path does not. When a synced
+  // base-mode change ends the session the item hides here; propagate that hiding so
+  // an already-open menu does not keep showing a stale "Mode: Temporary Monitor".
+  // Showing the header and its title stay with the poll path (which knows the mode),
+  // so the un-hide direction is intentionally left untouched.
+  if (state == self.tmmState && state.menuItem.hidden) {
+    self.monitorModeMenuItem.hidden = YES;
+  }
+
   [self updateTimedModeSeparatorVisibility];
 }
 

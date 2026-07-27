@@ -73,6 +73,11 @@ class TimedSyncSession : public Timer<TimedSyncSession> {
   // was active.
   bool Cancel();
 
+  // End an active session for a feature-specific reason WITHOUT writing a revoke
+  // policy (the feature stays eligible for immediate re-entry). Returns true if a
+  // session was active. Generalizes Cancel(), which is End(LeaveReasonCancelled()).
+  bool End(NSInteger leave_reason);
+
   // Revoke an active session and write the revoke policy. `leave_reason` is the
   // subclass's leave-reason enum value used for the audit event. Returns true if
   // a session was active.

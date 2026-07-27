@@ -676,4 +676,26 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
   XCTAssertNotNil([cfg savedDemotedAdmins]);
 }
 
+- (void)testClientModeIgnoringTemporaryMonitorMode {
+  NSString* plistPath = [NSString stringWithFormat:@"%@/cm-ignoring-tmm.plist", self.testDir];
+  SNTConfigurator* sut = [self configuratorWithEmptySyncStateAtPath:plistPath];
+  [sut setSyncServerClientMode:SNTClientModeLockdown];
+
+  XCTAssertEqual(sut.clientMode, SNTClientModeLockdown);
+  XCTAssertEqual(sut.clientModeIgnoringTemporaryMonitorMode, SNTClientModeLockdown);
+
+  [sut setInTemporaryMonitorMode:YES];
+
+  // The masked getter reports Monitor during a session; the unmasked accessor
+  // still reports the underlying Lockdown policy.
+  XCTAssertEqual(sut.clientMode, SNTClientModeMonitor);
+  XCTAssertEqual(sut.clientModeIgnoringTemporaryMonitorMode, SNTClientModeLockdown);
+
+  [sut setInTemporaryMonitorMode:NO];
+  [sut setSyncServerClientMode:SNTClientModeMonitor];
+  XCTAssertEqual(sut.clientModeIgnoringTemporaryMonitorMode, SNTClientModeMonitor);
+
+  XCTAssertTrue([self.fileMgr removeItemAtPath:plistPath error:nil]);
+}
+
 @end
