@@ -21,18 +21,21 @@
 @property(readwrite, copy) NSString* celExpr;
 @property(readwrite, copy) NSString* customMsg;
 @property(readwrite, copy) NSString* customURL;
+@property(readwrite, copy) NSString* eventDetailButtonText;
 @end
 
 @implementation SNTCELFallbackRule
 
 - (instancetype)initWithCELExpr:(NSString*)celExpr
                       customMsg:(NSString*)customMsg
-                      customURL:(NSString*)customURL {
+                      customURL:(NSString*)customURL
+          eventDetailButtonText:(NSString*)eventDetailButtonText {
   self = [super init];
   if (self) {
     _celExpr = [celExpr copy];
     _customMsg = [customMsg copy];
     _customURL = [customURL copy];
+    _eventDetailButtonText = [eventDetailButtonText copy];
   }
   return self;
 }
@@ -46,7 +49,9 @@
   // [nil isEqualToString:nil] is NO.
   return ([self.celExpr isEqualToString:o.celExpr] &&
           (self.customMsg == o.customMsg || [self.customMsg isEqualToString:o.customMsg]) &&
-          (self.customURL == o.customURL || [self.customURL isEqualToString:o.customURL]));
+          (self.customURL == o.customURL || [self.customURL isEqualToString:o.customURL]) &&
+          (self.eventDetailButtonText == o.eventDetailButtonText ||
+           [self.eventDetailButtonText isEqualToString:o.eventDetailButtonText]));
 }
 
 - (NSUInteger)hash {
@@ -55,6 +60,7 @@
   result = prime * result + [self.celExpr hash];
   result = prime * result + [self.customMsg hash];
   result = prime * result + [self.customURL hash];
+  result = prime * result + [self.eventDetailButtonText hash];
   return result;
 }
 
@@ -66,6 +72,7 @@
   ENCODE(coder, celExpr);
   ENCODE(coder, customMsg);
   ENCODE(coder, customURL);
+  ENCODE(coder, eventDetailButtonText);
 }
 
 - (instancetype)initWithCoder:(NSCoder*)decoder {
@@ -74,6 +81,7 @@
     DECODE(decoder, celExpr, NSString);
     DECODE(decoder, customMsg, NSString);
     DECODE(decoder, customURL, NSString);
+    DECODE(decoder, eventDetailButtonText, NSString);
   }
   return self;
 }

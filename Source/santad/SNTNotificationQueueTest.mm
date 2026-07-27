@@ -61,12 +61,13 @@
   OCMExpect([self.mockProxy postBlockNotification:se
                                 withCustomMessage:customMessage
                                         customURL:customURL
+                            eventDetailButtonText:OCMOCK_ANY
                                       configState:OCMOCK_ANY
                                          andReply:OCMOCK_ANY])
       .andDo(^(NSInvocation* inv) {
         // Extract the reply block from the invocation and call it
         void (^__unsafe_unretained replyBlock)(BOOL);
-        [inv getArgument:&replyBlock atIndex:6];
+        [inv getArgument:&replyBlock atIndex:7];
         // Note: The replyBlock must be called asynchronously
         dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
           replyBlock(YES);
@@ -74,12 +75,13 @@
       });
 
   [self.sut addEvent:se
-      withCustomMessage:customMessage
-              customURL:customURL
-            configState:nil
-               andReply:^(BOOL) {
-                 dispatch_semaphore_signal(sema);
-               }];
+          withCustomMessage:customMessage
+                  customURL:customURL
+      eventDetailButtonText:nil
+                configState:nil
+                   andReply:^(BOOL) {
+                     dispatch_semaphore_signal(sema);
+                   }];
 
   XCTAssertSemaTrue(sema, 3, "Reply block not called within expected window");
   OCMVerifyAll(self.mockProxy);
@@ -91,19 +93,21 @@
   NSString* customURL = @"https://northpolesec.com";
 
   [self.sut addEvent:nil
-      withCustomMessage:customMessage
-              customURL:customURL
-            configState:OCMOCK_ANY
-               andReply:^(BOOL val) {
-                 XCTAssertFalse(val);
-                 dispatch_semaphore_signal(sema);
-               }];
+          withCustomMessage:customMessage
+                  customURL:customURL
+      eventDetailButtonText:nil
+                configState:OCMOCK_ANY
+                   andReply:^(BOOL val) {
+                     XCTAssertFalse(val);
+                     dispatch_semaphore_signal(sema);
+                   }];
 
   XCTAssertSemaTrue(sema, 3, "Reply block not called within expected window");
 
   OCMVerify(never(), [self.mockProxy postBlockNotification:OCMOCK_ANY
                                          withCustomMessage:OCMOCK_ANY
                                                  customURL:OCMOCK_ANY
+                                     eventDetailButtonText:OCMOCK_ANY
                                                configState:OCMOCK_ANY
                                                   andReply:OCMOCK_ANY]);
 }
@@ -175,17 +179,19 @@
   OCMVerify(never(), [self.mockProxy postBlockNotification:se1
                                          withCustomMessage:@"Message 1"
                                                  customURL:@"https://northpolesec.com/1"
+                                     eventDetailButtonText:OCMOCK_ANY
                                                configState:OCMOCK_ANY
                                                   andReply:OCMOCK_ANY]);
 
   OCMExpect([self.mockProxy postBlockNotification:se2
                                 withCustomMessage:@"Message 2"
                                         customURL:@"https://northpolesec.com/2"
+                            eventDetailButtonText:OCMOCK_ANY
                                       configState:OCMOCK_ANY
                                          andReply:OCMOCK_ANY])
       .andDo(^(NSInvocation* invocation) {
         void (^__unsafe_unretained replyBlock)(BOOL);
-        [invocation getArgument:&replyBlock atIndex:6];
+        [invocation getArgument:&replyBlock atIndex:7];
         // Note: The replyBlock must be called asynchronously
         dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
           replyBlock(YES);
@@ -195,11 +201,12 @@
   OCMExpect([self.mockProxy postBlockNotification:se3
                                 withCustomMessage:@"Message 3"
                                         customURL:@"https://northpolesec.com/3"
+                            eventDetailButtonText:OCMOCK_ANY
                                       configState:OCMOCK_ANY
                                          andReply:OCMOCK_ANY])
       .andDo(^(NSInvocation* invocation) {
         void (^__unsafe_unretained replyBlock)(BOOL);
-        [invocation getArgument:&replyBlock atIndex:6];
+        [invocation getArgument:&replyBlock atIndex:7];
         // Note: The replyBlock must be called asynchronously
         dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
           replyBlock(YES);
@@ -209,11 +216,12 @@
   OCMExpect([self.mockProxy postBlockNotification:se4
                                 withCustomMessage:customMessage
                                         customURL:customURL
+                            eventDetailButtonText:OCMOCK_ANY
                                       configState:OCMOCK_ANY
                                          andReply:OCMOCK_ANY])
       .andDo(^(NSInvocation* inv) {
         void (^__unsafe_unretained replyBlock)(BOOL);
-        [inv getArgument:&replyBlock atIndex:6];
+        [inv getArgument:&replyBlock atIndex:7];
         // Note: The replyBlock must be called asynchronously
         dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
           replyBlock(YES);
@@ -221,10 +229,11 @@
       });
 
   [self.sut addEvent:se4
-      withCustomMessage:customMessage
-              customURL:customURL
-            configState:nil
-               andReply:replyBlock4];
+          withCustomMessage:customMessage
+                  customURL:customURL
+      eventDetailButtonText:nil
+                configState:nil
+                   andReply:replyBlock4];
 
   [self waitForExpectationsWithTimeout:4.0 handler:nil];
 

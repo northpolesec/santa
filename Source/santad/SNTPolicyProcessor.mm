@@ -78,6 +78,7 @@ struct CompiledFallbackRule {
   std::unique_ptr<::google::api::expr::runtime::CelExpression> expression;
   NSString* customMsg;
   NSString* customURL;
+  NSString* eventDetailButtonText;
 };
 
 // Immutable once published. arena declared FIRST -> destroyed LAST, because the
@@ -105,7 +106,8 @@ struct FallbackBatch {
              std::string(result.status().message()).c_str());
         return nullptr;
       }
-      compiled.push_back({std::move(*result), rule.customMsg, rule.customURL});
+      compiled.push_back(
+          {std::move(*result), rule.customMsg, rule.customURL, rule.eventDetailButtonText});
     }
     return std::make_shared<FallbackBatch>(std::move(arena), std::move(compiled));
   }
@@ -255,6 +257,7 @@ struct FallbackBatch {
                       : SNTEventStateBlockCELFallback;
     cd.customMsg = rule.customMsg;
     cd.customURL = rule.customURL;
+    cd.eventDetailButtonText = rule.eventDetailButtonText;
     return YES;
   }
 
@@ -564,6 +567,7 @@ static void ApplySilentBlock(SNTCachedDecision* cd, SNTRuleState state) {
   // We know we have a match so apply the custom messages
   cd.customMsg = rule.customMsg;
   cd.customURL = rule.customURL;
+  cd.eventDetailButtonText = rule.eventDetailButtonText;
   cd.staticRule = rule.staticRule;
   cd.ruleId = rule.ruleId;
 

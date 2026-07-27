@@ -1434,16 +1434,24 @@
             return requestDict[@"cursor"] != nil;
           }];
 
-  // Stub out the call to invoke the block, verification of the input is later
+  // Stub out the call to invoke the block, verification of the input is later.
+  // Also capture the execution rules so we can assert on fields that SNTRule's
+  // -isEqual: ignores (e.g. the truncated eventDetailButtonText below).
+  __block NSArray<SNTRule*>* capturedExecutionRules;
   OCMStub([self.daemonConnRop
-      databaseRuleAddExecutionRules:OCMOCK_ANY
-                    fileAccessRules:OCMOCK_ANY
-                   networkFlowRules:OCMOCK_ANY
-                            signals:OCMOCK_ANY
-                        ruleCleanup:SNTRuleCleanupNone
-                             source:SNTRuleAddSourceSyncService
-                              reply:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(YES), [NSNull null],
-                                                                 nil])]);
+              databaseRuleAddExecutionRules:OCMOCK_ANY
+                            fileAccessRules:OCMOCK_ANY
+                           networkFlowRules:OCMOCK_ANY
+                                    signals:OCMOCK_ANY
+                                ruleCleanup:SNTRuleCleanupNone
+                                     source:SNTRuleAddSourceSyncService
+                                      reply:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(YES),
+                                                                         [NSNull null], nil])])
+      .andDo(^(NSInvocation* inv) {
+        __unsafe_unretained NSArray<SNTRule*>* arg;
+        [inv getArgument:&arg atIndex:2];
+        capturedExecutionRules = arg;
+      });
   OCMStub([self.daemonConnRop postRuleSyncNotificationForApplication:[OCMArg any]
                                                                reply:([OCMArg invokeBlock])]);
   // Invoke the reply immediately; otherwise sync blocks on the 5s reply timeout.
@@ -1463,19 +1471,21 @@
                                   state:SNTRuleStateAllow
                                    type:SNTRuleTypeSigningID],
     [[SNTRule alloc]
-        initWithIdentifier:@"7846698e47ef41be80b83fb9e2b98fa6dc46c9188b068bff323c302955a00142"
-                     state:SNTRuleStateBlock
-                      type:SNTRuleTypeCertificate
-                 customMsg:@"Hi There"
-                 customURL:@"http://northpole.security"
-                   celExpr:nil
-            seatbeltPolicy:nil
-                    ruleId:0],
+           initWithIdentifier:@"7846698e47ef41be80b83fb9e2b98fa6dc46c9188b068bff323c302955a00142"
+                        state:SNTRuleStateBlock
+                         type:SNTRuleTypeCertificate
+                    customMsg:@"Hi There"
+                    customURL:@"http://northpole.security"
+        eventDetailButtonText:nil
+                      celExpr:nil
+               seatbeltPolicy:nil
+                       ruleId:0],
     [[SNTRule alloc] initWithIdentifier:@"AAAAAAAAAA"
                                   state:SNTRuleStateBlock
                                    type:SNTRuleTypeTeamID
                               customMsg:@"Banned team ID"
                               customURL:@"http://northpole.security"
+                  eventDetailButtonText:nil
                                 celExpr:nil
                          seatbeltPolicy:nil
                                  ruleId:0],
@@ -1489,6 +1499,23 @@
                                                        source:SNTRuleAddSourceSyncService
                                                         reply:OCMOCK_ANY]);
   OCMVerify([self.daemonConnRop postRuleSyncNotificationForApplication:@"yes" reply:OCMOCK_ANY]);
+
+  // The cert rule's event_detail_button_label in the fixture exceeds the max
+  // length, so the synced SNTRule must carry the truncated label. (SNTRule's
+  // -isEqual: ignores this field, so it is asserted off the captured rules.)
+  NSString* longLabel = @"Contact the Security Team before running this blocked binary";
+  XCTAssertGreaterThan(longLabel.length, kEventDetailButtonTextMaxLength);
+  SNTRule* certRule;
+  for (SNTRule* r in capturedExecutionRules) {
+    if ([r.identifier
+            isEqualToString:@"7846698e47ef41be80b83fb9e2b98fa6dc46c9188b068bff323c302955a00142"]) {
+      certRule = r;
+      break;
+    }
+  }
+  XCTAssertNotNil(certRule);
+  XCTAssertEqualObjects(certRule.eventDetailButtonText,
+                        [longLabel substringToIndex:kEventDetailButtonTextMaxLength]);
 }
 
 - (void)testRuleDownloadCel {
@@ -1522,6 +1549,7 @@
                                    type:SNTRuleTypeTeamID
                               customMsg:nil
                               customURL:nil
+                  eventDetailButtonText:nil
                                 celExpr:@"target.signing_time >= timestamp('2025-05-31T00:00:00Z')"
                          seatbeltPolicy:nil
                                  ruleId:0],
@@ -1530,6 +1558,7 @@
                                    type:SNTRuleTypeTeamID
                               customMsg:nil
                               customURL:nil
+                  eventDetailButtonText:nil
                                 celExpr:@"this is an invalid expression"
                          seatbeltPolicy:nil
                                  ruleId:0],
@@ -1575,6 +1604,7 @@
                                    type:SNTRuleTypeSigningID
                               customMsg:nil
                               customURL:nil
+                  eventDetailButtonText:nil
                                 celExpr:nil
                          seatbeltPolicy:@"(version 1)(deny default)"
                                  ruleId:0],

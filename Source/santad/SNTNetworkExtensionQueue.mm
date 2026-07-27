@@ -31,7 +31,9 @@
 #import "Source/common/SNTStoredNetworkFlowEvent.h"
 #import "Source/common/SNTStoredProcess.h"
 #import "Source/common/SNTStrengthify.h"
+#import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTXPCNotifierInterface.h"
+#import "Source/common/String.h"
 #import "Source/common/ne/SNDXPCNetworkExtensionInterface.h"
 #import "Source/common/ne/SNTNetworkExtensionSettings.h"
 #import "Source/common/ne/SNTSyncNetworkExtensionSettings.h"
@@ -224,6 +226,12 @@ static const NSTimeInterval kNetworkFlowDialogDedupeInterval = 60;
   for (SNDNetworkFlowDecision* decision in decisions) {
     SNTStoredNetworkFlowEvent* event = [decision storedEvent];
     if (!event) continue;  // open build / converter declined
+
+    // The network flow rule's event_detail_button_label rides in the opaque rule
+    // blob (never parsed at download), so cap it here on the way in, matching the
+    // limit enforced on execution and CEL fallback rules.
+    event.eventDetailButtonText = santa::TruncateNSStringToLength(event.eventDetailButtonText,
+                                                                  kEventDetailButtonTextMaxLength);
 
     // Enrich the originating process with cd-sourced fields (SHA-256, cert chain)
     // that santanetd cannot provide. Prefer the cached exec decision (vnode key); on a

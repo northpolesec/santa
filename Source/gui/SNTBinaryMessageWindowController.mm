@@ -35,6 +35,9 @@
 ///  The custom URL to use for this event
 @property(copy) NSString* customURL;
 
+///  Text that overrides the "Open" button label for this event
+@property(copy) NSString* eventDetailButtonText;
+
 @end
 
 @implementation SNTBinaryMessageWindowController
@@ -42,6 +45,7 @@
 - (instancetype)initWithEvent:(SNTStoredExecutionEvent*)event
                     customMsg:(NSString*)message
                     customURL:(NSString*)url
+        eventDetailButtonText:(NSString*)eventDetailButtonText
                   configState:(SNTConfigState*)configState
                         reply:(void (^)(BOOL))replyBlock {
   self = [super init];
@@ -49,6 +53,7 @@
     _event = event;
     _customMessage = message;
     _customURL = url;
+    _eventDetailButtonText = eventDetailButtonText;
     _configState = configState;
     _replyBlock = replyBlock;
     _progress = [NSProgress discreteProgressWithTotalUnitCount:1];
@@ -89,17 +94,18 @@
   self.window = [SNTMessageWindowController defaultWindow];
 
   self.window.contentViewController = [SNTBinaryMessageWindowViewFactory
-      createWithWindow:self.window
-                 event:self.event
-             customMsg:self.customMessage
-             customURL:self.customURL
-           configState:self.configState
-        bundleProgress:self.bundleProgress
-           silenceable:([self messageHash] != nil)
-       uiStateCallback:^(NSTimeInterval preventNotificationsPeriod) {
-         self.silenceFutureNotificationsPeriod = preventNotificationsPeriod;
-       }
-         replyCallback:self.replyBlock];
+           createWithWindow:self.window
+                      event:self.event
+                  customMsg:self.customMessage
+                  customURL:self.customURL
+      eventDetailButtonText:self.eventDetailButtonText
+                configState:self.configState
+             bundleProgress:self.bundleProgress
+                silenceable:([self messageHash] != nil)
+            uiStateCallback:^(NSTimeInterval preventNotificationsPeriod) {
+              self.silenceFutureNotificationsPeriod = preventNotificationsPeriod;
+            }
+              replyCallback:self.replyBlock];
 
   self.window.delegate = self;
 

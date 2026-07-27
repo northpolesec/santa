@@ -29,9 +29,14 @@
 /// Supports the same format values as EventDetailURL.
 @property(readonly, copy) NSString* customURL;
 
+/// Optional text that overrides the "Open" button label in the block
+/// notification. Overrides the EventDetailText configuration value.
+@property(readonly, copy) NSString* eventDetailButtonText;
+
 - (instancetype)initWithCELExpr:(NSString*)celExpr
                       customMsg:(NSString*)customMsg
-                      customURL:(NSString*)customURL;
+                      customURL:(NSString*)customURL
+          eventDetailButtonText:(NSString*)eventDetailButtonText;
 
 + (NSData*)serializeArray:(NSArray<SNTCELFallbackRule*>*)rules;
 + (NSArray<SNTCELFallbackRule*>*)deserializeArray:(NSData*)data;

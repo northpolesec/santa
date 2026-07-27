@@ -117,6 +117,7 @@ static NSString* const kBinarySHA256 =
                                               type:SNTRuleTypeBinary
                                          customMsg:nil
                                          customURL:nil
+                             eventDetailButtonText:nil
                                          timestamp:0
                                            comment:nil
                                            celExpr:nil

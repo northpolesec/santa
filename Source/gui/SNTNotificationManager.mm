@@ -411,6 +411,7 @@ static NSString* const silencedNotificationsKey = @"SilencedNotifications";
 - (void)postBlockNotification:(SNTStoredExecutionEvent*)event
             withCustomMessage:(NSString*)message
                     customURL:(NSString*)url
+        eventDetailButtonText:(NSString*)eventDetailButtonText
                   configState:(SNTConfigState*)configState
                      andReply:(void (^)(BOOL))replyBlock {
   if (!event) {
@@ -422,6 +423,7 @@ static NSString* const silencedNotificationsKey = @"SilencedNotifications";
       [[SNTBinaryMessageWindowController alloc] initWithEvent:event
                                                     customMsg:message
                                                     customURL:url
+                                        eventDetailButtonText:eventDetailButtonText
                                                   configState:configState
                                                         reply:replyBlock];
 

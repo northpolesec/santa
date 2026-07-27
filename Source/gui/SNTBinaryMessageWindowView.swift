@@ -36,6 +36,7 @@ import santa_gui_SNTMessageView
     event: SNTStoredExecutionEvent,
     customMsg: NSString?,
     customURL: NSString?,
+    eventDetailButtonText: NSString?,
     configState: SNTConfigState,
     bundleProgress: SNTBundleProgress,
     silenceable: Bool,
@@ -48,6 +49,7 @@ import santa_gui_SNTMessageView
         event: event,
         customMsg: customMsg,
         customURL: customURL,
+        eventDetailButtonText: eventDetailButtonText,
         configState: configState,
         bundleProgress: bundleProgress,
         silenceable: silenceable,
@@ -251,6 +253,7 @@ struct SNTBinaryMessageWindowView: View {
   let event: SNTStoredExecutionEvent?
   let customMsg: NSString?
   let customURL: NSString?
+  let eventDetailButtonText: NSString?
   let configState: SNTConfigState
   @StateObject var bundleProgress: SNTBundleProgress
   let silenceable: Bool
@@ -327,7 +330,7 @@ struct SNTBinaryMessageWindowView: View {
           StandaloneButton(action: standAloneButton)
         } else if shouldAddOpenButton() {
           OpenEventButton(
-            customText: configState.eventDetailText,
+            customText: (eventDetailButtonText as String?) ?? configState.eventDetailText,
             disabled: (event?.needsBundleHash ?? false && !bundleProgress.isFinished),
             action: openButton
           )

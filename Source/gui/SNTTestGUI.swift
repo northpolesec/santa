@@ -159,6 +159,8 @@ struct BinaryView: View {
 
   @State var customMsg: String = ""
   @State var customURL: String = ""
+  @State private var eventDetailText: String = ""
+  @State private var eventDetailButtonText: String = ""
 
   var body: some View {
     VStack(spacing: 15.0) {
@@ -205,6 +207,27 @@ struct BinaryView: View {
             Button(action: { eventDetailURL = "" }) { Text(verbatim: "Clear").font(Font.subheadline) }
           }
           HStack {
+            TextField(text: $eventDetailText, label: { Text(verbatim: "Event Detail Text") })
+            Button(action: { eventDetailText = "Request Access" }) {
+              Text("Populate").font(Font.subheadline)
+            }
+            Button(action: { eventDetailText = "" }) {
+              Text(verbatim: "Clear").font(Font.subheadline)
+            }
+          }
+          HStack {
+            TextField(
+              text: $eventDetailButtonText,
+              label: { Text(verbatim: "Event Detail Button Text (per-event)") }
+            )
+            Button(action: { eventDetailButtonText = "Request Access" }) {
+              Text("Populate").font(Font.subheadline)
+            }
+            Button(action: { eventDetailButtonText = "" }) {
+              Text(verbatim: "Clear").font(Font.subheadline)
+            }
+          }
+          HStack {
             Picker(selection: $dateOverride, label: Text(verbatim: "Date")) {
               Text(verbatim: "Nov 25").tag(SpecialDates.Nov25)
               Text(verbatim: "Apr 1").tag(SpecialDates.Apr1)
@@ -246,6 +269,9 @@ struct BinaryView: View {
         ]
         if !eventDetailURL.isEmpty {
           configMap["EventDetailURL"] = eventDetailURL
+        }
+        if !eventDetailText.isEmpty {
+          configMap["EventDetailText"] = eventDetailText
         }
         if !brandingCompanyName.isEmpty {
           configMap["BrandingCompanyName"] = brandingCompanyName
@@ -289,6 +315,7 @@ struct BinaryView: View {
             event: event,
             customMsg: customMsg as NSString?,
             customURL: effectiveURL.isEmpty ? nil : (effectiveURL as NSString),
+            eventDetailButtonText: eventDetailButtonText.isEmpty ? nil : (eventDetailButtonText as NSString),
             configState: SNTConfigState(config: SNTConfigurator.configurator()),
             bundleProgress: SNTBundleProgress(),
             silenceable: true,
@@ -480,6 +507,7 @@ struct NetworkFlowView: View {
   @State private var executingUser: String = NSUserName()
   @State private var customMsg: String = ""
   @State private var customURL: String = ""
+  @State private var eventDetailButtonText: String = ""
   @State private var allowNotificationSilence: Bool = true
 
   @State private var brandingCompanyName: String = ""
@@ -519,6 +547,18 @@ struct NetworkFlowView: View {
               Text(verbatim: "Populate").font(Font.subheadline)
             }
             Button(action: { customURL = "" }) { Text(verbatim: "Clear").font(Font.subheadline) }
+          }
+          HStack {
+            TextField(
+              text: $eventDetailButtonText,
+              label: { Text(verbatim: "Event Detail Button Text") }
+            )
+            Button(action: { eventDetailButtonText = "Request Access" }) {
+              Text("Populate").font(Font.subheadline)
+            }
+            Button(action: { eventDetailButtonText = "" }) {
+              Text(verbatim: "Clear").font(Font.subheadline)
+            }
           }
           HStack {
             Picker(selection: $decisionTier, label: Text(verbatim: "Match (decisionTier)")) {
@@ -582,6 +622,7 @@ struct NetworkFlowView: View {
         event.decisionTier = decisionTier
         event.customMsg = customMsg.isEmpty ? nil : customMsg
         event.customURL = customURL.isEmpty ? nil : customURL
+        event.eventDetailButtonText = eventDetailButtonText.isEmpty ? nil : eventDetailButtonText
 
         let bundle = SNTConfigBundle()
         bundle.setValue(NSNumber(value: allowNotificationSilence), forKey: "enableNotificationSilences")

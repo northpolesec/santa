@@ -800,17 +800,18 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
   SNTRule* (^createCELRule)(NSString*, BOOL) = ^SNTRule*(NSString* celExpr, BOOL v2) {
     return [[SNTRule alloc]
-        initWithIdentifier:@"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-                     state:v2 ? SNTRuleStateCELv2 : SNTRuleStateCEL
-                      type:SNTRuleTypeBinary
-                 customMsg:nil
-                 customURL:nil
-                 timestamp:0
-                   comment:nil
-                   celExpr:celExpr
-            seatbeltPolicy:nil
-                    ruleId:0
-                     error:NULL];
+           initWithIdentifier:@"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+                        state:v2 ? SNTRuleStateCELv2 : SNTRuleStateCEL
+                         type:SNTRuleTypeBinary
+                    customMsg:nil
+                    customURL:nil
+        eventDetailButtonText:nil
+                    timestamp:0
+                      comment:nil
+                      celExpr:celExpr
+               seatbeltPolicy:nil
+                       ruleId:0
+                        error:NULL];
   };
   {
     SNTRule* r = createCELRule(@"target.signing_time > timestamp(1717987100)", true);
@@ -937,17 +938,18 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     // Direct seatbelt rule (no CEL): same expectations as above, plus a
     // non-empty seatbeltPolicy on the rule.
     SNTRule* r = [[SNTRule alloc]
-        initWithIdentifier:@"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-                     state:SNTRuleStateSeatbelt
-                      type:SNTRuleTypeBinary
-                 customMsg:nil
-                 customURL:nil
-                 timestamp:0
-                   comment:nil
-                   celExpr:nil
-            seatbeltPolicy:@"(version 1)(deny default)"
-                    ruleId:0
-                     error:NULL];
+           initWithIdentifier:@"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+                        state:SNTRuleStateSeatbelt
+                         type:SNTRuleTypeBinary
+                    customMsg:nil
+                    customURL:nil
+        eventDetailButtonText:nil
+                    timestamp:0
+                      comment:nil
+                      celExpr:nil
+               seatbeltPolicy:@"(version 1)(deny default)"
+                       ruleId:0
+                        error:NULL];
     XCTAssertNotNil(r);
     XCTAssertEqualObjects(r.seatbeltPolicy, @"(version 1)(deny default)");
     SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
@@ -1012,17 +1014,18 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
   SNTRule* (^createCELRule)(NSString*, BOOL) = ^SNTRule*(NSString* celExpr, BOOL v2) {
     return [[SNTRule alloc]
-        initWithIdentifier:@"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-                     state:v2 ? SNTRuleStateCELv2 : SNTRuleStateCEL
-                      type:SNTRuleTypeBinary
-                 customMsg:nil
-                 customURL:nil
-                 timestamp:0
-                   comment:nil
-                   celExpr:celExpr
-            seatbeltPolicy:nil
-                    ruleId:0
-                     error:NULL];
+           initWithIdentifier:@"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+                        state:v2 ? SNTRuleStateCELv2 : SNTRuleStateCEL
+                         type:SNTRuleTypeBinary
+                    customMsg:nil
+                    customURL:nil
+        eventDetailButtonText:nil
+                    timestamp:0
+                      comment:nil
+                      celExpr:celExpr
+               seatbeltPolicy:nil
+                       ruleId:0
+                        error:NULL];
   };
 
   SNTRule* r = createCELRule(@"target.signing_time > timestamp(1717987100)", true);
@@ -1124,17 +1127,18 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
   SNTRule* (^createCELRule)(NSString*, BOOL) = ^SNTRule*(NSString* celExpr, BOOL v2) {
     return [[SNTRule alloc]
-        initWithIdentifier:@"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-                     state:v2 ? SNTRuleStateCELv2 : SNTRuleStateCEL
-                      type:SNTRuleTypeBinary
-                 customMsg:nil
-                 customURL:nil
-                 timestamp:0
-                   comment:nil
-                   celExpr:celExpr
-            seatbeltPolicy:nil
-                    ruleId:0
-                     error:NULL];
+           initWithIdentifier:@"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+                        state:v2 ? SNTRuleStateCELv2 : SNTRuleStateCEL
+                         type:SNTRuleTypeBinary
+                    customMsg:nil
+                    customURL:nil
+        eventDetailButtonText:nil
+                    timestamp:0
+                      comment:nil
+                      celExpr:celExpr
+               seatbeltPolicy:nil
+                       ruleId:0
+                        error:NULL];
   };
 
   // Test: Check that an ancestor with a specific path exists
@@ -1318,7 +1322,10 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 - (SNTCELFallbackRule*)ruleWithExpr:(NSString*)expr {
-  return [[SNTCELFallbackRule alloc] initWithCELExpr:expr customMsg:nil customURL:nil];
+  return [[SNTCELFallbackRule alloc] initWithCELExpr:expr
+                                           customMsg:nil
+                                           customURL:nil
+                               eventDetailButtonText:nil];
 }
 
 - (void)testCELFallbackExpressionAllow {
@@ -1543,7 +1550,8 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   SNTCELFallbackRule* rule =
       [[SNTCELFallbackRule alloc] initWithCELExpr:@"BLOCKLIST"
                                         customMsg:@"Custom block message"
-                                        customURL:@"https://example.com/details"];
+                                        customURL:@"https://example.com/details"
+                            eventDetailButtonText:@"Request Access"];
   [[SNTConfigurator configurator] setSyncServerCELFallbackRules:@[ rule ]];
   SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
   cd.sha256 = @"aabbccdd";
@@ -1555,6 +1563,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   XCTAssertEqual(cd.decision, SNTEventStateBlockCELFallback);
   XCTAssertEqualObjects(cd.customMsg, @"Custom block message");
   XCTAssertEqualObjects(cd.customURL, @"https://example.com/details");
+  XCTAssertEqualObjects(cd.eventDetailButtonText, @"Request Access");
 }
 
 // Concurrent evaluation while another thread repeatedly recompiles/swaps the
@@ -1631,6 +1640,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
                                                  type:SNTRuleTypeCDHash
                                             customMsg:nil
                                             customURL:nil
+                                eventDetailButtonText:nil
                                               celExpr:nil
                                        seatbeltPolicy:nil
                                                ruleId:42];

@@ -139,6 +139,7 @@ NSString* const kRuleTypeSigningID = @"SIGNINGID";
 NSString* const kRuleTypeCDHash = @"CDHASH";
 NSString* const kRuleCustomMsg = @"custom_msg";
 NSString* const kRuleCustomURL = @"custom_url";
+NSString* const kRuleEventDetailButtonText = @"event_detail_button_label";
 NSString* const kRuleComment = @"comment";
 NSString* const kRuleCELExpr = @"cel_expr";
 NSString* const kCursor = @"cursor";
@@ -152,6 +153,8 @@ NSString* const kLogSync = @"log_sync";
 
 NSString* const kPostflightRulesReceived = @"rules_received";
 NSString* const kPostflightRulesProcessed = @"rules_processed";
+
+const NSUInteger kEventDetailButtonTextMaxLength = 48;
 
 const NSUInteger kDefaultEventBatchSize = 50;
 const NSUInteger kMinimumFullSyncInterval = 60;

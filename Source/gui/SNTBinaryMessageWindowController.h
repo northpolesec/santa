@@ -29,6 +29,7 @@
 - (instancetype)initWithEvent:(SNTStoredExecutionEvent*)event
                     customMsg:(NSString*)message
                     customURL:(NSString*)url
+        eventDetailButtonText:(NSString*)eventDetailButtonText
                   configState:(SNTConfigState*)configState
                         reply:(void (^)(BOOL authenticated))replyBlock;
 
