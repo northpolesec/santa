@@ -35,14 +35,11 @@
 
 namespace santa {
 
-// In-memory fake admin-group membership for tests. Never touches the real
-// group 80. Models the seam's resolution behavior: `directory_down_` makes
-// every identity unresolvable (systemic outage), `deleted_uids_` makes
-// individual accounts unresolvable (deleted), `uuids_` overrides the per-uid
-// unique identifier (uid-reuse scenarios), `uuid_calls_until_outage_`
-// sequences a directory flap between two calls within the same reconcile
-// pass, and `remove_fails_no_console_user_` models RemoveMember's own
-// internal resolution flapping independently of Resolves().
+// In-memory fake admin-group membership. Never touches the real group 80.
+// Resolution knobs: `directory_down_` (systemic outage), `deleted_uids_`
+// (individual account gone), `uuids_` (uid reuse), `uuid_calls_until_outage_`
+// (a flap between two calls in one reconcile pass), and
+// `remove_fails_no_console_user_` (RemoveMember's own resolution flapping).
 class FakeAdminGroupMembership : public AdminGroupMembership {
  public:
   bool IsMember(uid_t uid) override { return Resolves(uid) && members_.count(uid) > 0; }
@@ -296,7 +293,7 @@ static uint64_t MakeDeadline(uint64_t want) {
                  SNTTemporaryAdminModeDeniedReasonAuthFailed);
 }
 
-// Review M3: an unresolvable / AD account fails cleanly via AddMember -> kApplyFailed.
+// An unresolvable / AD account fails cleanly via AddMember -> kApplyFailed.
 - (void)testApplyFailedFailsClean {
   [self stubPolicyAvailable];
   [self stubAuthReply:YES reason:@"reason"];
@@ -354,13 +351,10 @@ static uint64_t MakeDeadline(uint64_t want) {
   XCTAssertTrue(tam->SecondsRemaining().has_value());  // original session still live
 }
 
-// A refresh re-adds the live session's uid without recapturing identity. If the
-// uid was reused mid-session (it now resolves to a DIFFERENT account), re-adding
-// would elevate the new holder, whom RevertEffect's uid-reuse guard then refuses
-// to demote -- a permanent untracked admin. The refresh must be refused, leaving
-// the live record (with the ORIGINAL uuid) intact to revert at its own deadline.
-// AddMember is deliberately left able to succeed: without the guard the refresh
-// would be granted (returns 5), so the refusal below is the guard and nothing else.
+// A uid reused mid-session now resolves to a DIFFERENT account; re-adding it on
+// refresh would elevate the new holder, whom the revert's uid-reuse guard then
+// refuses to demote. The refresh must be refused and the live record left intact.
+// AddMember is left able to succeed, so the refusal below is the guard alone.
 - (void)testRefreshRefusedWhenUidReusedMidSession {
   [self stubPolicyAvailable];
   [self stubAuthReply:YES reason:@"reason"];
@@ -422,15 +416,11 @@ static uint64_t MakeDeadline(uint64_t want) {
   XCTAssertFalse(fake->IsMember(502));
 }
 
-// I3: RequestMinutes validates a refresh under lock_, then BeginGrant runs the
-// authorization window OFF lock_ (Touch ID + GUI, up to ~90s). If the session
-// ends during that window -- here, simulated as a screen lock via
-// EndForUserEvent -- target_uid_ is zeroed before ApplyEffect runs. ApplyEffect
-// must refuse rather than persist/elevate uid 0.
-//
-// Does not use stubAuthReply: -- OCMock matches the first-added stub, so this
-// test needs its own single stub that behaves differently on the 1st (initial
-// grant) and 2nd (raced refresh) invocation.
+// BeginGrant's authorization window runs off lock_, so a session that ends
+// during it (here a screen lock) zeroes target_uid_ before ApplyEffect runs.
+// ApplyEffect must refuse rather than persist/elevate uid 0. Uses its own auth
+// stub -- OCMock matches the first-added stub, and this needs one that behaves
+// differently on the initial grant and the raced refresh.
 - (void)testApplyEffectRefusesGrantWhenSessionEndsMidAuth {
   [self stubPolicyAvailable];
   __block std::shared_ptr<santa::TemporaryAdminMode> tam;
@@ -528,8 +518,8 @@ static uint64_t MakeDeadline(uint64_t want) {
                  SNTTemporaryAdminModeLeaveReasonSessionExpired);
 }
 
-// Review M1: a still-valid session whose user is no longer a member must NOT be
-// re-added — the elevation was revoked out of band. End the session instead.
+// A still-valid session whose user is no longer a member must NOT be re-added --
+// the elevation was revoked out of band. End the session instead.
 - (void)testReconcileValidButNotMemberEndsSession {
   [self stubPolicyAvailable];
   uid_t uid = getuid();
@@ -594,13 +584,10 @@ static uint64_t MakeDeadline(uint64_t want) {
   XCTAssertEqualObjects(lastPersisted[@"TargetUID"], @(uid));
 }
 
-// The headline stranding bug: at daemon start during a directory outage the
-// target does not resolve, which is byte-identical to a deleted account on
-// Darwin. The session record must be KEPT for retry (the user is still
-// elevated), not dropped as "no such account" — dropping it makes the user a
-// permanent untracked admin. The uid deliberately does not exist on the test
-// machine: the old StatusForUID gate reads it as kNotFound and drops the
-// record.
+// During a directory outage the target does not resolve, which on Darwin is
+// byte-identical to a deleted account. The record must be KEPT for retry (the
+// user is still elevated), not dropped as "no such account". The uid does not
+// exist on the test machine, so the old StatusForUID gate would drop it.
 - (void)testReconcileExpiredDuringOutageRetainsRecordForRetry {
   [self stubPolicyAvailable];
   constexpr uid_t kUnresolvableUID = 4000000000;
@@ -667,9 +654,9 @@ static uint64_t MakeDeadline(uint64_t want) {
   XCTAssertEqualObjects(writes.lastObject, [NSNull null]);  // cleared, not retried
 }
 
-// The uid was reallocated to a different account (UUID differs from the
-// record). The new holder must not be demoted — it may legitimately hold
-// admin — and the record is consumed: the elevated account no longer exists.
+// The uid was reallocated (UUID differs from the record). The new holder must
+// not be demoted -- it may legitimately hold admin -- and the record is consumed
+// because the elevated account no longer exists.
 - (void)testReconcileExpiredUidReusedConsumesWithoutDemoting {
   [self stubPolicyAvailable];
   OCMStub([self.mockConfigurator savedTimedSessionStateForKey:@"TempAdmin"])
@@ -700,10 +687,8 @@ static uint64_t MakeDeadline(uint64_t want) {
   XCTAssertEqualObjects(writes.lastObject, [NSNull null]);  // record consumed
 }
 
-// Same UUID means same account, whatever its name is now: a TAM user can
-// rename their own account while elevated, and the demotion must still land
-// (the guard keys on the GeneratedUID precisely so a rename is not an
-// escape hatch).
+// Same UUID means same account whatever its name is now: a user who renames
+// themselves while elevated must still be demoted.
 - (void)testReconcileExpiredSameAccountStillDemoted {
   [self stubPolicyAvailable];
   OCMStub([self.mockConfigurator savedTimedSessionStateForKey:@"TempAdmin"])
@@ -734,10 +719,9 @@ static uint64_t MakeDeadline(uint64_t want) {
   XCTAssertEqualObjects(writes.lastObject, [NSNull null]);  // record cleared
 }
 
-// A LOCAL account that fails user-resolution against a healthy local node
-// (RemoveMember -> SNTErrorCodeTAMNoConsoleUser) was deleted: there is
-// nothing left to demote, and the record must be consumed rather than left
-// as a residue that blocks every future grant on the machine.
+// A LOCAL account that fails to resolve against a healthy local node was
+// deleted: nothing left to demote, so the record is consumed rather than left as
+// a residue that blocks every future grant.
 - (void)testReconcileExpiredDeletedLocalConsumesRecord {
   [self stubPolicyAvailable];
   OCMStub([self.mockConfigurator savedTimedSessionStateForKey:@"TempAdmin"])
@@ -766,17 +750,13 @@ static uint64_t MakeDeadline(uint64_t want) {
   XCTAssertEqualObjects(writes.lastObject, [NSNull null]);  // consumed, no residue
 }
 
-// Row 5 bounded retry: a genuinely-deleted directory account is
-// indistinguishable from an off-network one through this seam, so its revert is
-// retried for a bounded number of daemon starts and then the record is consumed
-// -- otherwise a permanently-deleted account would wedge every future grant on
-// the machine forever. Each Create is one daemon start; the persisted record
-// (which now carries the retry count) is fed back into the next start.
+// A deleted directory account is indistinguishable from an off-network one, so
+// its revert is retried for a bounded number of daemon starts and then consumed
+// -- otherwise a deleted account would wedge every future grant forever. Each
+// Create is one daemon start, feeding the persisted retry count into the next.
 - (void)testReconcileExpiredDeletedDirectoryAccountConsumesAfterMaxRetries {
   [self stubPolicyAvailable];
-  // Mirrors kMaxRevertRetries in TemporaryAdminMode.mm: the initial failure plus
-  // (kMaxRetries - 1) restarts, then the consume.
-  constexpr int kMaxRetries = 5;
+  constexpr int kMaxRetries = 5;  // mirrors kMaxRevertRetries
   __block NSDictionary* current = [self stateWithBootUUID:[SNTSystemInfo bootSessionUUID]
                                                  deadline:1
                                                  syncHost:@"foo.workshop.cloud"
@@ -797,33 +777,54 @@ static uint64_t MakeDeadline(uint64_t want) {
         [writes addObject:s ? (id)[s copy] : (id)[NSNull null]];
       });
 
+  NSMutableArray<SNTStoredTemporaryAdminModeAuditEvent*>* audits = [NSMutableArray array];
+
   for (int attempt = 1; attempt <= kMaxRetries; attempt++) {
     auto fakeOwned = std::make_unique<FakeAdminGroupMembership>();
     FakeAdminGroupMembership* fake = fakeOwned.get();
     fake->deleted_uids_.insert(501);  // never resolves (deleted, or off-network)
     fake->members_.insert(501);       // group record persists; RemoveMember cannot scrub it
-    auto tam = santa::TemporaryAdminMode::Create((SNTConfigurator*)self.mockConfigurator,
-                                                 (SNTNotificationQueue*)self.mockNotQueue,
-                                                 std::move(fakeOwned),
-                                                 ^(SNTStoredTemporaryAdminModeAuditEvent* e){
-                                                 });
+    // The retry record carries the session UUID forward, so the abandon audit must be
+    // attributed to it. Read it before Create: the consume at the cap nils `current`.
+    NSString* recordSessionUUID = current[kTimedSessionSessionUUIDKey];
+    auto tam = santa::TemporaryAdminMode::Create(
+        (SNTConfigurator*)self.mockConfigurator, (SNTNotificationQueue*)self.mockNotQueue,
+        std::move(fakeOwned), ^(SNTStoredTemporaryAdminModeAuditEvent* e) {
+          [audits addObject:e];
+        });
+
+    // `audits` accumulates across attempts, so this also proves no earlier attempt
+    // audited an abandon.
+    NSMutableArray<SNTStoredTemporaryAdminModeLeaveAuditEvent*>* abandoned = [NSMutableArray array];
+    for (SNTStoredTemporaryAdminModeAuditEvent* e in audits) {
+      if ([e isKindOfClass:[SNTStoredTemporaryAdminModeLeaveAuditEvent class]] &&
+          ((SNTStoredTemporaryAdminModeLeaveAuditEvent*)e).reason ==
+              SNTTemporaryAdminModeLeaveReasonDemotionAbandoned) {
+        [abandoned addObject:(SNTStoredTemporaryAdminModeLeaveAuditEvent*)e];
+      }
+    }
+
     if (attempt < kMaxRetries) {
       NSDictionary* last = writes.lastObject;
       XCTAssertTrue([last isKindOfClass:[NSDictionary class]], @"attempt %d must retain the record",
                     attempt);
       XCTAssertEqualObjects(last[kTimedSessionDeadlineKey], @0);
       XCTAssertEqualObjects(last[@"TargetUID"], @501);
+      XCTAssertEqual(abandoned.count, 0u, @"attempt %d must not audit an abandon", attempt);
     } else {
       XCTAssertEqualObjects(writes.lastObject, [NSNull null],
                             @"the record must be consumed at the retry cap");
+      XCTAssertEqual(abandoned.count, 1u, @"the consume at the cap must audit the abandon");
+      SNTStoredTemporaryAdminModeLeaveAuditEvent* e = abandoned.firstObject;
+      XCTAssertEqualObjects(e.username, @"reconcile-user");
+      XCTAssertEqualObjects(e.uuid, recordSessionUUID);
     }
   }
 }
 
-// Recovery before the cap: an account that is merely unreachable for a few
-// daemon starts and then resolves again (same UUID) is demoted cleanly. The
-// accumulated retry count must not trigger a premature consume, and the
-// successful revert clears the record (discarding the count).
+// An account merely unreachable for a few daemon starts, then resolving again
+// (same UUID), is demoted cleanly: the accumulated retry count must not trigger
+// a premature consume, and the successful revert clears the record.
 - (void)testReconcileExpiredDirectoryAccountRecoversBeforeCapDemotes {
   [self stubPolicyAvailable];
   __block NSDictionary* current = [self stateWithBootUUID:[SNTSystemInfo bootSessionUUID]
@@ -876,11 +877,10 @@ static uint64_t MakeDeadline(uint64_t want) {
   XCTAssertEqualObjects(writes.lastObject, [NSNull null]);  // record cleared, count discarded
 }
 
-// I2: the uid-reuse guard can resolve the account (same UUID -- it provably
-// exists this pass), and then RemoveMember's OWN internal resolution flaps to
-// SNTErrorCodeTAMNoConsoleUser. That must not be read as "deleted" -- the
-// probe that ran moments earlier proved otherwise -- so the record must stay
-// retryable rather than being consumed out from under a still-existing user.
+// The probe resolves the account (same UUID, so it provably exists this pass)
+// and then RemoveMember's OWN resolution flaps to NoConsoleUser. That must not
+// read as "deleted" -- the record stays retryable rather than being consumed out
+// from under a still-existing user.
 - (void)testReconcileExpiredLocalRemoveMemberFlapRetainsRecordForRetry {
   [self stubPolicyAvailable];
   OCMStub([self.mockConfigurator savedTimedSessionStateForKey:@"TempAdmin"])
@@ -915,11 +915,9 @@ static uint64_t MakeDeadline(uint64_t want) {
   XCTAssertEqualObjects(last[@"TargetUID"], @501);
 }
 
-// A still-time-valid session at daemon start during a directory outage:
-// IsMember reads false only because nothing resolves. That must NOT be
-// treated as an out-of-band revocation (which ends the session without
-// reverting and strands the still-elevated user) — the session resumes, and
-// the timer or the next reconcile reverts once the directory answers.
+// At daemon start during an outage, IsMember reads false only because nothing
+// resolves. Treating that as an out-of-band revocation would end the session
+// without reverting and strand the user, so the session resumes instead.
 - (void)testReconcileValidDuringOutageResumesSession {
   [self stubPolicyAvailable];
   OCMStub([self.mockConfigurator savedTimedSessionStateForKey:@"TempAdmin"])
@@ -948,11 +946,9 @@ static uint64_t MakeDeadline(uint64_t want) {
                  SNTTemporaryAdminModeEnterReasonRestart);
 }
 
-// I1: the resolution probe (UUIDForUID) and IsMember are two separate
-// directory resolutions, not one atomic read. A flap BETWEEN them (the probe
-// resolves, then the directory goes down before IsMember runs) must not be
-// read as an out-of-band revocation: re-probe before trusting the negative,
-// and resume when the identity has stopped resolving.
+// UUIDForUID and IsMember are two separate resolutions, not one atomic read. A
+// flap between them (probe resolves, directory then goes down) must not read as
+// an out-of-band revocation: re-probe before trusting the negative.
 - (void)testReconcileValidDirectoryFlapBetweenProbeAndIsMemberResumesSession {
   [self stubPolicyAvailable];
   OCMStub([self.mockConfigurator savedTimedSessionStateForKey:@"TempAdmin"])
@@ -1256,11 +1252,9 @@ static uint64_t MakeDeadline(uint64_t want) {
   XCTAssertTrue(tam->SecondsRemaining().has_value());
 }
 
-// Persist-before-flip with identity capture: a provisional deadline-0 record
-// names the target on disk BEFORE the elevation, the real session record
-// follows, and BOTH records carry the account's UUID and Local bit so the
-// revert paths can distinguish uid reuse and deleted-local after a daemon
-// restart.
+// Persist-before-flip: a provisional deadline-0 record names the target on disk
+// BEFORE the elevation, the real record follows, and both carry the UUID and
+// Local bit the revert paths need after a daemon restart.
 - (void)testGrantPersistsTargetAndIdentityBeforeElevation {
   [self stubPolicyAvailable];
   [self stubAuthReply:YES reason:@"need to install"];
@@ -1323,9 +1317,9 @@ static uint64_t MakeDeadline(uint64_t want) {
   XCTAssertEqual(tam->RequestMinutes(@5, 501, @"alice", &err), 0u);
   XCTAssertFalse(fake->IsMember(501));
 
-  // The elevation never happened, so nothing is owed: the provisional record
-  // is written, then cleared — it must not linger as a fake residue (which
-  // would block future grants via the Task 1 guard).
+  // The elevation never happened, so nothing is owed: the provisional record is
+  // written, then cleared. Left behind it would look like a pending teardown
+  // retry and block every future grant.
   XCTAssertEqual(writes.count, 2u);
   NSDictionary* provisional = writes[0];
   XCTAssertEqualObjects(provisional[@"TargetUID"], @501);

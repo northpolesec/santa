@@ -61,6 +61,13 @@ typedef NS_ENUM(NSInteger, SNTTemporaryAdminModeLeaveReason) {
   // tool). Santa cannot attribute the cause and it is not a sync-server
   // revocation, so it is reported as REASON_UNSPECIFIED upstream.
   SNTTemporaryAdminModeLeaveReasonUnspecified,
+
+  // The demotion of an expired session's directory account was abandoned
+  // after the bounded retries: the account never resolved (deleted, or
+  // off-network the whole time). If the account still exists it RETAINS
+  // admin membership, with nothing tracking it. There is no proto
+  // counterpart yet, so it is reported as REASON_UNSPECIFIED upstream.
+  SNTTemporaryAdminModeLeaveReasonDemotionAbandoned,
 };
 
 // Reason a Temporary Admin Mode request was denied.
