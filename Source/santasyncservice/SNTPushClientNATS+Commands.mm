@@ -307,9 +307,6 @@ bool VerifyCommandRequestTimestamp(const ::pbv1::SantaCommandRequest& command) {
     case ::pbv1::SantaCommandRequest::kKill: commandName = @"kill"; break;
     case ::pbv1::SantaCommandRequest::kEventUpload: commandName = @"event_upload"; break;
     case ::pbv1::SantaCommandRequest::kBinaryUpload: commandName = @"binary_upload"; break;
-    // Not yet implemented; leaving the name unset routes the command to the
-    // ERROR_UNKNOWN_REQUEST_TYPE response below.
-    case ::pbv1::SantaCommandRequest::kInventoryScan: break;
     case ::pbv1::SantaCommandRequest::COMMAND_NOT_SET: break;
   }
 

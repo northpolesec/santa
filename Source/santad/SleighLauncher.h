@@ -23,6 +23,7 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "commands/v1.pb.h"
+#include "common/packageinventory.pb.h"
 #include "telemetry/sleighconfig.pb.h"
 
 namespace santa {
@@ -84,6 +85,18 @@ class SleighLauncher {
                    const std::vector<std::string>& serialized_signals,
                    uint32_t timeout_seconds);
 
+  // Package inventory scan: run a read-only package-inventory sweep. Unlike the
+  // other Launch* methods there is no input file — Sleigh walks the filesystem
+  // itself (per the PackageInventoryScan tuning params), so this launch retains
+  // santad's credentials rather than relying on root-opened input descriptors.
+  // There is no captured response: results are uploaded straight to the
+  // presigned POST, so success/failure is just Sleigh's exit code. A non-zero
+  // exit (or timeout) is returned as an error.
+  virtual absl::Status LaunchPackageInventoryScan(
+      const ::santa::common::v1::PackageInventoryScan& scan,
+      const std::string& signed_post_url,
+      const std::map<std::string, std::string>& form_values);
+
  protected:
   // Verifies the Sleigh binary's code signature before exec. Returns Ok when
   // the signature is acceptable (and, in DEBUG builds, always — Sleigh is
@@ -92,6 +105,11 @@ class SleighLauncher {
   virtual absl::Status VerifySleighCodeSignature();
 
  private:
+  enum class ChildCredentialMode {
+    kDropRoot,
+    kRetain,
+  };
+
   std::string sleigh_path_;
 
   // Sets host_id/host_name on a SleighConfig.
@@ -111,15 +129,20 @@ class SleighLauncher {
       int input_fd, int state_db_fd,
       const std::vector<std::string>& serialized_signals);
 
+  absl::StatusOr<std::string> SerializePackageInventoryScanConfig(
+      const ::santa::common::v1::PackageInventoryScan& scan,
+      const std::string& signed_post_url,
+      const std::map<std::string, std::string>& form_values);
+
   // Forks Sleigh, writes the serialized config to its stdin, optionally
   // captures its stdout, and waits up to timeout_secs (SIGKILL on timeout).
   // Closes every fd in input_fds in the parent (the child inherited its own
   // copies across fork). Returns the captured stdout (empty when capture_stdout
   // is false).
-  absl::StatusOr<std::string> RunSleigh(const std::string& serialized,
-                                        const std::vector<int>& input_fds,
-                                        uint32_t timeout_secs,
-                                        bool capture_stdout);
+  absl::StatusOr<std::string> RunSleigh(
+      const std::string& serialized, const std::vector<int>& input_fds,
+      uint32_t timeout_secs, bool capture_stdout, bool merge_stderr = false,
+      ChildCredentialMode credential_mode = ChildCredentialMode::kDropRoot);
 };
 
 }  // namespace santa

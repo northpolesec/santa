@@ -20,6 +20,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <limits>
 #include <memory>
 #include <string>
 
@@ -33,6 +34,7 @@
 #import "Source/common/SNTSystemInfo.h"
 #include "Source/common/String.h"
 #include "commands/v1.pb.h"
+#include "common/packageinventory.pb.h"
 #include "common/signals.pb.h"
 #include "telemetry/sleighconfig.pb.h"
 
@@ -175,9 +177,52 @@ absl::StatusOr<::santa::telemetry::v1::SleighSignalScanResponse> SleighLauncher:
   return response.signal_scan();
 }
 
+absl::Status SleighLauncher::LaunchPackageInventoryScan(
+    const ::santa::common::v1::PackageInventoryScan& scan, const std::string& signed_post_url,
+    const std::map<std::string, std::string>& form_values) {
+  // An absent or explicitly zero duration is unbounded in the command proto,
+  // so apply Santa's default safety limit. Otherwise let Sleigh reach its own
+  // deadline first by giving the child a one-minute outer margin.
+  uint32_t timeout_seconds = 30 * 60;
+  if (scan.has_max_duration()) {
+    const auto& duration = scan.max_duration();
+    if (duration.seconds() < 0 || duration.nanos() < 0 || duration.nanos() >= NSEC_PER_SEC) {
+      return absl::InvalidArgumentError("invalid package inventory max_duration");
+    }
+
+    if (duration.seconds() > 0 || duration.nanos() > 0) {
+      uint64_t rounded_seconds =
+          static_cast<uint64_t>(duration.seconds()) + (duration.nanos() > 0 ? 1 : 0);
+      constexpr uint64_t kTimeoutMarginSeconds = 60;
+      if (rounded_seconds > std::numeric_limits<uint32_t>::max() - kTimeoutMarginSeconds) {
+        return absl::InvalidArgumentError("package inventory max_duration is too large");
+      }
+      timeout_seconds = static_cast<uint32_t>(rounded_seconds + kTimeoutMarginSeconds);
+    }
+  }
+
+  absl::StatusOr<std::string> serialized =
+      SerializePackageInventoryScanConfig(scan, signed_post_url, form_values);
+  if (!serialized.ok()) {
+    return serialized.status();
+  }
+
+  // No input fds: Sleigh walks the filesystem itself. There's no proto response
+  // (results go straight to the presigned POST), so success/failure is Sleigh's
+  // exit code — but we capture stdout+stderr (merge_stderr) so a failing scan
+  // logs why. Package inventory is the one Sleigh operation that walks paths
+  // itself instead of receiving root-opened descriptors, so retain santad's
+  // credentials to support all_users and protected explicit roots.
+  return RunSleigh(*serialized, /*input_fds=*/{}, timeout_seconds, /*capture_stdout=*/true,
+                   /*merge_stderr=*/true, ChildCredentialMode::kRetain)
+      .status();
+}
+
 absl::StatusOr<std::string> SleighLauncher::RunSleigh(const std::string& serialized,
                                                       const std::vector<int>& input_fds,
-                                                      uint32_t timeout_secs, bool capture_stdout) {
+                                                      uint32_t timeout_secs, bool capture_stdout,
+                                                      bool merge_stderr,
+                                                      ChildCredentialMode credential_mode) {
   // Safety net that closes our copies of the input fds on any return before fork (or if fork
   // fails). After a successful fork the parent closes them explicitly and cancels this — the
   // child keeps its own inherited copies.
@@ -234,6 +279,9 @@ absl::StatusOr<std::string> SleighLauncher::RunSleigh(const std::string& seriali
     dup2(stdin_pipe[0], STDIN_FILENO);
     if (capture_stdout) {
       dup2(stdout_pipe[1], STDOUT_FILENO);
+      if (merge_stderr) {
+        dup2(stdout_pipe[1], STDERR_FILENO);
+      }
     }
     close(stdin_pipe[0]);
     close(stdin_pipe[1]);
@@ -242,7 +290,7 @@ absl::StatusOr<std::string> SleighLauncher::RunSleigh(const std::string& seriali
       close(stdout_pipe[1]);
     }
 
-    if (!DropRootPrivileges()) {
+    if (credential_mode == ChildCredentialMode::kDropRoot && !DropRootPrivileges()) {
       _exit(126);
     }
 
@@ -335,9 +383,20 @@ absl::StatusOr<std::string> SleighLauncher::RunSleigh(const std::string& seriali
     return absl::InternalError("Failed to read Sleigh stdout");
   }
 
+  // When stderr is merged into the capture buffer (inventory scan) the captured
+  // text is human-readable Sleigh diagnostics, not a proto — surface it so a
+  // failing scan says why. (Not logged for stdout-parsed callers, where the
+  // buffer is binary proto.)
+  if (merge_stderr && !captured.empty()) {
+    LOGD(@"SleighLauncher::RunSleigh(): Sleigh output: %s", captured.c_str());
+  }
+
   if (WIFEXITED(child_status)) {
     int exit_code = WEXITSTATUS(child_status);
     if (exit_code != 0) {
+      if (merge_stderr && !captured.empty()) {
+        LOGE(@"SleighLauncher::RunSleigh(): Sleigh exited %d: %s", exit_code, captured.c_str());
+      }
       return absl::UnknownError("Sleigh exited with code " + std::to_string(exit_code));
     }
   } else {
@@ -352,8 +411,8 @@ absl::Status SleighLauncher::VerifySleighCodeSignature() {
   MOLCodesignChecker* csc = [[MOLCodesignChecker alloc] initWithBinaryPath:sleighNSPath];
   if (!csc || ![csc.teamID isEqualToString:@"ZMCG7MLDV9"] ||
       csc.signatureFlags & kSecCodeSignatureAdhoc) {
-    LOGD(@"SleighLauncher::VerifySleighCodeSignature(): Sleigh code signature is invalid");
 #ifndef DEBUG
+    LOGD(@"SleighLauncher::VerifySleighCodeSignature(): Sleigh code signature is invalid");
     return absl::FailedPreconditionError("Sleigh code signature is invalid");
 #endif
   }
@@ -448,6 +507,28 @@ absl::StatusOr<std::string> SleighLauncher::SerializeSignalScanConfig(
     if (!signal->ParseFromString(serialized_signal)) {
       return absl::InvalidArgumentError("Failed to parse serialized Signal proto");
     }
+  }
+
+  std::string serialized;
+  if (!config.SerializeToString(&serialized)) {
+    return absl::UnknownError("Failed to serialize SleighConfig proto");
+  }
+  return serialized;
+}
+
+absl::StatusOr<std::string> SleighLauncher::SerializePackageInventoryScanConfig(
+    const ::santa::common::v1::PackageInventoryScan& scan, const std::string& signed_post_url,
+    const std::map<std::string, std::string>& form_values) {
+  ::santa::telemetry::v1::SleighConfig config;
+  PopulateHostInfo(&config);
+
+  auto* package_inventory_scan = config.mutable_package_inventory_scan();
+  *package_inventory_scan->mutable_scan() = scan;
+
+  auto* signed_post = package_inventory_scan->mutable_signed_post();
+  signed_post->set_url(signed_post_url);
+  for (const auto& [key, value] : form_values) {
+    (*signed_post->mutable_form_values())[key] = value;
   }
 
   std::string serialized;

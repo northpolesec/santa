@@ -83,6 +83,14 @@ typedef NS_ENUM(NSInteger, SNTRuleAddSource) {
 - (void)uploadBinary:(NSData*)serializedRequest reply:(void (^)(NSData* serializedResponse))reply;
 
 ///
+///  Run a Sleigh package-inventory scan described by a serialized
+///  santa.commands.v1.PackageInventoryRequest. reply receives a serialized
+///  santa.commands.v1.PackageInventoryResponse.
+///
+- (void)runPackageInventory:(NSData*)serializedRequest
+                      reply:(void (^)(NSData* serializedResponse))reply;
+
+///
 /// Control Ops
 ///
 - (void)installSantaApp:(NSString*)appPath reply:(void (^)(BOOL))reply;
