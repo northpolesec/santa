@@ -1411,6 +1411,19 @@ genrule(
     cmd = """
     STABLE_GIT_COMMIT=$$(awk '/STABLE_GIT_COMMIT/ { print $$2 }' bazel-out/stable-status.txt)
     defaults write $${PWD}/$(@) SNTCommitHash -string $${STABLE_GIT_COMMIT:-unset}
+
+    # The embed label may carry SemVer build metadata after "+". Record the
+    # recognized values so they can be reported with the version.
+    BUILD_EMBED_LABEL=$$(awk '/BUILD_EMBED_LABEL/ { print $$2 }' bazel-out/stable-status.txt)
+    case "$${BUILD_EMBED_LABEL}" in
+      *+*)
+        case ".$${BUILD_EMBED_LABEL##*+}." in
+          *.unpublished.*)
+            defaults write $${PWD}/$(@) SNTBuildMetadata -string unpublished
+            ;;
+        esac
+        ;;
+    esac
     """,
     local = True,
     message = "Generating CommitHash.plist",
