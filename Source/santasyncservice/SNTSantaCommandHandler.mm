@@ -17,6 +17,7 @@
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTLogging.h"
 #include "Source/common/String.h"
+#import "Source/santasyncservice/SNTSantaCommandHandler+BinaryUpload.h"
 #import "Source/santasyncservice/SNTSantaCommandHandler+EventUpload.h"
 #import "Source/santasyncservice/SNTSantaCommandHandler+Kill.h"
 #import "Source/santasyncservice/SNTSantaCommandHandler+PackageInventory.h"
@@ -24,8 +25,23 @@
 namespace pbv1 = ::santa::commands::v1;
 using santa::NSStringToUTF8String;
 
-NSString* const kSantaCommandNameEventUpload = @"event_upload";
-NSString* const kSantaCommandNamePackageInventory = @"package_inventory";
+namespace {
+
+// The AllowedSantaCommands name for a queued command, or nil for command types
+// this agent doesn't implement (those are reported as FAILED rather than gated).
+// No default case — compiler enforces all proto cases are handled
+// (-Werror + -Wswitch)
+NSString* CommandName(const ::pbv1::QueuedCommand& command) {
+  switch (command.command_case()) {
+    case ::pbv1::QueuedCommand::kKill: return @"kill";
+    case ::pbv1::QueuedCommand::kEventUpload: return @"event_upload";
+    case ::pbv1::QueuedCommand::kBinaryUpload: return @"binary_upload";
+    case ::pbv1::QueuedCommand::kPackageInventory: return @"package_inventory";
+    case ::pbv1::QueuedCommand::COMMAND_NOT_SET: return nil;
+  }
+}
+
+}  // namespace
 
 @implementation SNTSantaCommandHandler
 
@@ -42,27 +58,30 @@ NSString* const kSantaCommandNamePackageInventory = @"package_inventory";
   return !allowed || [allowed containsObject:commandName];
 }
 
++ (BOOL)shouldPostDeliveredAckForCommand:(const ::pbv1::QueuedCommand&)command {
+  // Uploads and package-inventory scans can run for minutes; acking first lets
+  // the server show them in flight instead of untouched while they run.
+  // Everything else is fast enough to post straight to COMPLETE.
+  switch (command.command_case()) {
+    case ::pbv1::QueuedCommand::kEventUpload:
+    case ::pbv1::QueuedCommand::kBinaryUpload:
+    case ::pbv1::QueuedCommand::kPackageInventory: break;
+    default: return NO;
+  }
+
+  // DELIVERED means "will execute it", so don't ack a command that is about to
+  // be rejected or reported as unimplemented.
+  NSString* commandName = CommandName(command);
+  return commandName && [self isCommandAllowed:commandName];
+}
+
 - (::pbv1::CommandResult*)executeQueuedCommand:(const ::pbv1::QueuedCommand&)command
                                        onArena:(google::protobuf::Arena*)arena {
   auto result = google::protobuf::Arena::Create<::pbv1::CommandResult>(arena);
   result->set_command_id(command.command_id());
 
   // Check if the command type is allowed by client configuration.
-  // No default case — compiler enforces all proto cases are handled (-Werror + -Wswitch)
-  NSString* commandName = nil;
-  switch (command.command_case()) {
-    case ::pbv1::QueuedCommand::kKill: commandName = @"kill"; break;
-    case ::pbv1::QueuedCommand::kEventUpload: commandName = kSantaCommandNameEventUpload; break;
-    case ::pbv1::QueuedCommand::kPackageInventory:
-      commandName = kSantaCommandNamePackageInventory;
-      break;
-    // binary_upload over the queued-command path is not implemented (binary upload
-    // is delivered via the NATS command path); leaving the name unset routes it to
-    // the FAILED default in the dispatch switch below.
-    case ::pbv1::QueuedCommand::kBinaryUpload: break;
-    case ::pbv1::QueuedCommand::COMMAND_NOT_SET: break;
-  }
-
+  NSString* commandName = CommandName(command);
   if (commandName && ![SNTSantaCommandHandler isCommandAllowed:commandName]) {
     LOGW(@"SantaCommand: Command '%@' rejected - not in AllowedSantaCommands", commandName);
     result->set_host_status(::pbv1::CommandResult::HOST_STATUS_REJECTED);
@@ -101,6 +120,18 @@ NSString* const kSantaCommandNamePackageInventory = @"package_inventory";
       }
       result->set_host_status(::pbv1::CommandResult::HOST_STATUS_COMPLETE);
       result->unsafe_arena_set_allocated_event_upload(uploadResponse);
+      break;
+    }
+
+    case ::pbv1::QueuedCommand::kBinaryUpload: {
+      LOGI(@"SantaCommand: Executing queued BinaryUploadRequest command %lld",
+           (long long)command.command_id());
+      // Like event upload, this blocks until santad reports the upload's
+      // outcome so the posted result reflects what actually happened.
+      auto* uploadResponse = [self handleBinaryUploadRequestAndWait:command.binary_upload()
+                                                            onArena:arena];
+      result->set_host_status(::pbv1::CommandResult::HOST_STATUS_COMPLETE);
+      result->unsafe_arena_set_allocated_binary_upload(uploadResponse);
       break;
     }
 

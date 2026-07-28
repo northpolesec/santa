@@ -20,8 +20,8 @@
 #include <google/protobuf/io/zero_copy_stream_impl.h>
 
 #import "Source/common/SNTLogging.h"
-#import "Source/common/SNTXPCControlInterface.h"
 #include "Source/common/String.h"
+#import "Source/santasyncservice/SNTSantaCommandHandler+BinaryUpload.h"
 #import "Source/santasyncservice/SNTSantaCommandHandler+EventUpload.h"
 #import "Source/santasyncservice/SNTSantaCommandHandler+Kill.h"
 #import "Source/santasyncservice/SNTSantaCommandHandler.h"
@@ -212,48 +212,25 @@ bool VerifyCommandRequestTimestamp(const ::pbv1::SantaCommandRequest& command) {
                                             completion:nil];
 }
 
-// Handle BinaryUploadRequest command (async). Forwards the request to santad over
+// Handle BinaryUploadRequest command (async). Execution lives in the
+// transport-agnostic command handler, which forwards the request to santad over
 // XPC; santad opens the file and launches sleigh. The response is published from
-// the XPC reply block so the shared command queue is never blocked for the upload.
+// the completion block so the shared command queue is never blocked for the
+// upload.
 - (void)handleBinaryUploadRequest:(const ::pbv1::BinaryUploadRequest&)binaryUploadRequest
                        replyTopic:(NSString*)replyTopic {
-  id<SNTPushNotificationsSyncDelegate> strongSyncDelegate = self.syncDelegate;
-  if (!strongSyncDelegate) {
-    LOGE(@"NATS: BinaryUploadRequest failed - no sync delegate");
-    ::pbv1::SantaCommandResponse response;
-    auto* uploadResponse = response.mutable_binary_upload();
-    uploadResponse->set_disposition(::pbv1::BinaryUploadResponse::DISPOSITION_INTERNAL_ERROR);
-    uploadResponse->set_message("santasyncservice has no sync delegate");
-    [self publishResponse:response toReplyTopic:replyTopic];
-    return;
-  }
-
-  std::string serializedRequest;
-  binaryUploadRequest.SerializeToString(&serializedRequest);
-  NSData* requestData = [NSData dataWithBytes:serializedRequest.data()
-                                       length:serializedRequest.size()];
-
   __weak __typeof(self) weakSelf = self;
-  [[[strongSyncDelegate daemonConnection] remoteObjectProxy]
-      uploadBinary:requestData
-             reply:^(NSData* responseData) {
-               __typeof(self) strongSelf = weakSelf;
-               if (!strongSelf) {
-                 return;
-               }
-               ::pbv1::SantaCommandResponse response;
-               ::pbv1::BinaryUploadResponse uploadResponse;
-               if (responseData &&
-                   uploadResponse.ParseFromArray(responseData.bytes, (int)responseData.length)) {
-                 *response.mutable_binary_upload() = uploadResponse;
-               } else {
-                 LOGE(@"NATS: BinaryUploadRequest got no parseable response from santad");
-                 ::pbv1::BinaryUploadResponse* bu = response.mutable_binary_upload();
-                 bu->set_disposition(::pbv1::BinaryUploadResponse::DISPOSITION_INTERNAL_ERROR);
-                 bu->set_message("no parseable response from santad");
-               }
-               [strongSelf publishResponse:response toReplyTopic:replyTopic];
-             }];
+  [self.commandHandler
+      handleBinaryUploadRequest:binaryUploadRequest
+                     completion:^(const ::pbv1::BinaryUploadResponse& uploadResponse) {
+                       __typeof(self) strongSelf = weakSelf;
+                       if (!strongSelf) {
+                         return;
+                       }
+                       ::pbv1::SantaCommandResponse response;
+                       *response.mutable_binary_upload() = uploadResponse;
+                       [strongSelf publishResponse:response toReplyTopic:replyTopic];
+                     }];
 }
 
 // Backwards-compatible overload for callers that don't publish asynchronously

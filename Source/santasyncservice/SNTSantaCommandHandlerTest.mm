@@ -16,8 +16,11 @@
 #import <OCMock/OCMock.h>
 #import <XCTest/XCTest.h>
 
+#import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTConfigurator.h"
+#import "Source/common/SNTXPCControlInterface.h"
 #import "Source/santasyncservice/SNTPushNotifications.h"
+#import "Source/santasyncservice/SNTSantaCommandHandler+BinaryUpload.h"
 #import "Source/santasyncservice/SNTSantaCommandHandler+EventUpload.h"
 #import "Source/santasyncservice/SNTSantaCommandHandler+Kill.h"
 #import "Source/santasyncservice/SNTSantaCommandHandler+PackageInventory.h"
@@ -34,6 +37,9 @@ namespace pbv1 = ::santa::commands::v1;
 @property(nonatomic) NSArray* eventUploadReplyErrors;
 @property(nonatomic) NSArray<NSString*>* lastEventUploadPaths;
 @property(nonatomic) NSUInteger eventUploadCallCount;
+// Connection handed to commands that talk to santad. Nil (the default) stands
+// in for a santasyncservice that isn't connected to the daemon.
+@property(nonatomic) MOLXPCConnection* daemonConnection;
 @end
 
 @implementation SNTFakeCommandSyncDelegate
@@ -48,9 +54,6 @@ namespace pbv1 = ::santa::commands::v1;
 - (void)preflightSync {
 }
 - (void)pushNotificationSyncSecondsFromNow:(uint64_t)seconds {
-}
-- (MOLXPCConnection*)daemonConnection {
-  return nil;
 }
 - (void)eventUploadForPaths:(NSArray<NSString*>*)paths reply:(void (^)(NSError* error))reply {
   self.eventUploadCallCount++;
@@ -68,9 +71,12 @@ namespace pbv1 = ::santa::commands::v1;
 
 @interface SNTSantaCommandHandlerTest : XCTestCase
 @property id mockConfigurator;
+@property id mockDaemonConnection;
 @property SNTFakeCommandSyncDelegate* fakeSyncDelegate;
 @property SNTSantaCommandHandler* handler;
 @property google::protobuf::Arena* arena;
+@property NSData* lastBinaryUploadRequestData;
+@property NSUInteger binaryUploadCallCount;
 @end
 
 @implementation SNTSantaCommandHandlerTest
@@ -89,9 +95,42 @@ namespace pbv1 = ::santa::commands::v1;
 
 - (void)tearDown {
   [self.mockConfigurator stopMocking];
+  [self.mockDaemonConnection stopMocking];
   delete self.arena;
   self.arena = nullptr;
   [super tearDown];
+}
+
+#pragma mark - Test Helpers
+
+// Connects the fake sync delegate to a mock santad that replies to
+// uploadBinary: with `replyData`, recording what it was handed.
+- (void)stubDaemonBinaryUploadReplyData:(NSData*)replyData {
+  id mockProxy = OCMProtocolMock(@protocol(SNTDaemonControlXPC));
+  OCMStub([mockProxy uploadBinary:OCMOCK_ANY reply:OCMOCK_ANY]).andDo(^(NSInvocation* invocation) {
+    __unsafe_unretained NSData* requestData = nil;
+    [invocation getArgument:&requestData atIndex:2];
+    __unsafe_unretained void (^reply)(NSData*) = nil;
+    [invocation getArgument:&reply atIndex:3];
+    self.lastBinaryUploadRequestData = requestData;
+    self.binaryUploadCallCount++;
+    reply(replyData);
+  });
+
+  self.mockDaemonConnection = OCMClassMock([MOLXPCConnection class]);
+  OCMStub([self.mockDaemonConnection remoteObjectProxy]).andReturn(mockProxy);
+  self.fakeSyncDelegate.daemonConnection = self.mockDaemonConnection;
+}
+
+- (NSData*)serializedBinaryUploadResponseWithDisposition:
+               (pbv1::BinaryUploadResponse::Disposition)disposition
+                                          sha256Computed:(const std::string&)sha256 {
+  pbv1::BinaryUploadResponse response;
+  response.set_disposition(disposition);
+  response.set_sha256_computed(sha256);
+  std::string serialized;
+  response.SerializeToString(&serialized);
+  return [NSData dataWithBytes:serialized.data() length:serialized.size()];
 }
 
 #pragma mark - isCommandAllowed
@@ -259,6 +298,135 @@ namespace pbv1 = ::santa::commands::v1;
   XCTAssertEqual(result->event_upload().error(), ::pbv1::EventUploadResponse::ERROR_INVALID_PATH);
   XCTAssertEqual(self.fakeSyncDelegate.eventUploadCallCount, 0u,
                  @"Delegate should not be invoked when validation fails");
+}
+
+- (void)testExecuteQueuedCommandBinaryUploadForwardsRequestAndReportsResponse {
+  [self
+      stubDaemonBinaryUploadReplyData:[self
+                                          serializedBinaryUploadResponseWithDisposition:
+                                              pbv1::BinaryUploadResponse::DISPOSITION_COMPLETED
+                                                                         sha256Computed:"abc123"]];
+
+  ::pbv1::QueuedCommand command;
+  command.set_command_id(21);
+  auto* upload = command.mutable_binary_upload();
+  upload->set_path("/bin/ls");
+  (*upload->mutable_signed_post()->mutable_form_values())["key"] = "objects/abc";
+
+  ::pbv1::CommandResult* result = [self.handler executeQueuedCommand:command onArena:self.arena];
+
+  XCTAssertEqual(result->command_id(), 21);
+  XCTAssertEqual(result->host_status(), ::pbv1::CommandResult::HOST_STATUS_COMPLETE);
+  XCTAssertTrue(result->has_binary_upload());
+  XCTAssertEqual(result->binary_upload().disposition(),
+                 ::pbv1::BinaryUploadResponse::DISPOSITION_COMPLETED);
+  XCTAssertEqual(result->binary_upload().sha256_computed(), "abc123");
+
+  // santad received the request as sent, presigned POST included.
+  XCTAssertEqual(self.binaryUploadCallCount, 1u);
+  ::pbv1::BinaryUploadRequest forwarded;
+  XCTAssertTrue(forwarded.ParseFromArray(self.lastBinaryUploadRequestData.bytes,
+                                         (int)self.lastBinaryUploadRequestData.length));
+  XCTAssertEqual(forwarded.path(), "/bin/ls");
+  XCTAssertEqual(forwarded.signed_post().form_values().at("key"), "objects/abc");
+}
+
+- (void)testExecuteQueuedCommandBinaryUploadUnparseableReply {
+  [self stubDaemonBinaryUploadReplyData:nil];
+
+  ::pbv1::QueuedCommand command;
+  command.set_command_id(23);
+  command.mutable_binary_upload()->set_path("/bin/ls");
+
+  ::pbv1::CommandResult* result = [self.handler executeQueuedCommand:command onArena:self.arena];
+
+  XCTAssertEqual(result->host_status(), ::pbv1::CommandResult::HOST_STATUS_COMPLETE);
+  XCTAssertEqual(result->binary_upload().disposition(),
+                 ::pbv1::BinaryUploadResponse::DISPOSITION_INTERNAL_ERROR);
+  XCTAssertGreaterThan(result->binary_upload().message().size(), 0u);
+}
+
+- (void)testExecuteQueuedCommandBinaryUploadNoDaemonConnection {
+  // The fake sync delegate has no daemon connection, so the request can't be
+  // handed off; the command still completes, reporting the failure.
+  ::pbv1::QueuedCommand command;
+  command.set_command_id(29);
+  command.mutable_binary_upload()->set_path("/bin/ls");
+
+  ::pbv1::CommandResult* result = [self.handler executeQueuedCommand:command onArena:self.arena];
+
+  XCTAssertEqual(result->host_status(), ::pbv1::CommandResult::HOST_STATUS_COMPLETE);
+  XCTAssertEqual(result->binary_upload().disposition(),
+                 ::pbv1::BinaryUploadResponse::DISPOSITION_INTERNAL_ERROR);
+  XCTAssertGreaterThan(result->binary_upload().message().size(), 0u);
+}
+
+- (void)testExecuteQueuedCommandBinaryUploadRejectedWhenNotAllowed {
+  OCMStub([self.mockConfigurator allowedSantaCommands]).andReturn(@[ @"kill" ]);
+  [self
+      stubDaemonBinaryUploadReplyData:[self
+                                          serializedBinaryUploadResponseWithDisposition:
+                                              pbv1::BinaryUploadResponse::DISPOSITION_COMPLETED
+                                                                         sha256Computed:"abc123"]];
+
+  ::pbv1::QueuedCommand command;
+  command.set_command_id(31);
+  command.mutable_binary_upload()->set_path("/bin/ls");
+
+  ::pbv1::CommandResult* result = [self.handler executeQueuedCommand:command onArena:self.arena];
+
+  XCTAssertEqual(result->host_status(), ::pbv1::CommandResult::HOST_STATUS_REJECTED);
+  XCTAssertEqual(result->result_case(), ::pbv1::CommandResult::RESULT_NOT_SET);
+  XCTAssertEqual(self.binaryUploadCallCount, 0u, @"Rejected commands should not reach santad");
+}
+
+- (void)testExecuteQueuedCommandUnsetFails {
+  ::pbv1::QueuedCommand command;
+  command.set_command_id(37);
+
+  ::pbv1::CommandResult* result = [self.handler executeQueuedCommand:command onArena:self.arena];
+
+  XCTAssertEqual(result->command_id(), 37);
+  XCTAssertEqual(result->host_status(), ::pbv1::CommandResult::HOST_STATUS_FAILED);
+  XCTAssertGreaterThan(result->error_message().size(), 0u);
+  XCTAssertEqual(result->result_case(), ::pbv1::CommandResult::RESULT_NOT_SET);
+}
+
+#pragma mark - shouldPostDeliveredAckForCommand
+
+- (void)testShouldPostDeliveredAckOnlyForLongRunningCommands {
+  ::pbv1::QueuedCommand eventUpload;
+  eventUpload.mutable_event_upload()->add_paths("/Applications/Safari.app");
+  XCTAssertTrue([SNTSantaCommandHandler shouldPostDeliveredAckForCommand:eventUpload]);
+
+  ::pbv1::QueuedCommand binaryUpload;
+  binaryUpload.mutable_binary_upload()->set_path("/bin/ls");
+  XCTAssertTrue([SNTSantaCommandHandler shouldPostDeliveredAckForCommand:binaryUpload]);
+
+  ::pbv1::QueuedCommand kill;
+  kill.mutable_kill()->set_team_id("EQHXZ8M8AV");
+  XCTAssertFalse([SNTSantaCommandHandler shouldPostDeliveredAckForCommand:kill],
+                 @"Kill is fast enough to post straight to COMPLETE");
+
+  ::pbv1::QueuedCommand packageInventory;
+  packageInventory.mutable_package_inventory();
+  XCTAssertTrue([SNTSantaCommandHandler shouldPostDeliveredAckForCommand:packageInventory]);
+
+  ::pbv1::QueuedCommand unset;
+  XCTAssertFalse([SNTSantaCommandHandler shouldPostDeliveredAckForCommand:unset]);
+}
+
+- (void)testShouldNotPostDeliveredAckForDisallowedCommand {
+  OCMStub([self.mockConfigurator allowedSantaCommands]).andReturn(@[ @"event_upload" ]);
+
+  ::pbv1::QueuedCommand eventUpload;
+  eventUpload.mutable_event_upload()->add_paths("/Applications/Safari.app");
+  XCTAssertTrue([SNTSantaCommandHandler shouldPostDeliveredAckForCommand:eventUpload]);
+
+  ::pbv1::QueuedCommand binaryUpload;
+  binaryUpload.mutable_binary_upload()->set_path("/bin/ls");
+  XCTAssertFalse([SNTSantaCommandHandler shouldPostDeliveredAckForCommand:binaryUpload],
+                 @"DELIVERED means 'will execute it'");
 }
 
 #pragma mark - handleEventUploadRequest completion

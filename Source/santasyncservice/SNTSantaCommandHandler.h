@@ -19,11 +19,6 @@
 #import "Source/santasyncservice/SNTPushNotifications.h"
 #include "commands/v1.pb.h"
 
-/// Canonical AllowedSantaCommands names, shared across transports so the command
-/// handler's allowlist mapping and the sync drain's checks cannot drift apart.
-extern NSString* const kSantaCommandNameEventUpload;
-extern NSString* const kSantaCommandNamePackageInventory;
-
 /// Executes Santa commands independently of the transport that delivered them.
 /// Both the NATS push client (request-reply) and the HTTP sync command drain
 /// call into this handler; transport concerns (envelope verification, replies,
@@ -42,6 +37,11 @@ extern NSString* const kSantaCommandNamePackageInventory;
 /// Returns YES if the named command is permitted by the AllowedSantaCommands
 /// configuration. An unset config allows all commands; an empty list blocks all.
 + (BOOL)isCommandAllowed:(NSString*)commandName;
+
+/// Returns YES if the caller should post an ack-only DELIVERED result before
+/// executing this queued command, i.e. it is long-running enough that the
+/// server should see it in flight, and it will actually be executed.
++ (BOOL)shouldPostDeliveredAckForCommand:(const santa::commands::v1::QueuedCommand&)command;
 
 /// Execute one queued command (HTTP delivery) and block until it finishes,
 /// returning the result to post back to the server. Never returns nullptr.
