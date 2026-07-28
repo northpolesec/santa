@@ -106,6 +106,20 @@ class AdminGroupMembershipImpl : public AdminGroupMembership {
     return ((CBUserIdentity*)identity).posixName;
   }
 
+  NSString* UUIDForUID(uid_t uid) override {
+    CBIdentity* identity = UserIdentityForUID(uid);
+    if (![identity isKindOfClass:[CBUserIdentity class]]) {
+      return nil;
+    }
+    return identity.uniqueIdentifier.UUIDString;
+  }
+
+  bool IsLocalAccount(uid_t uid) override {
+    return [CBUserIdentity
+               userIdentityWithPosixUID:uid
+                              authority:[CBIdentityAuthority localIdentityAuthority]] != nil;
+  }
+
  private:
   bool ChangeMembership(uid_t uid, bool add, NSError** error) {
     CBIdentity* user = UserIdentityForUID(uid);

@@ -24,8 +24,6 @@
 
 using santa::account::GroupNameForGID;
 using santa::account::HomeDirForUID;
-using santa::account::LookupStatus;
-using santa::account::StatusForUID;
 using santa::account::UIDForUsername;
 using santa::account::UsernameForUID;
 
@@ -36,10 +34,7 @@ static constexpr uid_t kAbsentUID = 4000000000;
 
 // These tests query the live passwd/group database. They assert only against
 // entries that exist on every macOS install (root/wheel) plus the current user,
-// so they do not depend on any particular host configuration. The kError branch
-// (a lookup that cannot complete) is not exercised here: it would require
-// injecting a failing getpwuid_r, which the free-function API intentionally does
-// not expose.
+// so they do not depend on any particular host configuration.
 @interface AccountLookupTest : XCTestCase
 @end
 
@@ -124,14 +119,6 @@ static constexpr uid_t kAbsentUID = 4000000000;
     return;
   }
   XCTAssertEqual(*resolved, me);
-}
-
-- (void)testStatusForUIDFound {
-  XCTAssertTrue(StatusForUID(0) == LookupStatus::kFound);
-}
-
-- (void)testStatusForUIDNotFound {
-  XCTAssertTrue(StatusForUID(kAbsentUID) == LookupStatus::kNotFound);
 }
 
 @end

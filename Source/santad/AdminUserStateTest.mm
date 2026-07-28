@@ -78,6 +78,16 @@ class FakeAdminGroupMembership : public AdminGroupMembership {
     return names_.count(uid) ? names_[uid] : nil;
   }
 
+  NSString* UUIDForUID(uid_t uid) override {
+    // Unused by these tests.
+    return nil;
+  }
+
+  bool IsLocalAccount(uid_t uid) override {
+    // Unused by these tests.
+    return false;
+  }
+
   std::set<uid_t> members_;           // current group-80 members (sorted => deterministic order)
   std::map<uid_t, NSString*> names_;  // uid -> username reported by enumeration
   std::set<uid_t> fail_add_uids_;     // AddMember fails (transient commit failure)
