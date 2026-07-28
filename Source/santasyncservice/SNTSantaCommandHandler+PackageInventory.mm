@@ -31,6 +31,7 @@ namespace pbv1 = ::santa::commands::v1;
   if (!strongSyncDelegate) {
     LOGE(@"SantaCommand: PackageInventoryRequest failed - no sync delegate");
     pbResponse->set_error(::pbv1::PackageInventoryResponse::ERROR_INTERNAL);
+    if (errorMessage) *errorMessage = "no sync delegate";
     return pbResponse;
   }
 
@@ -56,9 +57,10 @@ namespace pbv1 = ::santa::commands::v1;
                                dispatch_semaphore_signal(sema);
                              }];
 
-  // santad owns and bounds the Sleigh execution. Its XPC reply is therefore the
-  // authoritative completion signal; if the daemon connection is interrupted,
-  // SNTSyncService's invalidation handler spins down this process.
+  // santad owns and bounds the Sleigh execution (it has the Full Disk Access
+  // needed to walk the filesystem). Its XPC reply is therefore the authoritative
+  // completion signal; if the daemon connection is interrupted, SNTSyncService's
+  // invalidation handler spins down this process.
   dispatch_semaphore_wait(sema, DISPATCH_TIME_FOREVER);
 
   if (!responseData || !pbResponse->ParseFromArray(responseData.bytes, (int)responseData.length)) {

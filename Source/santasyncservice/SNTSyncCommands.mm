@@ -127,10 +127,11 @@ static const NSUInteger kMaxCommandsPerSync = 50;
     // the drain like any other transport failure: the command was never executed
     // and, unless the ack landed with only its response lost, is still queued
     // server-side for the next sync.
-    BOOL longRunning = (command.command_case() == ::pbv1::QueuedCommand::kEventUpload &&
-                        [SNTSantaCommandHandler isCommandAllowed:@"event_upload"]) ||
-                       (command.command_case() == ::pbv1::QueuedCommand::kPackageInventory &&
-                        [SNTSantaCommandHandler isCommandAllowed:@"package_inventory"]);
+    BOOL longRunning =
+        (command.command_case() == ::pbv1::QueuedCommand::kEventUpload &&
+         [SNTSantaCommandHandler isCommandAllowed:kSantaCommandNameEventUpload]) ||
+        (command.command_case() == ::pbv1::QueuedCommand::kPackageInventory &&
+         [SNTSantaCommandHandler isCommandAllowed:kSantaCommandNamePackageInventory]);
     if (longRunning && ![self postDeliveredAckForCommandID:command.command_id() onArena:&arena]) {
       return NO;
     }

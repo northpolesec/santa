@@ -354,13 +354,36 @@ absl::StatusOr<std::string> SleighLauncher::RunSleigh(const std::string& seriali
   __block int child_status = 0;
   __block std::string captured;
   __block bool read_failed = false;
+  __block bool captured_truncated = false;
+
+  // Upper bound on the merged stdout+stderr diagnostic buffer. Only applied to
+  // merge_stderr callers (package inventory), whose output is free-form text that
+  // a noisy scan could grow without limit — it would consume unbounded memory and
+  // flood the log. The proto-parsed callers are not capped: their stdout is a
+  // bounded response that must be read in full to parse.
+  // ponytail: fixed 64 KiB ceiling; revisit if a diagnostic ever needs more.
+  constexpr size_t kMaxMergedCaptureBytes = 64 * 1024;
 
   dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
     if (capture_stdout) {
       char buf[8192];
       ssize_t n;
       while ((n = read(stdout_read_fd, buf, sizeof(buf))) > 0) {
-        captured.append(buf, static_cast<size_t>(n));
+        size_t chunk = static_cast<size_t>(n);
+        if (merge_stderr) {
+          // Keep draining the pipe so Sleigh never blocks writing, but stop
+          // growing the buffer once the cap is reached.
+          if (captured.size() >= kMaxMergedCaptureBytes) {
+            captured_truncated = true;
+            continue;
+          }
+          size_t room = kMaxMergedCaptureBytes - captured.size();
+          if (chunk > room) {
+            chunk = room;
+            captured_truncated = true;
+          }
+        }
+        captured.append(buf, chunk);
       }
       if (n < 0) {
         read_failed = true;
@@ -387,6 +410,9 @@ absl::StatusOr<std::string> SleighLauncher::RunSleigh(const std::string& seriali
   // text is human-readable Sleigh diagnostics, not a proto — surface it so a
   // failing scan says why. (Not logged for stdout-parsed callers, where the
   // buffer is binary proto.)
+  if (merge_stderr && captured_truncated) {
+    captured.append("\n[Sleigh output truncated]");
+  }
   if (merge_stderr && !captured.empty()) {
     LOGD(@"SleighLauncher::RunSleigh(): Sleigh output: %s", captured.c_str());
   }

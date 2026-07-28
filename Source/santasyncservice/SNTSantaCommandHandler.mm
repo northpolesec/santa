@@ -24,6 +24,9 @@
 namespace pbv1 = ::santa::commands::v1;
 using santa::NSStringToUTF8String;
 
+NSString* const kSantaCommandNameEventUpload = @"event_upload";
+NSString* const kSantaCommandNamePackageInventory = @"package_inventory";
+
 @implementation SNTSantaCommandHandler
 
 - (instancetype)initWithSyncDelegate:(id<SNTPushNotificationsSyncDelegate>)syncDelegate {
@@ -49,8 +52,10 @@ using santa::NSStringToUTF8String;
   NSString* commandName = nil;
   switch (command.command_case()) {
     case ::pbv1::QueuedCommand::kKill: commandName = @"kill"; break;
-    case ::pbv1::QueuedCommand::kEventUpload: commandName = @"event_upload"; break;
-    case ::pbv1::QueuedCommand::kPackageInventory: commandName = @"package_inventory"; break;
+    case ::pbv1::QueuedCommand::kEventUpload: commandName = kSantaCommandNameEventUpload; break;
+    case ::pbv1::QueuedCommand::kPackageInventory:
+      commandName = kSantaCommandNamePackageInventory;
+      break;
     // binary_upload over the queued-command path is not implemented (binary upload
     // is delivered via the NATS command path); leaving the name unset routes it to
     // the FAILED default in the dispatch switch below.
