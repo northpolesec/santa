@@ -44,6 +44,7 @@ jobs:
   deploy:
     name: Deploy
     needs: build
+    if: github.repository == 'northpolesec/santa'
 
     # Grant GITHUB_TOKEN the permissions required to make a Pages deployment
     permissions:
