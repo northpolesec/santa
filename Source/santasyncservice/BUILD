@@ -26,18 +26,21 @@ objc_library(
     name = "SNTSantaCommandHandler",
     srcs = [
         "SNTSantaCommandHandler.mm",
+        "SNTSantaCommandHandler+BinaryUpload.mm",
         "SNTSantaCommandHandler+EventUpload.mm",
         "SNTSantaCommandHandler+Kill.mm",
         "SNTSantaCommandHandler+PackageInventory.mm",
     ],
     hdrs = [
         "SNTSantaCommandHandler.h",
+        "SNTSantaCommandHandler+BinaryUpload.h",
         "SNTSantaCommandHandler+EventUpload.h",
         "SNTSantaCommandHandler+Kill.h",
         "SNTSantaCommandHandler+PackageInventory.h",
     ],
     deps = [
         ":SNTPushNotifications",
+        "//Source/common:MOLXPCConnection",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTKillCommand",
         "//Source/common:SNTLogging",
@@ -619,7 +622,9 @@ santa_unit_test(
     deps = [
         ":SNTPushNotifications",
         ":SNTSantaCommandHandler",
+        "//Source/common:MOLXPCConnection",
         "//Source/common:SNTConfigurator",
+        "//Source/common:SNTXPCControlInterface",
         "@OCMock",
         "@northpolesec_protos//commands:v1_cc_proto",
         "@protobuf",

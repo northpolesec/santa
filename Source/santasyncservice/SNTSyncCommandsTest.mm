@@ -209,6 +209,58 @@ static NSString* const kMachineID = @"50C7E1EB-2EF5-42D4-A084-A7966FC45A95";
   XCTAssertNotNil(postedResult[@"eventUpload"]);
 }
 
+- (void)testDrainSingleBinaryUploadCommand {
+  // First exchange: no result posted -> server returns one queued command.
+  [self
+      stubRequestBody:[self dataFromDict:@{
+        @"command" : @{
+          @"commandId" : @"9",
+          @"binaryUpload" :
+              @{@"path" : @"/bin/ls",
+                @"signed_post" : @{@"url" : @"https://bucket.example/upload"}}
+        }
+      }]
+             response:nil
+                error:nil
+        validateBlock:^BOOL(NSURLRequest* req) {
+          return [self resultFromRequest:req] == nil;
+        }];
+
+  // Second exchange: ack-only DELIVERED result, posted before the upload runs.
+  __block NSDictionary* deliveredResult = nil;
+  [self stubRequestBody:[self dataFromDict:@{}]
+               response:nil
+                  error:nil
+          validateBlock:^BOOL(NSURLRequest* req) {
+            NSDictionary* result = [self resultFromRequest:req];
+            if (![result[@"hostStatus"] isEqual:@"HOST_STATUS_DELIVERED"]) return NO;
+            deliveredResult = result;
+            return YES;
+          }];
+
+  // Third exchange: the executed result is posted back -> queue is empty. This
+  // fake has no daemon connection, so the upload can't be handed to santad and
+  // the typed payload reports that; the command itself still completes.
+  __block NSDictionary* postedResult = nil;
+  [self stubRequestBody:[self dataFromDict:@{}]
+               response:nil
+                  error:nil
+          validateBlock:^BOOL(NSURLRequest* req) {
+            NSDictionary* result = [self resultFromRequest:req];
+            if (![result[@"hostStatus"] isEqual:@"HOST_STATUS_COMPLETE"]) return NO;
+            postedResult = result;
+            return YES;
+          }];
+
+  XCTAssertTrue([self.stage sync]);
+
+  XCTAssertEqualObjects(deliveredResult[@"commandId"], @"9");
+  XCTAssertNil(deliveredResult[@"binaryUpload"]);
+  XCTAssertEqualObjects(postedResult[@"commandId"], @"9");
+  XCTAssertEqualObjects(postedResult[@"binaryUpload"][@"disposition"],
+                        @"DISPOSITION_INTERNAL_ERROR");
+}
+
 - (void)testDrainMultipleCommandsSequentially {
   // No result -> command 1.
   [self
