@@ -6,6 +6,7 @@ on:
 
 jobs:
   test:
+    if: github.repository == 'northpolesec/santa'
     runs-on: macos-latest
     strategy:
       matrix:
