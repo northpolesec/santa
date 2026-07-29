@@ -157,15 +157,8 @@ REGISTER_COMMAND_NAME(@"version")
     commitHash = [commitHash substringToIndex:8];
   }
 
-  // Optional build metadata recorded at build time.
-  NSString* buildMetadata = dict[@"SNTBuildMetadata"];
-  NSString* commitDescription =
-      buildMetadata.length > 0
-          ? [NSString stringWithFormat:@"%@ commit %@", buildMetadata, commitHash]
-          : [NSString stringWithFormat:@"commit %@", commitHash];
-
   return [NSString
-      stringWithFormat:@"%@ (build %@, %@)", productVersion, buildVersion, commitDescription];
+      stringWithFormat:@"%@ (build %@, commit %@)", productVersion, buildVersion, commitHash];
 }
 
 - (NSString*)santadVersion {
