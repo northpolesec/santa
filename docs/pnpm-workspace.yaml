@@ -1,7 +1,3 @@
-# The @buf registry serves no tarball integrity metadata, so pnpm's
-# supply-chain check can never pass on a lockfile containing @buf packages.
-trustLockfile: true
-
 allowBuilds:
   "@swc/core": false
   core-js: false
