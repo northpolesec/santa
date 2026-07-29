@@ -39,7 +39,7 @@
     "clsx": "^2.1.1",
     "docusaurus-plugin-llms": "github:northpolesec/docusaurus-plugin-llms",
     "lucide-react": "^0.487.0",
-    "postcss": "^8.5.10",
+    "postcss": "^8.5.18",
     "prism-react-renderer": "^2.4.1",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
@@ -75,36 +75,7 @@
     ]
   },
   "engines": {
-    "node": ">=20.0"
+    "node": ">=22.13"
   },
-  "packageManager": "pnpm@10.24.0+sha512.01ff8ae71b4419903b65c60fb2dc9d34cf8bb6e06d03bde112ef38f7a34d6904c424ba66bea5cdcf12890230bf39f9580473140ed9c946fef328b6e5238a345a",
-  "pnpm": {
-    "overrides": {
-      "@babel/core@<7.29.6": "7.29.6",
-      "@babel/plugin-transform-modules-systemjs@<7.29.4": "7.29.4",
-      "@docsearch/react@<4.4.1": "4.6.3",
-      "body-parser@<1.20.6": "1.20.6",
-      "brace-expansion@<1.1.16": "1.1.16",
-      "brace-expansion@>=2.0.0 <2.1.2": "2.1.2",
-      "dompurify@<3.4.12": "3.4.12",
-      "esbuild@<0.28.1": "0.28.1",
-      "fast-uri@<3.1.4": "3.1.4",
-      "http-proxy-middleware@>=0.16.0 <2.0.10": "2.0.10",
-      "joi@<18.2.1": "18.2.1",
-      "js-yaml@<3.15.0": "3.15.0",
-      "js-yaml@>=4.0.0 <4.3.0": "4.3.0",
-      "launch-editor@<2.14.1": "2.14.1",
-      "lodash-es@<=4.17.23": "4.18.1",
-      "mermaid@<11.15.0": "11.15.0",
-      "qs@>=6.11.1 <=6.15.1": "6.15.2",
-      "serialize-javascript@<7.0.5": "7.0.5",
-      "shell-quote@<=1.8.4": "1.9.0",
-      "svgo@>=3.0.0 <3.3.4": "3.3.4",
-      "uuid@<14.0.0": "14.0.0",
-      "webpack-dev-server@<5.2.6": "5.2.6",
-      "websocket-driver@<0.7.5": "0.7.5",
-      "ws@>=7.0.0 <7.5.11": "7.5.11",
-      "ws@>=8.0.0 <8.21.0": "8.21.0"
-    }
-  }
+  "packageManager": "pnpm@11.18.0+sha512.33d83c77da82f49fba836925c6f1b841181ec3132b670639bd012f7075f5c7cf634c5f870147c19aae7478fac01df09d8892e880454896edd23ee9b33757563c"
 }
