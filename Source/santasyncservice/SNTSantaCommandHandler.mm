@@ -27,8 +27,8 @@ using santa::NSStringToUTF8String;
 
 namespace {
 
-// The AllowedSantaCommands name for a queued command, or nil for command types
-// this agent doesn't implement (those are reported as FAILED rather than gated).
+// The AllowedSantaCommands name for a queued command, or nil when no command is
+// set (that case is reported as FAILED rather than gated by the allowlist).
 // No default case — compiler enforces all proto cases are handled
 // (-Werror + -Wswitch)
 NSString* CommandName(const ::pbv1::QueuedCommand& command) {
@@ -70,7 +70,7 @@ NSString* CommandName(const ::pbv1::QueuedCommand& command) {
   }
 
   // DELIVERED means "will execute it", so don't ack a command that is about to
-  // be rejected or reported as unimplemented.
+  // be rejected by the allowlist.
   NSString* commandName = CommandName(command);
   return commandName && [self isCommandAllowed:commandName];
 }
