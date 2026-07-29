@@ -64,6 +64,7 @@
 #import "Source/santad/SNTNetworkExtensionQueue.h"
 #import "Source/santad/SNTNotificationQueue.h"
 #import "Source/santad/SNTSyncdQueue.h"
+#include "Source/santad/SleighLauncher.h"
 #include "Source/santad/TemporaryAdminMode.h"
 #include "Source/santad/TemporaryMonitorMode.h"
 #include "commands/v1.pb.h"
@@ -90,6 +91,7 @@ double watchdogRAMPeak = 0;
 @property dispatch_queue_t commandQ;
 @property dispatch_queue_t netFlowQ;
 @property dispatch_queue_t binaryUploadQ;
+@property dispatch_queue_t packageInventoryQ;
 
 ///
 ///  Called when caches should be flushed (rules changed, explicit flush command, etc.).
@@ -173,6 +175,13 @@ static NSString* TAMUsernameForUID(uid_t uid) {
         "com.northpolesec.santa.binaryupload.xpc", DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL,
         dispatch_get_global_queue(QOS_CLASS_UTILITY, 0));
 
+    // Package inventory scans are serialized with each other but not with NATS
+    // binary uploads, so a long-running sync command does not wait behind
+    // unrelated work already queued by another transport.
+    _packageInventoryQ = dispatch_queue_create_with_target(
+        "com.northpolesec.santa.packageinventory.xpc", DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL,
+        dispatch_get_global_queue(QOS_CLASS_UTILITY, 0));
+
     _temporaryMonitorMode = santa::TemporaryMonitorMode::Create(
         [SNTConfigurator configurator], _notQueue,
         ^(SNTStoredTemporaryMonitorModeAuditEvent* auditEvent) {
@@ -210,6 +219,39 @@ static NSString* TAMUsernameForUID(uid_t uid) {
       response.set_disposition(
           ::santa::commands::v1::BinaryUploadResponse::DISPOSITION_INTERNAL_ERROR);
       response.set_message("failed to parse BinaryUploadRequest");
+    }
+    std::string serialized;
+    response.SerializeToString(&serialized);
+    reply([NSData dataWithBytes:serialized.data() length:serialized.size()]);
+  });
+}
+
+// Runs a Sleigh package-inventory scan (santa.commands.v1.PackageInventoryRequest)
+// and uploads results to the request's presigned POST. Blocks (on the dedicated
+// inventory queue) until the forked Sleigh finishes; the caller in
+// santasyncservice waits on the reply. reply carries a serialized
+// PackageInventoryResponse.
+- (void)runPackageInventory:(NSData*)serializedRequest reply:(void (^)(NSData*))reply {
+  dispatch_async(_packageInventoryQ, ^{
+    ::santa::commands::v1::PackageInventoryResponse response;
+    ::santa::commands::v1::PackageInventoryRequest request;
+    if (request.ParseFromArray(serializedRequest.bytes, (int)serializedRequest.length)) {
+      std::map<std::string, std::string> form_values;
+      for (const auto& [key, value] : request.signed_post().form_values()) {
+        form_values[key] = value;
+      }
+
+      auto launcher =
+          santa::SleighLauncher::Create(std::string(santa::SleighLauncher::kDefaultSleighPath));
+      absl::Status status = launcher->LaunchPackageInventoryScan(
+          request.scan(), request.signed_post().url(), form_values);
+      if (!status.ok()) {
+        LOGE(@"Package inventory scan failed: %s", std::string(status.message()).c_str());
+        response.set_error(::santa::commands::v1::PackageInventoryResponse::ERROR_INTERNAL);
+      }
+    } else {
+      LOGE(@"Package inventory: failed to parse PackageInventoryRequest");
+      response.set_error(::santa::commands::v1::PackageInventoryResponse::ERROR_INTERNAL);
     }
     std::string serialized;
     response.SerializeToString(&serialized);

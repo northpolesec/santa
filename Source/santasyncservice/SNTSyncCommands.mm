@@ -119,17 +119,20 @@ static const NSUInteger kMaxCommandsPerSync = 50;
 
     const pbv1::QueuedCommand& command = response.command();
 
-    // Event uploads can run for minutes, so ack DELIVERED first: the server
-    // shows the command in flight instead of untouched while the upload runs.
-    // Kill is fast and posts straight to COMPLETE (the state machine allows
-    // skipping the ack). Commands the handler will reject are not acked —
-    // DELIVERED means "will execute it". An ack failure aborts the drain like
-    // any other transport failure: the command was never executed and, unless
-    // the ack landed with only its response lost, is still queued server-side
-    // for the next sync.
-    if (command.command_case() == ::pbv1::QueuedCommand::kEventUpload &&
-        [SNTSantaCommandHandler isCommandAllowed:@"event_upload"] &&
-        ![self postDeliveredAckForCommandID:command.command_id() onArena:&arena]) {
+    // Event uploads and package-inventory scans can run for minutes, so ack
+    // DELIVERED first: the server shows the command in flight instead of
+    // untouched while it runs. Kill is fast and posts straight to COMPLETE (the
+    // state machine allows skipping the ack). Commands the handler will reject
+    // are not acked — DELIVERED means "will execute it". An ack failure aborts
+    // the drain like any other transport failure: the command was never executed
+    // and, unless the ack landed with only its response lost, is still queued
+    // server-side for the next sync.
+    BOOL longRunning =
+        (command.command_case() == ::pbv1::QueuedCommand::kEventUpload &&
+         [SNTSantaCommandHandler isCommandAllowed:kSantaCommandNameEventUpload]) ||
+        (command.command_case() == ::pbv1::QueuedCommand::kPackageInventory &&
+         [SNTSantaCommandHandler isCommandAllowed:kSantaCommandNamePackageInventory]);
+    if (longRunning && ![self postDeliveredAckForCommandID:command.command_id() onArena:&arena]) {
       return NO;
     }
 

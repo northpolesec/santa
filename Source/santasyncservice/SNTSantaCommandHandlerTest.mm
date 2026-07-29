@@ -20,6 +20,7 @@
 #import "Source/santasyncservice/SNTPushNotifications.h"
 #import "Source/santasyncservice/SNTSantaCommandHandler+EventUpload.h"
 #import "Source/santasyncservice/SNTSantaCommandHandler+Kill.h"
+#import "Source/santasyncservice/SNTSantaCommandHandler+PackageInventory.h"
 #import "Source/santasyncservice/SNTSantaCommandHandler.h"
 #include "commands/v1.pb.h"
 #include "google/protobuf/arena.h"
@@ -140,6 +141,36 @@ namespace pbv1 = ::santa::commands::v1;
   XCTAssertEqual(result->host_status(), ::pbv1::CommandResult::HOST_STATUS_REJECTED);
   XCTAssertGreaterThan(result->error_message().size(), 0u);
   XCTAssertEqual(result->result_case(), ::pbv1::CommandResult::RESULT_NOT_SET);
+}
+
+- (void)testExecuteQueuedCommandPackageInventoryRejectedWhenNotAllowed {
+  // package_inventory is a recognized queued command, gated by the allowlist.
+  // When disallowed it is rejected before any XPC to santad.
+  OCMStub([self.mockConfigurator allowedSantaCommands]).andReturn(@[ @"ping" ]);
+
+  ::pbv1::QueuedCommand command;
+  command.set_command_id(23);
+  command.mutable_package_inventory()->mutable_scan()->set_profile(
+      ::santa::common::v1::PackageInventoryScan::PROFILE_BASELINE);
+
+  ::pbv1::CommandResult* result = [self.handler executeQueuedCommand:command onArena:self.arena];
+
+  XCTAssertEqual(result->command_id(), 23);
+  XCTAssertEqual(result->host_status(), ::pbv1::CommandResult::HOST_STATUS_REJECTED);
+  XCTAssertGreaterThan(result->error_message().size(), 0u);
+  XCTAssertEqual(result->result_case(), ::pbv1::CommandResult::RESULT_NOT_SET);
+}
+
+- (void)testHandlePackageInventoryWithoutDaemonConnectionFails {
+  ::pbv1::PackageInventoryRequest request;
+  std::string errorMessage;
+
+  auto* response = [self.handler handlePackageInventoryRequest:request
+                                                       onArena:self.arena
+                                                  errorMessage:&errorMessage];
+
+  XCTAssertEqual(response->error(), ::pbv1::PackageInventoryResponse::ERROR_INTERNAL);
+  XCTAssertEqual(errorMessage, "no daemon connection");
 }
 
 - (void)testExecuteQueuedCommandKillWithoutProcessCompletes {

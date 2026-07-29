@@ -24,6 +24,7 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "commands/v1.pb.h"
+#include "common/packageinventory.pb.h"
 #include "telemetry/sleighconfig.pb.h"
 
 // These tests drive the real fork/stdin/stdout machinery in SleighLauncher in any
@@ -150,6 +151,48 @@ class TestableSleighLauncher : public santa::SleighLauncher {
   absl::Status s = launcher.LaunchTelemetryExport({inPath.UTF8String}, /*timeout_seconds=*/10);
   XCTAssertFalse(s.ok());  // exportConfig is nil → InvalidArgumentError from
                            // SerializeTelemetryUploadConfig.
+}
+
+// LaunchPackageInventoryScan writes a SleighConfig with the package_inventory_scan
+// command (no input fd) to Sleigh's stdin. The stub captures stdin so we can parse
+// it back and confirm the scan params and presigned POST round-trip.
+- (void)testLaunchPackageInventoryScanSerializesConfig {
+  NSString* capture = [NSTemporaryDirectory()
+      stringByAppendingPathComponent:[NSString
+                                         stringWithFormat:@"inv-%@", [[NSUUID UUID] UUIDString]]];
+  NSString* stub = [self writeStubWithBody:[NSString stringWithFormat:@"cat > '%@'\n", capture]];
+  TestableSleighLauncher launcher(stub.UTF8String);
+
+  ::santa::common::v1::PackageInventoryScan scan;
+  scan.set_profile(::santa::common::v1::PackageInventoryScan::PROFILE_DEEP);
+  scan.add_roots("/opt");
+  scan.add_ecosystems(::santa::common::v1::PackageInventoryScan::ECOSYSTEM_NPM);
+  scan.mutable_max_duration();  // Explicit zero is the supported unbounded representation.
+
+  absl::Status s =
+      launcher.LaunchPackageInventoryScan(scan, "https://example.com/post", {{"key", "inv/x"}});
+  XCTAssertTrue(s.ok());
+
+  NSData* captured = [NSData dataWithContentsOfFile:capture];
+  ::santa::telemetry::v1::SleighConfig config;
+  XCTAssertTrue(config.ParseFromArray(captured.bytes, (int)captured.length));
+  XCTAssertTrue(config.has_package_inventory_scan());
+  XCTAssertEqual(config.package_inventory_scan().scan().profile(),
+                 ::santa::common::v1::PackageInventoryScan::PROFILE_DEEP);
+  XCTAssertEqual(config.package_inventory_scan().scan().roots(0), "/opt");
+  XCTAssertEqual(config.package_inventory_scan().signed_post().url(), "https://example.com/post");
+  XCTAssertEqual(config.package_inventory_scan().signed_post().form_values().at("key"), "inv/x");
+}
+
+- (void)testLaunchPackageInventoryScanRejectsInvalidDuration {
+  TestableSleighLauncher launcher("/nonexistent/sleigh");
+  ::santa::common::v1::PackageInventoryScan scan;
+  scan.mutable_max_duration()->set_seconds(-1);
+
+  absl::Status s =
+      launcher.LaunchPackageInventoryScan(scan, "https://example.com/post", {{"key", "inv/x"}});
+
+  XCTAssertTrue(absl::IsInvalidArgument(s));
 }
 
 @end

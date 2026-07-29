@@ -45,6 +45,11 @@ static NSString* const kBinarySHA256 =
 @property(readwrite) NSString* seatbeltPolicy;
 @end
 
+@interface SNTDaemonControlController (Testing)
+@property(readonly) dispatch_queue_t binaryUploadQ;
+@property(readonly) dispatch_queue_t packageInventoryQ;
+@end
+
 @interface SNTDaemonControlControllerTest : XCTestCase
 @property id mockDatabaseController;
 @property id mockRuleTable;
@@ -137,6 +142,12 @@ static NSString* const kBinarySHA256 =
 - (void)stubPeerAuditTokenPid:(pid_t)pid pidver:(int)pidver {
   audit_token_t tok = santa::MakeStubAuditToken(pid, pidver);
   OCMStub([self.mockMOLXPC currentPeerAuditToken]).andReturn(tok);
+}
+
+- (void)testPackageInventoryUsesDedicatedQueue {
+  XCTAssertNotNil(self.sut.binaryUploadQ);
+  XCTAssertNotNil(self.sut.packageInventoryQ);
+  XCTAssertNotEqual(self.sut.binaryUploadQ, self.sut.packageInventoryQ);
 }
 
 // ---- Shape validation ------------------------------------------------

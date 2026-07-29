@@ -19,9 +19,13 @@
 #include "Source/common/String.h"
 #import "Source/santasyncservice/SNTSantaCommandHandler+EventUpload.h"
 #import "Source/santasyncservice/SNTSantaCommandHandler+Kill.h"
+#import "Source/santasyncservice/SNTSantaCommandHandler+PackageInventory.h"
 
 namespace pbv1 = ::santa::commands::v1;
 using santa::NSStringToUTF8String;
+
+NSString* const kSantaCommandNameEventUpload = @"event_upload";
+NSString* const kSantaCommandNamePackageInventory = @"package_inventory";
 
 @implementation SNTSantaCommandHandler
 
@@ -48,7 +52,14 @@ using santa::NSStringToUTF8String;
   NSString* commandName = nil;
   switch (command.command_case()) {
     case ::pbv1::QueuedCommand::kKill: commandName = @"kill"; break;
-    case ::pbv1::QueuedCommand::kEventUpload: commandName = @"event_upload"; break;
+    case ::pbv1::QueuedCommand::kEventUpload: commandName = kSantaCommandNameEventUpload; break;
+    case ::pbv1::QueuedCommand::kPackageInventory:
+      commandName = kSantaCommandNamePackageInventory;
+      break;
+    // binary_upload over the queued-command path is not implemented (binary upload
+    // is delivered via the NATS command path); leaving the name unset routes it to
+    // the FAILED default in the dispatch switch below.
+    case ::pbv1::QueuedCommand::kBinaryUpload: break;
     case ::pbv1::QueuedCommand::COMMAND_NOT_SET: break;
   }
 
@@ -90,6 +101,23 @@ using santa::NSStringToUTF8String;
       }
       result->set_host_status(::pbv1::CommandResult::HOST_STATUS_COMPLETE);
       result->unsafe_arena_set_allocated_event_upload(uploadResponse);
+      break;
+    }
+
+    case ::pbv1::QueuedCommand::kPackageInventory: {
+      LOGI(@"SantaCommand: Executing queued PackageInventoryRequest command %lld",
+           (long long)command.command_id());
+      // Runs serially at the end of a sync and blocks until santad's scan
+      // finishes, so the posted result reflects the actual outcome.
+      std::string errorMessage;
+      auto* scanResponse = [self handlePackageInventoryRequest:command.package_inventory()
+                                                       onArena:arena
+                                                  errorMessage:&errorMessage];
+      if (!errorMessage.empty()) {
+        result->set_error_message(errorMessage);
+      }
+      result->set_host_status(::pbv1::CommandResult::HOST_STATUS_COMPLETE);
+      result->unsafe_arena_set_allocated_package_inventory(scanResponse);
       break;
     }
 

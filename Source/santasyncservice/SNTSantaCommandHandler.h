@@ -19,6 +19,11 @@
 #import "Source/santasyncservice/SNTPushNotifications.h"
 #include "commands/v1.pb.h"
 
+/// Canonical AllowedSantaCommands names, shared across transports so the command
+/// handler's allowlist mapping and the sync drain's checks cannot drift apart.
+extern NSString* const kSantaCommandNameEventUpload;
+extern NSString* const kSantaCommandNamePackageInventory;
+
 /// Executes Santa commands independently of the transport that delivered them.
 /// Both the NATS push client (request-reply) and the HTTP sync command drain
 /// call into this handler; transport concerns (envelope verification, replies,

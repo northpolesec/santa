@@ -28,11 +28,13 @@ objc_library(
         "SNTSantaCommandHandler.mm",
         "SNTSantaCommandHandler+EventUpload.mm",
         "SNTSantaCommandHandler+Kill.mm",
+        "SNTSantaCommandHandler+PackageInventory.mm",
     ],
     hdrs = [
         "SNTSantaCommandHandler.h",
         "SNTSantaCommandHandler+EventUpload.h",
         "SNTSantaCommandHandler+Kill.h",
+        "SNTSantaCommandHandler+PackageInventory.h",
     ],
     deps = [
         ":SNTPushNotifications",
