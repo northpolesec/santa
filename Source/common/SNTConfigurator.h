@@ -1184,7 +1184,8 @@ extern NSString* _Nonnull const kStateTempAdminTargetUIDKey;
 
 ///
 ///  If set, only the listed command types will be accepted from the sync server.
-///  Command names are lowercase strings matching proto field names: "kill", "ping", "eventupload".
+///  Command names are lowercase strings matching proto field names: "kill", "ping",
+///  "event_upload", "binary_upload", "package_inventory".
 ///  When unset (nil), all commands are allowed.
 ///
 ///  This is a forced config key (MDM only) — not settable via sync server.

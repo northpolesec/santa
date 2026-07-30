@@ -138,7 +138,9 @@ export const SantaConfigKeyGroups: SantaConfigGroups = {
       possibleValues: [
         { value: "kill" },
         { value: "ping" },
-        { value: "eventupload" },
+        { value: "event_upload" },
+        { value: "binary_upload", versionAdded: "2026.7" },
+        { value: "package_inventory", versionAdded: "2026.7" },
       ],
       versionAdded: "2026.3",
     },
