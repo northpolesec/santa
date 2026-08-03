@@ -1403,8 +1403,6 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
   XCTAssertTrue(
       [SNTEndpointSecurityTamperResistance isProtectedPath:"/private/var/db/santa/events.db"]);
   XCTAssertTrue([SNTEndpointSecurityTamperResistance
-      isProtectedPath:"/private/var/db/santa/sleigh_state.db"]);
-  XCTAssertTrue([SNTEndpointSecurityTamperResistance
       isProtectedPath:"/private/var/db/santa/rules.db-journal"]);
   XCTAssertTrue(
       [SNTEndpointSecurityTamperResistance isProtectedPath:"/private/var/db/santa/rules.db-wal"]);

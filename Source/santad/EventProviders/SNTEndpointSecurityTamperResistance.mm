@@ -73,7 +73,6 @@ constexpr std::tuple<std::string_view, WatchItemPathType, bool> kProtectedFiles[
     {"/private/var/db/santa/rules.db-", WatchItemPathType::kPrefix, false},
     {"/private/var/db/santa/events.db", WatchItemPathType::kLiteral, false},
     {"/private/var/db/santa/events.db-", WatchItemPathType::kPrefix, false},
-    {"/private/var/db/santa/sleigh_state.db", WatchItemPathType::kLiteral, false},
     {"/private/var/db/santa/sync-state.plist", WatchItemPathType::kLiteral, false},
     {"/private/var/db/santa/state.plist", WatchItemPathType::kLiteral, false},
     {"/Applications/Santa.app", WatchItemPathType::kPrefix, true},
