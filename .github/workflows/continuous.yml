@@ -1,20 +1,85 @@
 # Continuous Testing
 #
-# Run 50 times per day, split over two runs to keep individual run times
-# lower so as not to hit action timeout conditions.
+# Nightly flake hunt: runs the unit test suite 25 times under
+# --test_strategy=exclusive.
+#
+# macOS runner minutes bill at 10x, so this does not run unconditionally. A
+# cheap Linux "gate" job checks whether main received a commit recently; the
+# expensive macOS job runs only when it did, or on manual dispatch.
 name: continuous
 on:
   schedule:
     - cron: "0 10 * * *" # Every day at 10:00 UTC
-    - cron: "30 23 * * *" # Every day at 23:30 UTC
   workflow_dispatch: # Allows you to run this workflow manually from the Actions tab
 
+# No `concurrency` group: at one cron per day only a manual dispatch can double
+# up, and serialising that would make an on-demand run wait out the nightly.
+
 jobs:
-  preqs:
-    if: github.repository == 'northpolesec/santa'
-    runs-on: macos-latest
+  gate:
+    name: "Gate on recent merge"
+    # Only scheduled runs need gating. Manual dispatch skips this job entirely
+    # and forces the hunt to run (see the flake-hunt job's `if`).
+    if: github.event_name == 'schedule' && github.repository == 'northpolesec/santa'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      run: ${{ steps.check.outputs.run }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # ratchet:actions/checkout@v6
+        with:
+          persist-credentials: false
+      # Run only if HEAD landed within 36h (129600s). Wider than the 24h cron
+      # cadence on purpose: GitHub fires scheduled runs late, so a 25h window
+      # would drop commits that landed shortly before their slot.
+      - name: Check for a recent commit
+        id: check
+        run: |
+          if [ $(( $(date +%s) - $(git log -1 --format=%ct) )) -lt 129600 ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  flake-hunt:
+    name: "Flake hunt"
+    needs: gate
+    # Run on a scheduled trigger only when the gate found a recent merge, or on
+    # any manual dispatch. `!cancelled()` is required: on manual dispatch the
+    # gate job is skipped, and a job that `needs` a skipped job is skipped too
+    # by default unless its `if` uses a status function to opt back in.
+    if: ${{ !cancelled() && github.repository == 'northpolesec/santa' && (needs.gate.outputs.run == 'true' || github.event_name == 'workflow_dispatch') }}
+    runs-on: macos-latest
+    # Hang backstop, not a target; runs are ~3.5h with a 4.7h worst case.
+    timeout-minutes: 330
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # ratchet:actions/checkout@v6
+
+      # Read-only use of the same GCS cache PR CI populates: this build passes no
+      # --config, so its action keys match ci.yml's. Uploads stay off so the
+      # nightly can't poison the shared bucket, and test results are never
+      # cached regardless (-t- below). Auth is best effort — ci.yml only
+      # exercises this provider on pull_request, so if it rejects scheduled runs
+      # the build falls back to no cache instead of failing.
+      - name: Auth to GCP
+        continue-on-error: true
+        id: auth
+        uses: "google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093" # ratchet:google-github-actions/auth@v3
+        with:
+          workload_identity_provider: "projects/131531281042/locations/global/workloadIdentityPools/github/providers/github"
+          project_id: "santa-build-cache"
+
+      - name: Configure remote cache
+        run: |
+          if [[ "${{ steps.auth.outcome }}" == "success" ]]; then
+            echo "REMOTE_CACHE_FLAGS=--remote_cache=https://storage.googleapis.com/santa-build-cache --google_default_credentials --remote_upload_local_results=false" >> "$GITHUB_ENV"
+          else
+            echo "REMOTE_CACHE_FLAGS=" >> "$GITHUB_ENV"
+          fi
 
       # Note: Using Bazel flags documented here to reduce memory footprint:
       # https://bazel.build/advanced/performance/memory
@@ -30,6 +95,7 @@ jobs:
       - name: Check for flaky tests
         run: |
           bazel test \
+            ${REMOTE_CACHE_FLAGS} \
             --test_strategy=exclusive \
             --test_output=errors \
             --runs_per_test 25 \
