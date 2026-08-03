@@ -58,6 +58,8 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # ratchet:actions/checkout@v6
+        with:
+          persist-credentials: false
 
       # Read-only use of the same GCS cache PR CI populates: this build passes no
       # --config, so its action keys match ci.yml's. Uploads stay off so the

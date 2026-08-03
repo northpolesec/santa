@@ -53,6 +53,8 @@ jobs:
     runs-on: macos-latest
     # Hang backstop. TSAN is the long pole at ~1.7h; the others are ~25m.
     timeout-minutes: 180
+    permissions:
+      contents: read
     strategy:
       # One sanitizer failing shouldn't cancel the others mid-run.
       fail-fast: false
@@ -66,6 +68,8 @@ jobs:
             runs: 5
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # ratchet:actions/checkout@v6
+        with:
+          persist-credentials: false
       # Deliberately no build cache, unlike continuous.yml: -fsanitize=* is a
       # global --copt, so the whole closure is rebuilt instrumented and shares no
       # action keys with the fastbuild entries PR CI populates.
