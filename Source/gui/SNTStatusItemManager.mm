@@ -55,6 +55,12 @@
 @property NSMenuItem* refreshItem;
 @property(atomic, strong) NSTimer* timer;
 @property(atomic, strong) NSDate* expiration;
+
+// Bumped by every session change (enterModeWithExpiration:/leaveModeForState: are the only
+// writers of `expiration`, and both only run on the main thread). A background refresh
+// samples this after reading the daemon and re-checks it before applying, so a daemon push
+// or user action landing in between wins instead of being clobbered by the older read.
+@property(atomic) uint64_t generation;
 @end
 
 @implementation SNTTimedModeState
@@ -377,27 +383,19 @@ static NSString* const kNotificationSilencesKey = @"SilencedNotifications";
   // The synchronous control proxy runs these reply blocks on this background queue, so every
   // helper that mutates AppKit state (menu items, the countdown timer, the status title) must be
   // marshaled to the main thread. Each block is enqueued in call order, so main-queue FIFO
-  // preserves the ordering the UI depends on.
+  // preserves the ordering the UI depends on. As in retrieveAdminModeState, the active session
+  // is determined first: setAvailable: keeps the item visible while a session is active, so it
+  // has to run after the expiration it reads has been applied.
   [self withControlProxy:^(id proxy) {
+    [proxy temporaryMonitorModeSecondsRemaining:^(NSNumber* seconds) {
+      [self applySecondsRemaining:seconds forState:self.tmmState];
+    }];
     [proxy checkTemporaryMonitorModePolicyAvailable:^(BOOL available) {
       dispatch_async(dispatch_get_main_queue(), ^{
         [self setAvailable:available forState:self.tmmState];
       });
     }];
-    [proxy temporaryMonitorModeSecondsRemaining:^(NSNumber* seconds) {
-      dispatch_async(dispatch_get_main_queue(), ^{
-        if (seconds) {
-          [self enterModeWithExpiration:[NSDate dateWithTimeIntervalSinceNow:[seconds intValue]]
-                               forState:self.tmmState];
-        } else if (self.tmmState.expiration) {
-          // The daemon reports no active session but the GUI still shows one (a leave
-          // notification can be missed while this session is inactive, e.g. fast user
-          // switching). Clear the stale countdown.
-          [self leaveModeForState:self.tmmState];
-        }
-      });
-    }];
-    // Queried last so its main-queue block runs after the availability/session blocks
+    // Queried last so its main-queue block runs after the session/availability blocks
     // above; the Mode header reads the item visibility + expiration they set.
     [proxy clientMode:^(SNTClientMode mode) {
       dispatch_async(dispatch_get_main_queue(), ^{
@@ -407,6 +405,28 @@ static NSString* const kNotificationSilencesKey = @"SilencedNotifications";
   }];
 }
 
+// Apply a daemon-reported session length to `state` on the main thread. Called from a refresh
+// reply block, so the generation is sampled here -- right after the daemon read -- and
+// re-checked on the main thread. If a daemon push or user action changed the session in
+// between, that newer state stands and this stale read is dropped.
+- (void)applySecondsRemaining:(NSNumber*)seconds forState:(SNTTimedModeState*)state {
+  uint64_t generation = state.generation;
+  dispatch_async(dispatch_get_main_queue(), ^{
+    if (state.generation != generation) {
+      return;
+    }
+    if (seconds) {
+      [self enterModeWithExpiration:[NSDate dateWithTimeIntervalSinceNow:[seconds intValue]]
+                           forState:state];
+    } else if (state.expiration) {
+      // The daemon reports no active session but the GUI still shows one (a leave
+      // notification can be missed while this session is inactive, e.g. fast user
+      // switching). Clear the stale countdown.
+      [self leaveModeForState:state];
+    }
+  });
+}
+
 - (void)retrieveAdminModeState {
   // See retrieveMonitorModeState: reply blocks run on a background queue, so AppKit mutations are
   // marshaled to the main queue. Determine the active session first (sets the expiration / "Leave"
@@ -414,17 +434,7 @@ static NSString* const kNotificationSilencesKey = @"SilencedNotifications";
   // FIFO keeps that ordering.
   [self withControlProxy:^(id proxy) {
     [proxy temporaryAdminModeSecondsRemaining:^(NSNumber* seconds) {
-      dispatch_async(dispatch_get_main_queue(), ^{
-        if (seconds) {
-          [self enterModeWithExpiration:[NSDate dateWithTimeIntervalSinceNow:[seconds intValue]]
-                               forState:self.tamState];
-        } else if (self.tamState.expiration) {
-          // The daemon reports no active session but the GUI still shows one (a leave
-          // notification can be missed while this session is inactive, e.g. fast user
-          // switching). Clear the stale countdown.
-          [self leaveModeForState:self.tamState];
-        }
-      });
+      [self applySecondsRemaining:seconds forState:self.tamState];
     }];
     [proxy checkTemporaryAdminModeAvailable:^(BOOL available, BOOL alreadyAdmin) {
       dispatch_async(dispatch_get_main_queue(), ^{
@@ -683,6 +693,7 @@ static NSString* const kNotificationSilencesKey = @"SilencedNotifications";
 }
 
 - (void)enterModeWithExpiration:(NSDate*)expiration forState:(SNTTimedModeState*)state {
+  state.generation++;
   state.expiration = expiration;
 
   // Invalidate any existing timer
@@ -750,6 +761,7 @@ static NSString* const kNotificationSilencesKey = @"SilencedNotifications";
 }
 
 - (void)leaveModeForState:(SNTTimedModeState*)state {
+  state.generation++;
   [state.timer invalidate];
   state.timer = nil;
   state.expiration = nil;
