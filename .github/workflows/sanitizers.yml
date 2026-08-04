@@ -1,18 +1,78 @@
+# Sanitizers
+#
+# Runs the unit test suite under ASAN, TSAN, and UBSAN. TSAN is repeated because
+# data races are nondeterministic; ASAN/UBSAN faults are deterministic, so one
+# run per test is enough.
+#
+# macOS runner minutes bill at 10x, so this does not run unconditionally. A
+# cheap Linux "gate" job checks whether main received a commit recently; the
+# expensive macOS matrix runs only when it did, or on manual dispatch.
 name: sanitizers
 on:
   schedule:
-    - cron: '0 15 * * *'
-  workflow_dispatch:
+    - cron: '0 15 * * *' # 15:00 UTC; staggered clear of continuous.yml (10:00)
+  workflow_dispatch: # Allows manual runs from the Actions tab (skips the gate)
+
+# No `concurrency` group; see the note in continuous.yml.
 
 jobs:
-  test:
-    if: github.repository == 'northpolesec/santa'
-    runs-on: macos-latest
-    strategy:
-      matrix:
-        sanitizer: [asan, tsan, ubsan]
+  gate:
+    name: "Gate on recent merge"
+    # Only scheduled runs need gating. Manual dispatch skips this job entirely
+    # and forces the sanitizers to run (see the sanitizers job's `if`).
+    if: github.event_name == 'schedule' && github.repository == 'northpolesec/santa'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      run: ${{ steps.check.outputs.run }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # ratchet:actions/checkout@v6
+        with:
+          persist-credentials: false
+      # Run only if HEAD landed within 36h (129600s). Wider than the 24h cron
+      # cadence because GitHub fires scheduled runs late. Keep in sync with
+      # continuous.yml.
+      - name: Check for a recent commit
+        id: check
+        run: |
+          if [ $(( $(date +%s) - $(git log -1 --format=%ct) )) -lt 129600 ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  sanitizers:
+    name: "${{ matrix.sanitizer }}"
+    needs: gate
+    # Run on a scheduled trigger only when the gate found a recent merge, or on
+    # any manual dispatch. `!cancelled()` is required: on manual dispatch the
+    # gate job is skipped, and a job that `needs` a skipped job is skipped too
+    # by default unless its `if` uses a status function to opt back in.
+    if: ${{ !cancelled() && github.repository == 'northpolesec/santa' && (needs.gate.outputs.run == 'true' || github.event_name == 'workflow_dispatch') }}
+    runs-on: macos-latest
+    # Hang backstop. TSAN is the long pole at ~1.7h; the others are ~25m.
+    timeout-minutes: 180
+    permissions:
+      contents: read
+    strategy:
+      # One sanitizer failing shouldn't cancel the others mid-run.
+      fail-fast: false
+      matrix:
+        include:
+          - sanitizer: asan
+            runs: 1
+          - sanitizer: ubsan
+            runs: 1
+          - sanitizer: tsan
+            runs: 5
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # ratchet:actions/checkout@v6
+        with:
+          persist-credentials: false
+      # Deliberately no build cache, unlike continuous.yml: -fsanitize=* is a
+      # global --copt, so the whole closure is rebuilt instrumented and shares no
+      # action keys with the fastbuild entries PR CI populates.
       - name: ${{ matrix.sanitizer }}
         run: |
           CLANG_VERSION=$(clang --version | head -n 1 | cut -d' ' -f 4)
@@ -21,11 +81,11 @@ jobs:
           bazel test --config=${{ matrix.sanitizer }} \
             --test_strategy=exclusive --test_output=all \
             --test_env=DYLD_INSERT_LIBRARIES=${DYLIB_PATH} \
-            --runs_per_test 5 -t- :unit_tests \
+            --runs_per_test ${{ matrix.runs }} -t- :unit_tests \
             --define=SANTA_BUILD_TYPE=adhoc
       - name: Upload logs
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # ratchet:actions/upload-artifact@v7.0.0
         if: failure()
         with:
-          name: logs
+          name: logs-${{ matrix.sanitizer }}
           path: /tmp/san_out*
