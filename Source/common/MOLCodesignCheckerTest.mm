@@ -65,8 +65,8 @@
   NSError* error;
   MOLCodesignChecker* sut =
       [[MOLCodesignChecker alloc] initWithBinaryPath:@"/tmp/this/file/doesnt/exist"
-                                       signingFlags:kSecCSDefaultFlags
-                                              error:&error];
+                                        signingFlags:kSecCSDefaultFlags
+                                               error:&error];
   XCTAssertNil(sut);
   XCTAssertNotNil(error);
 }
