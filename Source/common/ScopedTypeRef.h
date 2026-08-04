@@ -16,11 +16,9 @@
 #ifndef SANTA_COMMON_SCOPEDTYPEREF_H
 #define SANTA_COMMON_SCOPEDTYPEREF_H
 
-#include <CoreFoundation/CoreFoundation.h>
-#import <Foundation/Foundation.h>
 #include <assert.h>
 
-#include <functional>
+#include <type_traits>
 #include <utility>
 
 namespace santa {
@@ -111,24 +109,35 @@ class ScopedTypeRef {
 
   ElementT Unsafe() const { return object_; }
 
+#ifdef __OBJC__
+  // Objective-C bridging helpers. Both `id` and the __bridge casts are
+  // compiler builtins in Objective-C mode, so these need no Foundation import.
+  // They are conditional so that this header remains usable from pure C++
+  // translation units, where __bridge isn't valid syntax.
+
   template <typename T>
   T Bridge() const {
     return (__bridge T)object_;
   }
 
+// The casts below transfer ownership, which is meaningless without ARC. Leave
+// them undeclared there rather than silently miscounting references.
+#if __has_feature(objc_arc)
   template <typename T>
     requires std::is_pointer_v<T> && std::is_convertible_v<id, T>
   T BridgeRelease() {
-    T tmp = CFBridgingRelease(object_);
+    T tmp = (__bridge_transfer T)object_;
     object_ = InvalidV;
     return tmp;
   }
 
   static ScopedTypeRef<ElementT, InvalidV, RetainFunc, ReleaseFunc>
   BridgeRetain(id nsobj) {
-    ElementT obj = (ElementT)(CFBridgingRetain(nsobj));
+    ElementT obj = (ElementT)((__bridge_retained void*)nsobj);
     return Assume(obj);
   }
+#endif  // __has_feature(objc_arc)
+#endif  // __OBJC__
 
   // This is to be used only to take ownership of objects that are created by
   // pass-by-pointer create functions. The object must not already be valid.

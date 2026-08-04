@@ -180,10 +180,23 @@ santa_unit_test(
 
 # This target shouldn't be used directly.
 # Use a more specific scoped type instead.
-objc_library(
+cc_library(
     name = "ScopedTypeRef",
     hdrs = ["ScopedTypeRef.h"],
     visibility = ["//Source/common:__pkg__"],
+)
+
+# ScopedTypeRef.h is intentionally free of Objective-C and Foundation deps so it
+# can be used from pure C++ TUs. This library compiles as C++ (not
+# Objective-C++) to keep it so.
+cc_library(
+    name = "ScopedTypeRefPureCXX",
+    testonly = 1,
+    srcs = ["ScopedTypeRefPureCXX.cc"],
+    visibility = ["//Source/common:__pkg__"],
+    deps = [
+        ":ScopedTypeRef",
+    ],
 )
 
 objc_library(
@@ -202,6 +215,7 @@ santa_unit_test(
     ],
     deps = [
         ":ScopedCFTypeRef",
+        ":ScopedTypeRefPureCXX",
     ],
 )
 
