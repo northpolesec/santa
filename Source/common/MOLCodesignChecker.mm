@@ -31,12 +31,11 @@ using ScopedCFString = santa::ScopedCFTypeRef<CFStringRef>;
 using ScopedSecStaticCode = santa::ScopedCFTypeRef<SecStaticCodeRef>;
 
 /**
-  kStaticSigningFlags are the flags used when validating signatures on disk.
+  kStaticSigningFlags are the default flags used when validating signatures on disk.
 
-  Don't validate resources but do validate nested code. Ignoring resources _dramatically_ speeds
-  up validation (see below) but does mean images, plists, etc will not be checked and modifying
-  these will not be considered invalid. To ensure any code inside the binary is still checked,
-  we check nested code.
+  Don't validate resources. Ignoring resources _dramatically_ speeds up validation (see below)
+  but does mean images, plists, etc will not be checked and modifying these will not be
+  considered invalid.
 
   We also want to make sure no network access occurs as a result of us checking,
   for performance. This potentially means accepting revoked certs for a short
@@ -75,6 +74,19 @@ NSString* const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
 
 // Cached on-disk binary file descriptor
 @property int binaryFileDescriptor;
+
+// The flags this instance validates on-disk code with. kStaticSigningFlags unless the caller asked
+// for something else. Has no effect on in-memory (SecCodeRef) checks, which use kSigningFlags.
+@property SecCSFlags staticSigningFlags;
+
+- (instancetype)initWithSecStaticCodeRef:(SecStaticCodeRef)codeRef
+                      staticSigningFlags:(SecCSFlags)staticSigningFlags
+                                   error:(NSError**)error;
+
+- (instancetype)initWithBinaryPath:(NSString*)binaryPath
+                    fileDescriptor:(int)fileDescriptor
+                staticSigningFlags:(SecCSFlags)staticSigningFlags
+                             error:(NSError**)error;
 @end
 
 @implementation MOLCodesignChecker
@@ -82,12 +94,20 @@ NSString* const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
 #pragma mark Init/dealloc
 
 - (instancetype)initWithSecStaticCodeRef:(SecStaticCodeRef)codeRef error:(NSError**)error {
+  return [self initWithSecStaticCodeRef:codeRef staticSigningFlags:kStaticSigningFlags error:error];
+}
+
+- (instancetype)initWithSecStaticCodeRef:(SecStaticCodeRef)codeRef
+                      staticSigningFlags:(SecCSFlags)staticSigningFlags
+                                   error:(NSError**)error {
   self = [super init];
 
   if (self) {
+    _staticSigningFlags = staticSigningFlags;
+
     auto [status, scopedError] = ScopedCFError::AssumeFrom(^OSStatus(CFErrorRef* out) {
       if (CFGetTypeID(codeRef) == SecStaticCodeGetTypeID()) {
-        return SecStaticCodeCheckValidityWithErrors(codeRef, kStaticSigningFlags, NULL, out);
+        return SecStaticCodeCheckValidityWithErrors(codeRef, staticSigningFlags, NULL, out);
       } else if (CFGetTypeID(codeRef) == SecCodeGetTypeID()) {
         return SecCodeCheckValidityWithErrors((SecCodeRef)codeRef, kSigningFlags, NULL, out);
       } else {
@@ -127,8 +147,11 @@ NSString* const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
       NSArray* certs = _signingInformation[(__bridge id)kSecCodeInfoCertificates];
       _certificates = [MOLCertificate certificatesFromArray:certs];
     }
-    if (status != errSecSuccess)
-      if (error) *error = err;
+    // Callers treat a nil error as a successful validation, so never leave the error unset when
+    // validation failed, even if the Security framework didn't hand back a CFError.
+    if (status != errSecSuccess) {
+      if (error) *error = err ?: [self errorWithCode:status];
+    }
     _codeRef = codeRef;
     CFRetain(_codeRef);
   }
@@ -152,7 +175,26 @@ NSString* const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
 }
 
 - (instancetype)initWithBinaryPath:(NSString*)binaryPath
+                      signingFlags:(SecCSFlags)signingFlags
+                             error:(NSError**)error {
+  return [self initWithBinaryPath:binaryPath
+                   fileDescriptor:-1
+               staticSigningFlags:signingFlags
+                            error:error];
+}
+
+- (instancetype)initWithBinaryPath:(NSString*)binaryPath
                     fileDescriptor:(int)fileDescriptor
+                             error:(NSError**)error {
+  return [self initWithBinaryPath:binaryPath
+                   fileDescriptor:fileDescriptor
+               staticSigningFlags:kStaticSigningFlags
+                            error:error];
+}
+
+- (instancetype)initWithBinaryPath:(NSString*)binaryPath
+                    fileDescriptor:(int)fileDescriptor
+                staticSigningFlags:(SecCSFlags)staticSigningFlags
                              error:(NSError**)error {
   OSStatus status = errSecSuccess;
   SecStaticCodeRef codeRef = NULL;
@@ -170,7 +212,7 @@ NSString* const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
   _binaryPath = binaryPath;
   _binaryFileDescriptor = (fileDescriptor != -1) ? fileDescriptor : -1;
 
-  self = [self initWithSecStaticCodeRef:codeRef error:error];
+  self = [self initWithSecStaticCodeRef:codeRef staticSigningFlags:staticSigningFlags error:error];
   if (codeRef) CFRelease(codeRef);  // it was retained above
   return self;
 }
@@ -325,7 +367,7 @@ NSString* const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
 
 - (BOOL)validateWithRequirement:(SecRequirementRef)requirement {
   if (!requirement) return NO;
-  return (SecStaticCodeCheckValidity(self.codeRef, kStaticSigningFlags, requirement) ==
+  return (SecStaticCodeCheckValidity(self.codeRef, self.staticSigningFlags, requirement) ==
           errSecSuccess);
 }
 
@@ -360,8 +402,9 @@ NSString* const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
     codeRef = self.codeRef;
   }
 
+  SecCSFlags flags = self.staticSigningFlags;
   auto [status, scopedError] = ScopedCFError::AssumeFrom(^OSStatus(CFErrorRef* out) {
-    return SecStaticCodeCheckValidityWithErrors(codeRef, kStaticSigningFlags, NULL, out);
+    return SecStaticCodeCheckValidityWithErrors(codeRef, flags, NULL, out);
   });
 
   if (status == errSecSuccess) {
