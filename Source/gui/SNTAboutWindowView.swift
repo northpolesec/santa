@@ -224,6 +224,11 @@ struct SyncButtonView: View {
             syncStatus = .unknown
           }
         }
+
+        // Captures ss to keep the connection alive for the reply, then tears it down.
+        // The handler is cleared first so the teardown isn't reported as a sync failure.
+        ss?.invalidationHandler = nil
+        ss?.invalidate()
       }
     }
   }

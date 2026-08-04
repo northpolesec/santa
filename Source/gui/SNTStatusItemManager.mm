@@ -90,6 +90,12 @@
 // Last status-bar title pushed via refreshStatusTitle, used to suppress redundant
 // updates (the per-mode timers fire every 5s but the displayed units change slowly).
 @property(copy) NSString* lastStatusTitle;
+
+// Serializes timed-mode refreshes. A refresh fans its results out to the main queue, so
+// overlapping refreshes could interleave and let an older one's values land last. Running
+// them one at a time keeps completion order matching request order: the newest refresh
+// enqueues its main-queue updates last and therefore wins.
+@property(nonatomic, strong) dispatch_queue_t timedModeRefreshQueue;
 @end
 
 static NSString* const kNotificationSilencesKey = @"SilencedNotifications";
@@ -103,6 +109,9 @@ static NSString* const kNotificationSilencesKey = @"SilencedNotifications";
     self.countdownFormatter.allowedUnits =
         NSCalendarUnitDay | NSCalendarUnitHour | NSCalendarUnitMinute;
     self.countdownFormatter.unitsStyle = NSDateComponentsFormatterUnitsStyleAbbreviated;
+
+    self.timedModeRefreshQueue = dispatch_queue_create(
+        "com.northpolesec.santa.gui.timed_mode_refresh", DISPATCH_QUEUE_SERIAL);
 
     self.tmmState = [[SNTTimedModeState alloc] init];
     self.tmmState.descriptor = [self monitorModeDescriptor];
@@ -355,8 +364,10 @@ static NSString* const kNotificationSilencesKey = @"SilencedNotifications";
 }
 
 // Re-query the daemon for live Monitor + Admin session/availability state off the main thread.
+// Serialized on timedModeRefreshQueue so a slow refresh can't finish after a newer one and
+// overwrite it with stale availability/expiration/client-mode values.
 - (void)refreshAllTimedModeStateAsync {
-  dispatch_async(dispatch_get_global_queue(0, 0), ^{
+  dispatch_async(self.timedModeRefreshQueue, ^{
     [self retrieveMonitorModeState];
     [self retrieveAdminModeState];
   });
