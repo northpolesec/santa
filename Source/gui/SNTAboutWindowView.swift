@@ -190,34 +190,39 @@ struct SyncButtonView: View {
     logReceiver.clear()
     inProgress = true
 
-    let ss = SNTXPCSyncServiceInterface.configuredConnection()
-    ss?.invalidationHandler = {
-      DispatchQueue.main.sync {
-        inProgress = false
-        syncStatus = .failedXPCConnection
-      }
-    }
-    ss?.resume()
-
     let logListener = NSXPCListener.anonymous()
     lr = MOLXPCConnection(serverWith: logListener)
     lr?.exportedObject = logReceiver
     lr?.unprivilegedInterface = NSXPCInterface(with: SNTSyncServiceLogReceiverXPC.self)
     lr?.resume()
 
-    let proxy = ss?.remoteObjectProxy as? SNTSyncServiceXPC
-    proxy?.sync(withLogListener: logListener.endpoint, syncType: clean ? .clean : .normal) { status in
-      lr = nil
-
-      DispatchQueue.main.sync {
-        inProgress = false
-        syncStatus = status
-      }
-
-      if status == .success {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+    // Off the main thread: MOLXPCConnection.resume() blocks on a connection handshake.
+    // The handlers below run on XPC-owned queues, so UI state is updated with main.async --
+    // main.sync would deadlock if a handler ever ran on the main thread.
+    DispatchQueue.global().async {
+      let ss = SNTXPCSyncServiceInterface.configuredConnection()
+      ss?.invalidationHandler = {
+        DispatchQueue.main.async {
           inProgress = false
-          syncStatus = .unknown
+          syncStatus = .failedXPCConnection
+        }
+      }
+      ss?.resume()
+
+      let proxy = ss?.remoteObjectProxy as? SNTSyncServiceXPC
+      proxy?.sync(withLogListener: logListener.endpoint, syncType: clean ? .clean : .normal) {
+        status in
+        DispatchQueue.main.async {
+          lr = nil
+          inProgress = false
+          syncStatus = status
+        }
+
+        if status == .success {
+          DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+            inProgress = false
+            syncStatus = .unknown
+          }
         }
       }
     }

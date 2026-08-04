@@ -344,6 +344,9 @@ static NSString* const kNotificationSilencesKey = @"SilencedNotifications";
 // Vend a resumed synchronous control proxy to `block`, then invalidate the connection.
 // The synchronous proxy blocks until each reply runs, so the connection stays valid for
 // the duration of `block`; this centralizes the connect/resume/invalidate lifecycle.
+//
+// Must be called off the main thread: `-resume` performs a blocking connection handshake
+// and every call on the returned proxy blocks until santad replies.
 - (void)withControlProxy:(void (^)(id proxy))block {
   MOLXPCConnection* daemonConn = [SNTXPCControlInterface configuredConnection];
   [daemonConn resume];
@@ -472,20 +475,16 @@ static NSString* const kNotificationSilencesKey = @"SilencedNotifications";
   self.timedModeSeparator.hidden = !(tmmVisible && tamVisible);
 }
 
-// Re-query Temporary Admin Mode availability and the current client mode against live
-// state each time the menu opens. The user's admin status and policy availability can
-// change after launch (e.g. dropping admin) between sync pushes, and the client mode
-// drives the Mode header. Neither call re-enters the GUI, so synchronous calls here are
-// safe (unlike the request path, which is dispatched off the main thread).
+// Re-query availability and the current client mode against live state each time the menu
+// opens. The user's admin status and policy availability can change after launch (e.g.
+// dropping admin) between sync pushes, and the client mode drives the Mode header.
+//
+// This is a menu delegate callback, so it runs on the main thread and must not talk to the
+// daemon here: both `-resume` and the synchronous proxy block until santad replies. The
+// refresh is dispatched off the main thread instead, which means the menu paints with the
+// previous values and updates a moment later.
 - (void)menuNeedsUpdate:(NSMenu*)menu {
-  [self withControlProxy:^(id proxy) {
-    [proxy checkTemporaryAdminModeAvailable:^(BOOL available, BOOL alreadyAdmin) {
-      [self setAdminItemVisibleWhenAvailable:available alreadyAdmin:alreadyAdmin];
-    }];
-    [proxy clientMode:^(SNTClientMode mode) {
-      [self refreshMonitorModeHeaderWithClientMode:mode];
-    }];
-  }];
+  [self refreshAllTimedModeStateAsync];
 }
 
 // Re-query the daemon for live Monitor/Admin session + availability state. Called when this
