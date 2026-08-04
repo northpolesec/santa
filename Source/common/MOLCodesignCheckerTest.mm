@@ -43,6 +43,34 @@
   XCTAssertNotNil(sut);
 }
 
+- (void)testInitWithBinaryPathAndSigningFlags {
+  NSError* error;
+  // Validate without kSecCSDoNotValidateResources, i.e. the slow, everything-is-checked path.
+  MOLCodesignChecker* sut = [[MOLCodesignChecker alloc]
+      initWithBinaryPath:@"/sbin/launchd"
+            signingFlags:(kSecCSCheckNestedCode | kSecCSCheckAllArchitectures |
+                          kSecCSStrictValidate | kSecCSNoNetworkAccess)
+                   error:&error];
+  XCTAssertNotNil(sut);
+  XCTAssertNil(error);
+
+  // The flags only change what is validated, not what is reported.
+  MOLCodesignChecker* defaultFlags =
+      [[MOLCodesignChecker alloc] initWithBinaryPath:@"/sbin/launchd"];
+  XCTAssertEqualObjects(sut.cdhash, defaultFlags.cdhash);
+  XCTAssertEqualObjects(sut.signingID, defaultFlags.signingID);
+}
+
+- (void)testInitWithSigningFlagsAndInvalidBinaryPath {
+  NSError* error;
+  MOLCodesignChecker* sut =
+      [[MOLCodesignChecker alloc] initWithBinaryPath:@"/tmp/this/file/doesnt/exist"
+                                       signingFlags:kSecCSDefaultFlags
+                                              error:&error];
+  XCTAssertNil(sut);
+  XCTAssertNotNil(error);
+}
+
 - (void)testInitWithInvalidBinaryPath {
   NSError* error;
   MOLCodesignChecker* sut =

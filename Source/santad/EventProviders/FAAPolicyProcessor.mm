@@ -219,12 +219,13 @@ bool FAAPolicyProcessor::PolicyMatchesProcess(const WatchItemProcess& policy_pro
   // outside of this method. This method is used to individually check each
   // configured process exception while the check for a valid code signature
   // is more broad and applies whether or not process exceptions exist.
-  if (es_proc->codesigning_flags & CS_SIGNED) {
-    // Check whether or not the process is a platform binary if specified by the policy.
-    if (policy_proc.platform_binary && !es_proc->is_platform_binary) {
-      return false;
-    }
+  // Platform-binary status is meaningful regardless of signing flags, so
+  // evaluate it unconditionally.
+  if (policy_proc.platform_binary && !es_proc->is_platform_binary) {
+    return false;
+  }
 
+  if (es_proc->codesigning_flags & CS_SIGNED) {
     // If the policy contains a team ID, check that the instigating process
     // also has a team ID and matches the policy.
     if (!policy_proc.team_id.empty() &&

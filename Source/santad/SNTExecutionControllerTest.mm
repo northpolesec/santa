@@ -17,6 +17,10 @@
 #import <OCMock/OCMock.h>
 #import <XCTest/XCTest.h>
 #include <dispatch/dispatch.h>
+
+#include <string>
+#include <vector>
+
 #include "Source/common/processtree/process.h"
 #include "Source/common/processtree/process_tree.h"
 #include "Source/common/processtree/process_tree_test_helpers.h"
@@ -84,6 +88,7 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
 @property(readwrite) SNTRuleState state;
 @property(readwrite) SNTRuleType type;
 @property(readwrite) NSString* customMsg;
+@property(readwrite) NSString* celExpr;
 @end
 
 @interface SNTExecutionControllerTest : XCTestCase
@@ -243,6 +248,22 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
 
 - (void)validateExecEvent:(SNTAction)wantAction
              messageSetup:(void (^)(es_message_t*))messageSetupBlock {
+  [self validateExecEvent:wantAction args:{} messageSetup:messageSetupBlock];
+}
+
+- (void)validateExecEvent:(SNTAction)wantAction {
+  [self validateExecEvent:wantAction messageSetup:nil];
+}
+
+// Like validateExecEvent:messageSetup: but also stubs the argument vector the
+// CEL activation sees, so rules using `args` can be exercised.
+//
+// ExecArgs must be stubbed directly: EndpointSecurityAPI::ExecArgs calls the
+// free es_exec_arg_count()/es_exec_arg() functions rather than the virtual
+// ExecArgCount()/ExecArg() methods, so stubbing those has no effect here.
+- (void)validateExecEvent:(SNTAction)wantAction
+                     args:(std::vector<std::string>)args
+             messageSetup:(void (^)(es_message_t*))messageSetupBlock {
   es_file_t file = MakeESFile("foo");
   es_process_t proc = MakeESProcess(&file);
   es_file_t fileExec = MakeESFile("bar", {
@@ -261,6 +282,7 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
 
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   mockESApi->SetExpectationsRetainReleaseMessage();
+  EXPECT_CALL(*mockESApi, ExecArgs).WillRepeatedly(testing::Return(args));
 
   {
     Message msg(mockESApi, &esMsg);
@@ -268,10 +290,6 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   }
 
   XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
-}
-
-- (void)validateExecEvent:(SNTAction)wantAction {
-  [self validateExecEvent:wantAction messageSetup:nil];
 }
 
 // Stubs the source-process decision lookup used by the seatbelt self-exec
@@ -578,6 +596,116 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
 
   [self validateExecEvent:SNTActionRespondAllowCompiler];
   [self checkMetricCounters:kAllowCompilerBinary expected:@1];
+}
+
+// ---------------- Contextual (non-cacheable) compiler rules ----------------
+
+// A CEL compiler rule that reads argv authorizes only the invocation it
+// matched. It must not produce a terminal, reusable action.
+- (void)testCELCompilerRuleBinaryIsNotReusable {
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
+  OCMStub([self.mockConfigurator enableTransitiveRules]).andReturn(YES);
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateCELv2;
+  rule.type = SNTRuleTypeBinary;
+  rule.celExpr = @"size(args) > 1 && args[1] == '--build' ? ALLOWLIST_COMPILER : BLOCKLIST";
+  [self stubRule:rule forIdentifiers:{.binarySHA256 = @"a"}];
+
+  [self validateExecEvent:SNTActionRespondAllowCompilerNoCache
+                     args:{"clang", "--build"}
+             messageSetup:nil];
+}
+
+- (void)testCELCompilerRuleSigningIDIsNotReusable {
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
+  OCMStub([self.mockConfigurator enableTransitiveRules]).andReturn(YES);
+
+  NSString* signingID = [NSString stringWithFormat:@"%s:%s", kExampleTeamID, kExampleSigningID];
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateCELv2;
+  rule.type = SNTRuleTypeSigningID;
+  rule.celExpr = @"size(args) > 1 && args[1] == '--build' ? ALLOWLIST_COMPILER : BLOCKLIST";
+  [self stubRule:rule
+      forIdentifiers:{.binarySHA256 = @"a", .signingID = signingID, .teamID = @(kExampleTeamID)}];
+
+  [self validateExecEvent:SNTActionRespondAllowCompilerNoCache
+                     args:{"clang", "--build"}
+             messageSetup:^(es_message_t* msg) {
+               msg->event.exec.target->team_id = MakeESStringToken(kExampleTeamID);
+               msg->event.exec.target->signing_id = MakeESStringToken(kExampleSigningID);
+             }];
+}
+
+- (void)testCELCompilerRuleCDHashIsNotReusable {
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
+  OCMStub([self.mockConfigurator enableTransitiveRules]).andReturn(YES);
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateCELv2;
+  rule.type = SNTRuleTypeCDHash;
+  rule.celExpr = @"size(args) > 1 && args[1] == '--build' ? ALLOWLIST_COMPILER : BLOCKLIST";
+  [self stubRule:rule
+      forIdentifiers:{.cdhash = @"aa00000000000000000000000000000000000000", .binarySHA256 = @"a"}];
+
+  [self validateExecEvent:SNTActionRespondAllowCompilerNoCache
+                     args:{"clang", "--build"}
+             messageSetup:^(es_message_t* msg) {
+               msg->event.exec.target->cdhash[0] = 0xaa;
+               msg->event.exec.target->codesigning_flags = CS_SIGNED | CS_VALID | CS_KILL | CS_HARD;
+             }];
+}
+
+// The blocked context must still be blocked. Together with the tests above this
+// pins both directions of the contextual rule.
+- (void)testCELCompilerRuleBlockedContextDenies {
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
+  OCMStub([self.mockConfigurator enableTransitiveRules]).andReturn(YES);
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateCELv2;
+  rule.type = SNTRuleTypeBinary;
+  rule.celExpr = @"size(args) > 1 && args[1] == '--build' ? ALLOWLIST_COMPILER : BLOCKLIST";
+  [self stubRule:rule forIdentifiers:{.binarySHA256 = @"a"}];
+
+  [self validateExecEvent:SNTActionRespondDeny args:{"clang", "--link"} messageSetup:nil];
+}
+
+// Anti-over-fix guard: an ordinary, cacheable ALLOWLIST_COMPILER rule must keep
+// producing the terminal action. Without this, a change that simply disabled
+// compiler caching entirely would pass every other test in this file.
+- (void)testStaticCompilerRuleRemainsReusable {
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
+  OCMStub([self.mockConfigurator enableTransitiveRules]).andReturn(YES);
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateAllowCompiler;
+  rule.type = SNTRuleTypeBinary;
+  [self stubRule:rule forIdentifiers:{.binarySHA256 = @"a"}];
+
+  [self validateExecEvent:SNTActionRespondAllowCompiler args:{"clang"} messageSetup:nil];
+}
+
+// A CEL rule that resolves no dynamic field stays cacheable, so a compiler
+// result from it is still reusable.
+- (void)testCELCompilerRuleWithoutDynamicFieldsRemainsReusable {
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
+  OCMStub([self.mockConfigurator enableTransitiveRules]).andReturn(YES);
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateCELv2;
+  rule.type = SNTRuleTypeBinary;
+  rule.celExpr = @"target.is_platform_binary == false ? ALLOWLIST_COMPILER : BLOCKLIST";
+  [self stubRule:rule forIdentifiers:{.binarySHA256 = @"a"}];
+
+  [self validateExecEvent:SNTActionRespondAllowCompiler args:{"clang"} messageSetup:nil];
 }
 
 - (void)testBinaryAllowCompilerRuleDisabled {

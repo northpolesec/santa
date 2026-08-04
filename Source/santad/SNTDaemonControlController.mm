@@ -14,6 +14,7 @@
 /// limitations under the License.
 
 #import "Source/santad/SNTDaemonControlController.h"
+#include <copyfile.h>
 #include <errno.h>
 #include <limits.h>
 #include <stdlib.h>
@@ -21,6 +22,7 @@
 #include <sys/stat.h>
 
 #import <Foundation/Foundation.h>
+#import <Security/Security.h>
 #include <sys/qos.h>
 
 #include <memory>
@@ -947,6 +949,99 @@ static const char* const kAllowedCanonicalBundlePaths[] = {
     kSantaAppPath,
 };
 
+///
+///  Flags used to validate a whole app bundle before installing it.
+///
+///  Unlike the flags MOLCodesignChecker uses by default on the exec hot path,
+///  resource validation is NOT skipped here. Skipping it leaves every file in the
+///  bundle other than the main executable and Info.plist unverified - including
+///  the privileged helpers launchd runs out of Contents/MacOS. Note also that
+///  kSecCSCheckNestedCode is a no-op when paired with
+///  kSecCSDoNotValidateResources, because nested code is discovered by walking
+///  the sealed resources.
+///
+///  This is orders of magnitude slower than the exec-path flags, which is fine:
+///  installs happen once and aren't latency sensitive.
+///
+static const SecCSFlags kDeepStaticSigningFlags =
+    (kSecCSCheckNestedCode | kSecCSCheckAllArchitectures | kSecCSStrictValidate |
+     kSecCSNoNetworkAccess);
+
+///
+///  Copy the tree at `src` to `dst`, cloning (copy-on-write) the files inside it.
+///  Every entry in the destination tree gets a fresh inode.
+///
+///  That is the entire point of using this instead of a rename: see the comment in
+///  `installSantaApp:` for why sharing inodes with the migration dir is unsafe. The
+///  fresh-inode property holds whether the clone succeeds or copyfile falls back to
+///  a plain copy, so COPYFILE_CLONE (best effort) is used rather than
+///  COPYFILE_CLONE_FORCE, which cannot handle directories at all.
+///
+static BOOL CloneBundleTree(NSString* src, NSString* dst) {
+  if (copyfile(src.UTF8String, dst.UTF8String, NULL,
+               COPYFILE_CLONE | COPYFILE_RECURSIVE | COPYFILE_NOFOLLOW) != 0) {
+    LOGE(@"Failed to clone %@ to %@: %d: %s", src, dst, errno, strerror(errno));
+    return NO;
+  }
+  return YES;
+}
+
+///
+///  Check that every entry in the bundle at `path` looks like something an
+///  installer laid down. Run before the signature checks, because a valid
+///  signature says nothing about the properties checked here.
+///
+- (BOOL)verifyBundleEntriesAreSane:(NSString*)path {
+  BOOL (^CheckEntry)(NSString*) = ^BOOL(NSString* entry) {
+    struct stat sb;
+    if (lstat(entry.UTF8String, &sb) != 0) {
+      LOGE(@"lstat failed for %@: %d", entry, errno);
+      return NO;
+    }
+
+    if (sb.st_uid != 0 || sb.st_gid != 0) {
+      LOGE(@"Bundle entry not owned by root:wheel: %@ (uid=%u gid=%u)", entry, sb.st_uid,
+           sb.st_gid);
+      return NO;
+    }
+
+    // BSD file flags are carried over by the clone. An attacker-set SF_IMMUTABLE
+    // would survive into /Applications/Santa.app and then make every future
+    // install fail when it tries to remove the bundle, so reject any flags at all.
+    // Nothing in a Santa bundle sets them.
+    if (sb.st_flags != 0) {
+      LOGE(@"Bundle entry has file flags set: %@ (flags=0x%x)", entry, sb.st_flags);
+      return NO;
+    }
+
+    return YES;
+  };
+
+  // The enumerator doesn't include the URL it was created with.
+  if (!CheckEntry(path)) {
+    return NO;
+  }
+
+  __block BOOL enumerationFailed = NO;
+  NSDirectoryEnumerator<NSURL*>* dirEnumerator =
+      [[NSFileManager defaultManager] enumeratorAtURL:[NSURL fileURLWithPath:path]
+                           includingPropertiesForKeys:nil
+                                              options:0
+                                         errorHandler:^BOOL(NSURL* url, NSError* error) {
+                                           LOGE(@"Failed to enumerate %@: %@", url, error);
+                                           enumerationFailed = YES;
+                                           return NO;
+                                         }];
+
+  for (NSURL* entry in dirEnumerator) {
+    if (!CheckEntry(entry.path)) {
+      return NO;
+    }
+  }
+
+  return !enumerationFailed;
+}
+
 - (BOOL)verifyPathIsSanta:(NSString*)path {
   if (path.length == 0) {
     LOGE(@"No path provided");
@@ -988,10 +1083,15 @@ static const char* const kAllowedCanonicalBundlePaths[] = {
     return NO;
   }
 
+  // Validate with flags that cover every sealed file in the bundle, not just the
+  // main executable: the helpers launchd runs as root out of Contents/MacOS would
+  // otherwise be unverified and could have been swapped for arbitrary content.
   NSError* err;
-  MOLCodesignChecker* cc = [[MOLCodesignChecker alloc] initWithBinaryPath:path error:&err];
+  MOLCodesignChecker* cc = [[MOLCodesignChecker alloc] initWithBinaryPath:path
+                                                             signingFlags:kDeepStaticSigningFlags
+                                                                    error:&err];
   if (err) {
-    LOGE(@"Failed to validate install path: %@", err);
+    LOGE(@"Failed to validate install path %@: %@", path, err);
     return NO;
   }
   if (![cc.teamID isEqualToString:@"ZMCG7MLDV9"] ||
@@ -1044,13 +1144,6 @@ static const char* const kAllowedCanonicalBundlePaths[] = {
          tempPath, kSantaMigrationAppPath);
   }
 
-  if ([[SNTConfigurator configurator] isSyncV2Enabled] &&
-      santa::SNTIsLiteAppBundle(@(kSantaMigrationAppPath))) {
-    LOGE(@"Refusing to install Lite version while SyncV2 is enabled");
-    reply(NO);
-    return;
-  }
-
   NSFileManager* fm = [NSFileManager defaultManager];
   NSError* error = nil;
 
@@ -1058,9 +1151,11 @@ static const char* const kAllowedCanonicalBundlePaths[] = {
   NSURL* stagingDirURL = [NSURL fileURLWithPath:@(kSantaStagingDir)];
   NSURL* stagingAppURL = [NSURL fileURLWithPath:@(kSantaStagingAppPath)];
   NSURL* appURL = [NSURL fileURLWithPath:@(kSantaAppPath)];
-  NSURL* backupURL = [NSURL fileURLWithPath:@(kSantaAppBackupPath)];
 
-  // Clear any leftover staging dir
+  // Clear any leftover staging dir. Nothing found here can be trusted: the tamper
+  // protection covering the staging dir only exists while santad is running, so a
+  // leftover bundle could have been planted while santad was down. Always start
+  // from a fresh copy of the payload.
   if ([fm fileExistsAtPath:stagingDirURL.path]) {
     if (![fm removeItemAtURL:stagingDirURL error:&error]) {
       LOGE(@"Failed to remove leftover staging dir: %@", error);
@@ -1084,11 +1179,41 @@ static const char* const kAllowedCanonicalBundlePaths[] = {
     return;
   }
 
-  // Move bundle from /migration into santad tamper protected /staging.
-  // santad's ES client self-mute keeps the tamper handler from denying our
-  // own ops. Do not shell out to NSTask for any of these steps.
-  if (![fm moveItemAtURL:migrationAppURL toURL:stagingAppURL error:&error]) {
-    LOGE(@"Failed to move bundle from migration to staging: %@", error);
+  // Copy the bundle from /migration into santad's tamper protected /staging.
+  //
+  // This clones rather than moves, because a move preserves inodes. /migration is
+  // intentionally not tamper protected, so anything with write access there can
+  // retain an alias to the payload's inodes - an open write descriptor, or a hard
+  // link under a path of its own - and a move would carry those inodes all the way
+  // into /Applications/Santa.app. Writes through such an alias are invisible to the
+  // tamper protection (there is no ES event for write(2), and the other name is not
+  // a protected path), so it would be a durable, unmonitored write channel into the
+  // installed bundle. Cloning gives every entry in staging a fresh inode, leaving
+  // any retained alias pointing at the copy discarded just below.
+  //
+  // santad's ES client self-mute keeps the tamper handler from denying our own ops.
+  // Do not shell out to NSTask for any of these steps: a child process is not
+  // covered by the self-mute and would be denied.
+  if (!CloneBundleTree(migrationAppURL.path, stagingAppURL.path)) {
+    [fm removeItemAtURL:stagingDirURL error:nil];
+    reply(NO);
+    return;
+  }
+
+  // Discard the payload now that we hold our own copy, so any alias retained while
+  // it sat in /migration has nothing left in common with the staged bundle.
+  if (![fm removeItemAtURL:migrationAppURL error:&error]) {
+    LOGW(@"Failed to remove migration bundle at %@: %@", migrationAppURL.path, error);
+  }
+
+  // Take ownership before validating, so the bytes that get validated are exactly
+  // the bytes that go live.
+  [self setAppOwnershipAndPermissions:stagingAppURL.path];
+
+  // Check the shape of the staged tree before its signature. A valid signature says
+  // nothing about ownership, link counts or file flags.
+  if (![self verifyBundleEntriesAreSane:stagingAppURL.path]) {
+    LOGE(@"Staged bundle failed sanity checks: %@", stagingAppURL.path);
     [fm removeItemAtURL:stagingDirURL error:nil];
     reply(NO);
     return;
@@ -1096,60 +1221,63 @@ static const char* const kAllowedCanonicalBundlePaths[] = {
 
   // Verify on the staged bundle.
   if (![self verifyPathIsSanta:stagingAppURL.path]) {
-    LOGE(@"Pre-swap verify failed for %@", stagingAppURL.path);
+    LOGE(@"Pre-install verify failed for %@", stagingAppURL.path);
     [fm removeItemAtURL:stagingDirURL error:nil];
     reply(NO);
     return;
   }
 
-  // Atomic install via replaceItemAtURL. End state:
-  //   /Applications/Santa.app          = new bundle
-  //   /Applications/Santa.app.previous = previous-good bundle (auto-protected
-  //                                      by the existing /Applications/Santa.app
-  //                                      kPrefix tamper rule)
-  //   /var/db/santa/staging/Santa.app  = gone (moved out)
-  //   /var/db/santa/staging/           = empty directory
-  if (![fm replaceItemAtURL:appURL
-              withItemAtURL:stagingAppURL
-             backupItemName:@"Santa.app.previous"
-                    options:NSFileManagerItemReplacementWithoutDeletingBackupItem
-           resultingItemURL:nil
-                      error:&error]) {
-    LOGE(@"Failed to replace /Applications/Santa.app: %@", error);
+  // Only inspect the bundle contents once staged and verified; /migration is
+  // not tamper protected, so anything read from there can change underneath us.
+  if ([[SNTConfigurator configurator] isSyncV2Enabled] &&
+      santa::SNTIsLiteAppBundle(stagingAppURL.path)) {
+    LOGE(@"Refusing to install Lite version while SyncV2 is enabled");
     [fm removeItemAtURL:stagingDirURL error:nil];
     reply(NO);
     return;
   }
 
-  [self setAppOwnershipAndPermissions:appURL.path];
-
-  // post move verify
-  if (![self verifyPathIsSanta:appURL.path]) {
-    LOGE(@"Post-swap verify failed for /Applications/Santa.app; rolling back");
-
-    // Atomic rollback on failure.
-    // Restore the previous-good bundle and discard the rejected bundle.
-    NSError* rollbackErr = nil;
-    if (![fm replaceItemAtURL:appURL
-                withItemAtURL:backupURL
-               backupItemName:nil
-                      options:0
-             resultingItemURL:nil
-                        error:&rollbackErr]) {
-      LOGE(@"CRITICAL: rollback failed: %@. /Applications/Santa.app may be "
-           @"inconsistent. Currently-loaded sysex continues to run.",
-           rollbackErr);
+  // Install in place: remove the live bundle, then move the staged bundle onto the
+  // same path. Deliberately NOT a rename of the old bundle out of the way.
+  //
+  // Processes still executing from the old bundle - santasyncservice, the GUI, the
+  // santactl that asked for this install - keep reporting the path they were exec'd
+  // from. Peer validation on Santa's XPC connections resolves that path and compares
+  // what it finds there against the running image, so all that matters is that the
+  // path keeps hosting a file with the same cdhash:
+  //
+  //   - Same bundle version: the file at the path is byte identical, so validation
+  //     keeps passing for the lifetime of those processes and nothing needs to be
+  //     restarted. Note this holds even though the inode at the path has changed.
+  //   - New bundle version: validation fails with errSecCSStaticCodeChanged until
+  //     the process restarts, which the system extension activation below drives.
+  //   - Nothing at the path: the kernel cannot report an executable path at all and
+  //     every validation fails until the process exits. Renaming the old bundle to a
+  //     backup name and then deleting that backup lands here, permanently, which is
+  //     why this does neither.
+  //
+  // Once the live bundle has been removed, the staged bundle is the only copy of
+  // Santa on disk, so the failure paths below leave it in place and name it.
+  if ([fm fileExistsAtPath:appURL.path]) {
+    if (![fm removeItemAtURL:appURL error:&error]) {
+      // A partial removal leaves the destination non-empty, so the move below would
+      // fail with ENOTEMPTY anyway. Stop here rather than compound it.
+      LOGE(@"CRITICAL: failed to remove %@: %@. The install has been abandoned and that "
+           @"bundle may be incomplete. The validated bundle is at %@; re-run the "
+           @"installer to retry.",
+           appURL.path, error, stagingAppURL.path);
+      reply(NO);
+      return;
     }
-
-    [fm removeItemAtURL:stagingDirURL error:nil];
-    reply(NO);
-    return;
   }
 
-  // Success. Clean up the backup.
-  NSError* backupRmErr = nil;
-  if (![fm removeItemAtURL:backupURL error:&backupRmErr]) {
-    LOGW(@"Failed to remove backup at %@: %@", backupURL.path, backupRmErr);
+  if (![fm moveItemAtURL:stagingAppURL toURL:appURL error:&error]) {
+    LOGE(@"CRITICAL: failed to move %@ to %@: %@. There is now no bundle at %@; the "
+         @"validated bundle is still at %@ and the currently loaded system extension "
+         @"continues to run. Re-run the installer to retry.",
+         stagingAppURL.path, appURL.path, error, appURL.path, stagingAppURL.path);
+    reply(NO);
+    return;
   }
 
   // Cleanup the now-empty staging dir.

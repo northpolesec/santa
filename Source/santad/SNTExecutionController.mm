@@ -312,6 +312,13 @@ static bool SameBinary(const es_process_t* a, NSString* aSHA256, const es_proces
       std::make_pair(audit_token_to_pid(token), audit_token_to_pidversion(token)));
 }
 
+// Returns YES when the decision grants compiler status
+static BOOL DecisionIsCompiler(SNTEventState decision) {
+  return decision == SNTEventStateAllowCompilerBinary ||
+         decision == SNTEventStateAllowCompilerSigningID ||
+         decision == SNTEventStateAllowCompilerCDHash;
+}
+
 - (void)validateExecEvent:(const Message&)esMsg
            cachedDecision:(SNTCachedDecision*)existingDecision
                postAction:(bool (^)(SNTAction, SNTCachedDecision*))postAction {
@@ -452,12 +459,17 @@ static bool SameBinary(const es_process_t* a, NSString* aSHA256, const es_proces
   // ACTION_NOTIFY_EXEC message related to the transitive rule is received.
   [[SNTDecisionCache sharedCache] cacheDecision:cd];
 
-  // Upgrade the action to SNTActionRespondAllowCompiler when appropriate, because we want the
-  // kernel to track this information in its decision cache.
-  if (cd.decision == SNTEventStateAllowCompilerBinary ||
-      cd.decision == SNTEventStateAllowCompilerSigningID ||
-      cd.decision == SNTEventStateAllowCompilerCDHash) {
-    action = SNTActionRespondAllowCompiler;
+  // Upgrade the action to a compiler action when appropriate, because we want the
+  // kernel to track this information in its decision cache. A compiler decision is
+  // always already an allow, so this only ever refines an allow.
+  //
+  // Cacheability must survive the upgrade. A compiler decision from a non-cacheable
+  // evaluation, such as a CEL rule that read argv or the environment, authorizes
+  // only this invocation. Caching it as a terminal entry would let a later
+  // execution of the same vnode inherit both the allow and the compiler status
+  // without re-evaluating the rule.
+  if (DecisionIsCompiler(cd.decision)) {
+    action = cd.cacheable ? SNTActionRespondAllowCompiler : SNTActionRespondAllowCompilerNoCache;
   }
 
   pid_t newProcPid = audit_token_to_pid(targetProc->audit_token);
@@ -568,8 +580,7 @@ static bool SameBinary(const es_process_t* a, NSString* aSHA256, const es_proces
     }
 
     // If binary was blocked, do the needful
-    if (action != SNTActionRespondAllow && action != SNTActionRespondAllowCompiler &&
-        action != SNTActionRespondAllowNoCache) {
+    if (!ACTION_IS_ALLOW(action)) {
       if (config.enableBundles && binInfo.bundle) {
         // If the binary is part of a bundle, find and hash all the related binaries in the bundle.
         // Let the GUI know hashing is needed. Once the hashing is complete the GUI will send a

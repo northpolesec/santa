@@ -16,6 +16,7 @@
 @class MOLCertificate;
 
 #import <Foundation/Foundation.h>
+#import <Security/Security.h>
 
 /**
   `MOLCodesignChecker` validates a binary (either on-disk or in memory) has been signed
@@ -23,7 +24,9 @@
 
   @warning When checking bundles this class will ignore non-code resources inside the bundle for
   validation purposes. This very dramatically speeds up validation but means that it is possible
-  to tamper with resource files without this class noticing.
+  to tamper with resource files - and with nested code, which is found by walking those resources -
+  without this class noticing. Callers that need a whole bundle validated can opt into stricter
+  (and much slower) flags with `initWithBinaryPath:signingFlags:error:`.
 */
 @interface MOLCodesignChecker : NSObject
 
@@ -153,6 +156,24 @@
   @return An initialized `MOLCodesignChecker` or nil if validation failed.
 */
 - (instancetype)initWithBinaryPath:(NSString*)binaryPath;
+
+/**
+  Initialize with a binary or bundle on disk, using caller-provided code signing flags.
+
+  @note While the method name mentions binary path, it is possible to initialize with a bundle
+  instead by passing the path to the root of the bundle.
+
+  @param binaryPath Path to a binary file on disk.
+  @param signingFlags `SecCSFlags` to validate the on-disk signature with. These entirely replace
+      the flags the other initializers use, so pass everything that is needed. The default flags
+      skip resource validation for speed; omitting `kSecCSDoNotValidateResources` here validates
+      every sealed file in a bundle, which is orders of magnitude slower.
+  @param error NSError to be filled in if validation fails for any reason.
+  @return An initialized `MOLCodesignChecker`.
+*/
+- (instancetype)initWithBinaryPath:(NSString*)binaryPath
+                      signingFlags:(SecCSFlags)signingFlags
+                             error:(NSError**)error;
 
 /**
   Wrapper around initWithBinaryPath:error: that takes a file descriptor for reading.

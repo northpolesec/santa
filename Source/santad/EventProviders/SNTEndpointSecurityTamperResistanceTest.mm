@@ -20,6 +20,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <stdlib.h>
+#include <sys/mount.h>
 
 #include <map>
 #include <memory>
@@ -40,13 +41,19 @@ using santa::Message;
 using santa::WatchItemPathType;
 
 static constexpr std::string_view kEventsDBPath = "/private/var/db/santa/events.db";
+static constexpr std::string_view kEventsDBWALPath = "/private/var/db/santa/events.db-wal";
 static constexpr std::string_view kRulesDBPath = "/private/var/db/santa/rules.db";
+static constexpr std::string_view kRulesDBJournalPath = "/private/var/db/santa/rules.db-journal";
+static constexpr std::string_view kSantaDBDirectoryPath = "/private/var/db/santa";
+static constexpr std::string_view kSantaLogPath = "/private/var/db/santa/santa.log";
+static constexpr std::string_view kSantaMigrationPath = "/private/var/db/santa/migration";
 static constexpr std::string_view kSantaAppPrefixPath =
     "/Applications/Santa.app/Contents/Info.plist";
 static constexpr std::string_view kBenignPath = "/some/other/path";
 
 @interface SNTEndpointSecurityTamperResistance (Testing)
 + (bool)isProtectedPath:(std::string_view)path;
++ (bool)isProtectedDirectory:(std::string_view)path;
 @end
 
 @interface SNTEndpointSecurityTamperResistanceTest : XCTestCase
@@ -67,12 +74,14 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
       ES_EVENT_TYPE_AUTH_EXEC,
       ES_EVENT_TYPE_AUTH_CLONE,
       ES_EVENT_TYPE_AUTH_COPYFILE,
+      ES_EVENT_TYPE_AUTH_EXCHANGEDATA,
       ES_EVENT_TYPE_AUTH_UNLINK,
       ES_EVENT_TYPE_AUTH_RENAME,
       ES_EVENT_TYPE_AUTH_OPEN,
       ES_EVENT_TYPE_AUTH_CREATE,
       ES_EVENT_TYPE_AUTH_TRUNCATE,
       ES_EVENT_TYPE_AUTH_LINK,
+      ES_EVENT_TYPE_AUTH_MOUNT,
       ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME,
   };
 
@@ -119,12 +128,14 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
       ES_EVENT_TYPE_AUTH_EXEC,
       ES_EVENT_TYPE_AUTH_CLONE,
       ES_EVENT_TYPE_AUTH_COPYFILE,
+      ES_EVENT_TYPE_AUTH_EXCHANGEDATA,
       ES_EVENT_TYPE_AUTH_UNLINK,
       ES_EVENT_TYPE_AUTH_RENAME,
       ES_EVENT_TYPE_AUTH_OPEN,
       ES_EVENT_TYPE_AUTH_CREATE,
       ES_EVENT_TYPE_AUTH_TRUNCATE,
       ES_EVENT_TYPE_AUTH_LINK,
+      ES_EVENT_TYPE_AUTH_MOUNT,
       ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME,
   };
 
@@ -170,12 +181,14 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
       ES_EVENT_TYPE_AUTH_EXEC,
       ES_EVENT_TYPE_AUTH_CLONE,
       ES_EVENT_TYPE_AUTH_COPYFILE,
+      ES_EVENT_TYPE_AUTH_EXCHANGEDATA,
       ES_EVENT_TYPE_AUTH_UNLINK,
       ES_EVENT_TYPE_AUTH_RENAME,
       ES_EVENT_TYPE_AUTH_OPEN,
       ES_EVENT_TYPE_AUTH_CREATE,
       ES_EVENT_TYPE_AUTH_TRUNCATE,
       ES_EVENT_TYPE_AUTH_LINK,
+      ES_EVENT_TYPE_AUTH_MOUNT,
       ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME,
   };
 
@@ -230,14 +243,19 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
   es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_READLINK, &proc, ActionType::Auth);
 
   es_file_t fileEventsDB = MakeESFile(kEventsDBPath.data());
+  es_file_t fileEventsDBWAL = MakeESFile(kEventsDBWALPath.data());
   es_file_t fileRulesDB = MakeESFile(kRulesDBPath.data());
+  es_file_t fileRulesDBJournal = MakeESFile(kRulesDBJournalPath.data());
+  es_file_t santaDBDirectory = MakeESFile(kSantaDBDirectoryPath.data());
+  es_file_t fileSantaLog = MakeESFile(kSantaLogPath.data());
+  es_file_t santaMigrationDirectory = MakeESFile(kSantaMigrationPath.data());
   es_file_t fileSantaAppPrefix = MakeESFile(kSantaAppPrefixPath.data());
   es_file_t fileBenign = MakeESFile(kBenignPath.data());
 
   std::map<es_file_t*, es_auth_result_t> pathToResult{
-      {&fileEventsDB, ES_AUTH_RESULT_DENY},
-      {&fileRulesDB, ES_AUTH_RESULT_DENY},
-      {&fileSantaAppPrefix, ES_AUTH_RESULT_DENY},
+      {&fileEventsDB, ES_AUTH_RESULT_DENY},      {&fileEventsDBWAL, ES_AUTH_RESULT_DENY},
+      {&fileRulesDB, ES_AUTH_RESULT_DENY},       {&fileRulesDBJournal, ES_AUTH_RESULT_DENY},
+      {&santaDBDirectory, ES_AUTH_RESULT_ALLOW}, {&fileSantaAppPrefix, ES_AUTH_RESULT_DENY},
       {&fileBenign, ES_AUTH_RESULT_ALLOW},
   };
 
@@ -383,6 +401,9 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
     es_file_t cloneBenignDir = MakeESFile("/tmp");
     es_string_token_t cloneBenignFilename = MakeESStringToken("benign");
     for (const auto& kv : pathToResult) {
+      // The directory object is denied for CLONE; covered in a dedicated block below.
+      if (kv.first == &santaDBDirectory) continue;
+
       Message msg(mockESApi, &esMsg);
       esMsg.event.clone.source = kv.first;
       esMsg.event.clone.target_dir = &cloneBenignDir;
@@ -442,6 +463,9 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
     es_file_t copyfileBenignDir = MakeESFile("/tmp");
     es_string_token_t copyfileBenignFilename = MakeESStringToken("benign");
     for (const auto& kv : pathToResult) {
+      // The directory object is denied for COPYFILE; covered in a dedicated block below.
+      if (kv.first == &santaDBDirectory) continue;
+
       Message msg(mockESApi, &esMsg);
       esMsg.event.copyfile.source = kv.first;
       esMsg.event.copyfile.target_file = NULL;
@@ -505,6 +529,9 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
     esMsg.event.copyfile.target_dir = NULL;
     esMsg.event.copyfile.target_name = MakeESStringToken("");
     for (const auto& kv : pathToResult) {
+      // The directory object is denied for COPYFILE; covered in a dedicated block below.
+      if (kv.first == &santaDBDirectory) continue;
+
       Message msg(mockESApi, &esMsg);
       esMsg.event.copyfile.target_file = kv.first;
 
@@ -519,6 +546,150 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
       XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
       XCTAssertEqual(gotAuthResult, kv.second);
       XCTAssertEqual(gotCachable, kv.second == ES_AUTH_RESULT_ALLOW);
+    }
+  }
+
+  // Check CLONE/COPYFILE of the /private/var/db/santa directory object are denied. A recursive
+  // directory clone would expose the read-protected databases inside.
+  {
+    es_file_t dirCopyBenignDir = MakeESFile("/tmp");
+    es_string_token_t dirCopyBenignFilename = MakeESStringToken("benign");
+
+    esMsg.event_type = ES_EVENT_TYPE_AUTH_CLONE;
+    {
+      Message msg(mockESApi, &esMsg);
+      esMsg.event.clone.source = &santaDBDirectory;
+      esMsg.event.clone.target_dir = &dirCopyBenignDir;
+      esMsg.event.clone.target_name = dirCopyBenignFilename;
+
+      [mockTamperClient handleMessage:std::move(msg)
+                   recordEventMetrics:^(EventDisposition d) {
+                     XCTAssertEqual(d, EventDisposition::kProcessed);
+                     dispatch_semaphore_signal(semaMetrics);
+                   }];
+
+      XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
+      XCTAssertEqual(gotAuthResult, ES_AUTH_RESULT_DENY);
+      XCTAssertFalse(gotCachable);
+    }
+
+    esMsg.event_type = ES_EVENT_TYPE_AUTH_COPYFILE;
+    {
+      Message msg(mockESApi, &esMsg);
+      esMsg.event.copyfile.source = &santaDBDirectory;
+      esMsg.event.copyfile.target_file = NULL;
+      esMsg.event.copyfile.target_dir = &dirCopyBenignDir;
+      esMsg.event.copyfile.target_name = dirCopyBenignFilename;
+
+      [mockTamperClient handleMessage:std::move(msg)
+                   recordEventMetrics:^(EventDisposition d) {
+                     XCTAssertEqual(d, EventDisposition::kProcessed);
+                     dispatch_semaphore_signal(semaMetrics);
+                   }];
+
+      XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
+      XCTAssertEqual(gotAuthResult, ES_AUTH_RESULT_DENY);
+      XCTAssertFalse(gotCachable);
+    }
+
+    // COPYFILE overwriting the directory object via an existing target_file must also be denied.
+    {
+      Message msg(mockESApi, &esMsg);
+      esMsg.event.copyfile.source = &fileBenign;
+      esMsg.event.copyfile.target_dir = NULL;
+      esMsg.event.copyfile.target_name = MakeESStringToken("");
+      esMsg.event.copyfile.target_file = &santaDBDirectory;
+
+      [mockTamperClient handleMessage:std::move(msg)
+                   recordEventMetrics:^(EventDisposition d) {
+                     XCTAssertEqual(d, EventDisposition::kProcessed);
+                     dispatch_semaphore_signal(semaMetrics);
+                   }];
+
+      XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
+      XCTAssertEqual(gotAuthResult, ES_AUTH_RESULT_DENY);
+      XCTAssertFalse(gotCachable);
+    }
+  }
+
+  // Check EXCHANGEDATA tamper events. exchangedata swaps the contents of two files, so a protected
+  // database appearing as either file1 or file2 must be denied.
+  {
+    esMsg.event_type = ES_EVENT_TYPE_AUTH_EXCHANGEDATA;
+    for (const auto& kv : pathToResult) {
+      // file1 = candidate, file2 = benign
+      {
+        Message msg(mockESApi, &esMsg);
+        esMsg.event.exchangedata.file1 = kv.first;
+        esMsg.event.exchangedata.file2 = &fileBenign;
+
+        [mockTamperClient
+                 handleMessage:std::move(msg)
+            recordEventMetrics:^(EventDisposition d) {
+              XCTAssertEqual(d, kv.second == ES_AUTH_RESULT_DENY ? EventDisposition::kProcessed
+                                                                 : EventDisposition::kDropped);
+              dispatch_semaphore_signal(semaMetrics);
+            }];
+
+        XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
+        XCTAssertEqual(gotAuthResult, kv.second);
+        XCTAssertEqual(gotCachable, kv.second == ES_AUTH_RESULT_ALLOW);
+      }
+
+      // file1 = benign, file2 = candidate
+      {
+        Message msg(mockESApi, &esMsg);
+        esMsg.event.exchangedata.file1 = &fileBenign;
+        esMsg.event.exchangedata.file2 = kv.first;
+
+        [mockTamperClient
+                 handleMessage:std::move(msg)
+            recordEventMetrics:^(EventDisposition d) {
+              XCTAssertEqual(d, kv.second == ES_AUTH_RESULT_DENY ? EventDisposition::kProcessed
+                                                                 : EventDisposition::kDropped);
+              dispatch_semaphore_signal(semaMetrics);
+            }];
+
+        XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
+        XCTAssertEqual(gotAuthResult, kv.second);
+        XCTAssertEqual(gotCachable, kv.second == ES_AUTH_RESULT_ALLOW);
+      }
+    }
+  }
+
+  // Check MOUNT tamper events. A mount whose mount point shadows the protected database directory
+  // (or any ancestor of it) is denied; unrelated mount points are allowed.
+  {
+    esMsg.event_type = ES_EVENT_TYPE_AUTH_MOUNT;
+    std::map<std::string_view, es_auth_result_t> mountPointToResult{
+        {"/private/var/db/santa", ES_AUTH_RESULT_DENY},           // the database directory itself
+        {"/private/var/db", ES_AUTH_RESULT_DENY},                 // parent
+        {"/private/var", ES_AUTH_RESULT_DENY},                    // grandparent
+        {"/", ES_AUTH_RESULT_DENY},                               // root shadows everything
+        {"/private/var/db/santa-backup", ES_AUTH_RESULT_ALLOW},   // component-boundary near miss
+        {"/private/var/db/santa/staging", ES_AUTH_RESULT_ALLOW},  // below the dir, cannot shadow
+        {"/Volumes/attacker", ES_AUTH_RESULT_ALLOW},              // unrelated mount point
+        {"", ES_AUTH_RESULT_ALLOW},                               // empty path must not match all
+    };
+
+    for (const auto& kv : mountPointToResult) {
+      struct statfs fs = {0};
+      strlcpy(fs.f_mntonname, kv.first.data(), sizeof(fs.f_mntonname));
+
+      Message msg(mockESApi, &esMsg);
+      esMsg.event.mount.statfs = &fs;
+
+      [mockTamperClient
+               handleMessage:std::move(msg)
+          recordEventMetrics:^(EventDisposition d) {
+            XCTAssertEqual(d, kv.second == ES_AUTH_RESULT_DENY ? EventDisposition::kProcessed
+                                                               : EventDisposition::kDropped);
+            dispatch_semaphore_signal(semaMetrics);
+          }];
+
+      XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
+      XCTAssertEqual(gotAuthResult, kv.second, @"mount point: %s", kv.first.data());
+      XCTAssertFalse(gotCachable);
     }
   }
 
@@ -599,12 +770,43 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
     XCTAssertTrue(gotCachable);
   }
 
+  // Check CREATE under /private/var/db/santa remains allowed for package-created migration
+  // artifacts and log files.
+  {
+    esMsg.event_type = ES_EVENT_TYPE_AUTH_CREATE;
+    es_file_t santaDBParentDir = MakeESFile(kSantaDBDirectoryPath.data());
+
+    std::map<std::string_view, es_auth_result_t> createSantaDBChildToResult{
+        {"migration", ES_AUTH_RESULT_ALLOW},
+        {"santa.log", ES_AUTH_RESULT_ALLOW},
+    };
+
+    for (const auto& kv : createSantaDBChildToResult) {
+      Message msg(mockESApi, &esMsg);
+      esMsg.event.create.destination_type = ES_DESTINATION_TYPE_NEW_PATH;
+      esMsg.event.create.destination.new_path.dir = &santaDBParentDir;
+      esMsg.event.create.destination.new_path.filename = MakeESStringToken(kv.first.data());
+
+      [mockTamperClient handleMessage:std::move(msg)
+                   recordEventMetrics:^(EventDisposition d) {
+                     XCTAssertEqual(d, EventDisposition::kDropped);
+                     dispatch_semaphore_signal(semaMetrics);
+                   }];
+
+      XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
+      XCTAssertEqual(gotAuthResult, kv.second);
+      XCTAssertTrue(gotCachable);
+    }
+  }
+
   // Check RENAME `source` tamper events
   {
     esMsg.event_type = ES_EVENT_TYPE_AUTH_RENAME;
     es_file_t renameSrcBenignDir = MakeESFile("/tmp");
     es_string_token_t renameSrcBenignFilename = MakeESStringToken("benign");
     for (const auto& kv : pathToResult) {
+      if (kv.first == &santaDBDirectory) continue;
+
       Message msg(mockESApi, &esMsg);
       esMsg.event.rename.source = kv.first;
       esMsg.event.rename.destination_type = ES_DESTINATION_TYPE_NEW_PATH;
@@ -630,6 +832,8 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
     esMsg.event_type = ES_EVENT_TYPE_AUTH_RENAME;
     esMsg.event.rename.source = &fileBenign;
     for (const auto& kv : pathToResult) {
+      if (kv.first == &santaDBDirectory) continue;
+
       Message msg(mockESApi, &esMsg);
       esMsg.event.rename.destination_type = ES_DESTINATION_TYPE_EXISTING_FILE;
       esMsg.event.rename.destination.existing_file = kv.first;
@@ -679,6 +883,114 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
       XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
       XCTAssertEqual(gotAuthResult, kv.second);
       XCTAssertEqual(gotCachable, kv.second == ES_AUTH_RESULT_ALLOW);
+    }
+  }
+
+  // Check RENAME of the /private/var/db/santa directory object is denied in all target forms.
+  {
+    esMsg.event_type = ES_EVENT_TYPE_AUTH_RENAME;
+    es_file_t renameDestBenignDir = MakeESFile("/tmp");
+    es_file_t santaDBGrandparentDir = MakeESFile("/private/var/db");
+    es_string_token_t renameDestBenignFilename = MakeESStringToken("benign");
+    es_string_token_t santaDBDirectoryFilename = MakeESStringToken("santa");
+
+    {
+      Message msg(mockESApi, &esMsg);
+      esMsg.event.rename.source = &santaDBDirectory;
+      esMsg.event.rename.destination_type = ES_DESTINATION_TYPE_NEW_PATH;
+      esMsg.event.rename.destination.new_path.dir = &renameDestBenignDir;
+      esMsg.event.rename.destination.new_path.filename = renameDestBenignFilename;
+
+      [mockTamperClient handleMessage:std::move(msg)
+                   recordEventMetrics:^(EventDisposition d) {
+                     XCTAssertEqual(d, EventDisposition::kProcessed);
+                     dispatch_semaphore_signal(semaMetrics);
+                   }];
+
+      XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
+      XCTAssertEqual(gotAuthResult, ES_AUTH_RESULT_DENY);
+      XCTAssertFalse(gotCachable);
+    }
+
+    {
+      Message msg(mockESApi, &esMsg);
+      esMsg.event.rename.source = &fileBenign;
+      esMsg.event.rename.destination_type = ES_DESTINATION_TYPE_EXISTING_FILE;
+      esMsg.event.rename.destination.existing_file = &santaDBDirectory;
+
+      [mockTamperClient handleMessage:std::move(msg)
+                   recordEventMetrics:^(EventDisposition d) {
+                     XCTAssertEqual(d, EventDisposition::kProcessed);
+                     dispatch_semaphore_signal(semaMetrics);
+                   }];
+
+      XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
+      XCTAssertEqual(gotAuthResult, ES_AUTH_RESULT_DENY);
+      XCTAssertFalse(gotCachable);
+    }
+
+    {
+      Message msg(mockESApi, &esMsg);
+      esMsg.event.rename.source = &fileBenign;
+      esMsg.event.rename.destination_type = ES_DESTINATION_TYPE_NEW_PATH;
+      esMsg.event.rename.destination.new_path.dir = &santaDBGrandparentDir;
+      esMsg.event.rename.destination.new_path.filename = santaDBDirectoryFilename;
+
+      [mockTamperClient handleMessage:std::move(msg)
+                   recordEventMetrics:^(EventDisposition d) {
+                     XCTAssertEqual(d, EventDisposition::kProcessed);
+                     dispatch_semaphore_signal(semaMetrics);
+                   }];
+
+      XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
+      XCTAssertEqual(gotAuthResult, ES_AUTH_RESULT_DENY);
+      XCTAssertFalse(gotCachable);
+    }
+  }
+
+  // Check RENAME of children under /private/var/db/santa remains allowed for newsyslog rotation
+  // and migration directory lifecycle.
+  {
+    esMsg.event_type = ES_EVENT_TYPE_AUTH_RENAME;
+    es_file_t santaDBParentDir = MakeESFile(kSantaDBDirectoryPath.data());
+    es_file_t renameDestBenignDir = MakeESFile("/tmp");
+    es_string_token_t rotatedLogFilename = MakeESStringToken("santa.log.0.gz");
+    es_string_token_t renameDestBenignFilename = MakeESStringToken("benign");
+
+    {
+      Message msg(mockESApi, &esMsg);
+      esMsg.event.rename.source = &fileSantaLog;
+      esMsg.event.rename.destination_type = ES_DESTINATION_TYPE_NEW_PATH;
+      esMsg.event.rename.destination.new_path.dir = &santaDBParentDir;
+      esMsg.event.rename.destination.new_path.filename = rotatedLogFilename;
+
+      [mockTamperClient handleMessage:std::move(msg)
+                   recordEventMetrics:^(EventDisposition d) {
+                     XCTAssertEqual(d, EventDisposition::kDropped);
+                     dispatch_semaphore_signal(semaMetrics);
+                   }];
+
+      XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
+      XCTAssertEqual(gotAuthResult, ES_AUTH_RESULT_ALLOW);
+      XCTAssertTrue(gotCachable);
+    }
+
+    {
+      Message msg(mockESApi, &esMsg);
+      esMsg.event.rename.source = &santaMigrationDirectory;
+      esMsg.event.rename.destination_type = ES_DESTINATION_TYPE_NEW_PATH;
+      esMsg.event.rename.destination.new_path.dir = &renameDestBenignDir;
+      esMsg.event.rename.destination.new_path.filename = renameDestBenignFilename;
+
+      [mockTamperClient handleMessage:std::move(msg)
+                   recordEventMetrics:^(EventDisposition d) {
+                     XCTAssertEqual(d, EventDisposition::kDropped);
+                     dispatch_semaphore_signal(semaMetrics);
+                   }];
+
+      XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
+      XCTAssertEqual(gotAuthResult, ES_AUTH_RESULT_ALLOW);
+      XCTAssertTrue(gotCachable);
     }
   }
 
@@ -931,14 +1243,16 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
     }
   }
 
-  // Check OPEN tamper events (read-only). Literal-protected files (.db, .plist) must still
-  // be denied even for reads, while prefix-protected content (Santa.app contents, LaunchAgents
-  // plists) is allowed when opened without FWRITE.
+  // Check OPEN tamper events (read-only). Database files and their sidecars must still be denied,
+  // while protected paths whose policy allows reads remain accessible.
   {
     esMsg.event_type = ES_EVENT_TYPE_AUTH_OPEN;
     std::map<es_file_t*, es_auth_result_t> openReadOnlyToResult{
         {&fileEventsDB, ES_AUTH_RESULT_DENY},         // literal-protected
+        {&fileEventsDBWAL, ES_AUTH_RESULT_DENY},      // sidecar prefix, reads denied
         {&fileRulesDB, ES_AUTH_RESULT_DENY},          // literal-protected
+        {&fileRulesDBJournal, ES_AUTH_RESULT_DENY},   // sidecar prefix, reads denied
+        {&santaDBDirectory, ES_AUTH_RESULT_ALLOW},    // literal-protected, reads allowed
         {&fileSantaAppPrefix, ES_AUTH_RESULT_ALLOW},  // prefix-protected, read-only OK
         {&fileBenign, ES_AUTH_RESULT_ALLOW},
     };
@@ -1089,7 +1403,25 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
   XCTAssertTrue(
       [SNTEndpointSecurityTamperResistance isProtectedPath:"/private/var/db/santa/events.db"]);
   XCTAssertTrue([SNTEndpointSecurityTamperResistance
-      isProtectedPath:"/private/var/db/santa/sleigh_state.db"]);
+      isProtectedPath:"/private/var/db/santa/rules.db-journal"]);
+  XCTAssertTrue(
+      [SNTEndpointSecurityTamperResistance isProtectedPath:"/private/var/db/santa/rules.db-wal"]);
+  XCTAssertTrue(
+      [SNTEndpointSecurityTamperResistance isProtectedPath:"/private/var/db/santa/events.db-shm"]);
+  XCTAssertFalse([SNTEndpointSecurityTamperResistance isProtectedPath:"/private/var/db/santa"]);
+  XCTAssertTrue([SNTEndpointSecurityTamperResistance isProtectedDirectory:"/private/var/db/santa"]);
+  // The Santa directory's parents are protected as directory objects (rename/clone/copyfile only),
+  // but are not general protected paths.
+  XCTAssertTrue([SNTEndpointSecurityTamperResistance isProtectedDirectory:"/private/var/db"]);
+  XCTAssertTrue([SNTEndpointSecurityTamperResistance isProtectedDirectory:"/private/var"]);
+  XCTAssertFalse([SNTEndpointSecurityTamperResistance isProtectedPath:"/private/var/db"]);
+  XCTAssertFalse([SNTEndpointSecurityTamperResistance isProtectedPath:"/private/var"]);
+  XCTAssertFalse(
+      [SNTEndpointSecurityTamperResistance isProtectedDirectory:"/private/var/db/santa/migration"]);
+  XCTAssertFalse(
+      [SNTEndpointSecurityTamperResistance isProtectedPath:"/private/var/db/santa-backup"]);
+  XCTAssertFalse(
+      [SNTEndpointSecurityTamperResistance isProtectedPath:"/private/var/db/santa/unrelated"]);
   XCTAssertTrue([SNTEndpointSecurityTamperResistance isProtectedPath:"/Applications/Santa.app"]);
   XCTAssertTrue([SNTEndpointSecurityTamperResistance
       isProtectedPath:"/Library/LaunchAgents/com.northpolesec.santa.plist"]);

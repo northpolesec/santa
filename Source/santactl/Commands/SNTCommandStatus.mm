@@ -16,6 +16,7 @@
 #import <Foundation/Foundation.h>
 
 #import "Source/common/MOLXPCConnection.h"
+#import "Source/common/Platform.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTXPCControlInterface.h"
@@ -275,6 +276,18 @@ REGISTER_COMMAND_NAME(@"status")
     isSyncV2Enabled = val;
   }];
 
+  // Network mount blocking relies on the ES mount `disposition` field, which
+  // only exists in message version 8 (macOS 15+). On earlier systems the
+  // setting can be configured and persisted but is never enforced, so report
+  // it as such rather than implying the block is in effect. The build-time
+  // guard covers the case where the field was compiled out entirely.
+  BOOL networkMountBlockingSupported = NO;
+#if HAVE_MACOS_15
+  if (@available(macOS 15.0, *)) {
+    networkMountBlockingSupported = YES;
+  }
+#endif
+
   __block NSNumber* networkMountExceptions;
   __block BOOL networkExtensionEnabled = NO;
   __block BOOL networkExtensionLoaded = NO;
@@ -404,6 +417,7 @@ REGISTER_COMMAND_NAME(@"status")
       NSMutableDictionary* daemon = [stats[@"daemon"] mutableCopy];
       daemon[@"block_network_mounts"] = @(networkMountExceptions != nil);
       daemon[@"network_mount_host_exceptions"] = @([networkMountExceptions intValue]);
+      daemon[@"block_network_mounts_supported"] = @(networkMountBlockingSupported);
       stats[@"daemon"] = daemon;
 
       stats[@"network_extension"] = @{
@@ -534,8 +548,12 @@ REGISTER_COMMAND_NAME(@"status")
     if (isSyncV2Enabled) {
       printf("  %-40s | %s", "Network Mount Blocking", (networkMountExceptions ? "Yes" : "No"));
       if (networkMountExceptions) {
-        printf(" (%d host exception%s)\n", [networkMountExceptions intValue],
+        printf(" (%d host exception%s", [networkMountExceptions intValue],
                [networkMountExceptions intValue] == 1 ? "" : "s");
+        if (!networkMountBlockingSupported) {
+          printf("; not enforced: requires macOS 15+");
+        }
+        printf(")\n");
       } else {
         printf("\n");
       }

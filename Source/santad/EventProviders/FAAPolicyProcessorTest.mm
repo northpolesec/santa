@@ -820,7 +820,13 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess& proc) {
     XCTAssertTrue(faaPolicyProcessor.PolicyMatchesProcess(policyProc, &esProc));
     esProc.is_platform_binary = false;
     XCTAssertFalse(faaPolicyProcessor.PolicyMatchesProcess(policyProc, &esProc));
+
+    // An unsigned process is never a platform binary and must not match.
+    esProc.codesigning_flags = 0x0;
+    XCTAssertFalse(faaPolicyProcessor.PolicyMatchesProcess(policyProc, &esProc));
+
     // Reset for remaining tests
+    esProc.codesigning_flags = CS_SIGNED;
     esProc.is_platform_binary = true;
   }
 

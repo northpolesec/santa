@@ -23,6 +23,8 @@
 #include <gtest/gtest.h>
 
 #include <set>
+#include <string>
+#include <vector>
 
 #include "Source/common/es/Client.h"
 #include "Source/common/es/EndpointSecurityAPI.h"
@@ -71,6 +73,11 @@ class MockEndpointSecurityAPI : public santa::EndpointSecurityAPI {
 
   MOCK_METHOD(uint32_t, ExecArgCount, (const es_event_exec_t* event));
   MOCK_METHOD(es_string_token_t, ExecArg, (const es_event_exec_t* event, uint32_t index));
+  // ExecArgs must be mocked separately: the real implementation calls the free
+  // es_exec_arg_count()/es_exec_arg() functions rather than the virtual methods
+  // above, so stubbing those does not affect it. Calling through to the real
+  // implementation with a synthetic es_message_t is undefined behaviour.
+  MOCK_METHOD(std::vector<std::string>, ExecArgs, (const es_event_exec_t* event));
 
   MOCK_METHOD(uint32_t, ExecEnvCount, (const es_event_exec_t* event));
   MOCK_METHOD(es_string_token_t, ExecEnv, (const es_event_exec_t* event, uint32_t index));

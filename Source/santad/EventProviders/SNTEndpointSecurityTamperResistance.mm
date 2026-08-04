@@ -66,18 +66,50 @@ struct TamperAuthResult {
 }  // namespace
 
 // The ES client process (com.northpolesec.santa.daemon) will be the only process allowed to
-// modify these file paths.
-constexpr std::pair<std::string_view, WatchItemPathType> kProtectedFiles[] = {
-    {"/private/var/db/santa/rules.db", WatchItemPathType::kLiteral},
-    {"/private/var/db/santa/events.db", WatchItemPathType::kLiteral},
-    {"/private/var/db/santa/sleigh_state.db", WatchItemPathType::kLiteral},
-    {"/private/var/db/santa/sync-state.plist", WatchItemPathType::kLiteral},
-    {"/private/var/db/santa/state.plist", WatchItemPathType::kLiteral},
-    {"/Applications/Santa.app", WatchItemPathType::kPrefix},
-    {"/Library/LaunchAgents/com.northpolesec.santa.", WatchItemPathType::kPrefix},
-    {"/Library/LaunchDaemons/com.northpolesec.santa.", WatchItemPathType::kPrefix},
-    {"/private/var/db/santa/staging", WatchItemPathType::kPrefix},
+// modify these file paths. The third tuple element controls whether other processes may open a
+// matching path read-only.
+constexpr std::tuple<std::string_view, WatchItemPathType, bool> kProtectedFiles[] = {
+    {"/private/var/db/santa/rules.db", WatchItemPathType::kLiteral, false},
+    {"/private/var/db/santa/rules.db-", WatchItemPathType::kPrefix, false},
+    {"/private/var/db/santa/events.db", WatchItemPathType::kLiteral, false},
+    {"/private/var/db/santa/events.db-", WatchItemPathType::kPrefix, false},
+    {"/private/var/db/santa/sync-state.plist", WatchItemPathType::kLiteral, false},
+    {"/private/var/db/santa/state.plist", WatchItemPathType::kLiteral, false},
+    {"/Applications/Santa.app", WatchItemPathType::kPrefix, true},
+    {"/Library/LaunchAgents/com.northpolesec.santa.", WatchItemPathType::kPrefix, true},
+    {"/Library/LaunchDaemons/com.northpolesec.santa.", WatchItemPathType::kPrefix, true},
+    {"/private/var/db/santa/staging", WatchItemPathType::kPrefix, true},
 };
+
+// The Santa database root and its parent directories are mutable by package scripts, newsyslog,
+// and normal runtime features. Only protect the directory objects themselves from
+// rename/replacement attacks and from being cloned/copied wholesale (renaming a parent would move
+// the protected subtree out from under us; a recursive directory clone would expose the
+// read-protected databases inside).
+constexpr std::pair<std::string_view, WatchItemPathType> kProtectedDirectories[] = {
+    {"/private/var", WatchItemPathType::kLiteral},
+    {"/private/var/db", WatchItemPathType::kLiteral},
+    {"/private/var/db/santa", WatchItemPathType::kLiteral},
+};
+
+bool ProtectedPathMatches(std::string_view path, std::string_view protectedPath,
+                          WatchItemPathType pathType) {
+  switch (pathType) {
+    case WatchItemPathType::kLiteral: return path == protectedPath;
+    case WatchItemPathType::kPrefix: return path.rfind(protectedPath, 0) == 0;
+  }
+  return false;
+}
+
+// True when a filesystem mounted at `mountPoint` would shadow `path`, i.e. `mountPoint` is `path`
+// itself or one of its ancestor directories. Comparison is path-component aware so "/private/var"
+// does not match "/private/variant".
+bool MountPointShadowsPath(std::string_view mountPoint, std::string_view path) {
+  if (mountPoint.empty()) return false;
+  if (mountPoint == "/" || mountPoint == path) return true;
+  return path.size() > mountPoint.size() && path.rfind(mountPoint, 0) == 0 &&
+         path[mountPoint.size()] == '/';
+}
 
 #if HAVE_MACOS_15_5
 // Platform-binary signing-IDs that Santa trusts to ask launchd to deliver
@@ -124,6 +156,7 @@ static NSString* TamperEventName(es_event_type_t type) {
   switch (type) {
     case ES_EVENT_TYPE_AUTH_CLONE: return @"clone";
     case ES_EVENT_TYPE_AUTH_COPYFILE: return @"copyfile";
+    case ES_EVENT_TYPE_AUTH_EXCHANGEDATA: return @"exchangedata";
     case ES_EVENT_TYPE_AUTH_UNLINK: return @"unlink";
     case ES_EVENT_TYPE_AUTH_TRUNCATE: return @"truncate";
     case ES_EVENT_TYPE_AUTH_CREATE: return @"create";
@@ -264,6 +297,7 @@ TamperAuthResult ValidateLaunchctlExec(const Message& esMsg) {
   switch (esMsg->event_type) {
     case ES_EVENT_TYPE_AUTH_CLONE:
     case ES_EVENT_TYPE_AUTH_COPYFILE:
+    case ES_EVENT_TYPE_AUTH_EXCHANGEDATA:
     case ES_EVENT_TYPE_AUTH_UNLINK:
     case ES_EVENT_TYPE_AUTH_TRUNCATE:
     case ES_EVENT_TYPE_AUTH_CREATE:
@@ -296,6 +330,22 @@ TamperAuthResult ValidateLaunchctlExec(const Message& esMsg) {
       // event types that don't support caching, so there's no need to enumerate them.
       return (esMsg->event_type == ES_EVENT_TYPE_AUTH_OPEN) ? TamperAuthResult::AllowNotCacheable()
                                                             : TamperAuthResult::AllowCacheable();
+    }
+
+    case ES_EVENT_TYPE_AUTH_MOUNT: {
+      // A mount whose mount point is a protected directory (or one of its ancestors) would shadow
+      // the real Santa databases behind an attacker-controlled filesystem. Deny such mounts. MOUNT
+      // is not subject to target-path muting, so it is delivered despite the inverted mute set.
+      std::string_view mountPoint(esMsg->event.mount.statfs->f_mntonname);
+      if ([SNTEndpointSecurityTamperResistance isMountShadowingProtectedDirectory:mountPoint]) {
+        return TamperAuthResult::Deny([NSString
+            stringWithFormat:@"Preventing mount over protected path (by PID %d, %@) at mount "
+                             @"point: %s",
+                             audit_token_to_pid(esMsg->process->audit_token),
+                             santa::StringTokenToNSString(esMsg->process->executable->path),
+                             esMsg->event.mount.statfs->f_mntonname]);
+      }
+      return TamperAuthResult::AllowNotCacheable();
     }
 
     case ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME: {
@@ -417,12 +467,14 @@ TamperAuthResult ValidateLaunchctlExec(const Message& esMsg) {
                                     ES_EVENT_TYPE_AUTH_EXEC,
                                     ES_EVENT_TYPE_AUTH_CLONE,
                                     ES_EVENT_TYPE_AUTH_COPYFILE,
+                                    ES_EVENT_TYPE_AUTH_EXCHANGEDATA,
                                     ES_EVENT_TYPE_AUTH_UNLINK,
                                     ES_EVENT_TYPE_AUTH_RENAME,
                                     ES_EVENT_TYPE_AUTH_OPEN,
                                     ES_EVENT_TYPE_AUTH_CREATE,
                                     ES_EVENT_TYPE_AUTH_TRUNCATE,
                                     ES_EVENT_TYPE_AUTH_LINK,
+                                    ES_EVENT_TYPE_AUTH_MOUNT,
                                     ES_EVENT_TYPE_AUTH_PROC_SUSPEND_RESUME,
   }];
 }
@@ -430,8 +482,12 @@ TamperAuthResult ValidateLaunchctlExec(const Message& esMsg) {
 + (SetPairPathAndType)getProtectedPaths {
   SetPairPathAndType protectedPathsCopy;
 
-  for (size_t i = 0; i < sizeof(kProtectedFiles) / sizeof(kProtectedFiles[0]); ++i) {
-    protectedPathsCopy.insert({std::string(kProtectedFiles[i].first), kProtectedFiles[i].second});
+  for (const auto& protectedFile : kProtectedFiles) {
+    protectedPathsCopy.insert(
+        {std::string(std::get<0>(protectedFile)), std::get<1>(protectedFile)});
+  }
+  for (const auto& [protectedPath, pathType] : kProtectedDirectories) {
+    protectedPathsCopy.insert({std::string(protectedPath), pathType});
   }
 
   return protectedPathsCopy;
@@ -442,39 +498,49 @@ TamperAuthResult ValidateLaunchctlExec(const Message& esMsg) {
   // now they live as NSStrings. We should make them `std::string_view` types
   // in order to use them here efficiently, but will need to make the
   // `SNTDatabaseController` an ObjC++ file.
-  for (size_t i = 0; i < sizeof(kProtectedFiles) / sizeof(kProtectedFiles[0]); ++i) {
-    auto pf = kProtectedFiles[i];
-    switch (pf.second) {
-      case WatchItemPathType::kLiteral:
-        if (path == pf.first) return true;
-        break;
-      case WatchItemPathType::kPrefix:
-        if (path.rfind(pf.first, 0) == 0) return true;
-        break;
+  for (const auto& protectedFile : kProtectedFiles) {
+    if (ProtectedPathMatches(path, std::get<0>(protectedFile), std::get<1>(protectedFile))) {
+      return true;
     }
   }
   return false;
 }
 
-+ (bool)isLiteralProtectedPath:(const std::string_view)path {
-  for (size_t i = 0; i < sizeof(kProtectedFiles) / sizeof(kProtectedFiles[0]); ++i) {
-    auto pf = kProtectedFiles[i];
-    if (pf.second == WatchItemPathType::kLiteral && path == pf.first) return true;
++ (bool)isProtectedDirectory:(const std::string_view)path {
+  for (const auto& [protectedPath, pathType] : kProtectedDirectories) {
+    if (ProtectedPathMatches(path, protectedPath, pathType)) return true;
   }
   return false;
+}
+
++ (bool)isMountShadowingProtectedDirectory:(const std::string_view)mountPoint {
+  for (const auto& [protectedPath, pathType] : kProtectedDirectories) {
+    if (MountPointShadowsPath(mountPoint, protectedPath)) return true;
+  }
+  return false;
+}
+
++ (bool)isReadAllowedForProtectedPath:(const std::string_view)path {
+  for (const auto& [protectedPath, pathType, allowRead] : kProtectedFiles) {
+    if (ProtectedPathMatches(path, protectedPath, pathType) && !allowRead) return false;
+  }
+  return true;
 }
 
 // Returns true when `path` in the context of `esMsg` should be denied as a tamper attempt.
-// Encapsulates the per-event-type semantics: OPEN requires the FWRITE flag to deny a
-// prefix-protected path, and separately denies any open of a literal-protected path
-// regardless of flags (the .db / .plist files should not be readable to outside processes).
+// Encapsulates the per-event-type semantics: writable opens of protected paths are denied, as are
+// read-only opens when the matching protected-path policy does not allow reads. Protected
+// directories only deny replacement (rename) and wholesale duplication (clone/copyfile).
 + (bool)isTamperedPath:(std::string_view)path forMessage:(const santa::Message&)esMsg {
+  if ([SNTEndpointSecurityTamperResistance isProtectedDirectory:path]) {
+    return esMsg->event_type == ES_EVENT_TYPE_AUTH_RENAME ||
+           esMsg->event_type == ES_EVENT_TYPE_AUTH_CLONE ||
+           esMsg->event_type == ES_EVENT_TYPE_AUTH_COPYFILE;
+  }
   if (esMsg->event_type == ES_EVENT_TYPE_AUTH_OPEN) {
-    if ((esMsg->event.open.fflag & FWRITE) &&
-        [SNTEndpointSecurityTamperResistance isProtectedPath:path]) {
-      return true;
-    }
-    return [SNTEndpointSecurityTamperResistance isLiteralProtectedPath:path];
+    if (![SNTEndpointSecurityTamperResistance isProtectedPath:path]) return false;
+    return (esMsg->event.open.fflag & FWRITE) ||
+           ![SNTEndpointSecurityTamperResistance isReadAllowedForProtectedPath:path];
   }
   return [SNTEndpointSecurityTamperResistance isProtectedPath:path];
 }

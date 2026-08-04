@@ -119,6 +119,16 @@ bool AuthResultCache::AddToCache(const es_file_t* es_file, SNTAction decision,
       return cache->set(vnode_id, entry, requestBinary);
     }
 
+    case SNTActionRespondAllowCompilerNoCache: {
+      // Compiler status was granted to the process that was just authorized, not
+      // to this vnode. Narrow to a plain no-cache entry so the next execution can
+      // reuse the identity data but must still run policy again.
+      //
+      // Because this action is never stored, no cache reader can observe it.
+      CachedAuthResult entry = {SNTActionRespondAllowNoCache, GetCurrentUptime(), [cd copy]};
+      return cache->set(vnode_id, entry, requestBinary);
+    }
+
     // SNTActionHoldAllowed and SNTActionHoldDenied are used for transitions, however the
     // cached action is translated to SNTActionRespondAllow or SNTActionRespondDeny respectively.
     // We do not want to cache this result and later execs need to go through this path again.
