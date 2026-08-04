@@ -1397,6 +1397,86 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
   [mockTamperClient stopMocking];
 }
 
+// Sleigh must be able to unlink/truncate its own BoltDB state database, but nothing else, and no
+// other process may touch that database.
+- (void)testSleighStateDbAccess {
+  es_file_t sleighExec = MakeESFile("/Applications/Santa.app/Contents/MacOS/sleigh");
+  es_process_t sleighProc = MakeESProcess(&sleighExec);
+  sleighProc.is_platform_binary = false;
+  sleighProc.team_id = MakeESStringToken("ZMCG7MLDV9");
+  sleighProc.signing_id = MakeESStringToken("com.northpolesec.santa.sleigh");
+
+  es_file_t otherExec = MakeESFile("/usr/local/bin/evil");
+  es_process_t otherProc = MakeESProcess(&otherExec);
+  otherProc.is_platform_binary = false;
+  otherProc.team_id = MakeESStringToken("ABCDE12345");
+  otherProc.signing_id = MakeESStringToken("com.example.evil");
+
+  es_file_t sleighStateDB = MakeESFile("/private/var/db/santa/sleigh_state.db");
+  es_file_t rulesDB = MakeESFile(kRulesDBPath.data());
+
+  struct {
+    es_process_t* proc;
+    es_file_t* target;
+    es_auth_result_t want;
+  } cases[] = {
+      {&sleighProc, &sleighStateDB, ES_AUTH_RESULT_ALLOW},
+      {&sleighProc, &rulesDB, ES_AUTH_RESULT_DENY},
+      {&otherProc, &sleighStateDB, ES_AUTH_RESULT_DENY},
+  };
+
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_UNLINK, &sleighProc, ActionType::Auth);
+
+  dispatch_semaphore_t semaMetrics = dispatch_semaphore_create(0);
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsESNewClient();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+
+  SNTEndpointSecurityTamperResistance* tamperClient =
+      [[SNTEndpointSecurityTamperResistance alloc] initWithESAPI:mockESApi
+                                                         metrics:nullptr
+                                                          logger:nullptr
+                                           antiSuspendSigningIDs:nil
+                                           allowDelegatedSignals:NO];
+
+  id mockTamperClient = OCMPartialMock(tamperClient);
+
+  __block es_auth_result_t gotAuthResult;
+  OCMStub([mockTamperClient respondToMessage:Message(mockESApi, &esMsg)
+                              withAuthResult:(es_auth_result_t)0
+                                   cacheable:false])
+      .ignoringNonObjectArgs()
+      .andDo(^(NSInvocation* inv) {
+        [inv getArgument:&gotAuthResult atIndex:3];
+      });
+
+  for (es_event_type_t eventType : {ES_EVENT_TYPE_AUTH_UNLINK, ES_EVENT_TYPE_AUTH_TRUNCATE}) {
+    esMsg.event_type = eventType;
+    for (const auto& c : cases) {
+      Message msg(mockESApi, &esMsg);
+      esMsg.process = c.proc;
+      if (eventType == ES_EVENT_TYPE_AUTH_UNLINK) {
+        esMsg.event.unlink.target = c.target;
+      } else {
+        esMsg.event.truncate.target = c.target;
+      }
+
+      [mockTamperClient handleMessage:std::move(msg)
+                   recordEventMetrics:^(EventDisposition d) {
+                     dispatch_semaphore_signal(semaMetrics);
+                   }];
+
+      XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
+      XCTAssertEqual(gotAuthResult, c.want, "%s on %s",
+                     eventType == ES_EVENT_TYPE_AUTH_UNLINK ? "unlink" : "truncate",
+                     c.target->path.data);
+    }
+  }
+
+  [mockTamperClient stopMocking];
+}
+
 - (void)testIsProtectedPath {
   XCTAssertTrue(
       [SNTEndpointSecurityTamperResistance isProtectedPath:"/private/var/db/santa/rules.db"]);

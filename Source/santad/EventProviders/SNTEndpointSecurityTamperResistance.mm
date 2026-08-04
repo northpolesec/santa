@@ -66,13 +66,15 @@ struct TamperAuthResult {
 }  // namespace
 
 // The ES client process (com.northpolesec.santa.daemon) will be the only process allowed to
-// modify these file paths. The third tuple element controls whether other processes may open a
+// modify these file paths, with the single exception of Sleigh and its own state database (see
+// IsSleighAccessingOwnState). The third tuple element controls whether other processes may open a
 // matching path read-only.
 constexpr std::tuple<std::string_view, WatchItemPathType, bool> kProtectedFiles[] = {
     {"/private/var/db/santa/rules.db", WatchItemPathType::kLiteral, false},
     {"/private/var/db/santa/rules.db-", WatchItemPathType::kPrefix, false},
     {"/private/var/db/santa/events.db", WatchItemPathType::kLiteral, false},
     {"/private/var/db/santa/events.db-", WatchItemPathType::kPrefix, false},
+    {"/private/var/db/santa/sleigh_state.db", WatchItemPathType::kLiteral, false},
     {"/private/var/db/santa/sync-state.plist", WatchItemPathType::kLiteral, false},
     {"/private/var/db/santa/state.plist", WatchItemPathType::kLiteral, false},
     {"/Applications/Santa.app", WatchItemPathType::kPrefix, true},
@@ -91,6 +93,23 @@ constexpr std::pair<std::string_view, WatchItemPathType> kProtectedDirectories[]
     {"/private/var/db", WatchItemPathType::kLiteral},
     {"/private/var/db/santa", WatchItemPathType::kLiteral},
 };
+
+// Sleigh's signal-scan state database. It is a BoltDB (single file, no sidecar journals), and
+// Sleigh needs full read/write/truncate/unlink access to it: santad hands it an open fd but BoltDB
+// grows/truncates/reopens the file itself, so fd inheritance alone isn't enough.
+constexpr std::string_view kSleighStateDbPath = "/private/var/db/santa/sleigh_state.db";
+static NSString* const kSleighSigningID = @"ZMCG7MLDV9:com.northpolesec.santa.sleigh";
+
+// True when the acting process is Sleigh and the target is Sleigh's own state database, i.e. the
+// one protected path Sleigh is allowed to modify.
+bool IsSleighAccessingOwnState(std::string_view path, const Message& esMsg) {
+  if (path != kSleighStateDbPath) return false;
+
+  NSString* signingID = FormatSigningID(santa::StringTokenToNSString(esMsg->process->signing_id),
+                                        santa::StringTokenToNSString(esMsg->process->team_id),
+                                        esMsg->process->is_platform_binary);
+  return [signingID isEqualToString:kSleighSigningID];
+}
 
 bool ProtectedPathMatches(std::string_view path, std::string_view protectedPath,
                           WatchItemPathType pathType) {
@@ -537,6 +556,7 @@ TamperAuthResult ValidateLaunchctlExec(const Message& esMsg) {
            esMsg->event_type == ES_EVENT_TYPE_AUTH_CLONE ||
            esMsg->event_type == ES_EVENT_TYPE_AUTH_COPYFILE;
   }
+  if (IsSleighAccessingOwnState(path, esMsg)) return false;
   if (esMsg->event_type == ES_EVENT_TYPE_AUTH_OPEN) {
     if (![SNTEndpointSecurityTamperResistance isProtectedPath:path]) return false;
     return (esMsg->event.open.fflag & FWRITE) ||
