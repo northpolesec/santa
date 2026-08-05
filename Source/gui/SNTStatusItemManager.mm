@@ -62,6 +62,12 @@
 // between wins instead of being clobbered by the older read. Written only on the main thread;
 // atomic for the background sample.
 @property(atomic) uint64_t generation;
+
+// The same scheme for policy availability, bumped by daemon-pushed availability updates. Kept
+// separate from `generation` because the two dimensions are independent: an availability push
+// carries no session state and a session push carries no availability state, so a single shared
+// counter would discard perfectly good reads of the other dimension.
+@property(atomic) uint64_t availabilityGeneration;
 @end
 
 @implementation SNTTimedModeState
@@ -429,9 +435,10 @@ static void SetMenuItemTitle(NSMenuItem* item, NSString* title) {
       [self applySecondsRemaining:seconds forState:self.tmmState];
     }];
     [proxy checkTemporaryMonitorModePolicyAvailable:^(BOOL available) {
-      dispatch_async(dispatch_get_main_queue(), ^{
-        [self setAvailable:available forState:self.tmmState];
-      });
+      [self applyAvailabilityForState:self.tmmState
+                                using:^{
+                                  [self setAvailable:available forState:self.tmmState];
+                                }];
     }];
     // Queried last so its main-queue block runs after the session/availability blocks
     // above; the Mode header reads the item visibility + expiration they set.
@@ -468,6 +475,23 @@ static void SetMenuItemTitle(NSMenuItem* item, NSString* title) {
   });
 }
 
+// Apply a daemon-reported availability result to `state` on the main thread. Mirrors
+// applySecondsRemaining:forState: -- the availability generation is sampled here, right after the
+// daemon read, and re-checked on the main thread, so a daemon-pushed availability change that
+// lands in between is not overwritten by this older read.
+//
+// Like the session path, the apply itself does not bump the generation: only the daemon-push
+// wrappers do, so one refresh cannot invalidate another refresh's in-flight read.
+- (void)applyAvailabilityForState:(SNTTimedModeState*)state using:(void (^)(void))apply {
+  uint64_t generation = state.availabilityGeneration;
+  dispatch_async(dispatch_get_main_queue(), ^{
+    if (state.availabilityGeneration != generation) {
+      return;
+    }
+    apply();
+  });
+}
+
 - (void)retrieveAdminModeState {
   // See retrieveMonitorModeState: reply blocks run on a background queue, so AppKit mutations are
   // marshaled to the main queue. Determine the active session first (sets the expiration / "Leave"
@@ -478,9 +502,11 @@ static void SetMenuItemTitle(NSMenuItem* item, NSString* title) {
       [self applySecondsRemaining:seconds forState:self.tamState];
     }];
     [proxy checkTemporaryAdminModeAvailable:^(BOOL available, BOOL alreadyAdmin) {
-      dispatch_async(dispatch_get_main_queue(), ^{
-        [self setAdminItemVisibleWhenAvailable:available alreadyAdmin:alreadyAdmin];
-      });
+      [self applyAvailabilityForState:self.tamState
+                                using:^{
+                                  [self setAdminItemVisibleWhenAvailable:available
+                                                            alreadyAdmin:alreadyAdmin];
+                                }];
     }];
   }];
 }
@@ -870,7 +896,10 @@ static void SetMenuItemTitle(NSMenuItem* item, NSString* title) {
   [self leaveModeForState:self.tmmState];
 }
 
+// Bumps availabilityGeneration for the same reason enterModeWithExpiration:/leaveModeForState:
+// bump generation: this is newer than any availability read already in flight, so drop those.
 - (void)setTemporaryMonitorModePolicyAvailable:(BOOL)available {
+  self.tmmState.availabilityGeneration++;
   [self setAvailable:available forState:self.tmmState];
 }
 
@@ -888,6 +917,7 @@ static void SetMenuItemTitle(NSMenuItem* item, NSString* title) {
 }
 
 - (void)setTemporaryAdminModeAvailable:(BOOL)available {
+  self.tamState.availabilityGeneration++;
   [self setAvailable:available forState:self.tamState];
 }
 
