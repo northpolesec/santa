@@ -35,6 +35,44 @@
 @interface SNTCommandRule : SNTCommand <SNTCommandProtocol>
 @end
 
+/// Errors are built with either a message alone or a message and a detail, so
+/// print whichever fields exist rather than assuming both.
+static NSString* ErrorDetailLine(NSError* error) {
+  if (error.localizedFailureReason.length > 0) {
+    return [NSString
+        stringWithFormat:@"%@: %@", error.localizedDescription, error.localizedFailureReason];
+  }
+  return error.localizedDescription;
+}
+
+/// Reports the reply from a rule change request and returns the exit code to
+/// use. A non-empty `errors` with `success` set means the change was applied but
+/// some rules were skipped, so the errors are reported as warnings.
+/// `successSummary` is a complete sentence; `failureSummary` is a headline that
+/// omits trailing punctuation, as the colon introducing the errors below it is
+/// added here.
+static int ReportRuleChangeOutcome(BOOL success, NSArray<NSError*>* errors,
+                                   NSString* failureSummary, NSString* successSummary) {
+  if (success) {
+    TEE_LOGI(@"%@", successSummary);
+
+    if (errors.count > 0) {
+      TEE_LOGW(@"The following warnings were emitted:");
+      for (NSError* e in errors) {
+        TEE_LOGW(@"\t%@", ErrorDetailLine(e));
+      }
+    }
+
+    return EXIT_SUCCESS;
+  } else {
+    TEE_LOGE(@"%@%@", failureSummary, errors.count > 0 ? @":" : @"");
+    for (NSError* e in errors) {
+      TEE_LOGE(@"\t%@", ErrorDetailLine(e));
+    }
+    return EXIT_FAILURE;
+  }
+}
+
 @implementation SNTCommandRule
 
 REGISTER_COMMAND_NAME(@"rule")
@@ -300,24 +338,14 @@ REGISTER_COMMAND_NAME(@"rule")
                           ruleCleanup:cleanupType
                                source:SNTRuleAddSourceSantactl
                                 reply:^(BOOL success, NSArray<NSError*>* errors) {
-                                  if (success) {
-                                    TEE_LOGI(@"Rules were successfully deleted.");
-                                    if (errors.count > 0) {
-                                      TEE_LOGE(@"The following warnings were emitted:");
-                                      for (NSError* e in errors) {
-                                        TEE_LOGW(@"\t%@", e.localizedDescription);
-                                      }
-                                    }
-                                  } else {
-                                    TEE_LOGE(@"Failed to delete rules:");
-                                    for (NSError* e in errors) {
-                                      TEE_LOGE(@"\t%@", e.localizedDescription);
-                                    }
-                                  }
-
-                                  exit(success == NO ? EXIT_FAILURE : EXIT_SUCCESS);
+                                  exit(ReportRuleChangeOutcome(
+                                      success, errors, @"Failed to delete rules",
+                                      @"Rules were successfully deleted."));
                                 }];
-    exit(EXIT_SUCCESS);
+    // The reply block above is responsible for exiting. Exiting here instead
+    // would race it: the run loop started once this command returns is what
+    // keeps the process alive until the reply arrives.
+    return;
   }
 
   if (importExportFilePath.length > 0) {
@@ -422,21 +450,6 @@ REGISTER_COMMAND_NAME(@"rule")
                         ruleCleanup:SNTRuleCleanupNone
                              source:SNTRuleAddSourceSantactl
                               reply:^(BOOL success, NSArray<NSError*>* errors) {
-                                if (!success) {
-                                  TEE_LOGE(@"Failed to modify rules:");
-                                  for (NSError* e in errors) {
-                                    TEE_LOGE(@"\t%@", e.localizedFailureReason);
-                                  }
-                                  exit(EXIT_FAILURE);
-                                }
-
-                                if (errors.count > 0) {
-                                  TEE_LOGW(@"Rules were modified but with the following issues:");
-                                  for (NSError* e in errors) {
-                                    TEE_LOGW(@"\t%@", e.localizedFailureReason);
-                                  }
-                                }
-
                                 NSString* ruleType;
                                 switch (newRule.type) {
                                   case SNTRuleTypeCertificate:
@@ -448,14 +461,14 @@ REGISTER_COMMAND_NAME(@"rule")
                                   case SNTRuleTypeCDHash: ruleType = @"CDHash"; break;
                                   default: ruleType = @"(Unknown type)"; break;
                                 }
-                                if (newRule.state == SNTRuleStateRemove) {
-                                  printf("Removed rule for %s: %s.\n", [ruleType UTF8String],
-                                         [newRule.identifier UTF8String]);
-                                } else {
-                                  printf("Added rule for %s: %s.\n", [ruleType UTF8String],
-                                         [newRule.identifier UTF8String]);
-                                }
-                                exit(EXIT_SUCCESS);
+
+                                NSString* action =
+                                    (newRule.state == SNTRuleStateRemove) ? @"Removed" : @"Added";
+
+                                exit(ReportRuleChangeOutcome(
+                                    success, errors, @"Failed to modify rules",
+                                    [NSString stringWithFormat:@"%@ rule for %@: %@.", action,
+                                                               ruleType, newRule.identifier]));
                               }];
 }
 
@@ -525,16 +538,12 @@ REGISTER_COMMAND_NAME(@"rule")
                         ruleCleanup:cleanupType
                              source:SNTRuleAddSourceSantactl
                               reply:^(BOOL success, NSArray<NSError*>* errors) {
-                                if (success) {
-                                  TEE_LOGE(@"Rules were modified but with the following issues:");
-                                } else {
-                                  TEE_LOGE(@"Failed to modify rules:");
-                                }
-                                for (NSError* e in errors) {
-                                  TEE_LOGE(@"\t%@", e.localizedFailureReason);
-                                }
-
-                                exit(success == NO ? EXIT_FAILURE : EXIT_SUCCESS);
+                                exit(ReportRuleChangeOutcome(
+                                    success, errors,
+                                    [NSString stringWithFormat:@"Failed to import rules from %@",
+                                                               jsonFilePath],
+                                    [NSString stringWithFormat:@"Imported rules from %@.",
+                                                               jsonFilePath]));
                               }];
 }
 
