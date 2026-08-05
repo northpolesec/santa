@@ -46,7 +46,9 @@
   self.notificationManager = [[SNTNotificationManager alloc] init];
   self.statusItemManager = [[SNTStatusItemManager alloc] init];
   self.notificationManager.statusItemManager = self.statusItemManager;
-  self.userSessionActive = YES;
+  @synchronized(self) {
+    self.userSessionActive = YES;
+  }
 
   [self setupMenu];
   [self setupNativeNotifications];
@@ -189,18 +191,25 @@ static const NSTimeInterval kHideDockIconDelay = 0.25;
 
   // Only publish this listener if the session and connection attempt are still current. A
   // session resign or newer attempt invalidates the generation while this worker is running.
+  BOOL stale = NO;
   @synchronized(self) {
     if (!self.userSessionActive || self.daemonConnectionGeneration != generation) {
       daemonListener.invalidationHandler = nil;
-      [daemonListener invalidate];
-      return;
-    }
-    self.daemonListener = daemonListener;
+      stale = YES;
+    } else {
+      self.daemonListener = daemonListener;
 
-    // This listener will also handle bundle service requests to update the GUI.
-    // When initializing connections with santabundleservice, the notification manager
-    // will send along the endpoint so santabundleservice knows where to find us.
-    self.notificationManager.notificationListener = listener.endpoint;
+      // This listener will also handle bundle service requests to update the GUI.
+      // When initializing connections with santabundleservice, the notification manager
+      // will send along the endpoint so santabundleservice knows where to find us.
+      self.notificationManager.notificationListener = listener.endpoint;
+    }
+  }
+
+  // Invalidated outside the lock, matching the other two teardown paths.
+  if (stale) {
+    [daemonListener invalidate];
+    return;
   }
 
   // Tell daemon to connect back to the above listener.

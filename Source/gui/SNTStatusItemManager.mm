@@ -56,10 +56,11 @@
 @property(atomic, strong) NSTimer* timer;
 @property(atomic, strong) NSDate* expiration;
 
-// Bumped by every session change (enterModeWithExpiration:/leaveModeForState: are the only
-// writers of `expiration`, and both only run on the main thread). A background refresh
-// samples this after reading the daemon and re-checks it before applying, so a daemon push
-// or user action landing in between wins instead of being clobbered by the older read.
+// Bumped by session changes that originate outside a refresh -- daemon pushes and this mode's
+// expiry timer, via enterModeWithExpiration:/leaveModeForState:. A background refresh samples
+// this after reading the daemon and re-checks it before applying, so such a change landing in
+// between wins instead of being clobbered by the older read. Written only on the main thread;
+// atomic for the background sample.
 @property(atomic) uint64_t generation;
 @end
 
@@ -99,12 +100,36 @@
 
 // Serializes timed-mode refreshes. A refresh fans its results out to the main queue, so
 // overlapping refreshes could interleave and let an older one's values land last. Running
-// them one at a time keeps completion order matching request order: the newest refresh
-// enqueues its main-queue updates last and therefore wins.
+// them one at a time keeps main-queue enqueue order matching request order, so the newest
+// refresh's updates are enqueued last and therefore win.
 @property(nonatomic, strong) dispatch_queue_t timedModeRefreshQueue;
+
+// Set while a refresh is queued but has not started. A refresh costs two connections and five
+// synchronous round-trips, each of which can stall on a 2s handshake timeout against an
+// unhealthy daemon, so without this an impatient user reopening the menu could pile up
+// refreshes faster than the queue drains them. Only ever touched from the main thread.
+@property BOOL timedModeRefreshPending;
 @end
 
 static NSString* const kNotificationSilencesKey = @"SilencedNotifications";
+
+// Menu state is applied asynchronously and so can land while the status menu is open (main-queue
+// blocks are serviced during menu tracking). Changing an item's visibility or title then forces
+// the popup to re-measure and re-lay-out, shifting items under the cursor. A refresh re-applies
+// the same values on every menu open, so skip writes that change nothing and the menu only moves
+// when something actually did. Both no-op on a nil item, which is the state after
+// removeStatusBarItem.
+static void SetMenuItemHidden(NSMenuItem* item, BOOL hidden) {
+  if (item && item.hidden != hidden) {
+    item.hidden = hidden;
+  }
+}
+
+static void SetMenuItemTitle(NSMenuItem* item, NSString* title) {
+  if (item && ![item.title isEqualToString:title]) {
+    item.title = title;
+  }
+}
 
 @implementation SNTStatusItemManager
 
@@ -372,8 +397,21 @@ static NSString* const kNotificationSilencesKey = @"SilencedNotifications";
 // Re-query the daemon for live Monitor + Admin session/availability state off the main thread.
 // Serialized on timedModeRefreshQueue so a slow refresh can't finish after a newer one and
 // overwrite it with stale availability/expiration/client-mode values.
+//
+// Coalesced: a refresh that is queued but has not started yet will read state at least as fresh
+// as anything this call could ask for, so there is no reason to queue a second one. The flag is
+// cleared back on the main thread once the refresh has started, bounding the queue at one
+// running plus one pending however fast the menu is reopened.
 - (void)refreshAllTimedModeStateAsync {
+  if (self.timedModeRefreshPending) {
+    return;
+  }
+  self.timedModeRefreshPending = YES;
+
   dispatch_async(self.timedModeRefreshQueue, ^{
+    dispatch_async(dispatch_get_main_queue(), ^{
+      self.timedModeRefreshPending = NO;
+    });
     [self retrieveMonitorModeState];
     [self retrieveAdminModeState];
   });
@@ -407,8 +445,11 @@ static NSString* const kNotificationSilencesKey = @"SilencedNotifications";
 
 // Apply a daemon-reported session length to `state` on the main thread. Called from a refresh
 // reply block, so the generation is sampled here -- right after the daemon read -- and
-// re-checked on the main thread. If a daemon push or user action changed the session in
-// between, that newer state stands and this stale read is dropped.
+// re-checked on the main thread. If a push or the expiry timer changed the session in between,
+// that newer state stands and this stale read is dropped.
+//
+// Calls the apply-cores, not enterModeWithExpiration:/leaveModeForState:, so that one refresh's
+// apply does not invalidate another refresh's in-flight read. See those methods for why.
 - (void)applySecondsRemaining:(NSNumber*)seconds forState:(SNTTimedModeState*)state {
   uint64_t generation = state.generation;
   dispatch_async(dispatch_get_main_queue(), ^{
@@ -416,13 +457,13 @@ static NSString* const kNotificationSilencesKey = @"SilencedNotifications";
       return;
     }
     if (seconds) {
-      [self enterModeWithExpiration:[NSDate dateWithTimeIntervalSinceNow:[seconds intValue]]
-                           forState:state];
+      [self applyEnterWithExpiration:[NSDate dateWithTimeIntervalSinceNow:[seconds intValue]]
+                            forState:state];
     } else if (state.expiration) {
       // The daemon reports no active session but the GUI still shows one (a leave
       // notification can be missed while this session is inactive, e.g. fast user
       // switching). Clear the stale countdown.
-      [self leaveModeForState:state];
+      [self applyLeaveForState:state];
     }
   });
 }
@@ -456,8 +497,9 @@ static NSString* const kNotificationSilencesKey = @"SilencedNotifications";
   // privilege level. This lines up by construction -- "Leave" only appears while the
   // user is elevated (alreadyAdmin), "Request" only while standard -- and mirrors the
   // "Current User Type" that `santactl status` reports.
-  self.userTypeMenuItem.hidden = self.tamState.menuItem.hidden;
-  self.userTypeMenuItem.title = alreadyAdmin ? @"User Type: Administrator" : @"User Type: Standard";
+  SetMenuItemHidden(self.userTypeMenuItem, self.tamState.menuItem.hidden);
+  SetMenuItemTitle(self.userTypeMenuItem,
+                   alreadyAdmin ? @"User Type: Administrator" : @"User Type: Standard");
 }
 
 // The Mode header tracks the Enter/Leave Temporary Monitor Mode item exactly:
@@ -465,8 +507,8 @@ static NSString* const kNotificationSilencesKey = @"SilencedNotifications";
 // Mirrors `santactl status`, which reports "Temporary Monitor Mode" whenever a TMM
 // session is active and otherwise the real client mode.
 - (void)refreshMonitorModeHeaderWithClientMode:(SNTClientMode)mode {
-  self.monitorModeMenuItem.hidden = self.tmmState.menuItem.hidden;
-  self.monitorModeMenuItem.title = [self monitorModeHeaderTitleForClientMode:mode];
+  SetMenuItemHidden(self.monitorModeMenuItem, self.tmmState.menuItem.hidden);
+  SetMenuItemTitle(self.monitorModeMenuItem, [self monitorModeHeaderTitleForClientMode:mode]);
 }
 
 - (NSString*)monitorModeHeaderTitleForClientMode:(SNTClientMode)mode {
@@ -493,7 +535,7 @@ static NSString* const kNotificationSilencesKey = @"SilencedNotifications";
   }
   BOOL tmmVisible = !self.tmmState.menuItem.hidden;
   BOOL tamVisible = !self.tamState.menuItem.hidden;
-  self.timedModeSeparator.hidden = !(tmmVisible && tamVisible);
+  SetMenuItemHidden(self.timedModeSeparator, !(tmmVisible && tamVisible));
 }
 
 // Re-query availability and the current client mode against live state each time the menu
@@ -692,36 +734,58 @@ static NSString* const kNotificationSilencesKey = @"SilencedNotifications";
   });
 }
 
+// Enter/leave driven by something other than a refresh: a daemon push or this mode's own
+// expiry timer. These bump the generation, which drops any refresh read already in flight --
+// that read predates this change, so applying it would resurrect the state just replaced.
+//
+// Refresh applies deliberately do not bump; they call the apply-cores below directly. Because
+// refreshes are serialized on timedModeRefreshQueue, their main-queue blocks are enqueued in
+// request order, so leaving the generation alone is what lets the newest read win. Bumping
+// here would make each refresh invalidate every other in-flight refresh, and an older read
+// could then beat a newer one.
 - (void)enterModeWithExpiration:(NSDate*)expiration forState:(SNTTimedModeState*)state {
   state.generation++;
+  [self applyEnterWithExpiration:expiration forState:state];
+}
+
+- (void)leaveModeForState:(SNTTimedModeState*)state {
+  state.generation++;
+  [self applyLeaveForState:state];
+}
+
+- (void)applyEnterWithExpiration:(NSDate*)expiration forState:(SNTTimedModeState*)state {
   state.expiration = expiration;
 
   // Invalidate any existing timer
   [state.timer invalidate];
 
   // Update menu options
-  state.menuItem.title = state.descriptor.leaveTitle;
+  SetMenuItemTitle(state.menuItem, state.descriptor.leaveTitle);
   state.refreshItem.target = self;
 
   // Create a timer that updates the countdown display. Using a 5 second interval is sufficient
   // since the displayed units are days/hours/minutes which change infrequently. The timer only
   // detects this mode's expiry; the title itself is composed from all active modes by
   // refreshStatusTitle so concurrent TMM/TAM sessions are both shown.
-  dispatch_async(dispatch_get_main_queue(), ^{
-    // Fire immediately to set the initial title, then repeat every 5 seconds.
-    state.timer =
-        [NSTimer scheduledTimerWithTimeInterval:5.0
-                                        repeats:YES
-                                          block:^(NSTimer* timer) {
-                                            if (!state.expiration ||
-                                                [state.expiration timeIntervalSinceNow] <= 0) {
-                                              [self leaveModeForState:state];
-                                              return;
-                                            }
-                                            [self refreshStatusTitle];
-                                          }];
-    [state.timer fire];
-  });
+  //
+  // Scheduled inline rather than via dispatch_async: every caller is already on the main
+  // thread, and deferring the assignment would let two calls in one drain window both
+  // invalidate the same old timer and then overwrite each other's replacement, orphaning a
+  // repeating timer that nothing holds a reference to and so can never be invalidated.
+  //
+  // Fire immediately to set the initial title, then repeat every 5 seconds.
+  state.timer =
+      [NSTimer scheduledTimerWithTimeInterval:5.0
+                                      repeats:YES
+                                        block:^(NSTimer* timer) {
+                                          if (!state.expiration ||
+                                              [state.expiration timeIntervalSinceNow] <= 0) {
+                                            [self leaveModeForState:state];
+                                            return;
+                                          }
+                                          [self refreshStatusTitle];
+                                        }];
+  [state.timer fire];
 }
 
 // Compose the status-bar title from every currently-active timed mode. With a single
@@ -760,8 +824,7 @@ static NSString* const kNotificationSilencesKey = @"SilencedNotifications";
   }
 }
 
-- (void)leaveModeForState:(SNTTimedModeState*)state {
-  state.generation++;
+- (void)applyLeaveForState:(SNTTimedModeState*)state {
   [state.timer invalidate];
   state.timer = nil;
   state.expiration = nil;
@@ -769,7 +832,7 @@ static NSString* const kNotificationSilencesKey = @"SilencedNotifications";
   // Recompose rather than blanking: another mode may still be active and must keep
   // showing its countdown.
   [self refreshStatusTitle];
-  state.menuItem.title = state.descriptor.enterTitle;
+  SetMenuItemTitle(state.menuItem, state.descriptor.enterTitle);
   state.refreshItem.target = nil;
 }
 
@@ -781,8 +844,8 @@ static NSString* const kNotificationSilencesKey = @"SilencedNotifications";
   // it here too covers the daemon-pushed availability updates, which carry no session
   // state of their own.
   BOOL active = (state.expiration != nil);
-  state.menuItem.hidden = !(available || active);
-  state.refreshItem.hidden = !(available || active);
+  SetMenuItemHidden(state.menuItem, !(available || active));
+  SetMenuItemHidden(state.refreshItem, !(available || active));
 
   // The greyed "Mode:" header tracks the TMM item's visibility (see
   // refreshMonitorModeHeaderWithClientMode:), but only the poll / menu-open paths
@@ -792,7 +855,7 @@ static NSString* const kNotificationSilencesKey = @"SilencedNotifications";
   // Showing the header and its title stay with the poll path (which knows the mode),
   // so the un-hide direction is intentionally left untouched.
   if (state == self.tmmState && state.menuItem.hidden) {
-    self.monitorModeMenuItem.hidden = YES;
+    SetMenuItemHidden(self.monitorModeMenuItem, YES);
   }
 
   [self updateTimedModeSeparatorVisibility];
