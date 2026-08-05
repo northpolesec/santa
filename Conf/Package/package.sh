@@ -71,8 +71,10 @@ echo "creating app pkg"
 /usr/bin/plutil -replace BundleOverwriteAction -string upgrade "${SCRATCH}/component.plist"
 /usr/bin/plutil -replace ChildBundles -json "[]" "${SCRATCH}/component.plist"
 
-# Build app package
-APP_VERSION=$(/usr/bin/plutil -extract CFBundleShortVersionString raw -o - "${APP_BUNDLE}/Contents/Info.plist")
+# Build app package. Use CFBundleVersion (release.build) rather than
+# CFBundleShortVersionString (release) so the installed receipt identifies the
+# exact build, making minor upgrades distinguishable.
+APP_VERSION=$(/usr/bin/plutil -extract CFBundleVersion raw -o - "${APP_BUNDLE}/Contents/Info.plist")
 [[ -n "${APP_VERSION}" ]] || die "failed to extract APP_VERSION from ${APP_BUNDLE}/Contents/Info.plist"
 readonly APP_VERSION
 /usr/bin/pkgbuild --identifier "com.northpolesec.santa" \
