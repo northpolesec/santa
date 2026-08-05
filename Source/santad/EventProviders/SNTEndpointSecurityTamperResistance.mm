@@ -344,9 +344,12 @@ TamperAuthResult ValidateLaunchctlExec(const Message& esMsg) {
       // OPEN is the only event that must opt out of caching here: its response is delivered as a
       // flags result (all-or-nothing 0xffffffff), so a cached ALLOW would incorrectly authorize
       // later opens whose flags differ (e.g. a write open of a protected path following a read
-      // open). Every other event type's decision is a pure function of the target path(s), which
-      // is exactly what ES keys its cache on, so caching is safe. ES ignores the cache flag for
-      // event types that don't support caching, so there's no need to enumerate them.
+      // open). Every other event type's decision is a pure function of the target path(s) and the
+      // acting executable, both of which ES includes in its cache key (see the per-event-type
+      // "Cache key" notes in <EndpointSecurity/ESMessage.h>), so caching is safe — the Sleigh
+      // carve-out cannot leak to another executable. ES ignores the cache flag for event types
+      // that don't support caching (which is all of the path-target types except OPEN), so there's
+      // no need to enumerate them.
       return (esMsg->event_type == ES_EVENT_TYPE_AUTH_OPEN) ? TamperAuthResult::AllowNotCacheable()
                                                             : TamperAuthResult::AllowCacheable();
     }
