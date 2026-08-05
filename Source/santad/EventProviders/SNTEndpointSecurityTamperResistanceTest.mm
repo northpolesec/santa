@@ -15,6 +15,7 @@
 
 #import "Source/santad/EventProviders/SNTEndpointSecurityTamperResistance.h"
 
+#include <Kernel/kern/cs_blobs.h>
 #import <OCMock/OCMock.h>
 #import <XCTest/XCTest.h>
 #include <gmock/gmock.h>
@@ -1405,12 +1406,18 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
   sleighProc.is_platform_binary = false;
   sleighProc.team_id = MakeESStringToken("ZMCG7MLDV9");
   sleighProc.signing_id = MakeESStringToken("com.northpolesec.santa.sleigh");
+  sleighProc.codesigning_flags = CS_SIGNED | CS_VALID | CS_HARD | CS_KILL;
+
+  // Same identity, but the kernel is no longer strictly enforcing the cdhash.
+  es_process_t unenforcedSleighProc = sleighProc;
+  unenforcedSleighProc.codesigning_flags = CS_SIGNED;
 
   es_file_t otherExec = MakeESFile("/usr/local/bin/evil");
   es_process_t otherProc = MakeESProcess(&otherExec);
   otherProc.is_platform_binary = false;
   otherProc.team_id = MakeESStringToken("ABCDE12345");
   otherProc.signing_id = MakeESStringToken("com.example.evil");
+  otherProc.codesigning_flags = CS_SIGNED | CS_VALID | CS_HARD | CS_KILL;
 
   es_file_t sleighStateDB = MakeESFile("/private/var/db/santa/sleigh_state.db");
   es_file_t rulesDB = MakeESFile(kRulesDBPath.data());
@@ -1422,6 +1429,7 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
   } cases[] = {
       {&sleighProc, &sleighStateDB, ES_AUTH_RESULT_ALLOW},
       {&sleighProc, &rulesDB, ES_AUTH_RESULT_DENY},
+      {&unenforcedSleighProc, &sleighStateDB, ES_AUTH_RESULT_DENY},
       {&otherProc, &sleighStateDB, ES_AUTH_RESULT_DENY},
   };
 

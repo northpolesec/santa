@@ -676,6 +676,7 @@ objc_library(
     hdrs = ["EventProviders/SNTEndpointSecurityTamperResistance.h"],
     deps = [
         ":EndpointSecurityLogger",
+        "//Source/common:CodeSigningIdentifierUtils",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTLogging",
         "//Source/common:SigningIDHelpers",

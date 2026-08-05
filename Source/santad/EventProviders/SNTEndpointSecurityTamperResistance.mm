@@ -30,6 +30,7 @@
 #include "absl/container/flat_hash_set.h"
 #include "absl/synchronization/mutex.h"
 
+#include "Source/common/CodeSigningIdentifierUtils.h"
 #import "Source/common/Platform.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTLogging.h"
@@ -104,6 +105,11 @@ static NSString* const kSleighSigningID = @"ZMCG7MLDV9:com.northpolesec.santa.sl
 // one protected path Sleigh is allowed to modify.
 bool IsSleighAccessingOwnState(std::string_view path, const Message& esMsg) {
   if (path != kSleighStateDbPath) return false;
+
+  // The reported signing ID is only a strong binding to the executed content when the kernel is
+  // strictly enforcing the cdhash. Otherwise (e.g. invalidated pages after a debugger attach) the
+  // identity could belong to code that is no longer running.
+  if (!santa::CdhashStrictlyEnforced(esMsg->process->codesigning_flags)) return false;
 
   NSString* signingID = FormatSigningID(santa::StringTokenToNSString(esMsg->process->signing_id),
                                         santa::StringTokenToNSString(esMsg->process->team_id),
