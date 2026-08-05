@@ -34,6 +34,8 @@
 @property SNTAboutWindowController* aboutWindowController;
 @property SNTNotificationManager* notificationManager;
 @property MOLXPCConnection* daemonListener;
+@property BOOL userSessionActive;
+@property NSUInteger daemonConnectionGeneration;
 @end
 
 @implementation SNTAppDelegate
@@ -44,6 +46,9 @@
   self.notificationManager = [[SNTNotificationManager alloc] init];
   self.statusItemManager = [[SNTStatusItemManager alloc] init];
   self.notificationManager.statusItemManager = self.statusItemManager;
+  @synchronized(self) {
+    self.userSessionActive = YES;
+  }
 
   [self setupMenu];
   [self setupNativeNotifications];
@@ -56,14 +61,15 @@
                    queue:[NSOperationQueue currentQueue]
               usingBlock:^(NSNotification* note) {
                 [self.statusItemManager temporaryAdminModeSessionResignedActive];
-                self.daemonListener.invalidationHandler = nil;
-                [self.daemonListener invalidate];
-                self.daemonListener = nil;
+                [self deactivateDaemonConnection];
               }];
   [workspaceNotifications addObserverForName:NSWorkspaceSessionDidBecomeActiveNotification
                                       object:nil
                                        queue:[NSOperationQueue currentQueue]
                                   usingBlock:^(NSNotification* note) {
+                                    @synchronized(self) {
+                                      self.userSessionActive = YES;
+                                    }
                                     [self attemptDaemonReconnection];
                                     // Reconcile timed-mode state: while this session was inactive
                                     // (e.g. fast user switching) the daemon may have ended a
@@ -77,7 +83,9 @@
                                                name:NSWindowWillCloseNotification
                                              object:nil];
 
-  [self createDaemonConnection];
+  // Connection setup runs off the main thread because it blocks on the handshake and then waits
+  // up to 5s for the daemon to connect back.
+  [self attemptDaemonReconnection];
 }
 
 // Any visible window other than those backing the status bar item. The status bar windows should
@@ -162,46 +170,109 @@ static const NSTimeInterval kHideDockIconDelay = 0.25;
 
 #pragma mark Connection handling
 
-- (void)createDaemonConnection {
+- (void)createDaemonConnectionForGeneration:(NSUInteger)generation {
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
 
   WEAKIFY(self);
 
   // Create listener for return connection from daemon.
   NSXPCListener* listener = [NSXPCListener anonymousListener];
-  self.daemonListener = [[MOLXPCConnection alloc] initServerWithListener:listener];
-  self.daemonListener.privilegedInterface = [SNTXPCNotifierInterface notifierInterface];
-  self.daemonListener.exportedObject = self.notificationManager;
-  self.daemonListener.acceptedHandler = ^{
+  MOLXPCConnection* daemonListener = [[MOLXPCConnection alloc] initServerWithListener:listener];
+  daemonListener.privilegedInterface = [SNTXPCNotifierInterface notifierInterface];
+  daemonListener.exportedObject = self.notificationManager;
+  daemonListener.acceptedHandler = ^{
     dispatch_semaphore_signal(sema);
   };
-  self.daemonListener.invalidationHandler = ^{
+  daemonListener.invalidationHandler = ^{
     STRONGIFY(self);
-    [self attemptDaemonReconnection];
+    [self attemptDaemonReconnectionIfGenerationCurrent:@(generation)];
   };
-  [self.daemonListener resume];
+  [daemonListener resume];
 
-  // This listener will also handle bundle service requests to update the GUI.
-  // When initializing connections with santabundleservice, the notification manager
-  // will send along the endpoint so santabundleservice knows where to find us.
-  self.notificationManager.notificationListener = listener.endpoint;
+  // Only publish this listener if the session and connection attempt are still current. A
+  // session resign or newer attempt invalidates the generation while this worker is running.
+  BOOL stale = NO;
+  @synchronized(self) {
+    if (!self.userSessionActive || self.daemonConnectionGeneration != generation) {
+      daemonListener.invalidationHandler = nil;
+      stale = YES;
+    } else {
+      self.daemonListener = daemonListener;
+
+      // This listener will also handle bundle service requests to update the GUI.
+      // When initializing connections with santabundleservice, the notification manager
+      // will send along the endpoint so santabundleservice knows where to find us.
+      self.notificationManager.notificationListener = listener.endpoint;
+    }
+  }
+
+  // Invalidated outside the lock, matching the other two teardown paths.
+  if (stale) {
+    [daemonListener invalidate];
+    return;
+  }
 
   // Tell daemon to connect back to the above listener.
   MOLXPCConnection* daemonConn = [SNTXPCControlInterface configuredConnection];
   [daemonConn resume];
-  [[daemonConn remoteObjectProxy] setNotificationListener:listener.endpoint];
+
+  // The client handshake above can block for 2s. Re-check before registering the endpoint so a
+  // worker invalidated during that handshake cannot replace a newer session's listener.
+  @synchronized(self) {
+    if (self.userSessionActive && self.daemonConnectionGeneration == generation &&
+        self.daemonListener == daemonListener) {
+      [[daemonConn remoteObjectProxy] setNotificationListener:listener.endpoint];
+    }
+  }
   [daemonConn invalidate];
 
   // Now wait for the connection to come in.
   if (dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC))) {
-    [self attemptDaemonReconnection];
+    [self attemptDaemonReconnectionIfGenerationCurrent:@(generation)];
   }
 }
 
 - (void)attemptDaemonReconnection {
-  self.daemonListener.invalidationHandler = nil;
-  [self.daemonListener invalidate];
-  [self performSelectorInBackground:@selector(createDaemonConnection) withObject:nil];
+  [self attemptDaemonReconnectionIfGenerationCurrent:nil];
+}
+
+// Replace the current connection only when `expectedGeneration` still identifies it. This makes
+// timeout and invalidation callbacks from older background attempts no-ops.
+- (void)attemptDaemonReconnectionIfGenerationCurrent:(NSNumber*)expectedGeneration {
+  MOLXPCConnection* oldListener;
+  NSUInteger generation;
+
+  @synchronized(self) {
+    BOOL staleGeneration = expectedGeneration && expectedGeneration.unsignedIntegerValue !=
+                                                     self.daemonConnectionGeneration;
+    if (!self.userSessionActive || staleGeneration) {
+      return;
+    }
+
+    generation = ++self.daemonConnectionGeneration;
+    oldListener = self.daemonListener;
+    oldListener.invalidationHandler = nil;
+    self.daemonListener = nil;
+  }
+
+  [oldListener invalidate];
+  dispatch_async(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
+    [self createDaemonConnectionForGeneration:generation];
+  });
+}
+
+- (void)deactivateDaemonConnection {
+  MOLXPCConnection* oldListener;
+
+  @synchronized(self) {
+    self.userSessionActive = NO;
+    ++self.daemonConnectionGeneration;
+    oldListener = self.daemonListener;
+    oldListener.invalidationHandler = nil;
+    self.daemonListener = nil;
+  }
+
+  [oldListener invalidate];
 }
 
 #pragma mark Menu Management

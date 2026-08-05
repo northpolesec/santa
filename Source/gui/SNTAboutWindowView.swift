@@ -190,35 +190,53 @@ struct SyncButtonView: View {
     logReceiver.clear()
     inProgress = true
 
-    let ss = SNTXPCSyncServiceInterface.configuredConnection()
-    ss?.invalidationHandler = {
-      DispatchQueue.main.sync {
-        inProgress = false
-        syncStatus = .failedXPCConnection
-      }
-    }
-    ss?.resume()
-
     let logListener = NSXPCListener.anonymous()
-    lr = MOLXPCConnection(serverWith: logListener)
-    lr?.exportedObject = logReceiver
-    lr?.unprivilegedInterface = NSXPCInterface(with: SNTSyncServiceLogReceiverXPC.self)
-    lr?.resume()
 
-    let proxy = ss?.remoteObjectProxy as? SNTSyncServiceXPC
-    proxy?.sync(withLogListener: logListener.endpoint, syncType: clean ? .clean : .normal) { status in
-      lr = nil
+    // Off the main thread: MOLXPCConnection.resume() blocks on a connection handshake, and both
+    // initializers compute this process's designated requirement (securityd plus file-system
+    // work). The handlers below run on XPC-owned queues, so UI state is updated with main.async
+    // -- main.sync would deadlock if a handler ever ran on the main thread.
+    DispatchQueue.global().async {
+      let logConn = MOLXPCConnection(serverWith: logListener)
+      logConn?.exportedObject = logReceiver
+      logConn?.unprivilegedInterface = NSXPCInterface(with: SNTSyncServiceLogReceiverXPC.self)
+      logConn?.resume()
 
-      DispatchQueue.main.sync {
-        inProgress = false
-        syncStatus = status
+      // lr is SwiftUI state, so it is only ever written on the main thread. This lands before
+      // the reply block's `lr = nil` below, which is enqueued later on the same queue.
+      DispatchQueue.main.async {
+        lr = logConn
       }
 
-      if status == .success {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+      let ss = SNTXPCSyncServiceInterface.configuredConnection()
+      ss?.invalidationHandler = {
+        DispatchQueue.main.async {
           inProgress = false
-          syncStatus = .unknown
+          syncStatus = .failedXPCConnection
         }
+      }
+      ss?.resume()
+
+      let proxy = ss?.remoteObjectProxy as? SNTSyncServiceXPC
+      proxy?.sync(withLogListener: logListener.endpoint, syncType: clean ? .clean : .normal) {
+        status in
+        DispatchQueue.main.async {
+          lr = nil
+          inProgress = false
+          syncStatus = status
+        }
+
+        if status == .success {
+          DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+            inProgress = false
+            syncStatus = .unknown
+          }
+        }
+
+        // Captures ss to keep the connection alive for the reply, then tears it down.
+        // The handler is cleared first so the teardown isn't reported as a sync failure.
+        ss?.invalidationHandler = nil
+        ss?.invalidate()
       }
     }
   }
