@@ -982,6 +982,7 @@ objc_library(
     hdrs = ["Logs/EndpointSecurity/Writers/Syslog.h"],
     deps = [
         ":EndpointSecurityWriter",
+        "//Source/common:SNTLogging",
     ],
 )
 
