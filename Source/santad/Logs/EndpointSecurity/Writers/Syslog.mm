@@ -17,6 +17,8 @@
 
 #include <os/log.h>
 
+#include "Source/common/SNTLogging.h"
+
 namespace santa {
 
 // Max length of data that should be displayed in a single line.
@@ -29,7 +31,13 @@ std::shared_ptr<Syslog> Syslog::Create() {
 }
 
 void Syslog::Write(std::vector<uint8_t>&& bytes) {
-  os_log(OS_LOG_DEFAULT, "%{public}.*s", (int)std::min(kMaxLineLength, bytes.size()), bytes.data());
+  // Telemetry uses its own category so that it can be configured separately
+  // from Santa's diagnostic logging. It is by far the highest volume thing
+  // Santa writes to the system log, and it is the only category that would
+  // benefit from Enable-Oversize-Messages, which raises the per-message limit
+  // that kMaxLineLength truncates to.
+  static os_log_t telemetryLog = LogHandleForCategory("telemetry");
+  os_log(telemetryLog, "%{public}.*s", (int)std::min(kMaxLineLength, bytes.size()), bytes.data());
 }
 
 void Syslog::Flush() {

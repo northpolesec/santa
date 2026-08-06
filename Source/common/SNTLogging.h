@@ -20,10 +20,52 @@
 #include <os/log.h>
 #include <sys/cdefs.h>
 
+// Every Santa component logs under a single subsystem, which lets the whole
+// product be configured with one logging configuration profile. This is the
+// reason not to use OS_LOG_DEFAULT: os_log(5) states that "behavior involving
+// the OS_LOG_DEFAULT constant is not affected by configuration profiles", so
+// logging through it cannot have its level, persistence, or message size limit
+// changed for Santa alone - only system-wide.
+#ifndef SNT_LOG_SUBSYSTEM
+#define SNT_LOG_SUBSYSTEM "com.northpolesec.santa"
+#endif
+
+// Categories subdivide the subsystem and are the unit that configuration
+// profiles address. A target that needs its own category can define this in its
+// copts; everything else shares the default. Note that the process name is
+// already recorded on every log message, so there is no need to spend a
+// category distinguishing Santa's components from each other.
+#ifndef SNT_LOG_CATEGORY
+#define SNT_LOG_CATEGORY "santa"
+#endif
+
+namespace santa {
+
+// The handle used by the LOG* macros below. The logging system interns handles,
+// so all translation units including this header share a single object per
+// (subsystem, category) pair.
+static inline os_log_t LogHandle() {
+  // C++11 onward guarantees thread-safe initialization of function-local
+  // statics, so this needs no explicit synchronization.
+  static os_log_t handle = os_log_create(SNT_LOG_SUBSYSTEM, SNT_LOG_CATEGORY);
+  return handle;
+}
+
+// Creates a handle for an explicit category within Santa's subsystem, for the
+// uncommon call site that should not log under its target's default category.
+// os_log_create costs roughly 40ns even when the category already exists, so
+// callers on a hot path must cache the result rather than calling this per
+// message.
+static inline os_log_t LogHandleForCategory(const char* category) {
+  return os_log_create(SNT_LOG_SUBSYSTEM, category);
+}
+
+}  // namespace santa
+
 __BEGIN_DECLS
 
-#define SNT_LOG_WITH_TYPE(type, fmt, ...)              \
-  os_log_with_type(OS_LOG_DEFAULT, type, "%{public}s", \
+#define SNT_LOG_WITH_TYPE(type, fmt, ...)                  \
+  os_log_with_type(santa::LogHandle(), type, "%{public}s", \
                    [[NSString stringWithFormat:fmt, ##__VA_ARGS__] UTF8String])
 
 #define SNT_PRINT_LOG(file, fmt, ...) \
