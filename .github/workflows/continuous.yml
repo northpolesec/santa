@@ -50,7 +50,7 @@ jobs:
     # gate job is skipped, and a job that `needs` a skipped job is skipped too
     # by default unless its `if` uses a status function to opt back in.
     if: ${{ !cancelled() && github.repository == 'northpolesec/santa' && (needs.gate.outputs.run == 'true' || github.event_name == 'workflow_dispatch') }}
-    runs-on: macos-latest
+    runs-on: [self-hosted, macOS, ARM64]
     # Hang backstop, not a target; runs are ~3.5h with a 4.7h worst case.
     timeout-minutes: 330
     permissions:
