@@ -15,6 +15,8 @@
 #ifndef SANTA_COMMON_CODERMACROS_H
 #define SANTA_COMMON_CODERMACROS_H
 
+#include <type_traits>
+
 /// Encode the property keyed by the property name.
 #define ENCODE(c, o)                        \
   do {                                      \
