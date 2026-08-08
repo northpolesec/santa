@@ -85,6 +85,33 @@
   XCTAssertEqual([mt getDurationMinutes:@(500)], [mt.maxMinutes unsignedIntValue]);
 }
 
+// An NSNumber holding a double too large for 64 bits reads as a small value
+// through -unsignedLongLongValue but saturates to UINT32_MAX through
+// -unsignedIntValue. Deciding with one accessor and returning through the other
+// let such a request pass the limit check and then be granted verbatim.
+- (void)testGetDurationMinutesCannotExceedMaxForAnOversizedRequest {
+  // The full policy maximum: the wrapped value only slips under the limit check
+  // when the cap is above it, which is the case in production.
+  SNTModeTransition* mt =
+      [[SNTModeTransition alloc] initOnDemandMinutes:kMaxTemporaryMonitorModeMinutes
+                                     defaultDuration:10];
+
+  // Built by arithmetic rather than written as a literal on purpose: an
+  // identical constant gets folded and converts differently, which would make
+  // this test pass against the very bug it guards.
+  volatile double computed = 12810238940076099.0 * 86400.0 / 60.0;
+  NSNumber* oversized = @((double)computed);
+
+  // These two assertions are what keep the test honest: they prove the fixture
+  // still reproduces the bug rather than passing for an unrelated reason.
+  XCTAssertLessThanOrEqual([oversized unsignedLongLongValue], [mt.maxMinutes unsignedLongLongValue],
+                           @"fixture no longer passes the limit check");
+  XCTAssertGreaterThan([oversized unsignedIntValue], [mt.maxMinutes unsignedIntValue],
+                       @"fixture no longer reads as oversized");
+
+  XCTAssertLessThanOrEqual([mt getDurationMinutes:oversized], [mt.maxMinutes unsignedIntValue]);
+}
+
 - (void)testEncodeDecodeSecureCoding {
   SNTModeTransition* mt = [[SNTModeTransition alloc] initRevocation];
   NSData* mtSerialized = [mt serialize];

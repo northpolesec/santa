@@ -22,6 +22,7 @@ typedef NS_ENUM(NSInteger, SNTErrorCode) {
   // General errors
   SNTErrorCodeInvalidType = 110,
   SNTErrorCodeManualRulesDisabled = 111,
+  SNTErrorCodeInvalidDuration = 112,
 
   // I/O errors
   SNTErrorCodeFailedToResolvePath = 210,

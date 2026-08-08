@@ -75,7 +75,9 @@
   } else if (durationVal > [self.maxMinutes unsignedLongLongValue]) {
     return [self.maxMinutes unsignedIntValue];
   } else {
-    return [requestedDuration unsignedIntValue];
+    // Return the value that was range-checked. Re-reading the NSNumber can
+    // yield a larger number: its unsigned accessors disagree above 64 bits.
+    return (uint32_t)durationVal;
   }
 }
 
