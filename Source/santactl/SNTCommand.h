@@ -15,6 +15,9 @@
 
 #import <Foundation/Foundation.h>
 
+#include <cstdint>
+#include <optional>
+
 @class MOLXPCConnection;
 
 @protocol SNTCommandProtocol <NSObject>
@@ -67,6 +70,19 @@
 
 @end
 
+///
+///  What a duration string with no unit suffix means. `SNTDurationUnitNone`
+///  makes a bare integer invalid, which is the right default for a caller that
+///  has no unitless interpretation of its own.
+///
+typedef NS_ENUM(NSInteger, SNTDurationUnit) {
+  SNTDurationUnitNone = 0,
+  SNTDurationUnitSeconds,
+  SNTDurationUnitMinutes,
+  SNTDurationUnitHours,
+  SNTDurationUnitDays,
+};
+
 @interface SNTCommand : NSObject <SNTCommandRunProtocol>
 
 @property(nonatomic, readonly) MOLXPCConnection* daemonConn;
@@ -79,12 +95,21 @@
 - (void)printErrorUsageAndExit:(NSString*)error;
 
 ///
-///  Parse a duration string into a whole number of minutes.
-///  Accepts a bare integer (interpreted as minutes) or an integer followed by a
-///  single unit suffix: 'm' (minutes), 'h' (hours), or 'd' (days). Any other
-///  suffix (including 's'), a multi-character suffix, trailing content, or a
-///  non-numeric string returns 0.
-///  e.g. "10" -> 10, "10m" -> 10, "2h" -> 120, "3d" -> 4320.
+///  Parse a duration string into whole seconds. Accepts an optionally-signed
+///  integer followed by a single unit suffix: 's', 'm', 'h' or 'd'. With no
+///  suffix, `defaultUnit` decides; if that is `SNTDurationUnitNone`, a bare
+///  integer is invalid.
 ///
-- (NSTimeInterval)parseTimeInterval:(NSString*)duration;
+///  The only failure mode is a syntax error, which includes a value the scanner
+///  could not read faithfully or that the result cannot represent. Zero and
+///  negative values parse successfully — whether they are *acceptable* is the
+///  caller's constraint to enforce, along with any granularity or bounds
+///  requirement.
+///
+///  Returns std::nullopt on a syntax error, populating `error` with
+///  `SNTErrorCodeInvalidDuration` when `error` is non-NULL.
+///
++ (std::optional<int64_t>)parseTimeInterval:(NSString*)duration
+                                defaultUnit:(SNTDurationUnit)defaultUnit
+                                      error:(NSError**)error;
 @end
