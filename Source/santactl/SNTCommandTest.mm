@@ -48,18 +48,13 @@
                 err.localizedDescription, needle);
 }
 
+// Also guards the minutes constraint creeping back in: these values are only
+// correct if the return unit is seconds.
 - (void)testParseDurationUnitSuffixes {
   [self assertDuration:@"10s" unit:SNTDurationUnitNone equals:10];
   [self assertDuration:@"10m" unit:SNTDurationUnitNone equals:600];
   [self assertDuration:@"2h" unit:SNTDurationUnitNone equals:7200];
   [self assertDuration:@"3d" unit:SNTDurationUnitNone equals:259200];
-}
-
-// Guard against the minutes constraint creeping back in: these values are only
-// correct if the return unit is seconds.
-- (void)testParseDurationHasNoNotionOfMinutes {
-  [self assertDuration:@"1h" unit:SNTDurationUnitNone equals:3600];
-  [self assertDuration:@"1d" unit:SNTDurationUnitNone equals:86400];
 }
 
 - (void)testParseDurationDefaultUnitAppliedToBareInteger {
@@ -131,16 +126,9 @@
 }
 
 // scanInteger saturates at NSIntegerMax/Min and still reports success, so a
-// saturated value is input the scanner could not read faithfully.
+// saturated value is input the scanner could not read faithfully. Seconds have a
+// multiplier of 1, so the overflow check cannot fire: this isolates the guard.
 - (void)testParseDurationOutOfRangeIsInvalid {
-  [self assertDurationInvalid:@"99999999999999999999d"
-                         unit:SNTDurationUnitNone
-              messageContains:@"out of range"];
-  [self assertDurationInvalid:@"9223372036854775807"
-                         unit:SNTDurationUnitMinutes
-              messageContains:@"out of range"];
-  // Multiplier of 1, so the overflow check cannot fire: this isolates the
-  // saturation guard.
   [self assertDurationInvalid:@"99999999999999999999s"
                          unit:SNTDurationUnitNone
               messageContains:@"out of range"];

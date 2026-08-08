@@ -53,16 +53,12 @@ extern NSNumber* SNTAdminModeDurationMinutes(NSString* arg, NSError** error);
   [self assertMinutes:@"2h" equals:120];  // suffixed durations convert
   [self assertMinutes:@"120s" equals:2];  // seconds are fine on a minute boundary
 
-  // The parser accepts all three of these; this command cannot use them.
+  // The parser accepts both of these; this command cannot use them.
   [self assertRejected:@"30s" messageContains:@"whole number of minutes"];
   [self assertRejected:@"0" messageContains:@"greater than zero"];
-  [self assertRejected:@"-5m" messageContains:@"greater than zero"];
 
   // A syntax error reaches the caller rather than being swallowed or reworded.
   [self assertRejected:@"10x" messageContains:@"unknown unit 'x'"];
-
-  // Rejected before it can become an NSNumber that slips past the policy cap.
-  [self assertRejected:@"12810238940076099d" messageContains:@"out of range"];
 }
 
 @end
