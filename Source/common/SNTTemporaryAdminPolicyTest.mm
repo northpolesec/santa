@@ -33,26 +33,20 @@
   XCTAssertEqual([p getDurationMinutes:@45], 45u);
 }
 
-// An NSNumber holding a double that does not fit in 64 bits reads as a small
-// number through -unsignedLongLongValue but saturates to UINT32_MAX through
-// -unsignedIntValue. Deciding the limit with one accessor and returning through
-// the other let such a request pass the check and then be granted verbatim.
+// A double above 2^64 wraps under -unsignedLongLongValue but saturates under
+// -unsignedIntValue, so deciding with one and returning the other leaked.
 - (void)testOversizedRequestCannotExceedMax {
-  // The full policy maximum: the wrapped value only slips under the limit check
-  // when the cap is above it, which is the case in production.
+  // Production cap: the wrapped value only slips under a cap above it.
   SNTTemporaryAdminPolicy* p =
       [[SNTTemporaryAdminPolicy alloc] initOnDemandMinutes:kMaxTemporaryAdminMinutes
                                            defaultDuration:30
                                       requireJustification:NO];
 
-  // Built by arithmetic rather than written as a literal on purpose: an
-  // identical constant gets folded and converts differently, which would make
-  // this test pass against the very bug it guards.
+  // Must be computed, not a literal: a folded constant converts differently and
+  // would make this test vacuous.
   volatile double computed = 12810238940076099.0 * 86400.0 / 60.0;
   NSNumber* oversized = @((double)computed);
 
-  // These two assertions are what keep the test honest: they prove the fixture
-  // still reproduces the bug rather than passing for an unrelated reason.
   XCTAssertLessThanOrEqual([oversized unsignedLongLongValue], [p.maxMinutes unsignedLongLongValue],
                            @"fixture no longer passes the limit check");
   XCTAssertGreaterThan([oversized unsignedIntValue], [p.maxMinutes unsignedIntValue],

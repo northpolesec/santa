@@ -139,28 +139,24 @@
   [self assertDurationInvalid:@"9223372036854775807"
                          unit:SNTDurationUnitMinutes
               messageContains:@"out of range"];
-  // Seconds have a multiplier of 1, so the overflow check below cannot fire and
-  // this input is caught by the saturation guard alone. Without it the parser
-  // would return NSIntegerMax seconds for a number it never actually read.
+  // Multiplier of 1, so the overflow check cannot fire: this isolates the
+  // saturation guard.
   [self assertDurationInvalid:@"99999999999999999999s"
                          unit:SNTDurationUnitNone
               messageContains:@"out of range"];
 }
 
-// The scanned integer fitting is not enough -- the product must fit too. An
-// unbounded result would reach callers as a value they cannot represent, and a
-// duration that large boxed into an NSNumber reads differently through
-// -unsignedLongLongValue than through -unsignedIntValue, which is how an
-// unchecked duration could slip past a policy limit expressed in minutes.
+// The scanned integer fitting is not enough -- the product must too, or an
+// unrepresentable duration reaches callers and can slip past a policy limit.
 - (void)testParseDurationRejectsAProductThatOverflows {
-  // Scans cleanly as an integer; only the multiply by 86400 overflows.
+  // Scans cleanly; only the multiply overflows.
   [self assertDurationInvalid:@"12810238940076099d"
                          unit:SNTDurationUnitNone
               messageContains:@"out of range"];
   [self assertDurationInvalid:@"9223372036854775806"
                          unit:SNTDurationUnitDays
               messageContains:@"out of range"];
-  // Just under the overflow boundary, so it still parses.
+  // Just under the boundary, so it still parses.
   [self assertDuration:@"106751991167300d" unit:SNTDurationUnitNone equals:9223372036854720000];
 }
 

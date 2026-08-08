@@ -139,10 +139,9 @@
     return std::nullopt;
   }
 
-  // The product is checked, not just the scanned integer. Seconds are int64_t
-  // rather than NSTimeInterval so the result stays exact: a floating-point
-  // carrier would reach callers as an NSNumber whose accessors disagree, and a
-  // duration that survives one check can then be read back larger by another.
+  // The product is checked, not just the scanned integer. int64_t rather than
+  // NSTimeInterval keeps it exact: a float carrier reaches callers as an
+  // NSNumber whose accessors disagree, so one check can be read back larger.
   int64_t seconds = 0;
   if (__builtin_mul_overflow((int64_t)intValue, multiplier, &seconds)) {
     [SNTError populateError:error

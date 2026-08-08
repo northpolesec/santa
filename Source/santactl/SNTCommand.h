@@ -72,8 +72,7 @@
 
 ///
 ///  What a duration string with no unit suffix means. `SNTDurationUnitNone`
-///  makes a bare integer invalid, which is the right default for a caller that
-///  has no unitless interpretation of its own.
+///  makes a bare integer invalid.
 ///
 typedef NS_ENUM(NSInteger, SNTDurationUnit) {
   SNTDurationUnitNone = 0,
