@@ -15,6 +15,7 @@
 
 #import "Source/santactl/SNTCommand.h"
 
+#import "Source/common/SNTError.h"
 #import "Source/common/SNTLogging.h"
 
 @implementation SNTCommand
@@ -44,45 +45,112 @@
   exit(1);
 }
 
-// Parse a time interval string into a number of minutes.
-// e.g. "10m" -> 10, "2h" -> 120, "3d" -> 4320
-- (NSTimeInterval)parseTimeInterval:(NSString*)duration {
++ (std::optional<int64_t>)parseTimeInterval:(NSString*)duration
+                                defaultUnit:(SNTDurationUnit)defaultUnit
+                                      error:(NSError**)error {
+  if (duration.length == 0) {
+    [SNTError populateError:error
+                   withCode:SNTErrorCodeInvalidDuration
+                     format:@"invalid duration: empty string"];
+    return std::nullopt;
+  }
+
   NSScanner* scanner = [NSScanner scannerWithString:duration];
   scanner.charactersToBeSkipped = nil;
-  NSString* unit = nil;
 
   NSInteger intValue = 0;
-  if ([scanner scanInteger:&intValue]) {
-    // Check if we're at the end (no unit specified)
-    if ([scanner isAtEnd]) {
-      return intValue;
-    }
+  if (![scanner scanInteger:&intValue]) {
+    [SNTError populateError:error
+                   withCode:SNTErrorCodeInvalidDuration
+                     format:@"invalid duration \"%@\": expected a number", duration];
+    return std::nullopt;
+  }
 
-    // Scan exactly one character from the unit set
+  // scanInteger saturates at NSIntegerMax/Min and still returns YES, so a value
+  // pinned to either extreme is input the scanner could not read faithfully.
+  if (intValue == NSIntegerMax || intValue == NSIntegerMin) {
+    [SNTError populateError:error
+                   withCode:SNTErrorCodeInvalidDuration
+                     format:@"invalid duration \"%@\": value out of range", duration];
+    return std::nullopt;
+  }
+
+  SNTDurationUnit unit = defaultUnit;
+
+  if (![scanner isAtEnd]) {
     NSString* scannedUnit = nil;
-    if ([scanner scanCharactersFromSet:[NSCharacterSet characterSetWithCharactersInString:@"smhd"]
-                            intoString:&scannedUnit]) {
-      // Ensure unit is exactly one character and we're at the end
-      if (scannedUnit.length == 1 && [scanner isAtEnd]) {
-        unit = scannedUnit;
-      } else {
-        return 0;  // Invalid: unit is not exactly one char or there's more content
-      }
-    } else {
-      return 0;  // Invalid: characters after integer that aren't a valid unit
+    if (![scanner scanCharactersFromSet:[NSCharacterSet characterSetWithCharactersInString:@"smhd"]
+                             intoString:&scannedUnit]) {
+      [SNTError
+          populateError:error
+               withCode:SNTErrorCodeInvalidDuration
+                 format:@"invalid duration \"%@\": unknown unit '%@' (expected s, m, h, or d)",
+                        duration, [duration substringFromIndex:scanner.scanLocation]];
+      return std::nullopt;
     }
-
-    if ([unit isEqualToString:@"m"]) {
-      return intValue;
+    if (scannedUnit.length != 1) {
+      [SNTError
+          populateError:error
+               withCode:SNTErrorCodeInvalidDuration
+                 format:@"invalid duration \"%@\": unit must be a single character", duration];
+      return std::nullopt;
     }
-    if ([unit isEqualToString:@"h"]) {
-      return intValue * 60;
+    if (![scanner isAtEnd]) {
+      [SNTError populateError:error
+                     withCode:SNTErrorCodeInvalidDuration
+                       format:@"invalid duration \"%@\": unexpected trailing content after unit",
+                              duration];
+      return std::nullopt;
     }
-    if ([unit isEqualToString:@"d"]) {
-      return intValue * (60 * 24);
+    switch ([scannedUnit characterAtIndex:0]) {
+      case 's': unit = SNTDurationUnitSeconds; break;
+      case 'm': unit = SNTDurationUnitMinutes; break;
+      case 'h': unit = SNTDurationUnitHours; break;
+      case 'd': unit = SNTDurationUnitDays; break;
+      default:
+        // Unreachable: the charset scan above only ever admits 's', 'm', 'h', or 'd'.
+        [SNTError
+            populateError:error
+                 withCode:SNTErrorCodeInvalidDuration
+                   format:@"invalid duration \"%@\": unknown unit '%@' (expected s, m, h, or d)",
+                          duration, scannedUnit];
+        return std::nullopt;
     }
   }
-  return 0;
+
+  int64_t multiplier = 0;
+  switch (unit) {
+    case SNTDurationUnitNone:
+      [SNTError
+          populateError:error
+               withCode:SNTErrorCodeInvalidDuration
+                 format:@"invalid duration \"%@\": a unit is required (s, m, h, or d)", duration];
+      return std::nullopt;
+    case SNTDurationUnitSeconds: multiplier = 1; break;
+    case SNTDurationUnitMinutes: multiplier = 60; break;
+    case SNTDurationUnitHours: multiplier = 60 * 60; break;
+    case SNTDurationUnitDays: multiplier = 60 * 60 * 24; break;
+  }
+
+  if (multiplier == 0) {  // Unreachable for a valid SNTDurationUnit.
+    [SNTError populateError:error
+                   withCode:SNTErrorCodeInvalidDuration
+                     format:@"invalid duration \"%@\": unsupported unit", duration];
+    return std::nullopt;
+  }
+
+  // The product is checked, not just the scanned integer. int64_t rather than
+  // NSTimeInterval keeps it exact: a float carrier reaches callers as an
+  // NSNumber whose accessors disagree, so one check can be read back larger.
+  int64_t seconds = 0;
+  if (__builtin_mul_overflow((int64_t)intValue, multiplier, &seconds)) {
+    [SNTError populateError:error
+                   withCode:SNTErrorCodeInvalidDuration
+                     format:@"invalid duration \"%@\": value out of range", duration];
+    return std::nullopt;
+  }
+
+  return seconds;
 }
 
 @end
