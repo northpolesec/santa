@@ -149,6 +149,7 @@ using santa::NSStringToUTF8String;
   NSError* requestError;
   NSData* data;
 
+  BOOL didInvalidateXSRFToken = NO;
   int maxAttempts = 5;
   for (int attempt = 1; attempt <= maxAttempts; ++attempt) {
     if (attempt >= 2) {
@@ -169,14 +170,22 @@ using santa::NSStringToUTF8String;
     // If the original request failed because of an auth error, attempt to get a new XSRF token and
     // try again. Unfortunately some servers cause NSURLSession to return 'client cert required' or
     // 'could not parse response' when a 403 occurs and SSL cert auth is enabled.
-    if ((response.statusCode == 403 || requestError.code == NSURLErrorClientCertificateRequired ||
-         requestError.code == NSURLErrorCannotParseResponse) &&
-        [self fetchXSRFToken]) {
-      NSMutableURLRequest* mutableRequest = [request mutableCopy];
-      NSString* xsrfHeader = self.syncState.xsrfTokenHeader ?: kDefaultXSRFTokenHeader;
-      [mutableRequest setValue:self.syncState.xsrfToken forHTTPHeaderField:xsrfHeader];
-      request = mutableRequest;
-      continue;
+    if (response.statusCode == 403 || requestError.code == NSURLErrorClientCertificateRequired ||
+        requestError.code == NSURLErrorCannotParseResponse) {
+
+      // Clear the cached token so fetchXSRFToken tries again.
+      if (!didInvalidateXSRFToken) {
+        didInvalidateXSRFToken = YES;
+        self.syncState.xsrfToken = nil;
+
+        if ([self fetchXSRFToken]) {
+          NSMutableURLRequest* mutableRequest = [request mutableCopy];
+          NSString* xsrfHeader = self.syncState.xsrfTokenHeader ?: kDefaultXSRFTokenHeader;
+          [mutableRequest setValue:self.syncState.xsrfToken forHTTPHeaderField:xsrfHeader];
+          request = mutableRequest;
+          continue;
+        }
+      }
     }
 
     // Most 4xx errors indicate a client-side problem that won't resolve by retrying.
