@@ -144,6 +144,10 @@
   [self assertDurationInvalid:@"9223372036854775806"
                          unit:SNTDurationUnitDays
               messageContains:@"out of range"];
+  // Underflow as well: a one-sided check against INT64_MAX would miss this.
+  [self assertDurationInvalid:@"-106751991167301d"
+                         unit:SNTDurationUnitNone
+              messageContains:@"out of range"];
   // Just under the boundary, so it still parses.
   [self assertDuration:@"106751991167300d" unit:SNTDurationUnitNone equals:9223372036854720000];
 }
