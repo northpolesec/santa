@@ -18,7 +18,8 @@ function die {
 # trivially, which is how an arm64-only sleigh shipped for several releases.
 readonly EXPECTED_ARCHS="x86_64 arm64"
 
-# Verify the architectures of a signed artifact, and every slice of it.
+# Verify the architectures of a signed artifact, then the signature, embedded
+# Info.plist and signing identity of every slice of it.
 #
 # `codesign --verify` without --arch only checks the slice matching the host, so
 # a broken slice in a universal binary passes locally and is first caught by
@@ -28,7 +29,13 @@ readonly EXPECTED_ARCHS="x86_64 arm64"
 # macos_command_line_application, which produces exactly that.
 function verify_slices {
   local artifact="${1}"
+  local want_id="${2}"
   local binary="${artifact}"
+
+  # Refuse to run without an expected identifier rather than silently checking
+  # nothing, which is how a caller would quietly opt out of half this function.
+  [[ -n "${want_id}" ]] ||
+    die "no expected signing identifier given for ${artifact}"
 
   if [[ -d "${artifact}" ]]; then
     local exe
@@ -52,7 +59,7 @@ function verify_slices {
       die "${binary} has no ${want} slice (found: ${archs})"
   done
 
-  local arch details
+  local arch details id
   for arch in ${archs}; do
     /usr/bin/codesign --verify --strict --arch "${arch}" "${artifact}" ||
       die "invalid signature in the ${arch} slice of ${artifact}"
@@ -64,6 +71,13 @@ function verify_slices {
     if /usr/bin/grep -q "Info.plist=not bound" <<<"${details}"; then
       die "the ${arch} slice of ${binary} has no bound Info.plist"
     fi
+
+    # codesign takes the identifier from the embedded Info.plist's
+    # CFBundleIdentifier, falling back to the file name under --prefix, so it
+    # is a property of the build rather than of the signing step here.
+    id=$(/usr/bin/sed -n 's/^Identifier=//p' <<<"${details}")
+    [[ "${id}" == "${want_id}" ]] ||
+      die "the ${arch} slice of ${binary} is signed as \"${id}\", expected \"${want_id}\""
   done
 }
 
@@ -144,19 +158,24 @@ for ARTIFACT in "${INPUT_SANTACTL}" "${INPUT_SANTABS}" "${INPUT_SANTAMS}" "${INP
   echo "codesigning ${BN}"
   /usr/bin/codesign "${CODESIGN_OPTS[@]}" "${ARTIFACT}"
 
-  echo "verifying every slice of ${BN}"
-  verify_slices "${ARTIFACT}"
+  # These are not derivable from the file name -- santactl signs as ".ctl", and
+  # the identifiers come from each target's Info.plist. santad matches some of
+  # them exactly at runtime, notably kSleighSigningID for the Sleigh database
+  # tamper-resistance carve-out, so a drifting identifier revokes access rather
+  # than breaking anything visibly.
+  case "${BN}" in
+    santactl) WANT_ID="com.northpolesec.santa.ctl" ;;
+    santabundleservice) WANT_ID="com.northpolesec.santa.bundleservice" ;;
+    santametricservice) WANT_ID="com.northpolesec.santa.metricservice" ;;
+    santasyncservice) WANT_ID="com.northpolesec.santa.syncservice" ;;
+    sleigh) WANT_ID="com.northpolesec.santa.sleigh" ;;
+    com.northpolesec.santa.daemon.systemextension) WANT_ID="com.northpolesec.santa.daemon" ;;
+    Santa.app) WANT_ID="com.northpolesec.santa" ;;
+    *) die "no expected signing identifier for ${BN}" ;;
+  esac
 
-  # santad's tamper-resistance carve-out for the Sleigh database matches this
-  # exact signing ID (kSleighSigningID). codesign takes it from the embedded
-  # Info.plist's CFBundleIdentifier, so an edit there would quietly revoke
-  # sleigh's access to its own database rather than fail anything.
-  if [[ "${BN}" == "sleigh" ]]; then
-    SLEIGH_ID=$(/usr/bin/codesign -d -vvv "${ARTIFACT}" 2>&1 |
-      /usr/bin/sed -n 's/^Identifier=//p')
-    [[ "${SLEIGH_ID}" == "com.northpolesec.santa.sleigh" ]] ||
-      die "sleigh signing identifier is \"${SLEIGH_ID}\", expected com.northpolesec.santa.sleigh"
-  fi
+  echo "verifying every slice of ${BN}"
+  verify_slices "${ARTIFACT}" "${WANT_ID}"
 done
 
 # Notarize all the bundles
@@ -272,7 +291,7 @@ if [ -n "${BUILD_LITE_PACKAGE}" ]; then
     "${LITE_APP}"
 
   echo "verifying every slice of the lite Santa.app"
-  verify_slices "${LITE_APP}"
+  verify_slices "${LITE_APP}" "com.northpolesec.santa"
 
   # Notarize the lite app
   echo "zipping lite Santa.app"
