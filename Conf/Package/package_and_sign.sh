@@ -33,15 +33,24 @@ function verify_slices {
     binary="${artifact}/Contents/MacOS/${exe}"
   fi
 
-  local arch
-  for arch in $(/usr/bin/lipo -archs "${binary}"); do
+  # Capture the architectures rather than iterating the substitution directly: a
+  # failing or empty lipo would otherwise run the loop zero times and report
+  # success, which is the one thing a verification step must never do.
+  local archs
+  archs=$(/usr/bin/lipo -archs "${binary}") ||
+    die "could not read the architectures of ${binary}"
+  [[ -n "${archs}" ]] || die "lipo reported no architectures for ${binary}"
+
+  local arch details
+  for arch in ${archs}; do
     /usr/bin/codesign --verify --strict --arch "${arch}" "${artifact}" ||
       die "invalid signature in the ${arch} slice of ${artifact}"
 
     # An unbound Info.plist means the slice carries no plist for its signature
     # to cover. codesign cannot add one; only the linker can.
-    if /usr/bin/codesign -d --arch "${arch}" -vvv "${binary}" 2>&1 |
-      /usr/bin/grep -q "Info.plist=not bound"; then
+    details=$(/usr/bin/codesign -d --arch "${arch}" -vvv "${binary}" 2>&1) ||
+      die "could not inspect the ${arch} slice of ${binary}"
+    if /usr/bin/grep -q "Info.plist=not bound" <<<"${details}"; then
       die "the ${arch} slice of ${binary} has no bound Info.plist"
     fi
   done
