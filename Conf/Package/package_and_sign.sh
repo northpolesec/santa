@@ -13,7 +13,12 @@ function die {
   exit 2
 }
 
-# Verify every architecture slice of a signed artifact.
+# Every artifact Santa ships is universal. Checking the slices that happen to be
+# present is not enough on its own: a thin binary satisfies a per-slice loop
+# trivially, which is how an arm64-only sleigh shipped for several releases.
+readonly EXPECTED_ARCHS="x86_64 arm64"
+
+# Verify the architectures of a signed artifact, and every slice of it.
 #
 # `codesign --verify` without --arch only checks the slice matching the host, so
 # a broken slice in a universal binary passes locally and is first caught by
@@ -40,6 +45,12 @@ function verify_slices {
   archs=$(/usr/bin/lipo -archs "${binary}") ||
     die "could not read the architectures of ${binary}"
   [[ -n "${archs}" ]] || die "lipo reported no architectures for ${binary}"
+
+  local want
+  for want in ${EXPECTED_ARCHS}; do
+    /usr/bin/grep -qw "${want}" <<<"${archs}" ||
+      die "${binary} has no ${want} slice (found: ${archs})"
+  done
 
   local arch details
   for arch in ${archs}; do
@@ -135,6 +146,17 @@ for ARTIFACT in "${INPUT_SANTACTL}" "${INPUT_SANTABS}" "${INPUT_SANTAMS}" "${INP
 
   echo "verifying every slice of ${BN}"
   verify_slices "${ARTIFACT}"
+
+  # santad's tamper-resistance carve-out for the Sleigh database matches this
+  # exact signing ID (kSleighSigningID). codesign takes it from the embedded
+  # Info.plist's CFBundleIdentifier, so an edit there would quietly revoke
+  # sleigh's access to its own database rather than fail anything.
+  if [[ "${BN}" == "sleigh" ]]; then
+    SLEIGH_ID=$(/usr/bin/codesign -d -vvv "${ARTIFACT}" 2>&1 |
+      /usr/bin/sed -n 's/^Identifier=//p')
+    [[ "${SLEIGH_ID}" == "com.northpolesec.santa.sleigh" ]] ||
+      die "sleigh signing identifier is \"${SLEIGH_ID}\", expected com.northpolesec.santa.sleigh"
+  fi
 done
 
 # Notarize all the bundles
