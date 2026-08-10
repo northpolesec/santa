@@ -223,7 +223,13 @@ static NSString* TAMUsernameForUID(uid_t uid) {
       response.set_message("failed to parse BinaryUploadRequest");
     }
     std::string serialized;
-    response.SerializeToString(&serialized);
+    if (!response.SerializeToString(&serialized)) {
+      // Nothing left to reply with: the reply *is* the serialized response. The
+      // caller treats a nil reply as an internal error.
+      LOGE(@"Binary upload: failed to serialize BinaryUploadResponse");
+      reply(nil);
+      return;
+    }
     reply([NSData dataWithBytes:serialized.data() length:serialized.size()]);
   });
 }
@@ -256,7 +262,13 @@ static NSString* TAMUsernameForUID(uid_t uid) {
       response.set_error(::santa::commands::v1::PackageInventoryResponse::ERROR_INTERNAL);
     }
     std::string serialized;
-    response.SerializeToString(&serialized);
+    if (!response.SerializeToString(&serialized)) {
+      // Nothing left to reply with: the reply *is* the serialized response. The
+      // caller treats a nil reply as an internal error.
+      LOGE(@"Package inventory: failed to serialize PackageInventoryResponse");
+      reply(nil);
+      return;
+    }
     reply([NSData dataWithBytes:serialized.data() length:serialized.size()]);
   });
 }

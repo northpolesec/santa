@@ -45,7 +45,12 @@ namespace pbv1 = ::santa::commands::v1;
   }
 
   std::string serializedRequest;
-  request.SerializeToString(&serializedRequest);
+  if (!request.SerializeToString(&serializedRequest)) {
+    LOGE(@"SantaCommand: PackageInventoryRequest failed - could not serialize request");
+    pbResponse->set_error(::pbv1::PackageInventoryResponse::ERROR_INTERNAL);
+    if (errorMessage) *errorMessage = "could not serialize request";
+    return pbResponse;
+  }
   NSData* requestData = [NSData dataWithBytes:serializedRequest.data()
                                        length:serializedRequest.size()];
 

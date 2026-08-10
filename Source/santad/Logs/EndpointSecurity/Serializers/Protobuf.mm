@@ -491,7 +491,7 @@ std::vector<uint8_t> Protobuf::FinalizeProto(::pbv1::SantaMessage* santa_msg) {
   }
 
   std::vector<uint8_t> vec(santa_msg->ByteSizeLong());
-  santa_msg->SerializeWithCachedSizesToArray(vec.data());
+  (void)santa_msg->SerializeWithCachedSizesToArray(vec.data());
   return vec;
 }
 

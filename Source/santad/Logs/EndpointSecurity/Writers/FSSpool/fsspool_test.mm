@@ -24,8 +24,6 @@
 #include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/AnyBatcher.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/StreamBatcher.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/fsspool.h"
-#include "google/protobuf/any.pb.h"
-#include "google/protobuf/timestamp.pb.h"
 
 namespace fsspool {
 
@@ -45,15 +43,6 @@ class FsSpoolWriterPeer : public FsSpoolWriter<T> {
 using fsspool::FsSpoolWriterPeer;
 
 static constexpr size_t kSpoolSize = 1048576;
-
-google::protobuf::Any TestAnyTimestamp(int64_t s, int32_t n) {
-  google::protobuf::Timestamp v;
-  v.set_seconds(s);
-  v.set_nanos(n);
-  google::protobuf::Any any;
-  any.PackFrom(v);
-  return any;
-}
 
 @interface FSSpoolTest : XCTestCase
 @property NSString* testDir;
