@@ -129,7 +129,7 @@ namespace pbv1 = ::santa::commands::v1;
   response.set_disposition(disposition);
   response.set_sha256_computed(sha256);
   std::string serialized;
-  response.SerializeToString(&serialized);
+  XCTAssertTrue(response.SerializeToString(&serialized));
   return [NSData dataWithBytes:serialized.data() length:serialized.size()];
 }
 
