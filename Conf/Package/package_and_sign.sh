@@ -120,6 +120,7 @@ fi
 
 readonly INPUT_APP="${RELEASE_ROOT}/binaries/Santa.app"
 readonly INPUT_SYSX="${INPUT_APP}/Contents/Library/SystemExtensions/com.northpolesec.santa.daemon.systemextension"
+readonly INPUT_NETD="${INPUT_APP}/Contents/Library/SystemExtensions/com.northpolesec.santa.netd.systemextension"
 readonly INPUT_SANTACTL="${INPUT_APP}/Contents/MacOS/santactl"
 readonly INPUT_SANTABS="${INPUT_APP}/Contents/MacOS/santabundleservice"
 readonly INPUT_SANTAMS="${INPUT_APP}/Contents/MacOS/santametricservice"
@@ -135,8 +136,17 @@ readonly PKG_PATH="${ARTIFACTS_DIR}/${RELEASE_NAME}.pkg"
 readonly DMG_PATH="${ARTIFACTS_DIR}/${RELEASE_NAME}.dmg"
 readonly TAR_PATH="${ARTIFACTS_DIR}/${RELEASE_NAME}.tar.gz"
 
+# The system extensions are signed and notarized alike. The network extension is
+# injected at build time (--//Source/gui:network_extension_bundle) and is absent
+# from builds without it, so it joins the list only when it is there.
+SYSEXES=("${INPUT_SYSX}")
+if [[ -d "${INPUT_NETD}" ]]; then
+  SYSEXES+=("${INPUT_NETD}")
+fi
+readonly SYSEXES
+
 # Sign all of binaries/bundles. Maintain inside-out ordering where necessary
-for ARTIFACT in "${INPUT_SANTACTL}" "${INPUT_SANTABS}" "${INPUT_SANTAMS}" "${INPUT_SANTASS}" "${INPUT_SLEIGH}" "${INPUT_SYSX}" "${INPUT_APP}"; do
+for ARTIFACT in "${INPUT_SANTACTL}" "${INPUT_SANTABS}" "${INPUT_SANTAMS}" "${INPUT_SANTASS}" "${INPUT_SLEIGH}" "${SYSEXES[@]}" "${INPUT_APP}"; do
   BN=$(/usr/bin/basename "${ARTIFACT}")
 
   CODESIGN_OPTS=(
@@ -170,6 +180,7 @@ for ARTIFACT in "${INPUT_SANTACTL}" "${INPUT_SANTABS}" "${INPUT_SANTAMS}" "${INP
     santasyncservice) WANT_ID="com.northpolesec.santa.syncservice" ;;
     sleigh) WANT_ID="com.northpolesec.santa.sleigh" ;;
     com.northpolesec.santa.daemon.systemextension) WANT_ID="com.northpolesec.santa.daemon" ;;
+    com.northpolesec.santa.netd.systemextension) WANT_ID="com.northpolesec.santa.netd" ;;
     Santa.app) WANT_ID="com.northpolesec.santa" ;;
     *) die "no expected signing identifier for ${BN}" ;;
   esac
@@ -179,7 +190,7 @@ for ARTIFACT in "${INPUT_SANTACTL}" "${INPUT_SANTABS}" "${INPUT_SANTAMS}" "${INP
 done
 
 # Notarize all the bundles
-for ARTIFACT in "${INPUT_SYSX}" "${INPUT_APP}"; do
+for ARTIFACT in "${SYSEXES[@]}" "${INPUT_APP}"; do
   BN=$(/usr/bin/basename "${ARTIFACT}")
 
   echo "zipping ${BN}"
