@@ -13,6 +13,40 @@ function die {
   exit 2
 }
 
+# Verify every architecture slice of a signed artifact.
+#
+# `codesign --verify` without --arch only checks the slice matching the host, so
+# a broken slice in a universal binary passes locally and is first caught by
+# notarization -- which reports it as "The signature of the binary is invalid"
+# with no indication of which slice or why. rules_apple 4.4.0 through at least
+# 4.5.3 omit the embedded Info.plist from the non-native slice of
+# macos_command_line_application, which produces exactly that.
+function verify_slices {
+  local artifact="${1}"
+  local binary="${artifact}"
+
+  if [[ -d "${artifact}" ]]; then
+    local exe
+    exe=$(/usr/bin/plutil -extract CFBundleExecutable raw -o - \
+      "${artifact}/Contents/Info.plist") ||
+      die "could not read CFBundleExecutable from ${artifact}"
+    binary="${artifact}/Contents/MacOS/${exe}"
+  fi
+
+  local arch
+  for arch in $(/usr/bin/lipo -archs "${binary}"); do
+    /usr/bin/codesign --verify --strict --arch "${arch}" "${artifact}" ||
+      die "invalid signature in the ${arch} slice of ${artifact}"
+
+    # An unbound Info.plist means the slice carries no plist for its signature
+    # to cover. codesign cannot add one; only the linker can.
+    if /usr/bin/codesign -d --arch "${arch}" -vvv "${binary}" 2>&1 |
+      /usr/bin/grep -q "Info.plist=not bound"; then
+      die "the ${arch} slice of ${binary} has no bound Info.plist"
+    fi
+  done
+}
+
 # RELEASE_ROOT is a required environment variable that points to the root
 # of a release tarball produced with the :release rule in Santa's
 # main BUILD file, or the root of an extracted release dir.
@@ -89,6 +123,9 @@ for ARTIFACT in "${INPUT_SANTACTL}" "${INPUT_SANTABS}" "${INPUT_SANTAMS}" "${INP
 
   echo "codesigning ${BN}"
   /usr/bin/codesign "${CODESIGN_OPTS[@]}" "${ARTIFACT}"
+
+  echo "verifying every slice of ${BN}"
+  verify_slices "${ARTIFACT}"
 done
 
 # Notarize all the bundles
@@ -202,6 +239,9 @@ if [ -n "${BUILD_LITE_PACKAGE}" ]; then
     --generate-entitlement-der \
     --options library,kill,runtime \
     "${LITE_APP}"
+
+  echo "verifying every slice of the lite Santa.app"
+  verify_slices "${LITE_APP}"
 
   # Notarize the lite app
   echo "zipping lite Santa.app"
