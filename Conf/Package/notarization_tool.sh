@@ -23,7 +23,12 @@ readonly CREDS=(
   --issuer "${NOTARIZATION_ISSUER_ID}"
 )
 
-readonly SUBMIT_OUTPUT=$(/usr/bin/mktemp -t notarytool-submit)
+# Assigned separately so a mktemp failure isn't masked by readonly's own status.
+SUBMIT_OUTPUT=$(/usr/bin/mktemp -t notarytool-submit) || {
+  echo "Could not create a temporary file to capture notarytool output" >&2
+  exit 1
+}
+readonly SUBMIT_OUTPUT
 trap 'rm -f "${SUBMIT_OUTPUT}"' EXIT
 
 /usr/bin/xcrun notarytool submit "${2}" --wait -v "${CREDS[@]}" 2>&1 | tee "${SUBMIT_OUTPUT}"
