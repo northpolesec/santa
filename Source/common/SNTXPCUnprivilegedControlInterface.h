@@ -139,6 +139,12 @@ struct RuleCounts {
 - (void)cancelTemporaryAdminMode:(void (^)(NSError*))reply;
 - (void)temporaryAdminModeSecondsRemaining:(void (^)(NSNumber*))reply;
 - (void)checkTemporaryAdminModeAvailable:(void (^)(BOOL available, BOOL alreadyAdmin))reply;
+///
+///  Whether the sync server is enforcing the set of accounts allowed to hold
+///  standing admin, and the usernames it sent. `usernames` is empty when
+///  enforcing with nobody allowed, and also when not enforcing.
+///
+- (void)temporaryAdminAllowlist:(void (^)(BOOL enforcing, NSArray<NSString*>* usernames))reply;
 - (void)temporaryAdminModeSessionResignedActive:(void (^)(NSError*))reply;
 
 ///

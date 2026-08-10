@@ -35,14 +35,22 @@ static NSNumber* TAMOwnedUID(SNTConfigurator* configurator) {
 
 AdminUserState::AdminUserState(SNTConfigurator* configurator,
                                std::unique_ptr<AdminGroupMembership> membership,
-                               void (^revoke_tam)(void))
+                               void (^revoke_tam)(void), NSNumber* (^active_tam_uid)(void))
     : configurator_(configurator),
       membership_(std::move(membership)),
-      revoke_tam_([revoke_tam copy]) {}
+      revoke_tam_([revoke_tam copy]),
+      active_tam_uid_([active_tam_uid copy]) {}
 
 void AdminUserState::HandlePolicy(SNTTemporaryAdminPolicy* policy) {
   absl::MutexLock lock(lock_);
+  if (policy.type == SNTTemporaryAdminPolicyTypeOnDemand && policy.enforcesAdminGroup) {
+    // The server names the accounts allowed to hold standing admin, so Santa
+    // reconciles the group on every sync rather than snapshotting it once.
+    SweepLocked(policy.allowedAdminUsernames);
+    return;
+  }
   bool have_record = [configurator_ savedDemotedAdmins] != nil;
+  // Legacy path, for a server that does not send the allowed-admins wrapper.
   // A record that survives a revoke (kept to retry a failed restore) also
   // suppresses capture for the whole next enabled window: restored users keep
   // admin, and new admins are never demoted, until the record drains and a
@@ -179,6 +187,180 @@ static bool EntryIsLocal(NSDictionary* entry) {
   return ![local isKindOfClass:[NSNumber class]] || local.boolValue;
 }
 
+void AdminUserState::SweepLocked(NSSet<NSString*>* allowed) {
+  // Enumerate the group BEFORE asking who is elevated. Reversing this reopens
+  // the window where a session that starts mid-sweep looks like a stray admin:
+  // for the sweep to see a user in the group, the grant must already have
+  // completed, and the grant holds TAM's lock across the whole promotion, so a
+  // later read is guaranteed to name them.
+  std::optional<std::vector<AdminGroupMember>> members = membership_->ListDirectUserMembers();
+  if (!members.has_value()) {
+    LOGE(@"AdminAllowlist: admin group enumeration failed; retrying at next sync");
+    return;
+  }
+  // Two different questions, two different answers.
+  //
+  // active_tam_uid_ answers "may this user keep admin right now?" Only a live
+  // session may, so a failed-teardown residue is excluded and the sweep demotes
+  // it — which is the point of the accessor.
+  //
+  // TAMOwnedUID answers "did this membership come from TAM at all?", which
+  // covers the residue too. A membership TAM created must never enter the
+  // record: the restore at revoke would promote a user who was only ever a
+  // temporary admin into a permanent one, and clear TAM's owed demotion on the
+  // way. CaptureAndDemoteLocked guards the same way for the same reason.
+  NSNumber* tam_uid = active_tam_uid_ ? active_tam_uid_() : nil;
+  NSNumber* tam_owned_uid = TAMOwnedUID(configurator_);
+
+  NSArray<NSDictionary*>* existing = [configurator_ savedDemotedAdmins];
+  NSMutableArray<NSDictionary*>* record = [(existing ?: @[]) mutableCopy];
+  NSMutableSet<NSNumber*>* recorded_uids = [NSMutableSet set];
+  for (NSDictionary* entry in record) {
+    NSNumber* uid = [entry isKindOfClass:[NSDictionary class]] ? entry[kDemotedAdminUID] : nil;
+    if ([uid isKindOfClass:[NSNumber class]]) {
+      [recorded_uids addObject:uid];
+    }
+  }
+
+  // The first sweep in an enforcing window always writes, even with nothing to
+  // record. See the persist comment below.
+  bool record_changed = (existing == nil);
+
+  std::vector<AdminGroupMember> demote;
+  for (const AdminGroupMember& member : *members) {
+    if (member.uid < kMinDemotableUID) {
+      continue;
+    }
+    if (tam_uid && member.uid == tam_uid.unsignedIntValue) {
+      // Legitimately elevated right now. TAM demotes them when their time is up.
+      continue;
+    }
+    // Normalize the directory's spelling the same way the policy normalized the
+    // server's. A raw comparison misses on a Unicode composition mismatch and
+    // demotes the account with nothing logged.
+    if ([allowed containsObject:[SNTTemporaryAdminPolicy normalizedUsername:member.username]]) {
+      continue;
+    }
+    bool tam_owned = tam_owned_uid && member.uid == tam_owned_uid.unsignedIntValue;
+    if (!tam_owned && ![recorded_uids containsObject:@(member.uid)]) {
+      [record addObject:@{
+        kDemotedAdminUsername : member.username,
+        kDemotedAdminUID : @(member.uid),
+        kDemotedAdminLocal : @(member.local),
+      }];
+      record_changed = true;
+    }
+    // Recorded or not: still an admin and still unlisted, so still demote.
+    // Unlike the one-shot path, retrying here is correct.
+    demote.push_back(member);
+  }
+
+  // Persist when the record changed, and on the first sweep even when it did
+  // not: an empty record marks this machine as managed, which is what keeps a
+  // later policy without the wrapper out of the one-shot capture branch.
+  //
+  // An explicit flag, not a count comparison. The restore pass removes entries
+  // from this same record; a sweep that removed as many as it added would leave
+  // the counts equal, skip the write, and demote users it never recorded.
+  if (record_changed) {
+    if (![configurator_ persistDemotedAdmins:record]) {
+      LOGE(@"AdminAllowlist: failed to persist record; no users demoted; retrying at next sync");
+      return;
+    }
+  }
+
+  for (const AdminGroupMember& member : demote) {
+    NSError* err;
+    if (membership_->RemoveMember(member.uid, &err)) {
+      LOGI(@"AdminAllowlist: demoted %@ (uid=%u) to standard", member.username, member.uid);
+      demote_failures_logged_.erase(member.uid);
+    } else if (demote_failures_logged_.insert(member.uid).second) {
+      LOGE(@"AdminAllowlist: failed to demote %@ (uid=%u): %@; will retry each sync",
+           member.username, member.uid, err.localizedDescription);
+    }
+  }
+
+  // Restore pass. Walks the RECORD, never the allowlist: an account this Santa
+  // never demoted has no entry, so editing the list can never promote it. This
+  // is what keeps a user promoted by another tool outside Santa's reach.
+  NSMutableArray<NSDictionary*>* kept = [NSMutableArray array];
+  // Named distinctly from the demote pass's record_changed, which is still in
+  // scope in this function.
+  bool restore_changed = false;
+  for (NSDictionary* entry in record) {
+    if (![entry isKindOfClass:[NSDictionary class]]) {
+      // Only possible via on-disk tampering or corruption. It can never be
+      // resolved, but it must not crash the sweep or vanish silently.
+      [kept addObject:entry];
+      continue;
+    }
+    NSNumber* uid_number = entry[kDemotedAdminUID];
+    NSString* recorded_username = [entry[kDemotedAdminUsername] isKindOfClass:[NSString class]]
+                                      ? entry[kDemotedAdminUsername]
+                                      : nil;
+    if (![uid_number isKindOfClass:[NSNumber class]] || recorded_username.length == 0 ||
+        uid_number.unsignedIntValue < kMinDemotableUID ||
+        ![allowed containsObject:[SNTTemporaryAdminPolicy normalizedUsername:recorded_username]]) {
+      [kept addObject:entry];
+      continue;
+    }
+
+    uid_t uid = uid_number.unsignedIntValue;
+    NSString* current_username = membership_->UsernameForUID(uid);
+    if (current_username.length == 0) {
+      if (EntryIsLocal(entry)) {
+        // A local identity that no longer resolves was deleted. Terminal:
+        // drop the entry so it cannot pin the record forever.
+        LOGW(@"AdminAllowlist: local account %@ (uid=%u) no longer resolves; dropping entry",
+             recorded_username, uid);
+        restore_changed = true;
+      } else {
+        // A directory account may be deleted OR merely unreachable
+        // (off-network, directory outage), and the two are indistinguishable.
+        // Consuming the entry on an outage would strand a real admin.
+        LOGW(@"AdminAllowlist: directory account %@ (uid=%u) unresolvable; retrying at next sync",
+             recorded_username, uid);
+        [kept addObject:entry];
+      }
+      continue;
+    }
+    if ([current_username caseInsensitiveCompare:recorded_username] != NSOrderedSame) {
+      // The uid names a different account than the one demoted: the original was
+      // deleted and the uid reused, or the account was renamed. Never promote it,
+      // and drop the entry so it cannot pin the record forever.
+      LOGW(@"AdminAllowlist: uid=%u now resolves to %@, not recorded %@; dropping entry", uid,
+           current_username, recorded_username);
+      restore_changed = true;
+      continue;
+    }
+
+    if (tam_uid && uid == tam_uid.unsignedIntValue) {
+      // This membership is TAM's, not a restore. Promoting now would consume
+      // the entry, and TAM's teardown would then demote an allowed user with
+      // nothing left in the record to bring them back. Retry next sweep.
+      [kept addObject:entry];
+      continue;
+    }
+
+    NSError* err;
+    if (membership_->AddMember(uid, &err)) {
+      LOGI(@"AdminAllowlist: %@ (uid=%u) is now allowed; restored to admin", recorded_username,
+           uid);
+      restore_changed = true;
+    } else {
+      // Keep the entry and retry next sync rather than losing track of them.
+      LOGE(@"AdminAllowlist: failed to restore allowed user %@ (uid=%u): %@; retrying at next sync",
+           recorded_username, uid, err.localizedDescription);
+      [kept addObject:entry];
+    }
+  }
+
+  if (restore_changed && ![configurator_ persistDemotedAdmins:kept]) {
+    LOGE(@"AdminAllowlist: restores applied but record update did not persist; "
+         @"retrying at next sync");
+  }
+}
+
 void AdminUserState::RestoreAndClearLocked() {
   NSArray<NSDictionary*>* record = [configurator_ savedDemotedAdmins];
   bool all_restored = true;
@@ -258,6 +440,8 @@ void AdminUserState::RestoreAndClearLocked() {
       // re-runs the (idempotent) restore and retries the deletion.
       LOGE(@"DemotedAdmins: restore complete but record deletion did not persist; "
            @"retrying at next sync");
+    } else {
+      demote_failures_logged_.clear();
     }
   }
 }

@@ -515,10 +515,22 @@ void HandleV2Responses(const ::pbv2::PreflightResponse& resp, SNTSyncState* sync
         // revocation are always enforced and are not part of the policy.
         uint32_t defaultDuration =
             oda.has_default_duration_minutes() ? oda.default_duration_minutes() : 0;
+        // Presence of the wrapper is what turns admin-group enforcement on. A
+        // server that never sends it must NOT be read as "allow nobody" — that
+        // would demote every administrator on the host.
+        NSArray<NSString*>* allowedAdmins = nil;
+        if (oda.has_allowed_admins()) {
+          NSMutableArray<NSString*>* names = [NSMutableArray array];
+          for (const std::string& name : oda.allowed_admins().usernames()) {
+            [names addObject:StringToNSString(name)];
+          }
+          allowedAdmins = names;
+        }
         syncState.temporaryAdminPolicy =
             [[SNTTemporaryAdminPolicy alloc] initOnDemandMinutes:oda.max_minutes()
                                                  defaultDuration:defaultDuration
-                                            requireJustification:oda.require_justification()];
+                                            requireJustification:oda.require_justification()
+                                                   allowedAdmins:allowedAdmins];
         break;
       }
 

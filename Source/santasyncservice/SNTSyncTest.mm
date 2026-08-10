@@ -458,6 +458,60 @@
                  SNTNetworkFlowDefaultActionDeny);
 }
 
+- (void)testPreflightAdminAllowlistPresent {
+  // temporary_admin_policy is only parsed on the v2 sync path.
+  if (!self.syncState.isSyncV2) return;
+
+  [self setupDefaultDaemonConnResponses];
+  SNTSyncPreflight* sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
+
+  NSData* respData = [@"{\"client_mode\": \"MONITOR\", \"batch_size\": 100, "
+                      @"\"temporary_admin_policy\": {\"on_demand_admin_mode\": "
+                      @"{\"max_minutes\": 30, \"allowed_admins\": "
+                      @"{\"usernames\": [\"Kandji_Admin\", \"ladmin\"]}}}}"
+      dataUsingEncoding:NSUTF8StringEncoding];
+  [self stubRequestBody:respData response:nil error:nil validateBlock:nil];
+
+  XCTAssertTrue([sut sync]);
+  XCTAssertTrue(self.syncState.temporaryAdminPolicy.enforcesAdminGroup);
+  NSSet* want = [NSSet setWithObjects:@"kandji_admin", @"ladmin", nil];
+  XCTAssertEqualObjects(self.syncState.temporaryAdminPolicy.allowedAdminUsernames, want);
+}
+
+- (void)testPreflightAdminAllowlistPresentButEmpty {
+  if (!self.syncState.isSyncV2) return;
+
+  [self setupDefaultDaemonConnResponses];
+  SNTSyncPreflight* sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
+
+  NSData* respData =
+      [@"{\"client_mode\": \"MONITOR\", \"batch_size\": 100, "
+       @"\"temporary_admin_policy\": {\"on_demand_admin_mode\": "
+       @"{\"max_minutes\": 30, \"allowed_admins\": {}}}}" dataUsingEncoding:NSUTF8StringEncoding];
+  [self stubRequestBody:respData response:nil error:nil validateBlock:nil];
+
+  XCTAssertTrue([sut sync]);
+  XCTAssertTrue(self.syncState.temporaryAdminPolicy.enforcesAdminGroup);
+  XCTAssertEqual(self.syncState.temporaryAdminPolicy.allowedAdminUsernames.count, 0u);
+}
+
+- (void)testPreflightAdminAllowlistAbsentDoesNotEnforce {
+  if (!self.syncState.isSyncV2) return;
+
+  [self setupDefaultDaemonConnResponses];
+  SNTSyncPreflight* sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
+
+  NSData* respData = [@"{\"client_mode\": \"MONITOR\", \"batch_size\": 100, "
+                      @"\"temporary_admin_policy\": {\"on_demand_admin_mode\": "
+                      @"{\"max_minutes\": 30}}}" dataUsingEncoding:NSUTF8StringEncoding];
+  [self stubRequestBody:respData response:nil error:nil validateBlock:nil];
+
+  XCTAssertTrue([sut sync]);
+  XCTAssertNotNil(self.syncState.temporaryAdminPolicy);
+  XCTAssertFalse(self.syncState.temporaryAdminPolicy.enforcesAdminGroup);
+  XCTAssertNil(self.syncState.temporaryAdminPolicy.allowedAdminUsernames);
+}
+
 - (void)testReschedulePreflightFail {
   // Have SNTSyncPreflight return mock obejcts
   id mockPreflight = OCMClassMock([SNTSyncPreflight class]);
