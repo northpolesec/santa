@@ -111,4 +111,12 @@ typedef NS_ENUM(NSInteger, SNTDurationUnit) {
 + (std::optional<int64_t>)parseTimeInterval:(NSString*)duration
                                 defaultUnit:(SNTDurationUnit)defaultUnit
                                       error:(NSError**)error;
+
+///
+///  Resolves a `--duration` argument to whole minutes for the commands whose XPC
+///  interface takes minutes. A bare integer means minutes, matching how both
+///  flags are documented. Returns nil and populates `error` if the string does
+///  not parse, is not positive, or is not a whole number of minutes.
+///
++ (NSNumber*)parseWholeMinutes:(NSString*)duration error:(NSError**)error;
 @end

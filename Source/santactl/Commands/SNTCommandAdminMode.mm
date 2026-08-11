@@ -16,11 +16,7 @@
 
 #include <unistd.h>
 
-#include <cstdint>
-#include <optional>
-
 #import "Source/common/MOLXPCConnection.h"
-#import "Source/common/SNTError.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTXPCControlInterface.h"
 #import "Source/santactl/SNTCommand.h"
@@ -28,31 +24,6 @@
 
 @interface SNTCommandAdminMode : SNTCommand <SNTCommandProtocol>
 @end
-
-// Resolves a --duration argument to whole minutes; a bare integer means minutes,
-// matching the documented flag. SNTMonitorModeDurationMinutes is the deliberate
-// twin of this function, so changes here usually belong there too.
-NSNumber* SNTAdminModeDurationMinutes(NSString* arg, NSError** error) {
-  std::optional<int64_t> seconds = [SNTCommand parseTimeInterval:arg
-                                                     defaultUnit:SNTDurationUnitMinutes
-                                                           error:error];
-  if (!seconds.has_value()) {
-    return nil;
-  }
-  if (*seconds <= 0) {
-    [SNTError populateError:error
-                   withCode:SNTErrorCodeInvalidDuration
-                     format:@"--duration must be greater than zero"];
-    return nil;
-  }
-  if (*seconds % 60 != 0) {
-    [SNTError populateError:error
-                   withCode:SNTErrorCodeInvalidDuration
-                     format:@"--duration must be a whole number of minutes (e.g. 30m, 2h, 1d)"];
-    return nil;
-  }
-  return @(*seconds / 60);
-}
 
 @implementation SNTCommandAdminMode
 
@@ -116,7 +87,7 @@ REGISTER_COMMAND_NAME(@"adminmode")
       arg = arguments[i];
 
       NSError* err = nil;
-      NSNumber* minutes = SNTAdminModeDurationMinutes(arg, &err);
+      NSNumber* minutes = [SNTCommand parseWholeMinutes:arg error:&err];
       if (!minutes) {
         [self printErrorUsageAndExit:err.localizedDescription];
       }

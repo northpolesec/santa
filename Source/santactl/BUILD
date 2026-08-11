@@ -80,7 +80,6 @@ objc_library(
     deps = [
         ":santactl_cmd",
         "//Source/common:MOLXPCConnection",
-        "//Source/common:SNTError",
         "//Source/common:SNTLogging",
         "//Source/common:SNTXPCControlInterface",
     ],
@@ -108,7 +107,6 @@ objc_library(
     deps = [
         ":santactl_cmd",
         "//Source/common:MOLXPCConnection",
-        "//Source/common:SNTError",
         "//Source/common:SNTLogging",
         "//Source/common:SNTXPCControlInterface",
     ],
@@ -379,26 +377,6 @@ santa_unit_test(
 )
 
 santa_unit_test(
-    name = "SNTCommandAdminModeTest",
-    srcs = ["Commands/SNTCommandAdminModeTest.mm"],
-    visibility = ["//:santa_package_group"],
-    deps = [
-        ":SNTCommandAdminMode",
-        "//Source/common:SNTError",
-    ],
-)
-
-santa_unit_test(
-    name = "SNTCommandMonitorModeTest",
-    srcs = ["Commands/SNTCommandMonitorModeTest.mm"],
-    visibility = ["//:santa_package_group"],
-    deps = [
-        ":SNTCommandMonitorMode",
-        "//Source/common:SNTError",
-    ],
-)
-
-santa_unit_test(
     name = "SNTCommandDoctorTest",
     srcs = [
         "Commands/SNTCommandDoctorTest.mm",
@@ -428,11 +406,9 @@ santa_unit_test(
 test_suite(
     name = "unit_tests",
     tests = [
-        ":SNTCommandAdminModeTest",
         ":SNTCommandDoctorTest",
         ":SNTCommandFileInfoTest",
         ":SNTCommandMetricsTest",
-        ":SNTCommandMonitorModeTest",
         ":SNTCommandTest",
     ],
     visibility = ["//:santa_package_group"],

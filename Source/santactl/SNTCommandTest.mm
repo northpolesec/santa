@@ -14,6 +14,8 @@
 
 #import <XCTest/XCTest.h>
 
+#include <cstdint>
+#include <cstring>
 #include <optional>
 
 #import "Source/common/SNTError.h"
@@ -107,31 +109,37 @@
   [self assertDurationInvalid:@"10x" unit:SNTDurationUnitNone messageContains:@"unknown unit 'x'"];
 }
 
-- (void)testParseDurationMultiCharUnitIsInvalid {
-  [self assertDurationInvalid:@"10mm" unit:SNTDurationUnitNone messageContains:@"single character"];
-}
-
 - (void)testParseDurationTrailingContentIsInvalid {
   [self assertDurationInvalid:@"10m5" unit:SNTDurationUnitNone messageContains:@"trailing content"];
+  [self assertDurationInvalid:@"10mm" unit:SNTDurationUnitNone messageContains:@"trailing content"];
 }
 
-// charactersToBeSkipped = nil is what makes these whitespace-containing inputs
-// fail rather than silently parsing as if the whitespace weren't there.
+// strtoll skips leading whitespace, so the parser rejects it explicitly rather
+// than letting " 10s" parse as if the space were not there.
 - (void)testParseDurationRejectsWhitespace {
-  [self assertDurationInvalid:@"10 s" unit:SNTDurationUnitNone messageContains:@"unknown unit"];
   [self assertDurationInvalid:@" 10s"
                          unit:SNTDurationUnitNone
-              messageContains:@"expected a number"];
+              messageContains:@"leading whitespace"];
+  [self assertDurationInvalid:@"\t10s"
+                         unit:SNTDurationUnitNone
+              messageContains:@"leading whitespace"];
+  [self assertDurationInvalid:@"10 s" unit:SNTDurationUnitNone messageContains:@"trailing content"];
   [self assertDurationInvalid:@"10 " unit:SNTDurationUnitNone messageContains:@"unknown unit"];
 }
 
-// scanInteger saturates at NSIntegerMax/Min and still reports success, so a
-// saturated value is input the scanner could not read faithfully. Seconds have a
-// multiplier of 1, so the overflow check cannot fire: this isolates the guard.
+// strtoll reports ERANGE for a value it cannot represent. Seconds have a
+// multiplier of 1, so the overflow check cannot fire: this isolates that path.
 - (void)testParseDurationOutOfRangeIsInvalid {
   [self assertDurationInvalid:@"99999999999999999999s"
                          unit:SNTDurationUnitNone
               messageContains:@"out of range"];
+}
+
+// ERANGE distinguishes an unreadable value from a genuine boundary one, so the
+// exact int64 limits parse rather than being rejected as collateral.
+- (void)testParseDurationAcceptsTheExactInt64Limits {
+  [self assertDuration:@"9223372036854775807s" unit:SNTDurationUnitNone equals:INT64_MAX];
+  [self assertDuration:@"-9223372036854775808s" unit:SNTDurationUnitNone equals:INT64_MIN];
 }
 
 // The scanned integer fitting is not enough -- the product must too, or an
@@ -157,6 +165,42 @@
                                                  defaultUnit:SNTDurationUnitNone
                                                        error:NULL];
   XCTAssertFalse(got.has_value());
+}
+
+#pragma mark - parseWholeMinutes:error:
+
+- (void)assertMinutes:(NSString*)input equals:(int64_t)expected {
+  NSError* err = nil;
+  NSNumber* got = [SNTCommand parseWholeMinutes:input error:&err];
+  XCTAssertNotNil(got, @"\"%@\" was rejected: %@", input, err.localizedDescription);
+  XCTAssertEqual(got.longLongValue, expected, @"\"%@\"", input);
+  // Integer-backed: the daemon's two unsigned accessors disagree for a double.
+  XCTAssertEqual(strcmp(got.objCType, @encode(long long)), 0, @"\"%@\" is not integer-backed",
+                 input);
+}
+
+- (void)assertMinutesRejected:(NSString*)input messageContains:(NSString*)needle {
+  NSError* err = nil;
+  XCTAssertNil([SNTCommand parseWholeMinutes:input error:&err], @"\"%@\" was accepted", input);
+  XCTAssertEqualObjects(err.domain, SantaErrorDomain);
+  XCTAssertEqual(err.code, SNTErrorCodeInvalidDuration);
+  XCTAssertTrue([err.localizedDescription containsString:needle], @"\"%@\": %@ lacks \"%@\"", input,
+                err.localizedDescription, needle);
+}
+
+// Covers what this adds on top of the parser: the minutes default unit, the
+// conversion, and the constraints the parser deliberately leaves to callers.
+- (void)testParseWholeMinutes {
+  [self assertMinutes:@"10" equals:10];   // bare integer means minutes
+  [self assertMinutes:@"2h" equals:120];  // suffixed durations convert
+  [self assertMinutes:@"120s" equals:2];  // seconds are fine on a minute boundary
+
+  // The parser accepts both of these; a minutes-based caller cannot use them.
+  [self assertMinutesRejected:@"30s" messageContains:@"whole number of minutes"];
+  [self assertMinutesRejected:@"0" messageContains:@"greater than zero"];
+
+  // A syntax error reaches the caller rather than being swallowed or reworded.
+  [self assertMinutesRejected:@"10x" messageContains:@"unknown unit 'x'"];
 }
 
 @end

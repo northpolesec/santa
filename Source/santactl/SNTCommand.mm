@@ -15,6 +15,10 @@
 
 #import "Source/santactl/SNTCommand.h"
 
+#include <cctype>
+#include <cerrno>
+#include <cstdlib>
+
 #import "Source/common/SNTError.h"
 #import "Source/common/SNTLogging.h"
 
@@ -48,27 +52,31 @@
 + (std::optional<int64_t>)parseTimeInterval:(NSString*)duration
                                 defaultUnit:(SNTDurationUnit)defaultUnit
                                       error:(NSError**)error {
-  if (duration.length == 0) {
+  const char* str = duration.UTF8String;
+  if (!str || *str == '\0') {
     [SNTError populateError:error
                    withCode:SNTErrorCodeInvalidDuration
                      format:@"invalid duration: empty string"];
     return std::nullopt;
   }
+  // strtoll skips leading whitespace; reject it so " 10s" cannot parse as "10s".
+  if (isspace((unsigned char)*str)) {
+    [SNTError populateError:error
+                   withCode:SNTErrorCodeInvalidDuration
+                     format:@"invalid duration \"%@\": leading whitespace", duration];
+    return std::nullopt;
+  }
 
-  NSScanner* scanner = [NSScanner scannerWithString:duration];
-  scanner.charactersToBeSkipped = nil;
-
-  NSInteger intValue = 0;
-  if (![scanner scanInteger:&intValue]) {
+  errno = 0;
+  char* suffix = NULL;
+  long long value = strtoll(str, &suffix, 10);
+  if (suffix == str) {
     [SNTError populateError:error
                    withCode:SNTErrorCodeInvalidDuration
                      format:@"invalid duration \"%@\": expected a number", duration];
     return std::nullopt;
   }
-
-  // scanInteger saturates at NSIntegerMax/Min and still returns YES, so a value
-  // pinned to either extreme is input the scanner could not read faithfully.
-  if (intValue == NSIntegerMax || intValue == NSIntegerMin) {
+  if (errno == ERANGE) {
     [SNTError populateError:error
                    withCode:SNTErrorCodeInvalidDuration
                      format:@"invalid duration \"%@\": value out of range", duration];
@@ -76,44 +84,25 @@
   }
 
   SNTDurationUnit unit = defaultUnit;
-
-  if (![scanner isAtEnd]) {
-    NSString* scannedUnit = nil;
-    if (![scanner scanCharactersFromSet:[NSCharacterSet characterSetWithCharactersInString:@"smhd"]
-                             intoString:&scannedUnit]) {
-      [SNTError
-          populateError:error
-               withCode:SNTErrorCodeInvalidDuration
-                 format:@"invalid duration \"%@\": unknown unit '%@' (expected s, m, h, or d)",
-                        duration, [duration substringFromIndex:scanner.scanLocation]];
-      return std::nullopt;
-    }
-    if (scannedUnit.length != 1) {
-      [SNTError
-          populateError:error
-               withCode:SNTErrorCodeInvalidDuration
-                 format:@"invalid duration \"%@\": unit must be a single character", duration];
-      return std::nullopt;
-    }
-    if (![scanner isAtEnd]) {
+  if (*suffix != '\0') {
+    if (suffix[1] != '\0') {
       [SNTError populateError:error
                      withCode:SNTErrorCodeInvalidDuration
                        format:@"invalid duration \"%@\": unexpected trailing content after unit",
                               duration];
       return std::nullopt;
     }
-    switch ([scannedUnit characterAtIndex:0]) {
+    switch (*suffix) {
       case 's': unit = SNTDurationUnitSeconds; break;
       case 'm': unit = SNTDurationUnitMinutes; break;
       case 'h': unit = SNTDurationUnitHours; break;
       case 'd': unit = SNTDurationUnitDays; break;
       default:
-        // Unreachable: the charset scan above only ever admits 's', 'm', 'h', or 'd'.
-        [SNTError
-            populateError:error
-                 withCode:SNTErrorCodeInvalidDuration
-                   format:@"invalid duration \"%@\": unknown unit '%@' (expected s, m, h, or d)",
-                          duration, scannedUnit];
+        [SNTError populateError:error
+                       withCode:SNTErrorCodeInvalidDuration
+                         format:@"invalid duration \"%@\": unknown unit '%c' (expected s, m, h, "
+                                @"or d)",
+                                duration, *suffix];
         return std::nullopt;
     }
   }
@@ -132,18 +121,21 @@
     case SNTDurationUnitDays: multiplier = 60 * 60 * 24; break;
   }
 
-  if (multiplier == 0) {  // Unreachable for a valid SNTDurationUnit.
+  // Catches a defaultUnit outside the enum, which would otherwise resolve to a
+  // multiplier of zero and return a wrong value rather than an error. The switch
+  // above stays exhaustive so -Wswitch still flags a genuinely unhandled case.
+  if (multiplier == 0) {
     [SNTError populateError:error
                    withCode:SNTErrorCodeInvalidDuration
                      format:@"invalid duration \"%@\": unsupported unit", duration];
     return std::nullopt;
   }
 
-  // The product is checked, not just the scanned integer. int64_t rather than
+  // The product is checked, not just the parsed integer. int64_t rather than
   // NSTimeInterval keeps it exact: a float carrier reaches callers as an
   // NSNumber whose accessors disagree, so one check can be read back larger.
   int64_t seconds = 0;
-  if (__builtin_mul_overflow((int64_t)intValue, multiplier, &seconds)) {
+  if (__builtin_mul_overflow((int64_t)value, multiplier, &seconds)) {
     [SNTError populateError:error
                    withCode:SNTErrorCodeInvalidDuration
                      format:@"invalid duration \"%@\": value out of range", duration];
@@ -151,6 +143,28 @@
   }
 
   return seconds;
+}
+
++ (NSNumber*)parseWholeMinutes:(NSString*)duration error:(NSError**)error {
+  std::optional<int64_t> seconds = [self parseTimeInterval:duration
+                                               defaultUnit:SNTDurationUnitMinutes
+                                                     error:error];
+  if (!seconds.has_value()) {
+    return nil;
+  }
+  if (*seconds <= 0) {
+    [SNTError populateError:error
+                   withCode:SNTErrorCodeInvalidDuration
+                     format:@"--duration must be greater than zero"];
+    return nil;
+  }
+  if (*seconds % 60 != 0) {
+    [SNTError populateError:error
+                   withCode:SNTErrorCodeInvalidDuration
+                     format:@"--duration must be a whole number of minutes (e.g. 30m, 2h, 1d)"];
+    return nil;
+  }
+  return @(*seconds / 60);
 }
 
 @end
