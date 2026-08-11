@@ -85,6 +85,27 @@
   XCTAssertEqual([mt getDurationMinutes:@(500)], [mt.maxMinutes unsignedIntValue]);
 }
 
+// A double above 2^64 wraps under -unsignedLongLongValue but saturates under
+// -unsignedIntValue, so deciding with one and returning the other leaked.
+- (void)testGetDurationMinutesCannotExceedMaxForAnOversizedRequest {
+  // Production cap: the wrapped value only slips under a cap above it.
+  SNTModeTransition* mt =
+      [[SNTModeTransition alloc] initOnDemandMinutes:kMaxTemporaryMonitorModeMinutes
+                                     defaultDuration:10];
+
+  // Must be computed, not a literal: a folded constant converts differently and
+  // would make this test vacuous.
+  volatile double computed = 12810238940076099.0 * 86400.0 / 60.0;
+  NSNumber* oversized = @((double)computed);
+
+  XCTAssertLessThanOrEqual([oversized unsignedLongLongValue], [mt.maxMinutes unsignedLongLongValue],
+                           @"fixture no longer passes the limit check");
+  XCTAssertGreaterThan([oversized unsignedIntValue], [mt.maxMinutes unsignedIntValue],
+                       @"fixture no longer reads as oversized");
+
+  XCTAssertLessThanOrEqual([mt getDurationMinutes:oversized], [mt.maxMinutes unsignedIntValue]);
+}
+
 - (void)testEncodeDecodeSecureCoding {
   SNTModeTransition* mt = [[SNTModeTransition alloc] initRevocation];
   NSData* mtSerialized = [mt serialize];

@@ -33,6 +33,28 @@
   XCTAssertEqual([p getDurationMinutes:@45], 45u);
 }
 
+// A double above 2^64 wraps under -unsignedLongLongValue but saturates under
+// -unsignedIntValue, so deciding with one and returning the other leaked.
+- (void)testOversizedRequestCannotExceedMax {
+  // Production cap: the wrapped value only slips under a cap above it.
+  SNTTemporaryAdminPolicy* p =
+      [[SNTTemporaryAdminPolicy alloc] initOnDemandMinutes:kMaxTemporaryAdminMinutes
+                                           defaultDuration:30
+                                      requireJustification:NO];
+
+  // Must be computed, not a literal: a folded constant converts differently and
+  // would make this test vacuous.
+  volatile double computed = 12810238940076099.0 * 86400.0 / 60.0;
+  NSNumber* oversized = @((double)computed);
+
+  XCTAssertLessThanOrEqual([oversized unsignedLongLongValue], [p.maxMinutes unsignedLongLongValue],
+                           @"fixture no longer passes the limit check");
+  XCTAssertGreaterThan([oversized unsignedIntValue], [p.maxMinutes unsignedIntValue],
+                       @"fixture no longer reads as oversized");
+
+  XCTAssertLessThanOrEqual([p getDurationMinutes:oversized], [p.maxMinutes unsignedIntValue]);
+}
+
 - (void)testDefaultDurationClampedToMax {
   SNTTemporaryAdminPolicy* p = [[SNTTemporaryAdminPolicy alloc] initOnDemandMinutes:10
                                                                     defaultDuration:9999

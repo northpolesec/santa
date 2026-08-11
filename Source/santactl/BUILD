@@ -16,6 +16,7 @@ objc_library(
     ],
     deps = [
         "//Source/common:MOLXPCConnection",
+        "//Source/common:SNTError",
         "//Source/common:SNTLogging",
         "//Source/common:SNTXPCControlInterface",
     ],
@@ -396,6 +397,7 @@ santa_unit_test(
     deps = [
         ":santactl_cmd",
         "//Source/common:MOLXPCConnection",
+        "//Source/common:SNTError",
         "//Source/common:SNTLogging",
         "//Source/common:SNTXPCControlInterface",
     ],

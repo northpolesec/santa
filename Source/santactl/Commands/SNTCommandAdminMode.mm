@@ -72,7 +72,7 @@ REGISTER_COMMAND_NAME(@"adminmode")
   }
 
   // A request of 0 minutes resolves to the policy-configured default on the daemon.
-  NSTimeInterval requestedDuration = 0;
+  NSNumber* requestedDuration = @0;
   bool shouldCancel = false;
 
   // Parse arguments
@@ -85,16 +85,13 @@ REGISTER_COMMAND_NAME(@"adminmode")
       }
 
       arg = arguments[i];
-      if (arg.length == 0) {
-        [self printErrorUsageAndExit:
-                  @"--duration requires a whole number argument or duration string"];
-      }
 
-      requestedDuration = [self parseTimeInterval:arg];
-      if (requestedDuration <= 0) {
-        [self printErrorUsageAndExit:
-                  @"--duration requires a whole number argument or duration string"];
+      NSError* err = nil;
+      NSNumber* minutes = [SNTCommand parseWholeMinutes:arg error:&err];
+      if (!minutes) {
+        [self printErrorUsageAndExit:err.localizedDescription];
       }
+      requestedDuration = minutes;
     } else if ([arg caseInsensitiveCompare:@"--cancel"] == NSOrderedSame) {
       shouldCancel = true;
     }
@@ -118,7 +115,7 @@ REGISTER_COMMAND_NAME(@"adminmode")
   } else {
     TEE_LOGI(@"Requesting temporary Admin Mode; respond to the authorization prompt if shown...");
     [[self.daemonConn synchronousRemoteObjectProxy]
-        requestTemporaryAdminModeWithDurationMinutes:@(requestedDuration)
+        requestTemporaryAdminModeWithDurationMinutes:requestedDuration
                                                reply:^(uint32_t minutes, NSError* err) {
                                                  success = (err == nil);
                                                  if (err) {

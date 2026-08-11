@@ -54,7 +54,8 @@ REGISTER_COMMAND_NAME(@"monitormode")
 }
 
 - (void)runWithArguments:(NSArray*)arguments {
-  NSTimeInterval requestedDuration = 0;
+  // A request of 0 minutes resolves to the policy-configured default on the daemon.
+  NSNumber* requestedDuration = @0;
   bool shouldCancel = false;
 
   // Parse arguments
@@ -67,16 +68,13 @@ REGISTER_COMMAND_NAME(@"monitormode")
       }
 
       arg = arguments[i];
-      if (arg.length == 0) {
-        [self printErrorUsageAndExit:
-                  @"--duration requires a whole number argument or duration string"];
-      }
 
-      requestedDuration = [self parseTimeInterval:arg];
-      if (requestedDuration <= 0) {
-        [self printErrorUsageAndExit:
-                  @"--duration requires a whole number argument or duration string"];
+      NSError* err = nil;
+      NSNumber* minutes = [SNTCommand parseWholeMinutes:arg error:&err];
+      if (!minutes) {
+        [self printErrorUsageAndExit:err.localizedDescription];
       }
+      requestedDuration = minutes;
     } else if ([arg caseInsensitiveCompare:@"--cancel"] == NSOrderedSame) {
       shouldCancel = true;
     }
@@ -94,7 +92,7 @@ REGISTER_COMMAND_NAME(@"monitormode")
     }];
   } else {
     [[self.daemonConn synchronousRemoteObjectProxy]
-        requestTemporaryMonitorModeWithDurationMinutes:@(requestedDuration)
+        requestTemporaryMonitorModeWithDurationMinutes:requestedDuration
                                                  reply:^(uint32_t minutes, NSError* err) {
                                                    success = (err == nil);
                                                    if (err) {
