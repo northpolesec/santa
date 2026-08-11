@@ -56,6 +56,10 @@ GUI_USER=$(/usr/bin/stat -f '%u' /dev/console)
 /bin/cp -vX "${CONF_DIR}/com.northpolesec.santa.metricservice.plist" "/Library/LaunchDaemons/"
 /bin/cp -vX "${CONF_DIR}/com.northpolesec.santa.syncservice.plist" "/Library/LaunchDaemons/"
 
+# Install the santactl zsh completion.
+/bin/mkdir -p "/usr/local/share/zsh/site-functions"
+/bin/cp -vX "${CONF_DIR}/_santactl" "/usr/local/share/zsh/site-functions/"
+
 # Load the services.
 /bin/launchctl load -w /Library/LaunchDaemons/com.northpolesec.santa.bundleservice.plist
 /bin/launchctl load -w /Library/LaunchDaemons/com.northpolesec.santa.metricservice.plist

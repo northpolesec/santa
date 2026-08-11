@@ -31,6 +31,7 @@ user=$(/usr/bin/stat -f '%u' /dev/console)
 /bin/rm -f /private/etc/asl/com.northpolesec.santa.asl.conf
 /bin/rm -f /private/etc/newsyslog.d/com.northpolesec.santa.newsyslog.conf
 /bin/rm -f /usr/local/bin/santactl # just a symlink
+/bin/rm -f /usr/local/share/zsh/site-functions/_santactl
 
 #forget receipt
 /usr/sbin/pkgutil --forget com.northpolesec.santa

@@ -44,8 +44,9 @@ REGISTER_COMMAND_NAME(@"metrics")
 + (NSString*)longHelpText {
   return (@"Provides metrics about Santa's operation while it's running.\n"
           @"Pass prefixes to filter list of metrics, if desired.\n"
-          @"  Use --json to output in JSON format\n"
-          @"  Use --export to trigger an immediate metric export");
+          @"  Options:\n"
+          @"    --json: Output in JSON format.\n"
+          @"    --export: Trigger an immediate metric export.");
 }
 
 - (void)prettyPrintRootLabels:(NSDictionary*)rootLabels {
