@@ -361,7 +361,11 @@ SNTNetworkFlowRule* NetworkFlowRuleFromProto(const ::pbv2::NetworkFlowRule& nr) 
 
       // Serialize only valid rules.
       std::string serialized;
-      add.SerializeToString(&serialized);
+      if (!add.SerializeToString(&serialized)) {
+        SLOGW(@"Dropping network flow rule %@ (rule_id %lld): serialization failed",
+              StringToNSString(add.name()), (long long)add.rule_id());
+        return nil;
+      }
       NSData* blob = [NSData dataWithBytes:serialized.data() length:serialized.size()];
       return [[SNTNetworkFlowRule alloc] initAddRuleWithName:StringToNSString(add.name())
                                                       ruleId:add.rule_id()

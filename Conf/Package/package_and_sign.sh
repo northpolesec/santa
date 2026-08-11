@@ -13,6 +13,74 @@ function die {
   exit 2
 }
 
+# Every artifact Santa ships is universal. Checking the slices that happen to be
+# present is not enough on its own: a thin binary satisfies a per-slice loop
+# trivially, which is how an arm64-only sleigh shipped for several releases.
+readonly EXPECTED_ARCHS="x86_64 arm64"
+
+# Verify the architectures of a signed artifact, then the signature, embedded
+# Info.plist and signing identity of every slice of it.
+#
+# `codesign --verify` without --arch only checks the slice matching the host, so
+# a broken slice in a universal binary passes locally and is first caught by
+# notarization -- which reports it as "The signature of the binary is invalid"
+# with no indication of which slice or why. rules_apple 4.4.0 through at least
+# 4.5.3 omit the embedded Info.plist from the non-native slice of
+# macos_command_line_application, which produces exactly that.
+function verify_slices {
+  local artifact="${1}"
+  local want_id="${2}"
+  local binary="${artifact}"
+
+  # Refuse to run without an expected identifier rather than silently checking
+  # nothing, which is how a caller would quietly opt out of half this function.
+  [[ -n "${want_id}" ]] ||
+    die "no expected signing identifier given for ${artifact}"
+
+  if [[ -d "${artifact}" ]]; then
+    local exe
+    exe=$(/usr/bin/plutil -extract CFBundleExecutable raw -o - \
+      "${artifact}/Contents/Info.plist") ||
+      die "could not read CFBundleExecutable from ${artifact}"
+    binary="${artifact}/Contents/MacOS/${exe}"
+  fi
+
+  # Capture the architectures rather than iterating the substitution directly: a
+  # failing or empty lipo would otherwise run the loop zero times and report
+  # success, which is the one thing a verification step must never do.
+  local archs
+  archs=$(/usr/bin/lipo -archs "${binary}") ||
+    die "could not read the architectures of ${binary}"
+  [[ -n "${archs}" ]] || die "lipo reported no architectures for ${binary}"
+
+  local want
+  for want in ${EXPECTED_ARCHS}; do
+    /usr/bin/grep -qw "${want}" <<<"${archs}" ||
+      die "${binary} has no ${want} slice (found: ${archs})"
+  done
+
+  local arch details id
+  for arch in ${archs}; do
+    /usr/bin/codesign --verify --strict --arch "${arch}" "${artifact}" ||
+      die "invalid signature in the ${arch} slice of ${artifact}"
+
+    # An unbound Info.plist means the slice carries no plist for its signature
+    # to cover. codesign cannot add one; only the linker can.
+    details=$(/usr/bin/codesign -d --arch "${arch}" -vvv "${binary}" 2>&1) ||
+      die "could not inspect the ${arch} slice of ${binary}"
+    if /usr/bin/grep -q "Info.plist=not bound" <<<"${details}"; then
+      die "the ${arch} slice of ${binary} has no bound Info.plist"
+    fi
+
+    # codesign takes the identifier from the embedded Info.plist's
+    # CFBundleIdentifier, falling back to the file name under --prefix, so it
+    # is a property of the build rather than of the signing step here.
+    id=$(/usr/bin/sed -n 's/^Identifier=//p' <<<"${details}")
+    [[ "${id}" == "${want_id}" ]] ||
+      die "the ${arch} slice of ${binary} is signed as \"${id}\", expected \"${want_id}\""
+  done
+}
+
 # RELEASE_ROOT is a required environment variable that points to the root
 # of a release tarball produced with the :release rule in Santa's
 # main BUILD file, or the root of an extracted release dir.
@@ -52,6 +120,7 @@ fi
 
 readonly INPUT_APP="${RELEASE_ROOT}/binaries/Santa.app"
 readonly INPUT_SYSX="${INPUT_APP}/Contents/Library/SystemExtensions/com.northpolesec.santa.daemon.systemextension"
+readonly INPUT_NETD="${INPUT_APP}/Contents/Library/SystemExtensions/com.northpolesec.santa.netd.systemextension"
 readonly INPUT_SANTACTL="${INPUT_APP}/Contents/MacOS/santactl"
 readonly INPUT_SANTABS="${INPUT_APP}/Contents/MacOS/santabundleservice"
 readonly INPUT_SANTAMS="${INPUT_APP}/Contents/MacOS/santametricservice"
@@ -67,8 +136,17 @@ readonly PKG_PATH="${ARTIFACTS_DIR}/${RELEASE_NAME}.pkg"
 readonly DMG_PATH="${ARTIFACTS_DIR}/${RELEASE_NAME}.dmg"
 readonly TAR_PATH="${ARTIFACTS_DIR}/${RELEASE_NAME}.tar.gz"
 
+# The system extensions are signed and notarized alike. The network extension is
+# injected at build time (--//Source/gui:network_extension_bundle) and is absent
+# from builds without it, so it joins the list only when it is there.
+SYSEXES=("${INPUT_SYSX}")
+if [[ -d "${INPUT_NETD}" ]]; then
+  SYSEXES+=("${INPUT_NETD}")
+fi
+readonly SYSEXES
+
 # Sign all of binaries/bundles. Maintain inside-out ordering where necessary
-for ARTIFACT in "${INPUT_SANTACTL}" "${INPUT_SANTABS}" "${INPUT_SANTAMS}" "${INPUT_SANTASS}" "${INPUT_SLEIGH}" "${INPUT_SYSX}" "${INPUT_APP}"; do
+for ARTIFACT in "${INPUT_SANTACTL}" "${INPUT_SANTABS}" "${INPUT_SANTAMS}" "${INPUT_SANTASS}" "${INPUT_SLEIGH}" "${SYSEXES[@]}" "${INPUT_APP}"; do
   BN=$(/usr/bin/basename "${ARTIFACT}")
 
   CODESIGN_OPTS=(
@@ -89,10 +167,30 @@ for ARTIFACT in "${INPUT_SANTACTL}" "${INPUT_SANTABS}" "${INPUT_SANTAMS}" "${INP
 
   echo "codesigning ${BN}"
   /usr/bin/codesign "${CODESIGN_OPTS[@]}" "${ARTIFACT}"
+
+  # These are not derivable from the file name -- santactl signs as ".ctl", and
+  # the identifiers come from each target's Info.plist. santad matches some of
+  # them exactly at runtime, notably kSleighSigningID for the Sleigh database
+  # tamper-resistance carve-out, so a drifting identifier revokes access rather
+  # than breaking anything visibly.
+  case "${BN}" in
+    santactl) WANT_ID="com.northpolesec.santa.ctl" ;;
+    santabundleservice) WANT_ID="com.northpolesec.santa.bundleservice" ;;
+    santametricservice) WANT_ID="com.northpolesec.santa.metricservice" ;;
+    santasyncservice) WANT_ID="com.northpolesec.santa.syncservice" ;;
+    sleigh) WANT_ID="com.northpolesec.santa.sleigh" ;;
+    com.northpolesec.santa.daemon.systemextension) WANT_ID="com.northpolesec.santa.daemon" ;;
+    com.northpolesec.santa.netd.systemextension) WANT_ID="com.northpolesec.santa.netd" ;;
+    Santa.app) WANT_ID="com.northpolesec.santa" ;;
+    *) die "no expected signing identifier for ${BN}" ;;
+  esac
+
+  echo "verifying every slice of ${BN}"
+  verify_slices "${ARTIFACT}" "${WANT_ID}"
 done
 
 # Notarize all the bundles
-for ARTIFACT in "${INPUT_SYSX}" "${INPUT_APP}"; do
+for ARTIFACT in "${SYSEXES[@]}" "${INPUT_APP}"; do
   BN=$(/usr/bin/basename "${ARTIFACT}")
 
   echo "zipping ${BN}"
@@ -202,6 +300,9 @@ if [ -n "${BUILD_LITE_PACKAGE}" ]; then
     --generate-entitlement-der \
     --options library,kill,runtime \
     "${LITE_APP}"
+
+  echo "verifying every slice of the lite Santa.app"
+  verify_slices "${LITE_APP}" "com.northpolesec.santa"
 
   # Notarize the lite app
   echo "zipping lite Santa.app"

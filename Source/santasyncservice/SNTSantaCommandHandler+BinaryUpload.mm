@@ -46,7 +46,14 @@ static constexpr int64_t kBinaryUploadResponseTimeoutSeconds = 15 * 60;
   }
 
   std::string serializedRequest;
-  request.SerializeToString(&serializedRequest);
+  if (!request.SerializeToString(&serializedRequest)) {
+    LOGE(@"SantaCommand: BinaryUploadRequest failed - could not serialize request");
+    pbv1::BinaryUploadResponse response;
+    response.set_disposition(pbv1::BinaryUploadResponse::DISPOSITION_INTERNAL_ERROR);
+    response.set_message("could not serialize BinaryUploadRequest");
+    completion(response);
+    return;
+  }
 
   [daemon
       uploadBinary:[NSData dataWithBytes:serializedRequest.data() length:serializedRequest.size()]

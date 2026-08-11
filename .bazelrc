@@ -22,9 +22,9 @@ build --copt=-Wno-c++20-designator
 # isn't recognized on older SDKs
 build --copt=-Wno-unknown-warning-option
 build --copt=-Wno-error=deprecated-non-prototype
-build --per_file_copt=.*\.mm\$@-std=c++20
-build --cxxopt=-std=c++20
-build --host_cxxopt=-std=c++20
+build --per_file_copt=.*\.mm\$@-std=c++23
+build --cxxopt=-std=c++23
+build --host_cxxopt=-std=c++23
 
 # Use ThinLTO for faster link times than full LTO with 90%+ of the LTO benefits
 build:opt --copt=-flto=thin
@@ -33,7 +33,7 @@ build:opt --linkopt=-flto=thin
 # Enable C++ interoperability in Swift
 build --@rules_swift//swift:copt=-cxx-interoperability-mode=default
 build --@rules_swift//swift:copt=-Xcc
-build --@rules_swift//swift:copt=-std=c++20
+build --@rules_swift//swift:copt=-std=c++23
 
 # cel-cpp has lots of warnings that we don't need to see (and definitely don't
 # want to be treated as errors).
@@ -41,11 +41,15 @@ build --per_file_copt=.*cel-cpp.*@-Wno-deprecated-declarations
 build --per_file_copt=.*cel-cpp.*@-Wno-nontrivial-memcall
 build --per_file_copt=.*cel-cpp.*@-Wno-nullability-completeness
 build --per_file_copt=.*cel-cpp.*@-Wno-unused-function
+build --per_file_copt=.*cel-cpp.*@-Wno-unused-result
 
 # protobuf v33.0 introduced a large number of warnings when building
 # the dependency about the use of newly deprecated functions.
 build --per_file_copt=external/protos\+.*@-Wno-deprecated-declarations
 build --host_per_file_copt=external/protobuf.*@-Wno-deprecated-declarations
+# protobuf v34 has an unused private field in descriptor.cc.
+build --per_file_copt=external/protobuf.*@-Wno-unused-private-field
+build --host_per_file_copt=external/protobuf.*@-Wno-unused-private-field
 
 # Many config options for sanitizers pulled from
 # https://github.com/protocolbuffers/protobuf/blob/main/.bazelrc

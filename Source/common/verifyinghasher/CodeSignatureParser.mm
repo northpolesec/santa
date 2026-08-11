@@ -27,6 +27,7 @@ __END_DECLS
 #include <cstddef>
 #include <cstdio>
 #include <cstring>
+#include <vector>
 
 #include "Source/common/verifyinghasher/HashTraits.h"
 
