@@ -159,7 +159,13 @@ using santa::NSStringToUTF8String;
 
     SLOGD(@"Performing request, attempt %d (of %d maximum)...", attempt, maxAttempts);
     data = [self performRequest:request timeout:timeout response:&response error:&requestError];
-    if (response.statusCode == 200) break;
+
+    // A transport-level error must be honored even alongside a 200, because the status line
+    // arrives before the body: if the connection drops mid-transfer (e.g. the machine sleeps),
+    // NSURLSession reports the server's `200 OK` *and* an error such as
+    // NSURLErrorNetworkConnectionLost, with no body at all. Breaking on the status code alone
+    // makes a truncated response indistinguishable from a complete one.
+    if (response.statusCode == 200 && !requestError) break;
 
     // If the original request failed because of a "No network" error, break out of the loop,
     // subsequent retries are pointless and the entire sync will be retried once a connection
@@ -192,13 +198,14 @@ using santa::NSStringToUTF8String;
   // does not implement.
   if (statusCode) *statusCode = response.statusCode;
 
-  // If the final attempt resulted in an error, log the error and return nil.
-  if (response.statusCode != 200) {
+  // If the final attempt resulted in an error, log the error and return nil. `requestError` is
+  // consulted even on a 200 so an incomplete response is never mistaken for a complete one.
+  if (response.statusCode != 200 || requestError) {
     long code = response.statusCode;
     NSString* errStr = [NSHTTPURLResponse localizedStringForStatusCode:response.statusCode];
-    if (requestError.localizedDescription) {
+    if (requestError) {
       code = (long)requestError.code;
-      errStr = requestError.localizedDescription;
+      errStr = requestError.localizedDescription ?: requestError.domain;
     }
     LOGE(@"HTTP Response: %ld %@", code, errStr);
     [SNTError populateError:error withCode:SNTErrorCodeFailedToHTTP format:@"%@", errStr ?: @""];
