@@ -44,6 +44,7 @@ SNTCachedDecision* MakeCachedDecision(struct stat sb, SNTEventState decision) {
 }
 
 @interface SNTDecisionCache (TestSupport)
+- (SNTCachedDecision*)buildDecisionForFileInfo:(SNTFileInfo*)fi;
 - (void)waitForCachePopulateQueueForTesting;
 - (NSUInteger)pendingRehydrateCountForTesting;
 - (dispatch_queue_t)cachePopulateQ;
@@ -130,6 +131,7 @@ SNTCachedDecision* MakeCachedDecision(struct stat sb, SNTEventState decision) {
   XCTAssertEqualObjects(cd.sha256, fi.SHA256);
   XCTAssertEqual(cd.decision, SNTEventStateUnknown);
   XCTAssertEqual(cd.cacheable, NO);
+  XCTAssertEqual(cd.codesignValidationState, SNTCodesignValidationStateUnsigned);
 
   // Verify it landed in the cache.
   SNTCachedDecision* cached = [dc cachedDecisionForVnode:fi.vnode];
@@ -139,6 +141,19 @@ SNTCachedDecision* MakeCachedDecision(struct stat sb, SNTEventState decision) {
 
   [dc forgetCachedDecisionForVnode:fi.vnode];
   [[NSFileManager defaultManager] removeItemAtPath:tmpPath error:nil];
+}
+
+- (void)testBuildDecisionRetriesMissingCodesignResultAndError {
+  id mockFileInfo = OCMClassMock([SNTFileInfo class]);
+  OCMStub([mockFileInfo SHA256]).andReturn(@"aabbccdd");
+  OCMStub([mockFileInfo vnode]).andReturn((SantaVnode){});
+  OCMStub([mockFileInfo codesignCheckerWithError:[OCMArg setTo:nil]]).andReturn(nil);
+
+  SNTCachedDecision* cd =
+      [[SNTDecisionCache sharedCache] buildDecisionForFileInfo:mockFileInfo];
+
+  XCTAssertEqual(cd.codesignValidationState, SNTCodesignValidationStateNeedsValidation);
+  [mockFileInfo stopMocking];
 }
 
 - (void)testAsyncRehydrateAndCacheDecisionForFileInfo {
@@ -227,6 +242,7 @@ SNTCachedDecision* MakeCachedDecision(struct stat sb, SNTEventState decision) {
   XCTAssertNotNil(cd.cdhash);
   XCTAssertNotNil(cd.certChain);
   XCTAssertGreaterThan(cd.certChain.count, 0u);
+  XCTAssertEqual(cd.codesignValidationState, SNTCodesignValidationStateSuccess);
 
   // launchd is a platform binary: no teamID, but signingID is retained.
   XCTAssertNil(cd.teamID);

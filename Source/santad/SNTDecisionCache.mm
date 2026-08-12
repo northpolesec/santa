@@ -155,6 +155,7 @@
   NSError* err;
   MOLCodesignChecker* csc = [fi codesignCheckerWithError:&err];
   if (csc && !err) {
+    cd.codesignValidationState = SNTCodesignValidationStateSuccess;
     cd.certSHA256 = csc.leafCertificate.SHA256;
     cd.certCommonName = csc.leafCertificate.commonName;
     cd.certChain = csc.certificates;
@@ -188,6 +189,8 @@
     cd.codesigningFlags = csc.signatureFlags;
     cd.secureSigningTime = csc.secureSigningTime;
     cd.signingTime = csc.signingTime;
+  } else if (err) {
+    cd.codesignValidationState = SNTCodesignValidationStateForError((OSStatus)err.code);
   }
 
   return cd;

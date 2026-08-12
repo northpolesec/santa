@@ -648,20 +648,37 @@ static void UpdateCachedDecisionSigningInfo(
   cd.quarantineURL = fileInfo.quarantineDataURL;
 
   NSError* csInfoError;
-  if (!cd.certSHA256.length) {
+  OSStatus cachedValidationError = SNTCodesignValidationErrorForState(cd.codesignValidationState);
+  if (cachedValidationError != errSecSuccess) {
+    csInfoError = [NSError errorWithDomain:NSOSStatusErrorDomain
+                                      code:cachedValidationError
+                                  userInfo:nil];
+    cd.decisionExtra = [NSString
+        stringWithFormat:@"Signature ignored due to error: %ld", (long)csInfoError.code];
+    cd.signingStatus = (cd.signingStatus == SNTSigningStatusUnsigned ? SNTSigningStatusUnsigned
+                                                                     : SNTSigningStatusInvalid);
+  } else if (cd.codesignValidationState == SNTCodesignValidationStateNeedsValidation) {
     // Grab the code signature, if there's an error don't try to capture
     // any of the signature details.
     // TODO(mlw): MOLCodesignChecker should be updated to still grab signing information
     // even if validity check fails. Once that is done, this code can be updated to grab
     // cert information so that it can still be reported to the sync server.
     MOLCodesignChecker* csInfo = [fileInfo codesignCheckerWithError:&csInfoError];
+    if (!csInfo && !csInfoError) {
+      csInfoError = [NSError errorWithDomain:NSOSStatusErrorDomain
+                                        code:errSecCSInternalError
+                                    userInfo:nil];
+    }
     if (csInfoError) {
+      cd.codesignValidationState =
+          SNTCodesignValidationStateForError((OSStatus)csInfoError.code);
       csInfo = nil;
       cd.decisionExtra = [NSString
           stringWithFormat:@"Signature ignored due to error: %ld", (long)csInfoError.code];
       cd.signingStatus = (cd.signingStatus == SNTSigningStatusUnsigned ? SNTSigningStatusUnsigned
                                                                        : SNTSigningStatusInvalid);
     } else {
+      cd.codesignValidationState = SNTCodesignValidationStateSuccess;
       UpdateCachedDecisionSigningInfo(cd, csInfo, platformBinaryState, entitlementsFilterCallback);
     }
   }

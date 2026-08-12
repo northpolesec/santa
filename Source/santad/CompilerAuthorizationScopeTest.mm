@@ -236,6 +236,14 @@ static const std::vector<std::string> kBlockedArgs = {"clang", "--link"};
                  @"the authorized context must be allowed");
   XCTAssertTrue(OCMVerifyAll(self.mockCompilerController));
 
+  es_file_t cachedFile = MakeESFile("clang", {.st_dev = 12, .st_ino = 34});
+  santa::CachedAuthResult cachedResult = _authResultCache->CheckCache(&cachedFile);
+  XCTAssertEqual(cachedResult.action, SNTActionRespondAllowNoCache);
+  XCTAssertNotNil(cachedResult.cached_decision);
+  XCTAssertEqual(cachedResult.cached_decision.codesignValidationState,
+                 SNTCodesignValidationStateSuccess,
+                 @"non-cacheable CEL policy must retain completed signature validation");
+
   // Same vnode, context the rule blocks, no cache flush in between. The rule must
   // be evaluated again rather than the earlier allow being reused. The strict mock
   // enforces that no compiler status is conferred.

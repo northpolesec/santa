@@ -21,6 +21,33 @@
 
 @class MOLCertificate;
 
+typedef NS_ENUM(NSInteger, SNTCodesignValidationState) {
+  SNTCodesignValidationStateNeedsValidation = 0,
+  SNTCodesignValidationStateSuccess,
+  SNTCodesignValidationStateUnsigned,
+  SNTCodesignValidationStateSignatureFailed,
+  SNTCodesignValidationStateSignatureUnsupported,
+  SNTCodesignValidationStateRequirementInvalid,
+  SNTCodesignValidationStateRequirementUnsupported,
+  SNTCodesignValidationStateBadObjectFormat,
+  SNTCodesignValidationStateSignatureInvalid,
+  SNTCodesignValidationStateTooBig,
+  SNTCodesignValidationStateUnsupportedDigestAlgorithm,
+  SNTCodesignValidationStateInvalidTeamIdentifier,
+  SNTCodesignValidationStateBadTeamIdentifier,
+  SNTCodesignValidationStateMultipleExecutableSegments,
+  SNTCodesignValidationStateInvalidEntitlements,
+  SNTCodesignValidationStateInvalidRuntimeVersion,
+};
+
+/// Returns a reusable state for errors determined by the executable's contents.
+/// All unrecognized or environment-dependent errors require validation again.
+SNTCodesignValidationState SNTCodesignValidationStateForError(OSStatus error);
+
+/// Returns the Security.framework error represented by a completed failure state.
+/// Returns errSecSuccess for NeedsValidation and Success.
+OSStatus SNTCodesignValidationErrorForState(SNTCodesignValidationState state);
+
 ///
 ///  Store information about executions from decision making for later logging.
 ///
@@ -58,6 +85,16 @@
 @property SNTSigningStatus signingStatus;
 @property NSDate* secureSigningTime;
 @property NSDate* signingTime;
+
+/// The reusable result of static code-signing validation for this identity.
+/// NeedsValidation means validation has not run or a prior validation attempt
+/// returned an error that must be retried. Only stable outcomes belong in this
+/// enum; do not add a Security.framework error without first establishing that
+/// it is determined by the executable's contents and cannot depend on bundle
+/// contents, filesystem access, cancellation, trust, or other mutable system
+/// state. See the errSecCS* catalog in <Security/CSCommon.h>.
+/// A successful result does not imply that the binary has a signing certificate.
+@property SNTCodesignValidationState codesignValidationState;
 
 @property NSString* quarantineURL;
 

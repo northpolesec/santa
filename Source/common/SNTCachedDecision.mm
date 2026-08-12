@@ -16,6 +16,51 @@
 
 #import "Source/common/SNTCachedDecision.h"
 
+SNTCodesignValidationState SNTCodesignValidationStateForError(OSStatus error) {
+  switch (error) {
+    case errSecCSUnsigned: return SNTCodesignValidationStateUnsigned;
+    case errSecCSSignatureFailed: return SNTCodesignValidationStateSignatureFailed;
+    case errSecCSSignatureUnsupported: return SNTCodesignValidationStateSignatureUnsupported;
+    case errSecCSReqInvalid: return SNTCodesignValidationStateRequirementInvalid;
+    case errSecCSReqUnsupported: return SNTCodesignValidationStateRequirementUnsupported;
+    case errSecCSBadObjectFormat: return SNTCodesignValidationStateBadObjectFormat;
+    case errSecCSSignatureInvalid: return SNTCodesignValidationStateSignatureInvalid;
+    case errSecCSTooBig: return SNTCodesignValidationStateTooBig;
+    case errSecCSUnsupportedDigestAlgorithm:
+      return SNTCodesignValidationStateUnsupportedDigestAlgorithm;
+    case errSecCSInvalidTeamIdentifier: return SNTCodesignValidationStateInvalidTeamIdentifier;
+    case errSecCSBadTeamIdentifier: return SNTCodesignValidationStateBadTeamIdentifier;
+    case errSecMultipleExecSegments:
+      return SNTCodesignValidationStateMultipleExecutableSegments;
+    case errSecCSInvalidEntitlements: return SNTCodesignValidationStateInvalidEntitlements;
+    case errSecCSInvalidRuntimeVersion: return SNTCodesignValidationStateInvalidRuntimeVersion;
+    default: return SNTCodesignValidationStateNeedsValidation;
+  }
+}
+
+OSStatus SNTCodesignValidationErrorForState(SNTCodesignValidationState state) {
+  switch (state) {
+    case SNTCodesignValidationStateUnsigned: return errSecCSUnsigned;
+    case SNTCodesignValidationStateSignatureFailed: return errSecCSSignatureFailed;
+    case SNTCodesignValidationStateSignatureUnsupported: return errSecCSSignatureUnsupported;
+    case SNTCodesignValidationStateRequirementInvalid: return errSecCSReqInvalid;
+    case SNTCodesignValidationStateRequirementUnsupported: return errSecCSReqUnsupported;
+    case SNTCodesignValidationStateBadObjectFormat: return errSecCSBadObjectFormat;
+    case SNTCodesignValidationStateSignatureInvalid: return errSecCSSignatureInvalid;
+    case SNTCodesignValidationStateTooBig: return errSecCSTooBig;
+    case SNTCodesignValidationStateUnsupportedDigestAlgorithm:
+      return errSecCSUnsupportedDigestAlgorithm;
+    case SNTCodesignValidationStateInvalidTeamIdentifier: return errSecCSInvalidTeamIdentifier;
+    case SNTCodesignValidationStateBadTeamIdentifier: return errSecCSBadTeamIdentifier;
+    case SNTCodesignValidationStateMultipleExecutableSegments: return errSecMultipleExecSegments;
+    case SNTCodesignValidationStateInvalidEntitlements: return errSecCSInvalidEntitlements;
+    case SNTCodesignValidationStateInvalidRuntimeVersion: return errSecCSInvalidRuntimeVersion;
+    case SNTCodesignValidationStateNeedsValidation:
+    case SNTCodesignValidationStateSuccess: return errSecSuccess;
+  }
+  return errSecCSInternalError;
+}
+
 @implementation SNTCachedDecision
 
 - (instancetype)init {
@@ -51,6 +96,7 @@
     _entitlementsFiltered = previous.entitlementsFiltered;
     _secureSigningTime = previous.secureSigningTime;
     _signingTime = previous.signingTime;
+    _codesignValidationState = previous.codesignValidationState;
   }
   return self;
 }
@@ -76,6 +122,7 @@
   copy.signingStatus = _signingStatus;
   copy.secureSigningTime = _secureSigningTime;
   copy.signingTime = _signingTime;
+  copy.codesignValidationState = _codesignValidationState;
   copy.quarantineURL = _quarantineURL;
   copy.customMsg = _customMsg;
   copy.customURL = _customURL;

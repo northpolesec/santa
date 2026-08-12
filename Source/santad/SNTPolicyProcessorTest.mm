@@ -753,6 +753,98 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   XCTAssertEqualObjects(cd.signingID, @"EQHXZ8M8AV:com.apple.ls");
 }
 
+- (void)testDecisionReusesCompletedCodesignValidationWithoutCertificate {
+  NSArray<NSDictionary*>* cases = @[
+    @{
+      @"state" : @(SNTCodesignValidationStateSuccess),
+      @"codesigning_flags" : @(CS_SIGNED | CS_VALID | CS_ADHOC | CS_LINKER_SIGNED),
+    },
+    @{
+      @"state" : @(SNTCodesignValidationStateUnsigned),
+      @"codesigning_flags" : @0,
+    },
+    @{
+      @"state" : @(SNTCodesignValidationStateSignatureFailed),
+      @"codesigning_flags" : @(CS_SIGNED),
+    },
+  ];
+
+  for (NSDictionary* testCase in cases) {
+    id mockRuleTable = OCMClassMock([SNTRuleTable class]);
+    SNTPolicyProcessor* processor =
+        [[SNTPolicyProcessor alloc] initWithRuleTable:mockRuleTable
+                                   entitlementsFilter:santa::EntitlementsFilter::Create(@[], @[])];
+    id mockConfigurator = OCMClassMock([SNTConfigurator class]);
+    OCMStub([mockConfigurator clientMode]).andReturn(SNTClientModeMonitor);
+    processor.configurator = mockConfigurator;
+
+    id mockFileInfo = OCMClassMock([SNTFileInfo class]);
+    OCMReject([mockFileInfo codesignCheckerWithError:[OCMArg setTo:nil]]);
+    OCMStub([mockFileInfo isMachO]).andReturn(YES);
+
+    SNTCachedDecision* cached = [[SNTCachedDecision alloc] init];
+    cached.sha256 = @"a326a1fb48074202e9ad41e4cd1e389eeea372c8c6f7d7e80da81176d5d9430e";
+    cached.codesignValidationState =
+        (SNTCodesignValidationState)[testCase[@"state"] integerValue];
+
+    es_file_t file = MakeESFile("/tmp/rg");
+    es_process_t proc = MakeESProcess(&file);
+    proc.is_platform_binary = false;
+    proc.codesigning_flags = [testCase[@"codesigning_flags"] unsignedIntValue];
+
+    SNTConfigState* configState = [[SNTConfigState alloc] initWithConfig:mockConfigurator];
+
+    SNTCachedDecision* cd = [processor decisionForFileInfo:mockFileInfo
+                                             targetProcess:&proc
+                                               configState:configState
+                                        activationCallback:nil
+                                            cachedDecision:cached];
+
+    XCTAssertEqual(cd.codesignValidationState,
+                   (SNTCodesignValidationState)[testCase[@"state"] integerValue]);
+    XCTAssertEqual(cd.decision, SNTEventStateAllowUnknown);
+    OCMVerifyAll(mockFileInfo);
+    [mockConfigurator stopMocking];
+    [mockRuleTable stopMocking];
+  }
+}
+
+- (void)testDecisionCatalogsContentDerivedCodesignError {
+  id mockRuleTable = OCMClassMock([SNTRuleTable class]);
+  SNTPolicyProcessor* processor =
+      [[SNTPolicyProcessor alloc] initWithRuleTable:mockRuleTable
+                                 entitlementsFilter:santa::EntitlementsFilter::Create(@[], @[])];
+  id mockConfigurator = OCMClassMock([SNTConfigurator class]);
+  OCMStub([mockConfigurator clientMode]).andReturn(SNTClientModeMonitor);
+  processor.configurator = mockConfigurator;
+
+  NSError* error = [NSError errorWithDomain:NSOSStatusErrorDomain
+                                        code:errSecCSSignatureFailed
+                                    userInfo:nil];
+  id mockFileInfo = OCMClassMock([SNTFileInfo class]);
+  OCMExpect([mockFileInfo codesignCheckerWithError:[OCMArg setTo:error]]).andReturn(nil);
+  OCMStub([mockFileInfo isMachO]).andReturn(YES);
+
+  es_file_t file = MakeESFile("/tmp/invalid-signature");
+  es_process_t proc = MakeESProcess(&file);
+  proc.is_platform_binary = false;
+  proc.codesigning_flags = CS_SIGNED;
+  SNTConfigState* configState = [[SNTConfigState alloc] initWithConfig:mockConfigurator];
+
+  SNTCachedDecision* cd = [processor decisionForFileInfo:mockFileInfo
+                                           targetProcess:&proc
+                                             configState:configState
+                                      activationCallback:nil
+                                          cachedDecision:nil];
+
+  XCTAssertEqual(cd.codesignValidationState, SNTCodesignValidationStateSignatureFailed);
+  XCTAssertEqual(cd.decision, SNTEventStateAllowUnknown);
+  OCMVerifyAll(mockFileInfo);
+  [mockFileInfo stopMocking];
+  [mockConfigurator stopMocking];
+  [mockRuleTable stopMocking];
+}
+
 - (void)testCELDecisions {
   ActivationCallbackBlock activation =
       ^std::unique_ptr<::google::api::expr::runtime::BaseActivation>(bool useV2) {

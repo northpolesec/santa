@@ -33,4 +33,90 @@
   XCTAssertEqual(sb.st_dev, cd.vnodeId.fsid);
 }
 
+- (void)testCachedIdentityPreservesUnsignedCodesignValidationResult {
+  SNTCachedDecision* previous = [[SNTCachedDecision alloc] init];
+  previous.sha256 = @"aabbccdd";
+  previous.codesignValidationState = SNTCodesignValidationStateUnsigned;
+
+  SNTCachedDecision* cached = [[SNTCachedDecision alloc] initWithCachedIdentity:previous];
+
+  XCTAssertEqual(cached.codesignValidationState, SNTCodesignValidationStateUnsigned);
+}
+
+- (void)testCachedIdentityPreservesSuccessfulAdhocValidationWithoutCertificate {
+  SNTCachedDecision* previous = [[SNTCachedDecision alloc] init];
+  previous.sha256 = @"aabbccdd";
+  previous.certSHA256 = nil;
+  previous.codesignValidationState = SNTCodesignValidationStateSuccess;
+
+  SNTCachedDecision* cached = [[SNTCachedDecision alloc] initWithCachedIdentity:previous];
+
+  XCTAssertEqual(cached.codesignValidationState, SNTCodesignValidationStateSuccess);
+  XCTAssertNil(cached.certSHA256);
+}
+
+- (void)testCachedIdentityPreservesNeedsValidationCodesignState {
+  SNTCachedDecision* previous = [[SNTCachedDecision alloc] init];
+  previous.sha256 = @"aabbccdd";
+
+  SNTCachedDecision* cached = [[SNTCachedDecision alloc] initWithCachedIdentity:previous];
+
+  XCTAssertEqual(cached.codesignValidationState, SNTCodesignValidationStateNeedsValidation);
+}
+
+- (void)testCodesignValidationErrorCatalog {
+  NSArray<NSNumber*>* reusableErrors = @[
+    @(errSecCSUnsigned),
+    @(errSecCSSignatureFailed),
+    @(errSecCSSignatureUnsupported),
+    @(errSecCSReqInvalid),
+    @(errSecCSReqUnsupported),
+    @(errSecCSBadObjectFormat),
+    @(errSecCSSignatureInvalid),
+    @(errSecCSTooBig),
+    @(errSecCSUnsupportedDigestAlgorithm),
+    @(errSecCSInvalidTeamIdentifier),
+    @(errSecCSBadTeamIdentifier),
+    @(errSecMultipleExecSegments),
+    @(errSecCSInvalidEntitlements),
+    @(errSecCSInvalidRuntimeVersion),
+  ];
+
+  for (NSNumber* error in reusableErrors) {
+    OSStatus status = (OSStatus)error.intValue;
+    SNTCodesignValidationState state = SNTCodesignValidationStateForError(status);
+    XCTAssertNotEqual(state, SNTCodesignValidationStateNeedsValidation);
+    XCTAssertEqual(SNTCodesignValidationErrorForState(state), status);
+  }
+}
+
+- (void)testMutableCodesignValidationErrorsRequireRetry {
+  NSArray<NSNumber*>* retryableErrors = @[
+    @(errSecCSSignatureNotVerifiable),
+    @(errSecCSBadDictionaryFormat),
+    @(errSecCSStaticCodeChanged),
+    @(errSecCSStaticCodeNotFound),
+    @(errSecCSDBAccess),
+    @(errSecCSInternalError),
+    @(errSecCSInfoPlistFailed),
+    @(errSecCSUnsignedNestedCode),
+    @(errSecCSBadNestedCode),
+    @(errSecCSBadMainExecutable),
+    @(errSecCSCancelled),
+    @(errSecCSInvalidAssociatedFileData),
+    @(errSecCSSignatureUntrusted),
+    @(errSecCSRevokedNotarization),
+  ];
+
+  for (NSNumber* error in retryableErrors) {
+    XCTAssertEqual(SNTCodesignValidationStateForError((OSStatus)error.intValue),
+                   SNTCodesignValidationStateNeedsValidation);
+  }
+}
+
+- (void)testUnknownCodesignValidationStateFailsClosed {
+  XCTAssertEqual(SNTCodesignValidationErrorForState((SNTCodesignValidationState)NSIntegerMax),
+                 errSecCSInternalError);
+}
+
 @end
