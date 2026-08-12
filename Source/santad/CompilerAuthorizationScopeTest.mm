@@ -97,6 +97,7 @@ static const std::vector<std::string> kBlockedArgs = {"clang", "--link"};
 @implementation CompilerAuthorizationScopeTest {
   std::shared_ptr<AuthResultCache> _authResultCache;
   std::shared_ptr<MockEndpointSecurityAPI> _mockESApi;
+  int _staticValidationCount;
 }
 
 - (void)setUp {
@@ -125,6 +126,9 @@ static const std::vector<std::string> kBlockedArgs = {"clang", "--link"};
   OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
   OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
   OCMStub([self.mockFileInfo codesignCheckerWithError:[OCMArg setTo:nil]])
+      .andDo(^(NSInvocation* inv) {
+        self->_staticValidationCount++;
+      })
       .andReturn(self.mockCodesignChecker);
 
   self.mockRuleDatabase = OCMClassMock([SNTRuleTable class]);
@@ -236,11 +240,25 @@ static const std::vector<std::string> kBlockedArgs = {"clang", "--link"};
                  @"the authorized context must be allowed");
   XCTAssertTrue(OCMVerifyAll(self.mockCompilerController));
 
+  // The non-cacheable entry must retain the completed validation. The mock
+  // checker has no leaf certificate, so certSHA256 is nil — the shape that
+  // previously forced a full re-validation on the next execution.
+  es_file_t cachedFile = MakeESFile("clang", {.st_dev = 12, .st_ino = 34});
+  santa::CachedAuthResult cachedResult = _authResultCache->CheckCache(&cachedFile);
+  XCTAssertEqual(cachedResult.action, SNTActionRespondAllowNoCache);
+  XCTAssertNotNil(cachedResult.cached_decision);
+  XCTAssertNil(cachedResult.cached_decision.certSHA256);
+  XCTAssertEqualObjects(cachedResult.cached_decision.codesignValidationStatus, @(errSecSuccess),
+                        @"non-cacheable CEL policy must retain completed signature validation");
+  int validationsAfterFirstExec = _staticValidationCount;
+
   // Same vnode, context the rule blocks, no cache flush in between. The rule must
   // be evaluated again rather than the earlier allow being reused. The strict mock
   // enforces that no compiler status is conferred.
   XCTAssertEqual([self runExecWithArgs:kBlockedArgs dev:12 ino:34], ES_AUTH_RESULT_DENY,
                  @"a primed vnode must not settle a blocked context");
+  XCTAssertEqual(_staticValidationCount, validationsAfterFirstExec,
+                 @"a primed vnode must not repeat static signature validation");
 }
 
 // Priming one vnode must not change the answer for a different one.
