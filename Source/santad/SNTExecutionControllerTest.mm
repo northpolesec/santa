@@ -1006,6 +1006,7 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
 
   OCMStub([mockPolicyProcessor decisionForFileInfo:OCMOCK_ANY
                                      targetProcess:&procExec
+                                      imageCPUType:0
                                        configState:OCMOCK_ANY
                                 activationCallback:OCMOCK_ANY
                                     cachedDecision:OCMOCK_ANY])
@@ -1073,6 +1074,130 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
                        expectedControl:santa::ProcessControl::Kill];
 }
 
+// When the kernel kills the process for code signature invalidity, a block must
+// still be applied and logged but no UI shown, and there's nothing to hold for
+// approval.
+- (void)validateBlockWithCodesigningFlags:(uint32_t)csFlags
+                             imageCPUType:(cpu_type_t)imageCPUType
+                           expectedAction:(SNTAction)expectedAction
+                                  wantGUI:(BOOL)wantGUI {
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
+  OCMStub([self.mockConfigurator clientMode]).andReturn(SNTClientModeLockdown);
+
+  id mockNotifierQueue = OCMClassMock([SNTNotificationQueue class]);
+  __block BOOL guiShown = NO;
+  OCMStub([mockNotifierQueue addEvent:OCMOCK_ANY
+                    withCustomMessage:OCMOCK_ANY
+                            customURL:OCMOCK_ANY
+                eventDetailButtonText:OCMOCK_ANY
+                          configState:OCMOCK_ANY
+                             andReply:OCMOCK_ANY])
+      .andDo(^(NSInvocation* invocation) {
+        guiShown = YES;
+      });
+
+  id mockPolicyProcessor = OCMClassMock([SNTPolicyProcessor class]);
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+  cd.decision = SNTEventStateBlockSigningID;
+  cd.holdAndAsk = YES;
+  cd.decisionClientMode = SNTClientModeLockdown;
+
+  es_file_t file = MakeESFile("foo");
+  es_process_t proc = MakeESProcess(&file);
+  es_file_t fileExec = MakeESFile("bar", {.st_dev = 12, .st_ino = 34});
+  es_process_t procExec = MakeESProcess(&fileExec);
+  procExec.is_platform_binary = false;
+  procExec.codesigning_flags = csFlags;
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_EXEC, &proc);
+  esMsg.event.exec.target = &procExec;
+  esMsg.event.exec.image_cputype = imageCPUType;
+
+  OCMStub([mockPolicyProcessor decisionForFileInfo:OCMOCK_ANY
+                                     targetProcess:&procExec
+                                      imageCPUType:imageCPUType
+                                       configState:OCMOCK_ANY
+                                activationCallback:OCMOCK_ANY
+                                    cachedDecision:OCMOCK_ANY])
+      .ignoringNonObjectArgs()
+      .andReturn(cd);
+
+  LogExecutionBlock loggerBlock = ^(Message esMsg) {
+  };
+  santa::ProcessControlBlock processControl = ^bool(pid_t pid, santa::ProcessControl control) {
+    return true;
+  };
+
+  std::shared_ptr<santa::santad::process_tree::ProcessTree> processTree;
+  SNTExecutionController* controller = [[SNTExecutionController alloc]
+        initWithRuleTable:self.mockRuleDatabase
+               eventTable:self.mockEventDatabase
+            notifierQueue:mockNotifierQueue
+               syncdQueue:nil
+                   logger:loggerBlock
+                ttyWriter:santa::TTYWriter::Create(true)
+          policyProcessor:mockPolicyProcessor
+      processControlBlock:processControl
+              processTree:processTree
+      sandboxExpectations:std::make_shared<santa::SandboxExpectations>()];
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+
+  __block SNTAction resultAction = SNTActionUnset;
+  {
+    Message msg(mockESApi, &esMsg);
+    [controller validateExecEvent:msg
+                   cachedDecision:nil
+                       postAction:^bool(SNTAction action, SNTCachedDecision* cd) {
+                         resultAction = action;
+                         return true;
+                       }];
+  }
+
+  XCTAssertEqual(resultAction, expectedAction);
+  XCTAssertEqual(guiShown, wantGUI);
+
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+  [mockNotifierQueue stopMocking];
+  [mockPolicyProcessor stopMocking];
+}
+
+- (void)testBlockWithCSKilledIsSilent {
+  [self validateBlockWithCodesigningFlags:CS_KILLED
+                             imageCPUType:CPU_TYPE_ANY
+                           expectedAction:SNTActionRespondDeny
+                                  wantGUI:NO];
+}
+
+// CS_KILL without CS_VALID is terminal for native arm64, where signing is
+// required, but not for x86_64, where unsigned code may execute.
+- (void)testBlockWithCSKillOnlyUsesTargetArchitecture {
+  [self validateBlockWithCodesigningFlags:CS_KILL
+                             imageCPUType:CPU_TYPE_ARM64
+                           expectedAction:SNTActionRespondDeny
+                                  wantGUI:NO];
+  [self validateBlockWithCodesigningFlags:CS_KILL
+                             imageCPUType:CPU_TYPE_X86_64
+                           expectedAction:SNTActionRespondHold
+                                  wantGUI:YES];
+}
+
+- (void)testBlockWithValidSignatureShowsGUI {
+  [self validateBlockWithCodesigningFlags:CS_SIGNED | CS_VALID | CS_KILL
+                             imageCPUType:CPU_TYPE_ARM64
+                           expectedAction:SNTActionRespondHold
+                                  wantGUI:YES];
+}
+
+// Invalid signature but the kernel is not set to kill for it.
+- (void)testBlockWithInvalidAndNoCSKillShowsGUI {
+  [self validateBlockWithCodesigningFlags:CS_SIGNED
+                             imageCPUType:CPU_TYPE_ARM64
+                           expectedAction:SNTActionRespondHold
+                                  wantGUI:YES];
+}
+
 // Test that successful TouchID auth populates the cache, and subsequent executions
 // of the same binary skip the TouchID prompt (cache hit scenario)
 - (void)testTouchIDCacheHitSkipsPrompt {
@@ -1117,6 +1242,7 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
 
   OCMStub([mockPolicyProcessor decisionForFileInfo:OCMOCK_ANY
                                      targetProcess:&procExec
+                                      imageCPUType:0
                                        configState:OCMOCK_ANY
                                 activationCallback:OCMOCK_ANY
                                     cachedDecision:OCMOCK_ANY])

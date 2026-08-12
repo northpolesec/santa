@@ -17,6 +17,7 @@
 
 #import <Foundation/Foundation.h>
 #include <Kernel/kern/cs_blobs.h>
+#include <mach/machine.h>
 
 #include <cstdint>
 #include <string_view>
@@ -31,6 +32,12 @@ namespace santa {
 static inline bool CdhashStrictlyEnforced(uint32_t csFlags) {
   return (csFlags & CS_VALID) && (csFlags & (CS_HARD | CS_KILL));
 }
+
+// Returns true when the kernel will kill the process for code-signing
+// invalidity even if we allow the execution to proceed. Native
+// arm64 code must be signed, while unsigned x86_64 code may execute on Intel or
+// under Rosetta, so CS_KILL without CS_VALID is only terminal for arm64.
+bool KernelWillKillForInvalidSignature(uint32_t csFlags, cpu_type_t imageCPUType);
 
 extern const NSUInteger kTeamIDLength;
 extern NSString* const kPlatformTeamID;
