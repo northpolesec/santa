@@ -67,6 +67,20 @@ package_group(
     packages = ["//..."],
 )
 
+# The zsh completion is scraped from the help output of the santactl being
+# built, so it can never document a command or flag that binary doesn't have.
+genrule(
+    name = "zsh_completion",
+    # santactl is a src, not a tool, so the completion is scraped from the same
+    # binary that ships rather than from a second, exec-configured build of it.
+    # Santa only ever builds macOS binaries on macOS, so it is always runnable.
+    srcs = ["//Source/santactl"],
+    outs = ["Conf/_santactl"],
+    cmd = "$(location Conf/generate_zsh_completion.sh) $(location //Source/santactl:santactl) > $@",
+    tools = ["Conf/generate_zsh_completion.sh"],
+    visibility = [":santa_package_group"],
+)
+
 ################################################################################
 # Loading/Unloading/Reloading
 ################################################################################

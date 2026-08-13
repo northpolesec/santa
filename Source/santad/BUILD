@@ -1470,6 +1470,7 @@ macos_bundle(
         "//:Conf/com.northpolesec.santa.plist",
         "//:Conf/com.northpolesec.santa.syncservice.plist",
         "//:Conf/install_services.sh",
+        "//:zsh_completion",
     ],
     version = "//:version",
     visibility = ["//:santa_package_group"],

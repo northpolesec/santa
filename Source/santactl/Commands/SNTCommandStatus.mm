@@ -80,7 +80,8 @@ REGISTER_COMMAND_NAME(@"status")
 
 + (NSString*)longHelpText {
   return (@"Provides details about Santa while it's running.\n"
-          @"  Use --json to output in JSON format");
+          @"  Options:\n"
+          @"    --json: Output in JSON format.");
 }
 
 - (void)runWithArguments:(NSArray*)arguments {

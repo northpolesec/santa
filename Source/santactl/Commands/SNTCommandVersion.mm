@@ -45,7 +45,8 @@ REGISTER_COMMAND_NAME(@"version")
 
 + (NSString*)longHelpText {
   return (@"Show versions of all Santa components.\n"
-          @"  Use --json to output in JSON format.");
+          @"  Options:\n"
+          @"    --json: Output in JSON format.");
 }
 
 - (void)runWithArguments:(NSArray*)arguments {
