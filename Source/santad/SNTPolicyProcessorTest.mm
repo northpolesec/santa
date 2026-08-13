@@ -745,6 +745,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
   SNTCachedDecision* cd = [processor decisionForFileInfo:fi
                                            targetProcess:&proc
+                                            imageCPUType:CPU_TYPE_ARM64
                                              configState:configState
                                       activationCallback:nil
                                           cachedDecision:nil];
@@ -802,6 +803,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
     SNTCachedDecision* cd = [processor decisionForFileInfo:mockFileInfo
                                              targetProcess:&proc
+                                              imageCPUType:CPU_TYPE_ARM64
                                                configState:configState
                                         activationCallback:nil
                                             cachedDecision:cached];
@@ -854,6 +856,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
   SNTCachedDecision* cd = [processor decisionForFileInfo:mockFileInfo
                                            targetProcess:&proc
+                                            imageCPUType:CPU_TYPE_ARM64
                                              configState:configState
                                       activationCallback:nil
                                           cachedDecision:nil];
@@ -900,6 +903,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
   SNTCachedDecision* cd = [processor decisionForFileInfo:mockFileInfo
                                            targetProcess:&proc
+                                            imageCPUType:CPU_TYPE_ARM64
                                              configState:configState
                                       activationCallback:nil
                                           cachedDecision:cached];
@@ -945,6 +949,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
   SNTCachedDecision* cd = [processor decisionForFileInfo:mockFileInfo
                                            targetProcess:&proc
+                                            imageCPUType:CPU_TYPE_ARM64
                                              configState:configState
                                       activationCallback:nil
                                           cachedDecision:nil];
@@ -990,6 +995,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
   SNTCachedDecision* cd = [processor decisionForFileInfo:mockFileInfo
                                            targetProcess:&proc
+                                            imageCPUType:CPU_TYPE_ARM64
                                              configState:configState
                                       activationCallback:nil
                                           cachedDecision:nil];
@@ -1040,6 +1046,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
   SNTCachedDecision* first = [processor decisionForFileInfo:mockFileInfo
                                               targetProcess:&proc
+                                               imageCPUType:CPU_TYPE_ARM64
                                                 configState:configState
                                          activationCallback:nil
                                              cachedDecision:nil];
@@ -1049,6 +1056,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
   SNTCachedDecision* second = [processor decisionForFileInfo:mockFileInfo
                                                targetProcess:&proc
+                                                imageCPUType:CPU_TYPE_ARM64
                                                  configState:configState
                                           activationCallback:nil
                                               cachedDecision:first];
@@ -1058,6 +1066,56 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   [mockFileInfo stopMocking];
   [mockConfigurator stopMocking];
   [mockRuleTable stopMocking];
+}
+
+- (SNTSigningStatus)signingStatusForCodesigningFlags:(uint32_t)csFlags
+                                        imageCPUType:(cpu_type_t)imageCPUType {
+  id mockRuleTable = OCMClassMock([SNTRuleTable class]);
+  SNTPolicyProcessor* processor =
+      [[SNTPolicyProcessor alloc] initWithRuleTable:mockRuleTable
+                                 entitlementsFilter:santa::EntitlementsFilter::Create(@[], @[])];
+
+  SNTFileInfo* fi = [[SNTFileInfo alloc] initWithPath:@"/bin/ls"];
+  XCTAssertNotNil(fi);
+
+  es_file_t file = MakeESFile("/bin/ls");
+  es_process_t proc = MakeESProcess(&file);
+  proc.codesigning_flags = csFlags;
+
+  SNTConfigState* configState =
+      [[SNTConfigState alloc] initWithConfig:[SNTConfigurator configurator]];
+
+  return [processor decisionForFileInfo:fi
+                          targetProcess:&proc
+                           imageCPUType:imageCPUType
+                            configState:configState
+                     activationCallback:nil
+                         cachedDecision:nil]
+      .signingStatus;
+}
+
+// CS_KILLED is invalid on every architecture. A CS_KILL-only image is invalid
+// for native arm64, where signing is required, but remains unsigned on x86_64.
+- (void)testSigningStatusFromCodesigningFlags {
+  XCTAssertEqual([self signingStatusForCodesigningFlags:0 imageCPUType:CPU_TYPE_ARM64],
+                 SNTSigningStatusUnsigned);
+  XCTAssertEqual([self signingStatusForCodesigningFlags:CS_KILLED imageCPUType:CPU_TYPE_ANY],
+                 SNTSigningStatusInvalid);
+  XCTAssertEqual([self signingStatusForCodesigningFlags:CS_KILL imageCPUType:CPU_TYPE_ARM64],
+                 SNTSigningStatusInvalid);
+  XCTAssertEqual([self signingStatusForCodesigningFlags:CS_KILL imageCPUType:CPU_TYPE_X86_64],
+                 SNTSigningStatusUnsigned);
+  XCTAssertEqual([self signingStatusForCodesigningFlags:CS_SIGNED imageCPUType:CPU_TYPE_ANY],
+                 SNTSigningStatusInvalid);
+  XCTAssertEqual([self signingStatusForCodesigningFlags:CS_SIGNED | CS_VALID | CS_ADHOC
+                                           imageCPUType:CPU_TYPE_ANY],
+                 SNTSigningStatusAdhoc);
+  XCTAssertEqual([self signingStatusForCodesigningFlags:CS_SIGNED | CS_VALID | CS_DEV_CODE
+                                           imageCPUType:CPU_TYPE_ANY],
+                 SNTSigningStatusDevelopment);
+  XCTAssertEqual([self signingStatusForCodesigningFlags:CS_SIGNED | CS_VALID
+                                           imageCPUType:CPU_TYPE_ANY],
+                 SNTSigningStatusProduction);
 }
 
 - (void)testCELDecisions {
@@ -1997,6 +2055,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
   return [processor decisionForFileInfo:fi
                           targetProcess:&proc
+                           imageCPUType:CPU_TYPE_ARM64
                             configState:configState
                      activationCallback:nil
                          cachedDecision:nil];

@@ -61,6 +61,7 @@ using ActivationCallbackBlock =
 ///
 - (nonnull SNTCachedDecision*)decisionForFileInfo:(nonnull SNTFileInfo*)fileInfo
                                     targetProcess:(nonnull const es_process_t*)targetProc
+                                     imageCPUType:(cpu_type_t)imageCPUType
                                       configState:(nonnull SNTConfigState*)configState
                                activationCallback:
                                    (nullable ActivationCallbackBlock)activationCallback

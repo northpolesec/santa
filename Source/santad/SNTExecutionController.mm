@@ -368,8 +368,10 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
           : santa::CreateCELActivationBlock(esMsg, [binInfo codesignCheckerWithError:NULL],
                                             _processTree);
 
+  cpu_type_t imageCPUType = esMsg->version >= 6 ? esMsg->event.exec.image_cputype : CPU_TYPE_ANY;
   SNTCachedDecision* cd = [self.policyProcessor decisionForFileInfo:binInfo
                                                       targetProcess:targetProc
+                                                       imageCPUType:imageCPUType
                                                         configState:configState
                                                  activationCallback:activationBlock
                                                      cachedDecision:existingDecision];
@@ -447,6 +449,25 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
                          audit_token_to_pidversion(targetProc->audit_token)),
           true);
     }
+  }
+
+  // When the kernel kills the target for code signature invalidity, this exec
+  // cannot succeed no matter what Santa decides. The policy still applies and
+  // the block is still logged and uploaded, but no UI is shown: the user would
+  // otherwise blame Santa for a kill it didn't cause.
+  if (santa::KernelWillKillForCodeSigning(targetProc->codesigning_flags, imageCPUType) &&
+      (cd.decision & SNTEventStateAllow) == 0) {
+    cd.silentBlockGUI = YES;
+    cd.silentBlockTTY = YES;
+    cd.holdAndAsk = NO;
+    NSString* extra = @"Kernel will kill the process for code signature invalidity; "
+                      @"suppressing block UI";
+    cd.decisionExtra =
+        cd.decisionExtra ? [NSString stringWithFormat:@"%@; %@", cd.decisionExtra, extra] : extra;
+    LOGW(@"Denying %@ but suppressing block UI: the kernel will kill this process for code "
+         @"signature invalidity (codesigning_flags=0x%x). The exec would have failed regardless of "
+         @"Santa's decision.",
+         santa::StringTokenToNSString(targetProc->executable->path), targetProc->codesigning_flags);
   }
 
   // Formulate an initial action from the decision.

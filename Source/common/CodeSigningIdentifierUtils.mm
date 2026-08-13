@@ -24,6 +24,12 @@ const NSUInteger kTeamIDLength = 10;
 NSString* const kPlatformTeamID = @"platform";
 NSString* const kPlatformTeamIDPrefix = @"platform:";
 
+bool KernelWillKillForCodeSigning(uint32_t csFlags, cpu_type_t imageCPUType) {
+  if (csFlags & CS_KILLED) return true;
+
+  return imageCPUType == CPU_TYPE_ARM64 && (csFlags & CS_KILL) && !(csFlags & CS_VALID);
+}
+
 namespace {
 
 bool IsAsciiAlnum(char c) {

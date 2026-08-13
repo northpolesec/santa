@@ -739,6 +739,7 @@ static void ApplyCodesignValidationFailure(SNTCachedDecision* cd, OSStatus statu
 
 - (nonnull SNTCachedDecision*)decisionForFileInfo:(nonnull SNTFileInfo*)fileInfo
                                     targetProcess:(nonnull const es_process_t*)targetProc
+                                     imageCPUType:(cpu_type_t)imageCPUType
                                       configState:(nonnull SNTConfigState*)configState
                                activationCallback:
                                    (nullable ActivationCallbackBlock)activationCallback
@@ -801,7 +802,11 @@ static void ApplyCodesignValidationFailure(SNTCachedDecision* cd, OSStatus statu
       platformBinaryState:pbs
       signingStatusCallback:^SNTSigningStatus {
         uint32_t csFlags = targetProc->codesigning_flags;
-        if ((csFlags & CS_SIGNED) == 0) {
+        // CS_KILLED, and CS_KILL without CS_VALID on native arm64, identify
+        // images the kernel rejected even if CS_SIGNED has already been cleared.
+        if (santa::KernelWillKillForCodeSigning(csFlags, imageCPUType)) {
+          return SNTSigningStatusInvalid;
+        } else if ((csFlags & CS_SIGNED) == 0) {
           return SNTSigningStatusUnsigned;
         } else if ((csFlags & CS_VALID) == 0) {
           return SNTSigningStatusInvalid;
