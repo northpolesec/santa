@@ -1006,6 +1006,60 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   [mockRuleTable stopMocking];
 }
 
+- (void)testDecisionRevalidatesWhenCachedStatusAbsent {
+  // The recorded status gates the skip, not the mere presence of a cached
+  // decision: a failure that was deliberately not recorded must be re-derived on
+  // the next execution.
+  id mockRuleTable = OCMClassMock([SNTRuleTable class]);
+  SNTPolicyProcessor* processor =
+      [[SNTPolicyProcessor alloc] initWithRuleTable:mockRuleTable
+                                 entitlementsFilter:santa::EntitlementsFilter::Create(@[], @[])];
+  id mockConfigurator = OCMClassMock([SNTConfigurator class]);
+  OCMStub([mockConfigurator clientMode]).andReturn(SNTClientModeMonitor);
+  processor.configurator = mockConfigurator;
+
+  NSError* csError = [NSError errorWithDomain:NSOSStatusErrorDomain
+                                         code:errSecCSSignatureFailed
+                                     userInfo:nil];
+  __block int validations = 0;
+  id mockFileInfo = OCMClassMock([SNTFileInfo class]);
+  OCMStub([mockFileInfo codesignCheckerWithError:[OCMArg setTo:csError]])
+      .andDo(^(NSInvocation* inv) {
+        validations++;
+      })
+      .andReturn(nil);
+  OCMStub([mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([mockFileInfo SHA256])
+      .andReturn(@"a326a1fb48074202e9ad41e4cd1e389eeea372c8c6f7d7e80da81176d5d9430e");
+
+  es_file_t file = MakeESFile("/tmp/invalid-signature");
+  es_process_t proc = MakeESProcess(&file);
+  proc.is_platform_binary = false;
+  proc.codesigning_flags = CS_SIGNED;
+  SNTConfigState* configState = [[SNTConfigState alloc] initWithConfig:mockConfigurator];
+
+  SNTCachedDecision* first = [processor decisionForFileInfo:mockFileInfo
+                                              targetProcess:&proc
+                                                configState:configState
+                                         activationCallback:nil
+                                             cachedDecision:nil];
+
+  XCTAssertNil(first.codesignValidationStatus);
+  XCTAssertEqual(validations, 1);
+
+  SNTCachedDecision* second = [processor decisionForFileInfo:mockFileInfo
+                                               targetProcess:&proc
+                                                 configState:configState
+                                          activationCallback:nil
+                                              cachedDecision:first];
+
+  XCTAssertEqual(validations, 2, @"an unrecorded failure must be re-derived");
+  XCTAssertNil(second.codesignValidationStatus);
+  [mockFileInfo stopMocking];
+  [mockConfigurator stopMocking];
+  [mockRuleTable stopMocking];
+}
+
 - (void)testCELDecisions {
   ActivationCallbackBlock activation =
       ^std::unique_ptr<::google::api::expr::runtime::BaseActivation>(bool useV2) {
