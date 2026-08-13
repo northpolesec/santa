@@ -751,6 +751,313 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
   XCTAssertEqualObjects(cd.teamID, @"EQHXZ8M8AV");
   XCTAssertEqualObjects(cd.signingID, @"EQHXZ8M8AV:com.apple.ls");
+  // /bin/ls validates cleanly, so the fresh path must record the success. This
+  // is the sole production write of the property the whole feature consumes.
+  XCTAssertEqualObjects(cd.codesignValidationStatus, @(errSecSuccess));
+}
+
+- (void)testDecisionReusesCompletedCodesignValidation {
+  // Each case is a validation that already completed and produced no
+  // certificate, so certSHA256 cannot distinguish it from "never validated".
+  NSArray<NSDictionary*>* cases = @[
+    @{
+      // Ad-hoc, linker-signed: valid signature, no certificate.
+      @"status" : @(errSecSuccess),
+      @"codesigning_flags" : @(CS_SIGNED | CS_VALID | CS_ADHOC | CS_LINKER_SIGNED),
+      @"expected_signing_status" : @(SNTSigningStatusAdhoc),
+      @"expected_extra" : [NSNull null],
+    },
+    @{
+      @"status" : @(errSecCSUnsigned),
+      @"codesigning_flags" : @0,
+      @"expected_signing_status" : @(SNTSigningStatusUnsigned),
+      @"expected_extra" : [NSString
+          stringWithFormat:@"Signature ignored due to error: %ld", (long)errSecCSUnsigned],
+    },
+  ];
+
+  for (NSDictionary* testCase in cases) {
+    id mockRuleTable = OCMClassMock([SNTRuleTable class]);
+    SNTPolicyProcessor* processor =
+        [[SNTPolicyProcessor alloc] initWithRuleTable:mockRuleTable
+                                   entitlementsFilter:santa::EntitlementsFilter::Create(@[], @[])];
+    id mockConfigurator = OCMClassMock([SNTConfigurator class]);
+    OCMStub([mockConfigurator clientMode]).andReturn(SNTClientModeMonitor);
+    processor.configurator = mockConfigurator;
+
+    id mockFileInfo = OCMClassMock([SNTFileInfo class]);
+    // The assertion that matters: static validation must not run again.
+    OCMReject([mockFileInfo codesignCheckerWithError:[OCMArg setTo:nil]]);
+    OCMStub([mockFileInfo isMachO]).andReturn(YES);
+
+    SNTCachedDecision* cached = [[SNTCachedDecision alloc] init];
+    cached.sha256 = @"a326a1fb48074202e9ad41e4cd1e389eeea372c8c6f7d7e80da81176d5d9430e";
+    cached.codesignValidationStatus = testCase[@"status"];
+
+    es_file_t file = MakeESFile("/tmp/rg");
+    es_process_t proc = MakeESProcess(&file);
+    proc.is_platform_binary = false;
+    proc.codesigning_flags = [testCase[@"codesigning_flags"] unsignedIntValue];
+    SNTConfigState* configState = [[SNTConfigState alloc] initWithConfig:mockConfigurator];
+
+    SNTCachedDecision* cd = [processor decisionForFileInfo:mockFileInfo
+                                             targetProcess:&proc
+                                               configState:configState
+                                        activationCallback:nil
+                                            cachedDecision:cached];
+
+    XCTAssertEqualObjects(cd.codesignValidationStatus, testCase[@"status"]);
+    XCTAssertEqual(cd.signingStatus,
+                   (SNTSigningStatus)[testCase[@"expected_signing_status"] integerValue]);
+    XCTAssertEqual(cd.decision, SNTEventStateAllowUnknown);
+
+    id expectedExtra = testCase[@"expected_extra"];
+    if (expectedExtra == [NSNull null]) {
+      XCTAssertNil(cd.decisionExtra);
+    } else {
+      XCTAssertEqualObjects(cd.decisionExtra, expectedExtra);
+    }
+
+    OCMVerifyAll(mockFileInfo);
+    [mockFileInfo stopMocking];
+    [mockConfigurator stopMocking];
+    [mockRuleTable stopMocking];
+  }
+}
+
+- (void)testDecisionBlocksFreshCodesignValidationFailure {
+  // A signature failure is not recorded, so it must be re-derived on every
+  // execution. Also the only coverage of the fresh failure path.
+  id mockRuleTable = OCMClassMock([SNTRuleTable class]);
+  SNTPolicyProcessor* processor =
+      [[SNTPolicyProcessor alloc] initWithRuleTable:mockRuleTable
+                                 entitlementsFilter:santa::EntitlementsFilter::Create(@[], @[])];
+  id mockConfigurator = OCMClassMock([SNTConfigurator class]);
+  OCMStub([mockConfigurator clientMode]).andReturn(SNTClientModeMonitor);
+  OCMStub([mockConfigurator enableBadSignatureProtection]).andReturn(YES);
+  processor.configurator = mockConfigurator;
+
+  NSError* csError = [NSError errorWithDomain:NSOSStatusErrorDomain
+                                         code:errSecCSSignatureFailed
+                                     userInfo:nil];
+  id mockFileInfo = OCMClassMock([SNTFileInfo class]);
+  OCMExpect([mockFileInfo codesignCheckerWithError:[OCMArg setTo:csError]]).andReturn(nil);
+  OCMStub([mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([mockFileInfo SHA256])
+      .andReturn(@"a326a1fb48074202e9ad41e4cd1e389eeea372c8c6f7d7e80da81176d5d9430e");
+
+  es_file_t file = MakeESFile("/tmp/invalid-signature");
+  es_process_t proc = MakeESProcess(&file);
+  proc.is_platform_binary = false;
+  proc.codesigning_flags = CS_SIGNED;
+  SNTConfigState* configState = [[SNTConfigState alloc] initWithConfig:mockConfigurator];
+
+  SNTCachedDecision* cd = [processor decisionForFileInfo:mockFileInfo
+                                           targetProcess:&proc
+                                             configState:configState
+                                      activationCallback:nil
+                                          cachedDecision:nil];
+
+  XCTAssertEqual(cd.decision, SNTEventStateBlockCertificate);
+  XCTAssertEqual(cd.signingStatus, SNTSigningStatusInvalid);
+  XCTAssertEqualObjects(cd.decisionExtra,
+                        ([NSString stringWithFormat:@"Blocked due to signature error: %ld",
+                                                    (long)errSecCSSignatureFailed]));
+  // The failure must NOT be recorded: the next execution has to re-derive it.
+  XCTAssertNil(cd.codesignValidationStatus);
+  OCMVerifyAll(mockFileInfo);
+  [mockFileInfo stopMocking];
+  [mockConfigurator stopMocking];
+  [mockRuleTable stopMocking];
+}
+
+- (void)testDecisionDoesNotBlockReusedUnsignedValidation {
+  // errSecCSUnsigned is carved out of bad signature protection: an unsigned
+  // binary is not a signature failure. Without that carve-out the setting
+  // would block every unsigned binary on the endpoint.
+  id mockRuleTable = OCMClassMock([SNTRuleTable class]);
+  SNTPolicyProcessor* processor =
+      [[SNTPolicyProcessor alloc] initWithRuleTable:mockRuleTable
+                                 entitlementsFilter:santa::EntitlementsFilter::Create(@[], @[])];
+  id mockConfigurator = OCMClassMock([SNTConfigurator class]);
+  OCMStub([mockConfigurator clientMode]).andReturn(SNTClientModeMonitor);
+  OCMStub([mockConfigurator enableBadSignatureProtection]).andReturn(YES);
+  processor.configurator = mockConfigurator;
+
+  id mockFileInfo = OCMClassMock([SNTFileInfo class]);
+  OCMReject([mockFileInfo codesignCheckerWithError:[OCMArg setTo:nil]]);
+  OCMStub([mockFileInfo isMachO]).andReturn(YES);
+
+  SNTCachedDecision* cached = [[SNTCachedDecision alloc] init];
+  cached.sha256 = @"a326a1fb48074202e9ad41e4cd1e389eeea372c8c6f7d7e80da81176d5d9430e";
+  cached.codesignValidationStatus = @(errSecCSUnsigned);
+
+  es_file_t file = MakeESFile("/tmp/unsigned-tool");
+  es_process_t proc = MakeESProcess(&file);
+  proc.is_platform_binary = false;
+  proc.codesigning_flags = 0;
+  SNTConfigState* configState = [[SNTConfigState alloc] initWithConfig:mockConfigurator];
+
+  SNTCachedDecision* cd = [processor decisionForFileInfo:mockFileInfo
+                                           targetProcess:&proc
+                                             configState:configState
+                                      activationCallback:nil
+                                          cachedDecision:cached];
+
+  XCTAssertEqual(cd.decision, SNTEventStateAllowUnknown);
+  XCTAssertEqual(cd.signingStatus, SNTSigningStatusUnsigned);
+  // The failure replay must still happen even though the block does not. These
+  // two are easy to conflate when editing that region, so both are pinned.
+  XCTAssertEqualObjects(
+      cd.decisionExtra,
+      ([NSString stringWithFormat:@"Signature ignored due to error: %ld", (long)errSecCSUnsigned]));
+  OCMVerifyAll(mockFileInfo);
+  [mockFileInfo stopMocking];
+  [mockConfigurator stopMocking];
+  [mockRuleTable stopMocking];
+}
+
+- (void)testDecisionRecordsFreshUnsignedValidation {
+  // errSecCSUnsigned is reusable, so a fresh unsigned verdict must be recorded
+  // for the next execution to skip.
+  id mockRuleTable = OCMClassMock([SNTRuleTable class]);
+  SNTPolicyProcessor* processor =
+      [[SNTPolicyProcessor alloc] initWithRuleTable:mockRuleTable
+                                 entitlementsFilter:santa::EntitlementsFilter::Create(@[], @[])];
+  id mockConfigurator = OCMClassMock([SNTConfigurator class]);
+  OCMStub([mockConfigurator clientMode]).andReturn(SNTClientModeMonitor);
+  processor.configurator = mockConfigurator;
+
+  NSError* csError = [NSError errorWithDomain:NSOSStatusErrorDomain
+                                         code:errSecCSUnsigned
+                                     userInfo:nil];
+  id mockFileInfo = OCMClassMock([SNTFileInfo class]);
+  OCMExpect([mockFileInfo codesignCheckerWithError:[OCMArg setTo:csError]]).andReturn(nil);
+  OCMStub([mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([mockFileInfo SHA256])
+      .andReturn(@"a326a1fb48074202e9ad41e4cd1e389eeea372c8c6f7d7e80da81176d5d9430e");
+
+  es_file_t file = MakeESFile("/tmp/unsigned-tool");
+  es_process_t proc = MakeESProcess(&file);
+  proc.is_platform_binary = false;
+  proc.codesigning_flags = 0;
+  SNTConfigState* configState = [[SNTConfigState alloc] initWithConfig:mockConfigurator];
+
+  SNTCachedDecision* cd = [processor decisionForFileInfo:mockFileInfo
+                                           targetProcess:&proc
+                                             configState:configState
+                                      activationCallback:nil
+                                          cachedDecision:nil];
+
+  XCTAssertEqualObjects(cd.codesignValidationStatus, @(errSecCSUnsigned));
+  XCTAssertEqual(cd.decision, SNTEventStateAllowUnknown);
+  XCTAssertEqual(cd.signingStatus, SNTSigningStatusUnsigned);
+  OCMVerifyAll(mockFileInfo);
+  [mockFileInfo stopMocking];
+  [mockConfigurator stopMocking];
+  [mockRuleTable stopMocking];
+}
+
+- (void)testDecisionDoesNotRecordUnsignedVerdictWhenKernelSaysSigned {
+  // errSecCSUnsigned is only reusable when the kernel agrees the executable
+  // itself carries no signature. When the running image is signed the two
+  // sources disagree, so the verdict must not be recorded and the next
+  // execution has to re-derive it.
+  id mockRuleTable = OCMClassMock([SNTRuleTable class]);
+  SNTPolicyProcessor* processor =
+      [[SNTPolicyProcessor alloc] initWithRuleTable:mockRuleTable
+                                 entitlementsFilter:santa::EntitlementsFilter::Create(@[], @[])];
+  id mockConfigurator = OCMClassMock([SNTConfigurator class]);
+  OCMStub([mockConfigurator clientMode]).andReturn(SNTClientModeMonitor);
+  processor.configurator = mockConfigurator;
+
+  NSError* csError = [NSError errorWithDomain:NSOSStatusErrorDomain
+                                         code:errSecCSUnsigned
+                                     userInfo:nil];
+  id mockFileInfo = OCMClassMock([SNTFileInfo class]);
+  OCMExpect([mockFileInfo codesignCheckerWithError:[OCMArg setTo:csError]]).andReturn(nil);
+  OCMStub([mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([mockFileInfo SHA256])
+      .andReturn(@"a326a1fb48074202e9ad41e4cd1e389eeea372c8c6f7d7e80da81176d5d9430e");
+
+  es_file_t file = MakeESFile("/tmp/signed-tool");
+  es_process_t proc = MakeESProcess(&file);
+  proc.is_platform_binary = false;
+  // The kernel loaded a valid signature for this executable, contradicting the
+  // static unsigned verdict.
+  proc.codesigning_flags = CS_SIGNED | CS_VALID;
+  SNTConfigState* configState = [[SNTConfigState alloc] initWithConfig:mockConfigurator];
+
+  SNTCachedDecision* cd = [processor decisionForFileInfo:mockFileInfo
+                                           targetProcess:&proc
+                                             configState:configState
+                                      activationCallback:nil
+                                          cachedDecision:nil];
+
+  XCTAssertNil(cd.codesignValidationStatus);
+  // The failure effects still apply; only the recording is withheld.
+  XCTAssertEqual(cd.signingStatus, SNTSigningStatusInvalid);
+  XCTAssertEqualObjects(
+      cd.decisionExtra,
+      ([NSString stringWithFormat:@"Signature ignored due to error: %ld", (long)errSecCSUnsigned]));
+  OCMVerifyAll(mockFileInfo);
+  [mockFileInfo stopMocking];
+  [mockConfigurator stopMocking];
+  [mockRuleTable stopMocking];
+}
+
+- (void)testDecisionRevalidatesWhenCachedStatusAbsent {
+  // The recorded status gates the skip, not the mere presence of a cached
+  // decision: a failure that was deliberately not recorded must be re-derived on
+  // the next execution.
+  id mockRuleTable = OCMClassMock([SNTRuleTable class]);
+  SNTPolicyProcessor* processor =
+      [[SNTPolicyProcessor alloc] initWithRuleTable:mockRuleTable
+                                 entitlementsFilter:santa::EntitlementsFilter::Create(@[], @[])];
+  id mockConfigurator = OCMClassMock([SNTConfigurator class]);
+  OCMStub([mockConfigurator clientMode]).andReturn(SNTClientModeMonitor);
+  processor.configurator = mockConfigurator;
+
+  NSError* csError = [NSError errorWithDomain:NSOSStatusErrorDomain
+                                         code:errSecCSSignatureFailed
+                                     userInfo:nil];
+  __block int validations = 0;
+  id mockFileInfo = OCMClassMock([SNTFileInfo class]);
+  OCMStub([mockFileInfo codesignCheckerWithError:[OCMArg setTo:csError]])
+      .andDo(^(NSInvocation* inv) {
+        validations++;
+      })
+      .andReturn(nil);
+  OCMStub([mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([mockFileInfo SHA256])
+      .andReturn(@"a326a1fb48074202e9ad41e4cd1e389eeea372c8c6f7d7e80da81176d5d9430e");
+
+  es_file_t file = MakeESFile("/tmp/invalid-signature");
+  es_process_t proc = MakeESProcess(&file);
+  proc.is_platform_binary = false;
+  proc.codesigning_flags = CS_SIGNED;
+  SNTConfigState* configState = [[SNTConfigState alloc] initWithConfig:mockConfigurator];
+
+  SNTCachedDecision* first = [processor decisionForFileInfo:mockFileInfo
+                                              targetProcess:&proc
+                                                configState:configState
+                                         activationCallback:nil
+                                             cachedDecision:nil];
+
+  XCTAssertNil(first.codesignValidationStatus);
+  XCTAssertEqual(validations, 1);
+
+  SNTCachedDecision* second = [processor decisionForFileInfo:mockFileInfo
+                                               targetProcess:&proc
+                                                 configState:configState
+                                          activationCallback:nil
+                                              cachedDecision:first];
+
+  XCTAssertEqual(validations, 2, @"an unrecorded failure must be re-derived");
+  XCTAssertNil(second.codesignValidationStatus);
+  [mockFileInfo stopMocking];
+  [mockConfigurator stopMocking];
+  [mockRuleTable stopMocking];
 }
 
 - (void)testCELDecisions {

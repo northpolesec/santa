@@ -621,6 +621,14 @@ static void UpdateCachedDecisionSigningInfo(
   cd.signingTime = csInfo.signingTime;
 }
 
+// Applies the effects of a failed static code signature validation.
+static void ApplyCodesignValidationFailure(SNTCachedDecision* cd, OSStatus status) {
+  cd.decisionExtra =
+      [NSString stringWithFormat:@"Signature ignored due to error: %ld", (long)status];
+  cd.signingStatus = (cd.signingStatus == SNTSigningStatusUnsigned ? SNTSigningStatusUnsigned
+                                                                   : SNTSigningStatusInvalid);
+}
+
 - (nonnull SNTCachedDecision*)
            decisionForFileInfo:(nonnull SNTFileInfo*)fileInfo
                    configState:(nonnull SNTConfigState*)configState
@@ -647,21 +655,33 @@ static void UpdateCachedDecisionSigningInfo(
   cd.decisionClientMode = configState.clientMode;
   cd.quarantineURL = fileInfo.quarantineDataURL;
 
-  NSError* csInfoError;
-  if (!cd.certSHA256.length) {
+  // Static validation is expensive, so it runs at most once per identity — but
+  // only outcomes that cannot change while the identity is valid are recorded.
+  OSStatus csStatus;
+  if (cd.codesignValidationStatus) {
+    csStatus = (OSStatus)cd.codesignValidationStatus.intValue;
+    if (csStatus != errSecSuccess) {
+      ApplyCodesignValidationFailure(cd, csStatus);
+    }
+  } else {
     // Grab the code signature, if there's an error don't try to capture
     // any of the signature details.
     // TODO(mlw): MOLCodesignChecker should be updated to still grab signing information
     // even if validity check fails. Once that is done, this code can be updated to grab
     // cert information so that it can still be reported to the sync server.
+    NSError* csInfoError;
     MOLCodesignChecker* csInfo = [fileInfo codesignCheckerWithError:&csInfoError];
+    csStatus = csInfoError ? (OSStatus)csInfoError.code : errSecSuccess;
     if (csInfoError) {
-      csInfo = nil;
-      cd.decisionExtra = [NSString
-          stringWithFormat:@"Signature ignored due to error: %ld", (long)csInfoError.code];
-      cd.signingStatus = (cd.signingStatus == SNTSigningStatusUnsigned ? SNTSigningStatusUnsigned
-                                                                       : SNTSigningStatusInvalid);
+      // Record an unsigned verdict only when the kernel agrees the executable itself
+      // carries no signature, so the recorded state describes this vnode. Other
+      // failures are left unrecorded and re-derived on the next execution.
+      if (csStatus == errSecCSUnsigned && cd.signingStatus == SNTSigningStatusUnsigned) {
+        cd.codesignValidationStatus = @(errSecCSUnsigned);
+      }
+      ApplyCodesignValidationFailure(cd, csStatus);
     } else {
+      cd.codesignValidationStatus = @(errSecSuccess);
       UpdateCachedDecisionSigningInfo(cd, csInfo, platformBinaryState, entitlementsFilterCallback);
     }
   }
@@ -677,10 +697,10 @@ static void UpdateCachedDecisionSigningInfo(
     }
   }
 
-  if ([self.configurator enableBadSignatureProtection] && csInfoError &&
-      csInfoError.code != errSecCSUnsigned) {
+  if ([self.configurator enableBadSignatureProtection] && csStatus != errSecSuccess &&
+      csStatus != errSecCSUnsigned) {
     cd.decisionExtra =
-        [NSString stringWithFormat:@"Blocked due to signature error: %ld", (long)csInfoError.code];
+        [NSString stringWithFormat:@"Blocked due to signature error: %ld", (long)csStatus];
     cd.decision = SNTEventStateBlockCertificate;
     return cd;
   }
