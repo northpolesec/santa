@@ -455,7 +455,7 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
   // cannot succeed no matter what Santa decides. The policy still applies and
   // the block is still logged and uploaded, but no UI is shown: the user would
   // otherwise blame Santa for a kill it didn't cause.
-  if (santa::KernelWillKillForInvalidSignature(targetProc->codesigning_flags, imageCPUType) &&
+  if (santa::KernelWillKillForCodeSigning(targetProc->codesigning_flags, imageCPUType) &&
       (cd.decision & SNTEventStateAllow) == 0) {
     cd.silentBlockGUI = YES;
     cd.silentBlockTTY = YES;
@@ -467,7 +467,7 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
     LOGW(@"Denying %@ but suppressing block UI: the kernel will kill this process for code "
          @"signature invalidity (codesigning_flags=0x%x). The exec would have failed regardless of "
          @"Santa's decision.",
-         @(targetProc->executable->path.data), targetProc->codesigning_flags);
+         santa::StringTokenToNSString(targetProc->executable->path), targetProc->codesigning_flags);
   }
 
   // Formulate an initial action from the decision.

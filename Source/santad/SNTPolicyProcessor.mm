@@ -784,7 +784,7 @@ static void UpdateCachedDecisionSigningInfo(
         uint32_t csFlags = targetProc->codesigning_flags;
         // CS_KILLED, and CS_KILL without CS_VALID on native arm64, identify
         // images the kernel rejected even if CS_SIGNED has already been cleared.
-        if (santa::KernelWillKillForInvalidSignature(csFlags, imageCPUType)) {
+        if (santa::KernelWillKillForCodeSigning(csFlags, imageCPUType)) {
           return SNTSigningStatusInvalid;
         } else if ((csFlags & CS_SIGNED) == 0) {
           return SNTSigningStatusUnsigned;

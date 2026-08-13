@@ -24,14 +24,14 @@
 
 @implementation CodeSigningIdentifierUtilsTest
 
-- (void)testKernelWillKillForInvalidSignature {
-  XCTAssertTrue(santa::KernelWillKillForInvalidSignature(CS_KILLED, CPU_TYPE_ANY));
-  XCTAssertTrue(santa::KernelWillKillForInvalidSignature(CS_KILL, CPU_TYPE_ARM64));
-  XCTAssertTrue(santa::KernelWillKillForInvalidSignature(CS_SIGNED | CS_KILL, CPU_TYPE_ARM64));
+- (void)testKernelWillKillForCodeSigning {
+  XCTAssertTrue(santa::KernelWillKillForCodeSigning(CS_KILLED, CPU_TYPE_ANY));
+  XCTAssertTrue(santa::KernelWillKillForCodeSigning(CS_KILL, CPU_TYPE_ARM64));
+  XCTAssertTrue(santa::KernelWillKillForCodeSigning(CS_SIGNED | CS_KILL, CPU_TYPE_ARM64));
 
-  XCTAssertFalse(santa::KernelWillKillForInvalidSignature(CS_VALID | CS_KILL, CPU_TYPE_ARM64));
-  XCTAssertFalse(santa::KernelWillKillForInvalidSignature(CS_KILL, CPU_TYPE_X86_64));
-  XCTAssertFalse(santa::KernelWillKillForInvalidSignature(CS_KILL, CPU_TYPE_ANY));
+  XCTAssertFalse(santa::KernelWillKillForCodeSigning(CS_VALID | CS_KILL, CPU_TYPE_ARM64));
+  XCTAssertFalse(santa::KernelWillKillForCodeSigning(CS_KILL, CPU_TYPE_X86_64));
+  XCTAssertFalse(santa::KernelWillKillForCodeSigning(CS_KILL, CPU_TYPE_ANY));
 }
 
 #pragma mark - IsValidTeamID Tests
