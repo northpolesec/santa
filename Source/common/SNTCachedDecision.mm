@@ -51,6 +51,7 @@
     _entitlementsFiltered = previous.entitlementsFiltered;
     _secureSigningTime = previous.secureSigningTime;
     _signingTime = previous.signingTime;
+    _codesignValidationStatus = previous.codesignValidationStatus;
   }
   return self;
 }
@@ -76,6 +77,7 @@
   copy.signingStatus = _signingStatus;
   copy.secureSigningTime = _secureSigningTime;
   copy.signingTime = _signingTime;
+  copy.codesignValidationStatus = _codesignValidationStatus;
   copy.quarantineURL = _quarantineURL;
   copy.customMsg = _customMsg;
   copy.customURL = _customURL;

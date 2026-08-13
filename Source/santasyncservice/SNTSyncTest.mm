@@ -20,6 +20,7 @@
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
+#import "Source/common/SNTError.h"
 #import "Source/common/SNTModeTransition.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTSIPStatus.h"
@@ -46,6 +47,10 @@
 
 @interface SNTSyncStage (XSSI)
 - (NSData*)stripXssi:(NSData*)data;
+- (NSData*)dataFromRequest:(NSURLRequest*)request
+                   timeout:(NSTimeInterval)timeout
+                statusCode:(NSInteger*)statusCode
+                     error:(NSError**)error;
 @property double retryBackoffBase;
 @end
 
@@ -338,6 +343,77 @@
   NSMutableURLRequest* req = [NSMutableURLRequest requestWithURL:u1];
   XCTAssertNil([sut performRequest:req intoMessage:NULL timeout:5]);
   XCTAssertEqualObjects(self.syncState.xsrfToken, @"my-xsrf-token");
+}
+
+- (void)testBaseTransportErrorAlongside200Fails {
+  // The status line arrives before the body, so a transfer interrupted
+  // mid-download is reported by NSURLSession as the server's 200 *plus* an
+  // error, with no body at all. That must be surfaced as a failure rather than
+  // an empty success.
+  NSError* connectionLost = [NSError errorWithDomain:NSURLErrorDomain
+                                                code:NSURLErrorNetworkConnectionLost
+                                            userInfo:nil];
+  __block int attempts = 0;
+  [self stubRequestBody:nil
+               response:nil
+                  error:connectionLost
+          validateBlock:^BOOL(NSURLRequest* req) {
+            attempts++;
+            return YES;
+          }];
+
+  NSString* stageName = [@"a" stringByAppendingFormat:@"/%@", self.syncState.machineID];
+  NSURL* u1 = [NSURL URLWithString:stageName relativeToURL:self.syncState.syncBaseURL];
+
+  SNTSyncStage* sut = [[SNTSyncStage alloc] initWithState:self.syncState];
+  sut.retryBackoffBase = 0;  // Skip the real retry nanosleep.
+  NSMutableURLRequest* req = [NSMutableURLRequest requestWithURL:u1];
+  NSError* err = [sut performRequest:req intoMessage:NULL timeout:5];
+  XCTAssertNotNil(err);
+  XCTAssertEqual(err.code, SNTErrorCodeFailedToHTTP);
+
+  // The 200 must not end the retry loop. An interrupted transfer is worth asking again for, so all
+  // five attempts are spent before giving up.
+  XCTAssertEqual(attempts, 5);
+}
+
+- (void)testBaseTransportErrorAlongside200IsRetriedThenSucceeds {
+  // A transport error on a 200 is usually transient so the request has to be retried.
+  NSHTTPURLResponse* ok = [self responseWithCode:200 headerDict:nil];
+  NSError* connectionLost = [NSError errorWithDomain:NSURLErrorDomain
+                                                code:NSURLErrorNetworkConnectionLost
+                                            userInfo:nil];
+  NSData* completeBody = [@"{\"cursor\":\"more-rules\"}" dataUsingEncoding:NSUTF8StringEncoding];
+
+  __block int attempts = 0;
+  OCMStub([self.syncState.session dataTaskWithRequest:OCMOCK_ANY completionHandler:OCMOCK_ANY])
+      .andDo(^(NSInvocation* inv) {
+        __unsafe_unretained void (^handler)(NSData*, NSURLResponse*, NSError*);
+        [inv getArgument:&handler atIndex:3];
+        // First attempt: the headers arrived, then the connection dropped, so NSURLSession reports
+        // the 200 with no body at all. Second attempt: the real response.
+        if (++attempts == 1) {
+          handler(nil, ok, connectionLost);
+        } else {
+          handler(completeBody, ok, nil);
+        }
+      });
+
+  NSString* stageName = [@"a" stringByAppendingFormat:@"/%@", self.syncState.machineID];
+  NSURL* u1 = [NSURL URLWithString:stageName relativeToURL:self.syncState.syncBaseURL];
+
+  SNTSyncStage* sut = [[SNTSyncStage alloc] initWithState:self.syncState];
+  sut.retryBackoffBase = 0;  // Skip the real retry nanosleep.
+  NSMutableURLRequest* req = [NSMutableURLRequest requestWithURL:u1];
+
+  NSInteger statusCode = 0;
+  NSError* err;
+  NSData* got = [sut dataFromRequest:req timeout:5 statusCode:&statusCode error:&err];
+
+  XCTAssertEqual(attempts, 2);
+  XCTAssertNil(err);
+  XCTAssertEqual(statusCode, 200);
+  XCTAssertEqualObjects(got, completeBody);
 }
 
 #pragma mark - SNTSyncPreflight Tests
@@ -1516,6 +1592,49 @@
   XCTAssertNotNil(certRule);
   XCTAssertEqualObjects(certRule.eventDetailButtonText,
                         [longLabel substringToIndex:kEventDetailButtonTextMaxLength]);
+}
+
+- (void)testRuleDownloadTruncatedMidPaginationFails {
+  // Regression test for a silently truncated clean sync. The first batch hands back a cursor, then
+  // the connection drops mid-transfer and NSURLSession reports the server's 200 with no body at
+  // all. That used to leave the response - and so the cursor - default-initialised, the download
+  // loop exited normally, and the handful of rules received so far were written to the database as
+  // though they were the complete set. On a clean sync that discards every rule the client never
+  // got to receive.
+  SNTSyncRuleDownload* sut = [[SNTSyncRuleDownload alloc] initWithState:self.syncState];
+  sut.retryBackoffBase = 0;  // Skip the real retry nanosleep.
+
+  NSData* respData = [self dataFromFixture:@"sync_ruledownload_batch1.json"];
+  [self stubRequestBody:respData
+               response:nil
+                  error:nil
+          validateBlock:^BOOL(NSURLRequest* req) {
+            // The initial request, which is answered with a cursor promising more rules.
+            return [self dictFromRequest:req][@"cursor"] == nil;
+          }];
+
+  NSError* connectionLost = [NSError errorWithDomain:NSURLErrorDomain
+                                                code:NSURLErrorNetworkConnectionLost
+                                            userInfo:nil];
+  [self stubRequestBody:nil
+               response:nil
+                  error:connectionLost
+          validateBlock:^BOOL(NSURLRequest* req) {
+            // The continuation request, interrupted after the response headers arrived.
+            return [self dictFromRequest:req][@"cursor"] != nil;
+          }];
+
+  // A truncated download is not a snapshot worth applying, so nothing may reach the database.
+  OCMReject([self.daemonConnRop databaseRuleAddExecutionRules:OCMOCK_ANY
+                                              fileAccessRules:OCMOCK_ANY
+                                             networkFlowRules:OCMOCK_ANY
+                                                      signals:OCMOCK_ANY
+                                                  ruleCleanup:SNTRuleCleanupNone
+                                                       source:SNTRuleAddSourceSyncService
+                                                        reply:OCMOCK_ANY]);
+
+  XCTAssertFalse([sut sync]);
+  XCTAssertEqual(self.syncState.rulesProcessed, 0);
 }
 
 - (void)testRuleDownloadCel {

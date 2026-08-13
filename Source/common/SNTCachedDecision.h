@@ -59,6 +59,10 @@
 @property NSDate* secureSigningTime;
 @property NSDate* signingTime;
 
+/// The OSStatus returned by static code signature validation for this identity,
+/// or nil if validation has not run yet.
+@property NSNumber* codesignValidationStatus;
+
 @property NSString* quarantineURL;
 
 @property NSString* customMsg;

@@ -12,6 +12,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
+#import <Security/Security.h>
 #import <XCTest/XCTest.h>
 
 #import "Source/common/SNTCachedDecision.h"
@@ -31,6 +32,48 @@
 
   XCTAssertEqual(sb.st_ino, cd.vnodeId.fileid);
   XCTAssertEqual(sb.st_dev, cd.vnodeId.fsid);
+}
+
+- (void)testCachedIdentityCarriesSuccessfulValidationWithoutCertificate {
+  SNTCachedDecision* previous = [[SNTCachedDecision alloc] init];
+  previous.sha256 = @"aabbccdd";
+  // Ad-hoc and linker-signed binaries validate successfully with no
+  // certificate. This is the case a certSHA256 check cannot distinguish from
+  // "validation has not run yet".
+  previous.codesignValidationStatus = @(errSecSuccess);
+
+  SNTCachedDecision* cached = [[SNTCachedDecision alloc] initWithCachedIdentity:previous];
+
+  XCTAssertEqualObjects(cached.codesignValidationStatus, @(errSecSuccess));
+  XCTAssertNil(cached.certSHA256);
+}
+
+- (void)testCachedIdentityCarriesValidationFailure {
+  SNTCachedDecision* previous = [[SNTCachedDecision alloc] init];
+  previous.sha256 = @"aabbccdd";
+  previous.codesignValidationStatus = @(errSecCSUnsigned);
+
+  SNTCachedDecision* cached = [[SNTCachedDecision alloc] initWithCachedIdentity:previous];
+
+  XCTAssertEqualObjects(cached.codesignValidationStatus, @(errSecCSUnsigned));
+}
+
+- (void)testCachedIdentityLeavesValidationStatusNilWhenNeverValidated {
+  SNTCachedDecision* previous = [[SNTCachedDecision alloc] init];
+  previous.sha256 = @"aabbccdd";
+
+  SNTCachedDecision* cached = [[SNTCachedDecision alloc] initWithCachedIdentity:previous];
+
+  XCTAssertNil(cached.codesignValidationStatus);
+}
+
+- (void)testCopyCarriesValidationStatus {
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+  cd.codesignValidationStatus = @(errSecCSUnsigned);
+
+  SNTCachedDecision* copy = [cd copy];
+
+  XCTAssertEqualObjects(copy.codesignValidationStatus, @(errSecCSUnsigned));
 }
 
 @end
