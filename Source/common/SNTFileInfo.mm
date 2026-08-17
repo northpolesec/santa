@@ -34,7 +34,7 @@
 #import "Source/common/SNTLogging.h"
 
 // Largest architecture count Santa will read from a universal header. Real
-// universal binaries carry a handful; matches the limit in HeaderParser.
+// universal binaries carry a handful.
 static const uint32_t kMaxFatArchCount = 64;
 
 // Simple class to hold the data of a mach_header and the offset within the file
@@ -527,7 +527,7 @@ static const uint32_t kMaxFatArchCount = 64;
 
       // Bound the count before using it as a read length: safeSubdataWithRange:
       // compares against the logical file size, which a sparse file inflates
-      // cheaply. Matches the limit in HeaderParser.
+      // cheaply.
       NSMutableData* fatArchs;
       if (nfat_arch <= kMaxFatArchCount) {
         range = NSMakeRange(sizeof(struct fat_header), sizeof(struct fat_arch) * nfat_arch);
