@@ -116,18 +116,18 @@
 /**
   Designated initializer
 
-  @note Takes ownership of `codeRef`.
+  @note Retains `codeRef`; the caller keeps ownership of its own reference.
 
   @param codeRef A `SecStaticCodeRef` or `SecCodeRef` representing a binary.
   @param error NSError to be filled in if validation fails for any reason.
-  @return An initialized `MOLCodesignChecker`
+  @return An initialized `MOLCodesignChecker`, or nil if `codeRef` is not a code object.
 */
 - (instancetype)initWithSecStaticCodeRef:(SecStaticCodeRef)codeRef error:(NSError**)error;
 
 /**
   Initialize with a SecStaticCodeRef (or SecCodeRef);
 
-  @note Takes ownership of `codeRef`.
+  @note Retains `codeRef`; the caller keeps ownership of its own reference.
 
   @param codeRef A `SecStaticCodeRef` or `SecCodeRef` representing a binary.
   @return An initialized `MOLCodesignChecker` or nil if validation failed.

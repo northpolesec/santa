@@ -80,6 +80,12 @@ NSString* const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
 @property SecCSFlags staticSigningFlags;
 
 - (instancetype)initWithSecStaticCodeRef:(SecStaticCodeRef)codeRef
+                              binaryPath:(NSString*)binaryPath
+                          fileDescriptor:(int)fileDescriptor
+                      staticSigningFlags:(SecCSFlags)staticSigningFlags
+                                   error:(NSError**)error;
+
+- (instancetype)initWithSecStaticCodeRef:(SecStaticCodeRef)codeRef
                       staticSigningFlags:(SecCSFlags)staticSigningFlags
                                    error:(NSError**)error;
 
@@ -100,30 +106,51 @@ NSString* const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
 - (instancetype)initWithSecStaticCodeRef:(SecStaticCodeRef)codeRef
                       staticSigningFlags:(SecCSFlags)staticSigningFlags
                                    error:(NSError**)error {
+  return [self initWithSecStaticCodeRef:codeRef
+                             binaryPath:nil
+                         fileDescriptor:-1
+                     staticSigningFlags:staticSigningFlags
+                                  error:error];
+}
+
+- (instancetype)initWithSecStaticCodeRef:(SecStaticCodeRef)codeRef
+                              binaryPath:(NSString*)binaryPath
+                          fileDescriptor:(int)fileDescriptor
+                      staticSigningFlags:(SecCSFlags)staticSigningFlags
+                                   error:(NSError**)error {
   self = [super init];
 
   if (self) {
+    // Security dereferences the ref without type checking it first, so a ref that isn't code
+    // can't be wrapped: every accessor here would crash inside Security.
+    BOOL isStaticCode = codeRef && CFGetTypeID(codeRef) == SecStaticCodeGetTypeID();
+    BOOL isCode = codeRef && CFGetTypeID(codeRef) == SecCodeGetTypeID();
+    if (!isStaticCode && !isCode) {
+      if (error) {
+        *error = [self errorWithCode:errSecUnimplemented description:@"Invalid code ref type"];
+      }
+      return nil;
+    }
+
+    // Assign before anything else: the checks below reach code that reads self.codeRef.
+    _codeRef = codeRef;
+    CFRetain(_codeRef);
+    _binaryPath = binaryPath;
+    _binaryFileDescriptor = fileDescriptor;
     _staticSigningFlags = staticSigningFlags;
 
     auto [status, scopedError] = ScopedCFError::AssumeFrom(^OSStatus(CFErrorRef* out) {
-      if (CFGetTypeID(codeRef) == SecStaticCodeGetTypeID()) {
+      if (isStaticCode) {
         return SecStaticCodeCheckValidityWithErrors(codeRef, staticSigningFlags, NULL, out);
-      } else if (CFGetTypeID(codeRef) == SecCodeGetTypeID()) {
-        return SecCodeCheckValidityWithErrors((SecCodeRef)codeRef, kSigningFlags, NULL, out);
-      } else {
-        OSStatus status = errSecUnimplemented;
-        *out = (CFErrorRef)CFBridgingRetain([self errorWithCode:status
-                                                    description:@"Invalid code ref type"]);
-        return status;
       }
+      return SecCodeCheckValidityWithErrors((SecCodeRef)codeRef, kSigningFlags, NULL, out);
     });
 
     // For static code checks perform additional checks across all slices
-    if (CFGetTypeID(codeRef) == SecStaticCodeGetTypeID()) {
+    if (isStaticCode) {
       // Ensure signing is consistent for all architectures.
       // Any issues found here take precedence over already found issues.
-      if (!_binaryPath) _binaryPath = [self binaryPathForCodeRef:self.codeRef];
-      NSArray* infos = [self universalSigningInformationForBinaryPath:_binaryPath
+      NSArray* infos = [self universalSigningInformationForBinaryPath:self.binaryPath
                                                        fileDescriptor:_binaryFileDescriptor];
       if (infos) _universalSigningInformation = infos;
       if (infos && ![self allSigningInformationMatches:infos]) {
@@ -152,8 +179,6 @@ NSString* const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
     if (status != errSecSuccess) {
       if (error) *error = err ?: [self errorWithCode:status];
     }
-    _codeRef = codeRef;
-    CFRetain(_codeRef);
   }
   return self;
 }
@@ -209,10 +234,11 @@ NSString* const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
     return nil;
   }
 
-  _binaryPath = binaryPath;
-  _binaryFileDescriptor = (fileDescriptor != -1) ? fileDescriptor : -1;
-
-  self = [self initWithSecStaticCodeRef:codeRef staticSigningFlags:staticSigningFlags error:error];
+  self = [self initWithSecStaticCodeRef:codeRef
+                             binaryPath:binaryPath
+                         fileDescriptor:fileDescriptor
+                     staticSigningFlags:staticSigningFlags
+                                  error:error];
   if (codeRef) CFRelease(codeRef);  // it was retained above
   return self;
 }
@@ -319,10 +345,13 @@ NSString* const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
 }
 
 - (NSString*)binaryPathForCodeRef:(SecStaticCodeRef)codeRef {
-  CFURLRef path;
+  CFURLRef path = NULL;
   OSStatus status = SecCodeCopyPath(codeRef, kSecCSDefaultFlags, &path);
+  if (status != errSecSuccess) {
+    if (path) CFRelease(path);
+    return nil;
+  }
   NSURL* pathURL = CFBridgingRelease(path);
-  if (status != errSecSuccess) return nil;
   return [pathURL path];
 }
 
@@ -550,6 +579,7 @@ NSString* const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
 }
 
 - (NSDictionary*)architectureAndOffsetsForUniversalBinaryPath:(NSString*)path {
+  if (!path) return nil;
   int fd = open(path.UTF8String, O_RDONLY | O_CLOEXEC);
   if (fd == -1) return nil;
   NSDictionary* offsets = [self architectureAndOffsetsForFileDescriptor:fd];
