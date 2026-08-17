@@ -87,6 +87,7 @@
   XCTAssertEqual(SecStaticCodeCreateWithPath((__bridge CFURLRef)[NSURL fileURLWithPath:path],
                                              kSecCSDefaultFlags, &codeRef),
                  errSecSuccess);
+  if (!codeRef) return;
 
   NSError* error;
   MOLCodesignChecker* sut = [[MOLCodesignChecker alloc] initWithSecStaticCodeRef:codeRef
@@ -113,6 +114,7 @@
   XCTAssertEqual(SecStaticCodeCreateWithPath((__bridge CFURLRef)[NSURL fileURLWithPath:path],
                                              kSecCSDefaultFlags, &codeRef),
                  errSecSuccess);
+  if (!codeRef) return;
 
   error = nil;
   MOLCodesignChecker* byCodeRef = [[MOLCodesignChecker alloc] initWithSecStaticCodeRef:codeRef
