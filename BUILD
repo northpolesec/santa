@@ -76,7 +76,9 @@ genrule(
     # Santa only ever builds macOS binaries on macOS, so it is always runnable.
     srcs = ["//Source/santactl"],
     outs = ["Conf/_santactl"],
-    cmd = "$(location Conf/generate_zsh_completion.sh) $(location //Source/santactl:santactl) > $@",
+    # With --apple_generate_dsym the srcs also contain the .dSYM bundle files, so
+    # pick the one output that isn't part of it rather than using $(location).
+    cmd = "$(location Conf/generate_zsh_completion.sh) $$(echo $(locations //Source/santactl:santactl) | tr ' ' '\\n' | grep -v '\\.dSYM/') > $@",
     tools = ["Conf/generate_zsh_completion.sh"],
     visibility = [":santa_package_group"],
 )
