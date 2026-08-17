@@ -79,6 +79,71 @@
   XCTAssertNotNil(error);
 }
 
+- (void)testInitWithSecStaticCodeRef {
+  NSBundle* bundle = [NSBundle bundleForClass:[self class]];
+  NSString* path = [bundle pathForResource:@"signed-with-teamid" ofType:@""];
+
+  SecStaticCodeRef codeRef = NULL;
+  XCTAssertEqual(SecStaticCodeCreateWithPath((__bridge CFURLRef)[NSURL fileURLWithPath:path],
+                                             kSecCSDefaultFlags, &codeRef),
+                 errSecSuccess);
+  if (!codeRef) return;
+
+  NSError* error;
+  MOLCodesignChecker* sut = [[MOLCodesignChecker alloc] initWithSecStaticCodeRef:codeRef
+                                                                           error:&error];
+  // The checker retains codeRef, so the caller's reference is theirs to drop.
+  CFRelease(codeRef);
+
+  XCTAssertNotNil(sut);
+  XCTAssertNil(error);
+  XCTAssertEqualObjects(sut.binaryPath, path);
+  XCTAssertEqualObjects(sut.cdhash, @"23cbe7039ac34bf26f0b1ccc22ff96d6f0d80b72");
+}
+
+- (void)testInitWithSecStaticCodeRefUniversalSigningInformation {
+  NSBundle* bundle = [NSBundle bundleForClass:[self class]];
+  NSString* path = [bundle pathForResource:@"yikes-universal_signed" ofType:@""];
+
+  NSError* error;
+  MOLCodesignChecker* byPath = [[MOLCodesignChecker alloc] initWithBinaryPath:path error:&error];
+  XCTAssertNil(error);
+  XCTAssertNotNil(byPath.universalSigningInformation);
+
+  SecStaticCodeRef codeRef = NULL;
+  XCTAssertEqual(SecStaticCodeCreateWithPath((__bridge CFURLRef)[NSURL fileURLWithPath:path],
+                                             kSecCSDefaultFlags, &codeRef),
+                 errSecSuccess);
+  if (!codeRef) return;
+
+  error = nil;
+  MOLCodesignChecker* byCodeRef = [[MOLCodesignChecker alloc] initWithSecStaticCodeRef:codeRef
+                                                                                 error:&error];
+  CFRelease(codeRef);
+
+  XCTAssertNil(error);
+  XCTAssertNotNil(byCodeRef.universalSigningInformation);
+  XCTAssertEqualObjects(
+      [self architecturesFromSigningInformation:byCodeRef.universalSigningInformation],
+      [self architecturesFromSigningInformation:byPath.universalSigningInformation]);
+}
+
+- (void)testInitWithSecStaticCodeRefOfWrongType {
+  NSError* error;
+  MOLCodesignChecker* sut =
+      [[MOLCodesignChecker alloc] initWithSecStaticCodeRef:(SecStaticCodeRef)CFSTR("not a code ref")
+                                                     error:&error];
+  XCTAssertNil(sut);
+  XCTAssertEqual(error.code, errSecUnimplemented);
+}
+
+- (void)testInitWithNullSecStaticCodeRef {
+  NSError* error;
+  MOLCodesignChecker* sut = [[MOLCodesignChecker alloc] initWithSecStaticCodeRef:NULL error:&error];
+  XCTAssertNil(sut);
+  XCTAssertEqual(error.code, errSecUnimplemented);
+}
+
 - (void)testInitWithPID {
   MOLCodesignChecker* sut = [[MOLCodesignChecker alloc] initWithPID:1];
   XCTAssertNotNil(sut);
@@ -270,6 +335,15 @@
   [wantedEntitlements enumerateKeysAndObjectsUsingBlock:^(id key, id value, BOOL* stop) {
     XCTAssertEqualObjects(sut.entitlements[key], value);
   }];
+}
+
+/// Sorted architecture names from a `universalSigningInformation` array.
+- (NSArray*)architecturesFromSigningInformation:(NSArray*)signingInformation {
+  NSMutableArray* archs = [NSMutableArray arrayWithCapacity:signingInformation.count];
+  for (NSDictionary* arch in signingInformation) {
+    [archs addObject:arch.allKeys.firstObject];
+  }
+  return [archs sortedArrayUsingSelector:@selector(compare:)];
 }
 
 @end
