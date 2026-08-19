@@ -1071,12 +1071,14 @@ thousand static rules working correctly, but we don't recommend using StaticRule
     {
       key: "ServerAuthRootsData",
       description: `If set, this is valid PEM containing one or more certificates to be used for certificate pinning.
-        To comply with ATS the certificate chain must also be trusted in the keychain`,
+        To comply with ATS the certificate chain must also be trusted in the keychain.
+        This should not be used by Workshop customers as it will be ignored.`,
       type: "data",
     },
     {
       key: "ServerAuthRootsFile",
-      description: `The same as the above but is a path to a file on disk containing the PEM data`,
+      description: `The same as the above but is a path to a file on disk containing the PEM data.
+        This should not be used by Workshop customers as it will be ignored.`,
       type: "string",
     },
     {
