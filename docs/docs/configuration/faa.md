@@ -53,10 +53,11 @@ Invalid names will be rejected and an error will be logged.
 
 :::
 
-Each rule contains three main components:
+Each rule contains these main components:
 
 - `Paths`: Array of path patterns to monitor
 - `Processes`: List of allowed/denied processes with specific identifiers
+- `ProcessesWithOptions` (sync server only): List of processes that state their own outcome and can override individual rule options. See [Per-Process Options](#per-process-options)
 - `Options`: Settings for rule behavior
 
 ## Basic Example
@@ -182,6 +183,57 @@ binaries can easily be moved. This should only be used as a last resort.
 Additionally, the `BinaryPath` key does not support glob patterns (`*`).
 
 :::
+
+## Per-Process Options
+
+:::info
+
+`ProcessesWithOptions` can only be delivered by a sync server. A rule using it in
+a locally managed configuration (a configuration profile's `FileAccessPolicy` or
+a `FileAccessPolicyPlist` file) is rejected, and an error is logged. It is
+documented here so the behavior of synced rules is clear.
+
+:::
+
+Membership in the `Processes` array means whatever the rule's `RuleType` says it
+means, and every option in the rule's `Options` dictionary applies to the rule as
+a whole.
+The `ProcessesWithOptions` array lifts both restrictions: each entry states its
+own outcome and can override individual rule options for just that process.
+
+This makes it possible to express things a single rule otherwise could not.
+For example, under a `PathsWithAllowedProcesses` rule a process can be denied,
+and denied silently, without splitting the rule in two.
+
+Entries use the same process-matching keys as `Processes` (see
+[Process Matching](#process-matching) above), plus the following:
+
+- `Action` (optional): What happens when this process accesses one of the rule's paths.
+  - `allow`: Access is allowed.
+  - `audit`: Access is allowed, but the violation is logged.
+  - `deny`: Access is denied.
+  - When omitted, the outcome is inherited from the rule, exactly as it would be for an entry in `Processes`.
+
+- `AllowReadAccess`, `EnableSilentMode`, `EnableSilentTTYMode`, `BlockMessage`,
+  `EventDetailURL`, `EventDetailText` (all optional): Override the same-named key
+  in the rule's `Options` dictionary for this process only. Any key that is not
+  set inherits the rule's value.
+
+Note that `Action` replaces `AuditOnly`, which cannot be overridden per-process.
+Use `Action: audit` instead.
+
+### Matching Order
+
+Both arrays are searched in order, with `ProcessesWithOptions` entries first, and
+the first entry that matches the instigating process wins.
+A process listed in both arrays is therefore governed by its
+`ProcessesWithOptions` entry.
+
+For the process-centric rule types (`ProcessesWithAllowedPaths` and
+`ProcessesWithDeniedPaths`) the process is matched once when it starts, and its
+overrides then apply to every file access it makes.
+`Action` still only takes effect for accesses to a path the rule matches; other
+accesses are decided by the rule's path list as usual.
 
 ## Rule Options
 

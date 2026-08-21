@@ -86,16 +86,45 @@ bool ShouldLogDecision(FileAccessPolicyDecision decision) {
   }
 }
 
-static inline bool ShouldShowUIForPolicy(const std::shared_ptr<WatchItemPolicyBase>& policy) {
-  return !policy->silent;
+static inline bool ShouldShowUI(const WatchItemProcessOptions& options) {
+  return !options.silent;
 }
 
-static inline bool ShouldMessageTTYForPolicy(const std::shared_ptr<WatchItemPolicyBase>& policy,
-                                             const Message& msg) {
-  if (policy->silent_tty || !TTYWriter::CanWrite(msg->process)) {
+static inline bool ShouldMessageTTY(const WatchItemProcessOptions& options, const Message& msg) {
+  if (options.silent_tty || !TTYWriter::CanWrite(msg->process)) {
     return false;
   }
   return true;
+}
+
+/// Collapse a policy and a match into the options to use for this event. When
+/// the matched process carried overrides they are used as-is (WatchItems has
+/// already merged them over the rule's options), otherwise the rule's own
+/// options are used.
+///
+/// The `action` override only applies to an actual match. Process rule types
+/// supply the overrides of the process matched at exec time even for events
+/// whose path didn't match, and in that case the rule's path semantics must
+/// still decide allowed vs denied.
+static WatchItemProcessOptions ResolveOptions(const WatchItemPolicyBase& policy,
+                                              const FAAPolicyProcessor::PolicyMatch& match) {
+  if (match.options) {
+    WatchItemProcessOptions options = *match.options;
+    if (!match.matched) {
+      options.action = WatchItemProcessAction::kInherit;
+    }
+    return options;
+  }
+
+  return WatchItemProcessOptions{
+      .action = WatchItemProcessAction::kInherit,
+      .allow_read_access = policy.allow_read_access,
+      .silent = policy.silent,
+      .silent_tty = policy.silent_tty,
+      .custom_message = policy.custom_message,
+      .event_detail_url = policy.event_detail_url,
+      .event_detail_text = policy.event_detail_text,
+  };
 }
 
 es_auth_result_t FileAccessPolicyDecisionToESAuthResult(FileAccessPolicyDecision decision) {
@@ -305,11 +334,11 @@ SNTCachedDecision* FAAPolicyProcessor::GetCachedDecision(const struct stat& stat
   return [decision_cache_ cachedDecisionForFile:stat_buf];
 }
 
-bool FAAPolicyProcessor::PolicyAllowsReadsForTarget(
-    const Message& msg, const Message::PathTarget& target,
-    const std::shared_ptr<WatchItemPolicyBase> policy) {
+bool FAAPolicyProcessor::PolicyAllowsReadsForTarget(const Message& msg,
+                                                    const Message::PathTarget& target,
+                                                    bool allow_read_access) {
   // All special cases currently require the option "allow_read_access" is set
-  if (!policy->allow_read_access) {
+  if (!allow_read_access) {
     return false;
   }
 
@@ -345,24 +374,31 @@ bool FAAPolicyProcessor::PolicyAllowsReadsForTarget(
   return false;
 }
 
-FileAccessPolicyDecision FAAPolicyProcessor::ApplyPolicy(
+FAAPolicyProcessor::DecisionAndOptions FAAPolicyProcessor::ApplyPolicy(
     const Message& msg, const Message::PathTarget& target,
     const std::optional<std::shared_ptr<WatchItemPolicyBase>> optional_policy,
     CheckIfPolicyMatchesBlock check_if_policy_matches_block) {
   if (!optional_policy.has_value()) {
-    return FileAccessPolicyDecision::kNoPolicy;
+    return {FileAccessPolicyDecision::kNoPolicy, {}};
   }
 
-  // If the process is signed but has an invalid signature, it is denied
+  std::shared_ptr<WatchItemPolicyBase> policy = *optional_policy;
+
+  // If the process is signed but has an invalid signature, it is denied.
+  // Note: The policy isn't evaluated at all here, so the rule's own options are
+  // used for the resulting notification.
   if (((msg->process->codesigning_flags & (CS_SIGNED | CS_VALID)) == CS_SIGNED) &&
       [configurator_ enableBadSignatureProtection]) {
     // TODO(mlw): Think about how to make stronger guarantees here to handle
     // programs becoming invalid after first being granted access. Maybe we
     // should only allow things that have hardened runtime flags set?
-    return FileAccessPolicyDecision::kDeniedInvalidSignature;
+    return {FileAccessPolicyDecision::kDeniedInvalidSignature, ResolveOptions(*policy, {})};
   }
 
-  std::shared_ptr<WatchItemPolicyBase> policy = *optional_policy;
+  // Note: The match must be computed before the read-access check below because
+  // a matched process can override the policy's allow_read_access option.
+  PolicyMatch match = check_if_policy_matches_block(*policy, target, msg);
+  WatchItemProcessOptions options = ResolveOptions(*policy, match);
 
   // If the policy allows read access and the target is readable, produce
   // an immediate result.
@@ -371,13 +407,25 @@ FileAccessPolicyDecision FAAPolicyProcessor::ApplyPolicy(
   // layer. If the policy would generally allow access to the resource,
   // producing the full kAllow result would potentially result in better
   // system performance.
-  if (PolicyAllowsReadsForTarget(msg, target, policy)) {
-    return FileAccessPolicyDecision::kAllowedReadAccess;
+  if (PolicyAllowsReadsForTarget(msg, target, options.allow_read_access)) {
+    return {FileAccessPolicyDecision::kAllowedReadAccess, std::move(options)};
   }
 
-  FileAccessPolicyDecision decision = check_if_policy_matches_block(*policy, target, msg)
-                                          ? FileAccessPolicyDecision::kAllowed
-                                          : FileAccessPolicyDecision::kDenied;
+  // A matched process that states its own action bypasses the rule's RuleType
+  // and audit-only options entirely. This is what allows e.g. a silently denied
+  // process under a PathsWithAllowedProcesses rule.
+  switch (options.action) {
+    case WatchItemProcessAction::kAllow:
+      return {FileAccessPolicyDecision::kAllowed, std::move(options)};
+    case WatchItemProcessAction::kAudit:
+      return {FileAccessPolicyDecision::kAllowedAuditOnly, std::move(options)};
+    case WatchItemProcessAction::kDeny:
+      return {FileAccessPolicyDecision::kDenied, std::move(options)};
+    case WatchItemProcessAction::kInherit: break;
+  }
+
+  FileAccessPolicyDecision decision =
+      match.matched ? FileAccessPolicyDecision::kAllowed : FileAccessPolicyDecision::kDenied;
 
   // If the RuleType option was configured to contain a list of denied
   // processes or denied paths, the decision should be inverted from allowed
@@ -396,7 +444,7 @@ FileAccessPolicyDecision FAAPolicyProcessor::ApplyPolicy(
     decision = FileAccessPolicyDecision::kAllowedAuditOnly;
   }
 
-  return decision;
+  return {decision, std::move(options)};
 }
 
 void FAAPolicyProcessor::LogTelemetry(const WatchItemPolicyBase& policy, const Message& msg,
@@ -447,14 +495,15 @@ bool FAAPolicyProcessor::HaveMessagedTTYForPolicy(const WatchItemPolicyBase& pol
 }
 
 void FAAPolicyProcessor::LogTTY(SNTStoredFileAccessEvent* event, URLTextPair link_info,
-                                const Message& msg, const WatchItemPolicyBase& policy) {
+                                const Message& msg, const WatchItemPolicyBase& policy,
+                                const WatchItemProcessOptions& options) {
   if (HaveMessagedTTYForPolicy(policy, msg)) {
     return;
   }
 
   NSAttributedString* attrStr = [SNTBlockMessage
       attributedBlockMessageForFileAccessEvent:event
-                                 customMessage:OptionalStringToNSString(policy.custom_message)];
+                                 customMessage:OptionalStringToNSString(options.custom_message)];
 
   NSMutableString* blockMsg = [NSMutableString stringWithCapacity:1024];
   // Escape sequences `\033[1m` and `\033[0m` begin/end bold lettering
@@ -479,7 +528,7 @@ void FAAPolicyProcessor::LogTTY(SNTStoredFileAccessEvent* event, URLTextPair lin
   tty_writer_->WriteWithoutSignal(msg->process, blockMsg);
 }
 
-FileAccessPolicyDecision FAAPolicyProcessor::ProcessTargetAndPolicy(
+FAAPolicyProcessor::DecisionAndOptions FAAPolicyProcessor::ProcessTargetAndPolicy(
     const Message& msg, const TargetPolicyPair& target_policy_pair,
     CheckIfPolicyMatchesBlock check_if_policy_matches_block,
     SNTFileAccessDeniedBlock file_access_denied_block,
@@ -489,13 +538,16 @@ FileAccessPolicyDecision FAAPolicyProcessor::ProcessTargetAndPolicy(
   if (target.truncated) {
     LOGW(@"FAA: truncated path target on event=%d, pid=%d, proc=%s", msg->event_type,
          audit_token_to_pid(msg->process->audit_token), msg->process->executable->path.data);
-    return ApplyOverrideToDecision(FileAccessPolicyDecision::kDenied, override_action);
+    return {ApplyOverrideToDecision(FileAccessPolicyDecision::kDenied, override_action), {}};
   }
 
   const std::optional<std::shared_ptr<WatchItemPolicyBase>> optional_policy =
       target_policy_pair.second;
-  FileAccessPolicyDecision decision = ApplyOverrideToDecision(
-      ApplyPolicy(msg, target, optional_policy, check_if_policy_matches_block), override_action);
+  DecisionAndOptions result =
+      ApplyPolicy(msg, target, optional_policy, check_if_policy_matches_block);
+  const WatchItemProcessOptions& options = result.options;
+  FileAccessPolicyDecision decision = ApplyOverrideToDecision(result.decision, override_action);
+  result.decision = decision;
 
   // Note: If ShouldLogDecision, it shouldn't be possible for optionalPolicy
   // to not have a value. Performing the check just in case to prevent a crash.
@@ -547,7 +599,8 @@ FileAccessPolicyDecision FAAPolicyProcessor::ProcessTargetAndPolicy(
 
     URLTextPair link_info;
     if (generate_event_detail_link_block_) {
-      link_info = generate_event_detail_link_block_(policy);
+      link_info =
+          generate_event_detail_link_block_(options.event_detail_url, options.event_detail_text);
     }
 
     if (store_access_event_block_) {
@@ -555,18 +608,18 @@ FileAccessPolicyDecision FAAPolicyProcessor::ProcessTargetAndPolicy(
     }
 
     if (IsBlockDecision(decision)) {
-      if (ShouldShowUIForPolicy(policy)) {
-        file_access_denied_block(event, OptionalStringToNSString(policy->custom_message),
+      if (ShouldShowUI(options)) {
+        file_access_denied_block(event, OptionalStringToNSString(options.custom_message),
                                  link_info.first, link_info.second);
       }
 
-      if (ShouldMessageTTYForPolicy(policy, msg)) {
-        LogTTY(event, link_info, msg, *policy);
+      if (ShouldMessageTTY(options, msg)) {
+        LogTTY(event, link_info, msg, *policy, options);
       }
     }
   }
 
-  return decision;
+  return result;
 }
 
 static inline FAAPolicyProcessor::ReadsCacheKey MakeReadsCacheKey(const audit_token_t& tok,
@@ -584,20 +637,21 @@ FAAPolicyProcessor::ESResult FAAPolicyProcessor::ProcessMessage(
 
   for (const TargetPolicyPair& target_policy_pair : target_policy_pairs) {
     const Message::PathTarget& path_target = msg.PathTargetAtIndex(target_policy_pair.first);
-    FileAccessPolicyDecision decision =
+    DecisionAndOptions result =
         ProcessTargetAndPolicy(msg, target_policy_pair, check_if_policy_matches_block,
                                file_access_denied_block, overrideAction);
+    FileAccessPolicyDecision decision = result.decision;
     // Populate the reads_cache_ if:
     //   1. The policy applied
     //   2. The process wasn't invalid
     //   3. A devno/ino pair existed for the target
-    //   4. The policy allowed read access
+    //   4. The effective policy allowed read access
     // Note: As long as a policy allows read access, the caller's read cache can be updated
     // regardless of the RuleType of the policy.
     if (decision != FileAccessPolicyDecision::kNoPolicy &&
         decision != FileAccessPolicyDecision::kDeniedInvalidSignature && !path_target.truncated &&
         path_target.is_readable && path_target.unsafe_file &&
-        target_policy_pair.second.has_value() && (*target_policy_pair.second)->allow_read_access) {
+        target_policy_pair.second.has_value() && result.options.allow_read_access) {
       reads_cache_.Set(MakeReadsCacheKey(msg->process->audit_token, client_type),
                        std::pair<dev_t, ino_t>({path_target.unsafe_file->stat.st_dev,
                                                 path_target.unsafe_file->stat.st_ino}));

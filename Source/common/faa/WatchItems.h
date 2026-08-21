@@ -58,11 +58,17 @@ extern NSString* const kWatchItemConfigKeyProcessesSigningID;
 extern NSString* const kWatchItemConfigKeyProcessesTeamID;
 extern NSString* const kWatchItemConfigKeyProcessesCDHash;
 extern NSString* const kWatchItemConfigKeyProcessesPlatformBinary;
+extern NSString* const kWatchItemConfigKeyProcessesWithOptions;
+extern NSString* const kWatchItemConfigKeyProcessesAction;
 
 extern NSString* const kRuleTypePathsWithAllowedProcesses;
 extern NSString* const kRuleTypePathsWithDeniedProcesses;
 extern NSString* const kRuleTypeProcessesWithAllowedPaths;
 extern NSString* const kRuleTypeProcessesWithDeniedPaths;
+
+extern NSString* const kProcessActionAllow;
+extern NSString* const kProcessActionAudit;
+extern NSString* const kProcessActionDeny;
 
 namespace santa {
 
@@ -186,12 +192,18 @@ class WatchItems : public Timer<WatchItems>, public PassKey<WatchItems> {
 
   std::optional<WatchItemsState> State();
 
-  std::pair<NSString*, NSString*> EventDetailLinkInfo(
-      const std::shared_ptr<WatchItemPolicyBase>& watch_item);
+  /// Resolve the event detail URL/text to display, falling back to the
+  /// top-level config values when the given values are unset. Callers pass the
+  /// effective values for the event, which may have come from a matched
+  /// process's overrides rather than the rule itself.
+  std::pair<NSString*, NSString*> EventDetailLinkInfo(std::optional<NSString*> event_detail_url,
+                                                      std::optional<NSString*> event_detail_text);
 
-  static bool IsValidRule(NSString* name, NSDictionary* rule, NSError** error,
-                          NSString* policyVersion = nil);
-  static bool IsValidConfig(NSDictionary* config, NSError** error);
+  /// Note: `data_source` gates features that are only deliverable by a sync
+  /// server. A rule using one of those in a locally managed config is invalid.
+  static bool IsValidRule(NSString* name, NSDictionary* rule, DataSource data_source,
+                          NSError** error, NSString* policyVersion = nil);
+  static bool IsValidConfig(NSDictionary* config, DataSource data_source, NSError** error);
 
   static NSString* DataSourceName(DataSource data_source);
 

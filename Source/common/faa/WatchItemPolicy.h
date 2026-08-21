@@ -49,7 +49,10 @@ struct SharedPtrValueEqual;
 // Helper type aliases
 using PairPathAndType = std::pair<std::string, WatchItemPathType>;
 using SetPairPathAndType = absl::flat_hash_set<PairPathAndType>;
-using SetWatchItemProcess = absl::flat_hash_set<WatchItemProcess>;
+// Note: This is an ordered list, not a set, because process matching is
+// first-match-wins. Entries parsed from `ProcessesWithOptions` are placed
+// ahead of entries parsed from `Processes` so that the former take precedence.
+using WatchItemProcessList = std::vector<WatchItemProcess>;
 using SetSharedDataWatchItemPolicy = absl::flat_hash_set<std::shared_ptr<DataWatchItemPolicy>,
                                                          SharedPtrValueHash<DataWatchItemPolicy>,
                                                          SharedPtrValueEqual<DataWatchItemPolicy>>;
@@ -78,9 +81,47 @@ static constexpr WatchItemRuleType kWatchItemPolicyDefaultRuleType =
 static constexpr bool kWatchItemPolicyDefaultEnableSilentMode = false;
 static constexpr bool kWatchItemPolicyDefaultEnableSilentTTYMode = false;
 
+/// The outcome of a match against a single configured process. `kInherit`
+/// defers to the rule's `rule_type` and `audit_only` options, which is the
+/// behavior of every process listed under the `Processes` key. The remaining
+/// values state their own outcome, which is how a `ProcessesWithOptions` entry
+/// can e.g. deny a process under a `PathsWithAllowedProcesses` rule.
+enum class WatchItemProcessAction {
+  kInherit,
+  kAllow,
+  kAudit,
+  kDeny,
+};
+
+static constexpr WatchItemProcessAction kWatchItemPolicyDefaultProcessAction =
+    WatchItemProcessAction::kInherit;
+
+/// Per-process overrides of a rule's options. These are fully merged against
+/// the rule's own options while parsing the config, so every field holds the
+/// effective value to use when this process is the one that matched.
+struct WatchItemProcessOptions {
+  WatchItemProcessAction action = kWatchItemPolicyDefaultProcessAction;
+  bool allow_read_access = kWatchItemPolicyDefaultAllowReadAccess;
+  bool silent = kWatchItemPolicyDefaultEnableSilentMode;
+  bool silent_tty = kWatchItemPolicyDefaultEnableSilentTTYMode;
+  std::optional<std::string> custom_message;
+  std::optional<NSString*> event_detail_url;
+  std::optional<NSString*> event_detail_text;
+
+  bool operator==(const WatchItemProcessOptions& other) const {
+    // Note: Matching WatchItemPolicyBase, custom_message, event_detail_url and
+    // event_detail_text are not currently considered for equality purposes.
+    return action == other.action && allow_read_access == other.allow_read_access &&
+           silent == other.silent && silent_tty == other.silent_tty;
+  }
+
+  bool operator!=(const WatchItemProcessOptions& other) const { return !(*this == other); }
+};
+
 struct WatchItemProcess {
   static std::optional<WatchItemProcess> Create(NSString* bp, NSString* sid, NSString* tid,
                                                 NSString* cdh, NSString* ch, bool pb,
+                                                std::optional<WatchItemProcessOptions> opts,
                                                 NSError** error) {
     // Ensure at least one attribute set
     if (!bp && !sid && !tid && !cdh && !ch && !pb) {
@@ -128,19 +169,21 @@ struct WatchItemProcess {
 
     return WatchItemProcess(NSStringToUTF8String(bp ?: @""), std::move(sid_str),
                             NSStringToUTF8String(tid ?: @""), HexStringToBuf(cdh),
-                            NSStringToUTF8String(ch ?: @""), pb, wildcard_pos);
+                            NSStringToUTF8String(ch ?: @""), pb, wildcard_pos, std::move(opts));
   }
 
 #ifdef DEBUG
   // This interface is intended to only be used by tests
   WatchItemProcess(std::string bp, std::string sid, std::string tid, std::vector<uint8_t> cdh,
-                   std::string ch, bool pb)
+                   std::string ch, bool pb,
+                   std::optional<WatchItemProcessOptions> opts = std::nullopt)
       : binary_path(bp),
         signing_id(sid),
         team_id(tid),
         cdhash(std::move(cdh)),
         certificate_sha256(ch),
-        platform_binary(pb) {
+        platform_binary(pb),
+        options(std::move(opts)) {
     signing_id_wildcard_pos = signing_id.find('*');
   }
 #endif
@@ -149,7 +192,7 @@ struct WatchItemProcess {
     return binary_path == other.binary_path && signing_id == other.signing_id &&
            team_id == other.team_id && cdhash == other.cdhash &&
            certificate_sha256 == other.certificate_sha256 &&
-           platform_binary == other.platform_binary;
+           platform_binary == other.platform_binary && options == other.options;
   }
 
   bool operator!=(const WatchItemProcess& other) const { return !(*this == other); }
@@ -163,12 +206,6 @@ struct WatchItemProcess {
   }
 #endif
 
-  template <typename H>
-  friend H AbslHashValue(H h, const WatchItemProcess& p) {
-    return H::combine(std::move(h), p.binary_path, p.signing_id, p.team_id, p.cdhash,
-                      p.certificate_sha256, p.platform_binary);
-  }
-
   std::string binary_path;
   const std::string signing_id;
   std::string team_id;
@@ -176,18 +213,22 @@ struct WatchItemProcess {
   std::string certificate_sha256;
   bool platform_binary;
   size_t signing_id_wildcard_pos;
+  // Only set for entries parsed from the `ProcessesWithOptions` key. Entries
+  // from `Processes` have no overrides and defer entirely to the rule.
+  std::optional<WatchItemProcessOptions> options;
 
  private:
   // This object is intended to be created via the factory method
   WatchItemProcess(std::string bp, std::string sid, std::string tid, std::vector<uint8_t> cdh,
-                   std::string ch, bool pb, size_t wc)
+                   std::string ch, bool pb, size_t wc, std::optional<WatchItemProcessOptions> opts)
       : binary_path(bp),
         signing_id(sid),
         team_id(tid),
         cdhash(std::move(cdh)),
         certificate_sha256(ch),
         platform_binary(pb),
-        signing_id_wildcard_pos(wc) {}
+        signing_id_wildcard_pos(wc),
+        options(std::move(opts)) {}
 };
 
 struct WatchItemPolicyBase {
@@ -198,7 +239,7 @@ struct WatchItemPolicyBase {
                       bool esm = kWatchItemPolicyDefaultEnableSilentMode,
                       bool estm = kWatchItemPolicyDefaultEnableSilentTTYMode,
                       std::string_view cm = "", NSString* edu = nil, NSString* edt = nil,
-                      SetWatchItemProcess procs = {}, int64_t rid = 0)
+                      WatchItemProcessList procs = {}, int64_t rid = 0)
       : name(n),
         version(v),
         allow_read_access(ara),
@@ -242,7 +283,7 @@ struct WatchItemPolicyBase {
   std::optional<std::string> custom_message;
   std::optional<NSString*> event_detail_url;
   std::optional<NSString*> event_detail_text;
-  SetWatchItemProcess processes;
+  WatchItemProcessList processes;
   int64_t rule_id;
 };
 
@@ -255,7 +296,7 @@ struct DataWatchItemPolicy : public WatchItemPolicyBase {
                       bool esm = kWatchItemPolicyDefaultEnableSilentMode,
                       bool estm = kWatchItemPolicyDefaultEnableSilentTTYMode,
                       std::string_view cm = "", NSString* edu = nil, NSString* edt = nil,
-                      SetWatchItemProcess procs = {}, int64_t rid = 0)
+                      WatchItemProcessList procs = {}, int64_t rid = 0)
       : WatchItemPolicyBase(n, v, ara, ao, rt, esm, estm, cm, edu, edt, std::move(procs), rid),
         path(p),
         path_type(pt) {}
@@ -285,7 +326,7 @@ struct ProcessWatchItemPolicy : public WatchItemPolicyBase {
                          bool esm = kWatchItemPolicyDefaultEnableSilentMode,
                          bool estm = kWatchItemPolicyDefaultEnableSilentTTYMode,
                          std::string_view cm = "", NSString* edu = nil, NSString* edt = nil,
-                         SetWatchItemProcess procs = {}, int64_t rid = 0)
+                         WatchItemProcessList procs = {}, int64_t rid = 0)
       : WatchItemPolicyBase(n, v, ara, ao, rt, esm, estm, cm, edu, edt, std::move(procs), rid),
         path_type_pairs(std::move(pt)),
         tree(std::make_unique<santa::PrefixTree<santa::Unit>>()) {
