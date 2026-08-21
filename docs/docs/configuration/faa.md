@@ -220,8 +220,8 @@ Entries use the same process-matching keys as `Processes` (see
   set inherits the rule's value.
 
 `Action` replaces `AuditOnly`, which cannot be overridden per-process. Use
-`Action: audit` instead. `AuditOnly` and `RuleType` are rejected if set on an
-entry.
+`Action: audit` instead. Setting `AuditOnly`, `RuleType`, or the deprecated
+`InvertProcessExceptions` on an entry is an error.
 
 :::important
 
