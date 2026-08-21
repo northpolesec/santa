@@ -568,8 +568,9 @@ static BOOL QueryUnionAllOrderBy(FMDatabase* db, const LookupIdentifiers& ids) {
 // Demotes transitive rules below every other type by splitting the Binary sub-select on `state`
 // and sorting on a constant `prio` per sub-select. Because each prio is a literal, the compound
 // query is still naturally ordered and SQLite plans it as a streaming MERGE over indexed lookups
-// -- so LIMIT 1 short-circuits and sub-selects after the first match never execute. Costs one
-// extra index seek on (binarySHA256, 1000), but only on lookups that get far enough to run it.
+// with no temp B-tree sort. LIMIT 1 is not an early-out: the MERGE steps every branch to find the
+// first ordered row, so the extra index seek on (binarySHA256, 1000) is paid on every lookup --
+// see the note in the file header.
 static BOOL QueryUnionAllPrio(FMDatabase* db, const LookupIdentifiers& ids) {
   FMResultSet* rs = [db executeQuery:@"SELECT * FROM ("
                                      @"  SELECT 1 AS prio, * FROM execution_rules "
