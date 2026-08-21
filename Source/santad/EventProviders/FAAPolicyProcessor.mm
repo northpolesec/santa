@@ -414,6 +414,13 @@ FAAPolicyProcessor::DecisionAndOptions FAAPolicyProcessor::ApplyPolicy(
   // A matched process that states its own action bypasses the rule's RuleType
   // and audit-only options entirely. This is what allows e.g. a silently denied
   // process under a PathsWithAllowedProcesses rule.
+  //
+  // Note: The effective allow_read_access option is applied above and takes
+  // precedence over the action, so a read-only operation is allowed even for an
+  // entry with an action of kDeny. This mirrors the rule-level behavior, where
+  // allow_read_access scopes which operations the rule covers at all rather
+  // than deciding their outcome. An entry that must also deny reads has to set
+  // AllowReadAccess to false.
   switch (options.action) {
     case WatchItemProcessAction::kAllow:
       return {FileAccessPolicyDecision::kAllowed, std::move(options)};

@@ -90,6 +90,13 @@ class WatchItemsPeer : public WatchItems {
 
   using WatchItems::ForceSetIntervalForTestingUnsafe;
   using WatchItems::ReloadConfig;
+
+  // Convenience for the many tests that don't care about the data source.
+  // Rules from a sync server are the permissive case.
+  void ReloadConfig(NSDictionary* config) {
+    WatchItems::ReloadConfig(config, WatchItems::DataSource::kDatabase);
+  }
+
   using WatchItems::SetConfig;
   using WatchItems::SetConfigPath;
 
@@ -968,6 +975,15 @@ BlockGenResult CreatePolicyBlockGen() {
                kWatchItemConfigKeyOptionsEventDetailText : RepeatedString(@"A", 49),
              } ],
              &err)));
+
+  // Options that only make sense rule-wide are rejected, not ignored
+  for (NSString* key in @[
+         kWatchItemConfigKeyOptionsAuditOnly, kWatchItemConfigKeyOptionsRuleType,
+         kWatchItemConfigKeyOptionsInvertProcessExceptions
+       ]) {
+    XCTAssertTrue(std::holds_alternative<Unit>(
+        verify(@[ @{kWatchItemConfigKeyProcessesBinaryPath : @"pa", key : @(NO)} ], &err)));
+  }
 
   // With no overrides set, every option is inherited from the rule
   {

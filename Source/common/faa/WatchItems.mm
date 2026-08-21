@@ -362,6 +362,25 @@ std::variant<Unit, SetPairPathAndType> VerifyConfigWatchItemPaths(NSArray<id>* p
 /// the rule's value, so the returned struct always holds effective values.
 std::optional<WatchItemProcessOptions> VerifyConfigWatchItemProcessOptions(
     NSDictionary* process, const WatchItemProcessOptions& rule_defaults, NSError** err) {
+  // These options only make sense for the rule as a whole. Reject them rather
+  // than silently ignoring them - reaching for AuditOnly here instead of
+  // `Action: audit` is an easy mistake, and quietly falling back to the rule's
+  // value could leave the process blocked when the intent was to audit it.
+  for (NSString* key in @[
+         kWatchItemConfigKeyOptionsAuditOnly, kWatchItemConfigKeyOptionsRuleType,
+         kWatchItemConfigKeyOptionsInvertProcessExceptions
+       ]) {
+    if (process[key]) {
+      [SNTError populateError:err
+                   withFormat:@"The '%@' option cannot be set per-process%@", key,
+                              [key isEqualToString:kWatchItemConfigKeyOptionsAuditOnly]
+                                  ? [NSString stringWithFormat:@". Use '%@' instead",
+                                                               kWatchItemConfigKeyProcessesAction]
+                                  : @""];
+      return std::nullopt;
+    }
+  }
+
   if (!VerifyConfigKey(process, kWatchItemConfigKeyProcessesAction, [NSString class], err, false,
                        ValidValuesValidator<WatchItemProcessAction>(GetProcessAction)) ||
       !VerifyConfigKey(process, kWatchItemConfigKeyOptionsAllowReadAccess, [NSNumber class], err) ||
@@ -1069,18 +1088,14 @@ void WatchItems::UpdateCurrentState(DataWatchItems new_data_watch_items,
   }
 }
 
-void WatchItems::ReloadConfig(NSDictionary* new_config) {
+/// Note: `data_source` must be the source that `new_config` was read from, and
+/// callers must capture the two together under a single lock acquisition. It
+/// gates a sync-only feature, so a config paired with the wrong source would
+/// apply the wrong validation rules.
+void WatchItems::ReloadConfig(NSDictionary* new_config, DataSource data_source) {
   DataWatchItems new_data_watch_items;
   ProcessWatchItems new_proc_watch_items;
   uint64_t rules_loaded = 0;
-
-  // Note: Read under the lock. The periodic task can reload concurrently with a
-  // Set* call changing the source, and this value gates a sync-only feature.
-  DataSource data_source;
-  {
-    absl::ReaderMutexLock lock(lock_);
-    data_source = data_source_;
-  }
 
   if (new_config) {
     SetSharedDataWatchItemPolicy new_data_policies;
@@ -1101,11 +1116,6 @@ void WatchItems::ReloadConfig(NSDictionary* new_config) {
                      rules_loaded);
 }
 
-NSDictionary* WatchItems::ReadConfig() {
-  absl::ReaderMutexLock lock(lock_);
-  return ReadConfigLocked();
-}
-
 NSDictionary* WatchItems::ReadConfigLocked() {
   if (config_path_) {
     return [NSDictionary dictionaryWithContentsOfFile:config_path_];
@@ -1115,7 +1125,15 @@ NSDictionary* WatchItems::ReadConfigLocked() {
 }
 
 bool WatchItems::OnTimer() {
-  ReloadConfig(embedded_config_ ?: ReadConfig());
+  NSDictionary* config;
+  DataSource data_source;
+  {
+    absl::ReaderMutexLock lock(lock_);
+    config = embedded_config_ ?: ReadConfigLocked();
+    data_source = data_source_;
+  }
+
+  ReloadConfig(config, data_source);
 
   if (periodic_task_complete_f_) {
     periodic_task_complete_f_();
@@ -1135,13 +1153,15 @@ void WatchItems::IterateProcessPolicies(CheckPolicyBlock checkPolicyBlock) {
 }
 
 void WatchItems::SetDBRules(NSDictionary* rules) {
+  NSDictionary* config;
   {
     absl::MutexLock lock(lock_);
     config_path_ = nil;
     embedded_config_ = @{kWatchItemConfigKeyWatchItems : rules};
     data_source_ = DataSource::kDatabase;
+    config = embedded_config_;
   }
-  ReloadConfig(embedded_config_);
+  ReloadConfig(config, DataSource::kDatabase);
 }
 
 void WatchItems::SetConfigPath(NSString* config_path) {
@@ -1155,7 +1175,7 @@ void WatchItems::SetConfigPath(NSString* config_path) {
     data_source_ = DataSource::kDetachedConfig;
     config = ReadConfigLocked();
   }
-  ReloadConfig(config);
+  ReloadConfig(config, DataSource::kDetachedConfig);
 }
 
 void WatchItems::SetConfig(NSDictionary* config) {
@@ -1165,7 +1185,7 @@ void WatchItems::SetConfig(NSDictionary* config) {
     embedded_config_ = config;
     data_source_ = DataSource::kEmbeddedConfig;
   }
-  ReloadConfig(embedded_config_);
+  ReloadConfig(config, DataSource::kEmbeddedConfig);
 }
 
 std::optional<WatchItemsState> WatchItems::State() {

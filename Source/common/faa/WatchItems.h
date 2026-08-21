@@ -214,9 +214,8 @@ class WatchItems : public Timer<WatchItems>, public PassKey<WatchItems> {
                                                     NSDictionary* config,
                                                     uint32_t reapply_config_frequency_secs);
 
-  NSDictionary* ReadConfig();
   NSDictionary* ReadConfigLocked() ABSL_SHARED_LOCKS_REQUIRED(lock_);
-  void ReloadConfig(NSDictionary* new_config);
+  void ReloadConfig(NSDictionary* new_config, DataSource data_source);
   void UpdateCurrentState(DataWatchItems new_data_watch_items,
                           ProcessWatchItems new_proc_watch_items, NSDictionary* new_config,
                           uint64_t rules_loaded);

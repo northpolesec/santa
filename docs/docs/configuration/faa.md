@@ -219,8 +219,18 @@ Entries use the same process-matching keys as `Processes` (see
   in the rule's `Options` dictionary for this process only. Any key that is not
   set inherits the rule's value.
 
-Note that `Action` replaces `AuditOnly`, which cannot be overridden per-process.
-Use `Action: audit` instead.
+`Action` replaces `AuditOnly`, which cannot be overridden per-process. Use
+`Action: audit` instead. `AuditOnly` and `RuleType` are rejected if set on an
+entry.
+
+:::important
+
+`AllowReadAccess` determines which operations the rule covers at all, so it takes
+precedence over `Action`. If the effective `AllowReadAccess` is `true`, read-only
+operations are allowed even for an entry with `Action` set to `deny`. An entry
+that must also deny reads has to set `AllowReadAccess` to `false`.
+
+:::
 
 ### Matching Order
 

@@ -727,6 +727,24 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess& proc) {
           .decision,
       FileAccessPolicyDecision::kDenied);
 
+  // The effective allow_read_access takes precedence over an explicit action, so
+  // a read-only operation is allowed even for an entry that says deny. Denying
+  // reads too requires the entry to also set allow_read_access false.
+  options.action = santa::WatchItemProcessAction::kDeny;
+  options.allow_read_access = true;
+  XCTAssertEqual(
+      faaPolicyProcessor
+          .ApplyPolicyWrapper(Message(mockESApi, &esMsg), target, optionalPolicy, matcher)
+          .decision,
+      FileAccessPolicyDecision::kAllowedReadAccess);
+
+  options.allow_read_access = false;
+  XCTAssertEqual(
+      faaPolicyProcessor
+          .ApplyPolicyWrapper(Message(mockESApi, &esMsg), target, optionalPolicy, matcher)
+          .decision,
+      FileAccessPolicyDecision::kDenied);
+
   XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
 }
 
