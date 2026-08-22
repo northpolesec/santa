@@ -21,14 +21,37 @@ Generate a test database:
 
 Run benchmarks with hyperfine:
   BENCH=bazel-bin/Testing/OneOffs/rule_query_bench
-  STRATEGIES=implicit,orderby,separate,unionall,unionallorderby
-  LOOKUPS=cdhash,teamid,miss,multimatch,mixed
+  STRATEGIES=none,implicit,orderby,separate,unionall,unionallorderby,unionallprio,unionallcase
+  LOOKUPS=cdhash,teamid,miss,multimatch,transitive,shadowed,mixed
   /opt/homebrew/bin/hyperfine --warmup 10 \
       --parameter-list strategy $STRATEGIES \
       --parameter-list lookup $LOOKUPS \
       "$BENCH -i 10000 -t {strategy} -l {lookup} -d /tmp/rule_bench.db"
 
+IMPORTANT -- how to turn a run into a per-query number:
+
+Each run measures whole-process time, which includes both a fixed cost (process launch, opening
+the DB) and a PER-ITERATION cost that is not the query (generating one random identifier set per
+iteration). Subtract the `none` strategy at the SAME `-i`, which pays both of those and runs no
+query:
+
+    per_query = (T(strategy, N) - T(none, N)) / N
+
+Do NOT use an `-i 1` run as the baseline. Identifier generation scales with `-i`, so an `-i 1`
+baseline removes almost none of it and what is left lands in the "per-query" figure instead.
+That mistake inflated the numbers recorded on SNT-391 by roughly 4x.
+
+Comparing two strategies at the same `-i` is also safe without any baseline, since the non-query
+cost is identical and cancels in the difference.
+
+Between-invocation drift on a loaded machine is ~0.3us/query, larger than the within-invocation
+standard error hyperfine reports. Deltas below ~0.5us/query need several independent hyperfine
+invocations pooled before they mean anything, and nothing else should be running.
+
 Strategies:
+  none            - Runs no query. Establishes the non-query cost (process launch, opening the
+                    DB, and the per-iteration identifier generation) for a given -i. Subtract it
+                    from another strategy at the same -i to recover the true per-query cost.
   implicit        - OR clauses + LIMIT 1, no ORDER BY. Relies on SQLite's query planner
                     evaluating OR clauses left-to-right -- empirically correct but not
                     guaranteed. A query planner change could silently break precedence.
@@ -44,16 +67,43 @@ Strategies:
   unionallorderby - UNION ALL of five selects wrapped in a subquery with ORDER BY type ASC
                     + LIMIT 1. Guaranteed correct by ORDER BY, and the UNION ALL structure
                     gives SQLite more optimization freedom than the flat OR approach.
+                    This was the production strategy before transitive rules were demoted.
+  unionallprio    - unionallorderby, but the Binary sub-select is split on `state` and the sort
+                    key is a constant `prio` per sub-select, so transitive Binary rules rank
+                    below every other type instead of ranking as Binary. Keeps the naturally
+                    ordered compound query (streaming MERGE, no temp B-tree) at the cost of one
+                    extra index seek on (binarySHA256, 1000), paid on EVERY lookup -- see the
+                    note below on LIMIT 1.
                     This is the strategy used in production (see SNTRuleTable.mm).
+  unionallcase    - Same demotion via ORDER BY CASE WHEN state=... over the original five
+                    sub-selects. Avoids the extra seek, but the sort key is opaque to the
+                    planner, so SQLite materializes the union and adds a temp B-tree sort.
+
+The last two exist because a transitive Binary rule must not outrank a configured Signing ID /
+Certificate / Team ID rule for the same executable -- see issue #1123, where a Go toolchain
+unpacked by another compiler stopped being treated as a compiler.
+
+LIMIT 1 is not an early-out. Under the MERGE (UNION ALL) plan SQLite steps every branch to
+determine which sorts first, so all of them do their index seek regardless of whether a
+higher-priority branch matched. Verified with a counting SQL function in the last branch: it is
+invoked even when the prio-1 CDHash branch matches. Consequently the strategies differ by a
+roughly CONSTANT amount across lookup types -- there is no "cheap" lookup that skips the extra
+work, and measured deltas being flat across lookup types is the expected result, not a bug in the
+measurement.
 
 Lookup types:
-  cdhash      - Hit on CDHash rule (highest priority, best case for short-circuit)
+  cdhash      - Hit on CDHash rule (highest priority)
   binary      - Hit on Binary rule
   signingid   - Hit on SigningID rule
   certificate - Hit on Certificate rule
-  teamid      - Hit on TeamID rule (lowest priority, worst case for short-circuit)
+  teamid      - Hit on TeamID rule (lowest priority)
   multimatch  - Hits on SigningID + Certificate + TeamID simultaneously (tests ordering correctness)
-  miss        - No matching rule exists
+  transitive  - Hit on a transitive Binary rule and nothing else. Exercises the extra sub-select
+                actually producing the winning row.
+  shadowed    - Hit on both a transitive Binary rule and a SigningID rule (the issue #1123 case).
+                unionall/unionallorderby return the transitive rule here; unionallprio and
+                unionallcase return the SigningID rule.
+  miss        - No matching rule exists.
   mixed       - Uniform random mix of all the above
 
 Note: Miss identifiers are randomly generated per-iteration to avoid B-tree page cache
@@ -82,6 +132,14 @@ static const int kRuleTypeCertificate = 3000;
 static const int kRuleTypeTeamID = 4000;
 
 static const int kRuleStateAllow = 1;
+static const int kRuleStateAllowTransitive = 6;
+
+// Fraction of generated Binary rules given state=AllowTransitive. Transitive rules are written
+// locally by the compiler controller, so on a developer machine they make up a large share of the
+// Binary rules. `state` is not part of execution_rules_unique, so varying this changes only row
+// composition, never row count or index shape -- results stay comparable to runs that predate the
+// transitive strategies.
+static const double kTransitiveBinaryFraction = 0.5;
 
 static const uint32_t kSeed = 0xBEEFCAFE;
 
@@ -105,14 +163,32 @@ static NSString* const kMultiCertificate =
     @"1111111111111111111111111111111111111111111111111111111111111111";
 static NSString* const kMultiTeamID = @"MULTITEST1";
 
+#pragma mark - Known identifiers for transitive rule testing
+
+// A Binary rule with state=AllowTransitive and nothing else matching. Every sub-select must be
+// evaluated before this is found, so this is the worst case for the prio strategy's extra
+// Binary sub-select.
+static NSString* const kTransitiveBinary =
+    @"2222222222222222222222222222222222222222222222222222222222222222";
+
+// The GOTOOLCHAIN=auto case from issue #1123: a binary carrying both a locally-written transitive
+// Binary rule and a configured SigningID rule. `unionall`/`unionallorderby` rank the transitive
+// rule by its Binary type and return it; `unionallprio`/`unionallcase` return the SigningID rule.
+static NSString* const kShadowedBinary =
+    @"3333333333333333333333333333333333333333333333333333333333333333";
+static NSString* const kShadowedSigningID = @"SHADOWTEST:com.example.benchmark.shadowed";
+
 #pragma mark - Enums and config
 
 enum class Strategy {
+  kNone,
   kImplicit,
   kOrderBy,
   kSeparate,
   kUnionAll,
   kUnionAllOrderBy,
+  kUnionAllPrio,
+  kUnionAllCase,
 };
 
 enum class LookupType {
@@ -122,6 +198,8 @@ enum class LookupType {
   kCertificate,
   kTeamID,
   kMultiMatch,
+  kTransitive,
+  kShadowed,
   kMiss,
   kMixed,
 };
@@ -145,14 +223,25 @@ struct LookupIdentifiers {
 
 #pragma mark - Random data generation
 
+// Fills a stack buffer and creates the NSString once. An earlier version appended one
+// -appendFormat: per character, which cost ~36us per lookup set -- an order of magnitude more
+// than the queries under test, diluting every strategy comparison into the noise.
 static NSString* RandomHex(int length, std::mt19937& gen) {
   static const char hex[] = "0123456789abcdef";
   std::uniform_int_distribution<> dist(0, 15);
-  NSMutableString* s = [NSMutableString stringWithCapacity:length];
-  for (int i = 0; i < length; i++) {
-    [s appendFormat:@"%c", hex[dist(gen)]];
+  char buf[128];
+  // Abort rather than clamp. Silently returning a shorter identifier would populate the
+  // database with wrong-length identifiers and raise the collision rate under INSERT OR
+  // IGNORE, quietly changing the row counts the benchmark is characterizing.
+  if (length < 0 || length > (int)sizeof(buf)) {
+    std::cerr << "Error: RandomHex length " << length << " out of range (max " << sizeof(buf) << ")"
+              << std::endl;
+    abort();
   }
-  return s;
+  for (int i = 0; i < length; i++) {
+    buf[i] = hex[dist(gen)];
+  }
+  return [[NSString alloc] initWithBytes:buf length:length encoding:NSASCIIStringEncoding];
 }
 
 static NSString* RandomTeamID(std::mt19937& gen) {
@@ -167,8 +256,24 @@ static NSString* RandomTeamID(std::mt19937& gen) {
 }
 
 static NSString* RandomSigningID(std::mt19937& gen) {
-  return
-      [NSString stringWithFormat:@"%@:com.example.bench.%@", RandomTeamID(gen), RandomHex(8, gen)];
+  static const char teamChars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  static const char hex[] = "0123456789abcdef";
+  static const char kInfix[] = ":com.example.bench.";
+  std::uniform_int_distribution<> teamDist(0, (int)strlen(teamChars) - 1);
+  std::uniform_int_distribution<> hexDist(0, 15);
+
+  // "<10 team chars>:com.example.bench.<8 hex>", assembled in one pass.
+  char buf[10 + sizeof(kInfix) - 1 + 8];
+  char* p = buf;
+  for (int i = 0; i < 10; i++) {
+    *p++ = teamChars[teamDist(gen)];
+  }
+  memcpy(p, kInfix, sizeof(kInfix) - 1);
+  p += sizeof(kInfix) - 1;
+  for (int i = 0; i < 8; i++) {
+    *p++ = hex[hexDist(gen)];
+  }
+  return [[NSString alloc] initWithBytes:buf length:sizeof(buf) encoding:NSASCIIStringEncoding];
 }
 
 // Generate a full set of random identifiers that will not match any known rules.
@@ -236,6 +341,16 @@ static void GenerateDatabase(const Config& config) {
   [db executeUpdate:@"INSERT INTO execution_rules (identifier, state, type) VALUES (?, ?, ?)",
                     kMultiTeamID, @(kRuleStateAllow), @(kRuleTypeTeamID)];
 
+  // Insert transitive known rules: one standalone, and one shadowing a SigningID rule.
+  [db executeUpdate:@"INSERT INTO execution_rules (identifier, state, type) VALUES (?, ?, ?)",
+                    kTransitiveBinary, @(kRuleStateAllowTransitive), @(kRuleTypeBinary)];
+  [db executeUpdate:@"INSERT INTO execution_rules (identifier, state, type) VALUES (?, ?, ?)",
+                    kShadowedBinary, @(kRuleStateAllowTransitive), @(kRuleTypeBinary)];
+  [db executeUpdate:@"INSERT INTO execution_rules (identifier, state, type) VALUES (?, ?, ?)",
+                    kShadowedSigningID, @(kRuleStateAllow), @(kRuleTypeSigningID)];
+
+  std::bernoulli_distribution transitiveDist(kTransitiveBinaryFraction);
+
   // Insert random rules
   for (int i = 0; i < config.generateCount; i++) {
     int typeIdx = typeDist(gen);
@@ -251,9 +366,13 @@ static void GenerateDatabase(const Config& config) {
       default: __builtin_unreachable();
     }
 
+    // Only Binary rules can be transitive.
+    int state = (type == kRuleTypeBinary && transitiveDist(gen)) ? kRuleStateAllowTransitive
+                                                                 : kRuleStateAllow;
+
     [db executeUpdate:
             @"INSERT OR IGNORE INTO execution_rules (identifier, state, type) VALUES (?, ?, ?)",
-            identifier, @(kRuleStateAllow), @(type)];
+            identifier, @(state), @(type)];
 
     if (i > 0 && i % 50000 == 0) {
       [db commit];
@@ -289,6 +408,11 @@ static void GenerateDatabase(const Config& config) {
   [rs close];
   std::cout << "  Total: " << total << std::endl;
 
+  std::cout << "  (of which transitive: " <<
+      [db longForQuery:@"SELECT COUNT(*) FROM execution_rules WHERE state=?",
+                       @(kRuleStateAllowTransitive)]
+            << ")" << std::endl;
+
   [db close];
 }
 
@@ -310,6 +434,11 @@ static LookupIdentifiers BuildLookup(LookupType type, std::mt19937& gen) {
       ids.certificateSHA256 = kMultiCertificate;
       ids.teamID = kMultiTeamID;
       break;
+    case LookupType::kTransitive: ids.binarySHA256 = kTransitiveBinary; break;
+    case LookupType::kShadowed:
+      ids.binarySHA256 = kShadowedBinary;
+      ids.signingID = kShadowedSigningID;
+      break;
     case LookupType::kMiss: break;
     case LookupType::kMixed: break;  // handled by caller
   }
@@ -317,6 +446,13 @@ static LookupIdentifiers BuildLookup(LookupType type, std::mt19937& gen) {
 }
 
 #pragma mark - Query strategies
+
+// Runs no query at all. Establishes the harness floor for a given -i: process launch, building
+// the lookup vector, and opening the DB. Subtract it from another strategy at the same -i to get
+// that strategy's true per-query cost, instead of a number diluted by harness overhead.
+static BOOL QueryNone(FMDatabase* db, const LookupIdentifiers& ids) {
+  return NO;
+}
 
 static BOOL QueryImplicit(FMDatabase* db, const LookupIdentifiers& ids) {
   FMResultSet* rs = [db executeQuery:@"SELECT * FROM execution_rules WHERE "
@@ -429,6 +565,64 @@ static BOOL QueryUnionAllOrderBy(FMDatabase* db, const LookupIdentifiers& ids) {
   return found;
 }
 
+// Demotes transitive rules below every other type by splitting the Binary sub-select on `state`
+// and sorting on a constant `prio` per sub-select. Because each prio is a literal, the compound
+// query is still naturally ordered and SQLite plans it as a streaming MERGE over indexed lookups
+// with no temp B-tree sort. LIMIT 1 is not an early-out: the MERGE steps every branch to find the
+// first ordered row, so the extra index seek on (binarySHA256, 1000) is paid on every lookup --
+// see the note in the file header.
+static BOOL QueryUnionAllPrio(FMDatabase* db, const LookupIdentifiers& ids) {
+  FMResultSet* rs = [db executeQuery:@"SELECT * FROM ("
+                                     @"  SELECT 1 AS prio, * FROM execution_rules "
+                                     @"    WHERE identifier=? AND type=500 "
+                                     @"  UNION ALL "
+                                     @"  SELECT 2 AS prio, * FROM execution_rules "
+                                     @"    WHERE identifier=? AND type=1000 AND state<>? "
+                                     @"  UNION ALL "
+                                     @"  SELECT 3 AS prio, * FROM execution_rules "
+                                     @"    WHERE identifier=? AND type=2000 "
+                                     @"  UNION ALL "
+                                     @"  SELECT 4 AS prio, * FROM execution_rules "
+                                     @"    WHERE identifier=? AND type=3000 "
+                                     @"  UNION ALL "
+                                     @"  SELECT 5 AS prio, * FROM execution_rules "
+                                     @"    WHERE identifier=? AND type=4000 "
+                                     @"  UNION ALL "
+                                     @"  SELECT 6 AS prio, * FROM execution_rules "
+                                     @"    WHERE identifier=? AND type=1000 AND state=?"
+                                     @") ORDER BY prio ASC LIMIT 1",
+                                     ids.cdhash, ids.binarySHA256, @(kRuleStateAllowTransitive),
+                                     ids.signingID, ids.certificateSHA256, ids.teamID,
+                                     ids.binarySHA256, @(kRuleStateAllowTransitive)];
+  BOOL found = [rs next];
+  [rs close];
+  return found;
+}
+
+// Same demotion expressed as a CASE over `state` in the ORDER BY, keeping the original five
+// sub-selects. Avoids the extra index seek, but the sort key is opaque to the planner: SQLite can
+// no longer prove the compound query is ordered, so it materializes the union as a co-routine and
+// adds a temp B-tree sort. Included to measure which trade wins.
+static BOOL QueryUnionAllCase(FMDatabase* db, const LookupIdentifiers& ids) {
+  FMResultSet* rs =
+      [db executeQuery:@"SELECT * FROM ("
+                       @"SELECT * FROM execution_rules WHERE identifier=? AND type=500 "
+                       @"UNION ALL "
+                       @"SELECT * FROM execution_rules WHERE identifier=? AND type=1000 "
+                       @"UNION ALL "
+                       @"SELECT * FROM execution_rules WHERE identifier=? AND type=2000 "
+                       @"UNION ALL "
+                       @"SELECT * FROM execution_rules WHERE identifier=? AND type=3000 "
+                       @"UNION ALL "
+                       @"SELECT * FROM execution_rules WHERE identifier=? AND type=4000"
+                       @") ORDER BY (CASE WHEN state=? THEN 1000000 ELSE type END) ASC LIMIT 1",
+                       ids.cdhash, ids.binarySHA256, ids.signingID, ids.certificateSHA256,
+                       ids.teamID, @(kRuleStateAllowTransitive)];
+  BOOL found = [rs next];
+  [rs close];
+  return found;
+}
+
 #pragma mark - Benchmark runner
 
 static void RunBenchmark(const Config& config) {
@@ -449,12 +643,12 @@ static void RunBenchmark(const Config& config) {
   std::mt19937 gen(kSeed);
 
   if (config.lookup == LookupType::kMixed) {
-    std::uniform_int_distribution<> dist(0, 6);
     LookupType allTypes[] = {
-        LookupType::kCDHash,      LookupType::kBinary, LookupType::kSigningID,
-        LookupType::kCertificate, LookupType::kTeamID, LookupType::kMultiMatch,
-        LookupType::kMiss,
+        LookupType::kCDHash,      LookupType::kBinary,   LookupType::kSigningID,
+        LookupType::kCertificate, LookupType::kTeamID,   LookupType::kMultiMatch,
+        LookupType::kTransitive,  LookupType::kShadowed, LookupType::kMiss,
     };
+    std::uniform_int_distribution<> dist(0, (int)(sizeof(allTypes) / sizeof(allTypes[0])) - 1);
     for (int i = 0; i < config.iterations; i++) {
       lookups.push_back(BuildLookup(allTypes[dist(gen)], gen));
     }
@@ -467,11 +661,14 @@ static void RunBenchmark(const Config& config) {
   // Select strategy
   BOOL (*queryFn)(FMDatabase*, const LookupIdentifiers&) = nullptr;
   switch (config.strategy) {
+    case Strategy::kNone: queryFn = QueryNone; break;
     case Strategy::kImplicit: queryFn = QueryImplicit; break;
     case Strategy::kOrderBy: queryFn = QueryOrderBy; break;
     case Strategy::kSeparate: queryFn = QuerySeparate; break;
     case Strategy::kUnionAll: queryFn = QueryUnionAll; break;
     case Strategy::kUnionAllOrderBy: queryFn = QueryUnionAllOrderBy; break;
+    case Strategy::kUnionAllPrio: queryFn = QueryUnionAllPrio; break;
+    case Strategy::kUnionAllCase: queryFn = QueryUnionAllCase; break;
   }
 
   int hits = 0;
@@ -492,11 +689,14 @@ static void RunBenchmark(const Config& config) {
 #pragma mark - CLI
 
 static std::optional<Strategy> ParseStrategy(const char* s) {
+  if (strcmp(s, "none") == 0) return Strategy::kNone;
   if (strcmp(s, "implicit") == 0) return Strategy::kImplicit;
   if (strcmp(s, "orderby") == 0) return Strategy::kOrderBy;
   if (strcmp(s, "separate") == 0) return Strategy::kSeparate;
   if (strcmp(s, "unionall") == 0) return Strategy::kUnionAll;
   if (strcmp(s, "unionallorderby") == 0) return Strategy::kUnionAllOrderBy;
+  if (strcmp(s, "unionallprio") == 0) return Strategy::kUnionAllPrio;
+  if (strcmp(s, "unionallcase") == 0) return Strategy::kUnionAllCase;
   return std::nullopt;
 }
 
@@ -507,6 +707,8 @@ static std::optional<LookupType> ParseLookup(const char* s) {
   if (strcmp(s, "certificate") == 0) return LookupType::kCertificate;
   if (strcmp(s, "teamid") == 0) return LookupType::kTeamID;
   if (strcmp(s, "multimatch") == 0) return LookupType::kMultiMatch;
+  if (strcmp(s, "transitive") == 0) return LookupType::kTransitive;
+  if (strcmp(s, "shadowed") == 0) return LookupType::kShadowed;
   if (strcmp(s, "miss") == 0) return LookupType::kMiss;
   if (strcmp(s, "mixed") == 0) return LookupType::kMixed;
   return std::nullopt;
@@ -517,10 +719,12 @@ static void PrintUsage() {
             << "Options:\n"
             << "  -g <count>     Generate database with <count> random rules, then exit\n"
             << "  -i <count>     Number of lookup iterations (default: 1000)\n"
-            << "  -t <strategy>  Query strategy: implicit, orderby, separate, unionall,\n"
-            << "                 unionallorderby (default: implicit)\n"
+            << "  -t <strategy>  Query strategy: none, implicit, orderby, separate, unionall,\n"
+            << "                 unionallorderby, unionallprio, unionallcase\n"
+            << "                 (default: implicit)\n"
             << "  -l <lookup>    Lookup type: cdhash, binary, signingid, certificate,\n"
-            << "                   teamid, multimatch, miss, mixed (default: mixed)\n"
+            << "                   teamid, multimatch, transitive, shadowed, miss, mixed\n"
+            << "                   (default: mixed)\n"
             << "  -d <path>      Database path (default: /tmp/rule_bench.db)\n"
             << "  -v             Verbose output\n"
             << "  -h             Show this help\n";

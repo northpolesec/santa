@@ -601,6 +601,106 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
       expectedDecision:SNTEventStateAllowSigningID];
 }
 
+// Decision-level coverage for https://github.com/northpolesec/santa/issues/1123, driven through
+// a real SNTRuleTable so the actual lookup SQL is exercised. Every other test in this file mocks
+// the rule table or calls -decision:forRule:... directly, so none of them can catch a precedence
+// regression.
+//
+// Scenario: a Go toolchain is unpacked by an existing compiler. The compiler controller writes a
+// transitive Binary rule for the new `go`, which is also covered by a Signing ID
+// ALLOWLIST_COMPILER rule. Adding that transitive rule must not change the decision -- if the
+// Binary-typed transitive rule outranks the Signing ID rule, `go` silently stops being a compiler
+// and everything it builds is blocked.
+- (void)testDecisionTransitiveRuleDoesNotShadowSigningIDCompilerRule {
+  static NSString* const kSHA256 =
+      @"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
+  static NSString* const kTeamID = @"TEAMID1234";
+  static NSString* const kSigningID = @"TEAMID1234:com.example.go";
+
+  // Same assertion with and without the transitive rule present. The pair is the property:
+  // writing a transitive rule must be decision-neutral when a compiler rule already covers it.
+  for (NSNumber* withTransitiveRule in @[ @NO, @YES ]) {
+    FMDatabaseQueue* dbq = [[FMDatabaseQueue alloc] init];
+    SNTRuleTable* ruleTable = [[SNTRuleTable alloc] initWithDatabaseQueue:dbq];
+
+    // Partial mock so executionRuleForIdentifiers: runs for real. Only the lazy critical-binary
+    // scan is stubbed out -- it spins up an ES client and codesigns system paths, neither of
+    // which this test needs.
+    id partialRuleTable = OCMPartialMock(ruleTable);
+    OCMStub([partialRuleTable criticalSystemBinaries]).andReturn(@{});
+
+    NSMutableArray<SNTRule*>* rules = [NSMutableArray array];
+    SNTRule* compilerRule = [[SNTRule alloc] initWithDictionary:@{
+      @"rule_type" : @"SIGNINGID",
+      @"identifier" : kSigningID,
+      @"policy" : @"ALLOWLIST_COMPILER",
+    }
+                                                          error:nil];
+    XCTAssertNotNil(compilerRule, @"invalid test rule dictionary");
+    [rules addObject:compilerRule];
+
+    if (withTransitiveRule.boolValue) {
+      [rules addObject:[[SNTRule alloc] initWithIdentifier:kSHA256
+                                                     state:SNTRuleStateAllowTransitive
+                                                      type:SNTRuleTypeBinary]];
+    }
+
+    NSArray<NSError*>* errs;
+    XCTAssertTrue([ruleTable addExecutionRules:rules ruleCleanup:SNTRuleCleanupNone errors:&errs]);
+    XCTAssertNil(errs);
+    // Only the database query is under test; keep static rules out of it.
+    [ruleTable updateStaticRules:nil];
+
+    id mockConfigurator = OCMClassMock([SNTConfigurator class]);
+    OCMStub([mockConfigurator clientMode]).andReturn(SNTClientModeLockdown);
+    OCMStub([mockConfigurator enableTransitiveRules]).andReturn(YES);
+
+    SNTPolicyProcessor* processor =
+        [[SNTPolicyProcessor alloc] initWithRuleTable:partialRuleTable
+                                   entitlementsFilter:santa::EntitlementsFilter::Create(@[], @[])];
+    processor.configurator = mockConfigurator;
+
+    id mockFileInfo = OCMClassMock([SNTFileInfo class]);
+    OCMStub([mockFileInfo isMachO]).andReturn(YES);
+    OCMStub([mockFileInfo SHA256]).andReturn(kSHA256);
+    // Signature validation is passed in as already-completed, so the identifiers the lookup sees
+    // are exactly the ones set below rather than whatever a real codesign check would produce.
+    OCMReject([mockFileInfo codesignCheckerWithError:[OCMArg setTo:nil]]);
+
+    SNTCachedDecision* cached = [[SNTCachedDecision alloc] init];
+    cached.sha256 = kSHA256;
+    cached.signingID = kSigningID;
+    cached.teamID = kTeamID;
+    cached.codesignValidationStatus = @(errSecSuccess);
+
+    es_file_t file = MakeESFile("/tmp/go");
+    es_process_t proc = MakeESProcess(&file);
+    proc.is_platform_binary = false;
+    // CS_SIGNED|CS_VALID without ADHOC or DEV_CODE yields SNTSigningStatusProduction, which is
+    // what allows Signing ID rules to be considered at all.
+    proc.codesigning_flags = CS_SIGNED | CS_VALID;
+
+    SNTConfigState* configState = [[SNTConfigState alloc] initWithConfig:mockConfigurator];
+
+    SNTCachedDecision* cd = [processor decisionForFileInfo:mockFileInfo
+                                             targetProcess:&proc
+                                              imageCPUType:CPU_TYPE_ARM64
+                                               configState:configState
+                                        activationCallback:nil
+                                            cachedDecision:cached];
+
+    NSString* ctx = withTransitiveRule.boolValue ? @"with transitive rule" : @"baseline";
+    XCTAssertEqual(cd.decision, SNTEventStateAllowCompilerSigningID,
+                   @"%@: the SigningID compiler rule must win", ctx);
+    XCTAssertNotEqual(cd.decision, SNTEventStateAllowTransitive,
+                      @"%@: a transitive rule must not shadow the compiler rule", ctx);
+
+    [partialRuleTable stopMocking];
+    [mockConfigurator stopMocking];
+    [mockFileInfo stopMocking];
+  }
+}
+
 // Transitive allowlist rules
 - (void)testDecisionForTransitiveAllowlistRuleMatches {
   SNTRule* rule = [[SNTRule alloc]
