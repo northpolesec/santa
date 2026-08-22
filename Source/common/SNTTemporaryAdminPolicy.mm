@@ -21,6 +21,7 @@
 @property(readwrite) NSNumber* maxMinutes;
 @property(readwrite) NSNumber* defaultDurationMinutes;
 @property(readwrite) BOOL requireJustification;
++ (NSSet<NSString*>*)normalizeAllowedAdmins:(NSArray<NSString*>*)raw;
 @end
 
 @implementation SNTTemporaryAdminPolicy
@@ -34,6 +35,16 @@
 - (instancetype)initOnDemandMinutes:(uint32_t)minutes
                     defaultDuration:(uint32_t)defaultDuration
                requireJustification:(BOOL)requireJustification {
+  return [self initOnDemandMinutes:minutes
+                   defaultDuration:defaultDuration
+              requireJustification:requireJustification
+                     allowedAdmins:nil];
+}
+
+- (instancetype)initOnDemandMinutes:(uint32_t)minutes
+                    defaultDuration:(uint32_t)defaultDuration
+               requireJustification:(BOOL)requireJustification
+                      allowedAdmins:(NSArray<NSString*>*)allowedAdmins {
   if (minutes == 0) return nil;
   self = [super init];
   if (self) {
@@ -41,8 +52,43 @@
     _maxMinutes = [self clampMinutes:minutes];
     _defaultDurationMinutes = [self clampDefaultDuration:defaultDuration];
     _requireJustification = requireJustification;
+    // nil vs empty is the whole point: nil means the server never sent the
+    // wrapper, empty means it sent one naming nobody.
+    _enforcesAdminGroup = (allowedAdmins != nil);
+    _allowedAdminUsernames =
+        allowedAdmins ? [SNTTemporaryAdminPolicy normalizeAllowedAdmins:allowedAdmins] : nil;
   }
   return self;
+}
+
+// The single canonical form for allowlist comparison. BOTH sides go through
+// this: the entries the server sent, and the usernames read back from the
+// directory. Workshop and opendirectoryd can hold the same visible name in
+// different Unicode compositions, and comparing raw strings would miss — which
+// demotes the account with nothing logged and nothing wrong-looking in the UI.
++ (NSString*)normalizedUsername:(NSString*)name {
+  return [name stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]]
+      .precomposedStringWithCanonicalMapping.lowercaseString;
+}
+
++ (NSSet<NSString*>*)normalizeAllowedAdmins:(NSArray<NSString*>*)raw {
+  NSMutableSet<NSString*>* out = [NSMutableSet set];
+  for (id entry in raw) {
+    if (![entry isKindOfClass:[NSString class]]) continue;
+    NSString* normalized = [SNTTemporaryAdminPolicy normalizedUsername:entry];
+    if (normalized.length == 0) continue;
+    // "scheme:value" is reserved for a future uid: form. A macOS posix name can
+    // never contain ':' (it is the passwd field separator), so nothing valid is
+    // lost, and an entry only a newer Santa understands is ignored here rather
+    // than matched as a literal username. Workshop rejects these at save time;
+    // this is the belt for a third-party sync server.
+    if ([normalized containsString:@":"]) {
+      LOGW(@"Temporary Admin Mode: ignoring unsupported allowlist entry %@", normalized);
+      continue;
+    }
+    [out addObject:normalized];
+  }
+  return out;
 }
 
 - (NSNumber*)clampMinutes:(uint64_t)v {
@@ -74,6 +120,8 @@
   ENCODE(coder, maxMinutes);
   ENCODE(coder, defaultDurationMinutes);
   ENCODE_BOXABLE(coder, requireJustification);
+  ENCODE_BOXABLE(coder, enforcesAdminGroup);
+  ENCODE(coder, allowedAdminUsernames);
 }
 
 - (instancetype)initWithCoder:(NSCoder*)decoder {
@@ -83,6 +131,16 @@
     DECODE(decoder, maxMinutes, NSNumber);
     DECODE(decoder, defaultDurationMinutes, NSNumber);
     DECODE_SELECTOR(decoder, requireJustification, NSNumber, boolValue);
+    DECODE_SELECTOR(decoder, enforcesAdminGroup, NSNumber, boolValue);
+    DECODE_SET(decoder, allowedAdminUsernames,
+               ([NSSet setWithObjects:[NSSet class], [NSString class], nil]));
+    // Keep the nil/empty distinction exact across a round trip, including for
+    // archives written by an older build that had neither key.
+    if (!_enforcesAdminGroup) {
+      _allowedAdminUsernames = nil;
+    } else if (_allowedAdminUsernames == nil) {
+      _allowedAdminUsernames = [NSSet set];
+    }
     // Revoke policies carry no duration fields; preserve their nil values so the
     // decoded object stays symmetric with -initRevocation. Only on-demand policies
     // have minutes to clamp.
