@@ -17,7 +17,8 @@
 #import <Foundation/Foundation.h>
 #include <Kernel/kern/cs_blobs.h>
 #include <libproc.h>
-#include <sys/signal.h>
+#include <signal.h>
+#include <unistd.h>
 
 #include <cerrno>
 #include <memory>
@@ -33,8 +34,13 @@
 #include "Source/common/String.h"
 #include "Source/common/SystemResources.h"
 #include "absl/cleanup/cleanup.h"
+#include "absl/container/flat_hash_set.h"
 
 namespace santa {
+
+int SignalProcessGroup(pid_t pgid, int sig) {
+  return kill(-pgid, sig) == 0 ? 0 : errno;
+}
 
 namespace {
 
@@ -120,7 +126,14 @@ SNTKilledProcessError LibprocSignalErrorToKilledProcessError(int error) {
   }
 }
 
-SNTKilledProcess* KillProcess(SNTKillRequest* request, audit_token_t* token) {
+// Delivers the request's signal to the process `token` identifies, or to that
+// process's group when the request targets process groups. `signaledPgids`
+// holds the groups this pass has already signaled, so each group is signaled
+// exactly once no matter how many of its members matched: the first member
+// signals the group and later members return nil, having already been reached
+// by that one signal.
+SNTKilledProcess* KillProcess(SNTKillRequest* request, audit_token_t* token, const KillEnv& env,
+                              absl::flat_hash_set<pid_t>* signaledPgids) {
   static pid_t myPid = getpid();
   pid_t targetPid = Pid(*token);
   pid_t targetPidversion = Pidversion(*token);
@@ -132,12 +145,53 @@ SNTKilledProcess* KillProcess(SNTKillRequest* request, audit_token_t* token) {
                                            error:SNTKilledProcessErrorInvalidTarget];
   }
 
-  int error = proc_signal_with_audittoken(token, SIGKILL);
+  if (request.targetProcessGroups) {
+    // The group is read here, immediately after the caller verified the audit
+    // token that brackets the match, so the raw syscall adjacency (token_after
+    // -> getpgid) matches the direct path's. The safety is NOT equivalent,
+    // though: the direct path's proc_signal_with_audittoken re-validates the
+    // token at delivery, so a pid recycled after matching yields ESRCH and its
+    // effective window is ~zero. kill(-pgid) cannot re-validate anything, so
+    // here the adjacency is the sole protection: a pid recycled in the narrow
+    // token_after -> getpgid window would put a stranger's group in scope. That
+    // residual is inherent to kill(-pgid) and is accepted; re-reading the token
+    // around this lookup would not remove it.
+    pid_t targetPgid = env.pgid_for_pid(targetPid);
+
+    // A group is only a legitimate target above pgid 1 and outside our own:
+    // kill(2) reads a pgid of 0 as the caller's own group and 1 as every
+    // process on the machine, and our own group would take santad down with
+    // it. Anything else, an unreadable pgid included, falls through to
+    // signaling the one matched process, which is never broader than what was
+    // asked for.
+    if (targetPgid > 1 && targetPgid != getpgrp()) {
+      if (!signaledPgids->insert(targetPgid).second) {
+        // Signaled earlier in this pass, which reached this process too.
+        return nil;
+      }
+
+      int error = env.signal_group(targetPgid, request.signal);
+      if (error == 0) {
+        LOGI(@"Signaled (%d) process group: %d (from kill command: %@)", request.signal, targetPgid,
+             request.uuid);
+      } else {
+        LOGW(@"Failed to signal (%d) process group: %d, error: %d (from kill command: %@)",
+             request.signal, targetPgid, error, request.uuid);
+      }
+
+      return [[SNTKilledProcess alloc] initWithPid:targetPid
+                                        pidversion:targetPidversion
+                                             error:LibprocSignalErrorToKilledProcessError(error)];
+    }
+  }
+
+  int error = env.signal_token(token, request.signal);
   if (error == 0) {
-    LOGI(@"Killed process: %d (from kill command: %@)", targetPid, request.uuid);
-  } else {
-    LOGW(@"Failed to kill process: %d, error: %d (from kill command: %@)", targetPid, error,
+    LOGI(@"Signaled (%d) process: %d (from kill command: %@)", request.signal, targetPid,
          request.uuid);
+  } else {
+    LOGW(@"Failed to signal (%d) process: %d, error: %d (from kill command: %@)", request.signal,
+         targetPid, error, request.uuid);
   }
 
   return [[SNTKilledProcess alloc] initWithPid:targetPid
@@ -145,7 +199,8 @@ SNTKilledProcess* KillProcess(SNTKillRequest* request, audit_token_t* token) {
                                          error:LibprocSignalErrorToKilledProcessError(error)];
 }
 
-SNTKilledProcess* KillByRunningProcess(SNTKillRequestRunningProcess* request) {
+SNTKilledProcess* KillByRunningProcess(SNTKillRequestRunningProcess* request, const KillEnv& env,
+                                       absl::flat_hash_set<pid_t>* signaledPgids) {
   if (![[SNTSystemInfo bootSessionUUID] isEqualToString:request.bootSessionUUID]) {
     LOGW(@"Request to kill running process with non-matching boot session UUID");
     return [[SNTKilledProcess alloc] initWithPid:request.pid
@@ -154,9 +209,9 @@ SNTKilledProcess* KillByRunningProcess(SNTKillRequestRunningProcess* request) {
   }
 
   audit_token_t token;
-  if (AuditTokenForPid(request.pid, &token)) {
+  if (env.token_for_pid(request.pid, &token)) {
     if (Pidversion(token) == request.pidversion) {
-      return KillProcess(request, &token);
+      return KillProcess(request, &token, env, signaledPgids);
     } else {
       LOGW(@"Rejecting request to kill pid (%d) due to pidversion mismatch (got: %d, want: %d)",
            request.pid, Pidversion(token), request.pidversion);
@@ -169,14 +224,15 @@ SNTKilledProcess* KillByRunningProcess(SNTKillRequestRunningProcess* request) {
 }
 
 SNTKilledProcess* KillByMatchers(SNTKillRequest* request, pid_t pid,
-                                 const std::vector<std::unique_ptr<ProcessMatcher>>& matchers) {
+                                 const std::vector<std::unique_ptr<ProcessMatcher>>& matchers,
+                                 const KillEnv& env, absl::flat_hash_set<pid_t>* signaledPgids) {
   // To protect against pid wrap races, we must grab the audit token before
   // and after the matcher checks to ensure the process that info was looked
   // up for matches the process we will signal.
   audit_token_t token_before;
   audit_token_t token_after;
 
-  if (!AuditTokenForPid(pid, &token_before)) {
+  if (!env.token_for_pid(pid, &token_before)) {
     // Process likely exited.
     return nil;
   }
@@ -189,9 +245,9 @@ SNTKilledProcess* KillByMatchers(SNTKillRequest* request, pid_t pid,
   }
 
   // All matchers matched. Now verify the process didn't change and kill it.
-  if (AuditTokenForPid(pid, &token_after)) {
+  if (env.token_for_pid(pid, &token_after)) {
     if (Pidversion(token_before) == Pidversion(token_after)) {
-      return KillProcess(request, &token_after);
+      return KillProcess(request, &token_after, env, signaledPgids);
     } else {
       LOGD(@"Audit token mismatch. Process exited.");
     }
@@ -229,15 +285,24 @@ bool TestStatusFlagsMatcher(pid_t pid, uint32_t mask, CSOpsFunc csops_func) {
 #endif
 
 SNTKillResponse* KillingMachine(SNTKillRequest* request) {
+  return KillingMachine(request, KillEnv());
+}
+
+SNTKillResponse* KillingMachine(SNTKillRequest* request, const KillEnv& env) {
   NSMutableArray<SNTKilledProcess*>* killedProcs = [NSMutableArray array];
 
+  // Groups already signaled by this pass, so a group with several matching
+  // members is signaled once. Empty unless the request targets groups.
+  absl::flat_hash_set<pid_t> signaledPgids;
+
   if ([request isKindOfClass:[SNTKillRequestRunningProcess class]]) {
-    SNTKilledProcess* killed = KillByRunningProcess((SNTKillRequestRunningProcess*)request);
+    SNTKilledProcess* killed =
+        KillByRunningProcess((SNTKillRequestRunningProcess*)request, env, &signaledPgids);
     if (killed) {
       [killedProcs addObject:killed];
     }
   } else {
-    std::optional<std::vector<pid_t>> pids = GetPidList();
+    std::optional<std::vector<pid_t>> pids = env.list_pids();
     if (!pids) {
       LOGE(@"Unable to get list of running processes");
       return [[SNTKillResponse alloc] initWithError:SNTKillResponseErrorListPids];
@@ -247,15 +312,16 @@ SNTKillResponse* KillingMachine(SNTKillRequest* request) {
 
     // Populate the appropriate matchers for the request
     if ([request isKindOfClass:[SNTKillRequestCDHash class]]) {
-      matchers.push_back(MakeCDHashMatcher(((SNTKillRequestCDHash*)request).cdhash));
+      matchers.push_back(
+          MakeCDHashMatcher(((SNTKillRequestCDHash*)request).cdhash, env.csops_func));
     } else if ([request isKindOfClass:[SNTKillRequestSigningID class]]) {
       SNTKillRequestSigningID* signingIDRequest = (SNTKillRequestSigningID*)request;
       if ([signingIDRequest.teamID isEqualToString:kPlatformTeamID]) {
-        matchers.push_back(MakeStatusFlagsMatcher(CS_PLATFORM_BINARY));
+        matchers.push_back(MakeStatusFlagsMatcher(CS_PLATFORM_BINARY, env.csops_func));
       } else {
-        matchers.push_back(MakeTeamIDMatcher(signingIDRequest.teamID));
+        matchers.push_back(MakeTeamIDMatcher(signingIDRequest.teamID, env.csops_func));
       }
-      matchers.push_back(MakeSigningIDMatcher(signingIDRequest.signingID));
+      matchers.push_back(MakeSigningIDMatcher(signingIDRequest.signingID, env.csops_func));
     } else if ([request isKindOfClass:[SNTKillRequestTeamID class]]) {
       // Don't allow `platform` here as killing all platform binaries is a bad
       // idea and isn't supported.
@@ -263,7 +329,7 @@ SNTKillResponse* KillingMachine(SNTKillRequest* request) {
       if ([teamIDRequest.teamID isEqualToString:kPlatformTeamID]) {
         return [[SNTKillResponse alloc] initWithError:SNTKillResponseErrorInvalidRequest];
       }
-      matchers.push_back(MakeTeamIDMatcher(((SNTKillRequestTeamID*)request).teamID));
+      matchers.push_back(MakeTeamIDMatcher(teamIDRequest.teamID, env.csops_func));
     } else {
       LOGE(@"Unexpected request type: %@", [request class]);
       return [[SNTKillResponse alloc] initWithError:SNTKillResponseErrorInvalidRequest];
@@ -274,7 +340,7 @@ SNTKillResponse* KillingMachine(SNTKillRequest* request) {
         continue;
       }
 
-      SNTKilledProcess* killed = KillByMatchers(request, pid, matchers);
+      SNTKilledProcess* killed = KillByMatchers(request, pid, matchers, env, &signaledPgids);
       if (killed) {
         [killedProcs addObject:killed];
       }
