@@ -1151,6 +1151,7 @@ objc_library(
         "//Source/common:String",
         "//Source/common:SystemResources",
         "@abseil-cpp//absl/cleanup:cleanup",
+        "@abseil-cpp//absl/container:flat_hash_set",
     ],
 )
 
@@ -1203,6 +1204,7 @@ santa_unit_test(
     ],
     deps = [
         ":KillingMachine",
+        "//Source/common:AuditUtilities",
         "//Source/common:CSOpsHelper",
         "//Source/common:CodeSigningIdentifierUtils",
         "//Source/common:SNTKillCommand",
