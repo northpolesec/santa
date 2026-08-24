@@ -39,6 +39,7 @@
 #import "Source/santad/SNTNetworkExtensionQueue.h"
 #import "Source/santad/SNTNotificationQueue.h"
 #import "Source/santad/SNTSyncdQueue.h"
+#import "Source/santad/SNTTimedRuleKills.h"
 #include "Source/santad/SandboxExpectations.h"
 #include "Source/santad/TTYWriter.h"
 
@@ -61,6 +62,7 @@ class SantadDeps {
       SNTNotificationQueue* notifier_queue, SNTSyncdQueue* syncd_queue,
       SNTNetworkExtensionQueue* netext_queue,
       SNTExecutionController* exec_controller,
+      SNTTimedRuleKills* timed_rule_kills,
       std::shared_ptr<santa::PrefixTree<santa::Unit>> prefix_tree,
       std::shared_ptr<santa::TTYWriter> tty_writer,
       std::shared_ptr<santa::santad::process_tree::ProcessTree> process_tree,
@@ -79,6 +81,7 @@ class SantadDeps {
   SNTSyncdQueue* SyncdQueue();
   SNTNetworkExtensionQueue* NetworkExtensionQueue();
   SNTExecutionController* ExecController();
+  SNTTimedRuleKills* TimedRuleKills();
   std::shared_ptr<santa::PrefixTree<santa::Unit>> PrefixTree();
   std::shared_ptr<santa::TTYWriter> TTYWriter();
   std::shared_ptr<santa::santad::process_tree::ProcessTree> ProcessTree();
@@ -98,6 +101,9 @@ class SantadDeps {
   SNTSyncdQueue* syncd_queue_;
   SNTNetworkExtensionQueue* netext_queue_;
   SNTExecutionController* exec_controller_;
+  // Held here so the component outlives Create(); the exec path takes it from
+  // the accessor once there is something recording entries.
+  SNTTimedRuleKills* timed_rule_kills_;
   std::shared_ptr<santa::PrefixTree<santa::Unit>> prefix_tree_;
   std::shared_ptr<santa::TTYWriter> tty_writer_;
   std::shared_ptr<santa::santad::process_tree::ProcessTree> process_tree_;
