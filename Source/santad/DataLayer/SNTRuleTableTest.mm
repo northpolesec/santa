@@ -114,6 +114,15 @@
   return r;
 }
 
+- (SNTRule*)_exampleSigningIDCompilerRule {
+  SNTRule* r = [[SNTRule alloc] init];
+  r.identifier = @"ABCDEFGHIJ:signingID";
+  r.state = SNTRuleStateAllowCompiler;
+  r.type = SNTRuleTypeSigningID;
+  r.customMsg = @"A signingID compiler rule";
+  return r;
+}
+
 - (SNTRule*)_exampleCertRule {
   SNTRule* r = [[SNTRule alloc] init];
   r.identifier = @"7ae80b9ab38af0c63a9a81765f434d9a7cd8f720eb6037ef303de39d779bc258";
@@ -589,6 +598,284 @@
   XCTAssertNotNil(r);
   XCTAssertEqualObjects(r.identifier, @"ABCDEFGHIJ");
   XCTAssertEqual(r.type, SNTRuleTypeTeamID, @"Implicit rule ordering failed (TeamID)");
+}
+
+// A transitive rule is not a statement of policy -- SNTCompilerController writes one for
+// whatever a compiler produced -- so it must lose to every configured rule type, including the
+// Binary slot it nominally occupies.
+//
+// The writer cannot be relied on to prevent the overlap: its existing-rule guard looks up only
+// .binarySHA256, so a Signing ID / Certificate / Team ID rule covering the same executable is
+// invisible to it and the transitive rule is written regardless.
+- (void)testFetchRuleOrderingTransitiveLosesToEveryConfiguredType {
+  NSArray<NSError*>* err;
+  [self.sut addExecutionRules:@[
+    [self _exampleTransitiveRule],
+    [self _exampleCDHashRule],
+    [self _exampleSigningIDRuleIsPlatform:NO],
+    [self _exampleCertRule],
+    [self _exampleTeamIDRule],
+  ]
+                  ruleCleanup:SNTRuleCleanupNone
+                       errors:&err];
+  XCTAssertNil(err);
+
+  // Only sqlite's behavior is under test here. Ensure static rules are ignored.
+  [self.sut updateStaticRules:nil];
+
+  NSString* transitiveID = [self _exampleTransitiveRule].identifier;
+
+  // Each case pairs the transitive Binary rule with exactly one configured rule. The configured
+  // rule must win every time, even Team ID -- the lowest-priority type there is.
+  NSArray<NSDictionary*>* cases = @[
+    @{
+      @"name" : @"CDHash",
+      @"ids" : [[SNTRuleIdentifiers alloc]
+          initWithRuleIdentifiers:(struct RuleIdentifiers){
+                                      .cdhash = @"dbe8c39801f93e05fc7bc53a02af5b4d3cfc670a",
+                                      .binarySHA256 = transitiveID,
+                                  }],
+      @"wantType" : @(SNTRuleTypeCDHash),
+      @"wantID" : @"dbe8c39801f93e05fc7bc53a02af5b4d3cfc670a",
+    },
+    @{
+      @"name" : @"SigningID",
+      @"ids" : [[SNTRuleIdentifiers alloc]
+          initWithRuleIdentifiers:(struct RuleIdentifiers){
+                                      .binarySHA256 = transitiveID,
+                                      .signingID = @"ABCDEFGHIJ:signingID",
+                                  }],
+      @"wantType" : @(SNTRuleTypeSigningID),
+      @"wantID" : @"ABCDEFGHIJ:signingID",
+    },
+    @{
+      @"name" : @"Certificate",
+      @"ids" : [[SNTRuleIdentifiers alloc]
+          initWithRuleIdentifiers:
+              (struct RuleIdentifiers){
+                  .binarySHA256 = transitiveID,
+                  .certificateSHA256 =
+                      @"7ae80b9ab38af0c63a9a81765f434d9a7cd8f720eb6037ef303de39d779bc258",
+              }],
+      @"wantType" : @(SNTRuleTypeCertificate),
+      @"wantID" : @"7ae80b9ab38af0c63a9a81765f434d9a7cd8f720eb6037ef303de39d779bc258",
+    },
+    @{
+      @"name" : @"TeamID",
+      @"ids" : [[SNTRuleIdentifiers alloc] initWithRuleIdentifiers:(struct RuleIdentifiers){
+                                                                       .binarySHA256 = transitiveID,
+                                                                       .teamID = @"ABCDEFGHIJ",
+                                                                   }],
+      @"wantType" : @(SNTRuleTypeTeamID),
+      @"wantID" : @"ABCDEFGHIJ",
+    },
+  ];
+
+  for (NSDictionary* testCase in cases) {
+    SNTRule* r =
+        [self.sut executionRuleForIdentifiers:[(SNTRuleIdentifiers*)testCase[@"ids"] toStruct]];
+    XCTAssertNotNil(r, @"%@: no rule returned", testCase[@"name"]);
+    XCTAssertEqual(r.type, (SNTRuleType)[testCase[@"wantType"] integerValue],
+                   @"%@ rule must outrank a transitive Binary rule", testCase[@"name"]);
+    XCTAssertEqualObjects(r.identifier, testCase[@"wantID"], @"%@: wrong rule returned",
+                          testCase[@"name"]);
+    XCTAssertNotEqual(r.state, SNTRuleStateAllowTransitive, @"%@: transitive rule was not demoted",
+                      testCase[@"name"]);
+  }
+
+  // Demotion must not mean "unreachable". With nothing else matching, the transitive rule is
+  // still the answer -- that is the whole point of transitive allowlisting.
+  SNTRule* r = [self.sut executionRuleForIdentifiers:(struct RuleIdentifiers){
+                                                         .cdhash = @"unknown",
+                                                         .binarySHA256 = transitiveID,
+                                                         .signingID = @"unknown",
+                                                         .certificateSHA256 = @"unknown",
+                                                         .teamID = @"unknown",
+                                                     }];
+  XCTAssertNotNil(r);
+  XCTAssertEqualObjects(r.identifier, transitiveID);
+  XCTAssertEqual(r.type, SNTRuleTypeBinary);
+  XCTAssertEqual(r.state, SNTRuleStateAllowTransitive,
+                 @"a transitive rule must still match when nothing else does");
+}
+
+// The GOTOOLCHAIN=auto case from https://github.com/northpolesec/santa/issues/1123. A compiler
+// unpacked by another compiler gets a transitive Binary rule written for it. If that rule
+// outranks the Signing ID ALLOWLIST_COMPILER rule covering the same executable, the new compiler
+// silently stops being treated as a compiler and everything it builds is blocked.
+- (void)testFetchRuleOrderingTransitiveDoesNotShadowCompilerRule {
+  NSArray<NSError*>* err;
+  [self.sut addExecutionRules:@[
+    [self _exampleSigningIDCompilerRule],
+    [self _exampleTransitiveRule],
+  ]
+                  ruleCleanup:SNTRuleCleanupNone
+                       errors:&err];
+  XCTAssertNil(err);
+  [self.sut updateStaticRules:nil];
+
+  SNTRule* r = [self.sut
+      executionRuleForIdentifiers:(struct RuleIdentifiers){
+                                      .binarySHA256 = [self _exampleTransitiveRule].identifier,
+                                      .signingID = @"ABCDEFGHIJ:signingID",
+                                  }];
+  XCTAssertNotNil(r);
+  XCTAssertEqual(r.type, SNTRuleTypeSigningID);
+  XCTAssertEqualObjects(r.identifier, @"ABCDEFGHIJ:signingID");
+  XCTAssertEqual(r.state, SNTRuleStateAllowCompiler,
+                 @"a transitive rule must not downgrade a compiler rule to a transitive allow");
+}
+
+// The configured rule must win regardless of its state, not just when it is a compiler rule.
+// Covers Signing ID, Certificate and Team ID, whose state is asserted to survive the lookup
+// unchanged -- none of these types could win under the pre-fix Binary-typed ordering.
+- (void)testFetchRuleOrderingConfiguredRuleStateIsPreserved {
+  NSArray<NSError*>* err;
+  // _exampleCertRule shares its state with the other fixtures, so a distinctly-stated
+  // Certificate rule is built here rather than reused -- without it a regression that demoted
+  // transitive below SigningID/TeamID but not below Certificate would slip through.
+  SNTRule* certRule = [[SNTRule alloc] init];
+  certRule.identifier = @"7ae80b9ab38af0c63a9a81765f434d9a7cd8f720eb6037ef303de39d779bc258";
+  certRule.state = SNTRuleStateBlock;
+  certRule.type = SNTRuleTypeCertificate;
+
+  [self.sut addExecutionRules:@[
+    [self _exampleTransitiveRule],
+    [self _exampleSigningIDRuleIsPlatform:NO],
+    certRule,
+    [self _exampleTeamIDRule],
+  ]
+                  ruleCleanup:SNTRuleCleanupNone
+                       errors:&err];
+  XCTAssertNil(err);
+  [self.sut updateStaticRules:nil];
+
+  NSString* transitiveID = [self _exampleTransitiveRule].identifier;
+
+  NSArray<NSDictionary*>* cases = @[
+    @{
+      @"name" : @"SigningID",
+      @"ids" : [[SNTRuleIdentifiers alloc]
+          initWithRuleIdentifiers:(struct RuleIdentifiers){
+                                      .binarySHA256 = transitiveID,
+                                      .signingID = @"ABCDEFGHIJ:signingID",
+                                  }],
+      @"wantType" : @(SNTRuleTypeSigningID),
+    },
+    @{
+      @"name" : @"Certificate",
+      @"ids" : [[SNTRuleIdentifiers alloc]
+          initWithRuleIdentifiers:
+              (struct RuleIdentifiers){
+                  .binarySHA256 = transitiveID,
+                  .certificateSHA256 =
+                      @"7ae80b9ab38af0c63a9a81765f434d9a7cd8f720eb6037ef303de39d779bc258",
+              }],
+      @"wantType" : @(SNTRuleTypeCertificate),
+    },
+    @{
+      @"name" : @"TeamID",
+      @"ids" : [[SNTRuleIdentifiers alloc] initWithRuleIdentifiers:(struct RuleIdentifiers){
+                                                                       .binarySHA256 = transitiveID,
+                                                                       .teamID = @"ABCDEFGHIJ",
+                                                                   }],
+      @"wantType" : @(SNTRuleTypeTeamID),
+    },
+  ];
+
+  for (NSDictionary* testCase in cases) {
+    SNTRule* r =
+        [self.sut executionRuleForIdentifiers:[(SNTRuleIdentifiers*)testCase[@"ids"] toStruct]];
+    XCTAssertNotNil(r, @"%@: no rule returned", testCase[@"name"]);
+    XCTAssertEqual(r.state, SNTRuleStateBlock, @"%@ rule state must survive the lookup",
+                   testCase[@"name"]);
+    XCTAssertEqual(r.type, (SNTRuleType)[testCase[@"wantType"] integerValue],
+                   @"%@: wrong rule type returned", testCase[@"name"]);
+  }
+}
+
+// Guard against over-correcting the above by demoting the whole Binary slot. Only the transitive
+// state is demoted; an ordinary Binary rule keeps outranking Signing ID / Certificate / Team ID.
+- (void)testFetchRuleOrderingNonTransitiveBinaryStillOutranksSigningID {
+  NSArray<NSError*>* err;
+  [self.sut addExecutionRules:@[
+    [self _exampleBinaryRule],
+    [self _exampleSigningIDRuleIsPlatform:NO],
+    [self _exampleCertRule],
+    [self _exampleTeamIDRule],
+  ]
+                  ruleCleanup:SNTRuleCleanupNone
+                       errors:&err];
+  XCTAssertNil(err);
+  [self.sut updateStaticRules:nil];
+
+  SNTRule* r = [self.sut
+      executionRuleForIdentifiers:
+          (struct RuleIdentifiers){
+              .binarySHA256 = @"b7c1e3fd640c5f211c89b02c2c6122f78ce322aa5c56eb0bb54bc422a8f8b670",
+              .signingID = @"ABCDEFGHIJ:signingID",
+              .certificateSHA256 =
+                  @"7ae80b9ab38af0c63a9a81765f434d9a7cd8f720eb6037ef303de39d779bc258",
+              .teamID = @"ABCDEFGHIJ",
+          }];
+  XCTAssertNotNil(r);
+  XCTAssertEqual(r.type, SNTRuleTypeBinary,
+                 @"only the transitive state is demoted, not the Binary type");
+  XCTAssertEqualObjects(r.identifier,
+                        @"b7c1e3fd640c5f211c89b02c2c6122f78ce322aa5c56eb0bb54bc422a8f8b670");
+}
+
+// executionRuleForIdentifiers: sorts on a literal aliased `prio` inside a subquery whose inner
+// selects use `*`. If execution_rules ever gains its own `prio` column, that column lands in the
+// subquery output alongside the alias and `ORDER BY prio` has two candidates -- SQLite takes the
+// first, so the alias is selected before the `*` to stay ahead of it. This test fails if such a
+// column is ever added, so the ambiguity has to be dealt with deliberately rather than silently
+// re-sorting rule precedence by unrelated row data.
+- (void)testExecutionRulesHasNoColumnNamedPrio {
+  __block NSMutableArray<NSString*>* columns = [NSMutableArray array];
+  [self.sut inDatabase:^(FMDatabase* db) {
+    FMResultSet* rs = [db executeQuery:@"PRAGMA table_info(execution_rules)"];
+    while ([rs next]) {
+      [columns addObject:[rs stringForColumn:@"name"]];
+    }
+    [rs close];
+  }];
+
+  XCTAssertGreaterThan(columns.count, 0, @"could not read execution_rules schema");
+  XCTAssertFalse([columns containsObject:@"prio"],
+                 @"execution_rules gained a column named 'prio', which collides with the sort "
+                 @"alias in executionRuleForIdentifiers:. Rename one of them.");
+}
+
+// The transitive demotion is scoped to type=1000 because SNTCompilerController is the only writer
+// of transitive rules and always writes type Binary. This asserts the half of that invariant the
+// rule table can see: a transitive rule at another type would NOT be demoted, so if a new writer
+// ever introduces one, this test documents what breaks.
+- (void)testTransitiveDemotionIsScopedToBinaryType {
+  NSArray<NSError*>* err;
+  SNTRule* transitiveSigningID = [[SNTRule alloc] init];
+  transitiveSigningID.identifier = @"ABCDEFGHIJ:signingID";
+  transitiveSigningID.state = SNTRuleStateAllowTransitive;
+  transitiveSigningID.type = SNTRuleTypeSigningID;
+
+  [self.sut addExecutionRules:@[ transitiveSigningID, [self _exampleTeamIDRule] ]
+                  ruleCleanup:SNTRuleCleanupNone
+                       errors:&err];
+  XCTAssertNil(err);
+  [self.sut updateStaticRules:nil];
+
+  SNTRule* r = [self.sut executionRuleForIdentifiers:(struct RuleIdentifiers){
+                                                         .signingID = @"ABCDEFGHIJ:signingID",
+                                                         .teamID = @"ABCDEFGHIJ",
+                                                     }];
+  XCTAssertNotNil(r);
+  // Characterization, not an endorsement: a transitive rule stored at a non-Binary type keeps
+  // that type's precedence. Reaching this state requires a new writer of transitive rules, since
+  // no policy string parses to SNTRuleStateAllowTransitive. If that ever happens, extend the
+  // state split in executionRuleForIdentifiers: to the affected type.
+  XCTAssertEqual(r.type, SNTRuleTypeSigningID);
+  XCTAssertEqual(r.state, SNTRuleStateAllowTransitive,
+                 @"demotion is type-scoped; a non-Binary transitive rule is not demoted");
 }
 
 - (void)testBadDatabase {

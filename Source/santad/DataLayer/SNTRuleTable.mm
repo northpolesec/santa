@@ -579,34 +579,40 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
 
   // Now query the database.
   //
-  // The intended order of precedence is CDHash > Binaries > Signing IDs > Certificates > Team IDs.
-  // The UNION ALL structure lets SQLite evaluate each sub-select independently (potentially
-  // short-circuiting via LIMIT 1), while ORDER BY type ASC guarantees the highest-priority
-  // rule is returned regardless of query planner behavior.
+  // The intended order of precedence is
+  // CDHash > Binaries > Signing IDs > Certificates > Team IDs > transitive Binaries.
   //
-  // There is a test for this in SNTRuleTableTests in case SQLite behavior changes in the future.
+  // Transitive rules sort last because they are not a statement of policy: they are written
+  // locally by SNTCompilerController for whatever a compiler happened to produce, which makes
+  // them an allowance of last resort that must not shadow a rule an admin actually configured.
   //
+  // The UNION ALL structure lets SQLite evaluate each sub-select independently, while
+  // ORDER BY prio ASC guarantees the highest-priority rule is returned regardless of query
+  // planner behavior. `prio` is a constant per sub-select rather than an expression over `state`
+  // so that the compound query stays naturally ordered: SQLite then plans this as a streaming
+  // MERGE over indexed lookups. An equivalent `ORDER BY CASE WHEN state=... END` is opaque to the
+  // planner and costs a temp B-tree sort on every lookup.
+  //
+  // clang-format off
   [self inDatabase:^(FMDatabase* db) {
-    FMResultSet* rs =
-        [db executeQuery:@"SELECT * FROM ("
-                         @"  SELECT * FROM execution_rules WHERE identifier=? AND type=500 "
-                         @"  UNION ALL "
-                         @"  SELECT * FROM execution_rules WHERE identifier=? AND type=1000 "
-                         @"  UNION ALL "
-                         @"  SELECT * FROM execution_rules WHERE identifier=? AND type=2000 "
-                         @"  UNION ALL "
-                         @"  SELECT * FROM execution_rules WHERE identifier=? AND type=3000 "
-                         @"  UNION ALL "
-                         @"  SELECT * FROM execution_rules WHERE identifier=? AND type=4000"
-                         @") ORDER BY type ASC LIMIT 1",
-                         identifiers.cdhash, identifiers.binarySHA256, identifiers.signingID,
-                         identifiers.certificateSHA256, identifiers.teamID];
+    FMResultSet* rs = [db executeQuery:@"SELECT * FROM ("
+                                      @"            SELECT 1 AS prio, * FROM execution_rules WHERE identifier=? AND type=500  "
+                                      @"  UNION ALL SELECT 2 AS prio, * FROM execution_rules WHERE identifier=? AND type=1000 AND state<>? "
+                                      @"  UNION ALL SELECT 3 AS prio, * FROM execution_rules WHERE identifier=? AND type=2000 "
+                                      @"  UNION ALL SELECT 4 AS prio, * FROM execution_rules WHERE identifier=? AND type=3000 "
+                                      @"  UNION ALL SELECT 5 AS prio, * FROM execution_rules WHERE identifier=? AND type=4000 "
+                                      @"  UNION ALL SELECT 6 AS prio, * FROM execution_rules WHERE identifier=? AND type=1000 AND state=?"
+                                      @") ORDER BY prio ASC LIMIT 1",
+                                      identifiers.cdhash, identifiers.binarySHA256,
+                                      @(SNTRuleStateAllowTransitive), identifiers.signingID,
+                                      identifiers.certificateSHA256, identifiers.teamID,
+                                      identifiers.binarySHA256, @(SNTRuleStateAllowTransitive)];
     if ([rs next]) {
       rule = [self executionRuleFromResultSet:rs];
     }
     [rs close];
   }];
-
+  // clang-format on
   return rule;
 }
 
@@ -966,9 +972,9 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
   [self inTransaction:^(FMDatabase* db, BOOL* rollback) {
     for (SNTRule* rule in rules) {
       if (rule.state != SNTRuleStateAllow) {
-        // If the rule is a CEL rule, block rule, silent block rule, or a compiler rule check if it
-        // already exists in the database. If it is a CEL rule also check the expression is the
-        // same.
+        // If the rule is a CEL rule, block rule, silent block rule, or a compiler rule check if
+        // it already exists in the database. If it is a CEL rule also check the expression is
+        // the same.
         //
         // If it does not then flush the cache. To ensure that the new rule is honored.
         if ([db longForQuery:
@@ -985,11 +991,11 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
         // Skip certificate and TeamID rules as they cannot be compiler rules.
         if (rule.type == SNTRuleTypeCertificate || rule.type == SNTRuleTypeTeamID) continue;
 
-        if ([db longForQuery:
-                    @"SELECT COUNT(*) FROM execution_rules WHERE identifier=? AND type IN (?, ?, ?)"
-                    @" AND state=? LIMIT 1",
-                    rule.identifier, @(SNTRuleTypeCDHash), @(SNTRuleTypeBinary),
-                    @(SNTRuleTypeSigningID), @(SNTRuleStateAllowCompiler)] > 0) {
+        if ([db longForQuery:@"SELECT COUNT(*) FROM execution_rules WHERE identifier=? AND type "
+                             @"IN (?, ?, ?)"
+                             @" AND state=? LIMIT 1",
+                             rule.identifier, @(SNTRuleTypeCDHash), @(SNTRuleTypeBinary),
+                             @(SNTRuleTypeSigningID), @(SNTRuleStateAllowCompiler)] > 0) {
           flushDecisionCache = YES;
           return;
         }
@@ -1084,8 +1090,8 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
   }
 
   // Column order: 0=name, 1=rule_id, 2=rule_blob. Both `name` (field 1) and `rule_id` (field 2)
-  // of the NetworkFlowRule.Add proto are already part of rule_blob, so the hash need only fold in
-  // the blob bytes; ordering by name ASC makes it deterministic.
+  // of the NetworkFlowRule.Add proto are already part of rule_blob, so the hash need only fold
+  // in the blob bytes; ordering by name ASC makes it deterministic.
   santa::Xxhash128 h;
   FMResultSet* rs = [db executeQuery:@"SELECT name, rule_id, rule_blob FROM network_flow_rules "
                                      @"ORDER BY name ASC"];
@@ -1255,7 +1261,8 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
 
 - (NSString*)networkFlowRulesHashSerialized:(FMDatabase*)db {
   // Shares the single scan/filter used to materialize the ruleset, so this hash and the
-  // snapshot's hash can never drift apart. See -networkFlowRulesHashSerializedInDB:collectInto:.
+  // snapshot's hash can never drift apart. See
+  // -networkFlowRulesHashSerializedInDB:collectInto:.
   return [self networkFlowRulesHashSerializedInDB:db collectInto:nil];
 }
 

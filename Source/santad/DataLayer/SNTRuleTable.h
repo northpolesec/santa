@@ -106,8 +106,9 @@
 
 ///
 ///  @return Rule for given identifiers.
-///          Currently: binary, signingID, certificate or teamID (in that order).
-///          The first matching rule found is returned.
+///          Precedence: CDHash, binary, signingID, certificate, teamID, with
+///          transitive binary rules ranked after all of them.
+///          The highest-precedence matching rule is returned.
 ///
 - (SNTRule*)executionRuleForIdentifiers:(struct RuleIdentifiers)identifiers;
 
