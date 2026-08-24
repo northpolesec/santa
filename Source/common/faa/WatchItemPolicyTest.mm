@@ -38,47 +38,60 @@ using santa::WatchItemRuleType;
 @implementation WatchItemPolicyTest
 
 - (void)testProcessWatchItemPolicy {
-  // Make sure the hash function for a WatchItemProcess covers all members
-  WatchItemProcess proc("proc_path_1", "com.example.proc", "PROCTEAMID", {}, "", false);
+  // Make sure the equality operator for a WatchItemProcess covers all members.
+  // Note: WatchItemProcess isn't assignable (it has a const member), so each
+  // case starts from a fresh copy.
+  auto makeProc = [] {
+    return WatchItemProcess("proc_path_1", "com.example.proc", "PROCTEAMID", {}, "", false);
+  };
+  WatchItemProcess orig = makeProc();
+
+  XCTAssertEqual(makeProc(), orig);
+
+  {
+    WatchItemProcess proc = makeProc();
+    proc.UnsafeUpdateSigningId("abc");
+    XCTAssertNotEqual(proc, orig);
+  }
+  {
+    WatchItemProcess proc = makeProc();
+    proc.binary_path = "abc";
+    XCTAssertNotEqual(proc, orig);
+  }
+  {
+    WatchItemProcess proc = makeProc();
+    proc.team_id = "abc";
+    XCTAssertNotEqual(proc, orig);
+  }
+  {
+    WatchItemProcess proc = makeProc();
+    proc.platform_binary = true;
+    XCTAssertNotEqual(proc, orig);
+  }
+  {
+    WatchItemProcess proc = makeProc();
+    proc.certificate_sha256 = "abc";
+    XCTAssertNotEqual(proc, orig);
+  }
+  {
+    WatchItemProcess proc = makeProc();
+    proc.cdhash = {1};
+    XCTAssertNotEqual(proc, orig);
+  }
+}
+
+- (void)testProcessWatchItemPolicyProcessOrder {
+  // The processes list is ordered - matching is first-match-wins.
+  WatchItemProcess first("first", "", "", {}, "", false);
+  WatchItemProcess second("second", "", "", {}, "", false);
 
   ProcessWatchItemPolicy pwip(
       "name", "ver", SetPairPathAndType{PairPathAndType{"path1", WatchItemPathType::kLiteral}},
-      true, true, santa::WatchItemRuleType::kProcessesWithAllowedPaths, false, false, "", nil, nil,
-      {proc});
+      true, santa::WatchItemRuleType::kProcessesWithAllowedPaths, {}, {first, second});
 
-  pwip.processes.insert(proc);
-  pwip.processes.insert(proc);
-  XCTAssertEqual(pwip.processes.size(), 1);
-
-  proc.UnsafeUpdateSigningId("abc");
-  pwip.processes.insert(proc);
-  pwip.processes.insert(proc);
   XCTAssertEqual(pwip.processes.size(), 2);
-
-  proc.binary_path = "abc";
-  pwip.processes.insert(proc);
-  pwip.processes.insert(proc);
-  XCTAssertEqual(pwip.processes.size(), 3);
-
-  proc.team_id = "abc";
-  pwip.processes.insert(proc);
-  pwip.processes.insert(proc);
-  XCTAssertEqual(pwip.processes.size(), 4);
-
-  proc.platform_binary = true;
-  pwip.processes.insert(proc);
-  pwip.processes.insert(proc);
-  XCTAssertEqual(pwip.processes.size(), 5);
-
-  proc.certificate_sha256 = "abc";
-  pwip.processes.insert(proc);
-  pwip.processes.insert(proc);
-  XCTAssertEqual(pwip.processes.size(), 6);
-
-  proc.cdhash = {1};
-  pwip.processes.insert(proc);
-  pwip.processes.insert(proc);
-  XCTAssertEqual(pwip.processes.size(), 7);
+  XCTAssertEqual(pwip.processes[0], first);
+  XCTAssertEqual(pwip.processes[1], second);
 }
 
 - (void)testWatchItemProcessCreate {
@@ -172,15 +185,15 @@ using santa::WatchItemRuleType;
 
   auto sharedDataPolicy1 =
       std::make_shared<DataWatchItemPolicy>("name", "v1", "/foo", WatchItemPathType::kLiteral, true,
-                                            true, WatchItemRuleType::kPathsWithAllowedProcesses);
+                                            WatchItemRuleType::kPathsWithAllowedProcesses);
 
   auto sharedDataPolicy2 =
       std::make_shared<DataWatchItemPolicy>("name", "v1", "/foo", WatchItemPathType::kLiteral, true,
-                                            true, WatchItemRuleType::kPathsWithAllowedProcesses);
+                                            WatchItemRuleType::kPathsWithAllowedProcesses);
 
   auto sharedDataPolicy3 =
       std::make_shared<DataWatchItemPolicy>("name", "v1", "/bar", WatchItemPathType::kLiteral, true,
-                                            true, WatchItemRuleType::kPathsWithAllowedProcesses);
+                                            WatchItemRuleType::kPathsWithAllowedProcesses);
 
   // Underlying pointers should be different
   XCTAssertNotEqual(sharedDataPolicy1, sharedDataPolicy2);
@@ -212,15 +225,15 @@ using santa::WatchItemRuleType;
   SetSharedProcessWatchItemPolicy procSet;
 
   auto sharedProcPolicy1 = std::make_shared<ProcessWatchItemPolicy>(
-      "name", "v1", SetPairPathAndType{{"/foo", WatchItemPathType::kLiteral}}, true, true,
+      "name", "v1", SetPairPathAndType{{"/foo", WatchItemPathType::kLiteral}}, true,
       WatchItemRuleType::kProcessesWithDeniedPaths);
 
   auto sharedProcPolicy2 = std::make_shared<ProcessWatchItemPolicy>(
-      "name", "v1", SetPairPathAndType{{"/foo", WatchItemPathType::kLiteral}}, true, true,
+      "name", "v1", SetPairPathAndType{{"/foo", WatchItemPathType::kLiteral}}, true,
       WatchItemRuleType::kProcessesWithDeniedPaths);
 
   auto sharedProcPolicy3 = std::make_shared<ProcessWatchItemPolicy>(
-      "name", "v1", SetPairPathAndType{{"/bar", WatchItemPathType::kLiteral}}, true, true,
+      "name", "v1", SetPairPathAndType{{"/bar", WatchItemPathType::kLiteral}}, true,
       WatchItemRuleType::kProcessesWithDeniedPaths);
 
   // Underlying pointers should be different

@@ -116,8 +116,8 @@ void SetExpectationsForProcessFileAccessAuthorizerInit(
   WatchItemProcess proc("proc_path_1", "com.example.proc", "PROCTEAMID", {}, "", false);
   auto pwip = std::make_shared<ProcessWatchItemPolicy>(
       "name", "ver", SetPairPathAndType{PairPathAndType{"path1", WatchItemPathType::kLiteral}},
-      true, true, santa::WatchItemRuleType::kProcessesWithAllowedPaths, false, false, "", nil, nil,
-      santa::SetWatchItemProcess{proc});
+      true, santa::WatchItemRuleType::kProcessesWithAllowedPaths, santa::WatchItemProcessOptions{},
+      santa::WatchItemProcessList{proc});
 
   // Test iter block will call the given CheckPolicyBlock and capture the return
   __block bool checkPolicyBlockResult;

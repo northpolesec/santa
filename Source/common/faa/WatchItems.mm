@@ -338,6 +338,50 @@ std::variant<Unit, SetPairPathAndType> VerifyConfigWatchItemPaths(NSArray<id>* p
   return path_list;
 }
 
+/// Verify and parse a rule's `Options` dictionary into the options struct.
+///
+/// Note: This is the only place the empty-string conventions are applied. An
+/// empty BlockMessage or EventDetailText means "unset", while an empty
+/// EventDetailURL is meaningful - it overrides the global value in order to
+/// hide the button.
+std::optional<WatchItemProcessOptions> VerifyConfigOptions(NSDictionary* dict, NSError** err) {
+  if (!VerifyConfigKey(dict, kWatchItemConfigKeyOptionsAllowReadAccess, [NSNumber class], err) ||
+      !VerifyConfigKey(dict, kWatchItemConfigKeyOptionsEnableSilentMode, [NSNumber class], err) ||
+      !VerifyConfigKey(dict, kWatchItemConfigKeyOptionsEnableSilentTTYMode, [NSNumber class],
+                       err) ||
+      !VerifyConfigKey(dict, kWatchItemConfigKeyOptionsCustomMessage, [NSString class], err, false,
+                       LenRangeValidator(0, kWatchItemConfigOptionCustomMessageMaxLength)) ||
+      !VerifyConfigKey(dict, kWatchItemConfigKeyOptionsEventDetailURL, [NSString class], err, false,
+                       LenRangeValidator(0, kWatchItemConfigEventDetailURLMaxLength)) ||
+      !VerifyConfigKey(dict, kWatchItemConfigKeyOptionsEventDetailText, [NSString class], err,
+                       false, LenRangeValidator(0, kWatchItemConfigEventDetailTextMaxLength))) {
+    return std::nullopt;
+  }
+
+  WatchItemProcessOptions opts;
+
+  opts.allow_read_access = GetBoolValue(dict, kWatchItemConfigKeyOptionsAllowReadAccess,
+                                        kWatchItemPolicyDefaultAllowReadAccess);
+  opts.silent = GetBoolValue(dict, kWatchItemConfigKeyOptionsEnableSilentMode,
+                             kWatchItemPolicyDefaultEnableSilentMode);
+  opts.silent_tty = GetBoolValue(dict, kWatchItemConfigKeyOptionsEnableSilentTTYMode,
+                                 kWatchItemPolicyDefaultEnableSilentTTYMode);
+
+  if (NSString* msg = dict[kWatchItemConfigKeyOptionsCustomMessage]) {
+    opts.custom_message = msg.length ? std::make_optional(NSStringToUTF8String(msg)) : std::nullopt;
+  }
+
+  if (NSString* url = dict[kWatchItemConfigKeyOptionsEventDetailURL]) {
+    opts.event_detail_url = url;
+  }
+
+  if (NSString* text = dict[kWatchItemConfigKeyOptionsEventDetailText]) {
+    opts.event_detail_text = text.length ? std::make_optional<NSString*>(text) : std::nullopt;
+  }
+
+  return opts;
+}
+
 /// The `Processes` array can only contain dictionaries. Each dictionary can
 /// contain the attributes that describe a single process.
 ///
@@ -359,9 +403,9 @@ std::variant<Unit, SetPairPathAndType> VerifyConfigWatchItemPaths(NSArray<id>* p
 ///     <string>EEEE</string>
 ///   </dict>
 /// </array>
-std::variant<Unit, SetWatchItemProcess> VerifyConfigWatchItemProcesses(NSDictionary* watch_item,
-                                                                       NSError** err) {
-  __block SetWatchItemProcess proc_list;
+std::variant<Unit, WatchItemProcessList> VerifyConfigWatchItemProcesses(NSDictionary* watch_item,
+                                                                        NSError** err) {
+  __block WatchItemProcessList proc_list;
 
   if (!VerifyConfigKeyArray(
           watch_item, kWatchItemConfigKeyProcesses, [NSDictionary class], err,
@@ -401,7 +445,7 @@ std::variant<Unit, SetWatchItemProcess> VerifyConfigWatchItemProcesses(NSDiction
                 [process[kWatchItemConfigKeyProcessesPlatformBinary] boolValue], err);
 
             if (watch_item_proc.has_value()) {
-              proc_list.insert(std::move(*watch_item_proc));
+              proc_list.push_back(std::move(*watch_item_proc));
               return true;
             } else {
               return false;
@@ -468,12 +512,10 @@ bool ParseConfigSingleWatchItem(NSString* name, std::string_view fallback_policy
 
   NSDictionary* options = watch_item[kWatchItemConfigKeyOptions];
   if (options) {
+    // Note: The keys VerifyConfigOptions handles are verified by it below.
     NSArray<NSString*>* boolOptions = @[
-      kWatchItemConfigKeyOptionsAllowReadAccess,
       kWatchItemConfigKeyOptionsAuditOnly,
       kWatchItemConfigKeyOptionsInvertProcessExceptions,
-      kWatchItemConfigKeyOptionsEnableSilentMode,
-      kWatchItemConfigKeyOptionsEnableSilentTTYMode,
     ];
 
     for (NSString* key in boolOptions) {
@@ -487,26 +529,15 @@ bool ParseConfigSingleWatchItem(NSString* name, std::string_view fallback_policy
       return false;
     }
 
-    if (!VerifyConfigKey(options, kWatchItemConfigKeyOptionsCustomMessage, [NSString class], err,
-                         false,
-                         LenRangeValidator(0, kWatchItemConfigOptionCustomMessageMaxLength))) {
-      return false;
-    }
-
-    if (!VerifyConfigKey(options, kWatchItemConfigKeyOptionsEventDetailURL, [NSString class], err,
-                         false, LenRangeValidator(0, kWatchItemConfigEventDetailURLMaxLength))) {
-      return false;
-    }
-
-    if (!VerifyConfigKey(options, kWatchItemConfigKeyOptionsEventDetailText, [NSString class], err,
-                         false, LenRangeValidator(0, kWatchItemConfigEventDetailTextMaxLength))) {
-      return false;
-    }
-
     if (!VerifyConfigKey(options, kWatchItemConfigKeyOptionsRuleId, [NSNumber class], err, false,
                          NonNegativeValidator())) {
       return false;
     }
+  }
+
+  std::optional<WatchItemProcessOptions> rule_options = VerifyConfigOptions(options, err);
+  if (!rule_options.has_value()) {
+    return false;
   }
 
   std::string policy_version;
@@ -524,16 +555,10 @@ bool ParseConfigSingleWatchItem(NSString* name, std::string_view fallback_policy
     return false;
   }
 
-  bool allow_read_access = GetBoolValue(options, kWatchItemConfigKeyOptionsAllowReadAccess,
-                                        kWatchItemPolicyDefaultAllowReadAccess);
   bool audit_only =
       GetBoolValue(options, kWatchItemConfigKeyOptionsAuditOnly, kWatchItemPolicyDefaultAuditOnly);
-  bool enable_silent_mode = GetBoolValue(options, kWatchItemConfigKeyOptionsEnableSilentMode,
-                                         kWatchItemPolicyDefaultEnableSilentMode);
-  bool enable_silent_tty_mode = GetBoolValue(options, kWatchItemConfigKeyOptionsEnableSilentTTYMode,
-                                             kWatchItemPolicyDefaultEnableSilentTTYMode);
 
-  std::variant<Unit, SetWatchItemProcess> proc_list =
+  std::variant<Unit, WatchItemProcessList> proc_list =
       VerifyConfigWatchItemProcesses(watch_item, err);
   if (std::holds_alternative<Unit>(proc_list)) {
     return false;
@@ -565,12 +590,8 @@ bool ParseConfigSingleWatchItem(NSString* name, std::string_view fallback_policy
       for (const PairPathAndType& path_type_pair : std::get<SetPairPathAndType>(path_list)) {
         data_policies->insert(std::make_shared<DataWatchItemPolicy>(
             NSStringToUTF8StringView(name), policy_version, path_type_pair.first,
-            path_type_pair.second, allow_read_access, audit_only, rule_type, enable_silent_mode,
-            enable_silent_tty_mode,
-            NSStringToUTF8StringView(options[kWatchItemConfigKeyOptionsCustomMessage]),
-            options[kWatchItemConfigKeyOptionsEventDetailURL],
-            options[kWatchItemConfigKeyOptionsEventDetailText],
-            std::get<SetWatchItemProcess>(proc_list), rule_id));
+            path_type_pair.second, audit_only, rule_type, *rule_options,
+            std::get<WatchItemProcessList>(proc_list), rule_id));
       }
 
       break;
@@ -579,11 +600,8 @@ bool ParseConfigSingleWatchItem(NSString* name, std::string_view fallback_policy
     case WatchItemRuleType::kProcessesWithDeniedPaths:
       proc_policies->insert(std::make_shared<ProcessWatchItemPolicy>(
           NSStringToUTF8StringView(name), policy_version, std::get<SetPairPathAndType>(path_list),
-          allow_read_access, audit_only, rule_type, enable_silent_mode, enable_silent_tty_mode,
-          NSStringToUTF8StringView(options[kWatchItemConfigKeyOptionsCustomMessage]),
-          options[kWatchItemConfigKeyOptionsEventDetailURL],
-          options[kWatchItemConfigKeyOptionsEventDetailText],
-          std::get<SetWatchItemProcess>(proc_list), rule_id));
+          audit_only, rule_type, std::move(*rule_options),
+          std::move(std::get<WatchItemProcessList>(proc_list)), rule_id));
 
       break;
   }
@@ -1032,17 +1050,10 @@ std::optional<WatchItemsState> WatchItems::State() {
 }
 
 std::pair<NSString*, NSString*> WatchItems::EventDetailLinkInfo(
-    const std::shared_ptr<WatchItemPolicyBase>& watch_item) {
+    std::optional<NSString*> event_detail_url, std::optional<NSString*> event_detail_text) {
   absl::ReaderMutexLock lock(lock_);
-  if (!watch_item) {
-    return {policy_event_detail_url_, policy_event_detail_text_};
-  }
-
-  NSString* url = watch_item->event_detail_url.has_value() ? watch_item->event_detail_url.value()
-                                                           : policy_event_detail_url_;
-
-  NSString* text = watch_item->event_detail_text.has_value() ? watch_item->event_detail_text.value()
-                                                             : policy_event_detail_text_;
+  NSString* url = event_detail_url.value_or(policy_event_detail_url_);
+  NSString* text = event_detail_text.value_or(policy_event_detail_text_);
 
   // Ensure empty strings are repplaced with nil
   if (!url.length) {

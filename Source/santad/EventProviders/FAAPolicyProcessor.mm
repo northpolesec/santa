@@ -86,13 +86,12 @@ bool ShouldLogDecision(FileAccessPolicyDecision decision) {
   }
 }
 
-static inline bool ShouldShowUIForPolicy(const std::shared_ptr<WatchItemPolicyBase>& policy) {
-  return !policy->silent;
+static inline bool ShouldShowUI(const WatchItemProcessOptions& options) {
+  return !options.silent;
 }
 
-static inline bool ShouldMessageTTYForPolicy(const std::shared_ptr<WatchItemPolicyBase>& policy,
-                                             const Message& msg) {
-  if (policy->silent_tty || !TTYWriter::CanWrite(msg->process)) {
+static inline bool ShouldMessageTTY(const WatchItemProcessOptions& options, const Message& msg) {
+  if (options.silent_tty || !TTYWriter::CanWrite(msg->process)) {
     return false;
   }
   return true;
@@ -305,11 +304,11 @@ SNTCachedDecision* FAAPolicyProcessor::GetCachedDecision(const struct stat& stat
   return [decision_cache_ cachedDecisionForFile:stat_buf];
 }
 
-bool FAAPolicyProcessor::PolicyAllowsReadsForTarget(
-    const Message& msg, const Message::PathTarget& target,
-    const std::shared_ptr<WatchItemPolicyBase> policy) {
+bool FAAPolicyProcessor::PolicyAllowsReadsForTarget(const Message& msg,
+                                                    const Message::PathTarget& target,
+                                                    bool allow_read_access) {
   // All special cases currently require the option "allow_read_access" is set
-  if (!policy->allow_read_access) {
+  if (!allow_read_access) {
     return false;
   }
 
@@ -371,7 +370,7 @@ FileAccessPolicyDecision FAAPolicyProcessor::ApplyPolicy(
   // layer. If the policy would generally allow access to the resource,
   // producing the full kAllow result would potentially result in better
   // system performance.
-  if (PolicyAllowsReadsForTarget(msg, target, policy)) {
+  if (PolicyAllowsReadsForTarget(msg, target, policy->options.allow_read_access)) {
     return FileAccessPolicyDecision::kAllowedReadAccess;
   }
 
@@ -452,9 +451,10 @@ void FAAPolicyProcessor::LogTTY(SNTStoredFileAccessEvent* event, URLTextPair lin
     return;
   }
 
-  NSAttributedString* attrStr = [SNTBlockMessage
-      attributedBlockMessageForFileAccessEvent:event
-                                 customMessage:OptionalStringToNSString(policy.custom_message)];
+  NSAttributedString* attrStr =
+      [SNTBlockMessage attributedBlockMessageForFileAccessEvent:event
+                                                  customMessage:OptionalStringToNSString(
+                                                                    policy.options.custom_message)];
 
   NSMutableString* blockMsg = [NSMutableString stringWithCapacity:1024];
   // Escape sequences `\033[1m` and `\033[0m` begin/end bold lettering
@@ -547,7 +547,8 @@ FileAccessPolicyDecision FAAPolicyProcessor::ProcessTargetAndPolicy(
 
     URLTextPair link_info;
     if (generate_event_detail_link_block_) {
-      link_info = generate_event_detail_link_block_(policy);
+      link_info = generate_event_detail_link_block_(policy->options.event_detail_url,
+                                                    policy->options.event_detail_text);
     }
 
     if (store_access_event_block_) {
@@ -555,12 +556,12 @@ FileAccessPolicyDecision FAAPolicyProcessor::ProcessTargetAndPolicy(
     }
 
     if (IsBlockDecision(decision)) {
-      if (ShouldShowUIForPolicy(policy)) {
-        file_access_denied_block(event, OptionalStringToNSString(policy->custom_message),
+      if (ShouldShowUI(policy->options)) {
+        file_access_denied_block(event, OptionalStringToNSString(policy->options.custom_message),
                                  link_info.first, link_info.second);
       }
 
-      if (ShouldMessageTTYForPolicy(policy, msg)) {
+      if (ShouldMessageTTY(policy->options, msg)) {
         LogTTY(event, link_info, msg, *policy);
       }
     }
@@ -597,7 +598,8 @@ FAAPolicyProcessor::ESResult FAAPolicyProcessor::ProcessMessage(
     if (decision != FileAccessPolicyDecision::kNoPolicy &&
         decision != FileAccessPolicyDecision::kDeniedInvalidSignature && !path_target.truncated &&
         path_target.is_readable && path_target.unsafe_file &&
-        target_policy_pair.second.has_value() && (*target_policy_pair.second)->allow_read_access) {
+        target_policy_pair.second.has_value() &&
+        (*target_policy_pair.second)->options.allow_read_access) {
       reads_cache_.Set(MakeReadsCacheKey(msg->process->audit_token, client_type),
                        std::pair<dev_t, ino_t>({path_target.unsafe_file->stat.st_dev,
                                                 path_target.unsafe_file->stat.st_ino}));
