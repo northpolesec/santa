@@ -27,6 +27,7 @@ objc_library(
     srcs = [
         "Activation.mm",
         "Evaluator.mm",
+        "PolicyForRangeFunction.mm",
         "RelativeTimeFunction.mm",
         "TouchIDFunction.mm",
     ],
@@ -35,6 +36,7 @@ objc_library(
         "CELPlanCache.h",
         "CELProtoTraits.h",
         "Evaluator.h",
+        "PolicyForRangeFunction.h",
         "RelativeTimeFunction.h",
         "TouchIDFunction.h",
     ],
@@ -90,6 +92,7 @@ santa_unit_test(
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/time",
+        "@abseil-cpp//absl/types:span",
         "@northpolesec_protos//celv2:v2_cc_proto",
     ],
 )

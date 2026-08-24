@@ -49,9 +49,22 @@ namespace cel {
 //   days(int) -> google.protobuf.Duration
 //     n*24h as a duration. CEL's native duration() only parses up to hours, so
 //     this is sugar for the common "N days" window. Pure and foldable.
+//
+//   now() -> google.protobuf.Timestamp
+//     The current instant, with no truncation. Like today() it is lazy and
+//     marks the evaluation non-cacheable, e.g. a window relative to the moment
+//     of the exec: now() + duration("30m").
+//
+//   weekdays() -> list<int>
+//     The constant [1, 2, 3, 4, 5]: Monday through Friday in the day-of-week
+//     numbering 0=Sunday through 6=Saturday. Pure and foldable, so it does not
+//     affect cacheability.
 
 // Descriptor for the today() -> Timestamp function (zero args, lazy).
 ::google::api::expr::runtime::CelFunctionDescriptor TodayDescriptor();
+
+// Descriptor for the now() -> Timestamp function (zero args, lazy).
+::google::api::expr::runtime::CelFunctionDescriptor NowDescriptor();
 
 // Lazy CEL function backing today(). On evaluation it returns the start of the
 // current UTC day and sets the supplied flag to true to mark the evaluation as
@@ -71,13 +84,32 @@ class TodayFunction : public ::google::api::expr::runtime::CelFunction {
   bool* used_sink_;
 };
 
-// Register the today() and days() decls with the type checker at compile time.
-// Only available in CELv2.
+// Lazy CEL function backing now(). On evaluation it returns the current instant
+// and sets the supplied flag to true to mark the evaluation as non-cacheable.
+// The sink pointer must outlive every evaluation.
+class NowFunction : public ::google::api::expr::runtime::CelFunction {
+ public:
+  explicit NowFunction(bool* used_sink)
+      : ::google::api::expr::runtime::CelFunction(NowDescriptor()),
+        used_sink_(used_sink) {}
+
+  absl::Status Evaluate(
+      absl::Span<const ::google::api::expr::runtime::CelValue> args,
+      ::google::api::expr::runtime::CelValue* result,
+      google::protobuf::Arena* arena) const override;
+
+ private:
+  bool* used_sink_;
+};
+
+// Register the today(), days(), now() and weekdays() decls with the type
+// checker at compile time. Only available in CELv2.
 absl::Status AddRelativeTimeCompilerLibrary(::cel::CompilerBuilder& builder);
 
-// Register relative-time functions at runtime. today() is registered as a lazy
-// function (its implementation is provided by the Activation, see
-// Activation::FindFunctionOverloads); days() is a normal eager function.
+// Register relative-time functions at runtime. today() and now() are registered
+// as lazy functions (their implementations are provided by the Activation, see
+// Activation::FindFunctionOverloads); days() and weekdays() are normal eager
+// functions.
 // Only available in CELv2.
 absl::Status RegisterRelativeTimeFunctions(
     ::google::api::expr::runtime::CelFunctionRegistry* registry,

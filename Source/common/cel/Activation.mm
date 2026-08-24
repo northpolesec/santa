@@ -191,13 +191,35 @@ std::optional<cel_runtime::CelValue> Activation<IsV2>::FindValue(
 template <bool IsV2>
 std::vector<const cel_runtime::CelFunction*> Activation<IsV2>::FindFunctionOverloads(
     absl::string_view name) const {
-  // Relative-time functions are CELv2 only.
+  // The relative-time functions and policy_for_range() are CELv2 only.
   if constexpr (IsV2) {
     if (name == "today") {
       if (!todayFn_) {
         todayFn_ = std::make_unique<TodayFunction>(&usedRelativeTime_);
       }
       return {todayFn_.get()};
+    }
+    if (name == "now") {
+      if (!nowFn_) {
+        nowFn_ = std::make_unique<NowFunction>(&usedRelativeTime_);
+      }
+      return {nowFn_.get()};
+    }
+    if (name == "policy_for_range") {
+      if (policyForRangeFns_.empty()) {
+        for (auto& descriptor : PolicyForRangeDescriptors()) {
+          policyForRangeFns_.push_back(
+              std::make_unique<PolicyForRangeFunction>(std::move(descriptor), &usedRelativeTime_));
+        }
+      }
+      // All overloads are returned; the runtime picks the one whose descriptor
+      // matches the arguments it actually has.
+      std::vector<const cel_runtime::CelFunction*> overloads;
+      overloads.reserve(policyForRangeFns_.size());
+      for (const auto& fn : policyForRangeFns_) {
+        overloads.push_back(fn.get());
+      }
+      return overloads;
     }
   }
   return {};
@@ -262,8 +284,10 @@ std::vector<std::pair<absl::string_view, ::cel::Type>> Activation<IsV2>::GetVari
 
 template <bool IsV2>
 bool Activation<IsV2>::IsResultCacheable() const {
-  // today() resolves to the current day, so a cached result would go stale at
-  // the next UTC midnight. Don't cache expressions that use it.
+  // today() resolves to the current day and now() to the current instant, so a
+  // cached result would go stale as time passes: at the next UTC midnight for
+  // today(), immediately for now(), at the window edge for policy_for_range().
+  // Don't cache expressions that use them.
   if (usedRelativeTime_) {
     return false;
   }

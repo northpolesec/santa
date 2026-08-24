@@ -31,6 +31,7 @@
 #include "parser/parser.h"
 
 #include "Source/common/cel/Activation.h"
+#include "Source/common/cel/PolicyForRangeFunction.h"
 #include "Source/common/cel/RelativeTimeFunction.h"
 #include "Source/common/cel/TouchIDFunction.h"
 #include "Source/common/cel/result.pb.h"
@@ -70,6 +71,13 @@ static absl::StatusOr<std::unique_ptr<::cel::Compiler>> CreateCompiler(
     if (auto result = santa::cel::AddRelativeTimeCompilerLibrary(*builder); !result.ok()) {
       return result;
     }
+    // policy_for_range() is declared for rules only: a fallback expression has
+    // no rule identity for a time window to attach to.
+    if (!allowUnspecified) {
+      if (auto result = santa::cel::AddPolicyForRangeCompilerLibrary(*builder); !result.ok()) {
+        return result;
+      }
+    }
   }
 
   // Link the reflection for needed messages so that the CEL compiler can
@@ -104,7 +112,8 @@ absl::StatusOr<std::unique_ptr<Evaluator<IsV2>>> Evaluator<IsV2>::Create(bool al
   if (!compiler.ok()) {
     return compiler.status();
   }
-  return std::make_unique<Evaluator<IsV2>>(std::move(*compiler), std::move(arena));
+  return std::make_unique<Evaluator<IsV2>>(std::move(*compiler), std::move(arena),
+                                           allowUnspecified);
 }
 
 template <bool IsV2>
@@ -159,6 +168,15 @@ absl::StatusOr<std::unique_ptr<::cel_runtime::CelExpression>> Evaluator<IsV2>::C
     if (auto result = santa::cel::RegisterRelativeTimeFunctions(builder->GetRegistry(), options);
         !result.ok()) {
       return result;
+    }
+    // Matches the declarations above: only an evaluator for rules has
+    // policy_for_range().
+    if (!allowUnspecified_) {
+      if (auto result =
+              santa::cel::RegisterPolicyForRangeFunctions(builder->GetRegistry(), options);
+          !result.ok()) {
+        return result;
+      }
     }
   }
 
