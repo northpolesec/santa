@@ -663,8 +663,6 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                    LOGI(@"EnableTelemetryExport changed: %d -> %d", oldBool,
                                         newBool);
 
-                                   [syncd_queue reassessSyncServiceConnection];
-
                                    if (newBool) {
                                      LOGW(@"WARNING - Telemetry export is currently in beta. "
                                           @"Configuration and format are subject to change.");

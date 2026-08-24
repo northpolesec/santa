@@ -117,6 +117,7 @@ NSString* const kStateTempAdminModeKey = @"TempAdmin";
 NSString* const kStateTempAdminTargetUIDKey = @"TargetUID";
 static NSString* const kStateDemotedAdminsKey = @"DemotedAdmins";
 static NSString* const kStateLastBootUUIDKey = @"LastBootUUID";
+static NSString* const kStateLastSyncServerURLKey = @"LastSyncServerURL";
 
 /// User defaults key for user override of the menu item enabled setting.
 NSString* const kEnableMenuItemUserOverride = @"EnableMenuItemUserOverride";
@@ -1017,6 +1018,18 @@ static SNTConfigurator* sharedConfigurator = nil;
   return self.state[kStateDemotedAdminsKey];
 }
 
+- (BOOL)persistLastSyncServerURL:(NSURL*)syncServerURL {
+  @synchronized(self) {
+    return [self updateStateSynchronizedKey:kStateLastSyncServerURLKey
+                                      value:syncServerURL.absoluteString];
+  }
+}
+
+- (NSURL*)savedLastSyncServerURL {
+  NSString* urlString = self.state[kStateLastSyncServerURLKey];
+  return urlString.length > 0 ? [NSURL URLWithString:urlString] : nil;
+}
+
 - (void)updateLastBootUUID:(NSString*)bootUUID {
   @synchronized(self) {
     [self updateStateSynchronizedKey:kStateLastBootUUIDKey value:bootUUID];
@@ -1432,7 +1445,9 @@ static SNTConfigurator* sharedConfigurator = nil;
 
 - (SNTSyncType)syncTypeRequired {
   if (self.syncState.count == 0) {
-    return SNTSyncTypeCleanAll;
+    // Without synced state the client can't vouch for its rules. Clean, not CleanAll, so the
+    // server keeps the final say and can still escalate.
+    return SNTSyncTypeClean;
   }
   return (SNTSyncType)[self.syncState[kSyncTypeRequired] integerValue];
 }
@@ -2121,6 +2136,24 @@ static SNTConfigurator* sharedConfigurator = nil;
 }
 
 ///
+///  Removes the sync state plist, returning whether it is now gone. A missing file is the
+///  expected case on a host that never synced and counts as success; anything else means synced
+///  state survived on disk and would be read back on the next launch, so it must not fail
+///  silently.
+///
+- (BOOL)removeSyncStateFile {
+  NSError* error;
+  if ([[NSFileManager defaultManager] removeItemAtPath:self.syncStateFilePath error:&error]) {
+    return YES;
+  }
+  if ([error.domain isEqualToString:NSCocoaErrorDomain] && error.code == NSFileNoSuchFileError) {
+    return YES;
+  }
+  LOGE(@"Failed to remove sync state at %@: %@", self.syncStateFilePath, error);
+  return NO;
+}
+
+///
 ///  Saves the current effective syncState to disk. Returns YES if the write
 ///  succeeded; NO if the authorizer denied the operation or the underlying
 ///  file write failed.
@@ -2131,6 +2164,15 @@ static SNTConfigurator* sharedConfigurator = nil;
   }
 
   NSMutableDictionary* syncState = self.syncState.mutableCopy;
+
+  // An empty sync state and a missing plist mean the same thing, so keep only the one that says
+  // so. Sync-state writes are unconditional, so without this a no-op commit (e.g. a preflight
+  // whose config bundle carries nothing) leaves an empty plist behind, which reads as though the
+  // host holds synced state when it holds none.
+  if (syncState.count == 0) {
+    return [self removeSyncStateFile];
+  }
+
   syncState[kAllowedPathRegexKey] = [syncState[kAllowedPathRegexKey] pattern];
   syncState[kBlockedPathRegexKey] = [syncState[kBlockedPathRegexKey] pattern];
   if (![syncState writeToFile:self.syncStateFilePath atomically:YES]) {
@@ -2155,7 +2197,7 @@ static SNTConfigurator* sharedConfigurator = nil;
       return;
     }
     self.syncState = [NSMutableDictionary dictionary];
-    [[NSFileManager defaultManager] removeItemAtPath:self.syncStateFilePath error:NULL];
+    [self removeSyncStateFile];
   };
   if ([NSThread isMainThread]) {
     block();
@@ -2246,6 +2288,10 @@ static SNTConfigurator* sharedConfigurator = nil;
   if ([state[kStateLastBootUUIDKey] isKindOfClass:[NSString class]]) {
     _lastBootUUID = state[kStateLastBootUUIDKey];
     newState[kStateLastBootUUIDKey] = _lastBootUUID;
+  }
+
+  if ([state[kStateLastSyncServerURLKey] isKindOfClass:[NSString class]]) {
+    newState[kStateLastSyncServerURLKey] = state[kStateLastSyncServerURLKey];
   }
 
   return newState;

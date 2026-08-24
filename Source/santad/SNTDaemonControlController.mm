@@ -328,6 +328,22 @@ static NSString* TAMUsernameForUID(uid_t uid) {
   reply(ruleCounts);
 }
 
+/// Whether a rule change originating from santactl must be refused because policy is managed
+/// elsewhere. Always compiled so it can be tested; enforcement is release-only.
+///
+/// `addingRules` distinguishes adding rules from clearing them, because the two differ once
+/// StaticRules is in play: static rules only override the identifiers they name, so a rule
+/// database that cannot be cleared would strand a host on a departed sync server's policy with no
+/// supported way out. A configured SyncBaseURL refuses both -- the sync server owns the database,
+/// and a clean sync is the supported way to reset it.
+- (BOOL)shouldRejectManualRuleChangeAddingRules:(BOOL)addingRules {
+  SNTConfigurator* config = [SNTConfigurator configurator];
+  if (config.syncBaseURL) {
+    return YES;
+  }
+  return config.staticRules.count > 0 && addingRules;
+}
+
 - (void)databaseRuleAddExecutionRules:(NSArray<SNTRule*>*)executionRules
                       fileAccessRules:(NSArray<SNTFileAccessRule*>*)fileAccessRules
                      networkFlowRules:(NSArray<SNTNetworkFlowRule*>*)networkFlowRules
@@ -336,8 +352,10 @@ static NSString* TAMUsernameForUID(uid_t uid) {
                                source:(SNTRuleAddSource)source
                                 reply:(void (^)(BOOL, NSArray<NSError*>* error))reply {
 #ifndef DEBUG
-  SNTConfigurator* config = [SNTConfigurator configurator];
-  if (source == SNTRuleAddSourceSantactl && (config.syncBaseURL || config.staticRules.count > 0)) {
+  BOOL addingRules = executionRules.count > 0 || fileAccessRules.count > 0 ||
+                     networkFlowRules.count > 0 || signals.count > 0;
+  if (source == SNTRuleAddSourceSantactl &&
+      [self shouldRejectManualRuleChangeAddingRules:addingRules]) {
     NSError* error;
     [SNTError populateError:&error
                    withCode:SNTErrorCodeManualRulesDisabled

@@ -85,6 +85,15 @@ namespace {
 
 void HandleV2Responses(const ::pbv2::PreflightResponse& resp, SNTSyncState* syncState);
 
+NSString* SyncTypeName(SNTSyncType syncType) {
+  switch (syncType) {
+    case SNTSyncTypeNormal: return @"normal";
+    case SNTSyncTypeClean: return @"clean";
+    case SNTSyncTypeCleanAll: return @"clean all";
+    default: return @"unknown";
+  }
+}
+
 SNTNetworkFlowDefaultAction NetworkFlowDefaultActionFromProto(
     ::pbv2::NetworkFlowDefaultAction action) {
   switch (action) {
@@ -400,6 +409,16 @@ BOOL Preflight(SNTSyncPreflight* self, google::protobuf::Arena* arena,
   } else {
     // Fallback if unspecified is a normal sync
     self.syncState.syncType = SNTSyncTypeNormal;
+  }
+
+  // Always report the resolved sync type. Without this a server that silently ignores
+  // `request_clean_sync` looks identical to one that was never asked, which leaves the client
+  // requesting a clean sync on every sync with nothing in the log to explain why.
+  SLOGD(@"Sync type: %@", SyncTypeName(self.syncState.syncType));
+  if (self.syncState.syncType == SNTSyncTypeNormal && requestSyncType != SNTSyncTypeNormal) {
+    SLOGW(@"Client requested a %@ sync but the server responded with a normal sync. The client "
+          @"will keep requesting one until the server performs it.",
+          SyncTypeName(requestSyncType));
   }
 
   // When running as sync v1, check if we have a push token chain. If so, save

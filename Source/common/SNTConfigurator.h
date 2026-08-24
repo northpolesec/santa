@@ -912,6 +912,20 @@ extern NSString* _Nonnull const kEnableMenuItemUserOverride;
 - (nullable NSArray<NSDictionary*>*)savedDemotedAdmins;
 
 ///
+///  Records the sync server most recently seen in `SyncBaseURL`, so that a change made while the
+///  daemon was not running is still recognisable on the next launch. Stored whole rather than by
+///  host, so that tenants sharing a host stay distinguishable.
+///
+///  Returns NO if the record could not be written to disk.
+///
+- (BOOL)persistLastSyncServerURL:(nullable NSURL*)syncServerURL;
+
+///
+///  Returns the sync server recorded by `persistLastSyncServerURL:`, or nil if none is recorded.
+///
+- (nullable NSURL*)savedLastSyncServerURL;
+
+///
 ///  State-file key under which Temporary Admin Mode persists its session state
 ///  (an active session, or a deadline-0 demote-retry residue after a failed
 ///  teardown), and the field within it naming the session's target uid.

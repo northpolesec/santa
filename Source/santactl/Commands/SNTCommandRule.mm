@@ -162,20 +162,28 @@ REGISTER_COMMAND_NAME(@"rule")
           @"\n");
 }
 
-- (void)runWithArguments:(NSArray*)arguments {
-  SNTConfigurator* config = [SNTConfigurator configurator];
-  if ((config.syncBaseURL || config.staticRules.count) &&
-      ![arguments containsObject:@"--check"]
-#ifdef DEBUG
-      // DEBUG builds add a --force flag to allow manually adding/removing rules during testing.
-      && ![arguments containsObject:@"--force"]) {
-#else
-  ) {
-#endif
-    TEE_LOGE(@"(SyncBaseURL/StaticRules is set, rules are managed centrally.)");
-    exit(1);
+/// Whether a manual rule change must be refused because policy belongs to something other than
+/// the operator. Clearing the database stays available when only StaticRules is set: static rules
+/// override just the identifiers they name, so a database that could never be cleared would
+/// strand a host on a departed sync server's policy with no supported way out. A configured
+/// SyncBaseURL refuses everything -- the sync server owns the database, and a clean sync is how
+/// to reset it.
+///
+/// Decided from parsed options rather than from raw arguments: an option value can look exactly
+/// like a flag (`--comment --clean` makes "--clean" a comment), so only the parser knows what the
+/// command actually does. Exposed for testing.
+BOOL SNTCommandRuleChangesAreRefused(NSURL* syncBaseURL, NSUInteger staticRuleCount, BOOL check,
+                                     BOOL importRules, SNTRuleCleanup cleanupType) {
+  // --check only reads, so it is never refused.
+  if (check) {
+    return NO;
   }
 
+  BOOL cleanupOnly = !importRules && cleanupType != SNTRuleCleanupNone;
+  return syncBaseURL != nil || (staticRuleCount > 0 && !cleanupOnly);
+}
+
+- (void)runWithArguments:(NSArray*)arguments {
   NSString* identifier;
   SNTRuleState state = SNTRuleStateUnknown;
   SNTRuleType type = SNTRuleTypeBinary;
@@ -189,6 +197,9 @@ REGISTER_COMMAND_NAME(@"rule")
   BOOL exportRules = NO;
   BOOL exportFileAccessRules = NO;
   BOOL faaLookup = NO;
+#ifdef DEBUG
+  BOOL force = NO;
+#endif
 
   // Parse arguments
   for (NSUInteger i = 0; i < arguments.count; ++i) {
@@ -256,7 +267,7 @@ REGISTER_COMMAND_NAME(@"rule")
       comment = arguments[i];
 #ifdef DEBUG
     } else if ([arg caseInsensitiveCompare:@"--force"] == NSOrderedSame) {
-      // Don't do anything special.
+      force = YES;
 #endif
     } else if ([arg caseInsensitiveCompare:@"--import"] == NSOrderedSame) {
       if (exportRules) {
@@ -299,6 +310,19 @@ REGISTER_COMMAND_NAME(@"rule")
     } else {
       [self printErrorUsageAndExit:[@"Unknown argument: " stringByAppendingString:arg]];
     }
+  }
+
+  // Placed after parsing so the decision reflects what the command will actually do.
+  SNTConfigurator* config = [SNTConfigurator configurator];
+  BOOL refused = SNTCommandRuleChangesAreRefused(config.syncBaseURL, config.staticRules.count,
+                                                 check, importRules, cleanupType);
+#ifdef DEBUG
+  // DEBUG builds add a --force flag to allow manually adding/removing rules during testing.
+  refused = refused && !force;
+#endif
+  if (refused) {
+    TEE_LOGE(@"(SyncBaseURL/StaticRules is set, rules are managed centrally.)");
+    exit(1);
   }
 
   if (check) {
