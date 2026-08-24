@@ -80,7 +80,11 @@ struct FakeEnv {
   int signalError = 0;
 
   std::vector<FakeSignal> signals;
+  std::vector<NSTimeInterval> waits;
   std::map<pid_t, int> tokenReads;
+  // Runs when the term-then-kill grace wait starts, so a test can retire the
+  // processes that died from SIGTERM.
+  std::function<void()> onWait = [] {};
 };
 
 santa::KillEnv MakeEnv(FakeEnv* fake) {
@@ -135,6 +139,11 @@ santa::KillEnv MakeEnv(FakeEnv* fake) {
   env.signal_group = [fake](pid_t pgid, int sig) {
     fake->signals.push_back({pgid, sig, true});
     return fake->signalError;
+  };
+
+  env.wait = [fake](NSTimeInterval seconds) {
+    fake->waits.push_back(seconds);
+    fake->onWait();
   };
 
   return env;
@@ -517,6 +526,193 @@ NSArray<NSString*>* SignalDescriptions(const std::vector<FakeSignal>& signals) {
   XCTAssertEqual(response.killedProcesses.count, 1);
   XCTAssertEqual(response.killedProcesses[0].pid, 10);
   XCTAssertEqual(response.killedProcesses[0].pidversion, 7);
+}
+
+//
+// KillingMachineTermThenKill
+//
+
+- (void)testTermThenKillSigkillsSurvivors {
+  FakeEnv fake;
+  fake.pids = std::vector<pid_t>{10, 11};
+  fake.pidversions = {{10, 1}, {11, 2}};
+  fake.matching = {10, 11};
+  // pid 10 exits during the grace period; pid 11 survives SIGTERM.
+  fake.onWait = [&fake] {
+    fake.matching.erase(10);
+    fake.pidversions.erase(10);
+  };
+
+  SNTKillRequest* request = [[SNTKillRequestTeamID alloc] initWithUUID:@"uuid"
+                                                                teamID:kMatchingTeamID];
+
+  SNTKillResponse* response = santa::KillingMachineTermThenKill(request, 5.0, MakeEnv(&fake));
+
+  XCTAssertEqual(response.error, SNTKillResponseErrorNone);
+  XCTAssertEqualObjects(SignalDescriptions(fake.signals),
+                        (@[ @"pid:10:15", @"pid:11:15", @"pid:11:9" ]));
+  XCTAssertEqual(fake.waits.size(), 1);
+  XCTAssertEqual(fake.waits[0], 5.0);
+
+  // Both passes are reported: the two processes sent SIGTERM, then the survivor
+  // sent SIGKILL.
+  XCTAssertEqual(response.killedProcesses.count, 3);
+  XCTAssertEqual(response.killedProcesses[2].pid, 11);
+}
+
+- (void)testTermThenKillGroupTargeting {
+  pid_t sharedPgid = getpgrp() + 1;
+
+  FakeEnv fake;
+  fake.pids = std::vector<pid_t>{10, 11};
+  fake.pidversions = {{10, 1}, {11, 2}};
+  fake.matching = {10, 11};
+  fake.pgids = {{10, sharedPgid}, {11, sharedPgid}};
+  fake.onWait = [&fake] {
+    fake.matching.erase(10);
+    fake.pidversions.erase(10);
+  };
+
+  SNTKillRequest* request = [[SNTKillRequestTeamID alloc] initWithUUID:@"uuid"
+                                                                teamID:kMatchingTeamID
+                                                                signal:SIGKILL
+                                                   targetProcessGroups:YES];
+
+  SNTKillResponse* response = santa::KillingMachineTermThenKill(request, 1.5, MakeEnv(&fake));
+
+  XCTAssertEqualObjects(SignalDescriptions(fake.signals), (@[
+                          [NSString stringWithFormat:@"group:%d:15", sharedPgid],
+                          [NSString stringWithFormat:@"group:%d:9", sharedPgid],
+                        ]));
+  XCTAssertEqual(fake.waits.size(), 1);
+  XCTAssertEqual(fake.waits[0], 1.5);
+  // One result per group per pass, not per matched pid: the SIGTERM pass reports
+  // the group once and the SIGKILL pass reports the survivor's group once.
+  XCTAssertEqual(response.killedProcesses.count, 2);
+}
+
+// Nothing matched the SIGTERM pass, so nothing can survive it. The caller's
+// queue must not be blocked for the grace period.
+- (void)testTermThenKillSkipsWaitWhenNothingMatched {
+  FakeEnv fake;
+  fake.pids = std::vector<pid_t>{10};
+  fake.pidversions = {{10, 1}};
+
+  SNTKillRequest* request = [[SNTKillRequestTeamID alloc] initWithUUID:@"uuid"
+                                                                teamID:kMatchingTeamID];
+
+  SNTKillResponse* response = santa::KillingMachineTermThenKill(request, 5.0, MakeEnv(&fake));
+
+  XCTAssertEqual(response.error, SNTKillResponseErrorNone);
+  XCTAssertEqual(response.killedProcesses.count, 0);
+  XCTAssertEqual(fake.signals.size(), 0);
+  XCTAssertEqual(fake.waits.size(), 0);
+}
+
+// A SIGTERM that was never delivered has nothing to escalate either.
+- (void)testTermThenKillSkipsWaitWhenNoSignalLanded {
+  FakeEnv fake;
+  fake.pids = std::vector<pid_t>{10};
+  fake.pidversions = {{10, 1}};
+  fake.matching = {10};
+  fake.signalError = ESRCH;
+
+  SNTKillRequest* request = [[SNTKillRequestTeamID alloc] initWithUUID:@"uuid"
+                                                                teamID:kMatchingTeamID];
+
+  SNTKillResponse* response = santa::KillingMachineTermThenKill(request, 5.0, MakeEnv(&fake));
+
+  XCTAssertEqualObjects(SignalDescriptions(fake.signals), (@[ @"pid:10:15" ]));
+  XCTAssertEqual(fake.waits.size(), 0);
+  XCTAssertEqual(response.killedProcesses.count, 1);
+  XCTAssertEqual(response.killedProcesses[0].error, SNTKilledProcessErrorNoSuchProcess);
+}
+
+- (void)testTermThenKillPropagatesFirstPassFailure {
+  FakeEnv fake;
+  fake.pids = std::nullopt;
+
+  SNTKillRequest* request = [[SNTKillRequestTeamID alloc] initWithUUID:@"uuid"
+                                                                teamID:kMatchingTeamID];
+
+  SNTKillResponse* response = santa::KillingMachineTermThenKill(request, 5.0, MakeEnv(&fake));
+
+  XCTAssertEqual(response.error, SNTKillResponseErrorListPids);
+  XCTAssertEqual(fake.waits.size(), 0);
+  XCTAssertEqual(fake.signals.size(), 0);
+}
+
+//
+// KillingMachineAnyMatch
+//
+
+- (void)testAnyMatchFindsAMatchingPidAndSignalsNothing {
+  FakeEnv fake;
+  fake.pids = std::vector<pid_t>{10, 11};
+  fake.pidversions = {{10, 1}, {11, 2}};
+  fake.matching = {11};
+
+  SNTKillRequest* request = [[SNTKillRequestTeamID alloc] initWithUUID:@"uuid"
+                                                                teamID:kMatchingTeamID];
+
+  std::optional<pid_t> match = santa::KillingMachineAnyMatch(request, MakeEnv(&fake));
+
+  XCTAssertTrue(match.has_value());
+  XCTAssertEqual(*match, 11);
+  // A match pass is not a kill pass.
+  XCTAssertEqual(fake.signals.size(), 0);
+}
+
+- (void)testAnyMatchReturnsNothingWhenNothingMatches {
+  FakeEnv fake;
+  fake.pids = std::vector<pid_t>{10, 11};
+  fake.pidversions = {{10, 1}, {11, 2}};
+  // Nothing reports the team ID.
+
+  SNTKillRequest* request = [[SNTKillRequestTeamID alloc] initWithUUID:@"uuid"
+                                                                teamID:kMatchingTeamID];
+
+  XCTAssertFalse(santa::KillingMachineAnyMatch(request, MakeEnv(&fake)).has_value());
+  XCTAssertEqual(fake.signals.size(), 0);
+}
+
+// The processes KillProcess refuses to signal must not be reported as matches
+// either: naming one in a warning would promise a kill that never happens.
+- (void)testAnyMatchSkipsKernelLaunchdAndSelf {
+  pid_t selfPid = getpid();
+
+  FakeEnv fake;
+  fake.pids = std::vector<pid_t>{0, 1, selfPid};
+  fake.pidversions = {{0, 1}, {1, 2}, {selfPid, 3}};
+  fake.matching = {0, 1, selfPid};
+
+  SNTKillRequest* request = [[SNTKillRequestTeamID alloc] initWithUUID:@"uuid"
+                                                                teamID:kMatchingTeamID];
+
+  XCTAssertFalse(santa::KillingMachineAnyMatch(request, MakeEnv(&fake)).has_value());
+}
+
+- (void)testAnyMatchReturnsNothingWhenThePidSnapshotFails {
+  FakeEnv fake;
+  fake.pids = std::nullopt;
+
+  SNTKillRequest* request = [[SNTKillRequestTeamID alloc] initWithUUID:@"uuid"
+                                                                teamID:kMatchingTeamID];
+
+  XCTAssertFalse(santa::KillingMachineAnyMatch(request, MakeEnv(&fake)).has_value());
+}
+
+// `platform` as a bare team ID is refused by the kill pass, so the match pass
+// must refuse it too rather than reporting every platform binary as a match.
+- (void)testAnyMatchRefusesPlatformTeamID {
+  FakeEnv fake;
+  fake.pids = std::vector<pid_t>{10};
+  fake.pidversions = {{10, 1}};
+  fake.matching = {10};
+
+  SNTKillRequest* request = [[SNTKillRequestTeamID alloc] initWithUUID:@"uuid" teamID:@"platform"];
+
+  XCTAssertFalse(santa::KillingMachineAnyMatch(request, MakeEnv(&fake)).has_value());
 }
 
 @end

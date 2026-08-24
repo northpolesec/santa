@@ -408,6 +408,36 @@ static NSString* const silencedNotificationsKey = @"SilencedNotifications";
   [un addNotificationRequest:req withCompletionHandler:nil];
 }
 
+- (void)postTimedRuleKillNotificationForApplication:(NSString*)app deadline:(NSDate*)deadline {
+  if ([SNTConfigurator configurator].enableSilentMode) return;
+  if (!app || !deadline) return;
+
+  UNUserNotificationCenter* un = [UNUserNotificationCenter currentNotificationCenter];
+
+  NSDateFormatter* formatter = [[NSDateFormatter alloc] init];
+  formatter.timeStyle = NSDateFormatterShortStyle;
+  formatter.dateStyle = NSDateFormatterNoStyle;
+
+  UNMutableNotificationContent* content = [[UNMutableNotificationContent alloc] init];
+  content.title = @"Santa";
+  content.body = [NSString
+      stringWithFormat:NSLocalizedString(
+                           @"\"%@\" will quit at %@.",
+                           @"Notification message warning that an app will be quit at a time"),
+                       app, [formatter stringFromDate:deadline]];
+
+  // One banner per (application, deadline): a repeated warning for the same
+  // deadline replaces the previous one rather than stacking up.
+  NSString* identifier = [NSString
+      stringWithFormat:@"timedRuleKillNotification_%@_%f", app, deadline.timeIntervalSince1970];
+
+  UNNotificationRequest* req = [UNNotificationRequest requestWithIdentifier:identifier
+                                                                    content:content
+                                                                    trigger:nil];
+
+  [un addNotificationRequest:req withCompletionHandler:nil];
+}
+
 - (void)postBlockNotification:(SNTStoredExecutionEvent*)event
             withCustomMessage:(NSString*)message
                     customURL:(NSString*)url

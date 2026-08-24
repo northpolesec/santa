@@ -14,6 +14,7 @@
 /// limitations under the License.
 
 #import <OCMock/OCMock.h>
+#import <UserNotifications/UserNotifications.h>
 #import <XCTest/XCTest.h>
 
 #import "Source/gui/SNTMessageWindowController.h"
@@ -22,6 +23,7 @@
 #import "Source/gui/SNTStatusItemManager.h"
 
 #import "Source/common/SNTConfigBundle.h"
+#import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
 #import "Source/common/SNTStoredNetworkFlowEvent.h"
 
@@ -44,6 +46,8 @@
 @end
 
 @interface SNTNotificationManagerTest : XCTestCase
+@property id mockConfigurator;
+@property id mockNotificationCenter;
 @end
 
 @implementation SNTNotificationManagerTest
@@ -51,6 +55,14 @@
 - (void)setUp {
   [super setUp];
   fclose(stdout);
+}
+
+- (void)tearDown {
+  // Class mocks swizzle the class itself, so they have to be undone or they
+  // follow the process into the next test.
+  [self.mockConfigurator stopMocking];
+  [self.mockNotificationCenter stopMocking];
+  [super tearDown];
 }
 
 - (void)testPostBlockNotificationSendsDistributedNotification {
@@ -295,6 +307,71 @@
           record();
         });
       }];
+}
+
+#pragma mark Timed rule kill warning
+
+// The notification center is a class mock so the informational-notification
+// path can be driven without a real app bundle behind it; silent mode comes
+// from the configurator, which is also mocked.
+- (id)mockNotificationCenterSilent:(BOOL)silent {
+  self.mockConfigurator = OCMClassMock([SNTConfigurator class]);
+  OCMStub([self.mockConfigurator configurator]).andReturn(self.mockConfigurator);
+  OCMStub([self.mockConfigurator enableSilentMode]).andReturn(silent);
+
+  self.mockNotificationCenter = OCMClassMock([UNUserNotificationCenter class]);
+  OCMStub([self.mockNotificationCenter currentNotificationCenter])
+      .andReturn(self.mockNotificationCenter);
+  return self.mockNotificationCenter;
+}
+
+- (NSString*)shortTimeFromDate:(NSDate*)date {
+  NSDateFormatter* formatter = [[NSDateFormatter alloc] init];
+  formatter.timeStyle = NSDateFormatterShortStyle;
+  formatter.dateStyle = NSDateFormatterNoStyle;
+  return [formatter stringFromDate:date];
+}
+
+- (void)testPostTimedRuleKillNotificationNamesTheAppAndTheTime {
+  id un = [self mockNotificationCenterSilent:NO];
+  NSDate* deadline = [NSDate dateWithTimeIntervalSince1970:1660221048];
+
+  [[[SNTNotificationManager alloc] init] postTimedRuleKillNotificationForApplication:@"Calculator"
+                                                                            deadline:deadline];
+
+  NSString* expected = [NSString
+      stringWithFormat:@"\"Calculator\" will quit at %@.", [self shortTimeFromDate:deadline]];
+  // One banner per (application, deadline): a repeat replaces rather than
+  // stacks, so both have to appear in the request's identifier.
+  NSString* stamp = [NSString stringWithFormat:@"%f", deadline.timeIntervalSince1970];
+  OCMVerify([un addNotificationRequest:[OCMArg checkWithBlock:^BOOL(UNNotificationRequest* req) {
+                  XCTAssertEqualObjects(req.content.body, expected);
+                  XCTAssertTrue([req.identifier containsString:@"Calculator"]);
+                  XCTAssertTrue([req.identifier containsString:stamp]);
+                  return YES;
+                }]
+                 withCompletionHandler:nil]);
+}
+
+- (void)testPostTimedRuleKillNotificationHonorsSilentMode {
+  id un = [self mockNotificationCenterSilent:YES];
+
+  [[[SNTNotificationManager alloc] init]
+      postTimedRuleKillNotificationForApplication:@"Calculator"
+                                         deadline:[NSDate dateWithTimeIntervalSinceNow:600]];
+
+  OCMVerify(never(), [un addNotificationRequest:OCMOCK_ANY withCompletionHandler:OCMOCK_ANY]);
+}
+
+- (void)testPostTimedRuleKillNotificationIgnoresIncompleteWarnings {
+  id un = [self mockNotificationCenterSilent:NO];
+  SNTNotificationManager* mgr = [[SNTNotificationManager alloc] init];
+
+  [mgr postTimedRuleKillNotificationForApplication:nil
+                                          deadline:[NSDate dateWithTimeIntervalSinceNow:600]];
+  [mgr postTimedRuleKillNotificationForApplication:@"Calculator" deadline:nil];
+
+  OCMVerify(never(), [un addNotificationRequest:OCMOCK_ANY withCompletionHandler:OCMOCK_ANY]);
 }
 
 @end

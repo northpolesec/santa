@@ -7,6 +7,9 @@
 /* Notification message shown when a known app has been unblocked */
 "%@ can now be run" = "%@ peut maintenant être exécuté";
 
+/* Notification message warning that an app will be quit at a time */
+"\"%@\" will quit at %@." = "\"%1$@\" se fermera à %2$@.";
+
 /* Reason shown when a justification is required but not given */
 "a justification is required" = "une justification est requise";
 

@@ -473,10 +473,12 @@ santa_unit_test(
     ],
     sdk_frameworks = [
         "Cocoa",
+        "UserNotifications",
     ],
     deps = [
         ":SNTNotificationManager",
         "//Source/common:SNTConfigBundle",
+        "//Source/common:SNTConfigurator",
         "//Source/common:SNTStoredExecutionEvent",
         "//Source/common:SNTStoredNetworkFlowEvent",
         "@OCMock",
