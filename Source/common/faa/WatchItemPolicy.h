@@ -244,7 +244,14 @@ struct WatchItemPolicyBase {
         rule_type(rt),
         options(std::move(opts)),
         processes(std::move(procs)),
-        rule_id(rid) {}
+        rule_id(rid) {
+    for (const WatchItemProcess& process : processes) {
+      if (process.options && process.options->allow_read_access != options.allow_read_access) {
+        has_read_access_override = true;
+        break;
+      }
+    }
+  }
 
   virtual ~WatchItemPolicyBase() = default;
 
@@ -274,6 +281,13 @@ struct WatchItemPolicyBase {
   WatchItemProcessOptions options;
   WatchItemProcessList processes;
   int64_t rule_id;
+  // True when some configured process sets a different AllowReadAccess than the
+  // rule. Discovering such an override is the only reason the process match has
+  // to be computed before a read-only access can be answered, so when this is
+  // false FAAPolicyProcessor::ApplyPolicy can skip the match entirely and
+  // short-circuit on the rule's own value. Derived from `options` and
+  // `processes` by the constructor; neither is mutated afterwards.
+  bool has_read_access_override = false;
 };
 
 struct DataWatchItemPolicy : public WatchItemPolicyBase {
