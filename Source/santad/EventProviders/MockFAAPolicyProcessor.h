@@ -51,8 +51,7 @@ class MockFAAPolicyProcessor : public FAAPolicyProcessor {
   MOCK_METHOD(SNTCachedDecision*, GetCachedDecision, (const struct stat& stat_buf), (override));
   MOCK_METHOD(NSString*, GetCertificateHash, (const es_file_t* es_file), (override));
   MOCK_METHOD(bool, PolicyAllowsReadsForTarget,
-              (const Message& msg, const Message::PathTarget& target,
-               std::shared_ptr<WatchItemPolicyBase> policy),
+              (const Message& msg, const Message::PathTarget& target, bool allow_read_access),
               (override));
   MOCK_METHOD(FileAccessPolicyDecision, ApplyPolicy,
               (const Message& msg, const Message::PathTarget& target,
@@ -68,8 +67,8 @@ class MockFAAPolicyProcessor : public FAAPolicyProcessor {
   }
 
   bool PolicyAllowsReadsForTargetWrapper(const Message& msg, const Message::PathTarget& target,
-                                         std::shared_ptr<WatchItemPolicyBase> policy) {
-    return FAAPolicyProcessor::PolicyAllowsReadsForTarget(msg, target, policy);
+                                         bool allow_read_access) {
+    return FAAPolicyProcessor::PolicyAllowsReadsForTarget(msg, target, allow_read_access);
   }
 
   FileAccessPolicyDecision ApplyPolicyWrapper(

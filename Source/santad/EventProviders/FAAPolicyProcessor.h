@@ -72,9 +72,10 @@ class FAAPolicyProcessor {
   using CheckIfPolicyMatchesBlock = bool (^)(const santa::WatchItemPolicyBase& base_policy,
                                              const Message::PathTarget& target, const Message& msg);
   using URLTextPair = std::pair<NSString*, NSString*>;
-  /// A block that generates custom URL and Text pairs from a given policy.
-  using GenerateEventDetailLinkBlock =
-      URLTextPair (^)(const std::shared_ptr<WatchItemPolicyBase>& watch_item);
+  /// A block that resolves the given event detail URL and text, filling in
+  /// global defaults for any value that is unset.
+  using GenerateEventDetailLinkBlock = URLTextPair (^)(std::optional<NSString*> event_detail_url,
+                                                       std::optional<NSString*> event_detail_text);
 
   using ReadsCacheKey = std::tuple<pid_t, int, FAAClientType>;
   using StoreAccessEventBlock = void (^)(SNTStoredFileAccessEvent*, bool);
@@ -161,7 +162,7 @@ class FAAPolicyProcessor {
       CheckIfPolicyMatchesBlock checkIfPolicyMatchesBlock);
 
   virtual bool PolicyAllowsReadsForTarget(const Message& msg, const Message::PathTarget& target,
-                                          std::shared_ptr<WatchItemPolicyBase> policy);
+                                          bool allow_read_access);
 
   /// Return true if the TTY was previously messaged for the given
   /// process/policy pair. Otherwise false.

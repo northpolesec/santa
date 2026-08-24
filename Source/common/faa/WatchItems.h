@@ -186,8 +186,10 @@ class WatchItems : public Timer<WatchItems>, public PassKey<WatchItems> {
 
   std::optional<WatchItemsState> State();
 
-  std::pair<NSString*, NSString*> EventDetailLinkInfo(
-      const std::shared_ptr<WatchItemPolicyBase>& watch_item);
+  /// Resolve the event detail URL/text to display, falling back to the
+  /// top-level config values when the given values are unset.
+  std::pair<NSString*, NSString*> EventDetailLinkInfo(std::optional<NSString*> event_detail_url,
+                                                      std::optional<NSString*> event_detail_text);
 
   static bool IsValidRule(NSString* name, NSDictionary* rule, NSError** error,
                           NSString* policyVersion = nil);

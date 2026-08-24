@@ -49,7 +49,9 @@ struct SharedPtrValueEqual;
 // Helper type aliases
 using PairPathAndType = std::pair<std::string, WatchItemPathType>;
 using SetPairPathAndType = absl::flat_hash_set<PairPathAndType>;
-using SetWatchItemProcess = absl::flat_hash_set<WatchItemProcess>;
+// Note: This is an ordered list, not a set, because process matching is
+// first-match-wins.
+using WatchItemProcessList = std::vector<WatchItemProcess>;
 using SetSharedDataWatchItemPolicy = absl::flat_hash_set<std::shared_ptr<DataWatchItemPolicy>,
                                                          SharedPtrValueHash<DataWatchItemPolicy>,
                                                          SharedPtrValueEqual<DataWatchItemPolicy>>;
@@ -77,6 +79,27 @@ static constexpr WatchItemRuleType kWatchItemPolicyDefaultRuleType =
     WatchItemRuleType::kPathsWithAllowedProcesses;
 static constexpr bool kWatchItemPolicyDefaultEnableSilentMode = false;
 static constexpr bool kWatchItemPolicyDefaultEnableSilentTTYMode = false;
+
+/// The options a rule carries. Grouped into a struct so that the effective
+/// values for an event can be passed around as a unit rather than as a handful
+/// of loose parameters.
+struct WatchItemProcessOptions {
+  bool allow_read_access = kWatchItemPolicyDefaultAllowReadAccess;
+  bool silent = kWatchItemPolicyDefaultEnableSilentMode;
+  bool silent_tty = kWatchItemPolicyDefaultEnableSilentTTYMode;
+  std::optional<std::string> custom_message;
+  std::optional<NSString*> event_detail_url;
+  std::optional<NSString*> event_detail_text;
+
+  bool operator==(const WatchItemProcessOptions& other) const {
+    // Note: Matching WatchItemPolicyBase, custom_message, event_detail_url and
+    // event_detail_text are not currently considered for equality purposes.
+    return allow_read_access == other.allow_read_access && silent == other.silent &&
+           silent_tty == other.silent_tty;
+  }
+
+  bool operator!=(const WatchItemProcessOptions& other) const { return !(*this == other); }
+};
 
 struct WatchItemProcess {
   static std::optional<WatchItemProcess> Create(NSString* bp, NSString* sid, NSString* tid,
@@ -163,12 +186,6 @@ struct WatchItemProcess {
   }
 #endif
 
-  template <typename H>
-  friend H AbslHashValue(H h, const WatchItemProcess& p) {
-    return H::combine(std::move(h), p.binary_path, p.signing_id, p.team_id, p.cdhash,
-                      p.certificate_sha256, p.platform_binary);
-  }
-
   std::string binary_path;
   const std::string signing_id;
   std::string team_id;
@@ -192,37 +209,25 @@ struct WatchItemProcess {
 
 struct WatchItemPolicyBase {
   WatchItemPolicyBase(std::string_view n, std::string_view v,
-                      bool ara = kWatchItemPolicyDefaultAllowReadAccess,
                       bool ao = kWatchItemPolicyDefaultAuditOnly,
                       WatchItemRuleType rt = kWatchItemPolicyDefaultRuleType,
-                      bool esm = kWatchItemPolicyDefaultEnableSilentMode,
-                      bool estm = kWatchItemPolicyDefaultEnableSilentTTYMode,
-                      std::string_view cm = "", NSString* edu = nil, NSString* edt = nil,
-                      SetWatchItemProcess procs = {}, int64_t rid = 0)
+                      WatchItemProcessOptions opts = {}, WatchItemProcessList procs = {},
+                      int64_t rid = 0)
       : name(n),
         version(v),
-        allow_read_access(ara),
         audit_only(ao),
         rule_type(rt),
-        silent(esm),
-        silent_tty(estm),
-        custom_message(cm.length() == 0 ? std::nullopt : std::make_optional<std::string>(cm)),
-        // Note: Empty string considered valid for event_detail_url to allow rules
-        // overriding global setting in order to hide the button.
-        event_detail_url(edu == nil ? std::nullopt : std::make_optional<NSString*>(edu)),
-        event_detail_text(edt.length == 0 ? std::nullopt : std::make_optional<NSString*>(edt)),
+        options(std::move(opts)),
         processes(std::move(procs)),
         rule_id(rid) {}
 
   virtual ~WatchItemPolicyBase() = default;
 
   virtual bool operator==(const WatchItemPolicyBase& other) const {
-    // Note: custom_message, event_detail_url, and event_detail_text are not currently considered
-    // for equality purposes
-    return name == other.name && version == other.version &&
-           allow_read_access == other.allow_read_access && audit_only == other.audit_only &&
-           rule_type == other.rule_type && silent == other.silent &&
-           silent_tty == other.silent_tty && processes == other.processes;
+    // Note: WatchItemProcessOptions::operator== does not consider custom_message,
+    // event_detail_url or event_detail_text.
+    return name == other.name && version == other.version && audit_only == other.audit_only &&
+           rule_type == other.rule_type && options == other.options && processes == other.processes;
   }
 
   virtual bool operator!=(const WatchItemPolicyBase& other) const { return !(*this == other); }
@@ -234,29 +239,21 @@ struct WatchItemPolicyBase {
 
   std::string name;
   std::string version;  // WIP - No current way to control via config
-  bool allow_read_access;
   bool audit_only;
   WatchItemRuleType rule_type;
-  bool silent;
-  bool silent_tty;
-  std::optional<std::string> custom_message;
-  std::optional<NSString*> event_detail_url;
-  std::optional<NSString*> event_detail_text;
-  SetWatchItemProcess processes;
+  WatchItemProcessOptions options;
+  WatchItemProcessList processes;
   int64_t rule_id;
 };
 
 struct DataWatchItemPolicy : public WatchItemPolicyBase {
   DataWatchItemPolicy(std::string_view n, std::string_view v, std::string_view p,
                       WatchItemPathType pt = kWatchItemPolicyDefaultPathType,
-                      bool ara = kWatchItemPolicyDefaultAllowReadAccess,
                       bool ao = kWatchItemPolicyDefaultAuditOnly,
                       WatchItemRuleType rt = kWatchItemPolicyDefaultRuleType,
-                      bool esm = kWatchItemPolicyDefaultEnableSilentMode,
-                      bool estm = kWatchItemPolicyDefaultEnableSilentTTYMode,
-                      std::string_view cm = "", NSString* edu = nil, NSString* edt = nil,
-                      SetWatchItemProcess procs = {}, int64_t rid = 0)
-      : WatchItemPolicyBase(n, v, ara, ao, rt, esm, estm, cm, edu, edt, std::move(procs), rid),
+                      WatchItemProcessOptions opts = {}, WatchItemProcessList procs = {},
+                      int64_t rid = 0)
+      : WatchItemPolicyBase(n, v, ao, rt, std::move(opts), std::move(procs), rid),
         path(p),
         path_type(pt) {}
 
@@ -279,14 +276,11 @@ struct DataWatchItemPolicy : public WatchItemPolicyBase {
 
 struct ProcessWatchItemPolicy : public WatchItemPolicyBase {
   ProcessWatchItemPolicy(std::string_view n, std::string_view v, SetPairPathAndType pt,
-                         bool ara = kWatchItemPolicyDefaultAllowReadAccess,
                          bool ao = kWatchItemPolicyDefaultAuditOnly,
                          WatchItemRuleType rt = kWatchItemPolicyDefaultRuleType,
-                         bool esm = kWatchItemPolicyDefaultEnableSilentMode,
-                         bool estm = kWatchItemPolicyDefaultEnableSilentTTYMode,
-                         std::string_view cm = "", NSString* edu = nil, NSString* edt = nil,
-                         SetWatchItemProcess procs = {}, int64_t rid = 0)
-      : WatchItemPolicyBase(n, v, ara, ao, rt, esm, estm, cm, edu, edt, std::move(procs), rid),
+                         WatchItemProcessOptions opts = {}, WatchItemProcessList procs = {},
+                         int64_t rid = 0)
+      : WatchItemPolicyBase(n, v, ao, rt, std::move(opts), std::move(procs), rid),
         path_type_pairs(std::move(pt)),
         tree(std::make_unique<santa::PrefixTree<santa::Unit>>()) {
     // Build tree

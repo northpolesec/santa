@@ -210,8 +210,8 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess& proc) {
 
   EXPECT_CALL(faaPolicyProcessor, PolicyAllowsReadsForTarget)
       .WillRepeatedly([&faaPolicyProcessor](const Message& msg, const Message::PathTarget& target,
-                                            std::shared_ptr<santa::WatchItemPolicyBase> policy) {
-        return faaPolicyProcessor.PolicyAllowsReadsForTargetWrapper(msg, target, policy);
+                                            bool allow_read_access) {
+        return faaPolicyProcessor.PolicyAllowsReadsForTargetWrapper(msg, target, allow_read_access);
       });
 
   {
@@ -219,26 +219,32 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess& proc) {
 
     // Write-only policy, Write operation
     {
-      policy->allow_read_access = true;
+      policy->options.allow_read_access = true;
       esMsg.event.open.fflag = FWRITE | FREAD;
       Message msg(mockESApi, &esMsg);
-      XCTAssertEqual(faaPolicyProcessor.PolicyAllowsReadsForTarget(msg, target, policy), false);
+      XCTAssertEqual(faaPolicyProcessor.PolicyAllowsReadsForTarget(
+                         msg, target, policy->options.allow_read_access),
+                     false);
     }
 
     // Write-only policy, Read operation
     {
-      policy->allow_read_access = true;
+      policy->options.allow_read_access = true;
       esMsg.event.open.fflag = FREAD;
       Message msg(mockESApi, &esMsg);
-      XCTAssertEqual(faaPolicyProcessor.PolicyAllowsReadsForTarget(msg, target, policy), true);
+      XCTAssertEqual(faaPolicyProcessor.PolicyAllowsReadsForTarget(
+                         msg, target, policy->options.allow_read_access),
+                     true);
     }
 
     // Read/Write policy, Read operation
     {
-      policy->allow_read_access = false;
+      policy->options.allow_read_access = false;
       esMsg.event.open.fflag = FREAD;
       Message msg(mockESApi, &esMsg);
-      XCTAssertEqual(faaPolicyProcessor.PolicyAllowsReadsForTarget(msg, target, policy), false);
+      XCTAssertEqual(faaPolicyProcessor.PolicyAllowsReadsForTarget(
+                         msg, target, policy->options.allow_read_access),
+                     false);
     }
   }
 
@@ -247,18 +253,22 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess& proc) {
 
     // Write-only policy, target readable
     {
-      policy->allow_read_access = true;
+      policy->options.allow_read_access = true;
       target.is_readable = true;
       Message msg(mockESApi, &esMsg);
-      XCTAssertEqual(faaPolicyProcessor.PolicyAllowsReadsForTarget(msg, target, policy), true);
+      XCTAssertEqual(faaPolicyProcessor.PolicyAllowsReadsForTarget(
+                         msg, target, policy->options.allow_read_access),
+                     true);
     }
 
     // Write-only policy, target not readable
     {
-      policy->allow_read_access = true;
+      policy->options.allow_read_access = true;
       target.is_readable = false;
       Message msg(mockESApi, &esMsg);
-      XCTAssertEqual(faaPolicyProcessor.PolicyAllowsReadsForTarget(msg, target, policy), false);
+      XCTAssertEqual(faaPolicyProcessor.PolicyAllowsReadsForTarget(
+                         msg, target, policy->options.allow_read_access),
+                     false);
     }
   }
 
@@ -267,18 +277,22 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess& proc) {
 
     // Write-only policy, target readable
     {
-      policy->allow_read_access = true;
+      policy->options.allow_read_access = true;
       target.is_readable = true;
       Message msg(mockESApi, &esMsg);
-      XCTAssertEqual(faaPolicyProcessor.PolicyAllowsReadsForTarget(msg, target, policy), true);
+      XCTAssertEqual(faaPolicyProcessor.PolicyAllowsReadsForTarget(
+                         msg, target, policy->options.allow_read_access),
+                     true);
     }
 
     // Write-only policy, target not readable
     {
-      policy->allow_read_access = true;
+      policy->options.allow_read_access = true;
       target.is_readable = false;
       Message msg(mockESApi, &esMsg);
-      XCTAssertEqual(faaPolicyProcessor.PolicyAllowsReadsForTarget(msg, target, policy), false);
+      XCTAssertEqual(faaPolicyProcessor.PolicyAllowsReadsForTarget(
+                         msg, target, policy->options.allow_read_access),
+                     false);
     }
   }
 
@@ -291,7 +305,9 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess& proc) {
   for (const auto& event : eventTypes) {
     esMsg.event_type = event;
     Message msg(mockESApi, &esMsg);
-    XCTAssertEqual(faaPolicyProcessor.PolicyAllowsReadsForTarget(msg, target, policy), false);
+    XCTAssertEqual(faaPolicyProcessor.PolicyAllowsReadsForTarget(msg, target,
+                                                                 policy->options.allow_read_access),
+                   false);
   }
 }
 
@@ -328,7 +344,7 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess& proc) {
   }
 
   auto policy = std::make_shared<WatchItemPolicyBase>("foo_policy", "ver", "/foo");
-  policy->processes.insert(policyProc);
+  policy->processes.push_back(policyProc);
   auto optionalPolicy = std::make_optional<std::shared_ptr<WatchItemPolicyBase>>(policy);
 
   // Signed but invalid instigating processes are automatically
