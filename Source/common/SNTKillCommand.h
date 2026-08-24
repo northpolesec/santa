@@ -16,6 +16,15 @@
 
 @interface SNTKillRequest : NSObject <NSSecureCoding>
 @property(readonly) NSString* uuid;
+
+/// Signal to deliver to matched processes. The initializers that don't take a
+/// signal use SIGKILL.
+@property(readonly) int signal;
+
+/// When YES, the signal goes to the process group of each matched process
+/// rather than to the matched process alone. The initializers that don't take
+/// it use NO.
+@property(readonly) BOOL targetProcessGroups;
 @end
 
 @interface SNTKillRequestRunningProcess : SNTKillRequest <NSSecureCoding>
@@ -27,12 +36,22 @@
                          pid:(int)pid
                   pidversion:(int)pidversion
              bootSessionUUID:(NSString*)bootSessionUUID;
+- (instancetype)initWithUUID:(NSString*)uuid
+                         pid:(int)pid
+                  pidversion:(int)pidversion
+             bootSessionUUID:(NSString*)bootSessionUUID
+                      signal:(int)signal
+         targetProcessGroups:(BOOL)targetProcessGroups;
 @end
 
 @interface SNTKillRequestCDHash : SNTKillRequest <NSSecureCoding>
 @property(readonly) NSString* cdhash;
 
 - (instancetype)initWithUUID:(NSString*)uuid cdHash:(NSString*)cdhash;
+- (instancetype)initWithUUID:(NSString*)uuid
+                      cdHash:(NSString*)cdhash
+                      signal:(int)signal
+         targetProcessGroups:(BOOL)targetProcessGroups;
 @end
 
 @interface SNTKillRequestSigningID : SNTKillRequest <NSSecureCoding>
@@ -40,12 +59,20 @@
 @property(readonly) NSString* signingID;
 
 - (instancetype)initWithUUID:(NSString*)uuid signingID:(NSString*)signingID;
+- (instancetype)initWithUUID:(NSString*)uuid
+                   signingID:(NSString*)signingID
+                      signal:(int)signal
+         targetProcessGroups:(BOOL)targetProcessGroups;
 @end
 
 @interface SNTKillRequestTeamID : SNTKillRequest <NSSecureCoding>
 @property(readonly) NSString* teamID;
 
 - (instancetype)initWithUUID:(NSString*)uuid teamID:(NSString*)teamID;
+- (instancetype)initWithUUID:(NSString*)uuid
+                      teamID:(NSString*)teamID
+                      signal:(int)signal
+         targetProcessGroups:(BOOL)targetProcessGroups;
 @end
 
 typedef NS_ENUM(NSInteger, SNTKilledProcessError) {

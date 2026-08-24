@@ -18,12 +18,21 @@
 #import <Kernel/kern/cs_blobs.h>
 #import <XCTest/XCTest.h>
 #import <arpa/inet.h>
+#include <signal.h>
+#include <unistd.h>
 
+#include <cerrno>
 #include <cstring>
 #include <functional>
+#include <map>
+#include <optional>
+#include <set>
 #include <vector>
 
+#include "Source/common/AuditUtilities.h"
 #include "Source/common/CSOpsHelper.h"
+#import "Source/common/SNTKillCommand.h"
+#import "Source/common/SNTSystemInfo.h"
 
 // Forward declare test-only functions exposed by KillingMachine.mm
 namespace santa {
@@ -34,6 +43,115 @@ extern bool TestSigningIDMatcher(pid_t pid, NSString* signingID, CSOpsFunc csops
 extern bool TestStatusFlagsMatcher(pid_t pid, uint32_t mask, CSOpsFunc csops_func);
 
 }  // namespace santa
+
+namespace {
+
+// The team ID the fake csops reports for pids a test wants matched. Paired with
+// an SNTKillRequestTeamID for the same value, this is how a test chooses which
+// pids the real (unfaked) matching machinery matches.
+static NSString* const kMatchingTeamID = @"ABCDE12345";
+
+// One recorded signal delivery. `target` is a pid when `group` is false and a
+// pgid when it is true.
+struct FakeSignal {
+  pid_t target;
+  int sig;
+  bool group;
+};
+
+// State behind a fully faked santa::KillEnv. Every seam is replaced, so no test
+// can reach a real syscall (or signal a real process) by forgetting to override
+// one.
+struct FakeEnv {
+  // nullopt makes the pid snapshot fail.
+  std::optional<std::vector<pid_t>> pids = std::vector<pid_t>{};
+  // pid -> pidversion. A pid that isn't here has no audit token.
+  std::map<pid_t, int> pidversions;
+  // pids the fake csops reports kMatchingTeamID for.
+  std::set<pid_t> matching;
+  // pid -> pgid. A pid that isn't here has an unreadable process group.
+  std::map<pid_t, pid_t> pgids;
+  // pid -> the audit token read after which that pid is recycled: its live
+  // pidversion changes, modeling a different process taking over the pid.
+  // Reads are counted per pid across the whole call. Matching reads a pid's
+  // token twice, so 1 recycles mid-match and 2 recycles after it matched.
+  std::map<pid_t, int> recycleAfterNthRead;
+  // errno both signal seams return for a delivery that reaches its target.
+  int signalError = 0;
+
+  std::vector<FakeSignal> signals;
+  std::map<pid_t, int> tokenReads;
+};
+
+santa::KillEnv MakeEnv(FakeEnv* fake) {
+  santa::KillEnv env;
+
+  env.list_pids = [fake] { return fake->pids; };
+
+  env.token_for_pid = [fake](pid_t pid, audit_token_t* token) {
+    auto it = fake->pidversions.find(pid);
+    if (it == fake->pidversions.end()) {
+      return false;
+    }
+    *token = santa::MakeStubAuditToken(pid, it->second);
+
+    auto recycle = fake->recycleAfterNthRead.find(pid);
+    if (recycle != fake->recycleAfterNthRead.end() && ++fake->tokenReads[pid] == recycle->second) {
+      it->second += 1;
+    }
+    return true;
+  };
+
+  env.csops_func = [fake](pid_t pid, unsigned int ops, void* useraddr, size_t usersize) {
+    if (ops != santa::kCsopTeamID || !fake->matching.count(pid) ||
+        usersize < sizeof(santa::csops_blob) + kMatchingTeamID.length) {
+      return -1;
+    }
+    santa::csops_blob* blob = (santa::csops_blob*)useraddr;
+    blob->type = 0;
+    blob->len = htonl(sizeof(santa::csops_blob) + 1 + kMatchingTeamID.length);
+    std::memcpy(blob->data, kMatchingTeamID.UTF8String, kMatchingTeamID.length);
+    return 0;
+  };
+
+  env.pgid_for_pid = [fake](pid_t pid) -> pid_t {
+    auto it = fake->pgids.find(pid);
+    return it == fake->pgids.end() ? -1 : it->second;
+  };
+
+  env.signal_token = [fake](audit_token_t* token, int sig) {
+    pid_t pid = santa::Pid(*token);
+    fake->signals.push_back({pid, sig, false});
+
+    // proc_signal_with_audittoken validates the token against the live
+    // process, so a token captured before the pid was recycled signals nothing.
+    auto it = fake->pidversions.find(pid);
+    if (it == fake->pidversions.end() || it->second != santa::Pidversion(*token)) {
+      return ESRCH;
+    }
+    return fake->signalError;
+  };
+
+  env.signal_group = [fake](pid_t pgid, int sig) {
+    fake->signals.push_back({pgid, sig, true});
+    return fake->signalError;
+  };
+
+  return env;
+}
+
+// Renders recorded deliveries as "pid:10:9" / "group:100:15" so a failing
+// assertion prints the whole sequence instead of a count mismatch.
+NSArray<NSString*>* SignalDescriptions(const std::vector<FakeSignal>& signals) {
+  NSMutableArray<NSString*>* out = [NSMutableArray array];
+  for (const FakeSignal& signal : signals) {
+    [out addObject:[NSString stringWithFormat:@"%@:%d:%d", signal.group ? @"group" : @"pid",
+                                              signal.target, signal.sig]];
+  }
+  return out;
+}
+
+}  // namespace
 
 @interface KillingMachineTest : XCTestCase
 @end
@@ -177,6 +295,228 @@ extern bool TestStatusFlagsMatcher(pid_t pid, uint32_t mask, CSOpsFunc csops_fun
       12345, CS_PLATFORM_BINARY, ^(pid_t pid, unsigned int ops, void* useraddr, size_t usersize) {
         return -1;
       }));
+}
+
+//
+// Signal delivery
+//
+
+// Pins today's behavior: a request built with the existing initializer signals
+// each matched pid individually with SIGKILL, even where the pids share a
+// process group.
+- (void)testDefaultRequestKeepsSigkillPerPid {
+  FakeEnv fake;
+  fake.pids = std::vector<pid_t>{10, 11, 12};
+  fake.pidversions = {{10, 1}, {11, 2}, {12, 3}};
+  fake.matching = {10, 11, 12};
+  fake.pgids = {{10, getpgrp() + 1}, {11, getpgrp() + 1}, {12, getpgrp() + 1}};
+
+  SNTKillRequest* request = [[SNTKillRequestTeamID alloc] initWithUUID:@"uuid"
+                                                                teamID:kMatchingTeamID];
+  XCTAssertEqual(request.signal, SIGKILL);
+  XCTAssertFalse(request.targetProcessGroups);
+
+  SNTKillResponse* response = santa::KillingMachine(request, MakeEnv(&fake));
+
+  XCTAssertEqual(response.error, SNTKillResponseErrorNone);
+  XCTAssertEqualObjects(SignalDescriptions(fake.signals),
+                        (@[ @"pid:10:9", @"pid:11:9", @"pid:12:9" ]));
+  XCTAssertEqual(response.killedProcesses.count, 3);
+  XCTAssertEqual(response.killedProcesses[0].pid, 10);
+  XCTAssertEqual(response.killedProcesses[0].pidversion, 1);
+  XCTAssertEqual(response.killedProcesses[0].error, SNTKilledProcessErrorNone);
+}
+
+- (void)testRequestSignalIsHonored {
+  FakeEnv fake;
+  fake.pids = std::vector<pid_t>{10};
+  fake.pidversions = {{10, 1}};
+  fake.matching = {10};
+
+  SNTKillRequest* request = [[SNTKillRequestTeamID alloc] initWithUUID:@"uuid"
+                                                                teamID:kMatchingTeamID
+                                                                signal:SIGTERM
+                                                   targetProcessGroups:NO];
+
+  santa::KillingMachine(request, MakeEnv(&fake));
+
+  XCTAssertEqualObjects(SignalDescriptions(fake.signals), (@[ @"pid:10:15" ]));
+}
+
+// Three pids share a process group, so that group is signaled once and the
+// later members are skipped. A fourth pid in another group gets its own signal.
+// Reporting follows delivery: one record per signal sent, attributed to the pid
+// that triggered it.
+- (void)testGroupTargetingSignalsEachGroupOnce {
+  pid_t pgidA = getpgrp() + 1;
+  pid_t pgidB = getpgrp() + 2;
+
+  FakeEnv fake;
+  fake.pids = std::vector<pid_t>{10, 11, 12, 20};
+  fake.pidversions = {{10, 1}, {11, 2}, {12, 3}, {20, 4}};
+  fake.matching = {10, 11, 12, 20};
+  fake.pgids = {{10, pgidA}, {11, pgidA}, {12, pgidA}, {20, pgidB}};
+  fake.signalError = EPERM;
+
+  SNTKillRequest* request = [[SNTKillRequestTeamID alloc] initWithUUID:@"uuid"
+                                                                teamID:kMatchingTeamID
+                                                                signal:SIGTERM
+                                                   targetProcessGroups:YES];
+
+  SNTKillResponse* response = santa::KillingMachine(request, MakeEnv(&fake));
+
+  XCTAssertEqualObjects(SignalDescriptions(fake.signals), (@[
+                          [NSString stringWithFormat:@"group:%d:15", pgidA],
+                          [NSString stringWithFormat:@"group:%d:15", pgidB]
+                        ]));
+
+  XCTAssertEqual(response.killedProcesses.count, 2);
+  XCTAssertEqual(response.killedProcesses[0].pid, 10);
+  XCTAssertEqual(response.killedProcesses[0].error, SNTKilledProcessErrorNotPermitted);
+  XCTAssertEqual(response.killedProcesses[1].pid, 20);
+  XCTAssertEqual(response.killedProcesses[1].error, SNTKilledProcessErrorNotPermitted);
+}
+
+// kill(2) reads a pgid of 1 as every process on the machine and a pgid of 0 as
+// the caller's own group, and santad's own group would take santad down. Those
+// pids fall back to a direct signal.
+- (void)testGroupTargetingSkipsUnsafeGroups {
+  // Some group that isn't ours. Derived from our own so they can never collide.
+  pid_t otherPgid = getpgrp() + 1;
+
+  FakeEnv fake;
+  fake.pids = std::vector<pid_t>{10, 11, 12, 13};
+  fake.pidversions = {{10, 1}, {11, 2}, {12, 3}, {13, 4}};
+  fake.matching = {10, 11, 12, 13};
+  fake.pgids = {{10, 1}, {11, 0}, {12, getpgrp()}, {13, otherPgid}};
+
+  SNTKillRequest* request = [[SNTKillRequestTeamID alloc] initWithUUID:@"uuid"
+                                                                teamID:kMatchingTeamID
+                                                                signal:SIGKILL
+                                                   targetProcessGroups:YES];
+
+  santa::KillingMachine(request, MakeEnv(&fake));
+
+  XCTAssertEqualObjects(
+      SignalDescriptions(fake.signals), (@[
+        @"pid:10:9", @"pid:11:9", @"pid:12:9", [NSString stringWithFormat:@"group:%d:9", otherPgid]
+      ]));
+}
+
+- (void)testGroupTargetingFallsBackWhenPgidUnreadable {
+  FakeEnv fake;
+  fake.pids = std::vector<pid_t>{10};
+  fake.pidversions = {{10, 1}};
+  fake.matching = {10};
+  // No pgids entry, so the lookup fails.
+
+  SNTKillRequest* request = [[SNTKillRequestTeamID alloc] initWithUUID:@"uuid"
+                                                                teamID:kMatchingTeamID
+                                                                signal:SIGKILL
+                                                   targetProcessGroups:YES];
+
+  SNTKillResponse* response = santa::KillingMachine(request, MakeEnv(&fake));
+
+  XCTAssertEqualObjects(SignalDescriptions(fake.signals), (@[ @"pid:10:9" ]));
+  XCTAssertEqual(response.killedProcesses.count, 1);
+  XCTAssertEqual(response.killedProcesses[0].error, SNTKilledProcessErrorNone);
+}
+
+- (void)testSelfAndLaunchdAreNeverSignaled {
+  pid_t selfPid = getpid();
+  pid_t otherPgid = getpgrp() + 1;
+
+  FakeEnv fake;
+  fake.pids = std::vector<pid_t>{1, selfPid, 20};
+  fake.pidversions = {{1, 1}, {selfPid, 2}, {20, 3}};
+  fake.matching = {1, selfPid, 20};
+  // launchd leads process group 1 and we are in our own group, so neither is a
+  // usable group target either. Only pid 20's group is.
+  fake.pgids = {{1, 1}, {selfPid, getpgrp()}, {20, otherPgid}};
+
+  SNTKillRequest* request = [[SNTKillRequestTeamID alloc] initWithUUID:@"uuid"
+                                                                teamID:kMatchingTeamID
+                                                                signal:SIGKILL
+                                                   targetProcessGroups:YES];
+
+  SNTKillResponse* response = santa::KillingMachine(request, MakeEnv(&fake));
+
+  XCTAssertEqualObjects(SignalDescriptions(fake.signals),
+                        (@[ [NSString stringWithFormat:@"group:%d:9", otherPgid] ]));
+  XCTAssertEqual(response.killedProcesses.count, 3);
+  XCTAssertEqual(response.killedProcesses[0].pid, 1);
+  XCTAssertEqual(response.killedProcesses[0].error, SNTKilledProcessErrorInvalidTarget);
+  XCTAssertEqual(response.killedProcesses[1].pid, selfPid);
+  XCTAssertEqual(response.killedProcesses[1].error, SNTKilledProcessErrorInvalidTarget);
+  XCTAssertEqual(response.killedProcesses[2].pid, 20);
+  XCTAssertEqual(response.killedProcesses[2].error, SNTKilledProcessErrorNone);
+}
+
+// The audit token is read before and after matching so a pid recycled mid-match
+// is never signaled at all.
+- (void)testPidRecycledDuringMatchIsNotSignaled {
+  FakeEnv fake;
+  fake.pids = std::vector<pid_t>{10, 11};
+  fake.pidversions = {{10, 1}, {11, 2}};
+  fake.matching = {10, 11};
+  fake.recycleAfterNthRead = {{10, 1}};
+
+  SNTKillRequest* request = [[SNTKillRequestTeamID alloc] initWithUUID:@"uuid"
+                                                                teamID:kMatchingTeamID];
+
+  SNTKillResponse* response = santa::KillingMachine(request, MakeEnv(&fake));
+
+  XCTAssertEqualObjects(SignalDescriptions(fake.signals), (@[ @"pid:11:9" ]));
+  XCTAssertEqual(response.killedProcesses.count, 1);
+  XCTAssertEqual(response.killedProcesses[0].pid, 11);
+}
+
+// A pid recycled after it matched is signaled against the token captured while
+// it matched, which the new process can't satisfy, so the signal lands nowhere.
+- (void)testPidRecycledAfterMatchIsNotSignaled {
+  FakeEnv fake;
+  fake.pids = std::vector<pid_t>{10};
+  fake.pidversions = {{10, 1}};
+  fake.matching = {10};
+  fake.recycleAfterNthRead = {{10, 2}};
+
+  SNTKillRequest* request = [[SNTKillRequestTeamID alloc] initWithUUID:@"uuid"
+                                                                teamID:kMatchingTeamID];
+
+  SNTKillResponse* response = santa::KillingMachine(request, MakeEnv(&fake));
+
+  XCTAssertEqualObjects(SignalDescriptions(fake.signals), (@[ @"pid:10:9" ]));
+  XCTAssertEqual(response.killedProcesses.count, 1);
+  XCTAssertEqual(response.killedProcesses[0].error, SNTKilledProcessErrorNoSuchProcess);
+}
+
+- (void)testRunningProcessRequestHonorsSignalAndGroupTargeting {
+  pid_t pgid = getpgrp() + 3;
+
+  FakeEnv fake;
+  // The running process path resolves its target from the request, so it must
+  // never consult the pid snapshot.
+  fake.pids = std::nullopt;
+  fake.pidversions = {{10, 7}};
+  fake.pgids = {{10, pgid}};
+
+  SNTKillRequest* request =
+      [[SNTKillRequestRunningProcess alloc] initWithUUID:@"uuid"
+                                                     pid:10
+                                              pidversion:7
+                                         bootSessionUUID:[SNTSystemInfo bootSessionUUID]
+                                                  signal:SIGTERM
+                                     targetProcessGroups:YES];
+  XCTAssertNotNil(request);
+
+  SNTKillResponse* response = santa::KillingMachine(request, MakeEnv(&fake));
+
+  XCTAssertEqual(response.error, SNTKillResponseErrorNone);
+  XCTAssertEqualObjects(SignalDescriptions(fake.signals),
+                        (@[ [NSString stringWithFormat:@"group:%d:15", pgid] ]));
+  XCTAssertEqual(response.killedProcesses.count, 1);
+  XCTAssertEqual(response.killedProcesses[0].pid, 10);
+  XCTAssertEqual(response.killedProcesses[0].pidversion, 7);
 }
 
 @end

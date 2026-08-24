@@ -14,20 +14,39 @@
 
 #import "Source/common/SNTKillCommand.h"
 #import <Foundation/Foundation.h>
+#include <sys/signal.h>
 
 #import "Source/common/CodeSigningIdentifierUtils.h"
 #include "Source/common/CoderMacros.h"
 
 @interface SNTKillRequest ()
 - (instancetype)initWithUUID:(NSString*)uuid;
+- (instancetype)initWithUUID:(NSString*)uuid
+                      signal:(int)signal
+         targetProcessGroups:(BOOL)targetProcessGroups;
 @end
 
 @implementation SNTKillRequest
 
 - (instancetype)initWithUUID:(NSString*)uuid {
+  return [self initWithUUID:uuid signal:SIGKILL targetProcessGroups:NO];
+}
+
+- (instancetype)initWithUUID:(NSString*)uuid
+                      signal:(int)signal
+         targetProcessGroups:(BOOL)targetProcessGroups {
+  // kill(2) treats signal 0 as a liveness probe rather than a kill, and rejects
+  // anything outside the signal table at delivery. Either would leave a request
+  // that reports success for every match while signaling nothing.
+  if (signal <= 0 || signal >= NSIG) {
+    return nil;
+  }
+
   self = [super init];
   if (self) {
     _uuid = uuid;
+    _signal = signal;
+    _targetProcessGroups = targetProcessGroups;
   }
   return self;
 }
@@ -38,12 +57,26 @@
 
 - (void)encodeWithCoder:(NSCoder*)coder {
   ENCODE(coder, uuid);
+  ENCODE_BOXABLE(coder, signal);
+  ENCODE_BOXABLE(coder, targetProcessGroups);
 }
 
 - (instancetype)initWithCoder:(NSCoder*)decoder {
+  // An archive written before the signal field existed has no signal key at
+  // all; keep such a request meaning what it meant when it was written. An
+  // archive that does carry a signal is held to the same range the
+  // initializers enforce.
+  NSNumber* encodedSignal = [decoder decodeObjectOfClass:[NSNumber class] forKey:@"signal"];
+  int decodedSignal = encodedSignal ? encodedSignal.intValue : SIGKILL;
+  if (decodedSignal <= 0 || decodedSignal >= NSIG) {
+    return nil;
+  }
+
   self = [super init];
   if (self) {
     DECODE(decoder, uuid, NSString);
+    _signal = decodedSignal;
+    DECODE_SELECTOR(decoder, targetProcessGroups, NSNumber, boolValue);
   }
   return self;
 }
@@ -59,6 +92,20 @@
                          pid:(int)pid
                   pidversion:(int)pidversion
              bootSessionUUID:(NSString*)bootSessionUUID {
+  return [self initWithUUID:uuid
+                        pid:pid
+                 pidversion:pidversion
+            bootSessionUUID:bootSessionUUID
+                     signal:SIGKILL
+        targetProcessGroups:NO];
+}
+
+- (instancetype)initWithUUID:(NSString*)uuid
+                         pid:(int)pid
+                  pidversion:(int)pidversion
+             bootSessionUUID:(NSString*)bootSessionUUID
+                      signal:(int)signal
+         targetProcessGroups:(BOOL)targetProcessGroups {
   if (pid == 0 || pidversion == 0) {
     return nil;
   } else {
@@ -80,7 +127,7 @@
     }
   }
 
-  self = [super initWithUUID:uuid];
+  self = [super initWithUUID:uuid signal:signal targetProcessGroups:targetProcessGroups];
   if (self) {
     _pid = pid;
     _pidversion = pidversion;
@@ -118,11 +165,18 @@
 @implementation SNTKillRequestCDHash
 
 - (instancetype)initWithUUID:(NSString*)uuid cdHash:(NSString*)cdhash {
+  return [self initWithUUID:uuid cdHash:cdhash signal:SIGKILL targetProcessGroups:NO];
+}
+
+- (instancetype)initWithUUID:(NSString*)uuid
+                      cdHash:(NSString*)cdhash
+                      signal:(int)signal
+         targetProcessGroups:(BOOL)targetProcessGroups {
   if (!santa::IsValidCDHash(cdhash)) {
     return nil;
   }
 
-  self = [super initWithUUID:uuid];
+  self = [super initWithUUID:uuid signal:signal targetProcessGroups:targetProcessGroups];
   if (self) {
     _cdhash = cdhash;
   }
@@ -154,12 +208,19 @@
 @implementation SNTKillRequestSigningID
 
 - (instancetype)initWithUUID:(NSString*)uuid signingID:(NSString*)signingID {
+  return [self initWithUUID:uuid signingID:signingID signal:SIGKILL targetProcessGroups:NO];
+}
+
+- (instancetype)initWithUUID:(NSString*)uuid
+                   signingID:(NSString*)signingID
+                      signal:(int)signal
+         targetProcessGroups:(BOOL)targetProcessGroups {
   auto [tid, sid] = santa::SplitSigningID(signingID);
   if (!tid || !sid) {
     return nil;
   }
 
-  self = [super initWithUUID:uuid];
+  self = [super initWithUUID:uuid signal:signal targetProcessGroups:targetProcessGroups];
   if (self) {
     _teamID = tid;
     _signingID = sid;
@@ -194,11 +255,18 @@
 @implementation SNTKillRequestTeamID
 
 - (instancetype)initWithUUID:(NSString*)uuid teamID:(NSString*)teamID {
+  return [self initWithUUID:uuid teamID:teamID signal:SIGKILL targetProcessGroups:NO];
+}
+
+- (instancetype)initWithUUID:(NSString*)uuid
+                      teamID:(NSString*)teamID
+                      signal:(int)signal
+         targetProcessGroups:(BOOL)targetProcessGroups {
   if (!santa::IsValidTeamID(teamID)) {
     return nil;
   }
 
-  self = [super initWithUUID:uuid];
+  self = [super initWithUUID:uuid signal:signal targetProcessGroups:targetProcessGroups];
   if (self) {
     _teamID = [teamID uppercaseString];
   }
