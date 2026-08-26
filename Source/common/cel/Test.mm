@@ -640,7 +640,10 @@ class ScopedHostZone {
   // evaluations would answer BLOCKLIST. The slack is for the compile and the
   // first evaluation, which take milliseconds here but have to clear the
   // threshold on a loaded CI machine too.
-  absl::Time thresholdTime = absl::Now() + absl::Seconds(3);
+  // Quantized to the literal's millisecond precision so the compiled threshold,
+  // the guard below, and the sleep all name the same instant.
+  absl::Time thresholdTime =
+      absl::FromUnixMillis(absl::ToUnixMillis(absl::Now() + absl::Seconds(3)));
   std::string threshold =
       absl::FormatTime("%Y-%m-%dT%H:%M:%E3SZ", thresholdTime, absl::UTCTimeZone());
 
