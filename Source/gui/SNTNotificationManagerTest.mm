@@ -68,6 +68,7 @@
 @interface SNTNotificationManagerTest : XCTestCase
 @property id mockConfigurator;
 @property id mockWindowControllerClass;
+@property NSApplicationActivationPolicy savedActivationPolicy;
 @end
 
 @implementation SNTNotificationManagerTest
@@ -87,12 +88,15 @@
   // [NSApp activateIgnoringOtherApps:YES] a no-op.
   self.mockWindowControllerClass = OCMClassMock([SNTMessageWindowController class]);
   OCMStub([self.mockWindowControllerClass defaultWindow]).andReturn([[OffScreenWindow alloc] init]);
+  self.savedActivationPolicy = NSApp.activationPolicy;
   [NSApp setActivationPolicy:NSApplicationActivationPolicyProhibited];
 }
 
 - (void)tearDown {
   // Class mocks swizzle the class itself, so they have to be undone or they
-  // follow the process into the next test.
+  // follow the process into the next test. The activation policy is process
+  // state too, so it goes back to whatever it was before setUp changed it.
+  [NSApp setActivationPolicy:self.savedActivationPolicy];
   [self.mockConfigurator stopMocking];
   [self.mockWindowControllerClass stopMocking];
   [super tearDown];
