@@ -44,6 +44,7 @@
 #import "Source/gui/SNTNetworkFlowMessageWindowController.h"
 #import "Source/gui/SNTNetworkMountMessageWindowController.h"
 #import "Source/gui/SNTStatusItemManager.h"
+#import "Source/gui/SNTTimedRuleKillMessageWindowController.h"
 #import "src/santanetd/SNDFilterConfigurationHelper.h"
 
 @interface SNTNotificationManager ()
@@ -408,34 +409,26 @@ static NSString* const silencedNotificationsKey = @"SilencedNotifications";
   [un addNotificationRequest:req withCompletionHandler:nil];
 }
 
+// A window, not a UNUserNotificationCenter banner: Do Not Disturb and Focus
+// modes suppress banners, and a warning that something is about to be quit must
+// not be dropped that way.
 - (void)postTimedRuleKillNotificationForApplication:(NSString*)app deadline:(NSDate*)deadline {
-  if ([SNTConfigurator configurator].enableSilentMode) return;
-  if (!app || !deadline) return;
+  // Length, not just nil: an empty name has no identity, so its window would
+  // both read absurdly and defeat the queue's dedup, stacking one focus-stealing
+  // window per repeated call. Logged like the other bad-input bails here, so a
+  // daemon-side regression is visible instead of silently dropping warnings.
+  if (!app.length || !deadline) {
+    LOGI(@"Error: Missing application name or deadline in message received from daemon!");
+    return;
+  }
 
-  UNUserNotificationCenter* un = [UNUserNotificationCenter currentNotificationCenter];
+  SNTTimedRuleKillMessageWindowController* pendingMsg =
+      [[SNTTimedRuleKillMessageWindowController alloc] initWithApplication:app deadline:deadline];
 
-  NSDateFormatter* formatter = [[NSDateFormatter alloc] init];
-  formatter.timeStyle = NSDateFormatterShortStyle;
-  formatter.dateStyle = NSDateFormatterNoStyle;
-
-  UNMutableNotificationContent* content = [[UNMutableNotificationContent alloc] init];
-  content.title = @"Santa";
-  content.body = [NSString
-      stringWithFormat:NSLocalizedString(
-                           @"\"%@\" will quit at %@.",
-                           @"Notification message warning that an app will be quit at a time"),
-                       app, [formatter stringFromDate:deadline]];
-
-  // One banner per (application, deadline): a repeated warning for the same
-  // deadline replaces the previous one rather than stacking up.
-  NSString* identifier = [NSString
-      stringWithFormat:@"timedRuleKillNotification_%@_%f", app, deadline.timeIntervalSince1970];
-
-  UNNotificationRequest* req = [UNNotificationRequest requestWithIdentifier:identifier
-                                                                    content:content
-                                                                    trigger:nil];
-
-  [un addNotificationRequest:req withCompletionHandler:nil];
+  // Silences are a block-event feature: a warning that an application is about
+  // to be quit is not something a user should be able to turn off per
+  // application. Silent mode still suppresses it, through the queue's own check.
+  [self queueMessage:pendingMsg enableSilences:NO];
 }
 
 - (void)postBlockNotification:(SNTStoredExecutionEvent*)event

@@ -4,7 +4,7 @@
 /* Notification message shown when a known app has been unblocked */
 "%@ can now be run" = "%@が実行できるようになった";
 
-/* Notification message warning that an app will be quit at a time */
+/* Window message warning that an app will be quit at a time */
 "\"%@\" will quit at %@." = "%2$@に「%1$@」を終了します。";
 
 /* Reason shown when a justification is required but not given */
