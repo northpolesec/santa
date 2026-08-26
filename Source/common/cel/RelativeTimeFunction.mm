@@ -19,7 +19,12 @@
 #include <utility>
 #include <vector>
 
+// today(zone) resolves its zone with policy_for_range()'s resolver so the two
+// cannot drift apart. Same build target, so this costs no new dependency.
+#include "Source/common/cel/PolicyForRangeFunction.h"
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
+#include "absl/time/civil_time.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
 
@@ -41,8 +46,6 @@ namespace santa {
 namespace cel {
 
 namespace {
-constexpr int64_t kSecondsPerDay = 24 * 60 * 60;
-
 // days(n) -> duration. Pure: n*24h. Sugar because CEL's native duration() only
 // parses units up to hours.
 absl::Duration DaysImpl(int64_t n, const google::protobuf::DescriptorPool*,
@@ -81,30 +84,50 @@ class WeekdaysFunction : public cel_runtime::CelFunction {
 };
 }  // namespace
 
-cel_runtime::CelFunctionDescriptor TodayDescriptor() {
-  return cel_runtime::CelFunctionDescriptor("today", /*receiver_style=*/false, /*types=*/{},
-                                            /*is_strict=*/true);
+std::vector<cel_runtime::CelFunctionDescriptor> TodayDescriptors() {
+  using Type = cel_runtime::CelValue::Type;
+  return {
+      cel_runtime::CelFunctionDescriptor("today", /*receiver_style=*/false, /*types=*/{},
+                                         /*is_strict=*/true),
+      cel_runtime::CelFunctionDescriptor("today", /*receiver_style=*/false,
+                                         /*types=*/{Type::kString},
+                                         /*is_strict=*/true),
+  };
 }
 
 absl::Status TodayFunction::Evaluate(absl::Span<const cel_runtime::CelValue> args,
                                      cel_runtime::CelValue* result,
                                      google::protobuf::Arena*) const {
-  if (!args.empty()) {
-    return absl::InvalidArgumentError("today() expects no arguments");
+  if (args.size() > 1) {
+    return absl::InvalidArgumentError("today() expects at most a time zone argument");
   }
 
-  // Truncate "now" to the start of the current UTC day. The returned value is
-  // therefore stable for the whole UTC day and only changes at the next UTC
-  // midnight. nowSec is always >= 0 (post-epoch) so the modulo truncation is
-  // well-defined.
-  int64_t nowSec = absl::ToUnixSeconds(absl::Now());
-  int64_t startOfDay = nowSec - (nowSec % kSecondsPerDay);
-
-  // The value changes at the next UTC midnight, so a cached decision could go
-  // stale. Mark the evaluation non-cacheable.
+  // The value changes at the next midnight in whichever zone applies, so a
+  // cached decision could go stale. Marked before the zone can fail to resolve,
+  // the same order policy_for_range() uses: a failed evaluation produces no
+  // decision to cache either way.
   *used_sink_ = true;
 
-  *result = cel_runtime::CelValue::CreateTimestamp(absl::FromUnixSeconds(startOfDay));
+  // Both forms are the same path; the bare one is its "local" case. The zone
+  // argument names a calendar for the windows that must mean one instant
+  // fleet-wide. The default is deliberately the same call ResolveTimeZone()'s
+  // "local" branch makes rather than a call to the resolver, which would put a
+  // status on a path that cannot fail; if what "local" means ever changes there,
+  // change it here and in PolicyForRangeFunction::Evaluate() too.
+  absl::TimeZone zone = absl::LocalTimeZone();
+  if (args.size() == 1) {
+    absl::StatusOr<absl::TimeZone> named = ResolveTimeZone(args[0].StringOrDie().value());
+    if (!named.ok()) {
+      return named.status();
+    }
+    zone = *named;
+  }
+
+  // The start of the civil day that zone is in right now, off the system clock:
+  // today() is the date this machine says it is, in the calendar asked for.
+  absl::Time now = absl::Now();
+  *result = cel_runtime::CelValue::CreateTimestamp(
+      absl::FromCivil(absl::CivilDay{absl::ToCivilSecond(now, zone)}, zone));
   return absl::OkStatus();
 }
 
@@ -130,9 +153,12 @@ absl::Status NowFunction::Evaluate(absl::Span<const cel_runtime::CelValue> args,
 absl::Status AddRelativeTimeCompilerLibrary(::cel::CompilerBuilder& builder) {
   return builder.AddLibrary(::cel::CompilerLibrary::FromCheckerLibrary(
       {"relative_time", [](::cel::TypeCheckerBuilder& checker) -> absl::Status {
-         CEL_ASSIGN_OR_RETURN(auto today_decl, ::cel::MakeFunctionDecl(
-                                                   "today", ::cel::MakeOverloadDecl(
-                                                                "today", ::cel::TimestampType())));
+         CEL_ASSIGN_OR_RETURN(
+             auto today_decl,
+             ::cel::MakeFunctionDecl(
+                 "today", ::cel::MakeOverloadDecl("today", ::cel::TimestampType()),
+                 ::cel::MakeOverloadDecl("today_timestamp_tz", ::cel::TimestampType(),
+                                         ::cel::StringType())));
          CEL_ASSIGN_OR_RETURN(auto days_decl,
                               ::cel::MakeFunctionDecl(
                                   "days", ::cel::MakeOverloadDecl("days_int", ::cel::DurationType(),
@@ -159,7 +185,9 @@ absl::Status RegisterRelativeTimeFunctions(cel_runtime::CelFunctionRegistry* reg
   // today() and now() are lazy: the implementations are vended by the Activation
   // so they are never constant-folded and can mark the evaluation
   // non-cacheable.
-  CEL_RETURN_IF_ERROR(registry->RegisterLazyFunction(TodayDescriptor()));
+  for (const auto& descriptor : TodayDescriptors()) {
+    CEL_RETURN_IF_ERROR(registry->RegisterLazyFunction(descriptor));
+  }
   CEL_RETURN_IF_ERROR(registry->RegisterLazyFunction(NowDescriptor()));
 
   // weekdays() is a pure constant.

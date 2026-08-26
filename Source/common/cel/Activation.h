@@ -102,7 +102,7 @@ class Activation : public ::google::api::expr::runtime::BaseActivation {
   mutable bool usedRelativeTime_ = false;
   // Lazily-created implementations of the lazy functions, vended via
   // FindFunctionOverloads.
-  mutable std::unique_ptr<TodayFunction> todayFn_;
+  mutable std::vector<std::unique_ptr<TodayFunction>> todayFns_;
   mutable std::unique_ptr<NowFunction> nowFn_;
   mutable std::vector<std::unique_ptr<PolicyForRangeFunction>> policyForRangeFns_;
 

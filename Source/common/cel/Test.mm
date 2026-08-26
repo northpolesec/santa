@@ -21,6 +21,8 @@
 #import <XCTest/XCTest.h>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
+#include <cstdlib>
 
 #include <memory>
 #include <optional>
@@ -69,6 +71,71 @@ std::unique_ptr<santa::cel::Activation<IsV2>> MakeActivation() {
         return {};
       });
 }
+
+constexpr int kMinutesPerDay = 24 * 60;
+
+// A fixed offset east of UTC, in minutes, written the way the zone argument
+// wants it: [+-]HH:MM.
+std::string FixedOffsetZone(int offsetMinutes) {
+  int magnitude = std::abs(offsetMinutes);
+  char formatted[7];
+  std::snprintf(formatted, sizeof(formatted), "%c%02d:%02d", offsetMinutes < 0 ? '-' : '+',
+                magnitude / 60, magnitude % 60);
+  return formatted;
+}
+
+// An instant as a CEL timestamp() literal, in UTC so the text carries no zone
+// question of its own.
+std::string AsUTCLiteral(absl::Time instant) {
+  return absl::FormatTime("%Y-%m-%dT%H:%M:%SZ", instant, absl::UTCTimeZone());
+}
+
+// The offset, in minutes east of UTC, of a fixed zone in which `now` reads as
+// hour:minute local. Lets a case pin a civil time through the CEL path, which
+// can only ever ask about the current instant, without knowing the host's zone
+// or the date. Always in [0, kMinutesPerDay), so always writable as +HH:MM.
+int OffsetWhereNowReads(absl::Time now, int hour, int minute) {
+  absl::CivilSecond utcNow = absl::ToCivilSecond(now, absl::UTCTimeZone());
+  int wanted = hour * 60 + minute;
+  int current = utcNow.hour() * 60 + utcNow.minute();
+  return ((wanted - current) % kMinutesPerDay + kMinutesPerDay) % kMinutesPerDay;
+}
+
+// Pins the host zone for as long as it is in scope, by setting $TZ:
+// absl::LocalTimeZone() re-reads $TZ on every call, so this is what the
+// functions under test see as "the host's zone".
+//
+// The cases that check a host-local default need this. Where the suite runs in
+// CI there is no TZ set at all, which means UTC, and on a UTC host a host-local
+// default and a UTC default are the same answer to every question the CEL path
+// can ask: those cases would pass whichever one the code implemented. Pinning a
+// zone with a nonzero offset is what makes them discriminate.
+//
+// The previous value is put back on the way out, including when an assertion in
+// the scope failed, since XCTest assertion failures do not unwind.
+class ScopedHostZone {
+ public:
+  explicit ScopedHostZone(const char* zone) {
+    if (const char* previous = getenv("TZ"); previous != nullptr) {
+      previous_ = std::string(previous);
+    }
+    setenv("TZ", zone, 1);
+  }
+
+  ~ScopedHostZone() {
+    if (previous_.has_value()) {
+      setenv("TZ", previous_->c_str(), 1);
+    } else {
+      unsetenv("TZ");
+    }
+  }
+
+  ScopedHostZone(const ScopedHostZone&) = delete;
+  ScopedHostZone& operator=(const ScopedHostZone&) = delete;
+
+ private:
+  std::optional<std::string> previous_;
+};
 
 }  // namespace
 
@@ -439,17 +506,123 @@ std::unique_ptr<santa::cel::Activation<IsV2>> MakeActivation() {
     }
   }
   {
-    // Unlike today(), now() is not truncated to the start of the UTC day: it is
-    // the current instant, somewhere inside the day today() starts.
+    // Unlike today(), now() is not truncated to the start of the day: it is the
+    // current instant, somewhere inside the local day today() starts. The upper
+    // bound allows a 25 hour day, which is what a fall-back DST transition makes
+    // of one.
     auto activation = MakeActivation<true>();
-    auto result = sut.value()->CompileAndEvaluate("now() >= today() && now() < today() + days(1)",
-                                                  *activation);
+    auto result = sut.value()->CompileAndEvaluate(
+        "now() >= today() && now() < today() + days(1) + duration('1h')", *activation);
     if (!result.ok()) {
       XCTFail("Failed to evaluate: %s", result.status().message().data());
     } else {
       XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
       XCTAssertFalse(result.value().cacheable);
     }
+  }
+}
+
+// today(): the start of the current civil day in the host's zone, and today(zone)
+// the same in a named one, both read off this machine's clock.
+- (void)testTodayInZone {
+  using ReturnValue = santa::cel::CELProtoTraits<true>::ReturnValue;
+
+  auto sut = santa::cel::Evaluator<true>::Create();
+  XCTAssertTrue(sut.ok());
+
+  auto evaluate = [&sut](absl::string_view expr) {
+    auto activation = MakeActivation<true>();
+    return sut.value()->CompileAndEvaluate(expr, *activation);
+  };
+
+  absl::Time now = absl::Now();
+
+  {
+    // The two rows below are the only ones that can catch today() reverting to
+    // the UTC meaning it shipped with, and neither can do it on a host whose zone
+    // is UTC, so they run against a pinned host zone with a nonzero offset.
+    ScopedHostZone hostZone("America/New_York");
+
+    {
+      // The bare form is the "local" case of the same path, so asking for
+      // "local" must give the same answer. A UTC truncation answers a different
+      // instant here for every hour of every day.
+      auto result = evaluate("today('local') == today()");
+      if (!result.ok()) {
+        XCTFail("Failed to evaluate: %s", result.status().message().data());
+      } else {
+        XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
+        XCTAssertFalse(result.value().cacheable);
+      }
+    }
+    {
+      // And the value is the host's civil day start, computed here with absl
+      // against the same pinned zone. Both candidate day starts are accepted,
+      // because a local midnight landing between this clock read and the
+      // evaluation moves the answer on to the next one; both are host-local
+      // midnights, so a UTC truncation matches neither.
+      absl::TimeZone host = absl::LocalTimeZone();
+      absl::CivilDay hostDay{absl::ToCivilSecond(now, host)};
+
+      auto result = evaluate(
+          "today() == timestamp('" + AsUTCLiteral(absl::FromCivil(hostDay, host)) +
+          "') || today() == timestamp('" + AsUTCLiteral(absl::FromCivil(hostDay + 1, host)) + "')");
+      if (!result.ok()) {
+        XCTFail("Failed to evaluate: %s", result.status().message().data());
+      } else {
+        XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
+      }
+    }
+  }
+  {
+    // Two zones an hour apart across a local midnight: right now it is 00:30 in
+    // one and 23:30 of the day before in the other, so their civil days start 23
+    // hours apart. A today() that ignored its zone would answer zero.
+    int offsetAfterMidnight = OffsetWhereNowReads(now, 0, 30);
+    std::string afterMidnight = FixedOffsetZone(offsetAfterMidnight);
+    std::string beforeMidnight = FixedOffsetZone(offsetAfterMidnight - 60);
+
+    auto result = evaluate("today('" + afterMidnight + "') - today('" + beforeMidnight +
+                           "') == duration('23h')");
+    if (!result.ok()) {
+      XCTFail("Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
+      // The zone form alone has to mark the evaluation non-cacheable: nothing
+      // here calls the bare today(), so this is the assertion that fails if the
+      // sink is dropped from that path.
+      XCTAssertFalse(result.value().cacheable);
+    }
+  }
+  {
+    // A named zone resolves and truncates to that zone's civil day. A New York
+    // day starts at 04:00Z or 05:00Z, never at 00:00Z, so this is a different
+    // instant from the UTC day start at every hour of every day; what varies
+    // with the hour is only whether the two zones agree on the civil date. The
+    // expectation is computed here rather than assumed.
+    //
+    // Both candidate day starts are accepted, because a New York midnight
+    // landing between this clock read and the evaluation moves the answer on to
+    // the next one. Both are New York midnights, so a today() that truncated in
+    // UTC still matches neither.
+    absl::TimeZone newYork;
+    XCTAssertTrue(absl::LoadTimeZone("America/New_York", &newYork));
+    absl::CivilDay newYorkDay{absl::ToCivilSecond(now, newYork)};
+
+    auto result = evaluate("today('America/New_York') == timestamp('" +
+                           AsUTCLiteral(absl::FromCivil(newYorkDay, newYork)) +
+                           "') || today('America/New_York') == timestamp('" +
+                           AsUTCLiteral(absl::FromCivil(newYorkDay + 1, newYork)) + "')");
+    if (!result.ok()) {
+      XCTFail("Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
+    }
+  }
+  {
+    // An unresolvable zone fails the evaluation here too: the resolver is shared
+    // with policy_for_range(), but this is a separate call site for its error.
+    XCTAssertFalse(evaluate("today('Mars/Olympus') > timestamp(0)").ok());
   }
 }
 
@@ -927,8 +1100,8 @@ std::unique_ptr<santa::cel::Activation<IsV2>> MakeActivation() {
     // In range (the timestamp overload straddles now) returns the policy
     // argument, and any use of policy_for_range() is non-cacheable.
     auto result = evaluate(
-        "policy_for_range([0, 1, 2, 3, 4, 5, 6], now() - duration('1h'), now() + duration('1h'), "
-        "false, ALLOWLIST, BLOCKLIST)");
+        "policy_for_range(now() - duration('1h'), now() + duration('1h'), false, ALLOWLIST, "
+        "BLOCKLIST)");
     if (!result.ok()) {
       XCTFail(@"Failed to evaluate: %s", result.status().message().data());
     } else {
@@ -940,8 +1113,8 @@ std::unique_ptr<santa::cel::Activation<IsV2>> MakeActivation() {
     // Out of range returns the out_of_range_policy argument, not a hardcoded
     // BLOCKLIST: SILENT_BLOCKLIST here proves the argument is what comes back.
     auto result = evaluate(
-        "policy_for_range([0, 1, 2, 3, 4, 5, 6], now() + duration('1h'), now() + duration('2h'), "
-        "false, ALLOWLIST, SILENT_BLOCKLIST)");
+        "policy_for_range(now() + duration('1h'), now() + duration('2h'), false, ALLOWLIST, "
+        "SILENT_BLOCKLIST)");
     if (!result.ok()) {
       XCTFail(@"Failed to evaluate: %s", result.status().message().data());
     } else {
@@ -950,30 +1123,32 @@ std::unique_ptr<santa::cel::Activation<IsV2>> MakeActivation() {
     }
   }
   {
+    // Timestamp edges are the instants they name, offset included: these are
+    // written as civil times in +05:30, so an evaluation that read them as UTC
+    // would place the window five and a half hours in the past and answer
+    // BLOCKLIST.
+    absl::TimeZone offsetZone = absl::FixedTimeZone(5 * 3600 + 30 * 60);
+    auto literal = [&offsetZone](absl::Time instant) {
+      return absl::FormatTime("%Y-%m-%dT%H:%M:%S+05:30", instant, offsetZone);
+    };
+    absl::Time now = absl::Now();
+
+    auto result = evaluate("policy_for_range(timestamp('" + literal(now - absl::Minutes(30)) +
+                           "'), timestamp('" + literal(now + absl::Minutes(30)) +
+                           "'), false, ALLOWLIST, BLOCKLIST)");
+    if (!result.ok()) {
+      XCTFail(@"Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
+    }
+  }
+  {
     // An empty day list is never in range.
-    auto result = evaluate(
-        "policy_for_range([], now() - duration('1h'), now() + duration('1h'), false, ALLOWLIST, "
-        "BLOCKLIST)");
+    auto result = evaluate("policy_for_range([], '00:00', '00:00', false, ALLOWLIST, BLOCKLIST)");
     if (!result.ok()) {
       XCTFail(@"Failed to evaluate: %s", result.status().message().data());
     } else {
       XCTAssertEqual(result.value().value, ReturnValue::BLOCKLIST);
-    }
-  }
-  {
-    // Day list membership, timestamp overload: the day checked is the day of the
-    // evaluation instant.
-    auto inList = evaluate("policy_for_range([" + today +
-                           "], now() - duration('1h'), now() + duration('1h'), false, ALLOWLIST, "
-                           "BLOCKLIST)");
-    auto notInList = evaluate("policy_for_range([" + notToday +
-                              "], now() - duration('1h'), now() + duration('1h'), false, "
-                              "ALLOWLIST, BLOCKLIST)");
-    if (!inList.ok() || !notInList.ok()) {
-      XCTFail(@"Failed to evaluate day list membership");
-    } else {
-      XCTAssertEqual(inList.value().value, ReturnValue::ALLOWLIST);
-      XCTAssertEqual(notInList.value().value, ReturnValue::BLOCKLIST);
     }
   }
   {
@@ -1007,9 +1182,8 @@ std::unique_ptr<santa::cel::Activation<IsV2>> MakeActivation() {
   }
   {
     // Double-quoted times, exactly as the rule editor writes them.
-    auto result =
-        evaluate("policy_for_range([1, 2, 3, 4, 5], \"09:00\", \"17:00\", false, ALLOWLIST, "
-                 "BLOCKLIST)");
+    auto result = evaluate(
+        "policy_for_range([1, 2, 3, 4, 5], \"09:00\", \"17:00\", false, ALLOWLIST, BLOCKLIST)");
     if (!result.ok()) {
       XCTFail(@"Failed to evaluate: %s", result.status().message().data());
     } else {
@@ -1032,9 +1206,9 @@ std::unique_ptr<santa::cel::Activation<IsV2>> MakeActivation() {
   {
     // The policy argument passes through untouched, so a TouchID policy keeps
     // its cooldown in range.
-    auto result = evaluate(
-        "policy_for_range([0, 1, 2, 3, 4, 5, 6], now() - duration('1h'), now() + duration('1h'), "
-        "false, require_touchid_with_cooldown_minutes(30), BLOCKLIST)");
+    auto result =
+        evaluate("policy_for_range(now() - duration('1h'), now() + duration('1h'), false, "
+                 "require_touchid_with_cooldown_minutes(30), BLOCKLIST)");
     if (!result.ok()) {
       XCTFail(@"Failed to evaluate: %s", result.status().message().data());
     } else {
@@ -1046,8 +1220,8 @@ std::unique_ptr<santa::cel::Activation<IsV2>> MakeActivation() {
   {
     // And the same holds in the out_of_range_policy position.
     auto result = evaluate(
-        "policy_for_range([0, 1, 2, 3, 4, 5, 6], now() + duration('1h'), now() + duration('2h'), "
-        "false, ALLOWLIST, require_touchid_with_cooldown_minutes(15))");
+        "policy_for_range(now() + duration('1h'), now() + duration('2h'), false, ALLOWLIST, "
+        "require_touchid_with_cooldown_minutes(15))");
     if (!result.ok()) {
       XCTFail(@"Failed to evaluate: %s", result.status().message().data());
     } else {
@@ -1127,9 +1301,171 @@ std::unique_ptr<santa::cel::Activation<IsV2>> MakeActivation() {
     XCTAssertFalse(result.ok());
   }
   {
+    // So does a zone that is neither "local", nor a name absl can load, nor a
+    // [+-]HH:MM offset.
+    auto result = evaluate(
+        "policy_for_range([1], '09:00', '17:00', 'Mars/Olympus', false, ALLOWLIST, BLOCKLIST)");
+    XCTAssertFalse(result.ok());
+  }
+  {
+    // An absolute span carries no calendar, so there is no day-list form of it
+    // and no zone form either: both fail to compile rather than silently
+    // ignoring the extra arguments.
+    XCTAssertFalse(
+        evaluate("policy_for_range([1], now(), now() + duration('1h'), false, ALLOWLIST, "
+                 "BLOCKLIST)")
+            .ok());
+    XCTAssertFalse(evaluate("policy_for_range([1], now(), now() + duration('1h'), 'local', false, "
+                            "ALLOWLIST, BLOCKLIST)")
+                       .ok());
+    // Including the likeliest version of the mistake, a zone appended to the
+    // span with no day list in front of it.
+    XCTAssertFalse(evaluate("policy_for_range(now(), now() + duration('1h'), 'local', false, "
+                            "ALLOWLIST, BLOCKLIST)")
+                       .ok());
+  }
+  {
     // A non-positive duration fails the evaluation.
     auto result = evaluate("policy_for_range(duration('0s'), false, ALLOWLIST)");
     XCTAssertFalse(result.ok());
+  }
+}
+
+// The zone argument, and its absence, reaching the window math through the full
+// rule path. Every case builds its zones and times from the current instant, so
+// they answer the same way whatever time it is; the cases that turn on what the
+// host's zone is pin it rather than reading whatever the machine happens to be
+// set to. The zone math itself is pinned in testPolicyForRangeWindowMath.
+- (void)testPolicyForRangeZone {
+  using ReturnValue = santa::cel::CELProtoTraits<true>::ReturnValue;
+
+  auto sut = santa::cel::Evaluator<true>::Create();
+  XCTAssertTrue(sut.ok());
+
+  auto evaluate = [&sut](absl::string_view expr) {
+    auto activation = MakeActivation<true>();
+    return sut.value()->CompileAndEvaluate(expr, *activation);
+  };
+
+  absl::Time now = absl::Now();
+
+  {
+    // HH:MM overload: an 11:00 to 13:00 window holds the instant in the zone
+    // where it is 12:00 and not in the zone where it is 00:00. Every day is
+    // listed and the expressions are otherwise identical, so only the zone
+    // argument can account for the difference.
+    std::string noon = FixedOffsetZone(OffsetWhereNowReads(now, 12, 0));
+    std::string midnight = FixedOffsetZone(OffsetWhereNowReads(now, 0, 0));
+
+    auto inZone = evaluate("policy_for_range([0, 1, 2, 3, 4, 5, 6], '11:00', '13:00', '" + noon +
+                           "', false, ALLOWLIST, BLOCKLIST)");
+    auto outOfZone = evaluate("policy_for_range([0, 1, 2, 3, 4, 5, 6], '11:00', '13:00', '" +
+                              midnight + "', false, ALLOWLIST, BLOCKLIST)");
+    if (!inZone.ok() || !outOfZone.ok()) {
+      XCTFail(@"Failed to evaluate HH:MM window under a named zone");
+    } else {
+      XCTAssertEqual(inZone.value().value, ReturnValue::ALLOWLIST);
+      XCTAssertEqual(outOfZone.value().value, ReturnValue::BLOCKLIST);
+    }
+  }
+  {
+    // No zone argument means the host's zone, which is what "local" spells out.
+    // The window is the hour either side of the host's current clock time, so it
+    // is in range in the host's zone: the two forms have to agree, and a default
+    // of anything more than an hour off the host's clock would show up as a
+    // BLOCKLIST from the six argument form. The host zone is pinned because that
+    // last sentence is vacuous on a UTC host, which is where CI runs.
+    ScopedHostZone hostZone("America/New_York");
+
+    auto hostLocalHourMinute = [](absl::Time instant) {
+      return absl::FormatTime("%H:%M", instant, absl::LocalTimeZone());
+    };
+    std::string start = hostLocalHourMinute(now - absl::Hours(1));
+    std::string end = hostLocalHourMinute(now + absl::Hours(1));
+
+    auto defaulted = evaluate("policy_for_range([0, 1, 2, 3, 4, 5, 6], '" + start + "', '" + end +
+                              "', false, ALLOWLIST, BLOCKLIST)");
+    auto spelled = evaluate("policy_for_range([0, 1, 2, 3, 4, 5, 6], '" + start + "', '" + end +
+                            "', 'local', false, ALLOWLIST, BLOCKLIST)");
+    if (!defaulted.ok() || !spelled.ok()) {
+      XCTFail(@"Failed to evaluate the defaulted and spelled out local forms");
+    } else {
+      XCTAssertEqual(defaulted.value().value, ReturnValue::ALLOWLIST);
+      XCTAssertEqual(spelled.value().value, defaulted.value().value);
+    }
+  }
+  {
+    // A named zone answers the same on every host: one expression, evaluated
+    // under two different host zones, has to give one decision. This is what the
+    // zone argument is for, so it is worth asserting rather than assuming.
+    std::string expr = "policy_for_range([0, 1, 2, 3, 4, 5, 6], '11:00', '13:00', '" +
+                       FixedOffsetZone(OffsetWhereNowReads(now, 12, 0)) +
+                       "', false, ALLOWLIST, BLOCKLIST)";
+
+    auto evaluateOnHost = [&evaluate](const char* hostZone, absl::string_view expression) {
+      ScopedHostZone pinned(hostZone);
+      return evaluate(expression);
+    };
+    auto inNewYork = evaluateOnHost("America/New_York", expr);
+    auto inKolkata = evaluateOnHost("Asia/Kolkata", expr);
+    if (!inNewYork.ok() || !inKolkata.ok()) {
+      XCTFail(@"Failed to evaluate a named zone under two host zones");
+    } else {
+      XCTAssertEqual(inNewYork.value().value, ReturnValue::ALLOWLIST);
+      XCTAssertEqual(inKolkata.value().value, inNewYork.value().value);
+    }
+  }
+}
+
+// The zone argument's grammar, at the resolver itself: every function that takes
+// a zone shares this one function, and the rule path can only reach a handful of
+// its cases.
+- (void)testResolveTimeZone {
+  absl::TimeZone newYork;
+  XCTAssertTrue(absl::LoadTimeZone("America/New_York", &newYork));
+
+  struct Case {
+    absl::string_view zone;
+    // The zone the string must resolve to, or nullopt when it must not resolve
+    // at all. Zones are compared as zones, not by their offset at some instant:
+    // two zones can share an offset and still be different calendars, and a
+    // "local" row that only checked the offset could not fail on a UTC host.
+    std::optional<absl::TimeZone> resolvesTo;
+  };
+
+  const std::vector<Case> cases = {
+      {"local", absl::LocalTimeZone()},
+      {"UTC", absl::UTCTimeZone()},
+      {"America/New_York", newYork},
+      {"+05:30", absl::FixedTimeZone(5 * 3600 + 30 * 60)},
+      {"-08:00", absl::FixedTimeZone(-8 * 3600)},
+      {"+00:00", absl::FixedTimeZone(0)},
+      // Neither a name the zone loader knows nor an offset.
+      {"Mars/Olympus", std::nullopt},
+      // Offsets are strict: the sign is required and the width is exact.
+      {"05:30", std::nullopt},
+      {"+5:30", std::nullopt},
+      {"", std::nullopt},
+      // The zone loader would take each of these and open a rule-named path as
+      // a tzfile: a "file:" prefix, an absolute path, or a traversal out of its
+      // zoneinfo directory. All three are rejected before it gets the chance.
+      {"file:/etc/localtime", std::nullopt},
+      {"/etc/localtime", std::nullopt},
+      {"America/../../etc/localtime", std::nullopt},
+  };
+
+  for (const Case& c : cases) {
+    std::string zone(c.zone);
+    absl::StatusOr<absl::TimeZone> resolved = santa::cel::ResolveTimeZone(c.zone);
+
+    if (!c.resolvesTo.has_value()) {
+      XCTAssertFalse(resolved.ok(), "zone '%s' must not resolve", zone.c_str());
+    } else if (!resolved.ok()) {
+      XCTFail("zone '%s' failed to resolve: %s", zone.c_str(), resolved.status().message().data());
+    } else {
+      XCTAssertTrue(resolved.value() == c.resolvesTo.value(), "zone '%s' resolved to %s",
+                    zone.c_str(), resolved->name().c_str());
+    }
   }
 }
 
@@ -1270,50 +1606,23 @@ std::unique_ptr<santa::cel::Activation<IsV2>> MakeActivation() {
     absl::Time now = local(2026, 6, 10, 13, 30);
     XCTAssertFalse(santa::cel::EvalDaysHHMMWindow({7}, "09:00", "17:00", now, zone).ok());
     XCTAssertFalse(santa::cel::EvalDaysHHMMWindow({-1}, "09:00", "17:00", now, zone).ok());
-    XCTAssertFalse(santa::cel::EvalDaysTimestampWindow({7}, now - absl::Hours(1),
-                                                       now + absl::Hours(1), now, zone)
-                       .ok());
   }
   {
-    // The timestamp overload takes the window as absolute instants; the day
-    // checked is the day of the instant asked about.
+    // An absolute span is [start, end) against the instant asked about, with no
+    // calendar in it: closed at the start, open at the end, and nothing else to
+    // say. A span crossing midnight needs no separate case for that reason.
     absl::Time start = local(2026, 6, 10, 9, 0);
     absl::Time end = local(2026, 6, 10, 17, 0);
-    auto result = santa::cel::EvalDaysTimestampWindow(wednesday, start, end,
-                                                      local(2026, 6, 10, 13, 30), zone);
-    XCTAssertTrue(result.ok());
-    XCTAssertTrue(result->in_range);
-    XCTAssertTrue(result->window_end == end);
-    XCTAssertTrue(result->window_length == absl::Hours(8));
 
-    auto wrongDay =
-        santa::cel::EvalDaysTimestampWindow(thursday, start, end, local(2026, 6, 10, 13, 30), zone);
-    XCTAssertTrue(wrongDay.ok());
-    XCTAssertFalse(wrongDay->in_range);
+    santa::cel::WindowEval inside =
+        santa::cel::EvalTimestampWindow(start, end, local(2026, 6, 10, 13, 30));
+    XCTAssertTrue(inside.in_range);
+    XCTAssertTrue(inside.window_end == end);
+    XCTAssertTrue(inside.window_length == absl::Hours(8));
 
-    auto before =
-        santa::cel::EvalDaysTimestampWindow(wednesday, start, end, local(2026, 6, 10, 8, 59), zone);
-    XCTAssertTrue(before.ok());
-    XCTAssertFalse(before->in_range);
-
-    auto atEnd = santa::cel::EvalDaysTimestampWindow(wednesday, start, end, end, zone);
-    XCTAssertTrue(atEnd.ok());
-    XCTAssertFalse(atEnd->in_range);
-  }
-  {
-    // Unlike the HH:MM overload, a timestamp window that crosses midnight is
-    // checked against the day of the instant asked about, not the day it
-    // started.
-    absl::Time start = local(2026, 6, 10, 22, 0);
-    absl::Time end = local(2026, 6, 11, 2, 0);
-    absl::Time now = local(2026, 6, 11, 0, 30);
-    auto onThursday = santa::cel::EvalDaysTimestampWindow(thursday, start, end, now, zone);
-    XCTAssertTrue(onThursday.ok());
-    XCTAssertTrue(onThursday->in_range);
-
-    auto onWednesday = santa::cel::EvalDaysTimestampWindow(wednesday, start, end, now, zone);
-    XCTAssertTrue(onWednesday.ok());
-    XCTAssertFalse(onWednesday->in_range);
+    XCTAssertTrue(santa::cel::EvalTimestampWindow(start, end, start).in_range);
+    XCTAssertFalse(santa::cel::EvalTimestampWindow(start, end, local(2026, 6, 10, 8, 59)).in_range);
+    XCTAssertFalse(santa::cel::EvalTimestampWindow(start, end, end).in_range);
   }
   {
     // A duration window runs from the instant asked about, so it is always in

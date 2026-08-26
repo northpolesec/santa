@@ -18,12 +18,14 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <string>
 #include <utility>
 #include <vector>
 
 #include "Source/common/cel/result.pb.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/time/civil_time.h"
@@ -47,15 +49,27 @@ namespace cel {
 
 namespace {
 
-// Argument layouts. The day-checked overloads are
-// (days, start, end, should_kill, policy, out_of_range_policy) and the duration
-// overload is (d, should_kill, policy). should_kill (index 3 and 1) is
-// type-checked but not read: nothing acts on it yet.
+// Argument layouts, one group per overload. The argument counts are all
+// different, which is what the runtime dispatches on. should_kill (the argument
+// before the policies in every layout) is type-checked but not read: nothing
+// acts on it yet.
+//
+//   (d, should_kill, policy)
+constexpr size_t kDurationOverloadArgCount = 3;
+constexpr size_t kDurationOverloadPolicyIndex = 2;
+//   (start, end, should_kill, policy, out_of_range_policy)
+constexpr size_t kTimestampOverloadArgCount = 5;
+constexpr size_t kTimestampOverloadPolicyIndex = 3;
+constexpr size_t kTimestampOverloadOutOfRangePolicyIndex = 4;
+//   (days, start, end, should_kill, policy, out_of_range_policy)
 constexpr size_t kDaysOverloadArgCount = 6;
 constexpr size_t kDaysOverloadPolicyIndex = 4;
 constexpr size_t kDaysOverloadOutOfRangePolicyIndex = 5;
-constexpr size_t kDurationOverloadArgCount = 3;
-constexpr size_t kDurationOverloadPolicyIndex = 2;
+//   (days, start, end, zone, should_kill, policy, out_of_range_policy)
+constexpr size_t kDaysZoneOverloadArgCount = 7;
+constexpr size_t kDaysZoneOverloadZoneIndex = 3;
+constexpr size_t kDaysZoneOverloadPolicyIndex = 5;
+constexpr size_t kDaysZoneOverloadOutOfRangePolicyIndex = 6;
 
 // Parses a strict 24-hour "HH:MM" into minutes after local midnight.
 std::optional<int> ParseHourMinute(absl::string_view time) {
@@ -74,6 +88,23 @@ std::optional<int> ParseHourMinute(absl::string_view time) {
     return std::nullopt;
   }
   return hour * 60 + minute;
+}
+
+// Parses a strict "[+-]HH:MM" fixed offset into seconds east of UTC. The width
+// is exact: no "+5:30", no seconds field, no bare "05:30". cel-cpp's own
+// timestamp functions handle such an offset by shifting the timestamp instead of
+// building a zone, which loses the civil-day boundary the window math needs, so
+// this parses the offset itself.
+std::optional<int> ParseFixedOffsetSeconds(absl::string_view zone) {
+  if (zone.size() != 6 || (zone[0] != '+' && zone[0] != '-')) {
+    return std::nullopt;
+  }
+
+  std::optional<int> minutes = ParseHourMinute(zone.substr(1));
+  if (!minutes) {
+    return std::nullopt;
+  }
+  return zone[0] == '-' ? -*minutes * 60 : *minutes * 60;
 }
 
 // 0=Sunday through 6=Saturday, matching getDayOfWeek() in both CEL engines.
@@ -148,9 +179,12 @@ absl::Status RegisterPolicyForRangeDecls(::cel::TypeCheckerBuilder& builder) {
           ::cel::MakeOverloadDecl("policy_for_range_days_string", resultType, dayList,
                                   ::cel::StringType(), ::cel::StringType(), ::cel::BoolType(),
                                   resultType, resultType),
-          ::cel::MakeOverloadDecl("policy_for_range_days_timestamp", resultType, dayList,
-                                  ::cel::TimestampType(), ::cel::TimestampType(), ::cel::BoolType(),
-                                  resultType, resultType),
+          ::cel::MakeOverloadDecl("policy_for_range_days_string_tz", resultType, dayList,
+                                  ::cel::StringType(), ::cel::StringType(), ::cel::StringType(),
+                                  ::cel::BoolType(), resultType, resultType),
+          ::cel::MakeOverloadDecl("policy_for_range_timestamp", resultType, ::cel::TimestampType(),
+                                  ::cel::TimestampType(), ::cel::BoolType(), resultType,
+                                  resultType),
           ::cel::MakeOverloadDecl("policy_for_range_duration", resultType, ::cel::DurationType(),
                                   ::cel::BoolType(), resultType)));
 
@@ -158,6 +192,36 @@ absl::Status RegisterPolicyForRangeDecls(::cel::TypeCheckerBuilder& builder) {
 }
 
 }  // namespace
+
+absl::StatusOr<absl::TimeZone> ResolveTimeZone(absl::string_view zone) {
+  // "local" is the only name that means "whatever this host is set to"; every
+  // other form names the same calendar on every host.
+  if (zone == "local") {
+    return absl::LocalTimeZone();
+  }
+
+  if (std::optional<int> offsetSeconds = ParseFixedOffsetSeconds(zone); offsetSeconds) {
+    return absl::FixedTimeZone(*offsetSeconds);
+  }
+
+  // Everything left goes to the platform's zone loader, which takes IANA names
+  // and "UTC" but also opens some names as files: "file:<path>" and "libc:*"
+  // (cctz documents both as test-only spellings), plus any name starting with
+  // "/" (the loader skips its zoneinfo prefix for absolute paths) or escaping
+  // that prefix with "..". No IANA name contains a colon or ".." or starts with
+  // "/", and the offset form is already handled above, so all three shapes are
+  // rejections here.
+  absl::TimeZone loaded;
+  if (!absl::StrContains(zone, ':') && !absl::StartsWith(zone, "/") &&
+      !absl::StrContains(zone, "..") && absl::LoadTimeZone(std::string(zone), &loaded)) {
+    return loaded;
+  }
+
+  return absl::InvalidArgumentError(
+      absl::StrCat("unknown time zone '", zone,
+                   "': expected \"local\", an IANA name such as \"America/New_York\", or a "
+                   "[+-]HH:MM offset"));
+}
 
 // HH:MM in the given time zone. An end at or before the start crosses midnight,
 // so the occurrence containing now may have begun yesterday; the day list
@@ -193,16 +257,10 @@ absl::StatusOr<WindowEval> EvalDaysHHMMWindow(absl::Span<const int64_t> days,
   return WindowEval{};
 }
 
-// Absolute instants. The day check applies to the instant asked about.
-absl::StatusOr<WindowEval> EvalDaysTimestampWindow(absl::Span<const int64_t> days, absl::Time start,
-                                                   absl::Time end, absl::Time now,
-                                                   absl::TimeZone zone) {
-  if (absl::Status status = ValidateDays(days); !status.ok()) {
-    return status;
-  }
-
-  absl::CivilDay currentDay{absl::ToCivilSecond(now, zone)};
-  if (start <= now && now < end && ContainsDay(days, currentDay)) {
+// Absolute instants, so there is no calendar to read: no day list and no zone.
+// A timestamp literal carries its zone in the offset it is written with.
+WindowEval EvalTimestampWindow(absl::Time start, absl::Time end, absl::Time now) {
+  if (start <= now && now < end) {
     return WindowEval{.in_range = true, .window_end = end, .window_length = end - start};
   }
   return WindowEval{};
@@ -223,9 +281,14 @@ std::vector<cel_runtime::CelFunctionDescriptor> PolicyForRangeDescriptors() {
           /*is_strict=*/true),
       cel_runtime::CelFunctionDescriptor("policy_for_range", /*receiver_style=*/false,
                                          /*types=*/
-                                         {Type::kList, Type::kTimestamp, Type::kTimestamp,
+                                         {Type::kList, Type::kString, Type::kString, Type::kString,
                                           Type::kBool, Type::kStruct, Type::kStruct},
                                          /*is_strict=*/true),
+      cel_runtime::CelFunctionDescriptor(
+          "policy_for_range", /*receiver_style=*/false,
+          /*types=*/
+          {Type::kTimestamp, Type::kTimestamp, Type::kBool, Type::kStruct, Type::kStruct},
+          /*is_strict=*/true),
       cel_runtime::CelFunctionDescriptor("policy_for_range", /*receiver_style=*/false,
                                          /*types=*/{Type::kDuration, Type::kBool, Type::kStruct},
                                          /*is_strict=*/true),
@@ -241,19 +304,31 @@ absl::Status PolicyForRangeFunction::Evaluate(absl::Span<const cel_runtime::CelV
 
   absl::Time now = absl::Now();
 
-  if (args.size() == kDaysOverloadArgCount) {
+  if (args.size() == kDaysOverloadArgCount || args.size() == kDaysZoneOverloadArgCount) {
     absl::StatusOr<std::vector<int64_t>> days = DayList(args[0], arena);
     if (!days.ok()) {
       return days.status();
     }
 
+    // Without a zone argument the window is read in the host's zone, which is
+    // the same zone "local" resolves to: a schedule written as clock time means
+    // the host's clock unless the rule says otherwise. This is deliberately the
+    // same call ResolveTimeZone()'s "local" branch makes rather than a call to
+    // the resolver, which would put a status on a path that cannot fail; if what
+    // "local" means ever changes there, change it here and in TodayFunction too.
+    bool zoneGiven = args.size() == kDaysZoneOverloadArgCount;
     absl::TimeZone zone = absl::LocalTimeZone();
-    absl::StatusOr<WindowEval> window =
-        args[1].type() == cel_runtime::CelValue::Type::kString
-            ? EvalDaysHHMMWindow(*days, args[1].StringOrDie().value(),
-                                 args[2].StringOrDie().value(), now, zone)
-            : EvalDaysTimestampWindow(*days, args[1].TimestampOrDie(), args[2].TimestampOrDie(),
-                                      now, zone);
+    if (zoneGiven) {
+      absl::StatusOr<absl::TimeZone> named =
+          ResolveTimeZone(args[kDaysZoneOverloadZoneIndex].StringOrDie().value());
+      if (!named.ok()) {
+        return named.status();
+      }
+      zone = *named;
+    }
+
+    absl::StatusOr<WindowEval> window = EvalDaysHHMMWindow(
+        *days, args[1].StringOrDie().value(), args[2].StringOrDie().value(), now, zone);
     if (!window.ok()) {
       return window.status();
     }
@@ -261,8 +336,18 @@ absl::Status PolicyForRangeFunction::Evaluate(absl::Span<const cel_runtime::CelV
     // Either way the answer is one of the policy arguments, passed through
     // untouched so a composite policy (e.g. a TouchID cooldown) keeps its
     // fields.
-    *result = window->in_range ? args[kDaysOverloadPolicyIndex]
-                               : args[kDaysOverloadOutOfRangePolicyIndex];
+    size_t policyIndex = zoneGiven ? kDaysZoneOverloadPolicyIndex : kDaysOverloadPolicyIndex;
+    size_t outOfRangePolicyIndex =
+        zoneGiven ? kDaysZoneOverloadOutOfRangePolicyIndex : kDaysOverloadOutOfRangePolicyIndex;
+    *result = window->in_range ? args[policyIndex] : args[outOfRangePolicyIndex];
+    return absl::OkStatus();
+  }
+
+  if (args.size() == kTimestampOverloadArgCount) {
+    WindowEval window =
+        EvalTimestampWindow(args[0].TimestampOrDie(), args[1].TimestampOrDie(), now);
+    *result = window.in_range ? args[kTimestampOverloadPolicyIndex]
+                              : args[kTimestampOverloadOutOfRangePolicyIndex];
     return absl::OkStatus();
   }
 

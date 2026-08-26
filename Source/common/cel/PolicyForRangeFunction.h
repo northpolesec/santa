@@ -44,7 +44,9 @@ namespace cel {
 //
 //   policy_for_range(list<int> days, string start, string end,
 //                    bool should_kill, policy, out_of_range_policy)
-//   policy_for_range(list<int> days, timestamp start, timestamp end,
+//   policy_for_range(list<int> days, string start, string end, string zone,
+//                    bool should_kill, policy, out_of_range_policy)
+//   policy_for_range(timestamp start, timestamp end,
 //                    bool should_kill, policy, out_of_range_policy)
 //   policy_for_range(duration d, bool should_kill, policy)
 //
@@ -58,12 +60,28 @@ namespace cel {
 // such as require_touchid_with_cooldown_minutes(30) can sit in either position
 // and is passed through untouched.
 //
-// Days are 0=Sunday through 6=Saturday, matching getDayOfWeek(). For the HH:MM
-// overload the window is interpreted in the host's local time zone, an `end` at
-// or before `start` crosses midnight, and the day list applies to the day the
-// window starts. For the timestamp overload the day check applies to the
-// evaluation instant. The duration overload is [now, now + d), which always
-// holds at evaluation, so it takes no out_of_range_policy.
+// Days are 0=Sunday through 6=Saturday, matching getDayOfWeek(). For both HH:MM
+// overloads an `end` at or before `start` crosses midnight and the day list
+// applies to the day the window starts. The timestamp overload takes absolute
+// instants and so has no day list and no zone: a timestamp literal already
+// carries its zone in its offset as it is written, and day-gating an absolute
+// span is a composition with one of the HH:MM forms. The duration overload is
+// [now, now + d), which always holds at evaluation, so it takes no calendar and
+// no out_of_range_policy.
+//
+// zone is optional on the HH:MM window and defaults to the host's zone: a
+// schedule written as clock time is most naturally the host's clock. The zone
+// argument is for the windows that have to mean one instant fleet-wide, and it
+// also lets an expression spell its calendar when it mixes in something that
+// reads a different one, since the standard library's getDayOfWeek() and its
+// siblings default to UTC. The zone is "local" for the host's zone (the
+// default, spelled out), a signed fixed offset from UTC written as [+-]HH:MM,
+// or a name the platform's zone loader accepts: IANA names such as
+// "America/New_York", "UTC", and whatever else that loader takes, so long as
+// the name holds no colon, holds no "..", and does not start with a slash.
+// Those three shapes are rejected because they are the loader's ways of opening
+// a rule-named path as a tzfile. Anything the loader does not know fails the
+// evaluation.
 //
 // should_kill asks for anything still running when the window closes to be
 // quit. It is type-checked but has no effect yet.
@@ -81,6 +99,16 @@ struct WindowEval {
   absl::Duration window_length;
 };
 
+// Resolves a zone argument to a time zone: "local" is the host's zone,
+// [+-]HH:MM is a signed fixed offset from UTC, and anything else goes to the
+// platform's zone loader (IANA names, "UTC", and whatever else it takes),
+// except that a name holding a colon or ".." or starting with "/" is rejected
+// first: those are the loader's spellings that open a caller-named path as a
+// tzfile ("file:<path>", "libc:*", absolute paths, traversal out of its
+// zoneinfo directory). Anything unresolved is an error naming the string.
+// Shared by policy_for_range() and today(zone) so the two cannot drift apart.
+absl::StatusOr<absl::TimeZone> ResolveTimeZone(absl::string_view zone);
+
 // The window math, kept separate from the CEL plumbing so the calendar cases
 // are testable directly and so the notification lead formula can reuse it.
 //
@@ -92,15 +120,17 @@ absl::StatusOr<WindowEval> EvalDaysHHMMWindow(absl::Span<const int64_t> days,
                                               absl::string_view end,
                                               absl::Time now,
                                               absl::TimeZone zone);
-absl::StatusOr<WindowEval> EvalDaysTimestampWindow(
-    absl::Span<const int64_t> days, absl::Time start, absl::Time end,
-    absl::Time now, absl::TimeZone zone);
+// An absolute span has no calendar in it, so nothing to validate and no zone to
+// read: it is [start, end) tested against `now`.
+WindowEval EvalTimestampWindow(absl::Time start, absl::Time end,
+                               absl::Time now);
 // A duration window has no error case and is never out of range: [now, now + d)
 // always contains now. Callers reject a non-positive d before asking.
 WindowEval EvalDurationWindow(absl::Duration d, absl::Time now);
 
-// Descriptors for the three policy_for_range() overloads, all registered
-// lazily.
+// Descriptors for the four policy_for_range() overloads, all registered lazily.
+// Their argument counts are all different, which is what the runtime dispatches
+// on.
 std::vector<::google::api::expr::runtime::CelFunctionDescriptor>
 PolicyForRangeDescriptors();
 
@@ -130,7 +160,7 @@ class PolicyForRangeFunction
 // rule identity for a window to attach to.
 absl::Status AddPolicyForRangeCompilerLibrary(::cel::CompilerBuilder& builder);
 
-// Register policy_for_range() at runtime. All three overloads are lazy: their
+// Register policy_for_range() at runtime. All four overloads are lazy: their
 // implementations are provided by the Activation (see
 // Activation::FindFunctionOverloads) so they are never constant-folded and can
 // mark the evaluation non-cacheable.

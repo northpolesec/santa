@@ -1538,7 +1538,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 // itself on the next exec.
 - (void)testCELRulePolicyForRange {
   SNTRule* inRange =
-      [self celV2RuleWithExpr:@"policy_for_range([0, 1, 2, 3, 4, 5, 6], now() - duration('1h'), "
+      [self celV2RuleWithExpr:@"policy_for_range(now() - duration('1h'), "
                               @"now() + duration('1h'), false, ALLOWLIST, BLOCKLIST)"];
   SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
   cd.sha256 = inRange.identifier;
@@ -1550,7 +1550,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   XCTAssertFalse(cd.cacheable);
 
   SNTRule* outOfRange =
-      [self celV2RuleWithExpr:@"policy_for_range([0, 1, 2, 3, 4, 5, 6], now() + duration('1h'), "
+      [self celV2RuleWithExpr:@"policy_for_range(now() + duration('1h'), "
                               @"now() + duration('2h'), false, ALLOWLIST, BLOCKLIST)"];
   SNTCachedDecision* outCD = [[SNTCachedDecision alloc] init];
   outCD.sha256 = outOfRange.identifier;

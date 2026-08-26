@@ -15,6 +15,9 @@
 #ifndef SANTA_COMMON_CEL_RELATIVETIMEFUNCTION_H
 #define SANTA_COMMON_CEL_RELATIVETIMEFUNCTION_H
 
+#include <utility>
+#include <vector>
+
 #include "absl/status/status.h"
 #include "absl/types/span.h"
 
@@ -39,12 +42,31 @@ namespace cel {
 //     target.secure_signing_time > today() - days(90)
 //
 //   today() -> google.protobuf.Timestamp
-//     The start of the current UTC day (00:00:00Z), truncated to a whole day
-//     rather than the literal current instant. Because its value changes at the
-//     next UTC midnight, any expression that uses it is marked non-cacheable.
-//     Registered as a lazy function so it is never constant-folded (folding
-//     would freeze the date at compile time) and so the Activation that vends
-//     it can flag the evaluation as non-cacheable.
+//     The start of the current day in the host's local time zone, truncated to
+//     a whole day rather than the literal current instant. Because its value
+//     changes at the next local midnight, any expression that uses it is marked
+//     non-cacheable. Registered as a lazy function so it is never
+//     constant-folded (folding would freeze the date at compile time) and so
+//     the Activation that vends it can flag the evaluation as non-cacheable.
+//
+//     Host local is a behavior change: today() shipped in 2026.6 as the start
+//     of the current UTC day, and an already-deployed rule using it now crosses
+//     its daily boundary at local midnight instead. The boundary moves by at
+//     most the host's UTC offset and a mid-day evaluation still sees the same
+//     day. The change makes today() agree with the HH:MM windows in
+//     policy_for_range(), which are host local by default, instead of
+//     contradicting them. Nothing about the interface moves: the sync server's
+//     gate keys on its own today_timestamp overload, which is unchanged and
+//     stays at its 2026.6 minimum.
+//
+//   today(string zone) -> google.protobuf.Timestamp
+//     The start of the current civil day in the named zone, for the rules whose
+//     calendar must be the same one fleet-wide. The zone string is the one
+//     policy_for_range() takes ("local", an IANA name, or a [+-]HH:MM offset),
+//     resolved by the same ResolveTimeZone() so the two cannot disagree. The
+//     bare form is the "local" case of this same path. Both read this machine's
+//     clock: today() is the date the host says it is, in the calendar asked
+//     for.
 //
 //   days(int) -> google.protobuf.Duration
 //     n*24h as a duration. CEL's native duration() only parses up to hours, so
@@ -60,19 +82,24 @@ namespace cel {
 //     numbering 0=Sunday through 6=Saturday. Pure and foldable, so it does not
 //     affect cacheability.
 
-// Descriptor for the today() -> Timestamp function (zero args, lazy).
-::google::api::expr::runtime::CelFunctionDescriptor TodayDescriptor();
+// Descriptors for the today() overloads, the bare form and today(zone), both
+// lazy. The runtime picks between them by descriptor shape, so both have to be
+// registered and both have to be vended by the Activation.
+std::vector<::google::api::expr::runtime::CelFunctionDescriptor>
+TodayDescriptors();
 
 // Descriptor for the now() -> Timestamp function (zero args, lazy).
 ::google::api::expr::runtime::CelFunctionDescriptor NowDescriptor();
 
-// Lazy CEL function backing today(). On evaluation it returns the start of the
-// current UTC day and sets the supplied flag to true to mark the evaluation as
+// Lazy CEL function backing one today() overload. On evaluation it returns the
+// start of the current day, in the host's zone or in the one its argument
+// names, and sets the supplied flag to true to mark the evaluation as
 // non-cacheable. The sink pointer must outlive every evaluation.
 class TodayFunction : public ::google::api::expr::runtime::CelFunction {
  public:
-  explicit TodayFunction(bool* used_sink)
-      : ::google::api::expr::runtime::CelFunction(TodayDescriptor()),
+  TodayFunction(::google::api::expr::runtime::CelFunctionDescriptor descriptor,
+                bool* used_sink)
+      : ::google::api::expr::runtime::CelFunction(std::move(descriptor)),
         used_sink_(used_sink) {}
 
   absl::Status Evaluate(
@@ -102,8 +129,8 @@ class NowFunction : public ::google::api::expr::runtime::CelFunction {
   bool* used_sink_;
 };
 
-// Register the today(), days(), now() and weekdays() decls with the type
-// checker at compile time. Only available in CELv2.
+// Register the today(), today(zone), days(), now() and weekdays() decls with
+// the type checker at compile time. Only available in CELv2.
 absl::Status AddRelativeTimeCompilerLibrary(::cel::CompilerBuilder& builder);
 
 // Register relative-time functions at runtime. today() and now() are registered
