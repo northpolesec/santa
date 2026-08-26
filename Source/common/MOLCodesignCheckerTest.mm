@@ -317,6 +317,51 @@
   XCTAssertTrue(sut.platformBinary);
 }
 
+/**
+  Apple stamps a CodeDirectory platform identifier only on binaries shipped in the OS image, but
+  the kernel reports `CS_PLATFORM_BINARY` for Apple software delivered separately too. XProtect is
+  such a binary: it ships under /Library/Apple rather than on the signed system volume, so it
+  exercises the `anchor apple` fallback rather than the platform identifier fast path.
+*/
+- (void)testPlatformBinaryWithoutPlatformIdentifier {
+  NSString* path =
+      @"/Library/Apple/System/Library/CoreServices/XProtect.app/Contents/MacOS/XProtect";
+  if (![[NSFileManager defaultManager] fileExistsAtPath:path]) {
+    XCTSkip(@"XProtect is not present on this host");
+  }
+
+  MOLCodesignChecker* sut = [[MOLCodesignChecker alloc] initWithBinaryPath:path];
+  XCTAssertNotNil(sut);
+
+  // Guard the premise. If this binary ever gains a platform identifier the assertion below would
+  // be satisfied by the fast path and would stop covering the fallback.
+  id platformIdentifier = sut.signingInformation[(__bridge id)kSecCodeInfoPlatformIdentifier];
+  XCTAssertTrue(!platformIdentifier || [platformIdentifier intValue] == 0,
+                @"expected no platform identifier, got %@", platformIdentifier);
+
+  XCTAssertTrue(sut.platformBinary);
+}
+
+/**
+  The platform check must not be relaxed to `anchor apple generic`. Both signed fixtures below
+  chain up to an Apple CA and so satisfy `anchor apple generic`, but neither is signed by Apple's
+  internal code signing chain, and the kernel does not report either as a platform binary.
+*/
+- (void)testPlatformBinaryDoesNotMatchNonAppleAnchoredCode {
+  NSBundle* bundle = [NSBundle bundleForClass:[self class]];
+
+  for (NSString* resource in
+       @[ @"signed-with-teamid", @"yikes-universal_signed", @"yikes-universal_adhoc" ]) {
+    NSString* path = [bundle pathForResource:resource ofType:@""];
+    XCTAssertNotNil(path, @"missing fixture %@", resource);
+
+    MOLCodesignChecker* sut = [[MOLCodesignChecker alloc] initWithBinaryPath:path];
+    // Assert the object exists, otherwise the check below would pass vacuously.
+    XCTAssertNotNil(sut, @"%@ failed to validate", resource);
+    XCTAssertFalse(sut.platformBinary, @"%@ should not be platform code", resource);
+  }
+}
+
 - (void)testEntitlements {
   NSError* error;
   NSBundle* bundle = [NSBundle bundleForClass:[self class]];

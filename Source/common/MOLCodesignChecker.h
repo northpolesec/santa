@@ -90,7 +90,15 @@
 /** The developer provided signing ID for this binary. */
 @property(readonly) NSString* signingID;
 
-/** Whether or not this binary is considered a platform binary (i.e. part of the OS) */
+/**
+  Whether or not this binary is considered a platform binary, i.e. Apple's own code.
+
+  This is the static equivalent of the kernel's `CS_PLATFORM_BINARY` (surfaced by
+  EndpointSecurity as `es_process_t.is_platform_binary`), and covers both binaries shipped in the
+  OS image and Apple software delivered separately, such as Xcode from the developer portal or the
+  Command Line Tools. Code signed for the Mac App Store or with a Developer ID is not platform
+  code, even when Apple is the signer.
+*/
 @property(readonly) BOOL platformBinary;
 
 /** The entitlements encoded in this binary. */

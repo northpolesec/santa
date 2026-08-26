@@ -63,6 +63,30 @@ static const SecCSFlags kStaticSigningFlags =
 */
 static const SecCSFlags kSigningFlags = kSecCSDefaultFlags;
 
+/**
+  The `anchor apple` requirement, used to identify Apple's own platform code.
+
+  A CodeDirectory platform identifier is only stamped on binaries shipped in the OS image, but the
+  kernel reports `CS_PLATFORM_BINARY` for all code AMFI recognizes as Apple's own — including Apple
+  software delivered separately, such as Xcode from the developer portal, the Command Line Tools
+  and the contents of /Library/Apple. Those carry no platform identifier, so the identifier alone
+  under-reports platform code relative to EndpointSecurity's `is_platform_binary`.
+
+  `anchor apple` is the OS-provided equivalent: it is satisfied when the cdhash is in AMFI's trust
+  cache, or when the code is signed by Apple's internal code signing chain. Note this is stricter
+  than `anchor apple generic`, which also matches Developer ID and Mac App Store signatures; an
+  App Store copy of Xcode is not platform code, and neither the kernel nor this requirement treats
+  it as such.
+*/
+static SecRequirementRef PlatformBinaryRequirement(void) {
+  static SecRequirementRef requirement;
+  static dispatch_once_t onceToken;
+  dispatch_once(&onceToken, ^{
+    SecRequirementCreateWithString(CFSTR("anchor apple"), kSecCSDefaultFlags, &requirement);
+  });
+  return requirement;
+}
+
 NSString* const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcodesignchecker";
 
 @interface MOLCodesignChecker ()
@@ -78,6 +102,9 @@ NSString* const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
 // The flags this instance validates on-disk code with. kStaticSigningFlags unless the caller asked
 // for something else. Has no effect on in-memory (SecCodeRef) checks, which use kSigningFlags.
 @property SecCSFlags staticSigningFlags;
+
+// Cached result of -platformBinary. Nil until first computed.
+@property NSNumber* cachedPlatformBinary;
 
 - (instancetype)initWithSecStaticCodeRef:(SecStaticCodeRef)codeRef
                               binaryPath:(NSString*)binaryPath
@@ -373,9 +400,32 @@ NSString* const kMOLCodesignCheckerErrorDomain = @"com.northpolesec.santa.molcod
 }
 
 - (BOOL)platformBinary {
+  if (!_cachedPlatformBinary) {
+    _cachedPlatformBinary = @([self computePlatformBinary]);
+  }
+  return _cachedPlatformBinary.boolValue;
+}
+
+- (BOOL)computePlatformBinary {
+  // Binaries shipped in the OS image carry a non-zero CodeDirectory platform identifier. That is
+  // the bulk of platform code and needs no signature evaluation, so check it before falling back
+  // to the requirement below.
   id p = self.signingInformation[(__bridge id)kSecCodeInfoPlatformIdentifier];
-  if (![p isKindOfClass:[NSNumber class]] || [p intValue] == 0) return NO;
-  return YES;
+  if ([p isKindOfClass:[NSNumber class]] && [p intValue] != 0) return YES;
+
+  SecRequirementRef requirement = PlatformBinaryRequirement();
+  if (!requirement) return NO;
+
+  // Evaluate with the same flags this instance was already validated with, so a platform verdict
+  // never rests on a weaker check than the rest of this object's signing information. The
+  // executable must still be verified against the CodeDirectory in particular: skipping that
+  // would let an Apple-signed CodeDirectory grafted onto other code read as platform code.
+  if (CFGetTypeID(self.codeRef) == SecStaticCodeGetTypeID()) {
+    return SecStaticCodeCheckValidity(self.codeRef, self.staticSigningFlags, requirement) ==
+           errSecSuccess;
+  }
+  return SecCodeCheckValidity((SecCodeRef)self.codeRef, kSigningFlags, requirement) ==
+         errSecSuccess;
 }
 
 - (NSDictionary*)entitlements {
