@@ -634,13 +634,15 @@ class ScopedHostZone {
   auto sut = santa::cel::Evaluator<true>::Create();
   XCTAssertTrue(sut.ok());
 
-  // A threshold one second out. The same compiled plan must answer BLOCKLIST
+  // A threshold three seconds out. The same compiled plan must answer BLOCKLIST
   // before that instant and ALLOWLIST after it: if now() were constant-folded
   // at compile time its value would be frozen before the threshold and both
-  // evaluations would answer BLOCKLIST. The one second of slack is for the
-  // compile and the first evaluation, which take milliseconds.
+  // evaluations would answer BLOCKLIST. The slack is for the compile and the
+  // first evaluation, which take milliseconds here but have to clear the
+  // threshold on a loaded CI machine too.
+  absl::Time thresholdTime = absl::Now() + absl::Seconds(3);
   std::string threshold =
-      absl::FormatTime("%Y-%m-%dT%H:%M:%E3SZ", absl::Now() + absl::Seconds(1), absl::UTCTimeZone());
+      absl::FormatTime("%Y-%m-%dT%H:%M:%E3SZ", thresholdTime, absl::UTCTimeZone());
 
   google::protobuf::Arena arena;
   auto expr = sut.value()->Compile("now() > timestamp('" + threshold + "')", &arena);
@@ -650,13 +652,18 @@ class ScopedHostZone {
   }
 
   auto before = sut.value()->Evaluate(expr.value().get(), *activation, &arena);
+  // If even three seconds was not enough for one compile and one evaluation,
+  // fail on the timing assumption by name rather than blaming constant folding.
+  XCTAssertLessThan(absl::Now(), thresholdTime,
+                    @"compile plus first evaluation overran the threshold slack");
   if (!before.ok()) {
     XCTFail("Failed to evaluate: %s", before.status().message().data());
   } else {
     XCTAssertEqual(before.value().value, ReturnValue::BLOCKLIST);
   }
 
-  absl::SleepFor(absl::Milliseconds(1500));
+  // Sleep to just past the threshold, however much of the slack is left.
+  absl::SleepFor(thresholdTime + absl::Milliseconds(500) - absl::Now());
 
   auto after = sut.value()->Evaluate(expr.value().get(), *activation, &arena);
   if (!after.ok()) {
