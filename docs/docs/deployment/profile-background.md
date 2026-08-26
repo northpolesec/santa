@@ -30,7 +30,7 @@ If your MDM doesn't have an option to add a Service Management profile but does
 have the option for deploying custom profiles, you can use the following
 example as a template.
 
-```xml showLineNumbers
+```xml showLineNumbers title="santa-background.mobileconfig"
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">

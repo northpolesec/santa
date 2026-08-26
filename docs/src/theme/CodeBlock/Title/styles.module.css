@@ -1,0 +1,52 @@
+/* Turns the code block title bar into a file row: name on the left, the
+   block's controls on the right. The name wraps rather than truncating when
+   space runs out. */
+.titleRow {
+  align-items: center;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.name {
+  overflow-wrap: anywhere;
+}
+
+.actions {
+  align-items: center;
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.25rem;
+}
+
+/* Two classes deep so these win over Docusaurus' own .clean-btn reset. */
+.actions .action {
+  align-items: center;
+  background: none;
+  border: none;
+  border-radius: var(--ifm-global-radius);
+  color: var(--ifm-color-emphasis-600);
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  font-weight: 400;
+  gap: 0.4rem;
+  line-height: 1;
+  padding: 0.25rem;
+  transition: color var(--ifm-transition-fast) ease;
+}
+
+.actions .action:hover {
+  color: var(--ifm-color-emphasis-900);
+}
+
+.actions .action:focus-visible {
+  outline: 2px solid var(--ifm-color-primary);
+  outline-offset: 2px;
+}
+
+/* Match the copy button's 1.125rem icon rather than the smaller title text. */
+.downloadIcon {
+  height: 1.125rem;
+  width: 1.125rem;
+}
