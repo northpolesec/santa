@@ -31,9 +31,13 @@
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTSignal.h"
 #import "Source/common/SNTXxhash.h"
+#import "Source/common/SantaCache.h"
 #import "Source/common/SigningIDHelpers.h"
 #include "Source/common/String.h"
 #include "Source/common/cel/Evaluator.h"
+
+#include <memory>
+#include <string>
 
 static const uint32_t kRuleTableCurrentVersion = 16;
 
@@ -41,6 +45,10 @@ static const uint32_t kRuleTableCurrentVersion = 16;
 static const int64_t kTransitiveRuleCullingThreshold = 500000;
 // Consider transitive rules out of date if they haven't been used in six months.
 static const NSUInteger kTransitiveRuleExpirationSeconds = 6 * 30 * 24 * 3600;
+
+// Maximum number of file hashes remembered by the execution rule miss cache.
+// Maxes out around 322KiB.
+static const uint64_t kExecutionRuleMissCacheSize = 10000;
 
 static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
   // Create a temporary ES client in order to grab the default set of muted paths.
@@ -77,6 +85,14 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
   std::unique_ptr<santa::cel::Evaluator<false>> _celEvaluator;
   std::unique_ptr<santa::cel::Evaluator<true>> _celV2Evaluator;
   dispatch_once_t _criticalSystemBinariesToken;
+  // Negative cache for the `execution_rules` query in `executionRuleForIdentifiers:`: records the
+  // file hashes that matched no row, so repeat executions of the same unruled binary skip the
+  // query entirely. Only the SQL lookup is cached -- the static rules are an in-memory dictionary
+  // and are checked on every call. Keyed on the binary SHA-256 alone -- it identifies the file
+  // contents, and so determines every other identifier a lookup would match on. Entries are only
+  // ever cleared wholesale (see `clearExecutionRuleMissCache`) -- there is no per-entry
+  // invalidation.
+  std::unique_ptr<SantaCache<std::string, bool>> _executionRuleMissCache;
 }
 @property MOLCodesignChecker* santadCSInfo;
 @property MOLCodesignChecker* launchdCSInfo;
@@ -247,6 +263,9 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
 }
 
 - (uint32_t)initializeDatabase:(FMDatabase*)db fromVersion:(uint32_t)version {
+  _executionRuleMissCache =
+      std::make_unique<SantaCache<std::string, bool>>(kExecutionRuleMissCacheSize);
+
   // Lock this database from other processes
   [[db executeQuery:@"PRAGMA locking_mode = EXCLUSIVE;"] close];
 
@@ -575,6 +594,21 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
     if (rule.type == SNTRuleTypeTeamID) {
       return rule;
     }
+
+    // A static rule found under one identifier but typed for another is not a
+    // match.
+    rule = nil;
+  }
+
+  // If we already looked in the db during another exec and there was no rule,
+  // return early. The cache will be cleared when new rules are added. Keyed by
+  // file sha256. Using a cdhash is appealing, but a cdhash is not guaranteed
+  // unique across files.
+  std::string missCacheKey = identifiers.binarySHA256.length
+                                 ? santa::NSStringToUTF8String(identifiers.binarySHA256)
+                                 : std::string();
+  if (!missCacheKey.empty() && _executionRuleMissCache->get(missCacheKey)) {
+    return nil;
   }
 
   // Now query the database.
@@ -613,6 +647,13 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
     [rs close];
   }];
   // clang-format on
+
+  // No rule exists, cache that fact so we don't needlessly keep looking in the
+  // db during future execs.
+  if (!rule && !missCacheKey.empty()) {
+    _executionRuleMissCache->set(missCacheKey, true);
+  }
+
   return rule;
 }
 
@@ -871,6 +912,10 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
   if (blockErrors.count > 0 && errors) {
     *errors = [blockErrors copy];
   }
+
+  // Clear the miss cache regardless of rule type. We could ignore clearing if
+  // there were only REMOVE rules, but it is not worth the effort.
+  _executionRuleMissCache->clear();
 
   // If the DB updated successfully, call the "rules changed" callbacks if appropriate
   if (!failed && self.fileAccessRulesChangedCallback &&
