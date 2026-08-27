@@ -63,11 +63,26 @@
 
 - (instancetype)initWithCoder:(NSCoder*)decoder {
   // An archive written before the signal field existed has no signal key at
-  // all; keep such a request meaning what it meant when it was written. An
-  // archive that does carry a signal is held to the same range the
-  // initializers enforce.
-  NSNumber* encodedSignal = [decoder decodeObjectOfClass:[NSNumber class] forKey:@"signal"];
-  int decodedSignal = encodedSignal ? encodedSignal.intValue : SIGKILL;
+  // all; keep such a request meaning what it meant when it was written. The
+  // absence of the key is the only thing that means that, so test for it
+  // directly rather than inferring it from a nil decode: -decodeObjectOfClass:
+  // also returns nil for a key that is present but holds a class secure coding
+  // rejects, and reading a malformed archive as SIGKILL is not the same
+  // decision as reading a pre-signal one that way.
+  int decodedSignal = SIGKILL;
+  if ([decoder containsValueForKey:@"signal"]) {
+    // The declared class is not enough on its own either: an NSString stored
+    // under this key comes back from -decodeObjectOfClass:[NSNumber class]
+    // without an error, and its -intValue would quietly become the signal.
+    NSNumber* encodedSignal = [decoder decodeObjectOfClass:[NSNumber class] forKey:@"signal"];
+    if (![encodedSignal isKindOfClass:[NSNumber class]]) {
+      return nil;
+    }
+    decodedSignal = encodedSignal.intValue;
+  }
+
+  // A signal that is present is held to the same range the initializers
+  // enforce.
   if (decodedSignal <= 0 || decodedSignal >= NSIG) {
     return nil;
   }
