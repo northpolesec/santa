@@ -43,6 +43,7 @@ objc_library(
         "//Source/common:SNTRuleIdentifiers",
         "//Source/common:SNTSignal",
         "//Source/common:SNTXxhash",
+        "//Source/common:SantaCache",
         "//Source/common:SigningIDHelpers",
         "//Source/common:String",
         "//Source/common/cel:CEL",
