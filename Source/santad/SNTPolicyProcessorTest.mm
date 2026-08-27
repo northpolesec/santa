@@ -1516,6 +1516,69 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   XCTAssertEqual(cd1.decision, cd2.decision);
 }
 
+- (SNTRule*)celV2RuleWithExpr:(NSString*)expr {
+  return [[SNTRule alloc]
+         initWithIdentifier:@"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+                      state:SNTRuleStateCELv2
+                       type:SNTRuleTypeBinary
+                  customMsg:nil
+                  customURL:nil
+      eventDetailButtonText:nil
+                  timestamp:0
+                    comment:nil
+                    celExpr:expr
+             seatbeltPolicy:nil
+                     ruleId:0
+                      error:NULL];
+}
+
+// A database rule may use policy_for_range(): in range it decides with its
+// policy argument, out of range with its out_of_range_policy argument. Either
+// way the decision is not cacheable, because the window edge has to enforce
+// itself on the next exec.
+- (void)testCELRulePolicyForRange {
+  SNTRule* inRange =
+      [self celV2RuleWithExpr:@"policy_for_range(now() - duration('1h'), "
+                              @"now() + duration('1h'), false, ALLOWLIST, BLOCKLIST)"];
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+  cd.sha256 = inRange.identifier;
+  [self.processor decision:cd
+                       forRule:inRange
+           withTransitiveRules:YES
+      andCELActivationCallback:[self fallbackTestActivationCallback]];
+  XCTAssertEqual(cd.decision, SNTEventStateAllowBinary);
+  XCTAssertFalse(cd.cacheable);
+
+  SNTRule* outOfRange =
+      [self celV2RuleWithExpr:@"policy_for_range(now() + duration('1h'), "
+                              @"now() + duration('2h'), false, ALLOWLIST, BLOCKLIST)"];
+  SNTCachedDecision* outCD = [[SNTCachedDecision alloc] init];
+  outCD.sha256 = outOfRange.identifier;
+  [self.processor decision:outCD
+                       forRule:outOfRange
+           withTransitiveRules:YES
+      andCELActivationCallback:[self fallbackTestActivationCallback]];
+  XCTAssertEqual(outCD.decision, SNTEventStateBlockBinary);
+  XCTAssertFalse(outCD.cacheable);
+}
+
+// UNSPECIFIED is for fallback expressions, which have a next rule to fall
+// through to; a database rule naming it fails to compile. The activation's euid
+// is 501, so the ALLOWLIST branch is the one that would be taken: no decision
+// here means the expression never compiled, not that it returned UNSPECIFIED.
+- (void)testCELRuleCannotUseUnspecified {
+  SNTRule* r = [self celV2RuleWithExpr:@"euid == 501 ? ALLOWLIST : UNSPECIFIED"];
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+  cd.sha256 = r.identifier;
+
+  BOOL decisionIsFinal = [self.processor decision:cd
+                                          forRule:r
+                              withTransitiveRules:YES
+                         andCELActivationCallback:[self fallbackTestActivationCallback]];
+  XCTAssertFalse(decisionIsFinal);
+  XCTAssertEqual(cd.decision, SNTEventStateUnknown);
+}
+
 - (void)testCELAncestors {
   using AncestorT = santa::cel::CELProtoTraits<true>::AncestorT;
 
@@ -1984,6 +2047,39 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   // args has ["arg0", "arg1"], so size(args) > 0 is true, returning BLOCKLIST
   XCTAssertTrue(handled);
   XCTAssertEqual(cd.decision, SNTEventStateBlockCELFallback);
+}
+
+// policy_for_range() is declared for database rules only, so a fallback
+// expression naming it fails to compile like any other unknown function. A
+// compile failure drops the whole batch, so the ALLOWLIST behind it never gets
+// a chance and the empty batch published at init still stands.
+- (void)testCELFallbackCannotUsePolicyForRange {
+  [[SNTConfigurator configurator] setSyncServerCELFallbackRules:@[
+    [self ruleWithExpr:@"policy_for_range(duration('30m'), false, ALLOWLIST)"],
+    [self ruleWithExpr:@"ALLOWLIST"],
+  ]];
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+  cd.sha256 = @"aabbccdd";
+
+  BOOL handled =
+      [self.processor evaluateCELFallbackExpressions:cd
+                                  activationCallback:[self fallbackTestActivationCallback]];
+  XCTAssertFalse(handled);
+  XCTAssertEqual(cd.decision, SNTEventStateUnknown);
+
+  // UNSPECIFIED, on the other hand, is still declared for fallback expressions:
+  // the same batch shape compiles and the second rule decides.
+  [[SNTConfigurator configurator] setSyncServerCELFallbackRules:@[
+    [self ruleWithExpr:@"UNSPECIFIED"],
+    [self ruleWithExpr:@"ALLOWLIST"],
+  ]];
+  SNTCachedDecision* control = [[SNTCachedDecision alloc] init];
+  control.sha256 = @"aabbccdd";
+
+  XCTAssertTrue([self.processor
+      evaluateCELFallbackExpressions:control
+                  activationCallback:[self fallbackTestActivationCallback]]);
+  XCTAssertEqual(control.decision, SNTEventStateAllowCELFallback);
 }
 
 - (void)testCELFallbackInvalidExpressionSkipped {

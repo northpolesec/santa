@@ -96,6 +96,32 @@ cel_runtime::CelValue CreateCELValue(const std::map<K, V>& v, google::protobuf::
   return cel_runtime::CelValue::CreateMap(builder);
 }
 
+// Builds one lazy function's implementations on first use and hands back the
+// whole overload set: the runtime picks the one whose descriptor matches the
+// arguments it actually has, so an overloaded function must vend all of them.
+// The descriptors come in as a factory rather than a vector because this runs
+// once per lazy call site per evaluation, so on every exec: building descriptors
+// only to discard them would allocate for nothing.
+template <typename FunctionT>
+std::vector<const cel_runtime::CelFunction*> LazyOverloads(
+    std::vector<std::unique_ptr<FunctionT>>& fns,
+    std::vector<cel_runtime::CelFunctionDescriptor> (*descriptors)(), bool* usedSink) {
+  if (fns.empty()) {
+    std::vector<cel_runtime::CelFunctionDescriptor> built = descriptors();
+    fns.reserve(built.size());
+    for (auto& descriptor : built) {
+      fns.push_back(std::make_unique<FunctionT>(std::move(descriptor), usedSink));
+    }
+  }
+
+  std::vector<const cel_runtime::CelFunction*> overloads;
+  overloads.reserve(fns.size());
+  for (const auto& fn : fns) {
+    overloads.push_back(fn.get());
+  }
+  return overloads;
+}
+
 }  // namespace
 
 // Template methods that delegate to the helper functions
@@ -191,13 +217,19 @@ std::optional<cel_runtime::CelValue> Activation<IsV2>::FindValue(
 template <bool IsV2>
 std::vector<const cel_runtime::CelFunction*> Activation<IsV2>::FindFunctionOverloads(
     absl::string_view name) const {
-  // Relative-time functions are CELv2 only.
+  // The relative-time functions and policy_for_range() are CELv2 only.
   if constexpr (IsV2) {
     if (name == "today") {
-      if (!todayFn_) {
-        todayFn_ = std::make_unique<TodayFunction>(&usedRelativeTime_);
+      return LazyOverloads(todayFns_, TodayDescriptors, &usedRelativeTime_);
+    }
+    if (name == "now") {
+      if (!nowFn_) {
+        nowFn_ = std::make_unique<NowFunction>(&usedRelativeTime_);
       }
-      return {todayFn_.get()};
+      return {nowFn_.get()};
+    }
+    if (name == "policy_for_range") {
+      return LazyOverloads(policyForRangeFns_, PolicyForRangeDescriptors, &usedRelativeTime_);
     }
   }
   return {};
@@ -262,8 +294,11 @@ std::vector<std::pair<absl::string_view, ::cel::Type>> Activation<IsV2>::GetVari
 
 template <bool IsV2>
 bool Activation<IsV2>::IsResultCacheable() const {
-  // today() resolves to the current day, so a cached result would go stale at
-  // the next UTC midnight. Don't cache expressions that use it.
+  // today() resolves to the current day and now() to the current instant, so a
+  // cached result would go stale as time passes: at the next midnight for today()
+  // (the host's zone for the bare form, the named zone for today(zone)),
+  // immediately for now(), at the window edge for policy_for_range(). Don't cache
+  // expressions that use them.
   if (usedRelativeTime_) {
     return false;
   }

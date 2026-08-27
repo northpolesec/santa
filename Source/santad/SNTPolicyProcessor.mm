@@ -118,6 +118,11 @@ struct FallbackBatch {
 @interface SNTPolicyProcessor () {
   std::unique_ptr<santa::cel::Evaluator<false>> celEvaluatorV1_;
   std::unique_ptr<santa::cel::Evaluator<true>> celEvaluatorV2_;
+  // Fallback expressions compile against a different set of declarations than
+  // rules do: they may return UNSPECIFIED, and they may not use
+  // policy_for_range(). Only compilation differs, so plans compiled here are
+  // evaluated by celEvaluatorV2_ like any other.
+  std::unique_ptr<santa::cel::Evaluator<true>> celFallbackEvaluatorV2_;
   std::shared_ptr<santa::EntitlementsFilter> entitlementsFilter_;
   // Immutable, atomically-swapped batch of compiled fallback rules
   // (CompiledFallbackRule / FallbackBatch are defined in the anonymous namespace
@@ -149,9 +154,7 @@ struct FallbackBatch {
            std::string(evaluatorV1.status().message()).c_str());
     }
 
-    // This evaluator also handles CEL fallback expressions, which may return
-    // UNSPECIFIED to fall through to the next rule.
-    auto evaluatorV2 = santa::cel::Evaluator<true>::Create(/*allowUnspecified=*/true);
+    auto evaluatorV2 = santa::cel::Evaluator<true>::Create();
     if (evaluatorV2.ok()) {
       celEvaluatorV2_ = std::move(*evaluatorV2);
       celPlanCacheV2_ = std::make_unique<santa::cel::CELPlanCache<true>>(celEvaluatorV2_.get(),
@@ -159,6 +162,16 @@ struct FallbackBatch {
     } else {
       LOGW(@"Failed to create CEL v2 evaluator: %s",
            std::string(evaluatorV2.status().message()).c_str());
+    }
+
+    // A second evaluator for CEL fallback expressions, which may return
+    // UNSPECIFIED to fall through to the next rule.
+    auto fallbackEvaluatorV2 = santa::cel::Evaluator<true>::Create(/*allowUnspecified=*/true);
+    if (fallbackEvaluatorV2.ok()) {
+      celFallbackEvaluatorV2_ = std::move(*fallbackEvaluatorV2);
+    } else {
+      LOGW(@"Failed to create CEL v2 fallback evaluator: %s",
+           std::string(fallbackEvaluatorV2.status().message()).c_str());
     }
 
     // Pre-compile any existing fallback rules
@@ -191,7 +204,7 @@ struct FallbackBatch {
 }
 
 - (void)compileFallbackRules:(NSArray<SNTCELFallbackRule*>*)rules {
-  if (!celEvaluatorV2_) {
+  if (!celFallbackEvaluatorV2_) {
     return;
   }
 
@@ -200,7 +213,8 @@ struct FallbackBatch {
     return;
   }
 
-  std::shared_ptr<const FallbackBatch> batch = FallbackBatch::Create(celEvaluatorV2_.get(), rules);
+  std::shared_ptr<const FallbackBatch> batch =
+      FallbackBatch::Create(celFallbackEvaluatorV2_.get(), rules);
   if (!batch) {
     return;  // compile failure already logged; keep the currently-published batch
   }
@@ -213,6 +227,9 @@ struct FallbackBatch {
 
 - (BOOL)evaluateCELFallbackExpressions:(SNTCachedDecision*)cd
                     activationCallback:(ActivationCallbackBlock)activationCallback {
+  // celEvaluatorV2_, not celFallbackEvaluatorV2_: fallback plans are compiled by
+  // the fallback evaluator but evaluated through celEvaluatorV2_ below, since a
+  // compiled plan carries its own function registry.
   if (!celEvaluatorV2_ || !activationCallback) {
     return NO;
   }
