@@ -48,6 +48,7 @@
 #import "Source/santad/SNTExecutionController.h"
 #import "Source/santad/SNTNotificationQueue.h"
 #import "Source/santad/SNTPolicyProcessor.h"
+#import "Source/santad/SNTTimedRuleKills.h"
 #include "Source/santad/SandboxExpectations.h"
 
 using santa::Message;
@@ -152,7 +153,9 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
                                                policyProcessor:policyProcessor
                                            processControlBlock:santa::ProdSuspendResumeBlock()
                                                    processTree:nullptr
-                                           sandboxExpectations:_sandboxExpectations];
+                                           sandboxExpectations:_sandboxExpectations
+                                                timedRuleKills:nil
+                                               believableClock:nil];
 }
 
 - (void)tearDown {
@@ -327,7 +330,9 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
                                            policyProcessor:policyProcessor
                                        processControlBlock:santa::ProdSuspendResumeBlock()
                                                processTree:tree
-                                       sandboxExpectations:_sandboxExpectations];
+                                       sandboxExpectations:_sandboxExpectations
+                                            timedRuleKills:nil
+                                           believableClock:nil];
 }
 
 - (void)stubRule:(SNTRule*)rule forIdentifiers:(struct RuleIdentifiers)wantIdentifiers {
@@ -1025,7 +1030,9 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
           policyProcessor:mockPolicyProcessor
       processControlBlock:processControl
               processTree:processTree
-      sandboxExpectations:std::make_shared<santa::SandboxExpectations>()];
+      sandboxExpectations:std::make_shared<santa::SandboxExpectations>()
+           timedRuleKills:nil
+          believableClock:nil];
 
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   mockESApi->SetExpectationsRetainReleaseMessage();
@@ -1139,7 +1146,9 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
           policyProcessor:mockPolicyProcessor
       processControlBlock:processControl
               processTree:processTree
-      sandboxExpectations:std::make_shared<santa::SandboxExpectations>()];
+      sandboxExpectations:std::make_shared<santa::SandboxExpectations>()
+           timedRuleKills:nil
+          believableClock:nil];
 
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   mockESApi->SetExpectationsRetainReleaseMessage();
@@ -1263,7 +1272,9 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
           policyProcessor:mockPolicyProcessor
       processControlBlock:processControl
               processTree:processTree
-      sandboxExpectations:std::make_shared<santa::SandboxExpectations>()];
+      sandboxExpectations:std::make_shared<santa::SandboxExpectations>()
+           timedRuleKills:nil
+          believableClock:nil];
 
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   mockESApi->SetExpectationsRetainReleaseMessage();
@@ -1347,6 +1358,234 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   [mockPolicyProcessor stopMocking];
 }
 
+#pragma mark Timed rule kills
+
+/// A decision carrying the kill an in-window policy_for_range(...,
+/// should_kill=true) asked for, as SNTPolicyProcessor would have left it. Never
+/// cacheable: the window edge has to enforce itself on the next exec.
+- (SNTCachedDecision*)decisionWithTimedRuleKill:(SNTEventState)state {
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+  cd.decision = state;
+  cd.decisionClientMode = SNTClientModeLockdown;
+  cd.sha256 = @"a";
+  cd.cacheable = NO;
+  cd.timedRuleKillDeadline = [NSDate dateWithTimeIntervalSinceNow:3600];
+  cd.timedRuleKillNotifyAt = [NSDate dateWithTimeIntervalSinceNow:3300];
+  cd.timedRuleKillRuleType = SNTRuleTypeTeamID;
+  cd.timedRuleKillIdentifier = @"ABCDE12345";
+  cd.timedRuleKillCELHash = @"c0ffee";
+  cd.timedRuleKillWindowDays = @[ @1, @2, @3, @4, @5 ];
+  cd.timedRuleKillWindowStart = @"09:00";
+  cd.timedRuleKillWindowEnd = @"17:00";
+  cd.timedRuleKillWindowZone = @"America/New_York";
+  return cd;
+}
+
+- (NSArray<NSDictionary*>*)recordedKillsForDecision:(SNTCachedDecision*)cd
+                                       touchIDReply:(NSNumber*)touchIDReply {
+  return [self recordedKillsForDecision:cd touchIDReply:touchIDReply processControlSucceeds:YES];
+}
+
+/// Runs one exec whose policy decision is `cd` through a controller wired to a
+/// mocked SNTTimedRuleKills, and returns the kills it recorded, one dictionary
+/// of arguments per call. `touchIDReply` is nil unless the decision holds for
+/// TouchID, in which case the captured reply block is invoked with it.
+/// `processControlSucceeds` is what suspending and resuming the held process
+/// report back; NO is a hold that could not stop the process, or a resume that
+/// failed.
+- (NSArray<NSDictionary*>*)recordedKillsForDecision:(SNTCachedDecision*)cd
+                                       touchIDReply:(NSNumber*)touchIDReply
+                             processControlSucceeds:(BOOL)processControlSucceeds {
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
+  OCMStub([self.mockConfigurator clientMode]).andReturn(SNTClientModeLockdown);
+
+  id mockNotifierQueue = OCMClassMock([SNTNotificationQueue class]);
+  __block NotificationReplyBlock capturedReplyBlock = nil;
+  OCMStub([mockNotifierQueue addEvent:OCMOCK_ANY
+                    withCustomMessage:OCMOCK_ANY
+                            customURL:OCMOCK_ANY
+                eventDetailButtonText:OCMOCK_ANY
+                          configState:OCMOCK_ANY
+                             andReply:OCMOCK_ANY])
+      .andDo(^(NSInvocation* invocation) {
+        __unsafe_unretained NotificationReplyBlock block;
+        [invocation getArgument:&block atIndex:7];
+        capturedReplyBlock = [block copy];
+      });
+
+  NSMutableArray<NSDictionary*>* recorded = [NSMutableArray array];
+  id mockTimedRuleKills = OCMClassMock([SNTTimedRuleKills class]);
+  OCMStub([mockTimedRuleKills recordKillForRuleType:SNTRuleTypeUnknown
+                                         identifier:OCMOCK_ANY
+                                            celHash:OCMOCK_ANY
+                                           deadline:OCMOCK_ANY
+                                           notifyAt:OCMOCK_ANY
+                                         windowDays:OCMOCK_ANY
+                                        windowStart:OCMOCK_ANY
+                                          windowEnd:OCMOCK_ANY
+                                         windowZone:OCMOCK_ANY])
+      .ignoringNonObjectArgs()
+      .andDo(^(NSInvocation* invocation) {
+        SNTRuleType ruleType = SNTRuleTypeUnknown;
+        __unsafe_unretained NSString* identifier;
+        __unsafe_unretained NSString* celHash;
+        __unsafe_unretained NSDate* deadline;
+        __unsafe_unretained NSDate* notifyAt;
+        __unsafe_unretained NSArray* windowDays;
+        __unsafe_unretained NSString* windowStart;
+        __unsafe_unretained NSString* windowEnd;
+        __unsafe_unretained NSString* windowZone;
+        [invocation getArgument:&ruleType atIndex:2];
+        [invocation getArgument:&identifier atIndex:3];
+        [invocation getArgument:&celHash atIndex:4];
+        [invocation getArgument:&deadline atIndex:5];
+        [invocation getArgument:&notifyAt atIndex:6];
+        [invocation getArgument:&windowDays atIndex:7];
+        [invocation getArgument:&windowStart atIndex:8];
+        [invocation getArgument:&windowEnd atIndex:9];
+        [invocation getArgument:&windowZone atIndex:10];
+        // Built key by key rather than as a literal: andDo() is a macro, and a
+        // comma inside a braced literal would be read as another argument to it.
+        NSMutableDictionary* call = [NSMutableDictionary dictionary];
+        call[@"ruleType"] = @(ruleType);
+        call[@"identifier"] = identifier;
+        call[@"celHash"] = celHash;
+        call[@"deadline"] = deadline;
+        call[@"notifyAt"] = notifyAt;
+        call[@"windowDays"] = windowDays;
+        call[@"windowStart"] = windowStart;
+        call[@"windowEnd"] = windowEnd;
+        call[@"windowZone"] = windowZone;
+        [recorded addObject:call];
+      });
+
+  id mockPolicyProcessor = OCMClassMock([SNTPolicyProcessor class]);
+
+  es_file_t file = MakeESFile("foo");
+  es_process_t proc = MakeESProcess(&file);
+  es_file_t fileExec = MakeESFile("bar", {.st_dev = 12, .st_ino = 34});
+  es_process_t procExec = MakeESProcess(&fileExec);
+  procExec.is_platform_binary = false;
+  procExec.codesigning_flags = CS_SIGNED | CS_VALID;
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_EXEC, &proc);
+  esMsg.event.exec.target = &procExec;
+
+  OCMStub([mockPolicyProcessor decisionForFileInfo:OCMOCK_ANY
+                                     targetProcess:&procExec
+                                      imageCPUType:0
+                                       configState:OCMOCK_ANY
+                                activationCallback:OCMOCK_ANY
+                                    cachedDecision:OCMOCK_ANY])
+      .ignoringNonObjectArgs()
+      .andReturn(cd);
+
+  SNTExecutionController* controller =
+      [[SNTExecutionController alloc] initWithRuleTable:self.mockRuleDatabase
+          eventTable:self.mockEventDatabase
+          notifierQueue:mockNotifierQueue
+          syncdQueue:nil
+          logger:^(Message esMsg) {
+          }
+          ttyWriter:santa::TTYWriter::Create(true)
+          policyProcessor:mockPolicyProcessor
+          processControlBlock:^bool(pid_t pid, santa::ProcessControl control) {
+            return processControlSucceeds;
+          }
+          processTree:nullptr
+          sandboxExpectations:std::make_shared<santa::SandboxExpectations>()
+          timedRuleKills:mockTimedRuleKills
+          believableClock:nil];
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+  {
+    Message msg(mockESApi, &esMsg);
+    [controller validateExecEvent:msg
+                   cachedDecision:nil
+                       postAction:^bool(SNTAction action, SNTCachedDecision* decision) {
+                         return true;
+                       }];
+  }
+
+  if (touchIDReply) {
+    XCTAssertNotNil(capturedReplyBlock, @"Reply block should have been captured");
+    XCTAssertEqual(recorded.count, 0UL, @"A held execution has not proceeded yet");
+    capturedReplyBlock(touchIDReply.boolValue);
+  }
+
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+  [mockNotifierQueue stopMocking];
+  [mockPolicyProcessor stopMocking];
+  [mockTimedRuleKills stopMocking];
+  return recorded;
+}
+
+// An allowed in-window exec records the kill, with everything the decision
+// carried passed through untouched: the identifier especially, which the
+// fire-time re-check looks the rule up by, case-sensitively.
+- (void)testTimedRuleKillRecordedWhenTheExecIsAllowed {
+  SNTCachedDecision* cd = [self decisionWithTimedRuleKill:SNTEventStateAllowBinary];
+  NSArray<NSDictionary*>* recorded = [self recordedKillsForDecision:cd touchIDReply:nil];
+
+  XCTAssertEqual(recorded.count, 1UL);
+  NSDictionary* call = recorded.firstObject;
+  XCTAssertEqualObjects(call[@"ruleType"], @(SNTRuleTypeTeamID));
+  XCTAssertEqualObjects(call[@"identifier"], @"ABCDE12345");
+  XCTAssertEqualObjects(call[@"celHash"], @"c0ffee");
+  XCTAssertEqualObjects(call[@"deadline"], cd.timedRuleKillDeadline);
+  XCTAssertEqualObjects(call[@"notifyAt"], cd.timedRuleKillNotifyAt);
+  XCTAssertEqualObjects(call[@"windowDays"], (@[ @1, @2, @3, @4, @5 ]));
+  XCTAssertEqualObjects(call[@"windowStart"], @"09:00");
+  XCTAssertEqualObjects(call[@"windowEnd"], @"17:00");
+  XCTAssertEqualObjects(call[@"windowZone"], @"America/New_York");
+}
+
+// The window was open and the kill was asked for, but the policy in the window
+// blocks: nothing ran, so there is nothing to quit later.
+- (void)testTimedRuleKillNotRecordedWhenTheExecIsBlocked {
+  SNTCachedDecision* cd = [self decisionWithTimedRuleKill:SNTEventStateBlockBinary];
+  XCTAssertEqual([self recordedKillsForDecision:cd touchIDReply:nil].count, 0UL);
+}
+
+// No deadline on the decision, which is what both an out-of-window exec and a
+// should_kill of false leave behind.
+- (void)testTimedRuleKillNotRecordedWithoutADeadline {
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+  cd.decision = SNTEventStateAllowBinary;
+  cd.sha256 = @"a";
+  XCTAssertEqual([self recordedKillsForDecision:cd touchIDReply:nil].count, 0UL);
+}
+
+// A held execution proceeds only when the user authorizes it, so that is where
+// its kill is recorded.
+- (void)testTimedRuleKillRecordedWhenTouchIDApproves {
+  SNTCachedDecision* cd = [self decisionWithTimedRuleKill:SNTEventStateBlockSigningID];
+  cd.holdAndAsk = YES;
+  NSArray<NSDictionary*>* recorded = [self recordedKillsForDecision:cd touchIDReply:@YES];
+
+  XCTAssertEqual(recorded.count, 1UL);
+  XCTAssertEqualObjects(recorded.firstObject[@"identifier"], @"ABCDE12345");
+}
+
+- (void)testTimedRuleKillNotRecordedWhenTouchIDIsDenied {
+  SNTCachedDecision* cd = [self decisionWithTimedRuleKill:SNTEventStateBlockSigningID];
+  cd.holdAndAsk = YES;
+  XCTAssertEqual([self recordedKillsForDecision:cd touchIDReply:@NO].count, 0UL);
+}
+
+// An approval is not an execution: a hold that could not stop the process (it
+// was killed instead) or a resume that failed leaves nothing running, so there
+// is nothing for the window to quit.
+- (void)testTimedRuleKillNotRecordedWhenTheHeldProcessCannotResume {
+  SNTCachedDecision* cd = [self decisionWithTimedRuleKill:SNTEventStateBlockSigningID];
+  cd.holdAndAsk = YES;
+  NSArray<NSDictionary*>* recorded = [self recordedKillsForDecision:cd
+                                                       touchIDReply:@YES
+                                             processControlSucceeds:NO];
+  XCTAssertEqual(recorded.count, 0UL);
+}
+
 // Test that flushTouchIDApprovalCache clears the cache
 - (void)testFlushTouchIDApprovalCache {
   SNTExecutionController* controller = [[SNTExecutionController alloc]
@@ -1359,7 +1598,9 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
           policyProcessor:nil
       processControlBlock:santa::ProdSuspendResumeBlock()
               processTree:nullptr
-      sandboxExpectations:std::make_shared<santa::SandboxExpectations>()];
+      sandboxExpectations:std::make_shared<santa::SandboxExpectations>()
+           timedRuleKills:nil
+          believableClock:nil];
 
   // Just verify that flush doesn't crash - the cache internals are private
   XCTAssertNoThrow([controller flushTouchIDApprovalCache]);

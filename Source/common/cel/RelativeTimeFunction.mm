@@ -124,7 +124,11 @@ absl::Status TodayFunction::Evaluate(absl::Span<const cel_runtime::CelValue> arg
   }
 
   // The start of the civil day that zone is in right now, off the system clock:
-  // today() is the date this machine says it is, in the calendar asked for.
+  // today() is the date this machine says it is, in the calendar asked for. The
+  // system clock and not the activation's, which is what rules written before
+  // time windows existed already depend on; holding it to a believable clock
+  // would make a forward clock jump stick to the calendar for rules that asked
+  // for none of this.
   absl::Time now = absl::Now();
   *result = cel_runtime::CelValue::CreateTimestamp(
       absl::FromCivil(absl::CivilDay{absl::ToCivilSecond(now, zone)}, zone));
@@ -146,7 +150,7 @@ absl::Status NowFunction::Evaluate(absl::Span<const cel_runtime::CelValue> args,
   // immediately. Mark the evaluation non-cacheable.
   *used_sink_ = true;
 
-  *result = cel_runtime::CelValue::CreateTimestamp(absl::Now());
+  *result = cel_runtime::CelValue::CreateTimestamp(now_());
   return absl::OkStatus();
 }
 
@@ -156,7 +160,7 @@ absl::Status AddRelativeTimeCompilerLibrary(::cel::CompilerBuilder& builder) {
          CEL_ASSIGN_OR_RETURN(
              auto today_decl,
              ::cel::MakeFunctionDecl(
-                 "today", ::cel::MakeOverloadDecl("today", ::cel::TimestampType()),
+                 "today", ::cel::MakeOverloadDecl("today_timestamp", ::cel::TimestampType()),
                  ::cel::MakeOverloadDecl("today_timestamp_tz", ::cel::TimestampType(),
                                          ::cel::StringType())));
          CEL_ASSIGN_OR_RETURN(auto days_decl,

@@ -37,8 +37,10 @@
 #include "Source/common/cel/CELPlanCache.h"
 #include "Source/common/cel/Evaluator.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
+#import "Source/santad/SNTTimedRuleKills.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/statusor.h"
+#include "absl/time/time.h"
 #include "cel/v1.pb.h"
 
 static constexpr uint64_t kCELPlanCacheMaxSize = 128;
@@ -56,6 +58,36 @@ struct CELEvaluationResult {
 };
 
 static void ApplySilentBlock(SNTCachedDecision* cd, SNTRuleState state);
+
+static NSDate* NSDateFromAbslTime(absl::Time t) {
+  return [NSDate dateWithTimeIntervalSince1970:absl::ToDoubleSeconds(t - absl::UnixEpoch())];
+}
+
+static NSArray<NSNumber*>* NSArrayFromDays(const std::vector<int64_t>& days) {
+  NSMutableArray<NSNumber*>* out = [NSMutableArray arrayWithCapacity:days.size()];
+  for (int64_t day : days) {
+    [out addObject:@(day)];
+  }
+  return out;
+}
+
+// Drops whatever a CEL evaluation left on the decision about a timed rule kill.
+// Called before a rule is evaluated and on every path where an evaluated rule
+// does not go on to decide, because a deadline may only ever be attributed to
+// the rule that governed the execution recording it: a rule that falls through
+// to the fallback expressions, the platform allow, a scope allow or Monitor mode
+// must leave nothing behind for that allow to record.
+static void ClearTimedRuleKill(SNTCachedDecision* cd) {
+  cd.timedRuleKillDeadline = nil;
+  cd.timedRuleKillNotifyAt = nil;
+  cd.timedRuleKillRuleType = SNTRuleTypeUnknown;
+  cd.timedRuleKillIdentifier = nil;
+  cd.timedRuleKillCELHash = nil;
+  cd.timedRuleKillWindowDays = nil;
+  cd.timedRuleKillWindowStart = nil;
+  cd.timedRuleKillWindowEnd = nil;
+  cd.timedRuleKillWindowZone = nil;
+}
 
 struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
   return [SNTRuleIdentifiers filterIdentifiers:{
@@ -291,6 +323,7 @@ struct FallbackBatch {
   int returnValue = 0;
   bool cacheable = true;
   std::optional<uint64_t> touchIDCooldownMinutes;
+  std::optional<santa::cel::PendingKill> pendingKill;
 
   if (useV2) {
     const auto& v2Activation = static_cast<const santa::cel::Activation<true>&>(activation);
@@ -310,6 +343,7 @@ struct FallbackBatch {
     returnValue = static_cast<int>(evalResult->value);
     cacheable = evalResult->cacheable;
     touchIDCooldownMinutes = evalResult->touchIDCooldownMinutes;
+    pendingKill = evalResult->pendingKill;
   } else {
     const auto& v1Activation = static_cast<const santa::cel::Activation<false>&>(activation);
     assert(dynamic_cast<const santa::cel::Activation<false>*>(&activation) != nullptr);
@@ -327,7 +361,8 @@ struct FallbackBatch {
 
     returnValue = static_cast<int>(evalResult->value);
     cacheable = evalResult->cacheable;
-    // V1 doesn't support TouchID, so cooldown is always nullopt
+    // V1 doesn't support TouchID or policy_for_range(), so the cooldown and the
+    // pending kill are always nullopt
   }
 
   // Apply cacheability before the switch below so that an early return from a
@@ -406,6 +441,24 @@ struct FallbackBatch {
 
   ApplySilentBlock(cd, resultState);
 
+  // policy_for_range() matched an open window and asked for whatever the rule
+  // covers to be quit when it closes. The entry may only be recorded once the
+  // execution is known to proceed, so the deadline rides the decision out to
+  // SNTExecutionController, which records it. The rule's identity is filled in
+  // by the caller, which is where the rule is in hand. Fallback expressions are
+  // skipped: they are compiled without policy_for_range() precisely because
+  // they carry no rule identity for a kill to match a running process against.
+  if (pendingKill.has_value() && !inFallbackContext) {
+    cd.timedRuleKillDeadline = NSDateFromAbslTime(pendingKill->deadline);
+    cd.timedRuleKillNotifyAt = NSDateFromAbslTime(pendingKill->notify_at);
+    if (!pendingKill->window_days.empty()) {
+      cd.timedRuleKillWindowDays = NSArrayFromDays(pendingKill->window_days);
+      cd.timedRuleKillWindowStart = santa::StringToNSString(pendingKill->window_start);
+      cd.timedRuleKillWindowEnd = santa::StringToNSString(pendingKill->window_end);
+      cd.timedRuleKillWindowZone = santa::StringToNSString(pendingKill->window_zone);
+    }
+  }
+
   return {.succeeded = true, .decisionMade = false, .resultState = resultState};
 }
 
@@ -441,6 +494,9 @@ struct FallbackBatch {
   // Per-exec evaluation temporaries live on a stack arena; the plan's own
   // (cached) constant arena is long-lived and read-only here.
   google::protobuf::Arena evalArena;
+
+  // Whatever this evaluation asks for is named by the rule and committed in
+  // decision:forRule:, once that rule is known to have decided.
   return [self evaluateCompiledCELExpression:(*planResult)->expression.get()
                                        useV2:useV2
                               cachedDecision:cd
@@ -473,11 +529,19 @@ static void ApplySilentBlock(SNTCachedDecision* cd, SNTRuleState state) {
   SNTRuleState state = rule.state;
   SNTRuleType type = rule.type;
 
+  // A deadline is only ever attributed to the rule that produced it, so anything
+  // an earlier rule left on this decision goes now: only this call's own
+  // evaluation may leave one, and only if this rule goes on to decide.
+  ClearTimedRuleKill(cd);
+
   if ((state == SNTRuleStateCEL || state == SNTRuleStateCELv2) && activationCallback) {
     CELEvaluationResult celResult = [self evaluateCELExpressionForRule:rule
                                                         cachedDecision:cd
                                                     activationCallback:activationCallback];
     if (!celResult.succeeded) {
+      // The rule did not decide, so it leaves nothing behind: the same rule the
+      // unmapped-pair and transitive-disabled exits below follow.
+      ClearTimedRuleKill(cd);
       return celResult.decisionMade;
     }
     state = celResult.resultState;
@@ -535,7 +599,10 @@ static void ApplySilentBlock(SNTCachedDecision* cd, SNTRuleState state) {
   } else {
     // If we have an invalid state combination then either we have stale data in
     // the database or a programming error. We treat this as if the
-    // corresponding rule was not found.
+    // corresponding rule was not found, which includes forgetting any kill its
+    // expression asked for: whatever allows this execution instead is not this
+    // rule, and must not record against it.
+    ClearTimedRuleKill(cd);
     LOGE(@"Invalid rule type/state combination %ld/%ld", type, state);
     return NO;
   }
@@ -566,6 +633,7 @@ static void ApplySilentBlock(SNTCachedDecision* cd, SNTRuleState state) {
       // as if a matching rule was not found and set the state to unknown. Otherwise the
       // decision map will have already set the EventState to SNTEventStateAllowTransitive.
       if (!enableTransitiveRules) {
+        ClearTimedRuleKill(cd);
         cd.decision = SNTEventStateUnknown;
         return NO;
       }
@@ -587,6 +655,17 @@ static void ApplySilentBlock(SNTCachedDecision* cd, SNTRuleState state) {
   cd.eventDetailButtonText = rule.eventDetailButtonText;
   cd.staticRule = rule.staticRule;
   cd.ruleId = rule.ruleId;
+
+  // A kill this rule's policy_for_range() asked for is named only here, where
+  // the rule is known to have decided: the identifier is what the fire-time
+  // re-check looks the rule up by, so it has to be the rule that governed the
+  // execution recording it, taken as the rule table stores it and never
+  // re-derived from the binary.
+  if (cd.timedRuleKillDeadline) {
+    cd.timedRuleKillRuleType = rule.type;
+    cd.timedRuleKillIdentifier = rule.identifier;
+    cd.timedRuleKillCELHash = [SNTTimedRuleKills celHashForExpression:rule.celExpr];
+  }
 
   return YES;
 }

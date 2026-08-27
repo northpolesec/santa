@@ -35,6 +35,7 @@
 #import "Source/santad/DataLayer/SNTEventTable.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
 #include "Source/santad/EntitlementsFilter.h"
+#import "Source/santad/SNTBelievableClock.h"
 #import "Source/santad/SNTDatabaseController.h"
 #import "Source/santad/SNTDecisionCache.h"
 #import "Source/santad/SNTNetworkExtensionQueue.h"
@@ -100,13 +101,26 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator* configurator,
     exit(EXIT_FAILURE);
   }
 
+  // The clock every time window and every deadline is judged against: the
+  // minimum believable time, which no change to the system clock can move
+  // backwards. Created before the components that read it, since constructing
+  // it is what records this daemon start's reading.
+  SNTBelievableClock* believable_clock =
+      [[SNTBelievableClock alloc] initWithConfigurator:configurator];
+  if (!believable_clock) {
+    LOGE(@"Failed to initialize the believable clock.");
+    exit(EXIT_FAILURE);
+  }
+
   // Owns the kills asked for by CEL rules using policy_for_range(...,
-  // should_kill=true). Nothing records entries yet, so the only thing it does
-  // in production today is settle the entries a previous daemon left behind.
+  // should_kill=true): the exec controller records an entry when an in-window
+  // execution is allowed, and this settles the entries a previous daemon left
+  // behind.
   SNTTimedRuleKills* timed_rule_kills =
       [[SNTTimedRuleKills alloc] initWithNotifierQueue:notifier_queue
                                              ruleTable:rule_table
-                                          configurator:configurator];
+                                          configurator:configurator
+                                                 clock:believable_clock];
   if (!timed_rule_kills) {
     LOGE(@"Failed to initialize timed rule kills.");
     exit(EXIT_FAILURE);
@@ -238,7 +252,9 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator* configurator,
                                         policyProcessor:policy_processor
                                     processControlBlock:processControlBlock
                                             processTree:process_tree
-                                    sandboxExpectations:sandbox_expectations];
+                                    sandboxExpectations:sandbox_expectations
+                                         timedRuleKills:timed_rule_kills
+                                        believableClock:believable_clock];
   if (!exec_controller) {
     LOGE(@"Failed to initialize exec controller.");
     exit(EXIT_FAILURE);

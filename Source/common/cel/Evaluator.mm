@@ -204,9 +204,11 @@ absl::StatusOr<typename Evaluator<IsV2>::EvaluationResultT> Evaluator<IsV2>::Eva
   //         both return this type). Bool is also supported for convenience.
   if (bool value; result->GetValue(&value)) {
     if (value) {
-      return EvaluationResultT(Traits::ALLOWLIST, activation.IsResultCacheable());
+      return EvaluationResultT(Traits::ALLOWLIST, activation.IsResultCacheable(), std::nullopt,
+                               activation.GetPendingKill());
     }
-    return EvaluationResultT(Traits::BLOCKLIST, activation.IsResultCacheable());
+    return EvaluationResultT(Traits::BLOCKLIST, activation.IsResultCacheable(), std::nullopt,
+                             activation.GetPendingKill());
   } else if constexpr (IsV2) {
     // V2: Handle Result message
     if (result->IsMessage()) {
@@ -220,7 +222,8 @@ absl::StatusOr<typename Evaluator<IsV2>::EvaluationResultT> Evaluator<IsV2>::Eva
           if (cel_result->has_cooldown_minutes()) {
             cooldownOpt = cel_result->cooldown_minutes();
           }
-          return EvaluationResultT(rv, activation.IsResultCacheable(), cooldownOpt);
+          return EvaluationResultT(rv, activation.IsResultCacheable(), cooldownOpt,
+                                   activation.GetPendingKill());
         }
       }
     }

@@ -56,8 +56,7 @@ struct KillEnv {
   std::function<pid_t(pid_t)> pgid_for_pid = getpgid;
 
   // Signal one process, validated against its audit token. Returns 0 or errno.
-  std::function<int(audit_token_t*, int)> signal_token =
-      proc_signal_with_audittoken;
+  std::function<int(audit_token_t*, int)> signal_token = proc_signal_with_audittoken;
 
   // Signal every process in a group. Returns 0 or errno.
   std::function<int(pid_t, int)> signal_group = SignalProcessGroup;
@@ -72,12 +71,37 @@ SNTKillResponse* KillingMachine(SNTKillRequest* request, const KillEnv& env);
 // Sends SIGTERM to everything the request matches, blocks the calling thread
 // for `grace`, then re-matches and SIGKILLs whatever is still there. Blocking
 // is the contract: callers run this on a queue they own. The request's own
-// `signal` field is not used by this path.
-SNTKillResponse* KillingMachineTermThenKill(SNTKillRequest* request,
-                                            NSTimeInterval grace);
-SNTKillResponse* KillingMachineTermThenKill(SNTKillRequest* request,
-                                            NSTimeInterval grace,
+// `signal` field is not used by this path. When nothing was actually sent a
+// signal, there is nothing to escalate, so the grace period is skipped and the
+// calling thread is not held at all.
+//
+// A convenience wrapper over the multi-request form below, which is what santad
+// itself calls; the answer for one request is identical either way.
+SNTKillResponse* KillingMachineTermThenKill(SNTKillRequest* request, NSTimeInterval grace);
+SNTKillResponse* KillingMachineTermThenKill(SNTKillRequest* request, NSTimeInterval grace,
                                             const KillEnv& env);
+
+// The same for several requests at once: every request's SIGTERM goes out, the
+// calling thread blocks once for `grace`, and then the SIGKILL re-matches run.
+// Requests that come due together therefore cost one grace period rather than
+// one each. One response per request, in the order they were given. A request
+// whose SIGTERM pass matched nothing is not re-matched, and when nothing at all
+// was actually sent a signal, there is nothing to escalate, so the grace period
+// is skipped and the calling thread is not held at all.
+//
+// A process group is signaled once per pass, however many of the requests reach
+// it: the group signal is not repeated for the second request, whose response is
+// then empty of that delivery. Being covered by another request's signal is not
+// the same as having matched nothing, though, so such a request is still
+// re-matched and escalated at SIGKILL. It has to be: the request that signaled
+// the group may have stopped matching by then, which is what happens whenever
+// its own process honors SIGTERM, and the survivor in the group would otherwise
+// escape the escalation entirely. Only a group signal that actually landed
+// suppresses another attempt at it.
+NSArray<SNTKillResponse*>* KillingMachineTermThenKill(NSArray<SNTKillRequest*>* requests,
+                                                      NSTimeInterval grace);
+NSArray<SNTKillResponse*>* KillingMachineTermThenKill(NSArray<SNTKillRequest*>* requests,
+                                                      NSTimeInterval grace, const KillEnv& env);
 
 // The pid of one process the request matches, or nullopt when nothing does.
 // Signals nothing: this is the match pass on its own, so a caller can find out
@@ -86,8 +110,7 @@ SNTKillResponse* KillingMachineTermThenKill(SNTKillRequest* request,
 // may be gone by the time the caller looks at it. Running-process requests are
 // not supported here, as they already name the process the caller wants.
 std::optional<pid_t> KillingMachineAnyMatch(SNTKillRequest* request);
-std::optional<pid_t> KillingMachineAnyMatch(SNTKillRequest* request,
-                                            const KillEnv& env);
+std::optional<pid_t> KillingMachineAnyMatch(SNTKillRequest* request, const KillEnv& env);
 
 }  // namespace santa
 

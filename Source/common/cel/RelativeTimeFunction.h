@@ -15,10 +15,12 @@
 #ifndef SANTA_COMMON_CEL_RELATIVETIMEFUNCTION_H
 #define SANTA_COMMON_CEL_RELATIVETIMEFUNCTION_H
 
+#include <functional>
 #include <utility>
 #include <vector>
 
 #include "absl/status/status.h"
+#include "absl/time/time.h"
 #include "absl/types/span.h"
 
 // CEL headers have warnings and our config turns them into errors.
@@ -42,12 +44,13 @@ namespace cel {
 //     target.secure_signing_time > today() - days(90)
 //
 //   today() -> google.protobuf.Timestamp
-//     The start of the current day in the host's local time zone, truncated to
-//     a whole day rather than the literal current instant. Because its value
-//     changes at the next local midnight, any expression that uses it is marked
-//     non-cacheable. Registered as a lazy function so it is never
-//     constant-folded (folding would freeze the date at compile time) and so
-//     the Activation that vends it can flag the evaluation as non-cacheable.
+//     The start of the current day in the host's local time zone by the system
+//     clock, truncated to a whole day rather than the literal current instant.
+//     Because its value changes at the next local midnight, any expression that
+//     uses it is marked non-cacheable. Registered as a lazy function so it is
+//     never constant-folded (folding would freeze the date at compile time)
+//     and so the Activation that vends it can flag the evaluation as
+//     non-cacheable.
 //
 //     Host local is a behavior change: today() shipped in 2026.6 as the start
 //     of the current UTC day, and an already-deployed rule using it now crosses
@@ -81,6 +84,23 @@ namespace cel {
 //     The constant [1, 2, 3, 4, 5]: Monday through Friday in the day-of-week
 //     numbering 0=Sunday through 6=Saturday. Pure and foldable, so it does not
 //     affect cacheability.
+//
+// The two read different clocks, deliberately. today() is calendar truth and
+// reads the system clock, as it has since before any of this existed: rules
+// already depend on it meaning "the date this machine says it is", and moving
+// it onto santad's believable clock would export that clock's roll-forward
+// stickiness onto rules that never asked for a time window. It is therefore not
+// rollback protected. now(), like policy_for_range(), reads the clock the
+// Activation supplies, so a rule that does ask for a window gets one that a
+// clock change cannot re-open.
+//
+// Mixing them is safe in the direction that matters. A today() edge handed to
+// policy_for_range(), as in policy_for_range(weekdays(), today(), today() +
+// days(1), ...), is tested for membership on the believable clock, so under
+// skew the window reads as out of range and the rule falls to its
+// out_of_range_policy: closed, not open. The other direction, a today()
+// comparison outside any window, keeps exactly the exposure today() already
+// had.
 
 // Descriptors for the today() overloads, the bare form and today(zone), both
 // lazy. The runtime picks between them by descriptor shape, so both have to be
@@ -92,9 +112,10 @@ TodayDescriptors();
 ::google::api::expr::runtime::CelFunctionDescriptor NowDescriptor();
 
 // Lazy CEL function backing one today() overload. On evaluation it returns the
-// start of the current day, in the host's zone or in the one its argument
-// names, and sets the supplied flag to true to mark the evaluation as
-// non-cacheable. The sink pointer must outlive every evaluation.
+// start of the current day by the system clock, in the host's zone or in the
+// one its argument names, and sets the supplied flag to true to mark the
+// evaluation as non-cacheable. Takes no clock: see above for why this one stays
+// on the system clock. The sink pointer must outlive every evaluation.
 class TodayFunction : public ::google::api::expr::runtime::CelFunction {
  public:
   TodayFunction(::google::api::expr::runtime::CelFunctionDescriptor descriptor,
@@ -111,14 +132,15 @@ class TodayFunction : public ::google::api::expr::runtime::CelFunction {
   bool* used_sink_;
 };
 
-// Lazy CEL function backing now(). On evaluation it returns the current instant
-// and sets the supplied flag to true to mark the evaluation as non-cacheable.
-// The sink pointer must outlive every evaluation.
+// Lazy CEL function backing now(). On evaluation it returns `now` and sets the
+// supplied flag to true to mark the evaluation as non-cacheable. The sink
+// pointer must outlive every evaluation.
 class NowFunction : public ::google::api::expr::runtime::CelFunction {
  public:
-  explicit NowFunction(bool* used_sink)
+  NowFunction(bool* used_sink, std::function<absl::Time()> now)
       : ::google::api::expr::runtime::CelFunction(NowDescriptor()),
-        used_sink_(used_sink) {}
+        used_sink_(used_sink),
+        now_(std::move(now)) {}
 
   absl::Status Evaluate(
       absl::Span<const ::google::api::expr::runtime::CelValue> args,
@@ -127,6 +149,7 @@ class NowFunction : public ::google::api::expr::runtime::CelFunction {
 
  private:
   bool* used_sink_;
+  std::function<absl::Time()> now_;
 };
 
 // Register the today(), today(zone), days(), now() and weekdays() decls with

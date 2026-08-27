@@ -19,6 +19,7 @@
 
 #import "Source/common/SNTCommonEnums.h"
 
+@class SNTBelievableClock;
 @class SNTConfigurator;
 @class SNTNotificationQueue;
 @class SNTRuleTable;
@@ -26,7 +27,7 @@
 ///
 ///  Owns the kills asked for by CEL rules using policy_for_range(...,
 ///  should_kill=true): one entry per rule, a timer for the next event across
-///  them, the warning banner shortly before a deadline, and the kill itself at
+///  them, the warning window shortly before a deadline, and the kill itself at
 ///  the deadline.
 ///
 ///  Nothing running is touched except at a recorded deadline. A rule arriving,
@@ -35,6 +36,22 @@
 ///  Entries are persisted, so a deadline is an appointment that survives a
 ///  daemon restart: `resumeFromSavedState` runs the ones that came due while
 ///  the daemon was down and re-arms the timer for the rest.
+///
+///  Every "has this come due" question is asked of `clock`, the minimum
+///  believable time, rather than of the system clock, so moving the system clock
+///  backwards cannot push a deadline out. Each entry also carries the deadline
+///  as a mach continuous instant, paired with the boot session that instant
+///  belongs to, and whichever of the two clocks arrives first fires the kill.
+///  Across a reboot the mach value belongs to a counter that has restarted, so
+///  there the wall instant governs alone; everything the rule covered died with
+///  the reboot anyway.
+///
+///  The whole due question is re-asked on `clock`'s refresh, which runs on the
+///  uptime clock and so cannot be delayed by any change to the wall clock. That
+///  is what bounds the damage a rolled-back clock can do: it delays a quit by at
+///  most one refresh interval, whatever the size of the rollback, and the
+///  countdown timer, which runs on the wall clock, is re-armed from the
+///  believable one on the way through.
 ///
 ///  A deadline reached while the entry's recurring window is standing open with a
 ///  later end than the deadline itself is not a kill but an appointment moved:
@@ -47,7 +64,8 @@
 
 - (instancetype)initWithNotifierQueue:(SNTNotificationQueue*)notifierQueue
                             ruleTable:(SNTRuleTable*)ruleTable
-                         configurator:(SNTConfigurator*)configurator NS_DESIGNATED_INITIALIZER;
+                         configurator:(SNTConfigurator*)configurator
+                                clock:(SNTBelievableClock*)clock NS_DESIGNATED_INITIALIZER;
 
 - (instancetype)init NS_UNAVAILABLE;
 

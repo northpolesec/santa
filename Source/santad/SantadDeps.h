@@ -101,8 +101,8 @@ class SantadDeps {
   SNTSyncdQueue* syncd_queue_;
   SNTNetworkExtensionQueue* netext_queue_;
   SNTExecutionController* exec_controller_;
-  // Held here so the component outlives Create(); the exec path takes it from
-  // the accessor once there is something recording entries.
+  // Held here so the component outlives Create(); the exec controller holds its
+  // own reference to record entries through.
   SNTTimedRuleKills* timed_rule_kills_;
   std::shared_ptr<santa::PrefixTree<santa::Unit>> prefix_tree_;
   std::shared_ptr<santa::TTYWriter> tty_writer_;

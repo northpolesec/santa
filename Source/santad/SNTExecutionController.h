@@ -53,11 +53,13 @@ const static NSString* kBlockCELFallback = @"BlockCELFallback";
 const static NSString* kAllowCELFallback = @"AllowCELFallback";
 const static NSString* kAllowPlatform = @"AllowPlatform";
 
+@class SNTBelievableClock;
 @class SNTCachedDecision;
 @class SNTEventTable;
 @class SNTNotificationQueue;
 @class SNTRuleTable;
 @class SNTSyncdQueue;
+@class SNTTimedRuleKills;
 
 using LogExecutionBlock = void (^)(santa::Message esMsg);
 
@@ -71,6 +73,16 @@ using LogExecutionBlock = void (^)(santa::Message esMsg);
 ///
 @interface SNTExecutionController : NSObject
 
+///
+///  `believableClock` is required in production: without it the CEL time windows
+///  this controller evaluates are judged against the system clock, which a clock
+///  change can move. Tests that evaluate no time window may pass nil, which is
+///  logged.
+///
+///  `timedRuleKills` may be nil in tests, in which case no kill entries are
+///  recorded at all; the daemon always supplies one. Unlike the clock this is
+///  silent: the recording call is a message to nil.
+///
 - (instancetype)initWithRuleTable:(SNTRuleTable*)ruleTable
                        eventTable:(SNTEventTable*)eventTable
                     notifierQueue:(SNTNotificationQueue*)notifierQueue
@@ -81,7 +93,9 @@ using LogExecutionBlock = void (^)(santa::Message esMsg);
               processControlBlock:(santa::ProcessControlBlock)processControlBlock
                       processTree:
                           (std::shared_ptr<santa::santad::process_tree::ProcessTree>)processTree
-              sandboxExpectations:(std::shared_ptr<santa::SandboxExpectations>)sandboxExpectations;
+              sandboxExpectations:(std::shared_ptr<santa::SandboxExpectations>)sandboxExpectations
+                   timedRuleKills:(SNTTimedRuleKills*)timedRuleKills
+                  believableClock:(SNTBelievableClock*)believableClock;
 
 ///
 ///  Handles the logic of deciding whether to allow the binary to run or not, sends the response to
