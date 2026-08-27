@@ -25,6 +25,8 @@
 #include <limits>
 #include <memory>
 #include <optional>
+#include <string>
+#include <vector>
 
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTConfigurator.h"
@@ -34,9 +36,12 @@
 #import "Source/common/SNTRuleIdentifiers.h"
 #import "Source/common/SNTXPCNotifierInterface.h"
 #include "Source/common/Timer.h"
+#include "Source/common/cel/PolicyForRangeFunction.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
 #include "Source/santad/KillingMachine.h"
 #import "Source/santad/SNTNotificationQueue.h"
+#include "absl/status/statusor.h"
+#include "absl/time/time.h"
 
 // Fields of a persisted entry.
 static NSString* const kEntryRuleTypeKey = @"RuleType";
@@ -45,6 +50,10 @@ static NSString* const kEntryCELHashKey = @"CELHash";
 static NSString* const kEntryDeadlineKey = @"Deadline";
 static NSString* const kEntryNotifyAtKey = @"NotifyAt";
 static NSString* const kEntryNotifiedKey = @"Notified";
+static NSString* const kEntryWindowDaysKey = @"WindowDays";
+static NSString* const kEntryWindowStartKey = @"WindowStart";
+static NSString* const kEntryWindowEndKey = @"WindowEnd";
+static NSString* const kEntryWindowZoneKey = @"WindowZone";
 
 // A timer can fire marginally early; anything due within this window is treated
 // as due now rather than re-arming for a fraction of a second.
@@ -53,8 +62,9 @@ static const NSTimeInterval kDueTolerance = 0.25;
 // How long a matched process has to exit after SIGTERM before it is SIGKILLed.
 static const NSTimeInterval kTermGrace = 5.0;
 
-/// One pending kill: the rule it came from, when it fires, and whether the user
-/// has already been warned.
+/// One pending kill: the rule it came from, when it fires, whether the user has
+/// already been warned, and the shape of the window the deadline came from (nil
+/// for a window that does not recur).
 @interface SNTTimedRuleKillEntry : NSObject
 @property SNTRuleType ruleType;
 @property(copy) NSString* identifier;
@@ -62,6 +72,10 @@ static const NSTimeInterval kTermGrace = 5.0;
 @property NSDate* deadline;
 @property NSDate* notifyAt;
 @property BOOL notified;
+@property(copy) NSArray<NSNumber*>* windowDays;
+@property(copy) NSString* windowStart;
+@property(copy) NSString* windowEnd;
+@property(copy) NSString* windowZone;
 
 /// Deserializes a persisted entry, or nil when it isn't one: the state file is
 /// on disk, so every field is validated rather than trusted.
@@ -81,6 +95,58 @@ namespace {
 bool SupportedRuleType(SNTRuleType ruleType) {
   return ruleType == SNTRuleTypeSigningID || ruleType == SNTRuleTypeTeamID ||
          ruleType == SNTRuleTypeCDHash;
+}
+
+// The persisted window shape, checked rather than trusted, because the state
+// file is on disk: a day list must be an array of whole numbers 0 (Sunday)
+// through 6 (Saturday), each time a 24-hour "HH:MM", and the zone a string
+// policy_for_range()'s own resolver accepts. That is exactly what
+// policy_for_range() accepts, and so exactly what a window can be rebuilt from.
+// Anything else reads as no shape at all, which is the same answer a missing key
+// gives: the entry still loads and still holds its deadline, it just has no
+// window for a restart to re-check.
+NSArray<NSNumber*>* WindowDaysFromValue(id value) {
+  if (![value isKindOfClass:[NSArray class]]) {
+    return nil;
+  }
+  for (NSNumber* day in value) {
+    if (![day isKindOfClass:[NSNumber class]] || day.integerValue < 0 || day.integerValue > 6 ||
+        (double)day.integerValue != day.doubleValue) {
+      return nil;
+    }
+  }
+  return value;
+}
+
+NSString* WindowTimeFromValue(id value) {
+  NSString* time = [value isKindOfClass:[NSString class]] ? value : nil;
+  if (time.length != 5 || [time characterAtIndex:2] != ':') {
+    return nil;
+  }
+  for (NSUInteger index : {0, 1, 3, 4}) {
+    unichar digit = [time characterAtIndex:index];
+    if (digit < '0' || digit > '9') {
+      return nil;
+    }
+  }
+
+  int hour = ([time characterAtIndex:0] - '0') * 10 + ([time characterAtIndex:1] - '0');
+  int minute = ([time characterAtIndex:3] - '0') * 10 + ([time characterAtIndex:4] - '0');
+  return (hour > 23 || minute > 59) ? nil : time;
+}
+
+// The zone is checked by asking the resolver the re-check will use, rather than
+// by matching its grammar here: a zone this daemon cannot resolve is one the
+// window cannot be rebuilt in, whatever it looks like. That includes a name the
+// host's zoneinfo no longer carries, so an entry can lose its shape between
+// writing and loading. Nil then, which the caller reads as no shape: the window
+// cannot be asked, so a past-due deadline is a kill.
+NSString* WindowZoneFromValue(id value) {
+  NSString* zone = [value isKindOfClass:[NSString class]] ? value : nil;
+  if (!zone.length) {
+    return nil;
+  }
+  return santa::cel::ResolveTimeZone(zone.UTF8String).ok() ? zone : nil;
 }
 
 // Identifiers that fetch exactly the rule an entry came from: one field set, so
@@ -170,18 +236,40 @@ SNTKillRequest* KillRequestForEntry(SNTTimedRuleKillEntry* entry) {
   // disk can't reach -boolValue and crash-loop the daemon at startup.
   id notified = dict[kEntryNotifiedKey];
   entry.notified = [notified isKindOfClass:[NSNumber class]] && [notified boolValue];
+  // Absent on an entry whose window does not recur, so a missing key is the
+  // normal case rather than a reason to drop the entry. A shape is only usable
+  // whole, so a partial one, like an unreadable one, is no shape.
+  NSArray<NSNumber*>* windowDays = WindowDaysFromValue(dict[kEntryWindowDaysKey]);
+  NSString* windowStart = WindowTimeFromValue(dict[kEntryWindowStartKey]);
+  NSString* windowEnd = WindowTimeFromValue(dict[kEntryWindowEndKey]);
+  NSString* windowZone = WindowZoneFromValue(dict[kEntryWindowZoneKey]);
+  if (windowDays.count && windowStart.length && windowEnd.length && windowZone.length) {
+    entry.windowDays = windowDays;
+    entry.windowStart = windowStart;
+    entry.windowEnd = windowEnd;
+    entry.windowZone = windowZone;
+  }
   return entry;
 }
 
 - (NSDictionary*)dictionaryRepresentation {
-  return @{
+  NSMutableDictionary* dict = [@{
     kEntryRuleTypeKey : @(self.ruleType),
     kEntryIdentifierKey : self.identifier,
     kEntryCELHashKey : self.celHash,
     kEntryDeadlineKey : @(self.deadline.timeIntervalSince1970),
     kEntryNotifyAtKey : @(self.notifyAt.timeIntervalSince1970),
     kEntryNotifiedKey : @(self.notified),
-  };
+  } mutableCopy];
+
+  if (self.windowDays.count && self.windowStart.length && self.windowEnd.length &&
+      self.windowZone.length) {
+    dict[kEntryWindowDaysKey] = self.windowDays;
+    dict[kEntryWindowStartKey] = self.windowStart;
+    dict[kEntryWindowEndKey] = self.windowEnd;
+    dict[kEntryWindowZoneKey] = self.windowZone;
+  }
+  return dict;
 }
 
 - (NSString*)key {
@@ -319,7 +407,11 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
                    identifier:(NSString*)identifier
                       celHash:(NSString*)celHash
                      deadline:(NSDate*)deadline
-                     notifyAt:(NSDate*)notifyAt {
+                     notifyAt:(NSDate*)notifyAt
+                   windowDays:(NSArray<NSNumber*>*)windowDays
+                  windowStart:(NSString*)windowStart
+                    windowEnd:(NSString*)windowEnd
+                   windowZone:(NSString*)windowZone {
   if (!identifier.length || !celHash.length || !deadline || !notifyAt) {
     LOGW(@"Ignoring incomplete timed rule kill for %@", identifier);
     return;
@@ -339,6 +431,14 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
     entry.celHash = celHash;
     entry.deadline = deadline;
     entry.notifyAt = notifyAt;
+    // A window shape is only usable whole, so a partial one is no shape. The
+    // zone is part of the whole: "09:00" names no instant without it.
+    if (windowDays.count && windowStart.length && windowEnd.length && windowZone.length) {
+      entry.windowDays = windowDays;
+      entry.windowStart = windowStart;
+      entry.windowEnd = windowEnd;
+      entry.windowZone = windowZone;
+    }
 
     SNTTimedRuleKillEntry* existing = self.entries[entry.key];
     if (existing) {
@@ -390,10 +490,24 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
     if ([entry.deadline timeIntervalSinceDate:now] > kDueTolerance) {
       continue;
     }
+    // Whichever way this entry goes from here it does not stay as it was.
+    changed = YES;
+
+    // The rule first: one that no longer governs has no kill coming, and there
+    // is no window left to reschedule into either.
+    if (![self ruleStillGovernsSerialized:entry]) {
+      [self.entries removeObjectForKey:key];
+      continue;
+    }
+
+    // Then the window, before any process is looked at: a deadline reached
+    // inside an occurrence that is standing again moves rather than fires.
+    if ([self rescheduleForOpenWindowSerialized:entry now:now]) {
+      continue;
+    }
 
     [self killForEntrySerialized:entry];
     [self.entries removeObjectForKey:key];
-    changed = YES;
   }
 
   for (NSString* key in self.entries.allKeys) {
@@ -447,12 +561,87 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
   return YES;
 }
 
-/// The kill at a deadline: re-check the rule, then quit what it covers.
-- (void)killForEntrySerialized:(SNTTimedRuleKillEntry*)entry {
-  if (![self ruleStillGovernsSerialized:entry]) {
-    return;
+/// The window re-check, asked of every entry on every pass through the kill
+/// path. An entry whose recurring window is standing open right now is not
+/// killed: its deadline moves to the end of the occurrence in progress, keeping
+/// the lead its warning was recorded with, and the warning is owed again because
+/// this is a different deadline.
+///
+/// Asked on every pass rather than only at daemon start, because a machine that
+/// slept through a deadline wakes inside a later occurrence just as a daemon that
+/// was down comes back inside one. At a deadline that arrives on time the instant
+/// is the end of the occurrence, and a window holds from its start up to but not
+/// including its end, so that case reads as closed and the kill goes ahead.
+///
+/// Answers NO for an entry with no window, a window that is closed, a window the
+/// math refuses, and an open window whose end is not later than the deadline
+/// being replaced: all four mean the deadline stands. The caller persists and
+/// re-arms the timer either way.
+- (BOOL)rescheduleForOpenWindowSerialized:(SNTTimedRuleKillEntry*)entry now:(NSDate*)now {
+  if (!entry.windowDays.count || !entry.windowStart.length || !entry.windowEnd.length ||
+      !entry.windowZone.length) {
+    return NO;
   }
 
+  // The zone the rule named, resolved again here rather than carried resolved: a
+  // stored "local" is whatever this host is set to now, which is what a local
+  // rule means. A zone that no longer resolves leaves the deadline standing, the
+  // same answer a missing shape gives.
+  absl::StatusOr<absl::TimeZone> zone = santa::cel::ResolveTimeZone(entry.windowZone.UTF8String);
+  if (!zone.ok()) {
+    LOGW(@"Unable to resolve the window zone '%@' for %@; quitting what the rule covers",
+         entry.windowZone, entry.identifier);
+    return NO;
+  }
+
+  std::vector<int64_t> days;
+  days.reserve(entry.windowDays.count);
+  for (NSNumber* day in entry.windowDays) {
+    days.push_back(day.longLongValue);
+  }
+
+  // The same math the rule was evaluated with, at the time this pass started and
+  // in the zone the rule named, so a re-check and the evaluation that recorded
+  // the entry cannot disagree about where the window is.
+  absl::StatusOr<santa::cel::WindowEval> window = santa::cel::EvalDaysHHMMWindow(
+      days, entry.windowStart.UTF8String, entry.windowEnd.UTF8String,
+      absl::UnixEpoch() + absl::Seconds(now.timeIntervalSince1970), *zone);
+  if (!window.ok()) {
+    LOGW(@"Unable to re-check the window for %@ (%s); quitting what the rule covers",
+         entry.identifier, std::string(window.status().message()).c_str());
+    return NO;
+  }
+  if (!window->in_range) {
+    return NO;
+  }
+
+  NSDate* deadline = [NSDate
+      dateWithTimeIntervalSince1970:absl::ToDoubleSeconds(window->window_end - absl::UnixEpoch())];
+
+  // Only an occurrence ending later than the deadline being replaced is a
+  // reschedule. The two can name the same instant: the due tolerance treats an
+  // entry as due in the fraction of a second before its deadline, and a window
+  // still holds there, so this is the on-time fire arriving a hair early. Moving
+  // the deadline to where it already is would reset the warning and send a
+  // second banner for a kill that is happening now.
+  if ([deadline timeIntervalSinceDate:entry.deadline] <= 0) {
+    return NO;
+  }
+
+  NSTimeInterval lead = [entry.deadline timeIntervalSinceDate:entry.notifyAt];
+
+  LOGI(@"Timed rule kill for %@ deferred: its window is open again until %@, nothing quit",
+       entry.identifier, deadline);
+
+  entry.deadline = deadline;
+  entry.notifyAt = [deadline dateByAddingTimeInterval:-lead];
+  entry.notified = NO;
+  return YES;
+}
+
+/// The kill at a deadline: quit what the rule covers. The caller has already
+/// re-checked the rule and the window.
+- (void)killForEntrySerialized:(SNTTimedRuleKillEntry*)entry {
   SNTKillRequest* request = KillRequestForEntry(entry);
   if (!request) {
     LOGW(@"Unable to build a kill request for %@; nothing killed", entry.identifier);

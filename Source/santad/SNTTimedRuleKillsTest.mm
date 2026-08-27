@@ -90,6 +90,10 @@ namespace {
 // chooses what the real matching machinery matches.
 static NSString* const kMatchingTeamID = @"ABCDE12345";
 
+// A second team ID, for the case that needs two entries under two rules. Nothing
+// is ever matched against it, so the fake csops below does not know it.
+static NSString* const kSecondTeamID = @"FGHIJ67890";
+
 // One recorded signal delivery. `target` is a pgid when `group` is true.
 struct FakeSignal {
   pid_t target;
@@ -176,6 +180,10 @@ NSArray<NSString*>* SignalDescriptions(const std::vector<FakeSignal>& signals) {
 // hash matters.
 static NSString* const kCELExpr = @"euid == 0 ? REQUIRE_TOUCHID : ALLOWLIST";
 static NSString* const kEditedCELExpr = @"euid == 1 ? REQUIRE_TOUCHID : ALLOWLIST";
+
+// Every day of the week, which is what makes a recurring HH:MM window in these
+// tests land the same way whichever day they run on.
+static NSArray<NSNumber*>* const kEveryDay = @[ @0, @1, @2, @3, @4, @5, @6 ];
 
 static NSString* const kTimedRuleKillsStateKey = @"TimedRuleKills";
 static NSString* const kTMMStateKey = @"TMM";
@@ -297,6 +305,37 @@ static NSString* const kTAMStateKey = @"TempAdmin";
   return [NSDictionary dictionaryWithContentsOfFile:self.statePath];
 }
 
+- (NSDictionary*)savedEntryForIdentifier:(NSString*)identifier {
+  for (NSDictionary* entry in self.savedEntries) {
+    if ([entry[@"Identifier"] isEqualToString:identifier]) {
+      return entry;
+    }
+  }
+  return nil;
+}
+
+/// A fixed offset zone ([+-]HH:MM) that reads `instant` as `hour`:00 local, to
+/// the whole minute. An entry's window is HH:MM in the zone the entry stored, and
+/// nothing a test runs can move this host's clock, so the zone is the part these
+/// cases choose: an offset picked from the real instant is how one stands inside
+/// or outside a fixed 09:00 to 17:00 window on any host at any time of day.
+- (NSString*)zoneReading:(NSDate*)instant asHour:(NSInteger)hour {
+  NSInteger minutesIntoDayUTC = (NSInteger)floor(instant.timeIntervalSince1970 / 60) % (24 * 60);
+  NSInteger offset = hour * 60 - minutesIntoDayUTC;
+  // Whole hours into a 24 hour day, so every offset this can produce is inside
+  // the [+-]HH:MM range the zone resolver takes.
+  XCTAssertLessThan(ABS(offset), 24 * 60);
+  return [NSString stringWithFormat:@"%@%02ld:%02ld", offset < 0 ? @"-" : @"+",
+                                    (long)(ABS(offset) / 60), (long)(ABS(offset) % 60)];
+}
+
+/// The start of the minute `instant` falls in, which is the instant a zone from
+/// -zoneReading:asHour: reads as exactly that hour, and so what the end of an
+/// occurrence is measured from.
+- (NSDate*)minuteFloor:(NSDate*)instant {
+  return [NSDate dateWithTimeIntervalSince1970:floor(instant.timeIntervalSince1970 / 60) * 60];
+}
+
 /// Sets a kill block that records the requests it is handed and fulfills
 /// `expectation` for each one, without signaling anything.
 - (void)captureKillsOn:(SNTTimedRuleKills*)sut
@@ -371,7 +410,11 @@ static NSString* const kTAMStateKey = @"TempAdmin";
                   identifier:kMatchingTeamID
                      celHash:hash
                     deadline:far
-                    notifyAt:[far dateByAddingTimeInterval:-60]];
+                    notifyAt:[far dateByAddingTimeInterval:-60]
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
   [self drain:sut];
   XCTAssertEqual(self.savedEntries.count, 1u);
   XCTAssertEqualWithAccuracy([self.savedEntries.firstObject[@"Deadline"] doubleValue],
@@ -383,7 +426,11 @@ static NSString* const kTAMStateKey = @"TempAdmin";
                   identifier:kMatchingTeamID
                      celHash:hash
                     deadline:near
-                    notifyAt:[near dateByAddingTimeInterval:-60]];
+                    notifyAt:[near dateByAddingTimeInterval:-60]
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
   [self drain:sut];
   XCTAssertEqual(self.savedEntries.count, 1u);
   XCTAssertEqualWithAccuracy([self.savedEntries.firstObject[@"Deadline"] doubleValue],
@@ -395,7 +442,11 @@ static NSString* const kTAMStateKey = @"TempAdmin";
                   identifier:kMatchingTeamID
                      celHash:hash
                     deadline:farther
-                    notifyAt:[farther dateByAddingTimeInterval:-60]];
+                    notifyAt:[farther dateByAddingTimeInterval:-60]
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
   [self drain:sut];
   XCTAssertEqual(self.savedEntries.count, 1u);
   XCTAssertEqualWithAccuracy([self.savedEntries.firstObject[@"Deadline"] doubleValue],
@@ -413,7 +464,11 @@ static NSString* const kTAMStateKey = @"TempAdmin";
                     identifier:kMatchingTeamID
                        celHash:hash
                       deadline:deadline
-                      notifyAt:[deadline dateByAddingTimeInterval:-60]];
+                      notifyAt:[deadline dateByAddingTimeInterval:-60]
+                    windowDays:nil
+                   windowStart:nil
+                     windowEnd:nil
+                    windowZone:nil];
   }
   [self drain:sut];
 
@@ -429,12 +484,20 @@ static NSString* const kTAMStateKey = @"TempAdmin";
                   identifier:kMatchingTeamID
                      celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
                     deadline:deadline
-                    notifyAt:deadline];
+                    notifyAt:deadline
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
   [sut recordKillForRuleType:SNTRuleTypeTeamID
                   identifier:kMatchingTeamID
                      celHash:[SNTTimedRuleKills celHashForExpression:kEditedCELExpr]
                     deadline:deadline
-                    notifyAt:deadline];
+                    notifyAt:deadline
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
   [self drain:sut];
 
   XCTAssertEqual(self.savedEntries.count, 2u);
@@ -449,12 +512,20 @@ static NSString* const kTAMStateKey = @"TempAdmin";
                   identifier:@"b7c1e3fd640c5f211c89b02c2c6122f78ce322aa5c56eb0bb54bc422a8f8b670"
                      celHash:hash
                     deadline:deadline
-                    notifyAt:deadline];
+                    notifyAt:deadline
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
   [sut recordKillForRuleType:SNTRuleTypeCertificate
                   identifier:@"7ae80b9ab38af0c63a9a81765f434d9a7cd8f720eb6037ef303de39d779bc258"
                      celHash:hash
                     deadline:deadline
-                    notifyAt:deadline];
+                    notifyAt:deadline
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
   [self drain:sut];
 
   XCTAssertNil(self.savedEntries);
@@ -470,17 +541,29 @@ static NSString* const kTAMStateKey = @"TempAdmin";
                   identifier:@""
                      celHash:hash
                     deadline:deadline
-                    notifyAt:deadline];
+                    notifyAt:deadline
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
   [sut recordKillForRuleType:SNTRuleTypeTeamID
                   identifier:kMatchingTeamID
                      celHash:nil
                     deadline:deadline
-                    notifyAt:deadline];
+                    notifyAt:deadline
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
   [sut recordKillForRuleType:SNTRuleTypeTeamID
                   identifier:kMatchingTeamID
                      celHash:hash
                     deadline:nil
-                    notifyAt:deadline];
+                    notifyAt:deadline
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
   [self drain:sut];
 
   XCTAssertNil(self.savedEntries);
@@ -499,7 +582,11 @@ static NSString* const kTAMStateKey = @"TempAdmin";
                   identifier:kMatchingTeamID
                      celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
                     deadline:[NSDate dateWithTimeIntervalSinceNow:3600]
-                    notifyAt:[NSDate dateWithTimeIntervalSinceNow:3540]];
+                    notifyAt:[NSDate dateWithTimeIntervalSinceNow:3540]
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
   [self drain:sut];
 
   NSDictionary* onDisk = [self rawStateFile];
@@ -533,6 +620,161 @@ static NSString* const kTAMStateKey = @"TempAdmin";
   XCTAssertNil([[self makeConfigurator] savedTimedRuleKills]);
 }
 
+// The window shape is part of the entry: written with it, read back with it and
+// written out again unchanged, which is what lets a restart re-check the window
+// a deadline came from. The kills recorded from a timestamp or duration window
+// carry no shape, so their entries have no window fields at all.
+- (void)testWindowShapePersistsAndSurvivesAReload {
+  NSString* cdhash = @"deadbeefcafebabe0123456789abcdeffedcba98";
+  NSString* hash = [SNTTimedRuleKills celHashForExpression:kCELExpr];
+  NSDate* deadline = [NSDate dateWithTimeIntervalSinceNow:3600];
+  NSDate* notifyAt = [deadline dateByAddingTimeInterval:-300];
+
+  SNTTimedRuleKills* sut = [self makeSUT];
+  [sut recordKillForRuleType:SNTRuleTypeTeamID
+                  identifier:kMatchingTeamID
+                     celHash:hash
+                    deadline:deadline
+                    notifyAt:notifyAt
+                  windowDays:@[ @1, @3, @5 ]
+                 windowStart:@"09:00"
+                   windowEnd:@"17:00"
+                  windowZone:@"local"];
+  [self drain:sut];
+
+  NSDictionary* saved = self.savedEntries.firstObject;
+  XCTAssertEqualObjects(saved[@"WindowDays"], (@[ @1, @3, @5 ]));
+  XCTAssertEqualObjects(saved[@"WindowStart"], @"09:00");
+  XCTAssertEqualObjects(saved[@"WindowEnd"], @"17:00");
+  XCTAssertEqualObjects(saved[@"WindowZone"], @"local");
+
+  // A restart: a new configurator reads the state file back from disk and a new
+  // component loads the entry out of it.
+  self.configurator = [self makeConfigurator];
+  SNTTimedRuleKills* restarted = [self makeSUT];
+  [restarted resumeFromSavedState];
+  [self drain:restarted];
+
+  // Recording an unrelated entry rewrites the whole set, so what lands on disk
+  // for the first entry is what the reload deserialized.
+  [restarted recordKillForRuleType:SNTRuleTypeCDHash
+                        identifier:cdhash
+                           celHash:hash
+                          deadline:deadline
+                          notifyAt:notifyAt
+                        windowDays:nil
+                       windowStart:nil
+                         windowEnd:nil
+                        windowZone:nil];
+  [self drain:restarted];
+
+  NSDictionary* reloaded = [self savedEntryForIdentifier:kMatchingTeamID];
+  XCTAssertEqualObjects(reloaded[@"WindowDays"], (@[ @1, @3, @5 ]));
+  XCTAssertEqualObjects(reloaded[@"WindowStart"], @"09:00");
+  XCTAssertEqualObjects(reloaded[@"WindowEnd"], @"17:00");
+  XCTAssertEqualObjects(reloaded[@"WindowZone"], @"local");
+
+  NSDictionary* shapeless = [self savedEntryForIdentifier:cdhash];
+  XCTAssertNotNil(shapeless);
+  XCTAssertNil(shapeless[@"WindowDays"]);
+  XCTAssertNil(shapeless[@"WindowStart"]);
+  XCTAssertNil(shapeless[@"WindowEnd"]);
+  XCTAssertNil(shapeless[@"WindowZone"]);
+}
+
+// A shape a window cannot be rebuilt from reads as no shape at all: wrong types,
+// a day outside 0-6, a time that isn't HH:MM, or a shape only half there. The
+// entry still loads and still holds its deadline, and nothing on the way in is
+// sent a message it doesn't answer.
+- (void)testMalformedWindowShapeLoadsAsAbsent {
+  NSString* hash = [SNTTimedRuleKills celHashForExpression:kCELExpr];
+  NSDate* deadline = [NSDate dateWithTimeIntervalSinceNow:3600];
+
+  // One unusable shape per entry, keyed by the CDHash identifier its entry gets
+  // so they can all be asserted together after the reload.
+  NSDictionary<NSString*, NSDictionary*>* shapes = @{
+    // A day list holding something that isn't a number.
+    @"1111111111111111111111111111111111111111" : @{
+      @"WindowDays" : @[ @1, @"Wednesday" ],
+      @"WindowStart" : @"09:00",
+      @"WindowEnd" : @"17:00",
+      @"WindowZone" : @"local"
+    },
+    // A day outside 0 (Sunday) through 6 (Saturday).
+    @"2222222222222222222222222222222222222222" : @{
+      @"WindowDays" : @[ @42 ],
+      @"WindowStart" : @"09:00",
+      @"WindowEnd" : @"17:00",
+      @"WindowZone" : @"local"
+    },
+    // A start time that is not a 24-hour HH:MM.
+    @"3333333333333333333333333333333333333333" : @{
+      @"WindowDays" : @[ @1, @3, @5 ],
+      @"WindowStart" : @"banana",
+      @"WindowEnd" : @"17:00",
+      @"WindowZone" : @"local"
+    },
+    // An end time that parses as HH:MM but names no hour of the day.
+    @"4444444444444444444444444444444444444444" : @{
+      @"WindowDays" : @[ @1, @3, @5 ],
+      @"WindowStart" : @"09:00",
+      @"WindowEnd" : @"25:00",
+      @"WindowZone" : @"local"
+    },
+    // A shape missing its start time.
+    @"5555555555555555555555555555555555555555" :
+        @{@"WindowDays" : @[ @1, @3, @5 ], @"WindowEnd" : @"17:00", @"WindowZone" : @"local"},
+    // A zone that is not a string, which must not be sent -UTF8String. The other
+    // two ways a zone can be unusable, a name the resolver refuses and a shape
+    // whole but for the zone, are pinned at the kill seam instead by
+    // testUnusablePersistedWindowShapesKillRatherThanRescheduling.
+    @"6666666666666666666666666666666666666666" : @{
+      @"WindowDays" : @[ @1, @3, @5 ],
+      @"WindowStart" : @"09:00",
+      @"WindowEnd" : @"17:00",
+      @"WindowZone" : @42
+    },
+  };
+
+  NSMutableArray<NSDictionary*>* saved = [NSMutableArray array];
+  for (NSString* identifier in shapes) {
+    NSMutableDictionary* entry = [[self entryDictForRuleType:SNTRuleTypeCDHash
+                                                  identifier:identifier
+                                                     celHash:hash
+                                                    deadline:deadline] mutableCopy];
+    [entry addEntriesFromDictionary:shapes[identifier]];
+    [saved addObject:entry];
+  }
+  XCTAssertTrue([self.configurator persistTimedRuleKills:saved]);
+
+  self.configurator = [self makeConfigurator];
+  SNTTimedRuleKills* sut = [self makeSUT];
+  [sut resumeFromSavedState];
+  [self drain:sut];
+
+  // As above, an unrelated recording rewrites what the reload deserialized.
+  [sut recordKillForRuleType:SNTRuleTypeTeamID
+                  identifier:kMatchingTeamID
+                     celHash:hash
+                    deadline:deadline
+                    notifyAt:deadline
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
+  [self drain:sut];
+
+  XCTAssertEqual(self.savedEntries.count, shapes.count + 1);
+  for (NSString* identifier in shapes) {
+    NSDictionary* entry = [self savedEntryForIdentifier:identifier];
+    XCTAssertNotNil(entry, @"%@ should still have loaded", identifier);
+    XCTAssertNil(entry[@"WindowDays"], @"%@", identifier);
+    XCTAssertNil(entry[@"WindowStart"], @"%@", identifier);
+    XCTAssertNil(entry[@"WindowEnd"], @"%@", identifier);
+    XCTAssertNil(entry[@"WindowZone"], @"%@", identifier);
+  }
+}
+
 - (void)testEntryIsRemovedAndPersistedAfterFiring {
   [self addRuleOfType:SNTRuleTypeTeamID identifier:kMatchingTeamID cel:kCELExpr];
 
@@ -546,7 +788,11 @@ static NSString* const kTAMStateKey = @"TempAdmin";
                   identifier:kMatchingTeamID
                      celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
                     deadline:deadline
-                    notifyAt:deadline];
+                    notifyAt:deadline
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
 
   [self waitForExpectations:@[ killed ] timeout:10];
   [self drain:sut];
@@ -571,7 +817,11 @@ static NSString* const kTAMStateKey = @"TempAdmin";
                   identifier:kMatchingTeamID
                      celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
                     deadline:deadline
-                    notifyAt:deadline];
+                    notifyAt:deadline
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
   [self waitForExpectations:@[ killed ] timeout:10];
 
   XCTAssertEqual(requests.count, 1u);
@@ -593,7 +843,11 @@ static NSString* const kTAMStateKey = @"TempAdmin";
                   identifier:@"platform:com.apple.ls"
                      celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
                     deadline:deadline
-                    notifyAt:deadline];
+                    notifyAt:deadline
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
   [self waitForExpectations:@[ killed ] timeout:10];
 
   XCTAssertEqual(requests.count, 1u);
@@ -618,7 +872,11 @@ static NSString* const kTAMStateKey = @"TempAdmin";
                   identifier:cdhash
                      celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
                     deadline:deadline
-                    notifyAt:deadline];
+                    notifyAt:deadline
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
   [self waitForExpectations:@[ killed ] timeout:10];
 
   XCTAssertEqual(requests.count, 1u);
@@ -658,7 +916,11 @@ static NSString* const kTAMStateKey = @"TempAdmin";
                   identifier:kMatchingTeamID
                      celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
                     deadline:deadline
-                    notifyAt:deadline];
+                    notifyAt:deadline
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
   [self waitForExpectations:@[ killed ] timeout:10];
 
   XCTAssertEqualObjects(SignalDescriptions(fake.signals), (@[
@@ -683,7 +945,11 @@ static NSString* const kTAMStateKey = @"TempAdmin";
                   identifier:kMatchingTeamID
                      celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
                     deadline:deadline
-                    notifyAt:deadline];
+                    notifyAt:deadline
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
   [self drain:sut];
   XCTAssertEqual(self.savedEntries.count, 1u);
 
@@ -706,7 +972,11 @@ static NSString* const kTAMStateKey = @"TempAdmin";
                   identifier:kMatchingTeamID
                      celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
                     deadline:deadline
-                    notifyAt:deadline];
+                    notifyAt:deadline
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
   [self drain:sut];
 
   // The rule's text changes between recording and firing.
@@ -737,7 +1007,11 @@ static NSString* const kTAMStateKey = @"TempAdmin";
                   identifier:kMatchingTeamID
                      celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
                     deadline:deadline
-                    notifyAt:[NSDate dateWithTimeIntervalSinceNow:0.3]];
+                    notifyAt:[NSDate dateWithTimeIntervalSinceNow:0.3]
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
 
   // The banner arrives long before the deadline, so the timer fired for the
   // warning rather than the kill.
@@ -775,7 +1049,11 @@ static NSString* const kTAMStateKey = @"TempAdmin";
                   identifier:kMatchingTeamID
                      celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
                     deadline:[NSDate dateWithTimeIntervalSinceNow:3600]
-                    notifyAt:[NSDate dateWithTimeIntervalSinceNow:0.3]];
+                    notifyAt:[NSDate dateWithTimeIntervalSinceNow:0.3]
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
 
   [self waitForExpectations:@[ posted ] timeout:10];
 
@@ -798,7 +1076,11 @@ static NSString* const kTAMStateKey = @"TempAdmin";
                   identifier:kMatchingTeamID
                      celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
                     deadline:[NSDate dateWithTimeIntervalSinceNow:3600]
-                    notifyAt:[NSDate dateWithTimeIntervalSinceNow:0.3]];
+                    notifyAt:[NSDate dateWithTimeIntervalSinceNow:0.3]
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
 
   [self waitForTheWarningPass];
   [self drain:sut];
@@ -835,13 +1117,21 @@ static NSString* const kTAMStateKey = @"TempAdmin";
                   identifier:kMatchingTeamID
                      celHash:hash
                     deadline:firstDeadline
-                    notifyAt:[NSDate dateWithTimeIntervalSinceNow:-10]];
+                    notifyAt:[NSDate dateWithTimeIntervalSinceNow:-10]
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
   // A later warning, which is what brings the pass back over the first entry.
   [sut recordKillForRuleType:SNTRuleTypeCDHash
                   identifier:cdhash
                      celHash:hash
                     deadline:secondDeadline
-                    notifyAt:[NSDate dateWithTimeIntervalSinceNow:0.7]];
+                    notifyAt:[NSDate dateWithTimeIntervalSinceNow:0.7]
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
 
   [self waitForExpectations:@[ posted ] timeout:10];
   [self drain:sut];
@@ -875,7 +1165,11 @@ static NSString* const kTAMStateKey = @"TempAdmin";
                   identifier:kMatchingTeamID
                      celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
                     deadline:[NSDate dateWithTimeIntervalSinceNow:3600]
-                    notifyAt:[NSDate dateWithTimeIntervalSinceNow:0.3]];
+                    notifyAt:[NSDate dateWithTimeIntervalSinceNow:0.3]
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
   [self drain:sut];
   XCTAssertEqual(self.savedEntries.count, 1u);
 
@@ -909,7 +1203,11 @@ static NSString* const kTAMStateKey = @"TempAdmin";
                   identifier:kMatchingTeamID
                      celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
                     deadline:deadline
-                    notifyAt:deadline];
+                    notifyAt:deadline
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
 
   [self waitForExpectations:@[ killed ] timeout:10];
   [self drain:sut];
@@ -958,12 +1256,20 @@ static NSString* const kTAMStateKey = @"TempAdmin";
                   identifier:kMatchingTeamID
                      celHash:hash
                     deadline:[NSDate dateWithTimeIntervalSinceNow:3600]
-                    notifyAt:due];
+                    notifyAt:due
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
   [sut recordKillForRuleType:SNTRuleTypeCDHash
                   identifier:cdhash
                      celHash:hash
                     deadline:due
-                    notifyAt:due];
+                    notifyAt:due
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
 
   [self waitForExpectations:@[ killed, snapshotted ] timeout:10];
   XCTAssertEqualObjects(order, (@[ @"kill", @"match" ]));
@@ -1125,6 +1431,155 @@ static NSString* const kTAMStateKey = @"TempAdmin";
 
   XCTAssertEqual(self.savedEntries.count, 1u);
   XCTAssertEqualObjects(self.savedEntries.firstObject[@"Identifier"], kMatchingTeamID);
+}
+
+#pragma mark The window re-check
+
+// The stored zone is the calendar the window is re-checked in, not the host's.
+// Two entries at one instant with one window and two stored fixed offsets eight
+// hours apart: 12:00 in the first, 04:00 in the second. A re-check that read the
+// host's zone would read the same clock for both and so answer the same way for
+// both, whatever that answer was; here the first is inside its window and moves
+// its deadline to the occurrence end, and the second is outside its window and is
+// quit. Fixed offsets rather than named zones so the instants are arithmetic, and
+// offsets read off the clock rather than written down so the pair means the same
+// thing on any host at any time of day.
+- (void)testTheStoredZoneGovernsTheWindowRecheck {
+  [self addRuleOfType:SNTRuleTypeTeamID identifier:kMatchingTeamID cel:kCELExpr];
+  [self addRuleOfType:SNTRuleTypeTeamID identifier:kSecondTeamID cel:kCELExpr];
+
+  NSDate* now = [NSDate date];
+  NSString* insideZone = [self zoneReading:now asHour:12];
+  NSString* outsideZone = [self zoneReading:now asHour:4];
+  // An hour ago, so both entries are past due whichever zone they are read in.
+  NSDate* deadline = [now dateByAddingTimeInterval:-3600];
+
+  NSMutableArray<NSDictionary*>* saved = [NSMutableArray array];
+  for (NSArray* row in @[ @[ kMatchingTeamID, insideZone ], @[ kSecondTeamID, outsideZone ] ]) {
+    NSMutableDictionary* entry =
+        [[self entryDictForRuleType:SNTRuleTypeTeamID
+                         identifier:row[0]
+                            celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
+                           deadline:deadline] mutableCopy];
+    entry[@"WindowDays"] = kEveryDay;
+    entry[@"WindowStart"] = @"09:00";
+    entry[@"WindowEnd"] = @"17:00";
+    entry[@"WindowZone"] = row[1];
+    // A warning already delivered for the old deadline, on both rows: the moved
+    // deadline is a different one and owes its own, and the row that is quit is
+    // gone before the warning pass looks at it.
+    entry[@"Notified"] = @YES;
+    [saved addObject:entry];
+  }
+  XCTAssertTrue([self.configurator persistTimedRuleKills:saved]);
+
+  self.configurator = [self makeConfigurator];
+  SNTTimedRuleKills* sut = [self makeSUT];
+  XCTestExpectation* killed = [self expectationWithDescription:@"kill ran"];
+  NSMutableArray<SNTKillRequest*>* requests = [NSMutableArray array];
+  [self captureKillsOn:sut into:requests expectation:killed];
+
+  [sut resumeFromSavedState];
+
+  [self waitForExpectations:@[ killed ] timeout:10];
+  [self drain:sut];
+
+  // Only the entry whose stored zone puts it outside its window was quit.
+  XCTAssertEqual(requests.count, 1u);
+  XCTAssertEqualObjects(((SNTKillRequestTeamID*)requests.firstObject).teamID, kSecondTeamID);
+
+  // The other moved to 17:00 in its own zone, five hours on from the clock, and
+  // kept the shape so the next pass can ask again.
+  XCTAssertEqual(self.savedEntries.count, 1u);
+  NSDictionary* rescheduled = [self savedEntryForIdentifier:kMatchingTeamID];
+  XCTAssertEqualWithAccuracy([rescheduled[@"Deadline"] doubleValue],
+                             [self minuteFloor:now].timeIntervalSince1970 + 5 * 3600, 1);
+  // The lead the old deadline was warned with, carried onto the new one.
+  XCTAssertEqualWithAccuracy([rescheduled[@"NotifyAt"] doubleValue],
+                             [rescheduled[@"Deadline"] doubleValue] - 60, 0.001);
+  // The warning is owed again: this is a different deadline from the one the
+  // user was already warned about.
+  XCTAssertFalse([rescheduled[@"Notified"] boolValue]);
+  XCTAssertEqualObjects(rescheduled[@"WindowZone"], insideZone);
+  XCTAssertEqualObjects(rescheduled[@"WindowDays"], kEveryDay);
+}
+
+// A window shape that could not be rebuilt from the state file is no shape: the
+// entry has nothing to re-check, so its deadline stands. The first row stands at
+// 12:00 inside a 09:00 to 17:00 window, which is the arrangement the first entry
+// of testTheStoredZoneGovernsTheWindowRecheck reschedules from, so it would
+// reschedule too if its day list could be read. The other two lose their shape at
+// the zone itself, which leaves no zone for them to stand in at all. Every row is
+// past due, so a kill is the defect being read as absent rather than as a window.
+- (void)testUnusablePersistedWindowShapesKillRatherThanRescheduling {
+  [self addRuleOfType:SNTRuleTypeTeamID identifier:kMatchingTeamID cel:kCELExpr];
+
+  NSDate* now = [NSDate date];
+  NSDictionary<NSString*, NSDictionary*>* shapes = @{
+    @"a day list holding something that isn't a number" :
+        @{@"WindowDays" : @[ @1, @"Wednesday" ], @"WindowZone" : [self zoneReading:now asHour:12]},
+    // The zone cannot be resolved, so the window cannot be asked. The design
+    // calls that past-due, which means kill.
+    @"a zone the resolver refuses" : @{@"WindowDays" : kEveryDay, @"WindowZone" : @"Mars/Olympus"},
+    // What an upgraded daemon finds on disk: a shape whole but for the zone. It
+    // loses its shape, so it behaves exactly like an entry that never had one.
+    @"a shape written before the zone existed" : @{@"WindowDays" : kEveryDay},
+  };
+
+  for (NSString* defect in shapes) {
+    NSMutableDictionary* entry =
+        [[self entryDictForRuleType:SNTRuleTypeTeamID
+                         identifier:kMatchingTeamID
+                            celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
+                           deadline:[now dateByAddingTimeInterval:-3600]] mutableCopy];
+    entry[@"WindowStart"] = @"09:00";
+    entry[@"WindowEnd"] = @"17:00";
+    [entry addEntriesFromDictionary:shapes[defect]];
+    XCTAssertTrue([self.configurator persistTimedRuleKills:@[ entry ]], @"%@", defect);
+
+    // A fresh configurator reads the entry just written back off disk, so each
+    // row is a restart of its own.
+    self.configurator = [self makeConfigurator];
+    SNTTimedRuleKills* sut = [self makeSUT];
+    XCTestExpectation* killed = [self expectationWithDescription:defect];
+    NSMutableArray<SNTKillRequest*>* requests = [NSMutableArray array];
+    [self captureKillsOn:sut into:requests expectation:killed];
+
+    [sut resumeFromSavedState];
+
+    [self waitForExpectations:@[ killed ] timeout:10];
+    [self drain:sut];
+    XCTAssertEqual(requests.count, 1u, @"%@", defect);
+    XCTAssertNil(self.savedEntries, @"%@", defect);
+  }
+}
+
+// A shape the window math itself refuses, which is what a day outside 0 through
+// 6 is. There is no window to be inside, so the answer is the same as a closed
+// one: proceed to the kill, rather than throwing or holding the entry forever.
+- (void)testAWindowEvaluationErrorProceedsToTheKill {
+  [self addRuleOfType:SNTRuleTypeTeamID identifier:kMatchingTeamID cel:kCELExpr];
+
+  SNTTimedRuleKills* sut = [self makeSUT];
+  XCTestExpectation* killed = [self expectationWithDescription:@"kill ran"];
+  NSMutableArray<SNTKillRequest*>* requests = [NSMutableArray array];
+  [self captureKillsOn:sut into:requests expectation:killed];
+
+  NSDate* deadline = [NSDate dateWithTimeIntervalSinceNow:0.5];
+  [sut recordKillForRuleType:SNTRuleTypeTeamID
+                  identifier:kMatchingTeamID
+                     celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
+                    deadline:deadline
+                    notifyAt:deadline
+                  windowDays:@[ @42 ]
+                 windowStart:@"09:00"
+                   windowEnd:@"17:00"
+                  windowZone:@"local"];
+
+  [self waitForExpectations:@[ killed ] timeout:10];
+  [self drain:sut];
+  XCTAssertEqual(requests.count, 1u);
+  XCTAssertNil(self.savedEntries);
 }
 
 #pragma mark Helpers that wait
