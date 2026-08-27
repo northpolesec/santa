@@ -582,6 +582,37 @@
   XCTAssertEqual(r.type, SNTRuleTypeTeamID);
 }
 
+// executeQuery: returns nil when the statement itself fails -- a locked or corrupt db, a schema
+// that isn't what was expected. That is not evidence the file has no rule, and the only
+// invalidation the miss cache has is a full clear on the rule write paths, so a cached failure
+// would outlive it. Renaming the table away and back simulates the failure and its recovery with
+// no rule write in between, which would otherwise clear the cache and hide the bug.
+- (void)testExecutionRuleMissCacheIgnoresQueryFailures {
+  [self.sut addExecutionRules:@[ [self _exampleBinaryRule] ]
+                  ruleCleanup:SNTRuleCleanupNone
+                       errors:nil];
+
+  struct RuleIdentifiers ids = {
+      .binarySHA256 = @"b7c1e3fd640c5f211c89b02c2c6122f78ce322aa5c56eb0bb54bc422a8f8b670",
+  };
+
+  [self.dbq inDatabase:^(FMDatabase* db) {
+    XCTAssertTrue(
+        [db executeUpdate:@"ALTER TABLE execution_rules RENAME TO execution_rules_hidden"]);
+  }];
+
+  XCTAssertNil([self.sut executionRuleForIdentifiers:ids]);
+
+  [self.dbq inDatabase:^(FMDatabase* db) {
+    XCTAssertTrue(
+        [db executeUpdate:@"ALTER TABLE execution_rules_hidden RENAME TO execution_rules"]);
+  }];
+
+  SNTRule* r = [self.sut executionRuleForIdentifiers:ids];
+  XCTAssertNotNil(r, @"a failed query must not be cached as a rule miss");
+  XCTAssertEqual(r.type, SNTRuleTypeBinary);
+}
+
 - (void)testFetchRuleOrdering {
   NSArray<NSError*>* err;
   [self.sut addExecutionRules:@[

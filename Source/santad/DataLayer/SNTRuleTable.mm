@@ -628,6 +628,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
   // planner and costs a temp B-tree sort on every lookup.
   //
   // clang-format off
+  __block BOOL queryFailed = NO;
   [self inDatabase:^(FMDatabase* db) {
     FMResultSet* rs = [db executeQuery:@"SELECT * FROM ("
                                       @"            SELECT 1 AS prio, * FROM execution_rules WHERE identifier=? AND type=500  "
@@ -641,6 +642,13 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
                                       @(SNTRuleStateAllowTransitive), identifiers.signingID,
                                       identifiers.certificateSHA256, identifiers.teamID,
                                       identifiers.binarySHA256, @(SNTRuleStateAllowTransitive)];
+    // A nil result set means the statement itself failed (e.g. a locked or corrupt db), not
+    // that the file has no rule. Note the failure so it isn't remembered as a miss below.
+    if (!rs) {
+      queryFailed = YES;
+      LOGE(@"Failed to query execution rules: %@", [db lastErrorMessage]);
+      return;
+    }
     if ([rs next]) {
       rule = [self executionRuleFromResultSet:rs];
     }
@@ -648,9 +656,11 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
   }];
   // clang-format on
 
-  // No rule exists, cache that fact so we don't needlessly keep looking in the
-  // db during future execs.
-  if (!rule && !missCacheKey.empty()) {
+  // The query ran and found nothing, so cache that fact to avoid needlessly looking in the db
+  // during future execs. A failed query is deliberately not cached: the miss cache is only ever
+  // invalidated by a rule write, so caching a transient db error would pin it in place and deny
+  // this file its rule indefinitely.
+  if (!rule && !queryFailed && !missCacheKey.empty()) {
     _executionRuleMissCache->set(missCacheKey, true);
   }
 
