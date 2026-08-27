@@ -318,7 +318,8 @@ SNTFileAccessRule* FAARuleFromProtoFAARuleAdd(const ::pbv2::FileAccessRule::Add&
   NSString* name = StringToNSString(pbAddRule.name());
 
   NSError* err;
-  if (santa::WatchItems::IsValidRule(name, details, &err)) {
+  if (santa::WatchItems::IsValidRule(name, details, santa::WatchItems::DataSource::kDatabase,
+                                     &err)) {
     return [[SNTFileAccessRule alloc] initAddRuleWithName:name details:details];
   } else {
     return nil;

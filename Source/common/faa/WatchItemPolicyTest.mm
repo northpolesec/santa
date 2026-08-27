@@ -30,6 +30,7 @@ using santa::SetSharedDataWatchItemPolicy;
 using santa::SetSharedProcessWatchItemPolicy;
 using santa::WatchItemPathType;
 using santa::WatchItemProcess;
+using santa::WatchItemProcessOptions;
 using santa::WatchItemRuleType;
 
 @interface WatchItemPolicyTest : XCTestCase
@@ -78,6 +79,44 @@ using santa::WatchItemRuleType;
     proc.cdhash = {1};
     XCTAssertNotEqual(proc, orig);
   }
+  {
+    WatchItemProcess proc = makeProc();
+    proc.options = WatchItemProcessOptions{};
+    XCTAssertNotEqual(proc, orig);
+  }
+
+  // Every field of the options struct that participates in equality
+  WatchItemProcess withDefaultOptions = makeProc();
+  withDefaultOptions.options = WatchItemProcessOptions{};
+
+  {
+    WatchItemProcess proc = makeProc();
+    WatchItemProcessOptions opts;
+    opts.action = santa::WatchItemProcessAction::kDeny;
+    proc.options = opts;
+    XCTAssertNotEqual(proc, withDefaultOptions);
+  }
+  {
+    WatchItemProcess proc = makeProc();
+    WatchItemProcessOptions opts;
+    opts.allow_read_access = !opts.allow_read_access;
+    proc.options = opts;
+    XCTAssertNotEqual(proc, withDefaultOptions);
+  }
+  {
+    WatchItemProcess proc = makeProc();
+    WatchItemProcessOptions opts;
+    opts.silent = !opts.silent;
+    proc.options = opts;
+    XCTAssertNotEqual(proc, withDefaultOptions);
+  }
+  {
+    WatchItemProcess proc = makeProc();
+    WatchItemProcessOptions opts;
+    opts.silent_tty = !opts.silent_tty;
+    proc.options = opts;
+    XCTAssertNotEqual(proc, withDefaultOptions);
+  }
 }
 
 - (void)testProcessWatchItemPolicyProcessOrder {
@@ -96,28 +135,34 @@ using santa::WatchItemRuleType;
 
 - (void)testWatchItemProcessCreate {
   // Fail when nothing is set
-  XCTAssertFalse(WatchItemProcess::Create(nil, nil, nil, nil, nil, false, nil).has_value());
+  XCTAssertFalse(
+      WatchItemProcess::Create(nil, nil, nil, nil, nil, false, std::nullopt, nil).has_value());
 
   // Both PlatformBinary and a TID cannot be set (as long as not "platform")
   XCTAssertFalse(
-      WatchItemProcess::Create(nil, nil, @"ABCDE12345", nil, nil, true, nil).has_value());
+      WatchItemProcess::Create(nil, nil, @"ABCDE12345", nil, nil, true, std::nullopt, nil)
+          .has_value());
 
   // SigningID being set requires a TID/PlatformBinary
   XCTAssertFalse(
-      WatchItemProcess::Create(nil, @"com.example", nil, nil, nil, false, nil).has_value());
+      WatchItemProcess::Create(nil, @"com.example", nil, nil, nil, false, std::nullopt, nil)
+          .has_value());
 
   // Test invalid TID prefixes for an SID
-  XCTAssertFalse(WatchItemProcess::Create(nil, @"platforms:com.example", nil, nil, nil, false, nil)
+  XCTAssertFalse(WatchItemProcess::Create(nil, @"platforms:com.example", nil, nil, nil, false,
+                                          std::nullopt, nil)
                      .has_value());
-  XCTAssertFalse(WatchItemProcess::Create(nil, @"ABCDE1234:com.example", nil, nil, nil, false, nil)
+  XCTAssertFalse(WatchItemProcess::Create(nil, @"ABCDE1234:com.example", nil, nil, nil, false,
+                                          std::nullopt, nil)
                      .has_value());
-  XCTAssertFalse(
-      WatchItemProcess::Create(nil, @"ABCDE123456:com.example", nil, nil, nil, false, nil)
-          .has_value());
+  XCTAssertFalse(WatchItemProcess::Create(nil, @"ABCDE123456:com.example", nil, nil, nil, false,
+                                          std::nullopt, nil)
+                     .has_value());
 
   {
     // If PB is set, TID:SID prefix is ignored
-    auto wip = WatchItemProcess::Create(nil, @"ABCDE12345:com.example", nil, nil, nil, true, nil);
+    auto wip = WatchItemProcess::Create(nil, @"ABCDE12345:com.example", nil, nil, nil, true,
+                                        std::nullopt, nil);
     XCTAssertTrue(wip.has_value());
     XCTAssertCppStringEqual(wip->signing_id, "ABCDE12345:com.example");
     XCTAssertTrue(wip->platform_binary);
@@ -125,8 +170,8 @@ using santa::WatchItemRuleType;
 
   {
     // If TID is set to platform, TID:SID prefix is ignored, marked as platform
-    auto wip =
-        WatchItemProcess::Create(nil, @"ABCDE12345:com.example", @"PLatFOrm", nil, nil, false, nil);
+    auto wip = WatchItemProcess::Create(nil, @"ABCDE12345:com.example", @"PLatFOrm", nil, nil,
+                                        false, std::nullopt, nil);
     XCTAssertTrue(wip.has_value());
     XCTAssertCppStringEqual(wip->signing_id, "ABCDE12345:com.example");
     XCTAssertTrue(wip->platform_binary);
@@ -135,8 +180,8 @@ using santa::WatchItemRuleType;
 
   {
     // If TID is set, TID:SID prefix is ignored
-    auto wip =
-        WatchItemProcess::Create(nil, @"platform:com.example", @"ABCDE12345", nil, nil, false, nil);
+    auto wip = WatchItemProcess::Create(nil, @"platform:com.example", @"ABCDE12345", nil, nil,
+                                        false, std::nullopt, nil);
     XCTAssertTrue(wip.has_value());
     XCTAssertCppStringEqual(wip->signing_id, "platform:com.example");
     XCTAssertFalse(wip->platform_binary);
@@ -145,7 +190,8 @@ using santa::WatchItemRuleType;
 
   {
     // Extract TID
-    auto wip = WatchItemProcess::Create(nil, @"ABCDE12345:x", nil, nil, nil, false, nil);
+    auto wip =
+        WatchItemProcess::Create(nil, @"ABCDE12345:x", nil, nil, nil, false, std::nullopt, nil);
     XCTAssertTrue(wip.has_value());
     XCTAssertCppStringEqual(wip->signing_id, "x");
     XCTAssertFalse(wip->platform_binary);
@@ -154,7 +200,8 @@ using santa::WatchItemRuleType;
 
   {
     // Extract platform TID
-    auto wip = WatchItemProcess::Create(nil, @"platFORM:*", nil, nil, nil, false, nil);
+    auto wip =
+        WatchItemProcess::Create(nil, @"platFORM:*", nil, nil, nil, false, std::nullopt, nil);
     XCTAssertTrue(wip.has_value());
     XCTAssertCppStringEqual(wip->signing_id, "*");
     XCTAssertTrue(wip->platform_binary);
@@ -163,7 +210,8 @@ using santa::WatchItemRuleType;
 
   {
     // Extract platform TID
-    auto wip = WatchItemProcess::Create(nil, @"platform:*", nil, nil, nil, false, nil);
+    auto wip =
+        WatchItemProcess::Create(nil, @"platform:*", nil, nil, nil, false, std::nullopt, nil);
     XCTAssertTrue(wip.has_value());
     XCTAssertCppStringEqual(wip->signing_id, "*");
     XCTAssertTrue(wip->platform_binary);
@@ -172,7 +220,7 @@ using santa::WatchItemRuleType;
 
   {
     // Both PlatformBinary and a TID can be set if TID is "platform"
-    auto wip = WatchItemProcess::Create(nil, nil, @"plATFOrm", nil, nil, true, nil);
+    auto wip = WatchItemProcess::Create(nil, nil, @"plATFOrm", nil, nil, true, std::nullopt, nil);
     XCTAssertTrue(wip.has_value());
     XCTAssertTrue(wip->platform_binary);
     XCTAssertCppStringEqual(wip->team_id, "");
