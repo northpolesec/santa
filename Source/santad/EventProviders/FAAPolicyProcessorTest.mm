@@ -715,12 +715,15 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess& proc) {
   auto optionalPolicy = std::make_optional<std::shared_ptr<WatchItemPolicyBase>>(policy);
 
   __block santa::WatchItemProcessOptions options;
+  __block bool matched = false;
   auto matcher = ^FAAPolicyProcessor::PolicyMatch(const santa::WatchItemPolicyBase&,
                                                   const Message::PathTarget&, const Message&) {
-    return {false, &options};
+    return {matched, &options};
   };
 
-  // The rule denies read access, but the matched process allows it
+  // A process's overrides apply even when the match failed, which is the case
+  // for a process rule type whose path didn't match. The rule denies read
+  // access, but the matched process allows it.
   options.allow_read_access = true;
   XCTAssertEqual(
       faaPolicyProcessor
@@ -740,6 +743,8 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess& proc) {
   // The effective allow_read_access takes precedence over an explicit action, so
   // a read-only operation is allowed even for an entry that says deny. Denying
   // reads too requires the entry to also set allow_read_access false.
+  // Note: The match has to succeed for the action to be considered at all.
+  matched = true;
   options.action = santa::WatchItemProcessAction::kDeny;
   options.allow_read_access = true;
   XCTAssertEqual(
