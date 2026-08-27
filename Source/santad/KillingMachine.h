@@ -31,8 +31,10 @@
 
 namespace santa {
 
-// Default for KillEnv::signal_group. Defined in KillingMachine.mm.
+// Defaults for the seams in KillEnv that aren't a bare syscall. Defined in
+// KillingMachine.mm.
 int SignalProcessGroup(pid_t pgid, int sig);
+void BlockingWait(NSTimeInterval seconds);
 
 // Everything a kill pass reaches for outside this file, injectable because
 // signal delivery has no safe form to exercise against real processes. The
@@ -59,10 +61,33 @@ struct KillEnv {
 
   // Signal every process in a group. Returns 0 or errno.
   std::function<int(pid_t, int)> signal_group = SignalProcessGroup;
+
+  // Blocks the calling thread for the term-then-kill grace period.
+  std::function<void(NSTimeInterval)> wait = BlockingWait;
 };
 
 SNTKillResponse* KillingMachine(SNTKillRequest* request);
 SNTKillResponse* KillingMachine(SNTKillRequest* request, const KillEnv& env);
+
+// Sends SIGTERM to everything the request matches, blocks the calling thread
+// for `grace`, then re-matches and SIGKILLs whatever is still there. Blocking
+// is the contract: callers run this on a queue they own. The request's own
+// `signal` field is not used by this path.
+SNTKillResponse* KillingMachineTermThenKill(SNTKillRequest* request,
+                                            NSTimeInterval grace);
+SNTKillResponse* KillingMachineTermThenKill(SNTKillRequest* request,
+                                            NSTimeInterval grace,
+                                            const KillEnv& env);
+
+// The pid of one process the request matches, or nullopt when nothing does.
+// Signals nothing: this is the match pass on its own, so a caller can find out
+// whether a kill would hit anything before the kill is due. Which of several
+// matches comes back is unspecified, and the answer is a snapshot: the process
+// may be gone by the time the caller looks at it. Running-process requests are
+// not supported here, as they already name the process the caller wants.
+std::optional<pid_t> KillingMachineAnyMatch(SNTKillRequest* request);
+std::optional<pid_t> KillingMachineAnyMatch(SNTKillRequest* request,
+                                            const KillEnv& env);
 
 }  // namespace santa
 

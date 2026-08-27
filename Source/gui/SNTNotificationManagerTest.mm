@@ -20,17 +20,21 @@
 #import "Source/gui/SNTNetworkFlowMessageWindowController.h"
 #import "Source/gui/SNTNotificationManager.h"
 #import "Source/gui/SNTStatusItemManager.h"
+#import "Source/gui/SNTTimedRuleKillMessageWindowController.h"
 
 #import "Source/common/SNTConfigBundle.h"
+#import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
 #import "Source/common/SNTStoredNetworkFlowEvent.h"
 
 @class SNTBinaryMessageWindowController;
 
 @interface SNTNotificationManager (Testing)
+@property(readonly) NSMutableArray* pendingNotifications;
 - (void)hashBundleBinariesForEvent:(SNTStoredEvent*)event
                     withController:(SNTBinaryMessageWindowController*)controller;
 - (void)queueMessage:(SNTMessageWindowController*)pendingMsg enableSilences:(BOOL)enableSilences;
+- (void)showQueuedWindow;
 @end
 
 // Overrides only messageHash, to confirm the base queueDedupeHash defaults to it.
@@ -43,7 +47,28 @@
 }
 @end
 
+// A real NSWindow that refuses to come on screen. Nothing any test here asserts
+// needs a window to be visible: a dialog is closed through -close and its
+// delegate, both of which work the same off screen.
+@interface OffScreenWindow : NSWindow
+@end
+
+@implementation OffScreenWindow
+- (instancetype)init {
+  return [super initWithContentRect:NSZeroRect
+                          styleMask:NSWindowStyleMaskTitled
+                            backing:NSBackingStoreBuffered
+                              defer:NO];
+}
+
+- (void)makeKeyAndOrderFront:(id)sender {
+}
+@end
+
 @interface SNTNotificationManagerTest : XCTestCase
+@property id mockConfigurator;
+@property id mockWindowControllerClass;
+@property NSApplicationActivationPolicy savedActivationPolicy;
 @end
 
 @implementation SNTNotificationManagerTest
@@ -51,6 +76,30 @@
 - (void)setUp {
   [super setUp];
   fclose(stdout);
+
+  // Nothing in this suite may reach the screen. Several tests here run the real
+  // queueMessage:, which shows the dialog it accepted, so without these two lines
+  // a test run puts santa dialogs in front of whoever is running it: an xctest
+  // bundle has a real WindowServer connection and a live NSApplication.
+  //
+  // +defaultWindow is the single place any message window controller gets its
+  // window, so handing back one that refuses to be ordered in covers every path,
+  // and a prohibited activation policy makes the base class's
+  // [NSApp activateIgnoringOtherApps:YES] a no-op.
+  self.mockWindowControllerClass = OCMClassMock([SNTMessageWindowController class]);
+  OCMStub([self.mockWindowControllerClass defaultWindow]).andReturn([[OffScreenWindow alloc] init]);
+  self.savedActivationPolicy = NSApp.activationPolicy;
+  [NSApp setActivationPolicy:NSApplicationActivationPolicyProhibited];
+}
+
+- (void)tearDown {
+  // Class mocks swizzle the class itself, so they have to be undone or they
+  // follow the process into the next test. The activation policy is process
+  // state too, so it goes back to whatever it was before setUp changed it.
+  [NSApp setActivationPolicy:self.savedActivationPolicy];
+  [self.mockConfigurator stopMocking];
+  [self.mockWindowControllerClass stopMocking];
+  [super tearDown];
 }
 
 - (void)testPostBlockNotificationSendsDistributedNotification {
@@ -295,6 +344,174 @@
           record();
         });
       }];
+}
+
+#pragma mark Timed rule kill warning
+
+- (void)mockSilentMode:(BOOL)silent {
+  self.mockConfigurator = OCMClassMock([SNTConfigurator class]);
+  OCMStub([self.mockConfigurator configurator]).andReturn(self.mockConfigurator);
+  OCMStub([self.mockConfigurator enableSilentMode]).andReturn(silent);
+}
+
+// Every window the message-window base class hands out for the rest of the test
+// is one that cannot come on screen. +defaultWindow is the single place any
+// controller gets its window, so stubbing it is enough to keep a test run silent
+// no matter which path ends up creating a window.
+//
+// The warning is a window on the block-dialog queue, not a UNUserNotificationCenter
+// banner, because Do Not Disturb and Focus modes suppress banners. Silences stay
+// off: a warning that something is about to be quit is not silenceable per app.
+- (void)testPostTimedRuleKillNotificationQueuesAWindow {
+  SNTNotificationManager* mgr = [[SNTNotificationManager alloc] init];
+  id mgrMock = OCMPartialMock(mgr);
+  OCMExpect([mgrMock
+        queueMessage:[OCMArg isKindOfClass:[SNTTimedRuleKillMessageWindowController class]]
+      enableSilences:NO]);
+
+  [mgr postTimedRuleKillNotificationForApplication:@"Calculator"
+                                          deadline:[NSDate dateWithTimeIntervalSinceNow:600]];
+
+  OCMVerifyAll(mgrMock);
+  [mgrMock stopMocking];
+}
+
+- (void)testPostTimedRuleKillNotificationIgnoresIncompleteWarnings {
+  SNTNotificationManager* mgr = [[SNTNotificationManager alloc] init];
+  id mgrMock = OCMPartialMock(mgr);
+  OCMReject([mgrMock queueMessage:OCMOCK_ANY enableSilences:NO]);
+
+  [mgr postTimedRuleKillNotificationForApplication:nil
+                                          deadline:[NSDate dateWithTimeIntervalSinceNow:600]];
+  // An empty name has no identity either: its messageHash is nil, so repeats
+  // would stack rather than collapse.
+  [mgr postTimedRuleKillNotificationForApplication:@""
+                                          deadline:[NSDate dateWithTimeIntervalSinceNow:600]];
+  [mgr postTimedRuleKillNotificationForApplication:@"Calculator" deadline:nil];
+
+  OCMVerifyAll(mgrMock);
+  [mgrMock stopMocking];
+}
+
+// One window per (application, deadline): the queue collapses on this key, so a
+// repeated warning for the same deadline cannot stack a second window, while a
+// moved deadline or a different application still gets its own.
+- (void)testTimedRuleKillWindowIdentityIsApplicationAndDeadline {
+  NSDate* deadline = [NSDate dateWithTimeIntervalSince1970:1660221048];
+  NSString* (^key)(NSString*, NSDate*) = ^(NSString* app, NSDate* d) {
+    return [[[SNTTimedRuleKillMessageWindowController alloc] initWithApplication:app deadline:d]
+        queueDedupeHash];
+  };
+
+  XCTAssertEqualObjects(key(@"Calculator", deadline), key(@"Calculator", deadline));
+  XCTAssertNotEqualObjects(key(@"Calculator", deadline),
+                           key(@"Calculator", [deadline dateByAddingTimeInterval:60]));
+  XCTAssertNotEqualObjects(key(@"Calculator", deadline), key(@"Chess", deadline));
+}
+
+// Silent mode is enforced once, by the queue, so the warning path carries no gate
+// of its own. Both rows run the real queueMessage: and differ only in the
+// configurator's answer.
+- (void)testTimedRuleKillWarningIsQueuedUnlessSilentMode {
+  for (NSNumber* silent in @[ @NO, @YES ]) {
+    [self mockSilentMode:silent.boolValue];
+
+    SNTNotificationManager* mgr = [[SNTNotificationManager alloc] init];
+    id mgrMock = OCMPartialMock(mgr);
+    // What the queue accepted is the assertion; presentation is stubbed out so
+    // the test cannot put anything on screen.
+    OCMStub([mgrMock showQueuedWindow]).andDo(nil);
+
+    [mgr postTimedRuleKillNotificationForApplication:@"Calculator"
+                                            deadline:[NSDate dateWithTimeIntervalSinceNow:600]];
+
+    // queueMessage: finishes its bookkeeping in a block on the main queue, so
+    // hop through that queue to let the block run before asserting.
+    XCTestExpectation* drained = [self expectationWithDescription:@"main queue drained"];
+    dispatch_async(dispatch_get_main_queue(), ^{
+      [drained fulfill];
+    });
+    [self waitForExpectationsWithTimeout:5.0 handler:nil];
+
+    XCTAssertEqual(mgr.pendingNotifications.count, silent.boolValue ? 0u : 1u);
+
+    [mgrMock stopMocking];
+    [self.mockConfigurator stopMocking];
+    self.mockConfigurator = nil;
+  }
+}
+
+// Queues a warning for real and hands back the manager once the queue has retired
+// it again. The manager's own cleanup callback is the signal, so what is being
+// waited on is the queue advancing, not merely a window closing.
+- (SNTNotificationManager*)queueUntilRetired:(SNTMessageWindowController*)controller
+                                 describedAs:(NSString*)description
+                                  onRetiring:(void (^)(void))onRetiring {
+  [self mockSilentMode:NO];
+
+  SNTNotificationManager* mgr = [[SNTNotificationManager alloc] init];
+  id mgrMock = OCMPartialMock(mgr);
+
+  XCTestExpectation* retired = [self expectationWithDescription:description];
+  OCMStub([mgrMock windowDidCloseSilenceHash:OCMOCK_ANY withInterval:0])
+      .andDo(^(NSInvocation* i) {
+        onRetiring();
+        [retired fulfill];
+      })
+      .andForwardToRealObject();
+
+  [mgr queueMessage:controller enableSilences:NO];
+
+  [self waitForExpectationsWithTimeout:10.0 handler:nil];
+  [mgrMock stopMocking];
+  return mgr;
+}
+
+// The warning stops being true at its deadline, and it holds the one dialog slot
+// until it closes, so it closes itself with nobody touching it.
+- (void)testTimedRuleKillWindowClosesItselfAtTheDeadline {
+  SNTTimedRuleKillMessageWindowController* controller =
+      [[SNTTimedRuleKillMessageWindowController alloc]
+          initWithApplication:@"Calculator"
+                     deadline:[NSDate dateWithTimeIntervalSinceNow:0.25]];
+
+  // The window was stood up and its delegate wired, which is what the deadline
+  // timer closed. windowWillClose: runs while the window is still in the screen
+  // list, so a window that had been displayed would read visible here: that is
+  // the assertion that keeps the suite from ever flashing a dialog.
+  dispatch_block_t nothingWasSeen = ^{
+    XCTAssertNotNil(controller.window);
+    XCTAssertFalse(controller.window.isVisible);
+  };
+
+  SNTNotificationManager* mgr = [self queueUntilRetired:controller
+                                            describedAs:@"warning closed itself at its deadline"
+                                             onRetiring:nothingWasSeen];
+
+  XCTAssertEqual(mgr.pendingNotifications.count, 0u);
+}
+
+// A warning whose deadline passed while it waited behind another dialog must not
+// be drawn at all: it says something untrue and would steal focus on its way out.
+// It still has to be retired through the delegate, or it would hold the one dialog
+// slot and everything behind it would wait on it forever.
+- (void)testExpiredTimedRuleKillWindowIsRetiredWithoutBeingShown {
+  SNTTimedRuleKillMessageWindowController* controller =
+      [[SNTTimedRuleKillMessageWindowController alloc]
+          initWithApplication:@"Calculator"
+                     deadline:[NSDate dateWithTimeIntervalSinceNow:-1]];
+
+  // No window was ever built, so there was nothing to order in, draw, or activate.
+  dispatch_block_t noWindowAtAll = ^{
+    XCTAssertNil(controller.window);
+  };
+
+  SNTNotificationManager* mgr =
+      [self queueUntilRetired:controller
+                  describedAs:@"expired warning retired without being shown"
+                   onRetiring:noWindowAtAll];
+
+  XCTAssertEqual(mgr.pendingNotifications.count, 0u);
 }
 
 @end

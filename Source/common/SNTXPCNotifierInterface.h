@@ -46,6 +46,10 @@
                             configBundle:(SNTConfigBundle*)configBundle;
 - (void)postClientModeNotification:(SNTClientMode)clientmode;
 - (void)postRuleSyncNotificationForApplication:(NSString*)app;
+/// Warns that a rule's time window is about to close and the application will
+/// be quit at `deadline`. Fire-and-forget: the kill happens whether or not the
+/// warning window is shown.
+- (void)postTimedRuleKillNotificationForApplication:(NSString*)app deadline:(NSDate*)deadline;
 - (void)authorizeTemporaryMonitorMode:(void (^)(BOOL authenticated))reply;
 - (void)enterTemporaryMonitorMode:(NSDate*)expiration;
 - (void)leaveTemporaryMonitorMode;
