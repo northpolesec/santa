@@ -1601,6 +1601,21 @@ class ScopedHostZone {
     XCTAssertTrue(secondPass->in_range);
   }
   {
+    // Both edges inside the repeated hour: 01:15 and 01:45 each resolve to their
+    // first occurrence, so the window is a real 30 minutes and it fires on the
+    // first pass only. By the second pass through 01:30 it is already over.
+    absl::Time firstPass = local(2026, 11, 1, 1, 30);
+    auto result = santa::cel::EvalDaysHHMMWindow({0}, "01:15", "01:45", firstPass, zone);
+    XCTAssertTrue(result.ok());
+    XCTAssertTrue(result->in_range);
+    XCTAssertTrue(result->window_length == absl::Minutes(30));
+
+    auto secondPass =
+        santa::cel::EvalDaysHHMMWindow({0}, "01:15", "01:45", firstPass + absl::Hours(1), zone);
+    XCTAssertTrue(secondPass.ok());
+    XCTAssertFalse(secondPass->in_range);
+  }
+  {
     // Unparseable HH:MM has no window to test.
     for (absl::string_view bad : {"9:00", "24:00", "09:60", "0900", "09-00", "09:00:00", ""}) {
       XCTAssertFalse(

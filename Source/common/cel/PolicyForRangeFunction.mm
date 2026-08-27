@@ -134,16 +134,18 @@ bool ContainsDay(absl::Span<const int64_t> days, absl::CivilDay day) {
   return std::find(days.begin(), days.end(), DayOfWeek(day)) != days.end();
 }
 
-// The instant a local civil time falls on. A DST transition makes the requested
-// civil time either skipped or repeated; the transition instant is the
-// well-defined answer for both. Because a window's closing edge and the next
-// occurrence's opening edge are the same civil time, both land on that instant
-// and back-to-back 24h occurrences stay exactly contiguous across the
-// transition. The trade is that a window with both edges inside the skipped or
-// repeated hour collapses to a zero-length range and is empty that day.
+// The instant a local civil time falls on, resolved the way absl::FromCivil()
+// does so that today() and a window edge never disagree about the same civil
+// time. A DST transition makes the requested civil time either repeated or
+// skipped. A repeated civil time resolves to its first occurrence, so a window
+// with both edges inside the repeated hour keeps its full length and fires once,
+// on the first pass. A skipped civil time resolves to the transition instant.
+// FromCivil() is documented to be order preserving, which is what keeps
+// windowStart <= windowEnd. Back-to-back 24h occurrences stay contiguous because
+// a window's closing edge and the next occurrence's opening edge are the same
+// civil expression and so land on the same instant under any deterministic rule.
 absl::Time LocalInstant(absl::CivilDay day, int minutesAfterMidnight, absl::TimeZone zone) {
-  absl::TimeZone::TimeInfo info = zone.At(absl::CivilSecond(day) + minutesAfterMidnight * 60);
-  return info.kind == absl::TimeZone::TimeInfo::UNIQUE ? info.pre : info.trans;
+  return absl::FromCivil(absl::CivilSecond(day) + minutesAfterMidnight * 60, zone);
 }
 
 absl::StatusOr<std::vector<int64_t>> DayList(const cel_runtime::CelValue& value,
