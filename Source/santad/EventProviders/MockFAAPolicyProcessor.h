@@ -53,7 +53,7 @@ class MockFAAPolicyProcessor : public FAAPolicyProcessor {
   MOCK_METHOD(bool, PolicyAllowsReadsForTarget,
               (const Message& msg, const Message::PathTarget& target, bool allow_read_access),
               (override));
-  MOCK_METHOD(FileAccessPolicyDecision, ApplyPolicy,
+  MOCK_METHOD(FAAPolicyProcessor::DecisionAndOptions, ApplyPolicy,
               (const Message& msg, const Message::PathTarget& target,
                const std::optional<std::shared_ptr<santa::WatchItemPolicyBase>> optional_policy,
                FAAPolicyProcessor::CheckIfPolicyMatchesBlock checkIfPolicyMatchesBlock),
@@ -71,14 +71,14 @@ class MockFAAPolicyProcessor : public FAAPolicyProcessor {
     return FAAPolicyProcessor::PolicyAllowsReadsForTarget(msg, target, allow_read_access);
   }
 
-  FileAccessPolicyDecision ApplyPolicyWrapper(
+  FAAPolicyProcessor::DecisionAndOptions ApplyPolicyWrapper(
       const Message& msg, const Message::PathTarget& target,
       const std::optional<std::shared_ptr<WatchItemPolicyBase>> optional_policy,
       FAAPolicyProcessor::CheckIfPolicyMatchesBlock checkIfPolicyMatchesBlock) {
     return FAAPolicyProcessor::ApplyPolicy(msg, target, optional_policy, checkIfPolicyMatchesBlock);
   }
 
-  FileAccessPolicyDecision ProcessTargetAndPolicyWrapper(
+  FAAPolicyProcessor::DecisionAndOptions ProcessTargetAndPolicyWrapper(
       const Message& msg, const FAAPolicyProcessor::TargetPolicyPair& target_policy_pair,
       FAAPolicyProcessor::CheckIfPolicyMatchesBlock checkIfPolicyMatchesBlock,
       SNTFileAccessDeniedBlock fileAccessDeniedBlock, SNTOverrideFileAccessAction overrideAction) {
