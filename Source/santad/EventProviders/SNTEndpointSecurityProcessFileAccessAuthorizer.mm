@@ -34,7 +34,25 @@ using santa::PidPidversion;
 using santa::ProcessWatchItemPolicy;
 
 using PidPidverPair = std::pair<pid_t, int>;
-using ProcessRuleCache = SantaCache<PidPidverPair, std::shared_ptr<ProcessWatchItemPolicy>>;
+
+/// The policy a process matched, plus the option overrides carried by the entry
+/// that matched it. For process rule types the process is matched once at exec
+/// time, so its overrides must be remembered alongside the policy in order to
+/// apply to every subsequent event from that process.
+///
+/// Note: `options` points into `policy->processes`, which is immutable for the
+/// lifetime of the policy, so the owning `shared_ptr` here keeps it valid. It is
+/// null when the matched entry carried no overrides.
+struct MatchedProcessPolicy {
+  std::shared_ptr<ProcessWatchItemPolicy> policy;
+  const santa::WatchItemProcessOptions* options = nullptr;
+
+  // Note: Only the policy is considered. SantaCache only ever compares against
+  // a default constructed value to determine whether an entry exists.
+  bool operator==(const MatchedProcessPolicy& other) const { return policy == other.policy; }
+};
+
+using ProcessRuleCache = SantaCache<PidPidverPair, MatchedProcessPolicy>;
 
 @interface SNTEndpointSecurityProcessFileAccessAuthorizer ()
 @property bool isSubscribed;
@@ -73,7 +91,7 @@ using ProcessRuleCache = SantaCache<PidPidverPair, std::shared_ptr<ProcessWatchI
 }
 
 - (void)processMessage:(Message)msg
-                policy:(std::shared_ptr<ProcessWatchItemPolicy>)procPolicy
+                policy:(const MatchedProcessPolicy&)matchedPolicy
         overrideAction:(SNTOverrideFileAccessAction)overrideAction {
   if (msg->action_type != ES_ACTION_TYPE_AUTH) {
     return;
@@ -82,25 +100,23 @@ using ProcessRuleCache = SantaCache<PidPidverPair, std::shared_ptr<ProcessWatchI
   std::vector<FAAPolicyProcessor::TargetPolicyPair> targetPolicyPairs;
   size_t numTargets = msg.PathTargets().size();
   for (size_t i = 0; i < numTargets; ++i) {
-    targetPolicyPairs.emplace_back(i, procPolicy);
+    targetPolicyPairs.emplace_back(i, matchedPolicy.policy);
   }
+
+  const santa::WatchItemProcessOptions* matchedOptions = matchedPolicy.options;
 
   FAAPolicyProcessor::ESResult result = _faaPolicyProcessorProxy->ProcessMessage(
       msg, targetPolicyPairs,
-      ^bool(const santa::WatchItemPolicyBase& base_policy, const Message::PathTarget& target,
-            const Message& msg) {
+      ^FAAPolicyProcessor::PolicyMatch(const santa::WatchItemPolicyBase& base_policy,
+                                       const Message::PathTarget& target, const Message& msg) {
         const ProcessWatchItemPolicy* policy =
             dynamic_cast<const ProcessWatchItemPolicy*>(&base_policy);
         if (!policy) {
           LOGW(@"Failed to cast process policy");
-          return false;
+          return {false, matchedOptions};
         }
 
-        if (policy->tree->Contains(target.Path().data())) {
-          return true;
-        } else {
-          return false;
-        }
+        return {policy->tree->Contains(target.Path().data()), matchedOptions};
       },
       self.fileAccessDeniedBlock, overrideAction);
 
@@ -156,14 +172,14 @@ using ProcessRuleCache = SantaCache<PidPidverPair, std::shared_ptr<ProcessWatchI
     return;
   }
 
-  std::shared_ptr<ProcessWatchItemPolicy> policy =
+  MatchedProcessPolicy matchedPolicy =
       _procRuleCache->get(PidPidversion(esMsg->process->audit_token));
-  if (!policy) {
+  if (!matchedPolicy.policy) {
     auto pidPidver = PidPidversion(esMsg->process->audit_token);
-    policy = [self findPolicyForProcess:esMsg->process];
-    if (policy) {
+    matchedPolicy = [self findPolicyForProcess:esMsg->process];
+    if (matchedPolicy.policy) {
       // Found match, add to the cache. The process is already being watched.
-      _procRuleCache->set(pidPidver, policy);
+      _procRuleCache->set(pidPidver, matchedPolicy);
     } else {
       // Still no match, time to give up.
       [self stopWatching:pidPidver];
@@ -181,19 +197,23 @@ using ProcessRuleCache = SantaCache<PidPidverPair, std::shared_ptr<ProcessWatchI
 
   [self processMessage:std::move(esMsg)
                handler:^(Message msg) {
-                 [self processMessage:std::move(msg) policy:policy overrideAction:overrideAction];
+                 [self processMessage:std::move(msg)
+                               policy:matchedPolicy
+                       overrideAction:overrideAction];
                  recordEventMetrics(santa::EventDisposition::kProcessed);
                }];
 }
 
-- (std::shared_ptr<ProcessWatchItemPolicy>)findPolicyForProcess:(const es_process_t*)esProc {
-  __block std::shared_ptr<ProcessWatchItemPolicy> foundPolicy;
+- (MatchedProcessPolicy)findPolicyForProcess:(const es_process_t*)esProc {
+  __block MatchedProcessPolicy foundPolicy;
   self.iterateProcessPoliciesBlock(^bool(std::shared_ptr<ProcessWatchItemPolicy> policy) {
+    // Note: Iteration order is meaningful. ProcessesWithOptions entries come
+    // first in this list so they take precedence over Processes.
     for (const santa::WatchItemProcess& policyProcess : policy->processes) {
       if ((*_faaPolicyProcessorProxy)->PolicyMatchesProcess(policyProcess, esProc)) {
         // Map the new process to the matched policy and begin
         // watching the new process
-        foundPolicy = policy;
+        foundPolicy = {policy, policyProcess.options ? &policyProcess.options.value() : nullptr};
 
         // Stop iteration, no need to continue once a match is found
         return true;
@@ -211,11 +231,10 @@ using ProcessRuleCache = SantaCache<PidPidverPair, std::shared_ptr<ProcessWatchI
     return santa::ProbeInterest::kUninterested;
   }
 
-  std::shared_ptr<ProcessWatchItemPolicy> policy =
-      [self findPolicyForProcess:esMsg->event.exec.target];
+  MatchedProcessPolicy matchedPolicy = [self findPolicyForProcess:esMsg->event.exec.target];
 
-  if (policy) {
-    [self startWatching:esMsg->event.exec.target->audit_token policy:policy];
+  if (matchedPolicy.policy) {
+    [self startWatching:esMsg->event.exec.target->audit_token policy:matchedPolicy];
 
     return santa::ProbeInterest::kInterested;
   } else {
@@ -223,10 +242,9 @@ using ProcessRuleCache = SantaCache<PidPidverPair, std::shared_ptr<ProcessWatchI
   }
 }
 
-- (void)startWatching:(const audit_token_t)tok
-               policy:(std::shared_ptr<ProcessWatchItemPolicy>)policy {
-  if (policy) {
-    _procRuleCache->set(PidPidversion(tok), policy);
+- (void)startWatching:(const audit_token_t)tok policy:(const MatchedProcessPolicy&)matchedPolicy {
+  if (matchedPolicy.policy) {
+    _procRuleCache->set(PidPidversion(tok), matchedPolicy);
   }
 
   // Note: Always start watching the process, even if no policy currently exists.
@@ -260,11 +278,10 @@ using ProcessRuleCache = SantaCache<PidPidverPair, std::shared_ptr<ProcessWatchI
   // watching any of the processes. The next time the process emits some event, it will
   // be reevaluated against the latest config. However we still notify the FAAPolicyProcessor
   // as if the process exited so that caches may be cleaned up.
-  _procRuleCache->clear(
-      ^(std::pair<pid_t, int>& pidPidver, std::shared_ptr<ProcessWatchItemPolicy>&) {
-        _faaPolicyProcessorProxy->NotifyExit(
-            santa::MakeStubAuditToken(pidPidver.first, pidPidver.second));
-      });
+  _procRuleCache->clear(^(std::pair<pid_t, int>& pidPidver, MatchedProcessPolicy&) {
+    _faaPolicyProcessorProxy->NotifyExit(
+        santa::MakeStubAuditToken(pidPidver.first, pidPidver.second));
+  });
 
   // Always clear cache to ensure operations that were previously allowed are re-evaluated.
   [super clearCache];
@@ -277,10 +294,9 @@ using ProcessRuleCache = SantaCache<PidPidverPair, std::shared_ptr<ProcessWatchI
       self.isSubscribed = false;
     }
 
-    _procRuleCache->clear(
-        ^(std::pair<pid_t, int>& pidPidver, std::shared_ptr<ProcessWatchItemPolicy>&) {
-          [self stopWatching:pidPidver];
-        });
+    _procRuleCache->clear(^(std::pair<pid_t, int>& pidPidver, MatchedProcessPolicy&) {
+      [self stopWatching:pidPidver];
+    });
   }
 }
 

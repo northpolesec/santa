@@ -18,6 +18,7 @@
 #import <Foundation/Foundation.h>
 
 #import "Source/common/SNTCommonEnums.h"
+#include "Source/santad/KillingMachine.h"
 
 @class SNTBelievableClock;
 @class SNTConfigurator;
@@ -27,7 +28,7 @@
 ///
 ///  Owns the kills asked for by CEL rules using policy_for_range(...,
 ///  should_kill=true): one entry per rule, a timer for the next event across
-///  them, the warning window shortly before a deadline, and the kill itself at
+///  them, the warning banner shortly before a deadline, and the kill itself at
 ///  the deadline.
 ///
 ///  Nothing running is touched except at a recorded deadline. A rule arriving,
@@ -62,10 +63,15 @@
 ///
 @interface SNTTimedRuleKills : NSObject
 
+///
+///  `killEnv` is the syscall environment kills and match checks run against:
+///  santa::KillEnv() in production, faked in tests.
+///
 - (instancetype)initWithNotifierQueue:(SNTNotificationQueue*)notifierQueue
                             ruleTable:(SNTRuleTable*)ruleTable
                          configurator:(SNTConfigurator*)configurator
-                                clock:(SNTBelievableClock*)clock NS_DESIGNATED_INITIALIZER;
+                                clock:(SNTBelievableClock*)clock
+                              killEnv:(santa::KillEnv)killEnv NS_DESIGNATED_INITIALIZER;
 
 - (instancetype)init NS_UNAVAILABLE;
 

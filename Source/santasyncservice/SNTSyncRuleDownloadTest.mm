@@ -32,6 +32,9 @@ extern NSArray* PathsFromProtoFAARulePaths(
 extern NSDictionary* OptionsFromProtoFAARuleAdd(const ::pbv2::FileAccessRule::Add& pbAddRule);
 extern NSArray* ProcessesFromProtoFAARuleProcesses(
     const google::protobuf::RepeatedPtrField<::pbv2::FileAccessRule::Process>& pbProcesses);
+extern NSArray* ProcessesWithOptionsFromProtoFAARuleProcesses(
+    const google::protobuf::RepeatedPtrField<::pbv2::FileAccessRule::ProcessWithOptions>&
+        pbProcesses);
 extern SNTFileAccessRule* FAARuleFromProtoFileAccessRule(const ::pbv2::FileAccessRule& wi);
 extern SNTNetworkFlowRule* NetworkFlowRuleFromProto(const ::pbv2::NetworkFlowRule& nr);
 
@@ -172,6 +175,131 @@ extern SNTNetworkFlowRule* NetworkFlowRuleFromProto(const ::pbv2::NetworkFlowRul
   proc = addRule.add_processes();
   procs = ProcessesFromProtoFAARuleProcesses(addRule.processes());
   XCTAssertNil(procs);
+}
+
+- (void)testProcessesWithOptionsFromProtoFAARuleProcesses {
+  ::pbv2::FileAccessRule::Add addRule;
+
+  // All four actions
+  ::pbv2::FileAccessRule::ProcessWithOptions* pwo = addRule.add_processes_with_options();
+  pwo->mutable_process()->set_binary_path("/unspecified");
+  pwo = addRule.add_processes_with_options();
+  pwo->mutable_process()->set_binary_path("/allow");
+  pwo->set_action(::pbv2::FileAccessRule::ProcessWithOptions::ACTION_ALLOW);
+  pwo = addRule.add_processes_with_options();
+  pwo->mutable_process()->set_binary_path("/audit");
+  pwo->set_action(::pbv2::FileAccessRule::ProcessWithOptions::ACTION_AUDIT);
+  pwo = addRule.add_processes_with_options();
+  pwo->mutable_process()->set_binary_path("/deny");
+  pwo->set_action(::pbv2::FileAccessRule::ProcessWithOptions::ACTION_DENY);
+
+  NSArray* procs = ProcessesWithOptionsFromProtoFAARuleProcesses(addRule.processes_with_options());
+  XCTAssertEqual(procs.count, 4);
+  XCTAssertEqualObjects(procs[0][kWatchItemConfigKeyProcessesBinaryPath], @"/unspecified");
+  // Unspecified is conveyed by omitting the key so the rule's behavior is inherited
+  XCTAssertNil(procs[0][kWatchItemConfigKeyProcessesAction]);
+  XCTAssertEqualObjects(procs[1][kWatchItemConfigKeyProcessesAction], kProcessActionAllow);
+  XCTAssertEqualObjects(procs[2][kWatchItemConfigKeyProcessesAction], kProcessActionAudit);
+  XCTAssertEqualObjects(procs[3][kWatchItemConfigKeyProcessesAction], kProcessActionDeny);
+
+  // Unset overrides are omitted entirely so that they are inherited
+  for (NSString* key in @[
+         kWatchItemConfigKeyOptionsAllowReadAccess, kWatchItemConfigKeyOptionsEnableSilentMode,
+         kWatchItemConfigKeyOptionsEnableSilentTTYMode, kWatchItemConfigKeyOptionsCustomMessage,
+         kWatchItemConfigKeyOptionsEventDetailURL, kWatchItemConfigKeyOptionsEventDetailText
+       ]) {
+    XCTAssertNil(procs[0][key]);
+  }
+
+  // Every override, explicitly set. Note the bools are set to false to prove
+  // presence rather than truthiness is what's checked.
+  addRule.clear_processes_with_options();
+  pwo = addRule.add_processes_with_options();
+  pwo->mutable_process()->set_team_id("EXAMPLETID");
+  pwo->set_allow_read_access(false);
+  pwo->set_enable_silent_mode(false);
+  pwo->set_enable_silent_tty_mode(false);
+  pwo->set_block_message("proc msg");
+  pwo->set_event_detail_url("https://proc.example");
+  pwo->set_event_detail_text("proc text");
+
+  procs = ProcessesWithOptionsFromProtoFAARuleProcesses(addRule.processes_with_options());
+  XCTAssertEqual(procs.count, 1);
+  XCTAssertEqualObjects(procs[0][kWatchItemConfigKeyProcessesTeamID], @"EXAMPLETID");
+  XCTAssertEqualObjects(procs[0][kWatchItemConfigKeyOptionsAllowReadAccess], @(NO));
+  XCTAssertEqualObjects(procs[0][kWatchItemConfigKeyOptionsEnableSilentMode], @(NO));
+  XCTAssertEqualObjects(procs[0][kWatchItemConfigKeyOptionsEnableSilentTTYMode], @(NO));
+  XCTAssertEqualObjects(procs[0][kWatchItemConfigKeyOptionsCustomMessage], @"proc msg");
+  XCTAssertEqualObjects(procs[0][kWatchItemConfigKeyOptionsEventDetailURL],
+                        @"https://proc.example");
+  XCTAssertEqualObjects(procs[0][kWatchItemConfigKeyOptionsEventDetailText], @"proc text");
+
+  // Should return an empty array when no processes are added
+  addRule.clear_processes_with_options();
+  procs = ProcessesWithOptionsFromProtoFAARuleProcesses(addRule.processes_with_options());
+  XCTAssertEqual(procs.count, 0);
+
+  // Should return nil when an invalid identifier is used
+  addRule.add_processes_with_options();
+  procs = ProcessesWithOptionsFromProtoFAARuleProcesses(addRule.processes_with_options());
+  XCTAssertNil(procs);
+}
+
+- (void)testFAARuleFromProtoFileAccessRuleAddWithProcessesWithOptions {
+  ::pbv2::FileAccessRule wi;
+  ::pbv2::FileAccessRule::Add* addRule = wi.mutable_add();
+  ::pbv2::FileAccessRule::Path* path = addRule->add_paths();
+  path->set_path("/foo");
+  path->set_path_type(::pbv2::FileAccessRule::Path::PATH_TYPE_LITERAL);
+  addRule->set_name("my_test_rule");
+  addRule->set_version("v1");
+  addRule->set_rule_type(::pbv2::FileAccessRule::RULE_TYPE_PATHS_WITH_ALLOWED_PROCESSES);
+
+  // Servers send both arrays: `processes` for clients that predate
+  // `processes_with_options`, and the richer form for those that don't.
+  addRule->add_processes()->set_binary_path("/allowed");
+
+  ::pbv2::FileAccessRule::ProcessWithOptions* pwo = addRule->add_processes_with_options();
+  pwo->mutable_process()->set_binary_path("/allowed");
+  pwo = addRule->add_processes_with_options();
+  pwo->mutable_process()->set_binary_path("/silently/denied");
+  pwo->set_action(::pbv2::FileAccessRule::ProcessWithOptions::ACTION_DENY);
+  pwo->set_enable_silent_mode(true);
+
+  SNTFileAccessRule* rule = FAARuleFromProtoFileAccessRule(wi);
+  XCTAssertEqual(rule.state, SNTFileAccessRuleStateAdd);
+
+  NSDictionary* details = [NSKeyedUnarchiver
+      unarchivedObjectOfClasses:[NSSet setWithObjects:[NSDictionary class], [NSArray class],
+                                                      [NSString class], [NSNumber class],
+                                                      [NSData class], nil]
+                       fromData:rule.details
+                          error:nil];
+  XCTAssertNotNil(details);
+  XCTAssertEqual([details[kWatchItemConfigKeyProcesses] count], 1);
+  XCTAssertEqual([details[kWatchItemConfigKeyProcessesWithOptions] count], 2);
+  XCTAssertEqualObjects(
+      details[kWatchItemConfigKeyProcessesWithOptions][1][kWatchItemConfigKeyProcessesAction],
+      kProcessActionDeny);
+  XCTAssertEqualObjects(details[kWatchItemConfigKeyProcessesWithOptions][1]
+                               [kWatchItemConfigKeyOptionsEnableSilentMode],
+                        @(YES));
+
+  // The key is omitted entirely when the server sends no entries
+  addRule->clear_processes_with_options();
+  details = [NSKeyedUnarchiver
+      unarchivedObjectOfClasses:[NSSet setWithObjects:[NSDictionary class], [NSArray class],
+                                                      [NSString class], [NSNumber class],
+                                                      [NSData class], nil]
+                       fromData:FAARuleFromProtoFileAccessRule(wi).details
+                          error:nil];
+  XCTAssertNil(details[kWatchItemConfigKeyProcessesWithOptions]);
+
+  // An invalid action makes the whole rule invalid
+  addRule->add_processes_with_options()->mutable_process()->set_binary_path("/bad");
+  addRule->mutable_processes_with_options(0)->set_action(
+      static_cast<::pbv2::FileAccessRule::ProcessWithOptions::Action>(123));
+  XCTAssertNil(FAARuleFromProtoFileAccessRule(wi));
 }
 
 - (void)testFAARuleFromProtoFileAccessRuleAdd {

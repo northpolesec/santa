@@ -19,7 +19,9 @@
 #import <arpa/inet.h>
 #include <mach/mach_time.h>
 
+#include <cerrno>
 #include <cstring>
+#include <functional>
 #include <map>
 #include <optional>
 #include <set>
@@ -29,11 +31,11 @@
 #include "Source/common/CSOpsHelper.h"
 #include "Source/santad/KillingMachine.h"
 
-/// The fakes the three kill suites (KillingMachineTest, SNTTimedRuleKillsTest and
-/// TimedRuleKillsScenarioTest) had a copy of each. One definition here, and each
-/// suite overwrites the seams it discriminates on: the pid-recycling and errno
-/// models in KillingMachineTest, the SIGNINGID code signing lookups and the
-/// SIGTERM-honoring process groups in TimedRuleKillsScenarioTest.
+/// The fakes the kill suites (KillingMachineTest and SNTTimedRuleKillsTest) had
+/// a copy of each. One definition here, and a suite that discriminates on
+/// something this does not model derives from the struct and overwrites the
+/// seam: SNTTimedRuleKillsTest does that with the code signing lookups, since it
+/// matches rules on more than a team ID.
 namespace santa::testing {
 
 /// The team ID the fake csops reports for the pids a test wants matched. Paired
@@ -68,21 +70,26 @@ struct FakeKillEnv {
   std::set<pid_t> matchingSecond;
   // pid -> pgid. A pid that isn't here has an unreadable process group.
   std::map<pid_t, pid_t> pgids;
+  // pid -> the audit token read after which that pid is recycled: its live
+  // pidversion changes, modeling a different process taking over the pid.
+  // Reads are counted per pid across the whole call. Matching reads a pid's
+  // token twice, so 1 recycles mid-match and 2 recycles after it matched.
+  std::map<pid_t, int> recycleAfterNthRead;
+  // errno both signal seams return for a delivery that reaches its target.
+  int signalError = 0;
 
   std::vector<FakeSignal> signals;
   std::vector<NSTimeInterval> waits;
+  std::map<pid_t, int> tokenReads;
+  // Runs when the term-then-kill grace wait starts, so a test can retire the
+  // processes that died from SIGTERM.
+  std::function<void()> onWait = [] {};
 };
 
-/// Wires every seam the suites fake the same way. `EnvPtr` is anything that
-/// dereferences to a FakeKillEnv, which is what lets a suite hand over a raw
-/// pointer to a stack env or a shared_ptr to one that outlives the frame the
-/// env was built in; the lambdas hold whichever was given.
-///
-/// The bodies here are the plain ones: a snapshot that answers whatever `pids`
-/// holds, a token whose pidversion never changes under it, the TEAMID lookup
-/// over `matching` and `matchingSecond`, and signal and wait seams that only
-/// record. Anything that models a process changing under the caller is a
-/// suite's own override.
+/// Wires every seam. `EnvPtr` is anything that dereferences to a FakeKillEnv,
+/// which is what lets a suite hand over a raw pointer to a stack env or a
+/// shared_ptr to one that outlives the frame the env was built in; the lambdas
+/// hold whichever was given.
 template <typename EnvPtr>
 santa::KillEnv MakeKillEnv(EnvPtr fake) {
   santa::KillEnv env;
@@ -95,6 +102,11 @@ santa::KillEnv MakeKillEnv(EnvPtr fake) {
       return false;
     }
     *token = santa::MakeStubAuditToken(pid, it->second);
+
+    auto recycle = fake->recycleAfterNthRead.find(pid);
+    if (recycle != fake->recycleAfterNthRead.end() && ++fake->tokenReads[pid] == recycle->second) {
+      it->second += 1;
+    }
     return true;
   };
 
@@ -121,16 +133,27 @@ santa::KillEnv MakeKillEnv(EnvPtr fake) {
   };
 
   env.signal_token = [fake](audit_token_t* token, int sig) {
-    fake->signals.push_back({santa::Pid(*token), sig, false});
-    return 0;
+    pid_t pid = santa::Pid(*token);
+    fake->signals.push_back({pid, sig, false});
+
+    // proc_signal_with_audittoken validates the token against the live
+    // process, so a token captured before the pid was recycled signals nothing.
+    auto it = fake->pidversions.find(pid);
+    if (it == fake->pidversions.end() || it->second != santa::Pidversion(*token)) {
+      return ESRCH;
+    }
+    return fake->signalError;
   };
 
   env.signal_group = [fake](pid_t pgid, int sig) {
     fake->signals.push_back({pgid, sig, true});
-    return 0;
+    return fake->signalError;
   };
 
-  env.wait = [fake](NSTimeInterval seconds) { fake->waits.push_back(seconds); };
+  env.wait = [fake](NSTimeInterval seconds) {
+    fake->waits.push_back(seconds);
+    fake->onWait();
+  };
 
   return env;
 }
@@ -145,8 +168,7 @@ NSArray<NSString*>* SignalDescriptions(const std::vector<FakeSignal>& signals);
 /// moves at will, and a mach continuous reading that tracks the real one plus an
 /// offset. Mach continuous time is the reading nothing on the machine can move,
 /// so a test only ever adds to it, which is how it says "this much time really
-/// did pass" while the wall clock says otherwise. Shared by the two suites that
-/// drive a kill deadline through a clock.
+/// did pass" while the wall clock says otherwise.
 @interface FakeHost : NSObject
 @property NSTimeInterval wall;
 @property NSTimeInterval machOffsetSeconds;

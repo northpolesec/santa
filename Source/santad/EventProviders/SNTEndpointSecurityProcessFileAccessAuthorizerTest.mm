@@ -151,4 +151,66 @@ void SetExpectationsForProcessFileAccessAuthorizerInit(
   }
 }
 
+/// The process list is ordered so that ProcessesWithOptions entries precede
+/// Processes entries. Matching must visit them in that order and stop at the
+/// first match so those entries take precedence.
+- (void)testFindPolicyForProcessMatchesInOrder {
+  es_file_t esFile = MakeESFile("foo");
+  es_process_t esProc = MakeESProcess(&esFile);
+  es_file_t execFile = MakeESFile("bar");
+  es_process_t execProc = MakeESProcess(&execFile, MakeAuditToken(12, 23), MakeAuditToken(34, 45));
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_EXEC, &esProc);
+  esMsg.event.exec.target = &execProc;
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsESNewClient();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+  SetExpectationsForProcessFileAccessAuthorizerInit(mockESApi);
+
+  auto mockFAA = std::make_shared<MockFAAPolicyProcessor>(nil, nullptr, nullptr, nullptr, nullptr,
+                                                          0, 0, nil, nil);
+
+  // Record which entries were considered, in order. Only the second one matches
+  // so that iteration is observed to continue past a miss and then stop.
+  auto considered = std::make_shared<std::vector<std::string>>();
+  EXPECT_CALL(*mockFAA, PolicyMatchesProcess)
+      .WillRepeatedly([considered](const WatchItemProcess& policyProc, const es_process_t*) {
+        considered->push_back(policyProc.binary_path);
+        return policyProc.binary_path == "withopts2";
+      });
+  auto mockFAAProxy = std::make_shared<santa::ProcessFAAPolicyProcessorProxy>(mockFAA);
+
+  santa::WatchItemProcessOptions opts;
+  opts.action = santa::WatchItemProcessAction::kDeny;
+  auto pwip = std::make_shared<ProcessWatchItemPolicy>(
+      "name", "ver", SetPairPathAndType{PairPathAndType{"path1", WatchItemPathType::kLiteral}},
+      true, santa::WatchItemRuleType::kProcessesWithAllowedPaths, santa::WatchItemProcessOptions{},
+      santa::WatchItemProcessList{
+          WatchItemProcess("withopts1", "", "", {}, "", false, opts),
+          WatchItemProcess("withopts2", "", "", {}, "", false, opts),
+          WatchItemProcess("plain", "", "", {}, "", false),
+      });
+
+  IterateProcessPoliciesBlock iterPoliciesBlock = ^(CheckPolicyBlock block) {
+    block(pwip);
+  };
+
+  SNTEndpointSecurityProcessFileAccessAuthorizer* procFAAClient =
+      [[SNTEndpointSecurityProcessFileAccessAuthorizer alloc] initWithESAPI:mockESApi
+                                                                    metrics:nullptr
+                                                         faaPolicyProcessor:mockFAAProxy
+                                                iterateProcessPoliciesBlock:iterPoliciesBlock];
+  procFAAClient.isSubscribed = true;
+
+  EXPECT_CALL(*mockESApi, MuteProcess).WillOnce(testing::Return(true));
+
+  santa::Message msg(mockESApi, &esMsg);
+  XCTAssertEqual([procFAAClient probeInterest:msg], santa::ProbeInterest::kInterested);
+
+  // The trailing `plain` entry must never have been reached
+  XCTAssertEqual(considered->size(), 2);
+  XCTAssertCppStringEqual((*considered)[0], "withopts1");
+  XCTAssertCppStringEqual((*considered)[1], "withopts2");
+}
+
 @end

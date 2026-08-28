@@ -71,35 +71,17 @@ SNTKillResponse* KillingMachine(SNTKillRequest* request, const KillEnv& env);
 // Sends SIGTERM to everything the request matches, blocks the calling thread
 // for `grace`, then re-matches and SIGKILLs whatever is still there. Blocking
 // is the contract: callers run this on a queue they own. The request's own
-// `signal` field is not used by this path. When nothing was actually sent a
-// signal, there is nothing to escalate, so the grace period is skipped and the
-// calling thread is not held at all.
-//
-// A convenience wrapper over the multi-request form below, which is what santad
-// itself calls; the answer for one request is identical either way.
+// `signal` field is not used by this path. If nothing was signaled, the grace
+// wait is skipped.
 SNTKillResponse* KillingMachineTermThenKill(SNTKillRequest* request, NSTimeInterval grace);
 SNTKillResponse* KillingMachineTermThenKill(SNTKillRequest* request, NSTimeInterval grace,
                                             const KillEnv& env);
 
-// The same for several requests at once: every request's SIGTERM goes out, the
-// calling thread blocks once for `grace`, and then the SIGKILL re-matches run.
-// Requests that come due together therefore cost one grace period rather than
-// one each. One response per request, in the order they were given. A request
-// whose SIGTERM pass matched nothing is not re-matched, and when nothing at all
-// was actually sent a signal, there is nothing to escalate, so the grace period
-// is skipped and the calling thread is not held at all.
-//
-// A process group is signaled once per pass, however many of the requests reach
-// it: the group signal is not repeated for the second request, whose response is
-// then empty of that delivery. Being covered by another request's signal is not
-// the same as having matched nothing, though, so such a request is still
-// re-matched and escalated at SIGKILL. It has to be: the request that signaled
-// the group may have stopped matching by then, which is what happens whenever
-// its own process honors SIGTERM, and the survivor in the group would otherwise
-// escape the escalation entirely. Only a group signal that actually landed
-// suppresses another attempt at it.
-NSArray<SNTKillResponse*>* KillingMachineTermThenKill(NSArray<SNTKillRequest*>* requests,
-                                                      NSTimeInterval grace);
+// The same for several requests at once, sharing one grace period. One response
+// per request, in the order given. A process group reached by more than one
+// request is signaled once per pass; a request whose matches were covered by
+// another request's group signal is still re-matched at SIGKILL, since the
+// request that signaled the group may no longer match by then.
 NSArray<SNTKillResponse*>* KillingMachineTermThenKill(NSArray<SNTKillRequest*>* requests,
                                                       NSTimeInterval grace, const KillEnv& env);
 

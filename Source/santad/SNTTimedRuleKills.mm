@@ -38,6 +38,7 @@
 #import "Source/common/SNTRuleIdentifiers.h"
 #import "Source/common/SNTSystemInfo.h"
 #import "Source/common/SNTXPCNotifierInterface.h"
+#include "Source/common/String.h"
 #include "Source/common/SystemResources.h"
 #include "Source/common/Timer.h"
 #include "Source/common/cel/PolicyForRangeFunction.h"
@@ -127,8 +128,7 @@ bool SupportedRuleType(SNTRuleType ruleType) {
 // Only the plist type checks are written here: a plist real round-trips where an
 // integer was written, and 2.5 is no day of the week. What counts as a day and
 // what counts as an HH:MM is asked of policy_for_range()'s own validators, the
-// same way the zone is asked of its resolver, so all three answers come from the
-// code the re-check will use.
+// same way the zone is asked of its resolver.
 NSArray<NSNumber*>* WindowDaysFromValue(id value) {
   if (![value isKindOfClass:[NSArray class]]) {
     return nil;
@@ -169,8 +169,7 @@ NSString* WindowZoneFromValue(id value) {
 // The mach half of a deadline, checked rather than trusted like everything else
 // the state file holds: a tick count is a positive whole number, and a plist
 // real round-trips both infinities and NaN, neither of which converts to one.
-// Anything else reads as no mach deadline, which is the same answer a missing key
-// gives, and the entry's wall deadline governs alone.
+// Anything else reads as no mach deadline, and the wall deadline governs alone.
 uint64_t MachDeadlineFromValue(id value) {
   if (![value isKindOfClass:[NSNumber class]]) {
     return 0;
@@ -193,7 +192,7 @@ struct RuleIdentifiers IdentifiersForEntry(SNTTimedRuleKillEntry* entry) {
   }
 }
 
-// What to call a process in the warning window: the file name of its
+// What to call a process in the warning banner: the file name of its
 // executable, which is what the user sees in the Dock, falling back to the (16
 // character) accounting name. Nil when neither can be read.
 NSString* DisplayNameForPid(pid_t pid) {
@@ -212,7 +211,8 @@ NSString* DisplayNameForPid(pid_t pid) {
 
 // The kill is delivered to the process group of every match, with SIGKILL as
 // the nominal signal; the term-then-kill path sends SIGTERM and SIGKILL itself
-// and ignores this field.
+// and ignores this field. Never nil for an entry that exists: every write site
+// gates on SupportedRuleType, so only the switch needs the default arm.
 SNTKillRequest* KillRequestForEntry(SNTTimedRuleKillEntry* entry) {
   NSString* uuid = [[NSUUID UUID] UUIDString];
 
@@ -257,7 +257,7 @@ SNTKillRequest* KillRequestForEntry(SNTTimedRuleKillEntry* entry) {
   // A NaN deadline is the worst of them: it answers false to every "has this
   // come due" question and leaves the countdown arming for zero seconds, firing
   // and re-arming for zero forever. An appointment that cannot be compared is no
-  // appointment, so the record is dropped, which the caller logs.
+  // appointment, so the record is dropped.
   NSTimeInterval deadline = [dict[kEntryDeadlineKey] doubleValue];
   NSTimeInterval notifyAt = [dict[kEntryNotifyAtKey] doubleValue];
   if (!SupportedRuleType(ruleType) || !identifier.length || !celHash.length ||
@@ -271,10 +271,8 @@ SNTKillRequest* KillRequestForEntry(SNTTimedRuleKillEntry* entry) {
   entry.celHash = celHash;
   entry.deadline = [NSDate dateWithTimeIntervalSince1970:deadline];
   entry.notifyAt = [NSDate dateWithTimeIntervalSince1970:notifyAt];
-  // The one optional field: absent on entries written before the warning window
-  // existed, so a missing key is a valid NO rather than a reason to drop the
-  // entry. Guarded like every other field, though, so a non-NSNumber value on
-  // disk can't reach -boolValue and crash-loop the daemon at startup.
+  // Guarded like every other field: a non-NSNumber value on disk must not reach
+  // -boolValue and crash-loop the daemon at startup.
   id notified = dict[kEntryNotifiedKey];
   entry.notified = [notified isKindOfClass:[NSNumber class]] && [notified boolValue];
   // Absent on an entry whose window does not recur, so a missing key is the
@@ -348,17 +346,6 @@ SNTKillRequest* KillRequestForEntry(SNTTimedRuleKillEntry* entry) {
 /// was stopped. Written on every pass over the entries, so a test can see a
 /// countdown that was armed before the system clock moved being corrected.
 @property uint32_t armedTimerSeconds;
-/// Test seam for the one call with no safe form to exercise against real
-/// processes: one kill pass over every request that has come due, answering with
-/// one response each. Never set in production, where the real kill runs instead.
-@property(copy) NSArray<SNTKillResponse*>* (^killBlock)
-    (NSArray<SNTKillRequest*>* requests, NSTimeInterval grace);
-/// Test seam paired with killBlock: the pid of something the rule covers that
-/// is running, or nil for nothing running. Nothing a test runs can be made to
-/// match a rule, so the match is the part that is faked; naming the pid and
-/// deciding on the warning window are the production path either way. Never set
-/// in production.
-@property(copy) NSNumber* (^matchBlock)(SNTKillRequest* request);
 
 - (void)onDeadlineTimer;
 - (void)onClockRefresh;
@@ -396,14 +383,18 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
 
 @implementation SNTTimedRuleKills {
   std::shared_ptr<DeadlineTimer> _timer;
+  /// The syscalls every kill and every match here go through.
+  santa::KillEnv _killEnv;
 }
 
 - (instancetype)initWithNotifierQueue:(SNTNotificationQueue*)notifierQueue
                             ruleTable:(SNTRuleTable*)ruleTable
                          configurator:(SNTConfigurator*)configurator
-                                clock:(SNTBelievableClock*)clock {
+                                clock:(SNTBelievableClock*)clock
+                              killEnv:(santa::KillEnv)killEnv {
   self = [super init];
   if (self) {
+    _killEnv = std::move(killEnv);
     _notifierQueue = notifierQueue;
     _ruleTable = ruleTable;
     _configurator = configurator;
@@ -432,54 +423,37 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
   }
 
   NSData* text = [celExpr dataUsingEncoding:NSUTF8StringEncoding];
-  unsigned char digest[CC_SHA256_DIGEST_LENGTH];
+  uint8_t digest[CC_SHA256_DIGEST_LENGTH];
   CC_SHA256(text.bytes, (CC_LONG)text.length, digest);
-
-  NSMutableString* hex = [NSMutableString stringWithCapacity:CC_SHA256_DIGEST_LENGTH * 2];
-  for (int i = 0; i < CC_SHA256_DIGEST_LENGTH; i++) {
-    [hex appendFormat:@"%02x", digest[i]];
-  }
-  return hex;
+  return santa::StringToNSString(santa::BufToHexString(digest, sizeof(digest)));
 }
 
 - (void)resumeFromSavedState {
   dispatch_async(self.queue, ^{
     NSArray<NSDictionary*>* saved = [self.configurator savedTimedRuleKills];
-    // Counted apart: a record that would not deserialize says the state file is
-    // damaged, while a duplicate key that lost the earlier-deadline contest is a
-    // well-formed record that simply has a better twin. Both are dropped, and
-    // only the first is a reason to look at the file.
-    NSUInteger unusable = 0;
-    NSUInteger superseded = 0;
+    NSUInteger dropped = 0;
 
     for (NSDictionary* dict in saved) {
       SNTTimedRuleKillEntry* entry = [SNTTimedRuleKillEntry entryFromDictionary:dict];
       if (!entry) {
-        unusable++;
+        dropped++;
         continue;
       }
 
       // Earlier deadline wins here as it does at record time, so a duplicated
-      // key on disk can never extend a pending kill. Counted on both sides of
-      // the contest: the loser is dropped whether it is the record just read or
-      // the one already held.
+      // key on disk can never extend a pending kill.
       SNTTimedRuleKillEntry* existing = self.entries[entry.key];
       if (existing && [existing.deadline compare:entry.deadline] != NSOrderedDescending) {
-        superseded++;
+        dropped++;
         continue;
-      }
-      if (existing) {
-        superseded++;
       }
       self.entries[entry.key] = entry;
     }
 
-    NSUInteger dropped = unusable + superseded;
     if (self.entries.count || dropped) {
       LOGI(@"Restored %lu pending timed rule kill(s)%@", (unsigned long)self.entries.count,
-           dropped ? [NSString stringWithFormat:@", dropping %lu unusable and %lu superseded "
-                                                @"record(s)",
-                                                (unsigned long)unusable, (unsigned long)superseded]
+           dropped ? [NSString stringWithFormat:@", dropping %lu unusable record(s)",
+                                                (unsigned long)dropped]
                    : @"");
     }
     if (dropped) {
@@ -501,12 +475,7 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
                     windowEnd:(NSString*)windowEnd
                    windowZone:(NSString*)windowZone {
   if (!identifier.length || !celHash.length || !deadline || !notifyAt) {
-    // Any of the four can be the missing one, and a missing identifier is the
-    // commonest case, so name them all rather than logging the one field that
-    // may itself be absent.
-    LOGW(@"Ignoring incomplete timed rule kill (identifier: %@, celHash: %@, deadline: %@, "
-         @"notifyAt: %@)",
-         identifier, celHash, deadline, notifyAt);
+    LOGW(@"Ignoring incomplete timed rule kill for %@", identifier);
     return;
   }
 
@@ -595,9 +564,9 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
 /// warning first, which is the only honest answer left once the deadline is
 /// behind us.
 ///
-/// Every due entry is gathered before any of them is killed, so the quits share
-/// one grace period rather than taking one each: deadlines that land together
-/// are one pass over the machine's processes, not one apiece.
+/// Due entries are gathered and killed in one pass, sharing one grace period.
+/// An entry whose window is standing open again is not one of them: it goes back
+/// with a later deadline instead.
 - (void)processDueEntriesSerialized {
   NSDate* now = [self.clock now];
   uint64_t machNow = mach_continuous_time();
@@ -610,23 +579,26 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
     if (![self entryIsDue:entry now:now machNow:machNow bootSession:bootSession]) {
       continue;
     }
-    // Whichever way this entry goes from here it does not stay as it was.
+
+    // A deadline is spent once, whether or not anything is killed, and whichever
+    // way this entry goes from here it does not stay as it was.
+    [self.entries removeObjectForKey:key];
     changed = YES;
 
     // The rule first: one that no longer governs has no kill coming, and there
     // is no window left to reschedule into either.
     if (![self ruleStillGovernsSerialized:entry]) {
-      [self.entries removeObjectForKey:key];
       continue;
     }
 
     // Then the window, before any process is looked at: a deadline reached
-    // inside an occurrence that is standing again moves rather than fires.
+    // inside an occurrence that is standing again is an appointment moved rather
+    // than a kill, so the entry goes back under its new deadline.
     if ([self rescheduleForOpenWindowSerialized:entry now:now]) {
+      self.entries[key] = entry;
       continue;
     }
 
-    [self.entries removeObjectForKey:key];
     [due addObject:entry];
   }
 
@@ -650,7 +622,7 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
     }
 
     [self notifyForEntrySerialized:entry];
-    // Marked whether or not a window went up. This is the one warning pass for
+    // Marked whether or not a banner went out. This is the one warning pass for
     // this (rule, deadline): the user is warned once, or not at all when there
     // was nothing to warn about, and persisting the flag is what carries that
     // across a restart. It is also what keeps the timer from re-arming on a
@@ -745,10 +717,10 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
 /// is the end of the occurrence, and a window holds from its start up to but not
 /// including its end, so that case reads as closed and the kill goes ahead.
 ///
-/// Answers NO for an entry with no window, a window that is closed, a window
-/// whose zone no longer resolves, a window the math refuses, and an open window
-/// whose end is not later than the deadline being replaced: all five mean the
-/// deadline stands. The caller persists and re-arms the timer either way.
+/// Answers NO for an entry with no window, a window that is closed, a window the
+/// math refuses, and an open window whose end is not later than the deadline
+/// being replaced: all four mean the deadline stands. The caller persists and
+/// re-arms the timer either way.
 - (BOOL)rescheduleForOpenWindowSerialized:(SNTTimedRuleKillEntry*)entry now:(NSDate*)now {
   if (!entry.windowDays.count || !entry.windowStart.length || !entry.windowEnd.length ||
       !entry.windowZone.length) {
@@ -794,8 +766,8 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
   // reschedule. The two can name the same instant: the due tolerance treats an
   // entry as due in the fraction of a second before its deadline, and a window
   // still holds there, so this is the on-time fire arriving a hair early. Moving
-  // the deadline to where it already is would reset the warning and put up a
-  // second window for a kill that is happening now.
+  // the deadline to where it already is would reset the warning and send a
+  // second banner for a kill that is happening now.
   if ([deadline timeIntervalSinceDate:entry.deadline] <= 0) {
     return NO;
   }
@@ -812,47 +784,32 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
   return YES;
 }
 
-/// The kill at a deadline: one pass for every entry that has come due, sharing
-/// the grace period between the SIGTERMs and the SIGKILLs. The rule and the
-/// window have already been re-checked for each of them.
+/// The kill at a deadline: one pass over every due entry, sharing the grace
+/// period. The rule and the window have already been re-checked.
 - (void)killEntriesSerialized:(NSArray<SNTTimedRuleKillEntry*>*)entries {
-  NSMutableArray<SNTKillRequest*>* requests = [NSMutableArray array];
-  NSMutableArray<SNTTimedRuleKillEntry*>* requested = [NSMutableArray array];
+  NSMutableArray<SNTKillRequest*>* requests = [NSMutableArray arrayWithCapacity:entries.count];
   for (SNTTimedRuleKillEntry* entry in entries) {
-    SNTKillRequest* request = KillRequestForEntry(entry);
-    if (!request) {
-      LOGW(@"Unable to build a kill request for %@; nothing killed", entry.identifier);
-      continue;
-    }
-    [requests addObject:request];
-    [requested addObject:entry];
-  }
-
-  if (!requests.count) {
-    return;
+    [requests addObject:KillRequestForEntry(entry)];
   }
 
   NSArray<SNTKillResponse*>* responses =
-      self.killBlock ? self.killBlock(requests, kTermGrace)
-                     : santa::KillingMachineTermThenKill(requests, kTermGrace);
+      santa::KillingMachineTermThenKill(requests, kTermGrace, _killEnv);
 
-  // One response per request, in order.
-  for (NSUInteger index = 0; index < requested.count && index < responses.count; index++) {
-    // killedProcesses holds one result per delivery across both passes, so a
-    // process that survived SIGTERM appears twice. It is a count of deliveries,
-    // not of processes. "Of its own" is the honest qualifier: when two entries in
-    // one pass cover the same process group, the group is signaled once and that
-    // delivery is reported against whichever of them signaled it, so the other
-    // can report none while its processes were quit all the same.
-    LOGI(@"Timed rule kill fired for %@: %lu signal delivery result(s) of its own, error: %ld",
-         requested[index].identifier, (unsigned long)responses[index].killedProcesses.count,
+  // One response per request, in order, so `entries` indexes them.
+  // killedProcesses counts one record per matched process per pass, not one per
+  // delivery: the members of a group shared with another entry report under
+  // every entry that matched them, and a survivor of SIGTERM appears once per
+  // pass.
+  for (NSUInteger index = 0; index < responses.count; index++) {
+    LOGI(@"Timed rule kill fired for %@: %lu matched process result(s), error: %ld",
+         entries[index].identifier, (unsigned long)responses[index].killedProcesses.count,
          (long)responses[index].error);
   }
 }
 
 /// The warning shortly before a deadline: find something the rule covers that
-/// is running, name it, and hand the warning window to the GUI. Signals
-/// nothing. The caller has already confirmed the rule still governs.
+/// is running, name it, and hand the banner to the GUI. Signals nothing. The
+/// caller has already confirmed the rule still governs.
 - (void)notifyForEntrySerialized:(SNTTimedRuleKillEntry*)entry {
   // Asked first because it is the cheap question: with no GUI to warn, there is
   // no reason to walk every process on the machine looking for a name for it.
@@ -862,22 +819,7 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
     return;
   }
 
-  SNTKillRequest* request = KillRequestForEntry(entry);
-  if (!request) {
-    LOGW(@"Unable to build a kill request for %@; nothing to warn about", entry.identifier);
-    return;
-  }
-
-  std::optional<pid_t> pid;
-  if (self.matchBlock) {
-    NSNumber* matched = self.matchBlock(request);
-    if (matched) {
-      pid = matched.intValue;
-    }
-  } else {
-    pid = santa::KillingMachineAnyMatch(request);
-  }
-
+  std::optional<pid_t> pid = santa::KillingMachineAnyMatch(KillRequestForEntry(entry), _killEnv);
   if (!pid) {
     // Nothing the rule covers is running, so there is nothing to warn about.
     LOGD(@"No running process matches %@; skipping timed rule kill banner", entry.identifier);
@@ -914,7 +856,7 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
 /// Arms the one-shot timer for the earliest event across all entries, which is
 /// the earliest of every deadline and every warning still owed, or stops it
 /// when there are none. The distance to that event is measured on the believable
-/// clock; the countdown itself is Timer.h's, which runs on wall time, so a
+/// clock; the countdown itself is Timer.h's, which schedules on wall time, so a
 /// machine asleep at the deadline runs the kill on wake.
 ///
 /// Every pass re-arms it, including the ones the clock's refresh brings, and that

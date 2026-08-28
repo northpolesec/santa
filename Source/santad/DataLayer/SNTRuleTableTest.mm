@@ -54,11 +54,14 @@
 - (void)setUp {
   [super setUp];
 
-  self.dbq = [[FMDatabaseQueue alloc] init];
-  self.sut = [[SNTRuleTable alloc] initWithDatabaseQueue:self.dbq];
-
+  // Mock the configurator before the rule table is created: -initializeDatabase:fromVersion:
+  // reads the configurator, so a real one there would prime the static rule cache from the
+  // machine's own StaticRules and call -setSyncTypeRequired: on the real singleton.
   self.mockConfigurator = OCMClassMock([SNTConfigurator class]);
   OCMStub([self.mockConfigurator configurator]).andReturn(self.mockConfigurator);
+
+  self.dbq = [[FMDatabaseQueue alloc] init];
+  self.sut = [[SNTRuleTable alloc] initWithDatabaseQueue:self.dbq];
 }
 
 - (void)tearDown {
@@ -499,6 +502,120 @@
   XCTAssertNil(r);
 }
 
+// A lookup with no binary SHA-256 has no key to cache a miss under, so it must not record one --
+// doing so would make the first unhashable file's miss the answer for every later lookup.
+- (void)testExecutionRuleMissCacheIgnoresLookupsWithoutAFileHash {
+  [self.sut addExecutionRules:@[ [self _exampleCDHashRule] ]
+                  ruleCleanup:SNTRuleCleanupNone
+                       errors:nil];
+
+  struct RuleIdentifiers missed = {
+      .cdhash = @"ffffffffffffffffffffffffffffffffffffffff",
+  };
+  XCTAssertNil([self.sut executionRuleForIdentifiers:missed]);
+
+  SNTRule* r = [self.sut
+      executionRuleForIdentifiers:(struct RuleIdentifiers){
+                                      .cdhash = @"dbe8c39801f93e05fc7bc53a02af5b4d3cfc670a",
+                                  }];
+  XCTAssertNotNil(r, @"a miss with no file hash must not be cached");
+  XCTAssertEqual(r.type, SNTRuleTypeCDHash);
+}
+
+// A cached miss must only suppress lookups for the file it was recorded for. Note there is no
+// rule write between the two lookups here -- a write would clear the cache and hide the bug.
+- (void)testExecutionRuleMissCacheIsPerFileHash {
+  [self.sut addExecutionRules:@[ [self _exampleBinaryRule] ]
+                  ruleCleanup:SNTRuleCleanupNone
+                       errors:nil];
+
+  struct RuleIdentifiers missed = {
+      .binarySHA256 = @"b6ee1c3c5a715c049d14a8457faa6b6701b8507efe908300e238e0768bd759c2",
+  };
+  XCTAssertNil([self.sut executionRuleForIdentifiers:missed]);
+
+  struct RuleIdentifiers ruled = {
+      .binarySHA256 = @"b7c1e3fd640c5f211c89b02c2c6122f78ce322aa5c56eb0bb54bc422a8f8b670",
+  };
+  SNTRule* r = [self.sut executionRuleForIdentifiers:ruled];
+  XCTAssertNotNil(r, @"a miss must only suppress lookups for the same file hash");
+  XCTAssertEqual(r.type, SNTRuleTypeBinary);
+}
+
+// The only invalidation the miss cache has is a full clear on the rule write paths. Without it a
+// remembered miss would outlive the rule that resolves it -- which is exactly what happens to a
+// transitive rule SNTCompilerController writes after its own lookup missed.
+- (void)testExecutionRuleMissCacheClearedByRuleAdd {
+  struct RuleIdentifiers ids = {
+      .binarySHA256 = @"b7c1e3fd640c5f211c89b02c2c6122f78ce322aa5c56eb0bb54bc422a8f8b670",
+  };
+
+  XCTAssertNil([self.sut executionRuleForIdentifiers:ids]);
+
+  [self.sut addExecutionRules:@[ [self _exampleBinaryRule] ]
+                  ruleCleanup:SNTRuleCleanupNone
+                       errors:nil];
+
+  SNTRule* r = [self.sut executionRuleForIdentifiers:ids];
+  XCTAssertNotNil(r, @"a rule added after a cached miss must still be found");
+  XCTAssertEqual(r.type, SNTRuleTypeBinary);
+}
+
+// Static rules are checked ahead of the cache, so a remembered miss must never shadow one. Both
+// lookups here carry the same file hash -- the second is answered from the static rules despite
+// the first having recorded a miss under that key, with no rule write in between to clear it.
+- (void)testExecutionRuleMissCacheDoesNotShadowStaticRules {
+  [self.sut updateStaticRules:@[ @{
+              @"identifier" : @"ZZZZZZZZZZ",
+              @"policy" : @"BLOCKLIST",
+              @"rule_type" : @"TEAMID",
+            } ]];
+
+  struct RuleIdentifiers missed = {
+      .binarySHA256 = @"b6ee1c3c5a715c049d14a8457faa6b6701b8507efe908300e238e0768bd759c2",
+  };
+  XCTAssertNil([self.sut executionRuleForIdentifiers:missed]);
+
+  struct RuleIdentifiers ruled = {
+      .binarySHA256 = @"b6ee1c3c5a715c049d14a8457faa6b6701b8507efe908300e238e0768bd759c2",
+      .teamID = @"ZZZZZZZZZZ",
+  };
+  SNTRule* r = [self.sut executionRuleForIdentifiers:ruled];
+  XCTAssertNotNil(r, @"a cached miss must not shadow a static rule");
+  XCTAssertEqual(r.type, SNTRuleTypeTeamID);
+}
+
+// executeQuery: returns nil when the statement itself fails -- a locked or corrupt db, a schema
+// that isn't what was expected. That is not evidence the file has no rule, and the only
+// invalidation the miss cache has is a full clear on the rule write paths, so a cached failure
+// would outlive it. Renaming the table away and back simulates the failure and its recovery with
+// no rule write in between, which would otherwise clear the cache and hide the bug.
+- (void)testExecutionRuleMissCacheIgnoresQueryFailures {
+  [self.sut addExecutionRules:@[ [self _exampleBinaryRule] ]
+                  ruleCleanup:SNTRuleCleanupNone
+                       errors:nil];
+
+  struct RuleIdentifiers ids = {
+      .binarySHA256 = @"b7c1e3fd640c5f211c89b02c2c6122f78ce322aa5c56eb0bb54bc422a8f8b670",
+  };
+
+  [self.dbq inDatabase:^(FMDatabase* db) {
+    XCTAssertTrue(
+        [db executeUpdate:@"ALTER TABLE execution_rules RENAME TO execution_rules_hidden"]);
+  }];
+
+  XCTAssertNil([self.sut executionRuleForIdentifiers:ids]);
+
+  [self.dbq inDatabase:^(FMDatabase* db) {
+    XCTAssertTrue(
+        [db executeUpdate:@"ALTER TABLE execution_rules_hidden RENAME TO execution_rules"]);
+  }];
+
+  SNTRule* r = [self.sut executionRuleForIdentifiers:ids];
+  XCTAssertNotNil(r, @"a failed query must not be cached as a rule miss");
+  XCTAssertEqual(r.type, SNTRuleTypeBinary);
+}
+
 - (void)testFetchRuleOrdering {
   NSArray<NSError*>* err;
   [self.sut addExecutionRules:@[
@@ -511,9 +628,6 @@
                   ruleCleanup:SNTRuleCleanupNone
                        errors:&err];
   XCTAssertNil(err);
-
-  // This test is only concerned about sqlite's behavior. Ensure static rules are ignored.
-  [self.sut updateStaticRules:nil];
 
   // This test verifies that rule precedence ordering is correct.
   // The query uses UNION ALL with ORDER BY type ASC to guarantee the highest-priority
@@ -620,9 +734,6 @@
                        errors:&err];
   XCTAssertNil(err);
 
-  // Only sqlite's behavior is under test here. Ensure static rules are ignored.
-  [self.sut updateStaticRules:nil];
-
   NSString* transitiveID = [self _exampleTransitiveRule].identifier;
 
   // Each case pairs the transitive Binary rule with exactly one configured rule. The configured
@@ -712,7 +823,6 @@
                   ruleCleanup:SNTRuleCleanupNone
                        errors:&err];
   XCTAssertNil(err);
-  [self.sut updateStaticRules:nil];
 
   SNTRule* r = [self.sut
       executionRuleForIdentifiers:(struct RuleIdentifiers){
@@ -748,7 +858,6 @@
                   ruleCleanup:SNTRuleCleanupNone
                        errors:&err];
   XCTAssertNil(err);
-  [self.sut updateStaticRules:nil];
 
   NSString* transitiveID = [self _exampleTransitiveRule].identifier;
 
@@ -807,7 +916,6 @@
                   ruleCleanup:SNTRuleCleanupNone
                        errors:&err];
   XCTAssertNil(err);
-  [self.sut updateStaticRules:nil];
 
   SNTRule* r = [self.sut
       executionRuleForIdentifiers:
@@ -862,7 +970,6 @@
                   ruleCleanup:SNTRuleCleanupNone
                        errors:&err];
   XCTAssertNil(err);
-  [self.sut updateStaticRules:nil];
 
   SNTRule* r = [self.sut executionRuleForIdentifiers:(struct RuleIdentifiers){
                                                          .signingID = @"ABCDEFGHIJ:signingID",

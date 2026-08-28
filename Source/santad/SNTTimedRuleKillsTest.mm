@@ -15,13 +15,16 @@
 #import "Source/santad/SNTTimedRuleKills.h"
 
 #import <Foundation/Foundation.h>
+#import <Kernel/kern/cs_blobs.h>
 #import <OCMock/OCMock.h>
 #import <XCTest/XCTest.h>
 #import <arpa/inet.h>
 #include <mach/mach_time.h>
 #include <signal.h>
+#include <unistd.h>
 
 #include <cmath>
+#include <cstdint>
 #include <cstring>
 #include <map>
 #include <optional>
@@ -33,7 +36,6 @@
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
-#import "Source/common/SNTKillCommand.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTSystemInfo.h"
 #import "Source/common/SNTXPCNotifierInterface.h"
@@ -77,16 +79,11 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
                      bootSessionUUID:(NSString* (^)(void))bootSessionUUID;
 @end
 
-// The seams SNTTimedRuleKills keeps private: the kill pass and the process
-// snapshot behind a warning, neither of which has a safe form to exercise
-// against real processes, the interval the countdown timer was last armed for,
-// which is how a test sees a rolled-back clock being corrected, and the serial
-// queue the component does all of its work on, which a test drains to observe
-// the result of a record.
+// The seams SNTTimedRuleKills keeps private: the interval the countdown timer
+// was last armed for, which is how a test sees a rolled-back clock being
+// corrected, and the serial queue the component does all of its work on, which
+// a test drains to observe the result of a record.
 @interface SNTTimedRuleKills (Testing)
-@property(copy) NSArray<SNTKillResponse*>* (^killBlock)
-    (NSArray<SNTKillRequest*>* requests, NSTimeInterval grace);
-@property(copy) NSNumber* (^matchBlock)(SNTKillRequest* request);
 @property uint32_t armedTimerSeconds;
 @property(readonly) dispatch_queue_t queue;
 @end
@@ -115,14 +112,74 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
 
 namespace {
 
-// The fake kill env, its team IDs and the fake host clock are shared with
-// KillingMachineTest and TimedRuleKillsScenarioTest; this suite fakes every seam
-// the same way, so it takes them as they come.
-using FakeEnv = santa::testing::FakeKillEnv;
+// The fake kill env and its team ID are shared with KillingMachineTest. What
+// this suite adds is the rest of the code signing lookups: its rules match on a
+// signing ID, a CDHash and the platform bit as well as a team ID.
 using santa::testing::kMatchingTeamID;
-using santa::testing::kSecondTeamID;
-using santa::testing::MakeKillEnv;
 using santa::testing::SignalDescriptions;
+
+// The rest of the code signing identity the fake csops reports for every matched
+// pid. Each rule below is written against one of these criteria.
+static NSString* const kMatchingSigningID = @"com.apple.ls";
+// The hex form of kMatchingCDHashBytes, which is what a CDHASH rule holds.
+static NSString* const kMatchingCDHash = @"deadbeefcafebabe0123456789abcdeffedcba98";
+static const uint8_t kMatchingCDHashBytes[CS_CDHASH_LEN] = {
+    0xde, 0xad, 0xbe, 0xef, 0xca, 0xfe, 0xba, 0xbe, 0x01, 0x23,
+    0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0xfe, 0xdc, 0xba, 0x98};
+
+struct FakeEnv : santa::testing::FakeKillEnv {
+  // Puts one process in the fake world that every rule below matches, in a
+  // process group of its own.
+  void AddMatching(pid_t pid, pid_t pgid) {
+    pids->push_back(pid);
+    pidversions[pid] = 1;
+    matching.insert(pid);
+    pgids[pid] = pgid;
+  }
+};
+
+// Writes `value` into the blob-wrapped form csops returns for the string ops.
+int WriteCSOpsBlob(NSString* value, void* useraddr, size_t usersize) {
+  if (usersize < sizeof(santa::csops_blob) + 1 + value.length) {
+    return -1;
+  }
+  santa::csops_blob* blob = (santa::csops_blob*)useraddr;
+  blob->type = 0;
+  blob->len = htonl(sizeof(santa::csops_blob) + 1 + value.length);
+  std::memcpy(blob->data, value.UTF8String, value.length);
+  return 0;
+}
+
+santa::KillEnv MakeEnv(FakeEnv* fake) {
+  santa::KillEnv env = santa::testing::MakeKillEnv(fake);
+
+  // The one seam the shared fake does not cover: it answers a team ID and
+  // nothing else, and these rules are matched on four criteria.
+  env.csops_func = [fake](pid_t pid, unsigned int ops, void* useraddr, size_t usersize) {
+    if (!fake->matching.count(pid)) {
+      return -1;
+    }
+    switch (ops) {
+      case santa::kCsopTeamID: return WriteCSOpsBlob(kMatchingTeamID, useraddr, usersize);
+      case santa::kCsopIdentity: return WriteCSOpsBlob(kMatchingSigningID, useraddr, usersize);
+      case santa::kCsopCDHash:
+        if (usersize != sizeof(kMatchingCDHashBytes)) {
+          return -1;
+        }
+        std::memcpy(useraddr, kMatchingCDHashBytes, sizeof(kMatchingCDHashBytes));
+        return 0;
+      case santa::kCsopStatus:
+        if (usersize != sizeof(uint32_t)) {
+          return -1;
+        }
+        *(uint32_t*)useraddr = CS_PLATFORM_BINARY;
+        return 0;
+      default: return -1;
+    }
+  };
+
+  return env;
+}
 
 // Seconds of mach continuous time between two readings, which is how a test
 // checks where a persisted mach deadline points without knowing the machine's
@@ -139,36 +196,28 @@ NSTimeInterval MachSecondsBetween(uint64_t earlier, uint64_t later) {
 static NSString* const kCELExpr = @"euid == 0 ? REQUIRE_TOUCHID : ALLOWLIST";
 static NSString* const kEditedCELExpr = @"euid == 1 ? REQUIRE_TOUCHID : ALLOWLIST";
 
-static NSString* const kTimedRuleKillsStateKey = @"TimedRuleKills";
-static NSString* const kTMMStateKey = @"TMM";
-static NSString* const kTAMStateKey = @"TempAdmin";
-
 // Every day of the week, which is what makes a recurring HH:MM window in these
 // tests land the same way whichever day they run on.
 static NSArray<NSNumber*>* const kEveryDay = @[ @0, @1, @2, @3, @4, @5, @6 ];
 
-// A refresh cadence a test can wait for, for the cases that are about the
-// refresh due-check, and one no test will sit through, for the cases whose point
-// is that something other than a refresh did the work.
+static NSString* const kTimedRuleKillsStateKey = @"TimedRuleKills";
+static NSString* const kTMMStateKey = @"TMM";
+
+// Fast enough that a case waiting on a refresh finishes, and long enough that a
+// case which must not see one never does.
 static const NSTimeInterval kFastRefreshInterval = 0.1;
 static const NSTimeInterval kUntickableRefreshInterval = 3600;
 
 // A boot session that is not this machine's, for an entry left by an earlier one.
 static NSString* const kOtherBootSessionUUID = @"6A2B4C8E-0000-0000-0000-00000000000B";
 
-// The component's due tolerance, mirrored here so the case that stands inside it
-// can say where it stood. Not a seam: if the two ever disagree, the boundary case
-// below fails its own precondition and says so.
-static const NSTimeInterval kDueTolerance = 0.25;
-
 @interface SNTTimedRuleKillsTest : XCTestCase
 @property NSFileManager* fileMgr;
 @property NSString* testDir;
 @property NSString* statePath;
 @property CountingConfigurator* configurator;
-/// The clock the last makeSUTOnHost: built, so a case can ask the component's own
-/// believable time -- which is how the one case standing in a fraction of a
-/// second proves it really stood there.
+/// The clock the last -makeSUTOnHost:refreshInterval: built, so a case can ask
+/// the component's own believable time.
 @property SNTBelievableClock* believableClock;
 @property SNTRuleTable* ruleTable;
 @property FMDatabaseQueue* dbq;
@@ -176,12 +225,23 @@ static const NSTimeInterval kDueTolerance = 0.25;
 @property id mockNotifierQueue;
 @property id mockNotifierConnection;
 @property id mockNotifierProxy;
+/// The process group the one process in the fake world is in.
+@property pid_t matchingPgid;
 @end
 
-@implementation SNTTimedRuleKillsTest
+@implementation SNTTimedRuleKillsTest {
+  /// The faked syscalls the component's santa::KillEnv runs against, so the
+  /// production match and kill code runs against a world the test describes.
+  FakeEnv _fake;
+}
 
 - (void)setUp {
   [super setUp];
+
+  // A real pid that isn't ours, because the banner names it with real
+  // syscalls; the pgid is arbitrary, since every signal is faked.
+  self.matchingPgid = getpgrp() + 1;
+  _fake.AddMatching(getppid(), self.matchingPgid);
 
   self.fileMgr = [NSFileManager defaultManager];
   self.testDir = [NSString stringWithFormat:@"%@santa-timed-rule-kills-%d-%@",
@@ -240,7 +300,8 @@ static const NSTimeInterval kDueTolerance = 0.25;
   SNTTimedRuleKills* sut = [[SNTTimedRuleKills alloc] initWithNotifierQueue:self.mockNotifierQueue
                                                                   ruleTable:self.ruleTable
                                                                configurator:self.configurator
-                                                                      clock:clock];
+                                                                      clock:clock
+                                                                    killEnv:MakeEnv(&_fake)];
   XCTAssertNotNil(sut);
   return sut;
 }
@@ -276,9 +337,19 @@ static const NSTimeInterval kDueTolerance = 0.25;
   SNTTimedRuleKills* sut = [[SNTTimedRuleKills alloc] initWithNotifierQueue:self.mockNotifierQueue
                                                                   ruleTable:self.ruleTable
                                                                configurator:self.configurator
-                                                                      clock:clock];
+                                                                      clock:clock
+                                                                    killEnv:MakeEnv(&_fake)];
   XCTAssertNotNil(sut);
   return sut;
+}
+
+/// The two deliveries a kill makes to the matching process's group: SIGTERM,
+/// then SIGKILL to whatever survived the grace period.
+- (NSArray<NSString*>*)termThenKillOfTheProcessGroup {
+  return @[
+    [NSString stringWithFormat:@"group:%d:%d", self.matchingPgid, SIGTERM],
+    [NSString stringWithFormat:@"group:%d:%d", self.matchingPgid, SIGKILL],
+  ];
 }
 
 /// Wires up a notifier queue whose remote proxy is a protocol mock, the same
@@ -331,55 +402,23 @@ static const NSTimeInterval kDueTolerance = 0.25;
   return nil;
 }
 
-/// Sets a kill block that records the requests it is handed and fulfills
-/// `expectation` for each one, without signaling anything.
-- (void)captureKillsOn:(SNTTimedRuleKills*)sut
-                  into:(NSMutableArray<SNTKillRequest*>*)requests
-           expectation:(XCTestExpectation*)expectation {
-  sut.killBlock =
-      ^NSArray<SNTKillResponse*>*(NSArray<SNTKillRequest*>* pass, NSTimeInterval grace) {
-    @synchronized(requests) {
-      [requests addObjectsFromArray:pass];
-    }
-    // One response per request, none of them having signaled anything, so the
-    // grace period and the SIGKILL pass are never reached: a test that wants
-    // those routes into the real kill pass instead.
-    NSMutableArray<SNTKillResponse*>* responses = [NSMutableArray array];
-    for (NSUInteger index = 0; index < pass.count; index++) {
-      [responses addObject:[[SNTKillResponse alloc] initWithKilledProcesses:@[]]];
-      [expectation fulfill];
-    }
-    return responses;
-  };
+/// A fixed offset zone ([+-]HH:MM) that reads `instant` as `hour`:00 local, to
+/// the whole minute. An entry's window is HH:MM in the zone the entry stored, and
+/// nothing a test runs can move this host's clock, so the zone is the part these
+/// cases choose: an offset picked from the real instant is how one stands inside
+/// or outside a fixed 09:00 to 17:00 window on any host at any time of day.
+- (NSString*)zoneReading:(NSDate*)instant asHour:(NSInteger)hour {
+  NSInteger minutesIntoDayUTC = (NSInteger)floor(instant.timeIntervalSince1970 / 60) % (24 * 60);
+  NSInteger offset = hour * 60 - minutesIntoDayUTC;
+  // Whole hours into a 24 hour day, so every offset this can produce is inside
+  // the [+-]HH:MM range the zone resolver takes.
+  XCTAssertLessThan(ABS(offset), 24 * 60);
+  return [NSString stringWithFormat:@"%@%02ld:%02ld", offset < 0 ? @"-" : @"+",
+                                    (long)(ABS(offset) / 60), (long)(ABS(offset) % 60)];
 }
 
-/// Records every banner the component sends, in order, as
-/// @{@"app": ..., @"deadline": ...}, fulfilling `expectation` for each one.
-/// Pass a nil expectation when the test's point is that no banner arrives.
-- (void)recordBannersOn:(id)proxy
-                   into:(NSMutableArray<NSDictionary*>*)banners
-            expectation:(XCTestExpectation*)expectation {
-  OCMStub([proxy postTimedRuleKillNotificationForApplication:OCMOCK_ANY deadline:OCMOCK_ANY])
-      .andDo(^(NSInvocation* invocation) {
-        __unsafe_unretained NSString* app;
-        __unsafe_unretained NSDate* deadline;
-        [invocation getArgument:&app atIndex:2];
-        [invocation getArgument:&deadline atIndex:3];
-        // Built key by key rather than as a literal: andDo() is a macro, and a
-        // comma inside a braced literal would be read as another argument to it.
-        NSMutableDictionary* banner = [NSMutableDictionary dictionary];
-        banner[@"app"] = app;
-        banner[@"deadline"] = deadline;
-        @synchronized(banners) {
-          [banners addObject:banner];
-        }
-        [expectation fulfill];
-      });
-}
-
-/// An instant today at a local wall time. The recurring window an entry carries
-/// is HH:MM in the host's local zone, so a test that wants to stand inside or
-/// outside one places the clock it hands the component with this.
+/// Today at a wall-clock hour and minute in the host's own zone, which is what a
+/// case standing a fake host inside a "local" window needs.
 - (NSDate*)todayAtHour:(NSInteger)hour minute:(NSInteger)minute {
   NSCalendar* calendar = [NSCalendar currentCalendar];
   NSDateComponents* parts =
@@ -393,37 +432,39 @@ static const NSTimeInterval kDueTolerance = 0.25;
   return date;
 }
 
-/// The recording most tests here need: a TEAMID entry for kMatchingTeamID under
-/// kCELExpr, warned about at the deadline itself, with no window shape. Tests
-/// whose subject is one of those fields spell it out with the longer form below.
-- (void)record:(SNTTimedRuleKills*)sut deadline:(NSDate*)deadline {
-  [self record:sut
-            type:SNTRuleTypeTeamID
-      identifier:kMatchingTeamID
-         celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
-        deadline:deadline
-        notifyAt:deadline];
+/// The start of the minute `instant` falls in, which is the instant a zone from
+/// -zoneReading:asHour: reads as exactly that hour, and so what the end of an
+/// occurrence is measured from.
+- (NSDate*)minuteFloor:(NSDate*)instant {
+  return [NSDate dateWithTimeIntervalSince1970:floor(instant.timeIntervalSince1970 / 60) * 60];
 }
 
-/// The same with the four fields tests vary spelled out, and the window shape
-/// still absent. The three tests that record a shape call the component directly
-/// with all nine arguments, so a recording that carries a window always reads
-/// differently from one that does not.
-- (void)record:(SNTTimedRuleKills*)sut
-          type:(SNTRuleType)type
-    identifier:(NSString*)identifier
-       celHash:(NSString*)celHash
-      deadline:(NSDate*)deadline
-      notifyAt:(NSDate*)notifyAt {
-  [sut recordKillForRuleType:type
-                  identifier:identifier
-                     celHash:celHash
-                    deadline:deadline
-                    notifyAt:notifyAt
-                  windowDays:nil
-                 windowStart:nil
-                   windowEnd:nil
-                  windowZone:nil];
+/// Records every banner the component sends, in order, as
+/// @{@"app": ..., @"deadline": ..., @"signals": ...}, fulfilling `expectation`
+/// for each one. `signals` is how many deliveries the kill pass had already made
+/// when the banner went out, which is what an ordering test reads. Pass a nil
+/// expectation when the test's point is that no banner arrives.
+- (void)recordBannersOn:(id)proxy
+                   into:(NSMutableArray<NSDictionary*>*)banners
+            expectation:(XCTestExpectation*)expectation {
+  FakeEnv* fake = &_fake;
+  OCMStub([proxy postTimedRuleKillNotificationForApplication:OCMOCK_ANY deadline:OCMOCK_ANY])
+      .andDo(^(NSInvocation* invocation) {
+        __unsafe_unretained NSString* app;
+        __unsafe_unretained NSDate* deadline;
+        [invocation getArgument:&app atIndex:2];
+        [invocation getArgument:&deadline atIndex:3];
+        // Built key by key rather than as a literal: andDo() is a macro, and a
+        // comma inside a braced literal would be read as another argument to it.
+        NSMutableDictionary* banner = [NSMutableDictionary dictionary];
+        banner[@"app"] = app;
+        banner[@"deadline"] = deadline;
+        banner[@"signals"] = @(fake->signals.size());
+        @synchronized(banners) {
+          [banners addObject:banner];
+        }
+        [expectation fulfill];
+      });
 }
 
 - (NSDictionary*)entryDictForRuleType:(SNTRuleType)type
@@ -458,12 +499,15 @@ static const NSTimeInterval kDueTolerance = 0.25;
   NSDate* near = [NSDate dateWithTimeIntervalSinceNow:1800];
   NSDate* farther = [NSDate dateWithTimeIntervalSinceNow:7200];
 
-  [self record:sut
-            type:SNTRuleTypeTeamID
-      identifier:kMatchingTeamID
-         celHash:hash
-        deadline:far
-        notifyAt:[far dateByAddingTimeInterval:-60]];
+  [sut recordKillForRuleType:SNTRuleTypeTeamID
+                  identifier:kMatchingTeamID
+                     celHash:hash
+                    deadline:far
+                    notifyAt:[far dateByAddingTimeInterval:-60]
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
   [self drain:sut];
   XCTAssertEqual(self.savedEntries.count, 1u);
   XCTAssertEqualWithAccuracy([self.savedEntries.firstObject[@"Deadline"] doubleValue],
@@ -471,12 +515,15 @@ static const NSTimeInterval kDueTolerance = 0.25;
   XCTAssertEqual(self.configurator.timedRuleKillWrites, 1u);
 
   // Earlier deadline replaces it.
-  [self record:sut
-            type:SNTRuleTypeTeamID
-      identifier:kMatchingTeamID
-         celHash:hash
-        deadline:near
-        notifyAt:[near dateByAddingTimeInterval:-60]];
+  [sut recordKillForRuleType:SNTRuleTypeTeamID
+                  identifier:kMatchingTeamID
+                     celHash:hash
+                    deadline:near
+                    notifyAt:[near dateByAddingTimeInterval:-60]
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
   [self drain:sut];
   XCTAssertEqual(self.savedEntries.count, 1u);
   XCTAssertEqualWithAccuracy([self.savedEntries.firstObject[@"Deadline"] doubleValue],
@@ -484,103 +531,120 @@ static const NSTimeInterval kDueTolerance = 0.25;
   XCTAssertEqual(self.configurator.timedRuleKillWrites, 2u);
 
   // A later deadline for the same key changes nothing, and writes nothing.
-  [self record:sut
-            type:SNTRuleTypeTeamID
-      identifier:kMatchingTeamID
-         celHash:hash
-        deadline:farther
-        notifyAt:[farther dateByAddingTimeInterval:-60]];
+  [sut recordKillForRuleType:SNTRuleTypeTeamID
+                  identifier:kMatchingTeamID
+                     celHash:hash
+                    deadline:farther
+                    notifyAt:[farther dateByAddingTimeInterval:-60]
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
   [self drain:sut];
-  XCTAssertEqual(self.savedEntries.count, 1u);
+  XCTAssertEqual(self.savedEntries.count, 1u, @"a later deadline");
   XCTAssertEqualWithAccuracy([self.savedEntries.firstObject[@"Deadline"] doubleValue],
                              near.timeIntervalSince1970, 0.001);
-  XCTAssertEqual(self.configurator.timedRuleKillWrites, 2u);
-}
+  XCTAssertEqual(self.configurator.timedRuleKillWrites, 2u, @"a later deadline");
 
-- (void)testRepeatedIdenticalRecordingWritesNothing {
-  SNTTimedRuleKills* sut = [self makeSUT];
-  NSString* hash = [SNTTimedRuleKills celHashForExpression:kCELExpr];
-  NSDate* deadline = [NSDate dateWithTimeIntervalSinceNow:3600];
-
+  // Re-recording the deadline that already governs is the common case of a
+  // binary executing repeatedly inside its window: nothing changes, so nothing
+  // is written.
   for (int i = 0; i < 5; i++) {
-    [self record:sut
-              type:SNTRuleTypeTeamID
-        identifier:kMatchingTeamID
-           celHash:hash
-          deadline:deadline
-          notifyAt:[deadline dateByAddingTimeInterval:-60]];
+    [sut recordKillForRuleType:SNTRuleTypeTeamID
+                    identifier:kMatchingTeamID
+                       celHash:hash
+                      deadline:near
+                      notifyAt:[near dateByAddingTimeInterval:-60]
+                    windowDays:nil
+                   windowStart:nil
+                     windowEnd:nil
+                    windowZone:nil];
   }
   [self drain:sut];
+  XCTAssertEqual(self.savedEntries.count, 1u, @"the same deadline again");
+  XCTAssertEqual(self.configurator.timedRuleKillWrites, 2u, @"the same deadline again");
 
-  XCTAssertEqual(self.savedEntries.count, 1u);
-  XCTAssertEqual(self.configurator.timedRuleKillWrites, 1u);
-}
-
-- (void)testDifferentCELHashIsADifferentEntry {
-  SNTTimedRuleKills* sut = [self makeSUT];
-  NSDate* deadline = [NSDate dateWithTimeIntervalSinceNow:3600];
-
-  [self record:sut deadline:deadline];
-  [self record:sut
-            type:SNTRuleTypeTeamID
-      identifier:kMatchingTeamID
-         celHash:[SNTTimedRuleKills celHashForExpression:kEditedCELExpr]
-        deadline:deadline
-        notifyAt:deadline];
+  // A different CEL hash is a different key, so it is a second entry rather
+  // than an arbitration against the first.
+  [sut recordKillForRuleType:SNTRuleTypeTeamID
+                  identifier:kMatchingTeamID
+                     celHash:[SNTTimedRuleKills celHashForExpression:kEditedCELExpr]
+                    deadline:farther
+                    notifyAt:[farther dateByAddingTimeInterval:-60]
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
   [self drain:sut];
-
-  XCTAssertEqual(self.savedEntries.count, 2u);
+  XCTAssertEqual(self.savedEntries.count, 2u, @"a different CEL hash");
+  XCTAssertEqual(self.configurator.timedRuleKillWrites, 3u, @"a different CEL hash");
 }
 
-- (void)testBinaryAndCertificateRuleTypesAreRefused {
-  SNTTimedRuleKills* sut = [self makeSUT];
-  NSString* hash = [SNTTimedRuleKills celHashForExpression:kCELExpr];
-  NSDate* deadline = [NSDate dateWithTimeIntervalSinceNow:3600];
-
-  [self record:sut
-            type:SNTRuleTypeBinary
-      identifier:@"b7c1e3fd640c5f211c89b02c2c6122f78ce322aa5c56eb0bb54bc422a8f8b670"
-         celHash:hash
-        deadline:deadline
-        notifyAt:deadline];
-  [self record:sut
-            type:SNTRuleTypeCertificate
-      identifier:@"7ae80b9ab38af0c63a9a81765f434d9a7cd8f720eb6037ef303de39d779bc258"
-         celHash:hash
-        deadline:deadline
-        notifyAt:deadline];
-  [self drain:sut];
-
-  XCTAssertNil(self.savedEntries);
-  XCTAssertEqual(self.configurator.timedRuleKillWrites, 0u);
-}
-
-- (void)testIncompleteRecordingsAreRefused {
+// Both guards on the recording path: rule types no kill request can be built
+// for, and each field the completeness check requires.
+- (void)testUnsupportedAndIncompleteRecordingsAreRefused {
   SNTTimedRuleKills* sut = [self makeSUT];
   NSString* hash = [SNTTimedRuleKills celHashForExpression:kCELExpr];
   NSDate* deadline = [NSDate dateWithTimeIntervalSinceNow:3600];
 
-  [self record:sut
-            type:SNTRuleTypeTeamID
-      identifier:@""
-         celHash:hash
-        deadline:deadline
-        notifyAt:deadline];
-  [self record:sut
-            type:SNTRuleTypeTeamID
-      identifier:kMatchingTeamID
-         celHash:nil
-        deadline:deadline
-        notifyAt:deadline];
-  [self record:sut
-            type:SNTRuleTypeTeamID
-      identifier:kMatchingTeamID
-         celHash:hash
-        deadline:nil
-        notifyAt:deadline];
+  [sut recordKillForRuleType:SNTRuleTypeBinary
+                  identifier:@"b7c1e3fd640c5f211c89b02c2c6122f78ce322aa5c56eb0bb54bc422a8f8b670"
+                     celHash:hash
+                    deadline:deadline
+                    notifyAt:deadline
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
+  [sut recordKillForRuleType:SNTRuleTypeCertificate
+                  identifier:@"7ae80b9ab38af0c63a9a81765f434d9a7cd8f720eb6037ef303de39d779bc258"
+                     celHash:hash
+                    deadline:deadline
+                    notifyAt:deadline
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
+  [sut recordKillForRuleType:SNTRuleTypeTeamID
+                  identifier:@""
+                     celHash:hash
+                    deadline:deadline
+                    notifyAt:deadline
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
+  [sut recordKillForRuleType:SNTRuleTypeTeamID
+                  identifier:kMatchingTeamID
+                     celHash:nil
+                    deadline:deadline
+                    notifyAt:deadline
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
+  [sut recordKillForRuleType:SNTRuleTypeTeamID
+                  identifier:kMatchingTeamID
+                     celHash:hash
+                    deadline:nil
+                    notifyAt:deadline
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
+  [sut recordKillForRuleType:SNTRuleTypeTeamID
+                  identifier:kMatchingTeamID
+                     celHash:hash
+                    deadline:deadline
+                    notifyAt:nil
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
   [self drain:sut];
 
-  XCTAssertNil(self.savedEntries);
+  XCTAssertNil(self.savedEntries, @"one of: BINARY, CERTIFICATE, empty identifier, nil celHash, "
+                                  @"nil deadline, nil notifyAt");
   XCTAssertEqual(self.configurator.timedRuleKillWrites, 0u);
 }
 
@@ -588,44 +652,34 @@ static const NSTimeInterval kDueTolerance = 0.25;
 
 - (void)testEntryWritesPreserveOtherStateKeys {
   [self.configurator persistTimedSessionState:@{@"Deadline" : @123} forKey:kTMMStateKey];
-  [self.configurator persistTimedSessionState:@{@"Deadline" : @456} forKey:kTAMStateKey];
-  XCTAssertTrue([self.configurator persistDemotedAdmins:@[ @{@"Username" : @"jane"} ]]);
 
   SNTTimedRuleKills* sut = [self makeSUT];
-  [self record:sut
-            type:SNTRuleTypeTeamID
-      identifier:kMatchingTeamID
-         celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
-        deadline:[NSDate dateWithTimeIntervalSinceNow:3600]
-        notifyAt:[NSDate dateWithTimeIntervalSinceNow:3540]];
+  [sut recordKillForRuleType:SNTRuleTypeTeamID
+                  identifier:kMatchingTeamID
+                     celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
+                    deadline:[NSDate dateWithTimeIntervalSinceNow:3600]
+                    notifyAt:[NSDate dateWithTimeIntervalSinceNow:3540]
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
   [self drain:sut];
 
   NSDictionary* onDisk = [self rawStateFile];
   XCTAssertEqualObjects(onDisk[kTMMStateKey], (@{@"Deadline" : @123}));
-  XCTAssertEqualObjects(onDisk[kTAMStateKey], (@{@"Deadline" : @456}));
-  XCTAssertEqualObjects(onDisk[@"DemotedAdmins"], (@[ @{@"Username" : @"jane"} ]));
-  XCTAssertNotNil(onDisk[@"LastBootUUID"]);
   XCTAssertEqual([onDisk[kTimedRuleKillsStateKey] count], 1u);
 }
 
-- (void)testEntriesSurviveReloadAndUnknownKeysStillDoNot {
+- (void)testEntriesSurviveReloadButAWrongTypedValueDoesNot {
   NSDictionary* entry = [self entryDictForRuleType:SNTRuleTypeTeamID
                                         identifier:kMatchingTeamID
                                            celHash:@"abc"
                                           deadline:[NSDate dateWithTimeIntervalSinceNow:3600]];
-  NSDictionary* onDisk = @{
-    kTimedRuleKillsStateKey : @[ entry ],
-    kTMMStateKey : @{@"Deadline" : @1},
-    @"Bogus" : @"unknown",
-  };
-  XCTAssertTrue([onDisk writeToFile:self.statePath atomically:YES]);
+  XCTAssertTrue([@{kTimedRuleKillsStateKey : @[ entry ]} writeToFile:self.statePath
+                                                          atomically:YES]);
+  XCTAssertEqual([[self makeConfigurator] savedTimedRuleKills].count, 1u);
 
-  CountingConfigurator* reloaded = [self makeConfigurator];
-  XCTAssertEqual([reloaded savedTimedRuleKills].count, 1u);
-  XCTAssertNotNil([reloaded savedTimedSessionStateForKey:kTMMStateKey]);
-  XCTAssertNil([reloaded savedTimedSessionStateForKey:@"Bogus"]);
-
-  // A value of the wrong type under the key is stripped by the allowlist too.
+  // A value of the wrong type under the key is stripped by the allowlist.
   NSDictionary* wrongType = @{kTimedRuleKillsStateKey : @"not-an-array"};
   XCTAssertTrue([wrongType writeToFile:self.statePath atomically:YES]);
   XCTAssertNil([[self makeConfigurator] savedTimedRuleKills]);
@@ -636,7 +690,6 @@ static const NSTimeInterval kDueTolerance = 0.25;
 // a deadline came from. The kills recorded from a timestamp or duration window
 // carry no shape, so their entries have no window fields at all.
 - (void)testWindowShapePersistsAndSurvivesAReload {
-  NSString* cdhash = @"deadbeefcafebabe0123456789abcdeffedcba98";
   NSString* hash = [SNTTimedRuleKills celHashForExpression:kCELExpr];
   NSDate* deadline = [NSDate dateWithTimeIntervalSinceNow:3600];
   NSDate* notifyAt = [deadline dateByAddingTimeInterval:-300];
@@ -668,12 +721,15 @@ static const NSTimeInterval kDueTolerance = 0.25;
 
   // Recording an unrelated entry rewrites the whole set, so what lands on disk
   // for the first entry is what the reload deserialized.
-  [self record:restarted
-            type:SNTRuleTypeCDHash
-      identifier:cdhash
-         celHash:hash
-        deadline:deadline
-        notifyAt:notifyAt];
+  [restarted recordKillForRuleType:SNTRuleTypeCDHash
+                        identifier:kMatchingCDHash
+                           celHash:hash
+                          deadline:deadline
+                          notifyAt:notifyAt
+                        windowDays:nil
+                       windowStart:nil
+                         windowEnd:nil
+                        windowZone:nil];
   [self drain:restarted];
 
   NSDictionary* reloaded = [self savedEntryForIdentifier:kMatchingTeamID];
@@ -682,7 +738,7 @@ static const NSTimeInterval kDueTolerance = 0.25;
   XCTAssertEqualObjects(reloaded[@"WindowEnd"], @"17:00");
   XCTAssertEqualObjects(reloaded[@"WindowZone"], @"local");
 
-  NSDictionary* shapeless = [self savedEntryForIdentifier:cdhash];
+  NSDictionary* shapeless = [self savedEntryForIdentifier:kMatchingCDHash];
   XCTAssertNotNil(shapeless);
   XCTAssertNil(shapeless[@"WindowDays"]);
   XCTAssertNil(shapeless[@"WindowStart"]);
@@ -761,7 +817,15 @@ static const NSTimeInterval kDueTolerance = 0.25;
   [self drain:sut];
 
   // As above, an unrelated recording rewrites what the reload deserialized.
-  [self record:sut deadline:deadline];
+  [sut recordKillForRuleType:SNTRuleTypeTeamID
+                  identifier:kMatchingTeamID
+                     celHash:hash
+                    deadline:deadline
+                    notifyAt:deadline
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
   [self drain:sut];
 
   XCTAssertEqual(self.savedEntries.count, shapes.count + 1);
@@ -775,222 +839,119 @@ static const NSTimeInterval kDueTolerance = 0.25;
   }
 }
 
-- (void)testEntryIsRemovedAndPersistedAfterFiring {
-  [self addRuleOfType:SNTRuleTypeTeamID identifier:kMatchingTeamID cel:kCELExpr];
-
-  SNTTimedRuleKills* sut = [self makeSUT];
-  XCTestExpectation* killed = [self expectationWithDescription:@"kill ran"];
-  NSMutableArray<SNTKillRequest*>* requests = [NSMutableArray array];
-  [self captureKillsOn:sut into:requests expectation:killed];
-
-  NSDate* deadline = [NSDate dateWithTimeIntervalSinceNow:0.5];
-  [self record:sut deadline:deadline];
-
-  [self waitForExpectations:@[ killed ] timeout:10];
-  [self drain:sut];
-
-  XCTAssertEqual(requests.count, 1u);
-  XCTAssertNil(self.savedEntries);
-  XCTAssertNil([self rawStateFile][kTimedRuleKillsStateKey]);
-}
-
 #pragma mark The kill
 
-/// The request a deadline builds, one row per rule type that can be matched
-/// against a running process: the class it becomes and the identifying fields it
-/// carries, read back by name. targetProcessGroups is asserted on every row
-/// because KillRequestForEntry sets it for every type.
-- (void)testKillRequestShapePerRuleType {
-  NSString* cdhash = @"deadbeefcafebabe0123456789abcdeffedcba98";
-  struct Row {
-    SNTRuleType type;
-    NSString* identifier;
-    Class expected;
-    // Property name to expected value on the request the entry became.
-    NSDictionary<NSString*, NSString*>* fields;
-  };
+// Every rule type builds a different kill request, and each must quit the
+// process group of what it matches: SIGTERM, five seconds, then SIGKILL to
+// whatever is still there. The rows are not interchangeable: the `platform:`
+// SIGNINGID one is the only end-to-end cover of the flags-plus-signingID split,
+// since the whole identifier is not an identity anything reports.
+- (void)testEachRuleTypeTermsThenKillsTheProcessGroup {
+  NSArray<NSArray*>* rows = @[
+    @[ @(SNTRuleTypeTeamID), kMatchingTeamID ],
+    @[ @(SNTRuleTypeSigningID), [NSString stringWithFormat:@"platform:%@", kMatchingSigningID] ],
+    @[ @(SNTRuleTypeCDHash), kMatchingCDHash ],
+  ];
 
-  std::vector<Row> rows = {
-      {SNTRuleTypeTeamID, kMatchingTeamID, [SNTKillRequestTeamID class],
-       @{@"teamID" : kMatchingTeamID}},
-      // The one type whose identifier is split rather than passed through: the
-      // "platform:" prefix becomes the team ID and the rest the signing ID, so
-      // this row is the only one with two fields to check.
-      {SNTRuleTypeSigningID, @"platform:com.apple.ls", [SNTKillRequestSigningID class],
-       @{@"teamID" : @"platform", @"signingID" : @"com.apple.ls"}},
-      {SNTRuleTypeCDHash, cdhash, [SNTKillRequestCDHash class], @{@"cdhash" : cdhash}},
-  };
-
-  // The rows share the fixture: each adds a rule of its own type and identifier,
-  // and an entry is dropped once its deadline has fired, so nothing a row leaves
-  // behind is visible to the next one.
-  for (const Row& row : rows) {
-    [self addRuleOfType:row.type identifier:row.identifier cel:kCELExpr];
-
-    SNTTimedRuleKills* sut = [self makeSUT];
-    XCTestExpectation* killed = [self expectationWithDescription:@"kill ran"];
-    NSMutableArray<SNTKillRequest*>* requests = [NSMutableArray array];
-    [self captureKillsOn:sut into:requests expectation:killed];
+  SNTTimedRuleKills* sut = [self makeSUT];
+  for (NSArray* row in rows) {
+    SNTRuleType type = (SNTRuleType)[row[0] integerValue];
+    NSString* identifier = row[1];
+    _fake.signals.clear();
+    _fake.waits.clear();
+    [self addRuleOfType:type identifier:identifier cel:kCELExpr];
 
     NSDate* deadline = [NSDate dateWithTimeIntervalSinceNow:0.5];
-    [self record:sut
-              type:row.type
-        identifier:row.identifier
-           celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
-          deadline:deadline
-          notifyAt:deadline];
-    [self waitForExpectations:@[ killed ] timeout:10];
+    [sut recordKillForRuleType:type
+                    identifier:identifier
+                       celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
+                      deadline:deadline
+                      notifyAt:deadline
+                    windowDays:nil
+                   windowStart:nil
+                     windowEnd:nil
+                    windowZone:nil];
+    [self waitForEntriesToClear:sut];
+    [self drain:sut];
 
-    XCTAssertEqual(requests.count, 1u, @"%@", row.identifier);
-    SNTKillRequest* request = requests.firstObject;
-    XCTAssertTrue([request isKindOfClass:row.expected], @"%@", row.identifier);
-    for (NSString* field in row.fields) {
-      XCTAssertEqualObjects([request valueForKey:field], row.fields[field], @"%@ of %@", field,
-                            row.identifier);
-    }
-    XCTAssertTrue(request.targetProcessGroups, @"%@", row.identifier);
+    XCTAssertEqualObjects(SignalDescriptions(_fake.signals), [self termThenKillOfTheProcessGroup],
+                          @"%@", identifier);
+    XCTAssertEqual(_fake.waits.size(), 1u, @"%@", identifier);
+    XCTAssertEqualWithAccuracy(_fake.waits.front(), 5.0, 0.001);
+    // The clear reached disk, not just the configurator's in-memory state.
+    XCTAssertNil([self rawStateFile][kTimedRuleKillsStateKey], @"%@", identifier);
   }
 }
 
-- (void)testSIGTERMThenSIGKILLWithFiveSecondGrace {
+// Two deadlines landing in one pass share one grace period: every due entry
+// is collected into a single kill call. Both rules cover the one process, so
+// the shared group is also signaled once per pass.
+- (void)testDeadlinesInOnePassShareTheGracePeriod {
   [self addRuleOfType:SNTRuleTypeTeamID identifier:kMatchingTeamID cel:kCELExpr];
-
-  pid_t pgid = getpgrp() + 1;
-
-  FakeEnv fake;
-  fake.pids = {100};
-  fake.pidversions = {{100, 1}};
-  fake.matching = {100};
-  fake.pgids = {{100, pgid}};
+  [self addRuleOfType:SNTRuleTypeCDHash identifier:kMatchingCDHash cel:kCELExpr];
 
   SNTTimedRuleKills* sut = [self makeSUT];
-  XCTestExpectation* killed = [self expectationWithDescription:@"kill ran"];
-  // A block captures a C++ object by const copy, so the fake is reached
-  // through a pointer; it outlives the block, which runs before the wait below
-  // returns.
-  FakeEnv* fakePtr = &fake;
-  // The seam routes into the real term-then-kill against a fully faked
-  // KillEnv, so the ordering under test is the production one.
-  sut.killBlock =
-      ^NSArray<SNTKillResponse*>*(NSArray<SNTKillRequest*>* pass, NSTimeInterval grace) {
-    santa::KillEnv env = MakeKillEnv(fakePtr);
-    NSArray<SNTKillResponse*>* responses = santa::KillingMachineTermThenKill(pass, grace, env);
-    [killed fulfill];
-    return responses;
-  };
-
-  NSDate* deadline = [NSDate dateWithTimeIntervalSinceNow:0.5];
-  [self record:sut deadline:deadline];
-  [self waitForExpectations:@[ killed ] timeout:10];
-
-  XCTAssertEqualObjects(SignalDescriptions(fake.signals), (@[
-                          [NSString stringWithFormat:@"group:%d:%d", pgid, SIGTERM],
-                          [NSString stringWithFormat:@"group:%d:%d", pgid, SIGKILL],
-                        ]));
-  XCTAssertEqual(fake.waits.size(), 1u);
-  XCTAssertEqualWithAccuracy(fake.waits.front(), 5.0, 0.001);
-}
-
-// Deadlines that land together are one kill pass, not one each: every entry's
-// SIGTERM goes out, then the one grace period they share, then the SIGKILL
-// re-matches. Run per entry instead, two deadlines would hold the component's
-// queue for two grace periods and the second quit would be five seconds late.
-- (void)testSimultaneousDeadlinesShareOneGracePeriod {
-  [self addRuleOfType:SNTRuleTypeTeamID identifier:kMatchingTeamID cel:kCELExpr];
-  [self addRuleOfType:SNTRuleTypeTeamID identifier:kSecondTeamID cel:kCELExpr];
-
-  pid_t firstPgid = getpgrp() + 1;
-  pid_t secondPgid = getpgrp() + 2;
-
-  // One process per entry, each in its own group, so both entries really signal
-  // something: a grace period taken per entry would show up as two waits.
-  FakeEnv fake;
-  fake.pids = {100, 101};
-  fake.pidversions = {{100, 1}, {101, 2}};
-  fake.matching = {100};
-  fake.matchingSecond = {101};
-  fake.pgids = {{100, firstPgid}, {101, secondPgid}};
-
   NSString* hash = [SNTTimedRuleKills celHashForExpression:kCELExpr];
-  NSDate* past = [NSDate dateWithTimeIntervalSinceNow:-3600];
-  // Parenthesized: the comma between the two entries would otherwise read as
-  // another argument to the assertion macro.
-  XCTAssertTrue(([self.configurator persistTimedRuleKills:@[
-    [self entryDictForRuleType:SNTRuleTypeTeamID
-                    identifier:kMatchingTeamID
-                       celHash:hash
-                      deadline:past],
-    [self entryDictForRuleType:SNTRuleTypeTeamID
-                    identifier:kSecondTeamID
-                       celHash:hash
-                      deadline:past],
-  ]]));
+  NSDate* due = [NSDate dateWithTimeIntervalSinceNow:0.5];
+  [sut recordKillForRuleType:SNTRuleTypeTeamID
+                  identifier:kMatchingTeamID
+                     celHash:hash
+                    deadline:due
+                    notifyAt:due
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
+  [sut recordKillForRuleType:SNTRuleTypeCDHash
+                  identifier:kMatchingCDHash
+                     celHash:hash
+                    deadline:due
+                    notifyAt:due
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
 
-  SNTTimedRuleKills* sut = [self makeSUT];
-  __block NSUInteger passes = 0;
-  __block NSUInteger requestsInPass = 0;
-  FakeEnv* fakePtr = &fake;
-  // The seam routes into the real kill pass against a fully faked KillEnv, so
-  // the ordering under test is the production one.
-  sut.killBlock =
-      ^NSArray<SNTKillResponse*>*(NSArray<SNTKillRequest*>* pass, NSTimeInterval grace) {
-    passes++;
-    requestsInPass = pass.count;
-    santa::KillEnv env = MakeKillEnv(fakePtr);
-    return santa::KillingMachineTermThenKill(pass, grace, env);
-  };
-
-  [sut resumeFromSavedState];
-  [self waitForEntriesToClear];
+  [self waitForEntriesToClear:sut];
   [self drain:sut];
 
-  XCTAssertEqual(passes, 1u);
-  XCTAssertEqual(requestsInPass, 2u);
-  // The one wait is the whole point: both entries signaled, so a grace period
-  // per entry would be two of them, and the second quit would be five seconds
-  // late.
-  XCTAssertEqual(fake.waits.size(), 1u);
-  XCTAssertEqualWithAccuracy(fake.waits.front(), 5.0, 0.001);
-  // The SIGTERM-before-SIGKILL ordering inside the pass is KillingMachine's
-  // contract, pinned in order and per request by
-  // KillingMachineTest.testTermThenKillSharesOneGracePeriodAcrossRequests. What
-  // is this test's own is the batching above: one pass, two requests in it, one
-  // grace period.
+  XCTAssertEqual(_fake.waits.size(), 1u);
+  XCTAssertEqualObjects(SignalDescriptions(_fake.signals), [self termThenKillOfTheProcessGroup]);
 }
 
-/// The two ways the fire-time re-check fails, which differ only in when the rule
-/// stops being the one the entry was recorded under: it was never there at all,
-/// or its text changed after the entry was recorded and before the deadline
-/// arrived. Either way the entry is dropped and nothing is quit.
-- (void)testARuleThatNoLongerGovernsDropsTheEntryWithoutKilling {
-  for (BOOL edited : {NO, YES}) {
-    NSString* row = edited ? @"the rule's text changed after recording" : @"no rule was added";
-    if (edited) {
-      [self addRuleOfType:SNTRuleTypeTeamID identifier:kMatchingTeamID cel:kCELExpr];
-    }
+// Both branches of the fire-time re-check, in one pass: the CDHash entry's rule
+// was never added (gone), and the TeamID entry was recorded against text the
+// added rule does not hold (edited). Either one failing to drop signals.
+- (void)testRuleThatIsGoneOrEditedDropsTheEntryWithoutKilling {
+  [self addRuleOfType:SNTRuleTypeTeamID identifier:kMatchingTeamID cel:kCELExpr];
 
-    SNTTimedRuleKills* sut = [self makeSUT];
-    __block BOOL killCalled = NO;
-    sut.killBlock =
-        ^NSArray<SNTKillResponse*>*(NSArray<SNTKillRequest*>* pass, NSTimeInterval grace) {
-      killCalled = YES;
-      return @[ [[SNTKillResponse alloc] initWithKilledProcesses:@[]] ];
-    };
+  SNTTimedRuleKills* sut = [self makeSUT];
+  NSDate* deadline = [NSDate dateWithTimeIntervalSinceNow:0.5];
+  [sut recordKillForRuleType:SNTRuleTypeCDHash
+                  identifier:kMatchingCDHash
+                     celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
+                    deadline:deadline
+                    notifyAt:deadline
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
+  [sut recordKillForRuleType:SNTRuleTypeTeamID
+                  identifier:kMatchingTeamID
+                     celHash:[SNTTimedRuleKills celHashForExpression:kEditedCELExpr]
+                    deadline:deadline
+                    notifyAt:deadline
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
+  [self drain:sut];
+  XCTAssertEqual(self.savedEntries.count, 2u);
 
-    [self record:sut deadline:[NSDate dateWithTimeIntervalSinceNow:0.5]];
-    [self drain:sut];
-    // The entry really was persisted before the re-check dropped it.
-    XCTAssertEqual(self.savedEntries.count, 1u, @"%@", row);
-
-    // The edit lands between the recording and the deadline, which is the whole
-    // difference between the two rows.
-    if (edited) {
-      [self addRuleOfType:SNTRuleTypeTeamID identifier:kMatchingTeamID cel:kEditedCELExpr];
-    }
-
-    [self waitForEntriesToClear];
-    XCTAssertFalse(killCalled, @"%@", row);
-  }
+  [self waitForEntriesToClear:sut];
+  [self drain:sut];
+  XCTAssertEqualObjects(SignalDescriptions(_fake.signals), @[],
+                        @"a rule that is gone or edited has no kill coming");
 }
 
 #pragma mark The warning banner
@@ -1003,19 +964,17 @@ static const NSTimeInterval kDueTolerance = 0.25;
   XCTestExpectation* posted = [self expectationWithDescription:@"banner sent"];
   NSMutableArray<NSDictionary*>* banners = [NSMutableArray array];
   [self recordBannersOn:proxy into:banners expectation:posted];
-  // Nothing a test runs can be made to match a rule, so the match is faked.
-  // Naming the pid it returns is the production path.
-  sut.matchBlock = ^NSNumber*(SNTKillRequest* request) {
-    return @(getpid());
-  };
 
   NSDate* deadline = [NSDate dateWithTimeIntervalSinceNow:3600];
-  [self record:sut
-            type:SNTRuleTypeTeamID
-      identifier:kMatchingTeamID
-         celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
-        deadline:deadline
-        notifyAt:[NSDate dateWithTimeIntervalSinceNow:0.3]];
+  [sut recordKillForRuleType:SNTRuleTypeTeamID
+                  identifier:kMatchingTeamID
+                     celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
+                    deadline:deadline
+                    notifyAt:[NSDate dateWithTimeIntervalSinceNow:0.3]
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
 
   // The banner arrives long before the deadline, so the timer fired for the
   // warning rather than the kill.
@@ -1028,6 +987,8 @@ static const NSTimeInterval kDueTolerance = 0.25;
   XCTAssertNotEqualObjects(banners.firstObject[@"app"], kMatchingTeamID);
   XCTAssertEqualWithAccuracy([banners.firstObject[@"deadline"] timeIntervalSince1970],
                              deadline.timeIntervalSince1970, 0.001);
+  // The warning is the match pass on its own: nothing was signaled.
+  XCTAssertEqualObjects(SignalDescriptions(_fake.signals), @[]);
 
   // The entry is still pending, now marked warned on disk so a restart doesn't
   // warn again.
@@ -1039,22 +1000,25 @@ static const NSTimeInterval kDueTolerance = 0.25;
   [self addRuleOfType:SNTRuleTypeTeamID identifier:kMatchingTeamID cel:kCELExpr];
   id proxy = [self setUpNotifierProxy];
 
+  // The one matching process is a pid nothing can be read for, which is what a
+  // process that exited between the match and the banner looks like.
+  _fake = FakeEnv();
+  _fake.AddMatching(99999999, self.matchingPgid);
+
   SNTTimedRuleKills* sut = [self makeSUT];
   XCTestExpectation* posted = [self expectationWithDescription:@"banner sent"];
   NSMutableArray<NSDictionary*>* banners = [NSMutableArray array];
   [self recordBannersOn:proxy into:banners expectation:posted];
-  // A pid nothing can be read for, which is what a process that exited between
-  // the match and the banner looks like.
-  sut.matchBlock = ^NSNumber*(SNTKillRequest* request) {
-    return @(99999999);
-  };
 
-  [self record:sut
-            type:SNTRuleTypeTeamID
-      identifier:kMatchingTeamID
-         celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
-        deadline:[NSDate dateWithTimeIntervalSinceNow:3600]
-        notifyAt:[NSDate dateWithTimeIntervalSinceNow:0.3]];
+  [sut recordKillForRuleType:SNTRuleTypeTeamID
+                  identifier:kMatchingTeamID
+                     celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
+                    deadline:[NSDate dateWithTimeIntervalSinceNow:3600]
+                    notifyAt:[NSDate dateWithTimeIntervalSinceNow:0.3]
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
 
   [self waitForExpectations:@[ posted ] timeout:10];
 
@@ -1066,21 +1030,28 @@ static const NSTimeInterval kDueTolerance = 0.25;
   [self addRuleOfType:SNTRuleTypeTeamID identifier:kMatchingTeamID cel:kCELExpr];
   id proxy = [self setUpNotifierProxy];
 
+  // Nothing is running at all, so the match pass finds nothing.
+  _fake = FakeEnv();
+
   SNTTimedRuleKills* sut = [self makeSUT];
   NSMutableArray<NSDictionary*>* banners = [NSMutableArray array];
   [self recordBannersOn:proxy into:banners expectation:nil];
-  sut.matchBlock = ^NSNumber*(SNTKillRequest* request) {
-    return nil;
-  };
 
-  [self record:sut
-            type:SNTRuleTypeTeamID
-      identifier:kMatchingTeamID
-         celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
-        deadline:[NSDate dateWithTimeIntervalSinceNow:3600]
-        notifyAt:[NSDate dateWithTimeIntervalSinceNow:0.3]];
+  [sut recordKillForRuleType:SNTRuleTypeTeamID
+                  identifier:kMatchingTeamID
+                     celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
+                    deadline:[NSDate dateWithTimeIntervalSinceNow:3600]
+                    notifyAt:[NSDate dateWithTimeIntervalSinceNow:0.3]
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
 
-  [self waitForTheWarningPass];
+  [self
+      waitUntil:^BOOL {
+        return [self.savedEntries.firstObject[@"Notified"] boolValue];
+      }
+      described:@"warning pass ran"];
   [self drain:sut];
 
   XCTAssertEqual(banners.count, 0u);
@@ -1089,161 +1060,80 @@ static const NSTimeInterval kDueTolerance = 0.25;
   XCTAssertTrue([self.savedEntries.firstObject[@"Notified"] boolValue]);
 }
 
-- (void)testOneWarningPerRuleAndDeadline {
-  // Two entries, so the warning pass comes back over the first one.
-  NSString* cdhash = @"deadbeefcafebabe0123456789abcdeffedcba98";
-  [self addRuleOfType:SNTRuleTypeTeamID identifier:kMatchingTeamID cel:kCELExpr];
-  [self addRuleOfType:SNTRuleTypeCDHash identifier:cdhash cel:kCELExpr];
-  id proxy = [self setUpNotifierProxy];
-
-  SNTTimedRuleKills* sut = [self makeSUT];
-  XCTestExpectation* posted = [self expectationWithDescription:@"two banners"];
-  posted.expectedFulfillmentCount = 2;
-  posted.assertForOverFulfill = YES;
-  NSMutableArray<NSDictionary*>* banners = [NSMutableArray array];
-  [self recordBannersOn:proxy into:banners expectation:posted];
-  sut.matchBlock = ^NSNumber*(SNTKillRequest* request) {
-    return @(getpid());
-  };
-
-  NSString* hash = [SNTTimedRuleKills celHashForExpression:kCELExpr];
-  NSDate* firstDeadline = [NSDate dateWithTimeIntervalSinceNow:3600];
-  NSDate* secondDeadline = [NSDate dateWithTimeIntervalSinceNow:7200];
-
-  // Already past, so the first warning goes out as soon as it is recorded.
-  [self record:sut
-            type:SNTRuleTypeTeamID
-      identifier:kMatchingTeamID
-         celHash:hash
-        deadline:firstDeadline
-        notifyAt:[NSDate dateWithTimeIntervalSinceNow:-10]];
-  // A later warning, which is what brings the pass back over the first entry.
-  [self record:sut
-            type:SNTRuleTypeCDHash
-      identifier:cdhash
-         celHash:hash
-        deadline:secondDeadline
-        notifyAt:[NSDate dateWithTimeIntervalSinceNow:0.7]];
-
-  [self waitForExpectations:@[ posted ] timeout:10];
-  [self drain:sut];
-
-  NSCountedSet* deadlines = [NSCountedSet set];
-  for (NSDictionary* banner in banners) {
-    [deadlines addObject:banner[@"deadline"]];
-  }
-  XCTAssertEqual(banners.count, 2u);
-  XCTAssertEqual([deadlines countForObject:firstDeadline], 1u);
-  XCTAssertEqual([deadlines countForObject:secondDeadline], 1u);
-}
-
 // A rule withdrawn during the lead window has no kill coming, so warning about
 // it would promise a quit that never happens. The entry goes at warning time
 // rather than sitting until a deadline it will never act on.
 - (void)testNoWarningWhenTheRuleIsGoneAndTheEntryIsDropped {
-  // No rule is ever added, so the warning-time re-check finds nothing.
+  // No rule is ever added, so the warning-time re-check finds nothing. The
+  // fake process would match if the pass ever got as far as looking.
   id proxy = [self setUpNotifierProxy];
 
   SNTTimedRuleKills* sut = [self makeSUT];
   NSMutableArray<NSDictionary*>* banners = [NSMutableArray array];
   [self recordBannersOn:proxy into:banners expectation:nil];
-  __block BOOL snapshotTaken = NO;
-  sut.matchBlock = ^NSNumber*(SNTKillRequest* request) {
-    snapshotTaken = YES;
-    return @(getpid());
-  };
 
-  [self record:sut
-            type:SNTRuleTypeTeamID
-      identifier:kMatchingTeamID
-         celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
-        deadline:[NSDate dateWithTimeIntervalSinceNow:3600]
-        notifyAt:[NSDate dateWithTimeIntervalSinceNow:0.3]];
+  [sut recordKillForRuleType:SNTRuleTypeTeamID
+                  identifier:kMatchingTeamID
+                     celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
+                    deadline:[NSDate dateWithTimeIntervalSinceNow:3600]
+                    notifyAt:[NSDate dateWithTimeIntervalSinceNow:0.3]
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
   [self drain:sut];
   XCTAssertEqual(self.savedEntries.count, 1u);
 
   // Cleared at warning time, an hour before the deadline it was recorded for.
-  [self waitForEntriesToClear];
+  [self waitForEntriesToClear:sut];
 
-  XCTAssertEqual(banners.count, 0u);
-  XCTAssertFalse(snapshotTaken, @"snapshot taken for a rule that no longer governs");
-}
-
-- (void)testWarningIsSkippedWhenTheDeadlineIsAlreadyDue {
-  [self addRuleOfType:SNTRuleTypeTeamID identifier:kMatchingTeamID cel:kCELExpr];
-  id proxy = [self setUpNotifierProxy];
-
-  SNTTimedRuleKills* sut = [self makeSUT];
-  XCTestExpectation* killed = [self expectationWithDescription:@"kill ran"];
-  NSMutableArray<SNTKillRequest*>* requests = [NSMutableArray array];
-  [self captureKillsOn:sut into:requests expectation:killed];
-
-  NSMutableArray<NSDictionary*>* banners = [NSMutableArray array];
-  [self recordBannersOn:proxy into:banners expectation:nil];
-  __block BOOL snapshotTaken = NO;
-  sut.matchBlock = ^NSNumber*(SNTKillRequest* request) {
-    snapshotTaken = YES;
-    return @(getpid());
-  };
-
-  // Warning time and deadline land in the same pass.
-  NSDate* deadline = [NSDate dateWithTimeIntervalSinceNow:0.5];
-  [self record:sut deadline:deadline];
-
-  [self waitForExpectations:@[ killed ] timeout:10];
-  [self drain:sut];
-
-  XCTAssertEqual(requests.count, 1u);
-  XCTAssertFalse(snapshotTaken, @"snapshot taken for an entry that was already being killed");
   XCTAssertEqual(banners.count, 0u);
 }
 
 - (void)testWarningNeverDelaysTheKill {
-  NSString* cdhash = @"deadbeefcafebabe0123456789abcdeffedcba98";
   [self addRuleOfType:SNTRuleTypeTeamID identifier:kMatchingTeamID cel:kCELExpr];
-  [self addRuleOfType:SNTRuleTypeCDHash identifier:cdhash cel:kCELExpr];
-  [self setUpNotifierProxy];
+  [self addRuleOfType:SNTRuleTypeCDHash identifier:kMatchingCDHash cel:kCELExpr];
+  id proxy = [self setUpNotifierProxy];
 
   SNTTimedRuleKills* sut = [self makeSUT];
-  NSMutableArray<NSString*>* order = [NSMutableArray array];
-
-  XCTestExpectation* killed = [self expectationWithDescription:@"kill ran"];
-  sut.killBlock =
-      ^NSArray<SNTKillResponse*>*(NSArray<SNTKillRequest*>* pass, NSTimeInterval grace) {
-    @synchronized(order) {
-      [order addObject:@"kill"];
-    }
-    [killed fulfill];
-    return @[ [[SNTKillResponse alloc] initWithKilledProcesses:@[]] ];
-  };
-
-  // A slow snapshot: taken before the kill it would hold the kill for a second.
-  XCTestExpectation* snapshotted = [self expectationWithDescription:@"snapshot taken"];
-  // Taking more snapshots than expected is what a regression here looks like;
-  // let `order` be the thing that reports it.
-  snapshotted.assertForOverFulfill = NO;
-  sut.matchBlock = ^NSNumber*(SNTKillRequest* request) {
-    @synchronized(order) {
-      [order addObject:@"match"];
-    }
-    [NSThread sleepForTimeInterval:1.0];
-    [snapshotted fulfill];
-    return nil;
-  };
+  XCTestExpectation* posted = [self expectationWithDescription:@"banner sent"];
+  // Warning the entry that is being killed is what a regression here looks
+  // like, and an over-fulfilled expectation aborts the whole process; let the
+  // assertions below report it instead.
+  posted.assertForOverFulfill = NO;
+  NSMutableArray<NSDictionary*>* banners = [NSMutableArray array];
+  [self recordBannersOn:proxy into:banners expectation:posted];
 
   NSString* hash = [SNTTimedRuleKills celHashForExpression:kCELExpr];
   NSDate* due = [NSDate dateWithTimeIntervalSinceNow:0.5];
   // One entry warning at `due`, one entry deadlined at `due`: the same pass.
-  [self record:sut
-            type:SNTRuleTypeTeamID
-      identifier:kMatchingTeamID
-         celHash:hash
-        deadline:[NSDate dateWithTimeIntervalSinceNow:3600]
-        notifyAt:due];
-  [self record:sut type:SNTRuleTypeCDHash identifier:cdhash celHash:hash deadline:due notifyAt:due];
+  [sut recordKillForRuleType:SNTRuleTypeTeamID
+                  identifier:kMatchingTeamID
+                     celHash:hash
+                    deadline:[NSDate dateWithTimeIntervalSinceNow:3600]
+                    notifyAt:due
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
+  [sut recordKillForRuleType:SNTRuleTypeCDHash
+                  identifier:kMatchingCDHash
+                     celHash:hash
+                    deadline:due
+                    notifyAt:due
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
 
-  [self waitForExpectations:@[ killed, snapshotted ] timeout:10];
-  XCTAssertEqualObjects(order, (@[ @"kill", @"match" ]));
+  [self waitForExpectations:@[ posted ] timeout:10];
+  [self drain:sut];
+
+  // Both of the kill's deliveries were already out when the banner went, so
+  // the process snapshot behind the warning never held the kill up.
+  XCTAssertEqual(banners.count, 1u);
+  XCTAssertEqualObjects(banners.firstObject[@"signals"], @2);
+  XCTAssertEqualObjects(SignalDescriptions(_fake.signals), [self termThenKillOfTheProcessGroup]);
 }
 
 #pragma mark Restart
@@ -1263,16 +1153,12 @@ static const NSTimeInterval kDueTolerance = 0.25;
   SNTTimedRuleKills* sut = [self makeSUT];
   NSMutableArray<NSDictionary*>* banners = [NSMutableArray array];
   [self recordBannersOn:proxy into:banners expectation:nil];
-  __block BOOL snapshotTaken = NO;
-  sut.matchBlock = ^NSNumber*(SNTKillRequest* request) {
-    snapshotTaken = YES;
-    return @(getpid());
-  };
 
   [sut resumeFromSavedState];
   [self drain:sut];
 
-  XCTAssertFalse(snapshotTaken);
+  // The fake process matches the entry's rule, so the only reason no banner
+  // went out is the flag the entry was restored with.
   XCTAssertEqual(banners.count, 0u);
   XCTAssertEqual(self.savedEntries.count, 1u);
 }
@@ -1299,9 +1185,6 @@ static const NSTimeInterval kDueTolerance = 0.25;
   XCTestExpectation* posted = [self expectationWithDescription:@"banner sent"];
   NSMutableArray<NSDictionary*>* banners = [NSMutableArray array];
   [self recordBannersOn:proxy into:banners expectation:posted];
-  sut.matchBlock = ^NSNumber*(SNTKillRequest* request) {
-    return @(getpid());
-  };
 
   // Not throwing here is the point: the malformed Notified was guarded, not sent
   // -boolValue.
@@ -1326,38 +1209,11 @@ static const NSTimeInterval kDueTolerance = 0.25;
   ]]);
 
   SNTTimedRuleKills* sut = [self makeSUT];
-  XCTestExpectation* killed = [self expectationWithDescription:@"kill ran"];
-  NSMutableArray<SNTKillRequest*>* requests = [NSMutableArray array];
-  [self captureKillsOn:sut into:requests expectation:killed];
-
   [sut resumeFromSavedState];
 
-  [self waitForExpectations:@[ killed ] timeout:10];
+  [self waitForEntriesToClear:sut];
   [self drain:sut];
-  XCTAssertEqual(requests.count, 1u);
-  XCTAssertNil(self.savedEntries);
-}
-
-- (void)testRestartDropsPastDueEntryWhoseRuleIsGone {
-  XCTAssertTrue([self.configurator persistTimedRuleKills:@[
-    [self entryDictForRuleType:SNTRuleTypeTeamID
-                    identifier:kMatchingTeamID
-                       celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
-                      deadline:[NSDate dateWithTimeIntervalSinceNow:-3600]]
-  ]]);
-
-  SNTTimedRuleKills* sut = [self makeSUT];
-  __block BOOL killCalled = NO;
-  sut.killBlock =
-      ^NSArray<SNTKillResponse*>*(NSArray<SNTKillRequest*>* pass, NSTimeInterval grace) {
-    killCalled = YES;
-    return @[ [[SNTKillResponse alloc] initWithKilledProcesses:@[]] ];
-  };
-
-  [sut resumeFromSavedState];
-  [self drain:sut];
-
-  XCTAssertFalse(killCalled);
+  XCTAssertEqualObjects(SignalDescriptions(_fake.signals), [self termThenKillOfTheProcessGroup]);
   XCTAssertNil(self.savedEntries);
 }
 
@@ -1371,79 +1227,54 @@ static const NSTimeInterval kDueTolerance = 0.25;
   ]]);
 
   SNTTimedRuleKills* sut = [self makeSUT];
-  XCTestExpectation* killed = [self expectationWithDescription:@"kill ran"];
-  NSMutableArray<SNTKillRequest*>* requests = [NSMutableArray array];
-  [self captureKillsOn:sut into:requests expectation:killed];
-
   [sut resumeFromSavedState];
   [self drain:sut];
   // Not due yet: still pending, waiting on the restored timer.
   XCTAssertEqual(self.savedEntries.count, 1u);
 
-  [self waitForExpectations:@[ killed ] timeout:10];
-  XCTAssertEqual(requests.count, 1u);
+  [self waitForEntriesToClear:sut];
+  [self drain:sut];
+  XCTAssertEqualObjects(SignalDescriptions(_fake.signals), [self termThenKillOfTheProcessGroup]);
 }
 
-// A plist real round-trips both infinities and NaN, and neither is an instant.
-// A NaN deadline is the dangerous one: it answers no to every "has this come
-// due" question while leaving the countdown to arm for zero seconds, fire, find
-// nothing due, and arm for zero again. Such a record is no appointment, so it is
-// dropped on the way in (and logged with the other unusable records), which is
-// what stops that spin.
-- (void)testANonFiniteDeadlineOrNotifyAtDropsTheEntry {
-  NSString* cdhash = @"deadbeefcafebabe0123456789abcdeffedcba98";
+- (void)testRestartDropsMalformedEntries {
   NSString* hash = [SNTTimedRuleKills celHashForExpression:kCELExpr];
-  [self addRuleOfType:SNTRuleTypeTeamID identifier:kMatchingTeamID cel:kCELExpr];
-  [self addRuleOfType:SNTRuleTypeCDHash identifier:cdhash cel:kCELExpr];
-
-  NSMutableDictionary* notANumber = [[self entryDictForRuleType:SNTRuleTypeTeamID
-                                                     identifier:kMatchingTeamID
+  // A plist real round-trips both infinities and NaN, and neither is an instant.
+  // A NaN deadline is the worst of them: it answers false to every "has this come
+  // due" question and leaves the countdown arming for zero seconds forever.
+  NSMutableDictionary* notANumber = [[self entryDictForRuleType:SNTRuleTypeCDHash
+                                                     identifier:kMatchingCDHash
                                                         celHash:hash
                                                        deadline:[NSDate date]] mutableCopy];
   notANumber[@"Deadline"] = @(NAN);
   NSMutableDictionary* infinite =
-      [[self entryDictForRuleType:SNTRuleTypeCDHash
-                       identifier:cdhash
+      [[self entryDictForRuleType:SNTRuleTypeSigningID
+                       identifier:kMatchingSigningID
                           celHash:hash
                          deadline:[NSDate dateWithTimeIntervalSinceNow:3600]] mutableCopy];
   infinite[@"NotifyAt"] = @(INFINITY);
-  XCTAssertTrue(([self.configurator persistTimedRuleKills:@[ notANumber, infinite ]]));
 
-  self.configurator = [self makeConfigurator];
-  // The fixture has to really carry non-finite values, or this case would pass
-  // for the wrong reason.
-  XCTAssertFalse(
-      std::isfinite([[self savedEntryForIdentifier:kMatchingTeamID][@"Deadline"] doubleValue]));
-  XCTAssertFalse(std::isfinite([[self savedEntryForIdentifier:cdhash][@"NotifyAt"] doubleValue]));
-
-  SNTTimedRuleKills* sut = [self makeSUT];
-  __block BOOL killCalled = NO;
-  sut.killBlock =
-      ^NSArray<SNTKillResponse*>*(NSArray<SNTKillRequest*>* pass, NSTimeInterval grace) {
-    killCalled = YES;
-    return @[ [[SNTKillResponse alloc] initWithKilledProcesses:@[]] ];
-  };
-
-  [sut resumeFromSavedState];
-  [self drain:sut];
-
-  // Both records were dropped, so the key was rewritten with nothing under it.
-  XCTAssertFalse(killCalled);
-  XCTAssertNil(self.savedEntries);
-}
-
-- (void)testRestartDropsMalformedEntries {
   NSArray<NSDictionary*>* saved = @[
     // No type, hash or deadline.
     @{@"Identifier" : kMatchingTeamID},
     // No identifier or hash.
     @{@"RuleType" : @(SNTRuleTypeTeamID), @"Deadline" : @1},
+    notANumber,
+    infinite,
     [self entryDictForRuleType:SNTRuleTypeTeamID
                     identifier:kMatchingTeamID
-                       celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
+                       celHash:hash
                       deadline:[NSDate dateWithTimeIntervalSinceNow:3600]],
   ];
   XCTAssertTrue([self.configurator persistTimedRuleKills:saved]);
+
+  // Read back off disk, or the two non-finite rows would never have been plist
+  // values at all and this would pass for the wrong reason.
+  self.configurator = [self makeConfigurator];
+  XCTAssertFalse(
+      std::isfinite([[self savedEntryForIdentifier:kMatchingCDHash][@"Deadline"] doubleValue]));
+  XCTAssertFalse(
+      std::isfinite([[self savedEntryForIdentifier:kMatchingSigningID][@"NotifyAt"] doubleValue]));
 
   SNTTimedRuleKills* sut = [self makeSUT];
   [sut resumeFromSavedState];
@@ -1451,6 +1282,148 @@ static const NSTimeInterval kDueTolerance = 0.25;
 
   XCTAssertEqual(self.savedEntries.count, 1u);
   XCTAssertEqualObjects(self.savedEntries.firstObject[@"Identifier"], kMatchingTeamID);
+}
+
+#pragma mark The window re-check
+
+// The stored zone is the calendar the window is re-checked in, not the host's,
+// and an occurrence still standing at a deadline moves it rather than firing it.
+// Two entries past due at one instant with one window and two stored fixed
+// offsets five hours apart: the first reads the instant as 12:00, inside 09:00
+// to 17:00, so its deadline goes to the end of the occurrence in progress; the
+// second reads it as 17:00, where the occurrence has just ended, so its deadline
+// arrived on time and what its rule covers is quit. A re-check that read the
+// host's zone would read one clock for both and answer the same way twice.
+// Fixed offsets rather than named zones so the instants are arithmetic, and
+// offsets read off the clock rather than written down so the pair means the same
+// thing on any host at any time of day.
+- (void)testTheStoredZoneGovernsTheWindowRecheck {
+  [self addRuleOfType:SNTRuleTypeTeamID identifier:kMatchingTeamID cel:kCELExpr];
+  [self addRuleOfType:SNTRuleTypeCDHash identifier:kMatchingCDHash cel:kCELExpr];
+
+  NSDate* now = [NSDate date];
+  NSString* openZone = [self zoneReading:now asHour:12];
+  NSString* closedZone = [self zoneReading:now asHour:17];
+
+  NSMutableArray<NSDictionary*>* saved = [NSMutableArray array];
+  // The open row is a deadline an hour old, which is what a machine that slept
+  // through one wakes up to. The closed row's deadline is the occurrence's own
+  // end: a window holds up to but not including its end, so this is the deadline
+  // arriving on time rather than a window standing open at it.
+  for (NSArray* row in @[
+         @[ @(SNTRuleTypeTeamID), kMatchingTeamID, openZone, [now dateByAddingTimeInterval:-3600] ],
+         @[ @(SNTRuleTypeCDHash), kMatchingCDHash, closedZone, [self minuteFloor:now] ],
+       ]) {
+    NSMutableDictionary* entry =
+        [[self entryDictForRuleType:(SNTRuleType)[row[0] integerValue]
+                         identifier:row[1]
+                            celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
+                           deadline:row[3]] mutableCopy];
+    entry[@"WindowDays"] = kEveryDay;
+    entry[@"WindowStart"] = @"09:00";
+    entry[@"WindowEnd"] = @"17:00";
+    entry[@"WindowZone"] = row[2];
+    // A warning already delivered for the old deadline, on both rows: the moved
+    // deadline is a different one and owes its own, and the row that is quit is
+    // gone before the warning pass looks at it.
+    entry[@"Notified"] = @YES;
+    [saved addObject:entry];
+  }
+  XCTAssertTrue([self.configurator persistTimedRuleKills:saved]);
+
+  self.configurator = [self makeConfigurator];
+  SNTTimedRuleKills* sut = [self makeSUT];
+  [sut resumeFromSavedState];
+  [self drain:sut];
+
+  // One rule's worth of deliveries: the row whose window had ended. The
+  // rescheduled row covers the same process and would have doubled them.
+  XCTAssertEqualObjects(SignalDescriptions(_fake.signals), [self termThenKillOfTheProcessGroup]);
+
+  // The other moved to 17:00 in its own zone, five hours on from the clock, and
+  // kept the shape so the next pass can ask again.
+  XCTAssertEqual(self.savedEntries.count, 1u);
+  NSDictionary* rescheduled = [self savedEntryForIdentifier:kMatchingTeamID];
+  XCTAssertEqualWithAccuracy([rescheduled[@"Deadline"] doubleValue],
+                             [self minuteFloor:now].timeIntervalSince1970 + 5 * 3600, 1);
+  // The lead the old deadline was warned with, carried onto the new one.
+  XCTAssertEqualWithAccuracy([rescheduled[@"NotifyAt"] doubleValue],
+                             [rescheduled[@"Deadline"] doubleValue] - 60, 0.001);
+  // The warning is owed again: this is a different deadline from the one the
+  // user was already warned about.
+  XCTAssertFalse([rescheduled[@"Notified"] boolValue]);
+  XCTAssertEqualObjects(rescheduled[@"WindowZone"], openZone);
+  XCTAssertEqualObjects(rescheduled[@"WindowDays"], kEveryDay);
+}
+
+// A window shape that could not be rebuilt from the state file is no shape: the
+// entry has nothing to re-check, so its deadline stands. The first row stands at
+// 12:00 inside a 09:00 to 17:00 window, which is the arrangement the open row of
+// testTheStoredZoneGovernsTheWindowRecheck reschedules from, so it would
+// reschedule too if its day list could be read. The other two lose their shape at
+// the zone itself, which leaves no zone for them to stand in at all. Every row is
+// past due, so a kill is the defect being read as absent rather than as a window.
+- (void)testUnusablePersistedWindowShapesKillRatherThanRescheduling {
+  [self addRuleOfType:SNTRuleTypeTeamID identifier:kMatchingTeamID cel:kCELExpr];
+
+  NSDate* now = [NSDate date];
+  NSDictionary<NSString*, NSDictionary*>* shapes = @{
+    @"a day list holding something that isn't a number" :
+        @{@"WindowDays" : @[ @1, @"Wednesday" ], @"WindowZone" : [self zoneReading:now asHour:12]},
+    // The zone cannot be resolved, so the window cannot be asked. The design
+    // calls that past-due, which means kill.
+    @"a zone the resolver refuses" : @{@"WindowDays" : kEveryDay, @"WindowZone" : @"Mars/Olympus"},
+    // What an upgraded daemon finds on disk: a shape whole but for the zone. It
+    // loses its shape, so it behaves exactly like an entry that never had one.
+    @"a shape written before the zone existed" : @{@"WindowDays" : kEveryDay},
+  };
+
+  for (NSString* defect in shapes) {
+    _fake.signals.clear();
+    NSMutableDictionary* entry =
+        [[self entryDictForRuleType:SNTRuleTypeTeamID
+                         identifier:kMatchingTeamID
+                            celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
+                           deadline:[now dateByAddingTimeInterval:-3600]] mutableCopy];
+    entry[@"WindowStart"] = @"09:00";
+    entry[@"WindowEnd"] = @"17:00";
+    [entry addEntriesFromDictionary:shapes[defect]];
+    XCTAssertTrue([self.configurator persistTimedRuleKills:@[ entry ]], @"%@", defect);
+
+    // A fresh configurator reads the entry just written back off disk, so each
+    // row is a restart of its own.
+    self.configurator = [self makeConfigurator];
+    SNTTimedRuleKills* sut = [self makeSUT];
+    [sut resumeFromSavedState];
+    [self drain:sut];
+
+    XCTAssertEqualObjects(SignalDescriptions(_fake.signals), [self termThenKillOfTheProcessGroup],
+                          @"%@", defect);
+    XCTAssertNil(self.savedEntries, @"%@", defect);
+  }
+}
+
+// A shape the window math itself refuses, which is what a day outside 0 through
+// 6 is. There is no window to be inside, so the answer is the same as a closed
+// one: proceed to the kill, rather than throwing or holding the entry forever.
+- (void)testAWindowEvaluationErrorProceedsToTheKill {
+  [self addRuleOfType:SNTRuleTypeTeamID identifier:kMatchingTeamID cel:kCELExpr];
+
+  SNTTimedRuleKills* sut = [self makeSUT];
+  NSDate* deadline = [NSDate dateWithTimeIntervalSinceNow:0.5];
+  [sut recordKillForRuleType:SNTRuleTypeTeamID
+                  identifier:kMatchingTeamID
+                     celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
+                    deadline:deadline
+                    notifyAt:deadline
+                  windowDays:@[ @42 ]
+                 windowStart:@"09:00"
+                   windowEnd:@"17:00"
+                  windowZone:@"local"];
+
+  [self waitForEntriesToClear:sut];
+  [self drain:sut];
+  XCTAssertEqualObjects(SignalDescriptions(_fake.signals), [self termThenKillOfTheProcessGroup]);
 }
 
 #pragma mark A moved clock
@@ -1463,12 +1436,15 @@ static const NSTimeInterval kDueTolerance = 0.25;
   uint64_t machBefore = mach_continuous_time();
   NSDate* deadline = [NSDate dateWithTimeIntervalSinceNow:3600];
 
-  [self record:sut
-            type:SNTRuleTypeTeamID
-      identifier:kMatchingTeamID
-         celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
-        deadline:deadline
-        notifyAt:[deadline dateByAddingTimeInterval:-300]];
+  [sut recordKillForRuleType:SNTRuleTypeTeamID
+                  identifier:kMatchingTeamID
+                     celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
+                    deadline:deadline
+                    notifyAt:[deadline dateByAddingTimeInterval:-300]
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
   [self drain:sut];
 
   NSDictionary* saved = self.savedEntries.firstObject;
@@ -1486,20 +1462,26 @@ static const NSTimeInterval kDueTolerance = 0.25;
 
   FakeHost* host = [self makeHost];
   SNTTimedRuleKills* sut = [self makeSUTOnHost:host refreshInterval:kFastRefreshInterval];
-  XCTestExpectation* killed = [self expectationWithDescription:@"kill ran"];
-  NSMutableArray<SNTKillRequest*>* requests = [NSMutableArray array];
-  [self captureKillsOn:sut into:requests expectation:killed];
 
   NSDate* deadline = [NSDate dateWithTimeIntervalSince1970:host.wall + 3600];
-  [self record:sut deadline:deadline];
+  [sut recordKillForRuleType:SNTRuleTypeTeamID
+                  identifier:kMatchingTeamID
+                     celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
+                    deadline:deadline
+                    notifyAt:deadline
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
   [self drain:sut];
   XCTAssertEqual(self.savedEntries.count, 1u);
 
   host.machOffsetSeconds = 3600;
   host.wall -= 86400;
 
-  [self waitForExpectations:@[ killed ] timeout:10];
-  XCTAssertEqual(requests.count, 1u);
+  [self waitForEntriesToClear:sut];
+  [self drain:sut];
+  XCTAssertEqualObjects(SignalDescriptions(_fake.signals), [self termThenKillOfTheProcessGroup]);
 }
 
 // The same rollback with less mach time behind it leaves the deadline in the
@@ -1511,15 +1493,17 @@ static const NSTimeInterval kDueTolerance = 0.25;
 
   FakeHost* host = [self makeHost];
   SNTTimedRuleKills* sut = [self makeSUTOnHost:host refreshInterval:kFastRefreshInterval];
-  __block BOOL killCalled = NO;
-  sut.killBlock =
-      ^NSArray<SNTKillResponse*>*(NSArray<SNTKillRequest*>* pass, NSTimeInterval grace) {
-    killCalled = YES;
-    return @[ [[SNTKillResponse alloc] initWithKilledProcesses:@[]] ];
-  };
 
   NSDate* deadline = [NSDate dateWithTimeIntervalSince1970:host.wall + 3600];
-  [self record:sut deadline:deadline];
+  [sut recordKillForRuleType:SNTRuleTypeTeamID
+                  identifier:kMatchingTeamID
+                     celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
+                    deadline:deadline
+                    notifyAt:deadline
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
   [self drain:sut];
   XCTAssertEqual(sut.armedTimerSeconds, 3600u);
 
@@ -1532,7 +1516,7 @@ static const NSTimeInterval kDueTolerance = 0.25;
       }
       described:@"the countdown was re-armed"];
   XCTAssertEqualWithAccuracy((double)sut.armedTimerSeconds, 600, 2);
-  XCTAssertFalse(killCalled);
+  XCTAssertEqualObjects(SignalDescriptions(_fake.signals), @[]);
   XCTAssertEqual(self.savedEntries.count, 1u);
 }
 
@@ -1554,15 +1538,11 @@ static const NSTimeInterval kDueTolerance = 0.25;
   XCTAssertTrue([self.configurator persistTimedRuleKills:@[ entry ]]);
 
   SNTTimedRuleKills* sut = [self makeSUTOnHost:host refreshInterval:kFastRefreshInterval];
-  XCTestExpectation* killed = [self expectationWithDescription:@"kill ran"];
-  NSMutableArray<SNTKillRequest*>* requests = [NSMutableArray array];
-  [self captureKillsOn:sut into:requests expectation:killed];
-
   [sut resumeFromSavedState];
 
-  [self waitForExpectations:@[ killed ] timeout:10];
-  XCTAssertEqual(requests.count, 1u);
-  XCTAssertNil(self.savedEntries);
+  [self waitForEntriesToClear:sut];
+  [self drain:sut];
+  XCTAssertEqualObjects(SignalDescriptions(_fake.signals), [self termThenKillOfTheProcessGroup]);
 }
 
 // The same entry from an earlier boot session. Its mach value belongs to a
@@ -1583,28 +1563,21 @@ static const NSTimeInterval kDueTolerance = 0.25;
   XCTAssertTrue([self.configurator persistTimedRuleKills:@[ entry ]]);
 
   SNTTimedRuleKills* sut = [self makeSUTOnHost:host refreshInterval:kFastRefreshInterval];
-  __block BOOL killCalled = NO;
-  sut.killBlock =
-      ^NSArray<SNTKillResponse*>*(NSArray<SNTKillRequest*>* pass, NSTimeInterval grace) {
-    killCalled = YES;
-    return @[ [[SNTKillResponse alloc] initWithKilledProcesses:@[]] ];
-  };
-
   [sut resumeFromSavedState];
   [self drain:sut];
   // Several refreshes go by, every one of them looking at the entry.
   [self waitForRefreshCount:3];
   [self drain:sut];
 
-  XCTAssertFalse(killCalled);
-  XCTAssertEqual([self.configurator savedTimedRuleKills].count, 1u);
+  XCTAssertEqualObjects(SignalDescriptions(_fake.signals), @[]);
+  XCTAssertEqual(self.savedEntries.count, 1u);
 }
 
 // A mach pair that is only half there, or holds something that isn't a number,
-// is no pair: the entry still loads, its wall deadline still governs, and
-// nothing on the way in is sent a message it doesn't answer. Reaching -boolValue
-// or -isEqualToString: on the wrong type here would crash-loop the daemon, since
-// every pass over the entries looks at the pair.
+// is no pair: the entry still loads and its wall deadline still governs. Not
+// throwing is half the point, since reaching -unsignedLongLongValue or
+// -isEqualToString: on the wrong type would crash-loop the daemon: every pass
+// over the entries looks at the pair.
 - (void)testAMalformedOrHalfWrittenMachPairLoadsAsAbsent {
   NSString* hash = [SNTTimedRuleKills celHashForExpression:kCELExpr];
   NSDate* deadline = [NSDate dateWithTimeIntervalSinceNow:3600];
@@ -1645,27 +1618,24 @@ static const NSTimeInterval kDueTolerance = 0.25;
 
   self.configurator = [self makeConfigurator];
   SNTTimedRuleKills* sut = [self makeSUT];
-  __block BOOL killCalled = NO;
-  sut.killBlock =
-      ^NSArray<SNTKillResponse*>*(NSArray<SNTKillRequest*>* pass, NSTimeInterval grace) {
-    killCalled = YES;
-    return @[ [[SNTKillResponse alloc] initWithKilledProcesses:@[]] ];
-  };
-
-  // Not throwing here is half the point: nothing on the way in was sent a
-  // message it does not answer. Reaching -unsignedLongLongValue or
-  // -isEqualToString: on the wrong type would crash-loop the daemon, since every
-  // pass over the entries looks at the pair.
   [sut resumeFromSavedState];
   [self drain:sut];
 
   // An unrelated recording rewrites the whole set, so what lands on disk for
   // these entries is what the reload deserialized.
-  [self record:sut deadline:deadline];
+  [sut recordKillForRuleType:SNTRuleTypeTeamID
+                  identifier:kMatchingTeamID
+                     celHash:hash
+                    deadline:deadline
+                    notifyAt:deadline
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
   [self drain:sut];
 
   // Every wall deadline is an hour out, and no half pair may make one due.
-  XCTAssertFalse(killCalled);
+  XCTAssertEqualObjects(SignalDescriptions(_fake.signals), @[]);
   XCTAssertEqual(self.savedEntries.count, pairs.count + 1);
   for (NSString* identifier in pairs) {
     NSDictionary* entry = [self savedEntryForIdentifier:identifier];
@@ -1685,244 +1655,33 @@ static const NSTimeInterval kDueTolerance = 0.25;
 
   FakeHost* host = [self makeHost];
   SNTTimedRuleKills* sut = [self makeSUTOnHost:host refreshInterval:kFastRefreshInterval];
-  XCTestExpectation* killed = [self expectationWithDescription:@"kill ran"];
-  NSMutableArray<SNTKillRequest*>* requests = [NSMutableArray array];
-  [self captureKillsOn:sut into:requests expectation:killed];
   NSMutableArray<NSDictionary*>* banners = [NSMutableArray array];
   [self recordBannersOn:proxy into:banners expectation:nil];
-  __block BOOL snapshotTaken = NO;
-  sut.matchBlock = ^NSNumber*(SNTKillRequest* request) {
-    snapshotTaken = YES;
-    return @(getpid());
-  };
 
   NSDate* deadline = [NSDate dateWithTimeIntervalSince1970:host.wall + 3600];
-  [self record:sut
-            type:SNTRuleTypeTeamID
-      identifier:kMatchingTeamID
-         celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
-        deadline:deadline
-        notifyAt:[deadline dateByAddingTimeInterval:-60]];
+  [sut recordKillForRuleType:SNTRuleTypeTeamID
+                  identifier:kMatchingTeamID
+                     celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
+                    deadline:deadline
+                    notifyAt:[deadline dateByAddingTimeInterval:-60]
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
   [self drain:sut];
 
   host.wall += 7200;
 
-  [self waitForExpectations:@[ killed ] timeout:10];
+  [self waitForEntriesToClear:sut];
   [self drain:sut];
 
-  XCTAssertEqual(requests.count, 1u);
-  XCTAssertFalse(snapshotTaken, @"snapshot taken for an entry that was already being killed");
+  XCTAssertEqualObjects(SignalDescriptions(_fake.signals), [self termThenKillOfTheProcessGroup]);
   XCTAssertEqual(banners.count, 0u);
-  XCTAssertNil(self.savedEntries);
 }
 
-#pragma mark The window re-check
-
-// A deadline that came due while the daemon was down, or while the machine
-// slept, lands in a window that has opened again. The window is what the
-// deadline meant, so the entry moves to the end of the occurrence standing now
-// rather than quitting anything: the lead the warning was recorded with is
-// preserved, the warning is owed again, and the mach pair is recaptured for the
-// deadline it now points at.
-- (void)testAPastDueEntryReschedulesWhileItsWindowIsOpen {
-  [self addRuleOfType:SNTRuleTypeTeamID identifier:kMatchingTeamID cel:kCELExpr];
-
-  FakeHost* host = [self makeHost];
-  host.wall = [self todayAtHour:12 minute:0].timeIntervalSince1970;
-  NSDate* windowEnd = [self todayAtHour:17 minute:0];
-
-  NSMutableDictionary* entry =
-      [[self entryDictForRuleType:SNTRuleTypeTeamID
-                       identifier:kMatchingTeamID
-                          celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
-                         deadline:[self todayAtHour:11 minute:0]] mutableCopy];
-  // A five minute lead, and a warning already delivered for the old deadline.
-  entry[@"NotifyAt"] = @([self todayAtHour:10 minute:55].timeIntervalSince1970);
-  entry[@"Notified"] = @YES;
-  entry[@"WindowDays"] = kEveryDay;
-  entry[@"WindowStart"] = @"09:00";
-  entry[@"WindowEnd"] = @"17:00";
-  entry[@"WindowZone"] = @"local";
-  // Long past, so the entry is due on both clocks.
-  entry[@"MachDeadline"] = @1;
-  entry[@"BootSessionUUID"] = [SNTSystemInfo bootSessionUUID];
-  XCTAssertTrue([self.configurator persistTimedRuleKills:@[ entry ]]);
-
-  SNTTimedRuleKills* sut = [self makeSUTOnHost:host refreshInterval:kUntickableRefreshInterval];
-  __block BOOL killCalled = NO;
-  sut.killBlock =
-      ^NSArray<SNTKillResponse*>*(NSArray<SNTKillRequest*>* pass, NSTimeInterval grace) {
-    killCalled = YES;
-    return @[ [[SNTKillResponse alloc] initWithKilledProcesses:@[]] ];
-  };
-
-  uint64_t machBefore = mach_continuous_time();
-  [sut resumeFromSavedState];
-  [self drain:sut];
-
-  XCTAssertFalse(killCalled);
-  XCTAssertEqual(self.savedEntries.count, 1u);
-  NSDictionary* saved = self.savedEntries.firstObject;
-  XCTAssertEqualWithAccuracy([saved[@"Deadline"] doubleValue], windowEnd.timeIntervalSince1970, 1);
-  XCTAssertEqualWithAccuracy([saved[@"NotifyAt"] doubleValue],
-                             windowEnd.timeIntervalSince1970 - 300, 1);
-  XCTAssertFalse([saved[@"Notified"] boolValue]);
-  XCTAssertEqualObjects(saved[@"BootSessionUUID"], [SNTSystemInfo bootSessionUUID]);
-  // Five hours from noon to the end of the occurrence.
-  XCTAssertEqualWithAccuracy(
-      MachSecondsBetween(machBefore, [saved[@"MachDeadline"] unsignedLongLongValue]), 5 * 3600, 5);
-  // The window shape rides along unchanged, so the next pass can ask again.
-  XCTAssertEqualObjects(saved[@"WindowDays"], kEveryDay);
-  XCTAssertEqualObjects(saved[@"WindowStart"], @"09:00");
-  XCTAssertEqualObjects(saved[@"WindowEnd"], @"17:00");
-}
-
-// The same entry an hour after the window closed. Nothing is standing now, so
-// the deadline is what it always was and the kill goes ahead.
-- (void)testAPastDueEntryKillsOnceItsWindowIsClosed {
-  [self addRuleOfType:SNTRuleTypeTeamID identifier:kMatchingTeamID cel:kCELExpr];
-
-  FakeHost* host = [self makeHost];
-  host.wall = [self todayAtHour:18 minute:0].timeIntervalSince1970;
-
-  NSMutableDictionary* entry =
-      [[self entryDictForRuleType:SNTRuleTypeTeamID
-                       identifier:kMatchingTeamID
-                          celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
-                         deadline:[self todayAtHour:17 minute:0]] mutableCopy];
-  entry[@"WindowDays"] = kEveryDay;
-  entry[@"WindowStart"] = @"09:00";
-  entry[@"WindowEnd"] = @"17:00";
-  entry[@"WindowZone"] = @"local";
-  XCTAssertTrue([self.configurator persistTimedRuleKills:@[ entry ]]);
-
-  SNTTimedRuleKills* sut = [self makeSUTOnHost:host refreshInterval:kUntickableRefreshInterval];
-  XCTestExpectation* killed = [self expectationWithDescription:@"kill ran"];
-  NSMutableArray<SNTKillRequest*>* requests = [NSMutableArray array];
-  [self captureKillsOn:sut into:requests expectation:killed];
-
-  [sut resumeFromSavedState];
-
-  [self waitForExpectations:@[ killed ] timeout:10];
-  [self drain:sut];
-  XCTAssertEqual(requests.count, 1u);
-  XCTAssertNil(self.savedEntries);
-}
-
-// A deadline that arrives on time is the moment the window closed, and the end
-// of an occurrence is outside it, so the kill goes ahead rather than rescheduling
-// to the occurrence that just ended. The clock stands at the occurrence end
-// rather than safely past it, so a reading that held the window to include its
-// end would take the reschedule branch here.
-- (void)testAnOnTimeFireAtTheWindowEndKills {
-  [self addRuleOfType:SNTRuleTypeTeamID identifier:kMatchingTeamID cel:kCELExpr];
-
-  FakeHost* host = [self makeHost];
-  NSDate* windowEnd = [self todayAtHour:17 minute:0];
-  host.wall = windowEnd.timeIntervalSince1970;
-
-  SNTTimedRuleKills* sut = [self makeSUTOnHost:host refreshInterval:kUntickableRefreshInterval];
-  XCTestExpectation* killed = [self expectationWithDescription:@"kill ran"];
-  NSMutableArray<SNTKillRequest*>* requests = [NSMutableArray array];
-  [self captureKillsOn:sut into:requests expectation:killed];
-
-  [sut recordKillForRuleType:SNTRuleTypeTeamID
-                  identifier:kMatchingTeamID
-                     celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
-                    deadline:windowEnd
-                    notifyAt:[windowEnd dateByAddingTimeInterval:-300]
-                  windowDays:kEveryDay
-                 windowStart:@"09:00"
-                   windowEnd:@"17:00"
-                  windowZone:@"local"];
-
-  [self waitForExpectations:@[ killed ] timeout:10];
-  [self drain:sut];
-  XCTAssertEqual(requests.count, 1u);
-  XCTAssertNil(self.savedEntries);
-}
-
-// The due tolerance treats an entry as due in the fraction of a second before
-// its deadline, and a window still holds there, so this is the one pass that can
-// see an open window whose end is the deadline itself. That is the on-time fire
-// arriving a hair early, not a window that re-opened: the kill goes ahead, the
-// deadline is not rewritten to the instant it already names, and the warning the
-// user was already given is not sent a second time.
-- (void)testAPassInsideTheDueToleranceBeforeTheWindowEndKillsWithoutASecondBanner {
-  [self addRuleOfType:SNTRuleTypeTeamID identifier:kMatchingTeamID cel:kCELExpr];
-  id proxy = [self setUpNotifierProxy];
-
-  FakeHost* host = [self makeHost];
-  NSDate* windowEnd = [self todayAtHour:17 minute:0];
-  // Inside the tolerance, so the resume below finds the entry due while the
-  // window is still open. The clock's floor rises on mach continuous time even
-  // with this wall clock standing still, so the pass has to reach the kill inside
-  // that fraction of a second; it normally does so in microseconds. Overshooting
-  // would make the window read closed and prove nothing, so where the pass
-  // actually stood is captured below and asserted rather than assumed.
-  host.wall = windowEnd.timeIntervalSince1970 - 0.2;
-
-  NSMutableDictionary* entry =
-      [[self entryDictForRuleType:SNTRuleTypeTeamID
-                       identifier:kMatchingTeamID
-                          celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
-                         deadline:windowEnd] mutableCopy];
-  // The one banner this deadline was owed has already gone out.
-  entry[@"NotifyAt"] = @(windowEnd.timeIntervalSince1970 - 300);
-  entry[@"Notified"] = @YES;
-  entry[@"WindowDays"] = kEveryDay;
-  entry[@"WindowStart"] = @"09:00";
-  entry[@"WindowEnd"] = @"17:00";
-  entry[@"WindowZone"] = @"local";
-  XCTAssertTrue([self.configurator persistTimedRuleKills:@[ entry ]]);
-
-  SNTTimedRuleKills* sut = [self makeSUTOnHost:host refreshInterval:kUntickableRefreshInterval];
-  XCTestExpectation* killed = [self expectationWithDescription:@"kill ran"];
-  NSMutableArray<SNTKillRequest*>* requests = [NSMutableArray array];
-  // The believable time the kill path itself ran at, read from the component's
-  // own clock at the moment it reached the kill.
-  __block NSTimeInterval nowAtKill = 0;
-  SNTBelievableClock* clock = self.believableClock;
-  sut.killBlock =
-      ^NSArray<SNTKillResponse*>*(NSArray<SNTKillRequest*>* pass, NSTimeInterval grace) {
-    nowAtKill = [clock now].timeIntervalSince1970;
-    [requests addObjectsFromArray:pass];
-    [killed fulfill];
-    return @[ [[SNTKillResponse alloc] initWithKilledProcesses:@[]] ];
-  };
-  NSMutableArray<NSDictionary*>* banners = [NSMutableArray array];
-  [self recordBannersOn:proxy into:banners expectation:nil];
-  __block BOOL snapshotTaken = NO;
-  sut.matchBlock = ^NSNumber*(SNTKillRequest* request) {
-    snapshotTaken = YES;
-    return @(getpid());
-  };
-
-  [sut resumeFromSavedState];
-
-  [self waitForExpectations:@[ killed ] timeout:10];
-  [self drain:sut];
-
-  // The precondition, not an outcome: the kill has to have run in the sliver
-  // where the entry is due and the window is still open, or this case is about
-  // the on-time branch instead and says nothing about the guard. Asserted rather
-  // than trusted, because nothing here can hold the clock still.
-  NSTimeInterval end = windowEnd.timeIntervalSince1970;
-  if (nowAtKill >= end || nowAtKill < end - kDueTolerance) {
-    XCTFail(@"the kill ran %g s from the occurrence end, outside the tolerance sliver this case "
-            @"exists to stand in",
-            end - nowAtKill);
-  }
-
-  XCTAssertEqual(requests.count, 1u);
-  XCTAssertNil(self.savedEntries);
-  XCTAssertEqual(banners.count, 0u);
-  XCTAssertFalse(snapshotTaken, @"snapshot taken for an entry that was already being killed");
-}
-
-// The same equality reached without leaning on the tolerance: the mach deadline
-// says the moment has passed while the believable wall clock still sits inside
-// the occurrence. The entry's deadline is that occurrence's end, so there is no
+// The window re-check reached on the mach side: the mach deadline says the
+// moment has passed while the believable wall clock still sits inside the
+// occurrence. The entry's deadline is that occurrence's own end, so there is no
 // later end to move to and the kill goes ahead rather than being deferred by the
 // size of whatever moved the wall clock.
 - (void)testAMachDueEntryInsideItsOwnOccurrenceKills {
@@ -1946,156 +1705,11 @@ static const NSTimeInterval kDueTolerance = 0.25;
   XCTAssertTrue([self.configurator persistTimedRuleKills:@[ entry ]]);
 
   SNTTimedRuleKills* sut = [self makeSUTOnHost:host refreshInterval:kUntickableRefreshInterval];
-  XCTestExpectation* killed = [self expectationWithDescription:@"kill ran"];
-  NSMutableArray<SNTKillRequest*>* requests = [NSMutableArray array];
-  [self captureKillsOn:sut into:requests expectation:killed];
-
   [sut resumeFromSavedState];
 
-  [self waitForExpectations:@[ killed ] timeout:10];
+  [self waitForEntriesToClear:sut];
   [self drain:sut];
-  XCTAssertEqual(requests.count, 1u);
-  XCTAssertNil(self.savedEntries);
-}
-
-// A window shape that could not be rebuilt from the state file is no shape: the
-// entry has nothing to re-check, so its deadline stands. Every row here stands at
-// noon with a past-due deadline inside a 09:00 to 17:00 window, which is exactly
-// the arrangement that reschedules when the shape is whole (see
-// testAPastDueEntryReschedulesWhileItsWindowIsOpen), so a kill is the defect
-// being treated as absent rather than as a window.
-- (void)testUnusablePersistedWindowShapesKillRatherThanRescheduling {
-  [self addRuleOfType:SNTRuleTypeTeamID identifier:kMatchingTeamID cel:kCELExpr];
-
-  NSDictionary<NSString*, NSDictionary*>* shapes = @{
-    @"a day list holding something that isn't a number" :
-        @{@"WindowDays" : @[ @1, @"Wednesday" ], @"WindowZone" : @"local"},
-    // The zone cannot be resolved, so the window cannot be asked. The design
-    // calls that past-due, which means kill.
-    @"a zone the resolver refuses" : @{@"WindowDays" : kEveryDay, @"WindowZone" : @"Mars/Olympus"},
-    // What an upgraded daemon finds on disk: a shape whole but for the zone. It
-    // loses its shape, so it behaves exactly like an entry that never had one.
-    @"a shape written before the zone existed" : @{@"WindowDays" : kEveryDay},
-  };
-
-  for (NSString* defect in shapes) {
-    FakeHost* host = [self makeHost];
-    host.wall = [self todayAtHour:12 minute:0].timeIntervalSince1970;
-
-    NSMutableDictionary* entry =
-        [[self entryDictForRuleType:SNTRuleTypeTeamID
-                         identifier:kMatchingTeamID
-                            celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
-                           deadline:[self todayAtHour:11 minute:0]] mutableCopy];
-    entry[@"WindowStart"] = @"09:00";
-    entry[@"WindowEnd"] = @"17:00";
-    [entry addEntriesFromDictionary:shapes[defect]];
-    XCTAssertTrue([self.configurator persistTimedRuleKills:@[ entry ]], @"%@", defect);
-
-    // A fresh configurator reads the entry just written back off disk, so each
-    // row is a restart of its own.
-    self.configurator = [self makeConfigurator];
-    SNTTimedRuleKills* sut = [self makeSUTOnHost:host refreshInterval:kUntickableRefreshInterval];
-    XCTestExpectation* killed = [self expectationWithDescription:defect];
-    NSMutableArray<SNTKillRequest*>* requests = [NSMutableArray array];
-    [self captureKillsOn:sut into:requests expectation:killed];
-
-    [sut resumeFromSavedState];
-
-    [self waitForExpectations:@[ killed ] timeout:10];
-    [self drain:sut];
-    XCTAssertEqual(requests.count, 1u, @"%@", defect);
-    XCTAssertNil(self.savedEntries, @"%@", defect);
-  }
-}
-
-// The stored zone is the calendar the window is re-checked in, not the host's.
-// Two entries at one instant with one window and two stored fixed offsets eight
-// hours apart: 12:00 in the first, 20:00 in the second. A re-check that read the
-// host's zone would read the same clock for both and so answer the same way for
-// both, whatever that answer was; here the first is inside its window and moves
-// its deadline to the occurrence end, and the second is outside its window and is
-// quit. Fixed offsets rather than named zones so the instants are arithmetic, and
-// an absolute instant rather than "today" so nothing depends on this host.
-- (void)testTheStoredZoneGovernsTheWindowRecheck {
-  [self addRuleOfType:SNTRuleTypeTeamID identifier:kMatchingTeamID cel:kCELExpr];
-  [self addRuleOfType:SNTRuleTypeTeamID identifier:kSecondTeamID cel:kCELExpr];
-
-  // 2026-06-03T12:00:00Z, and the deadline an hour before it, so both entries are
-  // past due whichever zone they are read in.
-  NSDate* noonUTC = [NSDate dateWithTimeIntervalSince1970:1780488000];
-  NSDate* deadline = [noonUTC dateByAddingTimeInterval:-3600];
-
-  FakeHost* host = [self makeHost];
-  host.wall = noonUTC.timeIntervalSince1970;
-
-  NSMutableArray<NSDictionary*>* saved = [NSMutableArray array];
-  for (NSArray* row in @[ @[ kMatchingTeamID, @"+00:00" ], @[ kSecondTeamID, @"+08:00" ] ]) {
-    NSMutableDictionary* entry =
-        [[self entryDictForRuleType:SNTRuleTypeTeamID
-                         identifier:row[0]
-                            celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
-                           deadline:deadline] mutableCopy];
-    entry[@"WindowDays"] = kEveryDay;
-    entry[@"WindowStart"] = @"09:00";
-    entry[@"WindowEnd"] = @"17:00";
-    entry[@"WindowZone"] = row[1];
-    [saved addObject:entry];
-  }
-  XCTAssertTrue([self.configurator persistTimedRuleKills:saved]);
-
-  self.configurator = [self makeConfigurator];
-  SNTTimedRuleKills* sut = [self makeSUTOnHost:host refreshInterval:kUntickableRefreshInterval];
-  XCTestExpectation* killed = [self expectationWithDescription:@"kill ran"];
-  NSMutableArray<SNTKillRequest*>* requests = [NSMutableArray array];
-  [self captureKillsOn:sut into:requests expectation:killed];
-
-  [sut resumeFromSavedState];
-
-  [self waitForExpectations:@[ killed ] timeout:10];
-  [self drain:sut];
-
-  // Only the entry whose stored zone puts it outside its window was quit.
-  XCTAssertEqual(requests.count, 1u);
-  XCTAssertEqualObjects(((SNTKillRequestTeamID*)requests.firstObject).teamID, kSecondTeamID);
-
-  // The other moved to 17:00 in its own zone, five hours on from the clock.
-  XCTAssertEqual(self.savedEntries.count, 1u);
-  NSDictionary* rescheduled = [self savedEntryForIdentifier:kMatchingTeamID];
-  XCTAssertEqualWithAccuracy([rescheduled[@"Deadline"] doubleValue],
-                             noonUTC.timeIntervalSince1970 + 5 * 3600, 1);
-  XCTAssertEqualObjects(rescheduled[@"WindowZone"], @"+00:00");
-}
-
-// A shape the window math itself refuses, which is what a day outside 0 through
-// 6 is. There is no window to be inside, so the answer is the same as a closed
-// one: proceed to the kill, rather than throwing or holding the entry forever.
-- (void)testAWindowEvaluationErrorProceedsToTheKill {
-  [self addRuleOfType:SNTRuleTypeTeamID identifier:kMatchingTeamID cel:kCELExpr];
-
-  FakeHost* host = [self makeHost];
-  host.wall = [self todayAtHour:12 minute:0].timeIntervalSince1970;
-
-  SNTTimedRuleKills* sut = [self makeSUTOnHost:host refreshInterval:kUntickableRefreshInterval];
-  XCTestExpectation* killed = [self expectationWithDescription:@"kill ran"];
-  NSMutableArray<SNTKillRequest*>* requests = [NSMutableArray array];
-  [self captureKillsOn:sut into:requests expectation:killed];
-
-  NSDate* deadline = [self todayAtHour:11 minute:0];
-  [sut recordKillForRuleType:SNTRuleTypeTeamID
-                  identifier:kMatchingTeamID
-                     celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
-                    deadline:deadline
-                    notifyAt:deadline
-                  windowDays:@[ @42 ]
-                 windowStart:@"09:00"
-                   windowEnd:@"17:00"
-                  windowZone:@"local"];
-
-  [self waitForExpectations:@[ killed ] timeout:10];
-  [self drain:sut];
-  XCTAssertEqual(requests.count, 1u);
-  XCTAssertNil(self.savedEntries);
+  XCTAssertEqualObjects(SignalDescriptions(_fake.signals), [self termThenKillOfTheProcessGroup]);
 }
 
 #pragma mark Helpers that wait
@@ -2121,23 +1735,16 @@ static const NSTimeInterval kDueTolerance = 0.25;
 }
 
 /// Polls until the component has cleared its persisted entries, which happens
-/// once every recorded deadline has been processed.
-- (void)waitForEntriesToClear {
+/// once every recorded deadline has been processed. Drains first: a record is
+/// asynchronous, and "no entries persisted" is also true before its write lands,
+/// so polling straight away can pass before the deadline was ever processed.
+- (void)waitForEntriesToClear:(SNTTimedRuleKills*)sut {
+  [self drain:sut];
   [self
       waitUntil:^BOOL {
         return self.savedEntries == nil;
       }
       described:@"entries cleared"];
-}
-
-/// Polls until the component has recorded that it ran the warning pass for its
-/// single pending entry.
-- (void)waitForTheWarningPass {
-  [self
-      waitUntil:^BOOL {
-        return [self.savedEntries.firstObject[@"Notified"] boolValue];
-      }
-      described:@"warning pass ran"];
 }
 
 /// Polls until the clock has refreshed `count` times, which is how a test that
