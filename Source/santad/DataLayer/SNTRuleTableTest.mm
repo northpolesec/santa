@@ -54,11 +54,14 @@
 - (void)setUp {
   [super setUp];
 
-  self.dbq = [[FMDatabaseQueue alloc] init];
-  self.sut = [[SNTRuleTable alloc] initWithDatabaseQueue:self.dbq];
-
+  // Mock the configurator before the rule table is created: -initializeDatabase:fromVersion:
+  // reads the configurator, so a real one there would prime the static rule cache from the
+  // machine's own StaticRules and call -setSyncTypeRequired: on the real singleton.
   self.mockConfigurator = OCMClassMock([SNTConfigurator class]);
   OCMStub([self.mockConfigurator configurator]).andReturn(self.mockConfigurator);
+
+  self.dbq = [[FMDatabaseQueue alloc] init];
+  self.sut = [[SNTRuleTable alloc] initWithDatabaseQueue:self.dbq];
 }
 
 - (void)tearDown {
@@ -626,9 +629,6 @@
                        errors:&err];
   XCTAssertNil(err);
 
-  // This test is only concerned about sqlite's behavior. Ensure static rules are ignored.
-  [self.sut updateStaticRules:nil];
-
   // This test verifies that rule precedence ordering is correct.
   // The query uses UNION ALL with ORDER BY type ASC to guarantee the highest-priority
   // rule is returned. See the comment in SNTRuleTable#executionRuleForIdentifiers:
@@ -734,9 +734,6 @@
                        errors:&err];
   XCTAssertNil(err);
 
-  // Only sqlite's behavior is under test here. Ensure static rules are ignored.
-  [self.sut updateStaticRules:nil];
-
   NSString* transitiveID = [self _exampleTransitiveRule].identifier;
 
   // Each case pairs the transitive Binary rule with exactly one configured rule. The configured
@@ -826,7 +823,6 @@
                   ruleCleanup:SNTRuleCleanupNone
                        errors:&err];
   XCTAssertNil(err);
-  [self.sut updateStaticRules:nil];
 
   SNTRule* r = [self.sut
       executionRuleForIdentifiers:(struct RuleIdentifiers){
@@ -862,7 +858,6 @@
                   ruleCleanup:SNTRuleCleanupNone
                        errors:&err];
   XCTAssertNil(err);
-  [self.sut updateStaticRules:nil];
 
   NSString* transitiveID = [self _exampleTransitiveRule].identifier;
 
@@ -921,7 +916,6 @@
                   ruleCleanup:SNTRuleCleanupNone
                        errors:&err];
   XCTAssertNil(err);
-  [self.sut updateStaticRules:nil];
 
   SNTRule* r = [self.sut
       executionRuleForIdentifiers:
@@ -976,7 +970,6 @@
                   ruleCleanup:SNTRuleCleanupNone
                        errors:&err];
   XCTAssertNil(err);
-  [self.sut updateStaticRules:nil];
 
   SNTRule* r = [self.sut executionRuleForIdentifiers:(struct RuleIdentifiers){
                                                          .signingID = @"ABCDEFGHIJ:signingID",
