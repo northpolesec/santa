@@ -1171,6 +1171,7 @@ objc_library(
         "//Source/common:SNTRule",
         "//Source/common:SNTRuleIdentifiers",
         "//Source/common:SNTXPCNotifierInterface",
+        "//Source/common:String",
         "//Source/common:Timer",
     ],
 )
@@ -1188,7 +1189,6 @@ santa_unit_test(
         "//Source/common:MOLXPCConnection",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
-        "//Source/common:SNTKillCommand",
         "//Source/common:SNTRule",
         "//Source/common:SNTXPCNotifierInterface",
         "@FMDB",

@@ -18,6 +18,7 @@
 #import <Foundation/Foundation.h>
 
 #import "Source/common/SNTCommonEnums.h"
+#include "Source/santad/KillingMachine.h"
 
 @class SNTConfigurator;
 @class SNTNotificationQueue;
@@ -38,9 +39,14 @@
 ///
 @interface SNTTimedRuleKills : NSObject
 
+///
+///  `killEnv` is the syscall environment kills and match checks run against:
+///  santa::KillEnv() in production, faked in tests.
+///
 - (instancetype)initWithNotifierQueue:(SNTNotificationQueue*)notifierQueue
                             ruleTable:(SNTRuleTable*)ruleTable
-                         configurator:(SNTConfigurator*)configurator NS_DESIGNATED_INITIALIZER;
+                         configurator:(SNTConfigurator*)configurator
+                              killEnv:(santa::KillEnv)killEnv NS_DESIGNATED_INITIALIZER;
 
 - (instancetype)init NS_UNAVAILABLE;
 

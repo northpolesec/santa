@@ -33,6 +33,7 @@
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTRuleIdentifiers.h"
 #import "Source/common/SNTXPCNotifierInterface.h"
+#include "Source/common/String.h"
 #include "Source/common/Timer.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
 #include "Source/santad/KillingMachine.h"
@@ -113,7 +114,8 @@ NSString* DisplayNameForPid(pid_t pid) {
 
 // The kill is delivered to the process group of every match, with SIGKILL as
 // the nominal signal; the term-then-kill path sends SIGTERM and SIGKILL itself
-// and ignores this field.
+// and ignores this field. Never nil for an entry that exists: every write site
+// gates on SupportedRuleType, so only the switch needs the default arm.
 SNTKillRequest* KillRequestForEntry(SNTTimedRuleKillEntry* entry) {
   NSString* uuid = [[NSUUID UUID] UUIDString];
 
@@ -164,10 +166,8 @@ SNTKillRequest* KillRequestForEntry(SNTTimedRuleKillEntry* entry) {
   entry.celHash = celHash;
   entry.deadline = [NSDate dateWithTimeIntervalSince1970:[dict[kEntryDeadlineKey] doubleValue]];
   entry.notifyAt = [NSDate dateWithTimeIntervalSince1970:[dict[kEntryNotifyAtKey] doubleValue]];
-  // The one optional field: absent on entries written before the warning banner
-  // existed, so a missing key is a valid NO rather than a reason to drop the
-  // entry. Guarded like every other field, though, so a non-NSNumber value on
-  // disk can't reach -boolValue and crash-loop the daemon at startup.
+  // Guarded like every other field: a non-NSNumber value on disk must not reach
+  // -boolValue and crash-loop the daemon at startup.
   id notified = dict[kEntryNotifiedKey];
   entry.notified = [notified isKindOfClass:[NSNumber class]] && [notified boolValue];
   return entry;
@@ -199,15 +199,6 @@ SNTKillRequest* KillRequestForEntry(SNTTimedRuleKillEntry* entry) {
 /// Entries keyed by rule type, identifier and CEL hash, so repeated execs under
 /// the same rule share one entry. Only ever touched on `queue`.
 @property NSMutableDictionary<NSString*, SNTTimedRuleKillEntry*>* entries;
-/// Test seam for the one call with no safe form to exercise against real
-/// processes. Never set in production, where the real kill runs instead.
-@property(copy) SNTKillResponse* (^killBlock)(SNTKillRequest* request, NSTimeInterval grace);
-/// Test seam paired with killBlock: the pid of something the rule covers that
-/// is running, or nil for nothing running. Nothing a test runs can be made to
-/// match a rule, so the match is the part that is faked; naming the pid and
-/// deciding on the banner are the production path either way. Never set in
-/// production.
-@property(copy) NSNumber* (^matchBlock)(SNTKillRequest* request);
 
 - (void)onDeadlineTimer;
 @end
@@ -244,13 +235,17 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
 
 @implementation SNTTimedRuleKills {
   std::shared_ptr<DeadlineTimer> _timer;
+  /// The syscalls every kill and every match here go through.
+  santa::KillEnv _killEnv;
 }
 
 - (instancetype)initWithNotifierQueue:(SNTNotificationQueue*)notifierQueue
                             ruleTable:(SNTRuleTable*)ruleTable
-                         configurator:(SNTConfigurator*)configurator {
+                         configurator:(SNTConfigurator*)configurator
+                              killEnv:(santa::KillEnv)killEnv {
   self = [super init];
   if (self) {
+    _killEnv = std::move(killEnv);
     _notifierQueue = notifierQueue;
     _ruleTable = ruleTable;
     _configurator = configurator;
@@ -268,14 +263,9 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
   }
 
   NSData* text = [celExpr dataUsingEncoding:NSUTF8StringEncoding];
-  unsigned char digest[CC_SHA256_DIGEST_LENGTH];
+  uint8_t digest[CC_SHA256_DIGEST_LENGTH];
   CC_SHA256(text.bytes, (CC_LONG)text.length, digest);
-
-  NSMutableString* hex = [NSMutableString stringWithCapacity:CC_SHA256_DIGEST_LENGTH * 2];
-  for (int i = 0; i < CC_SHA256_DIGEST_LENGTH; i++) {
-    [hex appendFormat:@"%02x", digest[i]];
-  }
-  return hex;
+  return santa::StringToNSString(santa::BufToHexString(digest, sizeof(digest)));
 }
 
 - (void)resumeFromSavedState {
@@ -381,19 +371,32 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
 /// no kill is waiting on it by the time it is taken. It also means an entry
 /// whose deadline has arrived is gone before the warning pass sees it, so
 /// nothing is warned about a kill that is already happening.
+///
+/// Due entries are gathered and killed in one pass, sharing one grace period.
 - (void)processDueEntriesSerialized {
   NSDate* now = [NSDate date];
   BOOL changed = NO;
 
+  NSMutableArray<SNTTimedRuleKillEntry*>* due = [NSMutableArray array];
   for (NSString* key in self.entries.allKeys) {
     SNTTimedRuleKillEntry* entry = self.entries[key];
     if ([entry.deadline timeIntervalSinceDate:now] > kDueTolerance) {
       continue;
     }
 
-    [self killForEntrySerialized:entry];
+    // A deadline is spent once, whether or not anything is killed.
     [self.entries removeObjectForKey:key];
     changed = YES;
+
+    // A rule that no longer governs has no kill coming.
+    if (![self ruleStillGovernsSerialized:entry]) {
+      continue;
+    }
+    [due addObject:entry];
+  }
+
+  if (due.count) {
+    [self killEntriesSerialized:due];
   }
 
   for (NSString* key in self.entries.allKeys) {
@@ -447,27 +450,26 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
   return YES;
 }
 
-/// The kill at a deadline: re-check the rule, then quit what it covers.
-- (void)killForEntrySerialized:(SNTTimedRuleKillEntry*)entry {
-  if (![self ruleStillGovernsSerialized:entry]) {
-    return;
+/// The kill at a deadline: one pass over every due entry, sharing the grace
+/// period. Rules have already been re-checked.
+- (void)killEntriesSerialized:(NSArray<SNTTimedRuleKillEntry*>*)entries {
+  NSMutableArray<SNTKillRequest*>* requests = [NSMutableArray arrayWithCapacity:entries.count];
+  for (SNTTimedRuleKillEntry* entry in entries) {
+    [requests addObject:KillRequestForEntry(entry)];
   }
 
-  SNTKillRequest* request = KillRequestForEntry(entry);
-  if (!request) {
-    LOGW(@"Unable to build a kill request for %@; nothing killed", entry.identifier);
-    return;
+  NSArray<SNTKillResponse*>* responses =
+      santa::KillingMachineTermThenKill(requests, kTermGrace, _killEnv);
+
+  // One response per request, in order, so `entries` indexes them.
+  // killedProcesses counts deliveries, not processes: a survivor of SIGTERM
+  // appears twice, and a group shared with another entry is reported against
+  // whichever entry signaled it.
+  for (NSUInteger index = 0; index < responses.count; index++) {
+    LOGI(@"Timed rule kill fired for %@: %lu signal delivery result(s) of its own, error: %ld",
+         entries[index].identifier, (unsigned long)responses[index].killedProcesses.count,
+         (long)responses[index].error);
   }
-
-  SNTKillResponse* response = self.killBlock
-                                  ? self.killBlock(request, kTermGrace)
-                                  : santa::KillingMachineTermThenKill(request, kTermGrace);
-
-  // killedProcesses holds one result per delivery across both passes, so a
-  // process that survived SIGTERM appears twice. It is a count of deliveries,
-  // not of processes.
-  LOGI(@"Timed rule kill fired for %@: %lu signal delivery result(s), error: %ld", entry.identifier,
-       (unsigned long)response.killedProcesses.count, (long)response.error);
 }
 
 /// The warning shortly before a deadline: find something the rule covers that
@@ -482,22 +484,7 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
     return;
   }
 
-  SNTKillRequest* request = KillRequestForEntry(entry);
-  if (!request) {
-    LOGW(@"Unable to build a kill request for %@; nothing to warn about", entry.identifier);
-    return;
-  }
-
-  std::optional<pid_t> pid;
-  if (self.matchBlock) {
-    NSNumber* matched = self.matchBlock(request);
-    if (matched) {
-      pid = matched.intValue;
-    }
-  } else {
-    pid = santa::KillingMachineAnyMatch(request);
-  }
-
+  std::optional<pid_t> pid = santa::KillingMachineAnyMatch(KillRequestForEntry(entry), _killEnv);
   if (!pid) {
     // Nothing the rule covers is running, so there is nothing to warn about.
     LOGD(@"No running process matches %@; skipping timed rule kill banner", entry.identifier);

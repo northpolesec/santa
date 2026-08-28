@@ -1020,9 +1020,6 @@ static SNTConfigurator* sharedConfigurator = nil;
 
 - (BOOL)persistTimedRuleKills:(NSArray<NSDictionary*>*)entries {
   @synchronized(self) {
-    // No rollback on a failed write, unlike the demoted-admins record: the
-    // entries the daemon holds in memory are the kills it still owes, and
-    // discarding them here would cancel those kills outright.
     return [self updateStateSynchronizedKey:kStateTimedRuleKillsKey value:entries];
   }
 }

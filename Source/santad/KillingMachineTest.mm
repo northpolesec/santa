@@ -51,6 +51,10 @@ namespace {
 // pids the real (unfaked) matching machinery matches.
 static NSString* const kMatchingTeamID = @"ABCDE12345";
 
+// A second team ID, for the cases that need two requests matching two different
+// processes. Same length as the first, so the fake blob math is the same.
+static NSString* const kSecondTeamID = @"FGHIJ67890";
+
 // One recorded signal delivery. `target` is a pid when `group` is false and a
 // pgid when it is true.
 struct FakeSignal {
@@ -69,6 +73,9 @@ struct FakeEnv {
   std::map<pid_t, int> pidversions;
   // pids the fake csops reports kMatchingTeamID for.
   std::set<pid_t> matching;
+  // pids it reports kSecondTeamID for instead, so a test can have two requests
+  // match two different processes.
+  std::set<pid_t> matchingSecond;
   // pid -> pgid. A pid that isn't here has an unreadable process group.
   std::map<pid_t, pid_t> pgids;
   // pid -> the audit token read after which that pid is recycled: its live
@@ -107,14 +114,17 @@ santa::KillEnv MakeEnv(FakeEnv* fake) {
   };
 
   env.csops_func = [fake](pid_t pid, unsigned int ops, void* useraddr, size_t usersize) {
-    if (ops != santa::kCsopTeamID || !fake->matching.count(pid) ||
-        usersize < sizeof(santa::csops_blob) + kMatchingTeamID.length) {
+    NSString* teamID = fake->matching.count(pid)
+                           ? kMatchingTeamID
+                           : (fake->matchingSecond.count(pid) ? kSecondTeamID : nil);
+    if (ops != santa::kCsopTeamID || !teamID ||
+        usersize < sizeof(santa::csops_blob) + teamID.length) {
       return -1;
     }
     santa::csops_blob* blob = (santa::csops_blob*)useraddr;
     blob->type = 0;
-    blob->len = htonl(sizeof(santa::csops_blob) + 1 + kMatchingTeamID.length);
-    std::memcpy(blob->data, kMatchingTeamID.UTF8String, kMatchingTeamID.length);
+    blob->len = htonl(sizeof(santa::csops_blob) + 1 + teamID.length);
+    std::memcpy(blob->data, teamID.UTF8String, teamID.length);
     return 0;
   };
 
@@ -147,6 +157,30 @@ santa::KillEnv MakeEnv(FakeEnv* fake) {
   };
 
   return env;
+}
+
+// The request pair the multi-request tests share: two team IDs matching two
+// different processes, both targeting process groups.
+NSArray<SNTKillRequest*>* TwoGroupTargetingRequests() {
+  return @[
+    [[SNTKillRequestTeamID alloc] initWithUUID:@"first"
+                                        teamID:kMatchingTeamID
+                                        signal:SIGKILL
+                           targetProcessGroups:YES],
+    [[SNTKillRequestTeamID alloc] initWithUUID:@"second"
+                                        teamID:kSecondTeamID
+                                        signal:SIGKILL
+                           targetProcessGroups:YES],
+  ];
+}
+
+// One process per request of that pair, both in the same process group.
+void TwoMatchesInOneGroup(FakeEnv* fake, pid_t pgid) {
+  fake->pids = std::vector<pid_t>{10, 11};
+  fake->pidversions = {{10, 1}, {11, 2}};
+  fake->matching = {10};
+  fake->matchingSecond = {11};
+  fake->pgids = {{10, pgid}, {11, pgid}};
 }
 
 // Renders recorded deliveries as "pid:10:9" / "group:100:15" so a failing
@@ -626,6 +660,120 @@ NSArray<NSString*>* SignalDescriptions(const std::vector<FakeSignal>& signals) {
   XCTAssertEqual(fake.waits.size(), 0);
   XCTAssertEqual(response.killedProcesses.count, 1);
   XCTAssertEqual(response.killedProcesses[0].error, SNTKilledProcessErrorNoSuchProcess);
+}
+
+// Several requests in one call share the grace period: all SIGTERMs first,
+// one wait, then each request's SIGKILL re-match.
+- (void)testTermThenKillSharesOneGracePeriodAcrossRequests {
+  pid_t firstPgid = getpgrp() + 1;
+  pid_t secondPgid = getpgrp() + 2;
+
+  FakeEnv fake;
+  fake.pids = std::vector<pid_t>{10, 11};
+  fake.pidversions = {{10, 1}, {11, 2}};
+  fake.matching = {10};
+  fake.matchingSecond = {11};
+  fake.pgids = {{10, firstPgid}, {11, secondPgid}};
+  // The first request's process exits during the grace period; the second's
+  // survives.
+  fake.onWait = [&fake] {
+    fake.matching.erase(10);
+    fake.pidversions.erase(10);
+  };
+
+  NSArray<SNTKillResponse*>* responses =
+      santa::KillingMachineTermThenKill(TwoGroupTargetingRequests(), 5.0, MakeEnv(&fake));
+
+  // Both SIGTERMs precede any SIGKILL, and there is one wait between them.
+  XCTAssertEqualObjects(SignalDescriptions(fake.signals), (@[
+                          [NSString stringWithFormat:@"group:%d:15", firstPgid],
+                          [NSString stringWithFormat:@"group:%d:15", secondPgid],
+                          [NSString stringWithFormat:@"group:%d:9", secondPgid],
+                        ]));
+  XCTAssertEqual(fake.waits.size(), 1);
+  XCTAssertEqual(fake.waits[0], 5.0);
+
+  // One response per request, in order.
+  XCTAssertEqual(responses.count, 2);
+  XCTAssertEqual(responses[0].killedProcesses.count, 1);
+  XCTAssertEqual(responses[1].killedProcesses.count, 2);
+}
+
+// Two requests whose matches share a process group: the group is signaled
+// once per pass, not once per request.
+- (void)testTermThenKillSignalsASharedGroupOncePerPass {
+  pid_t sharedPgid = getpgrp() + 1;
+
+  FakeEnv fake;
+  TwoMatchesInOneGroup(&fake, sharedPgid);
+
+  NSArray<SNTKillResponse*>* responses =
+      santa::KillingMachineTermThenKill(TwoGroupTargetingRequests(), 5.0, MakeEnv(&fake));
+
+  XCTAssertEqualObjects(SignalDescriptions(fake.signals), (@[
+                          [NSString stringWithFormat:@"group:%d:15", sharedPgid],
+                          [NSString stringWithFormat:@"group:%d:9", sharedPgid],
+                        ]));
+  XCTAssertEqual(fake.waits.size(), 1);
+
+  // The delivery is reported by the request that signaled the group; the
+  // second reports none of its own.
+  XCTAssertEqual(responses.count, 2);
+  XCTAssertEqual(responses[0].killedProcesses.count, 2);
+  XCTAssertEqual(responses[1].killedProcesses.count, 0);
+}
+
+// The process that owned the shared group's signal honors SIGTERM and stops
+// matching. The covered request must still re-match, or the survivor in the
+// group would never be SIGKILLed.
+- (void)testTermThenKillEscalatesACoveredRequestWhenTheGroupOwnerExits {
+  pid_t sharedPgid = getpgrp() + 1;
+
+  FakeEnv fake;
+  TwoMatchesInOneGroup(&fake, sharedPgid);
+  // pid 10 quits on SIGTERM; pid 11 ignores it.
+  fake.onWait = [&fake] {
+    fake.matching.erase(10);
+    fake.pidversions.erase(10);
+  };
+
+  NSArray<SNTKillResponse*>* responses =
+      santa::KillingMachineTermThenKill(TwoGroupTargetingRequests(), 5.0, MakeEnv(&fake));
+
+  // The survivor's group is still SIGKILLed, and still only once.
+  XCTAssertEqualObjects(SignalDescriptions(fake.signals), (@[
+                          [NSString stringWithFormat:@"group:%d:15", sharedPgid],
+                          [NSString stringWithFormat:@"group:%d:9", sharedPgid],
+                        ]));
+  XCTAssertEqual(fake.waits.size(), 1);
+
+  // The second request reports the escalation; the first no longer matched.
+  XCTAssertEqual(responses.count, 2);
+  XCTAssertEqual(responses[0].killedProcesses.count, 1);
+  XCTAssertEqual(responses[1].killedProcesses.count, 1);
+  XCTAssertEqual(responses[1].killedProcesses[0].pid, 11);
+}
+
+// A failed group signal does not suppress another request's attempt. Nothing
+// landed, so no grace period is served either.
+- (void)testTermThenKillRetriesAGroupWhoseSignalFailed {
+  pid_t sharedPgid = getpgrp() + 1;
+
+  FakeEnv fake;
+  TwoMatchesInOneGroup(&fake, sharedPgid);
+  fake.signalError = ESRCH;
+
+  NSArray<SNTKillResponse*>* responses =
+      santa::KillingMachineTermThenKill(TwoGroupTargetingRequests(), 5.0, MakeEnv(&fake));
+
+  XCTAssertEqualObjects(SignalDescriptions(fake.signals), (@[
+                          [NSString stringWithFormat:@"group:%d:15", sharedPgid],
+                          [NSString stringWithFormat:@"group:%d:15", sharedPgid],
+                        ]));
+  XCTAssertEqual(fake.waits.size(), 0);
+  XCTAssertEqual(responses.count, 2);
+  XCTAssertEqual(responses[0].killedProcesses[0].error, SNTKilledProcessErrorNoSuchProcess);
+  XCTAssertEqual(responses[1].killedProcesses[0].error, SNTKilledProcessErrorNoSuchProcess);
 }
 
 - (void)testTermThenKillPropagatesFirstPassFailure {
