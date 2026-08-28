@@ -33,7 +33,6 @@
 #import "Source/common/SNTSystemInfo.h"
 #include "Source/common/String.h"
 #include "Source/common/SystemResources.h"
-#include "absl/cleanup/cleanup.h"
 #include "absl/container/flat_hash_map.h"
 
 namespace santa {
