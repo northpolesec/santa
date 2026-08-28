@@ -605,6 +605,31 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
   }
 }
 
+// Patterns from a sync server must be normalized the same way as ones from the
+// config profile: anchored with ^ if not already, so the stored expression is a
+// prefix match rather than a substring match.
+- (void)testSyncServerPathRegexesAreAnchored {
+  SNTConfigurator* sut = [[SNTConfigurator alloc] init];
+
+  [sut setSyncServerAllowedPathRegex:@"/usr/bin/.*"];
+  [sut setSyncServerBlockedPathRegex:@"^/tmp/.*"];
+
+  XCTAssertEqualObjects(sut.allowedPathRegex.pattern, @"^/usr/bin/.*");
+  XCTAssertEqualObjects(sut.blockedPathRegex.pattern, @"^/tmp/.*");
+
+  // "" means "no regex managed here". It must clear the key, not anchor into
+  // "^", which matches every path (i.e. allow everything under Lockdown).
+  [sut setSyncServerAllowedPathRegex:@""];
+  [sut setSyncServerBlockedPathRegex:@""];
+
+  XCTAssertNil(sut.allowedPathRegex);
+  XCTAssertNil(sut.blockedPathRegex);
+
+  // An uncompilable pattern also clears rather than storing a bogus expression.
+  [sut setSyncServerAllowedPathRegex:@"/usr/["];
+  XCTAssertNil(sut.allowedPathRegex);
+}
+
 - (void)testDNSUpstreamTimeoutSecsForcedConfig {
   SNTConfigurator* sut = [[SNTConfigurator alloc] init];
   // Unset -> 0, the "use built-in default" sentinel. The default + [1,60]s clamp live downstream
