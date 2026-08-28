@@ -81,11 +81,20 @@ static constexpr WatchItemRuleType kWatchItemPolicyDefaultRuleType =
 static constexpr bool kWatchItemPolicyDefaultEnableSilentMode = false;
 static constexpr bool kWatchItemPolicyDefaultEnableSilentTTYMode = false;
 
-/// The outcome of a match against a single configured process. `kInherit`
-/// defers to the rule's `rule_type` and `audit_only` options, which is the
-/// behavior of every process listed under the `Processes` key. The remaining
-/// values state their own outcome, which is how a `ProcessesWithOptions` entry
-/// can e.g. deny a process under a `PathsWithAllowedProcesses` rule.
+/// The outcome a `ProcessesWithOptions` entry states for itself, bypassing the
+/// rule's `rule_type` and `audit_only` options. `kInherit` defers to the rule
+/// entirely, which is the behavior of every process listed under `Processes`.
+///
+/// What the outcome applies to depends on what the entry describes:
+///   - Under the `PathsWith*` rule types the entry describes the instigating
+///     process, so the action is that process's verdict for the rule's paths.
+///     This is how a process can be denied under a `PathsWithAllowedProcesses`
+///     rule.
+///   - Under the `ProcessesWith*` rule types the entry describes the watched
+///     process, and the rule's path list decides each access. The action states
+///     what happens when that process violates the rule, so it can e.g. put one
+///     process of a `ProcessesWithAllowedPaths` rule into audit while the rest
+///     stay enforcing. Accesses the rule permits are unaffected.
 enum class WatchItemProcessAction {
   kInherit,
   kAllow,

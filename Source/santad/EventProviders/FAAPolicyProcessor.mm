@@ -16,6 +16,7 @@
 
 #include <bsm/libbsm.h>
 
+#include <optional>
 #include <vector>
 
 #include "Source/common/AccountLookup.h"
@@ -95,6 +96,16 @@ static inline bool ShouldMessageTTY(const WatchItemProcessOptions& options, cons
     return false;
   }
   return true;
+}
+
+/// The decision an entry's action states, or nullopt when it defers to the rule.
+static std::optional<FileAccessPolicyDecision> DecisionForAction(WatchItemProcessAction action) {
+  switch (action) {
+    case WatchItemProcessAction::kAllow: return FileAccessPolicyDecision::kAllowed;
+    case WatchItemProcessAction::kAudit: return FileAccessPolicyDecision::kAllowedAuditOnly;
+    case WatchItemProcessAction::kDeny: return FileAccessPolicyDecision::kDenied;
+    case WatchItemProcessAction::kInherit: return std::nullopt;
+  }
 }
 
 /// The options to use for this event: the matched process's overrides when it
@@ -373,18 +384,18 @@ FAAPolicyProcessor::DecisionAndOptions FAAPolicyProcessor::ApplyPolicy(
     return {FileAccessPolicyDecision::kDeniedInvalidSignature, &policy->options};
   }
 
-  // When no configured process overrides the rule's allow_read_access, the
-  // rule's own value decides, and a readable target can be answered without
-  // scanning the process list at all.
-  if (!policy->has_read_access_override &&
-      PolicyAllowsReadsForTarget(msg, target, policy->options.allow_read_access)) {
-    return {FileAccessPolicyDecision::kAllowedReadAccess, &policy->options};
+  // The match only has to be computed before the read-access check when a
+  // configured process can override the rule's allow_read_access. Otherwise the
+  // rule's own value decides, and deferring the match keeps the common case
+  // from scanning the process list to answer a read-only access.
+  PolicyMatch match;
+  bool have_match = false;
+  if (policy->has_read_access_override) {
+    match = check_if_policy_matches_block(*policy, target, msg);
+    have_match = true;
   }
 
-  // Otherwise the match must be computed before the read-access check below,
-  // because the matched process can override allow_read_access.
-  PolicyMatch match = check_if_policy_matches_block(*policy, target, msg);
-  const WatchItemProcessOptions& options = ResolveOptions(*policy, match);
+  const WatchItemProcessOptions* options = &ResolveOptions(*policy, match);
 
   // If the policy allows read access and the target is readable, produce
   // an immediate result.
@@ -393,18 +404,23 @@ FAAPolicyProcessor::DecisionAndOptions FAAPolicyProcessor::ApplyPolicy(
   // layer. If the policy would generally allow access to the resource,
   // producing the full kAllow result would potentially result in better
   // system performance.
-  if (PolicyAllowsReadsForTarget(msg, target, options.allow_read_access)) {
-    return {FileAccessPolicyDecision::kAllowedReadAccess, &options};
+  if (PolicyAllowsReadsForTarget(msg, target, options->allow_read_access)) {
+    return {FileAccessPolicyDecision::kAllowedReadAccess, options};
   }
 
-  // A matched process that states its own action bypasses the rule's RuleType
-  // and audit-only options entirely. This is what allows e.g. a silently denied
-  // process under a PathsWithAllowedProcesses rule.
+  if (!have_match) {
+    match = check_if_policy_matches_block(*policy, target, msg);
+    options = &ResolveOptions(*policy, match);
+  }
+
+  // An entry that states its own action bypasses the rule's RuleType and
+  // audit-only options entirely. Where that action is applied depends on what
+  // the entry describes, which differs between the two families of rule type.
   //
-  // Note: This only applies to an actual match. Process rule types supply the
-  // overrides of the process matched at exec time even for events whose path
-  // didn't match, and in that case the rule's path semantics below must still
-  // decide allowed vs denied.
+  // For the path-centric rule types the entry describes the instigating
+  // process, so a match means "this is the process the entry is about" and the
+  // action states that process's outcome. This is what allows e.g. a silently
+  // denied process under a PathsWithAllowedProcesses rule.
   //
   // Note: The effective allow_read_access option is applied above and takes
   // precedence over the action, so a read-only operation is allowed even for an
@@ -412,13 +428,13 @@ FAAPolicyProcessor::DecisionAndOptions FAAPolicyProcessor::ApplyPolicy(
   // allow_read_access scopes which operations the rule covers at all rather
   // than deciding their outcome. An entry that must also deny reads has to set
   // AllowReadAccess to false.
-  if (match.matched) {
-    switch (options.action) {
-      case WatchItemProcessAction::kAllow: return {FileAccessPolicyDecision::kAllowed, &options};
-      case WatchItemProcessAction::kAudit:
-        return {FileAccessPolicyDecision::kAllowedAuditOnly, &options};
-      case WatchItemProcessAction::kDeny: return {FileAccessPolicyDecision::kDenied, &options};
-      case WatchItemProcessAction::kInherit: break;
+  const bool path_centric_rule =
+      policy->rule_type == WatchItemRuleType::kPathsWithAllowedProcesses ||
+      policy->rule_type == WatchItemRuleType::kPathsWithDeniedProcesses;
+
+  if (path_centric_rule && match.matched) {
+    if (std::optional<FileAccessPolicyDecision> stated = DecisionForAction(options->action)) {
+      return {*stated, options};
     }
   }
 
@@ -438,11 +454,23 @@ FAAPolicyProcessor::DecisionAndOptions FAAPolicyProcessor::ApplyPolicy(
     }
   }
 
+  // For the process-centric rule types the entry describes the watched process,
+  // which was matched once at exec time, while `matched` describes the path. The
+  // action there states what happens when this process violates the rule, so it
+  // is applied to the denial rather than to the match. Without this, an entry on
+  // a ProcessesWithAllowedPaths rule would state the outcome for the accesses
+  // the rule permits, which is the opposite of what it reads as.
+  if (!path_centric_rule && decision == FileAccessPolicyDecision::kDenied) {
+    if (std::optional<FileAccessPolicyDecision> stated = DecisionForAction(options->action)) {
+      return {*stated, options};
+    }
+  }
+
   if (decision == FileAccessPolicyDecision::kDenied && policy->audit_only) {
     decision = FileAccessPolicyDecision::kAllowedAuditOnly;
   }
 
-  return {decision, &options};
+  return {decision, options};
 }
 
 void FAAPolicyProcessor::LogTelemetry(const WatchItemPolicyBase& policy, const Message& msg,

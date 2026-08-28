@@ -549,12 +549,11 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess& proc) {
     return {false, &options};
   };
 
-  // An explicit action bypasses both the rule type and the audit-only option.
-  // This is checked against every rule type to prove the inversion is skipped.
+  // For the path-centric rule types the entry describes the instigating
+  // process, so a match means the action states that process's outcome,
+  // bypassing both the rule type's inversion and the audit-only option.
   for (santa::WatchItemRuleType ruleType : {santa::WatchItemRuleType::kPathsWithAllowedProcesses,
-                                            santa::WatchItemRuleType::kPathsWithDeniedProcesses,
-                                            santa::WatchItemRuleType::kProcessesWithAllowedPaths,
-                                            santa::WatchItemRuleType::kProcessesWithDeniedPaths}) {
+                                            santa::WatchItemRuleType::kPathsWithDeniedProcesses}) {
     policy->rule_type = ruleType;
 
     for (bool auditOnly : {false, true}) {
@@ -580,6 +579,53 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess& proc) {
               .ApplyPolicyWrapper(Message(mockESApi, &esMsg), target, optionalPolicy, matcher)
               .decision,
           FileAccessPolicyDecision::kDenied);
+    }
+  }
+
+  // For the process-centric rule types the entry describes the watched process
+  // while the match describes the path, so the action states what happens when
+  // the process violates the rule. The violating access is a path that didn't
+  // match for ProcessesWithAllowedPaths and one that did for
+  // ProcessesWithDeniedPaths. A compliant access is unaffected either way -
+  // without this distinction, an action of audit on a ProcessesWithAllowedPaths
+  // rule would audit every permitted access and still hard-deny the violations.
+  for (bool allowedPaths : {true, false}) {
+    policy->rule_type = allowedPaths ? santa::WatchItemRuleType::kProcessesWithAllowedPaths
+                                     : santa::WatchItemRuleType::kProcessesWithDeniedPaths;
+    auto violating = allowedPaths ? nonMatcher : matcher;
+    auto compliant = allowedPaths ? matcher : nonMatcher;
+
+    for (bool auditOnly : {false, true}) {
+      policy->audit_only = auditOnly;
+
+      options.action = santa::WatchItemProcessAction::kAllow;
+      XCTAssertEqual(
+          faaPolicyProcessor
+              .ApplyPolicyWrapper(Message(mockESApi, &esMsg), target, optionalPolicy, violating)
+              .decision,
+          FileAccessPolicyDecision::kAllowed);
+
+      options.action = santa::WatchItemProcessAction::kAudit;
+      XCTAssertEqual(
+          faaPolicyProcessor
+              .ApplyPolicyWrapper(Message(mockESApi, &esMsg), target, optionalPolicy, violating)
+              .decision,
+          FileAccessPolicyDecision::kAllowedAuditOnly);
+
+      options.action = santa::WatchItemProcessAction::kDeny;
+      XCTAssertEqual(
+          faaPolicyProcessor
+              .ApplyPolicyWrapper(Message(mockESApi, &esMsg), target, optionalPolicy, violating)
+              .decision,
+          FileAccessPolicyDecision::kDenied);
+
+      // The action never turns a compliant access into a violation, or logs one
+      options.action = santa::WatchItemProcessAction::kAudit;
+      XCTAssertEqual(
+          faaPolicyProcessor
+              .ApplyPolicyWrapper(Message(mockESApi, &esMsg), target, optionalPolicy, compliant)
+              .decision,
+          FileAccessPolicyDecision::kAllowed);
     }
   }
 
