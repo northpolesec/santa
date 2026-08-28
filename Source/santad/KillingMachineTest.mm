@@ -386,10 +386,9 @@ NSArray<NSString*>* SignalDescriptions(const std::vector<FakeSignal>& signals) {
   XCTAssertEqualObjects(SignalDescriptions(fake.signals), (@[ @"pid:10:15" ]));
 }
 
-// Three pids share a process group, so that group is signaled once and the
-// later members are skipped. A fourth pid in another group gets its own signal.
-// Reporting follows delivery: one record per signal sent, attributed to the pid
-// that triggered it.
+// Three pids share a process group, so that group is signaled once no matter
+// how many of its members matched. A fourth pid in another group gets its own
+// signal. What each pass reports is covered by the two tests below.
 - (void)testGroupTargetingSignalsEachGroupOnce {
   pid_t pgidA = getpgrp() + 1;
   pid_t pgidB = getpgrp() + 2;
@@ -406,18 +405,80 @@ NSArray<NSString*>* SignalDescriptions(const std::vector<FakeSignal>& signals) {
                                                                 signal:SIGTERM
                                                    targetProcessGroups:YES];
 
-  SNTKillResponse* response = santa::KillingMachine(request, MakeEnv(&fake));
+  santa::KillingMachine(request, MakeEnv(&fake));
 
   XCTAssertEqualObjects(SignalDescriptions(fake.signals), (@[
                           [NSString stringWithFormat:@"group:%d:15", pgidA],
                           [NSString stringWithFormat:@"group:%d:15", pgidB]
                         ]));
+}
 
-  XCTAssertEqual(response.killedProcesses.count, 2);
+// One kill(-pgid) reaches every member of the group, so every matched member is
+// reported, not just the one that triggered the delivery. Deduplication is
+// about how many signals are sent, not about how much of the match is
+// disclosed: a caller that sees one record where three processes matched cannot
+// tell that the other two were affected.
+- (void)testGroupTargetingReportsEveryMatchedMemberOfSignaledGroup {
+  pid_t pgid = getpgrp() + 1;
+
+  FakeEnv fake;
+  fake.pids = std::vector<pid_t>{10, 11, 12};
+  fake.pidversions = {{10, 1}, {11, 2}, {12, 3}};
+  fake.matching = {10, 11, 12};
+  fake.pgids = {{10, pgid}, {11, pgid}, {12, pgid}};
+
+  SNTKillRequest* request = [[SNTKillRequestTeamID alloc] initWithUUID:@"uuid"
+                                                                teamID:kMatchingTeamID
+                                                                signal:SIGTERM
+                                                   targetProcessGroups:YES];
+
+  SNTKillResponse* response = santa::KillingMachine(request, MakeEnv(&fake));
+
+  XCTAssertEqualObjects(SignalDescriptions(fake.signals),
+                        (@[ [NSString stringWithFormat:@"group:%d:15", pgid] ]));
+
+  XCTAssertEqual(response.killedProcesses.count, 3);
   XCTAssertEqual(response.killedProcesses[0].pid, 10);
-  XCTAssertEqual(response.killedProcesses[0].error, SNTKilledProcessErrorNotPermitted);
-  XCTAssertEqual(response.killedProcesses[1].pid, 20);
-  XCTAssertEqual(response.killedProcesses[1].error, SNTKilledProcessErrorNotPermitted);
+  XCTAssertEqual(response.killedProcesses[0].pidversion, 1);
+  XCTAssertEqual(response.killedProcesses[0].error, SNTKilledProcessErrorNone);
+  XCTAssertEqual(response.killedProcesses[1].pid, 11);
+  XCTAssertEqual(response.killedProcesses[1].pidversion, 2);
+  XCTAssertEqual(response.killedProcesses[1].error, SNTKilledProcessErrorNone);
+  XCTAssertEqual(response.killedProcesses[2].pid, 12);
+  XCTAssertEqual(response.killedProcesses[2].pidversion, 3);
+  XCTAssertEqual(response.killedProcesses[2].error, SNTKilledProcessErrorNone);
+}
+
+// A failed kill(-pgid) signaled nothing, so none of the group's matched members
+// were reached. Every one of them is reported with that failure: dropping them
+// would leave the caller unable to distinguish a group it could not signal from
+// a group with a single member.
+- (void)testGroupTargetingReportsEveryMatchedMemberWhenGroupSignalFails {
+  pid_t pgid = getpgrp() + 1;
+
+  FakeEnv fake;
+  fake.pids = std::vector<pid_t>{10, 11, 12};
+  fake.pidversions = {{10, 1}, {11, 2}, {12, 3}};
+  fake.matching = {10, 11, 12};
+  fake.pgids = {{10, pgid}, {11, pgid}, {12, pgid}};
+  fake.signalError = EPERM;
+
+  SNTKillRequest* request = [[SNTKillRequestTeamID alloc] initWithUUID:@"uuid"
+                                                                teamID:kMatchingTeamID
+                                                                signal:SIGTERM
+                                                   targetProcessGroups:YES];
+
+  SNTKillResponse* response = santa::KillingMachine(request, MakeEnv(&fake));
+
+  // Still one attempt: a group that could not be signaled is not retried once
+  // per member.
+  XCTAssertEqualObjects(SignalDescriptions(fake.signals),
+                        (@[ [NSString stringWithFormat:@"group:%d:15", pgid] ]));
+
+  XCTAssertEqual(response.killedProcesses.count, 3);
+  for (SNTKilledProcess* killed in response.killedProcesses) {
+    XCTAssertEqual(killed.error, SNTKilledProcessErrorNotPermitted, @"pid %d", killed.pid);
+  }
 }
 
 // kill(2) reads a pgid of 1 as every process on the machine and a pgid of 0 as
@@ -620,9 +681,13 @@ NSArray<NSString*>* SignalDescriptions(const std::vector<FakeSignal>& signals) {
                         ]));
   XCTAssertEqual(fake.waits.size(), 1);
   XCTAssertEqual(fake.waits[0], 1.5);
-  // One result per group per pass, not per matched pid: the SIGTERM pass reports
-  // the group once and the SIGKILL pass reports the survivor's group once.
-  XCTAssertEqual(response.killedProcesses.count, 2);
+  // One result per matched pid per pass, even though each pass delivered one
+  // signal: the SIGTERM pass reports both members of the group it signaled, and
+  // the SIGKILL pass reports the survivor.
+  XCTAssertEqual(response.killedProcesses.count, 3);
+  XCTAssertEqual(response.killedProcesses[0].pid, 10);
+  XCTAssertEqual(response.killedProcesses[1].pid, 11);
+  XCTAssertEqual(response.killedProcesses[2].pid, 11);
 }
 
 // Nothing matched the SIGTERM pass, so nothing can survive it. The caller's
@@ -716,11 +781,16 @@ NSArray<NSString*>* SignalDescriptions(const std::vector<FakeSignal>& signals) {
                         ]));
   XCTAssertEqual(fake.waits.size(), 1);
 
-  // The delivery is reported by the request that signaled the group; the
-  // second reports none of its own.
+  // Each request reports its own match in both passes: the one that delivered
+  // reports the delivery, and the covered one reports that the delivery reached
+  // its member too.
   XCTAssertEqual(responses.count, 2);
   XCTAssertEqual(responses[0].killedProcesses.count, 2);
-  XCTAssertEqual(responses[1].killedProcesses.count, 0);
+  XCTAssertEqual(responses[1].killedProcesses.count, 2);
+  for (SNTKilledProcess* killed in responses[1].killedProcesses) {
+    XCTAssertEqual(killed.pid, 11);
+    XCTAssertEqual(killed.error, SNTKilledProcessErrorNone);
+  }
 }
 
 // The process that owned the shared group's signal honors SIGTERM and stops
@@ -747,11 +817,15 @@ NSArray<NSString*>* SignalDescriptions(const std::vector<FakeSignal>& signals) {
                         ]));
   XCTAssertEqual(fake.waits.size(), 1);
 
-  // The second request reports the escalation; the first no longer matched.
+  // The first request matched nothing in the SIGKILL pass, so it reports only
+  // its SIGTERM delivery. The second reports the SIGTERM that reached its
+  // member through the shared group, then the SIGKILL it delivered itself.
   XCTAssertEqual(responses.count, 2);
   XCTAssertEqual(responses[0].killedProcesses.count, 1);
-  XCTAssertEqual(responses[1].killedProcesses.count, 1);
+  XCTAssertEqual(responses[0].killedProcesses[0].pid, 10);
+  XCTAssertEqual(responses[1].killedProcesses.count, 2);
   XCTAssertEqual(responses[1].killedProcesses[0].pid, 11);
+  XCTAssertEqual(responses[1].killedProcesses[1].pid, 11);
 }
 
 // A failed group signal does not suppress another request's attempt. Nothing

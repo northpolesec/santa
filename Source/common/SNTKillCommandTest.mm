@@ -424,6 +424,39 @@
   }
 }
 
+// NSKeyedUnarchiver hands back an NSString for a key declared as NSNumber
+// without reporting an error, and -intValue would quietly turn it into the
+// signal to deliver. A signal key must hold an actual number.
+- (void)testSNTKillRequestDecodeRejectsSignalEncodedAsString {
+  NSKeyedArchiver* archiver = [[NSKeyedArchiver alloc] initRequiringSecureCoding:YES];
+  [archiver encodeObject:[[NSUUID UUID] UUIDString] forKey:@"uuid"];
+  [archiver encodeObject:@"17" forKey:@"signal"];
+  [archiver finishEncoding];
+
+  NSKeyedUnarchiver* unarchiver =
+      [[NSKeyedUnarchiver alloc] initForReadingFromData:archiver.encodedData error:nil];
+  unarchiver.requiresSecureCoding = YES;
+
+  XCTAssertNil([[SNTKillRequest alloc] initWithCoder:unarchiver]);
+}
+
+// When the signal key holds a class secure coding rejects, the decode yields
+// nil — the same thing an archive predating the field yields. Only the absence
+// of the key means "predates the field", so a key that is present but unusable
+// is treated as a malformed archive and rejected, not read as SIGKILL.
+- (void)testSNTKillRequestDecodeRejectsSignalOfRejectedClass {
+  NSKeyedArchiver* archiver = [[NSKeyedArchiver alloc] initRequiringSecureCoding:YES];
+  [archiver encodeObject:[[NSUUID UUID] UUIDString] forKey:@"uuid"];
+  [archiver encodeObject:@[ @9 ] forKey:@"signal"];
+  [archiver finishEncoding];
+
+  NSKeyedUnarchiver* unarchiver =
+      [[NSKeyedUnarchiver alloc] initForReadingFromData:archiver.encodedData error:nil];
+  unarchiver.requiresSecureCoding = YES;
+
+  XCTAssertNil([[SNTKillRequest alloc] initWithCoder:unarchiver]);
+}
+
 // The base class rejects the bad signal; subclasses reach that check through
 // [super initWithCoder:], so a concrete subclass carrying an invalid signal
 // must also decode to nil.

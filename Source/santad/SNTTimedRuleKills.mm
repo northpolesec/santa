@@ -462,11 +462,12 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
       santa::KillingMachineTermThenKill(requests, kTermGrace, _killEnv);
 
   // One response per request, in order, so `entries` indexes them.
-  // killedProcesses counts deliveries, not processes: a survivor of SIGTERM
-  // appears twice, and a group shared with another entry is reported against
-  // whichever entry signaled it.
+  // killedProcesses counts one record per matched process per pass, not one per
+  // delivery: the members of a group shared with another entry report under
+  // every entry that matched them, and a survivor of SIGTERM appears once per
+  // pass.
   for (NSUInteger index = 0; index < responses.count; index++) {
-    LOGI(@"Timed rule kill fired for %@: %lu signal delivery result(s) of its own, error: %ld",
+    LOGI(@"Timed rule kill fired for %@: %lu matched process result(s), error: %ld",
          entries[index].identifier, (unsigned long)responses[index].killedProcesses.count,
          (long)responses[index].error);
   }

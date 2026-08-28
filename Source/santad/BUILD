@@ -43,6 +43,7 @@ objc_library(
         "//Source/common:SNTRuleIdentifiers",
         "//Source/common:SNTSignal",
         "//Source/common:SNTXxhash",
+        "//Source/common:SantaCache",
         "//Source/common:SigningIDHelpers",
         "//Source/common:String",
         "//Source/common/cel:CEL",
@@ -1150,7 +1151,7 @@ objc_library(
         "//Source/common:SNTSystemInfo",
         "//Source/common:String",
         "//Source/common:SystemResources",
-        "@abseil-cpp//absl/cleanup:cleanup",
+        "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/container:flat_hash_set",
     ],
 )
