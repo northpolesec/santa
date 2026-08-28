@@ -102,11 +102,13 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator* configurator,
 
   // Owns the kills asked for by CEL rules using policy_for_range(...,
   // should_kill=true). Nothing records entries yet, so the only thing it does
-  // in production today is settle the entries a previous daemon left behind.
+  // in production today is settle the entries a previous daemon left behind. A
+  // default-constructed KillEnv is the real syscalls.
   SNTTimedRuleKills* timed_rule_kills =
       [[SNTTimedRuleKills alloc] initWithNotifierQueue:notifier_queue
                                              ruleTable:rule_table
-                                          configurator:configurator];
+                                          configurator:configurator
+                                               killEnv:santa::KillEnv()];
   if (!timed_rule_kills) {
     LOGE(@"Failed to initialize timed rule kills.");
     exit(EXIT_FAILURE);

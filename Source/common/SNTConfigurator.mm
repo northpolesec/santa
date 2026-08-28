@@ -1020,9 +1020,6 @@ static SNTConfigurator* sharedConfigurator = nil;
 
 - (BOOL)persistTimedRuleKills:(NSArray<NSDictionary*>*)entries {
   @synchronized(self) {
-    // No rollback on a failed write, unlike the demoted-admins record: the
-    // entries the daemon holds in memory are the kills it still owes, and
-    // discarding them here would cancel those kills outright.
     return [self updateStateSynchronizedKey:kStateTimedRuleKillsKey value:entries];
   }
 }
@@ -2536,9 +2533,12 @@ static SNTConfigurator* sharedConfigurator = nil;
 - (NSArray*)validateFileAccessPolicy:(NSDictionary*)policy {
   NSMutableArray* errors = [NSMutableArray array];
 
+  // Always a locally managed configuration, never a sync server's rules.
+  constexpr auto kDataSource = santa::WatchItems::DataSource::kEmbeddedConfig;
+
   // First validate top-level config structure.
   NSError* error;
-  if (!santa::WatchItems::IsValidConfig(policy, &error)) {
+  if (!santa::WatchItems::IsValidConfig(policy, kDataSource, &error)) {
     [errors addObject:[NSString stringWithFormat:@"FileAccessPolicy: %@",
                                                  error.localizedDescription ?: @"Unknown error"]];
   }
@@ -2555,7 +2555,8 @@ static SNTConfigurator* sharedConfigurator = nil;
         continue;
       }
       NSError* ruleError;
-      if (!santa::WatchItems::IsValidRule(name, watchItems[name], &ruleError, policyVersion)) {
+      if (!santa::WatchItems::IsValidRule(name, watchItems[name], kDataSource, &ruleError,
+                                          policyVersion)) {
         [errors addObject:[NSString
                               stringWithFormat:@"FileAccessPolicy rule '%@' is invalid: %@", name,
                                                ruleError.localizedDescription ?: @"Unknown error"]];

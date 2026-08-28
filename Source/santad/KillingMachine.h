@@ -56,8 +56,7 @@ struct KillEnv {
   std::function<pid_t(pid_t)> pgid_for_pid = getpgid;
 
   // Signal one process, validated against its audit token. Returns 0 or errno.
-  std::function<int(audit_token_t*, int)> signal_token =
-      proc_signal_with_audittoken;
+  std::function<int(audit_token_t*, int)> signal_token = proc_signal_with_audittoken;
 
   // Signal every process in a group. Returns 0 or errno.
   std::function<int(pid_t, int)> signal_group = SignalProcessGroup;
@@ -72,12 +71,19 @@ SNTKillResponse* KillingMachine(SNTKillRequest* request, const KillEnv& env);
 // Sends SIGTERM to everything the request matches, blocks the calling thread
 // for `grace`, then re-matches and SIGKILLs whatever is still there. Blocking
 // is the contract: callers run this on a queue they own. The request's own
-// `signal` field is not used by this path.
-SNTKillResponse* KillingMachineTermThenKill(SNTKillRequest* request,
-                                            NSTimeInterval grace);
-SNTKillResponse* KillingMachineTermThenKill(SNTKillRequest* request,
-                                            NSTimeInterval grace,
+// `signal` field is not used by this path. If nothing was signaled, the grace
+// wait is skipped.
+SNTKillResponse* KillingMachineTermThenKill(SNTKillRequest* request, NSTimeInterval grace);
+SNTKillResponse* KillingMachineTermThenKill(SNTKillRequest* request, NSTimeInterval grace,
                                             const KillEnv& env);
+
+// The same for several requests at once, sharing one grace period. One response
+// per request, in the order given. A process group reached by more than one
+// request is signaled once per pass; a request whose matches were covered by
+// another request's group signal is still re-matched at SIGKILL, since the
+// request that signaled the group may no longer match by then.
+NSArray<SNTKillResponse*>* KillingMachineTermThenKill(NSArray<SNTKillRequest*>* requests,
+                                                      NSTimeInterval grace, const KillEnv& env);
 
 // The pid of one process the request matches, or nullopt when nothing does.
 // Signals nothing: this is the match pass on its own, so a caller can find out
@@ -86,8 +92,7 @@ SNTKillResponse* KillingMachineTermThenKill(SNTKillRequest* request,
 // may be gone by the time the caller looks at it. Running-process requests are
 // not supported here, as they already name the process the caller wants.
 std::optional<pid_t> KillingMachineAnyMatch(SNTKillRequest* request);
-std::optional<pid_t> KillingMachineAnyMatch(SNTKillRequest* request,
-                                            const KillEnv& env);
+std::optional<pid_t> KillingMachineAnyMatch(SNTKillRequest* request, const KillEnv& env);
 
 }  // namespace santa
 

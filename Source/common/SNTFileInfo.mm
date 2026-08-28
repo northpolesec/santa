@@ -26,6 +26,7 @@
 #include <sys/xattr.h>
 
 #include <algorithm>
+#include <iterator>
 
 #import "Source/common/AccountLookup.h"
 #import "Source/common/CertificateHelpers.h"
@@ -65,6 +66,8 @@ static const uint32_t kMaxFatArchCount = 64;
 
 // Cached properties
 @property NSBundle* bundleRef;
+@property NSString* bundlePathStorage;
+@property NSDictionary* bundleInfoDict;
 @property NSDictionary* infoDict;
 @property NSDictionary* quarantineDict;
 @property NSDictionary* cachedHeaders;
@@ -152,7 +155,13 @@ static const uint32_t kMaxFatArchCount = 64;
     return nil;
   }
   self = [self initWithResolvedPath:resolvedPath error:error];
-  if (self && bndl) _bundleRef = bndl;
+  if (self && bndl) {
+    // `resolvePath:` already located the bundle. Seed both caches from it so that `bundlePath`
+    // has a single source of truth: `resolvedPath` is `bndl.executablePath`, so `bndl.bundlePath`
+    // is a prefix of `self.path`, just like a path the search would produce.
+    _bundleRef = bndl;
+    _bundlePathStorage = bndl.bundlePath ?: (NSString*)[NSNull null];
+  }
   return self;
 }
 
@@ -345,22 +354,40 @@ static const uint32_t kMaxFatArchCount = 64;
 
 ///
 ///  Directories with a "Contents/Info.plist" entry can be mistaken as a bundle. To be considered an
-///  ancestor, the bundle must have a valid extension.
+///  ancestor, the bundle must have one of these extensions.
 ///
-- (NSSet*)allowedAncestorExtensions {
-  static NSSet* set;
-  static dispatch_once_t onceToken;
-  dispatch_once(&onceToken, ^{
-    set = [NSSet setWithArray:@[
-      @"app",
-      @"bundle",
-      @"framework",
-      @"kext",
-      @"xctest",
-      @"xpc",
-    ]];
-  });
-  return set;
+static NSString* const kAllowedAncestorExtensions[] = {
+    @"app", @"bundle", @"framework", @"kext", @"xctest", @"xpc",
+};
+
+///
+///  Whether `ext` is an extension a bundle ancestor is allowed to have. Compared case
+///  insensitively, as macOS volumes are typically case insensitive.
+///
+static BOOL IsAllowedAncestorExtension(NSString* ext) {
+  for (size_t i = 0; i < std::size(kAllowedAncestorExtensions); ++i) {
+    if ([ext caseInsensitiveCompare:kAllowedAncestorExtensions[i]] == NSOrderedSame) return YES;
+  }
+  return NO;
+}
+
+///
+///  Read the Info.plist of the bundle rooted at `path`, or nil if `path` isn't a bundle.
+///
+///  `-[NSBundle infoDictionary]` is deliberately not used. `+[NSBundle bundleWithPath:]` keeps
+///  every bundle it creates in a process-wide cache for the lifetime of the process, so searching
+///  with it retains a bundle for each directory visited. That cache is also never invalidated, so
+///  changes to an Info.plist are not realized. `CFBundleCopyInfoDictionaryInDirectory` does
+///  neither.
+///
+- (NSDictionary*)infoDictionaryForBundleDirectory:(NSString*)path {
+  // Reject non-directories up front. CoreFoundation would otherwise probe several candidate
+  // bundle layouts to reach the same conclusion.
+  struct stat sb;
+  if (stat(path.UTF8String, &sb) != 0 || !S_ISDIR(sb.st_mode)) return nil;
+
+  return CFBridgingRelease(CFBundleCopyInfoDictionaryInDirectory(
+      (__bridge CFURLRef)[NSURL fileURLWithPath:path isDirectory:YES]));
 }
 
 ///
@@ -371,45 +398,81 @@ static const uint32_t kMaxFatArchCount = 64;
 ///  Also a bundle can contain multiple binaries within its subdirectories and we want any of these
 ///  to count as being part of the bundle.
 ///
-///  This method walks up the path until a bundle is found, if any.
+///  A bundle directory always has an extension, so the path is first filtered with a pure string
+///  pass and only the surviving components are touched on disk. The overwhelming majority of
+///  executables live outside a bundle entirely and are rejected without any I/O at all.
 ///
-///  @param ancestor YES this will return the highest NSBundle, with a valid extension, found in the
-///                  tree. NO will return the the lowest NSBundle, without validating the extension.
+///  @param ancestor YES this will return the highest bundle path, with a valid extension, found in
+///                  the tree. NO will return the lowest bundle path, accepting any extension.
+///  @param infoDict On return, the Info.plist of the located bundle. Cached by the caller so that
+///                  the plist read to identify the bundle isn't immediately parsed a second time.
 ///
-- (NSBundle*)findBundleWithAncestor:(BOOL)ancestor {
-  NSBundle* bundle;
-  NSMutableArray* pathComponents = [[self.path pathComponents] mutableCopy];
+- (NSString*)findBundlePathWithAncestor:(BOOL)ancestor infoDictionary:(NSDictionary**)infoDict {
+  NSArray<NSString*>* components = [self.path pathComponents];
+  // Ignore the root path "/", for some reason this is considered a bundle. The final component is
+  // also skipped: `self.path` always refers to a regular file, so it can never be a bundle itself.
+  if (components.count < 3) return nil;
 
-  // Ignore the root path "/", for some reason this is considered a bundle.
-  while (pathComponents.count > 1) {
-    NSBundle* bndl = [NSBundle bundleWithPath:[NSString pathWithComponents:pathComponents]];
-    if ([bndl objectForInfoDictionaryKey:@"CFBundleIdentifier"]) {
-      if ((!ancestor && bndl.bundlePath.pathExtension.length) ||
-          [[self allowedAncestorExtensions] containsObject:bndl.bundlePath.pathExtension]) {
-        bundle = bndl;
-      }
-      if (!ancestor) break;
-    }
-    [pathComponents removeLastObject];
+  NSMutableArray<NSString*>* candidates = [NSMutableArray array];
+  NSMutableString* prefix = [NSMutableString stringWithString:components.firstObject];
+  for (NSUInteger i = 1; i < components.count - 1; ++i) {
+    if (![prefix hasSuffix:@"/"]) [prefix appendString:@"/"];
+    [prefix appendString:components[i]];
+
+    NSString* ext = [components[i] pathExtension];
+    if (!ext.length) continue;
+    if (ancestor && !IsAllowedAncestorExtension(ext)) continue;
+    [candidates addObject:[prefix copy]];
   }
-  return bundle;
+  if (!candidates.count) return nil;
+
+  // Ancestor searches want the highest bundle in the tree, all others the lowest. Either way the
+  // search stops at the first match rather than continuing on to "/".
+  NSEnumerator* candidateEnum =
+      ancestor ? [candidates objectEnumerator] : [candidates reverseObjectEnumerator];
+  for (NSString* candidate in candidateEnum) {
+    NSDictionary* d = [self infoDictionaryForBundleDirectory:candidate];
+    if (!d[@"CFBundleIdentifier"]) continue;
+    if (infoDict) *infoDict = d;
+    return candidate;
+  }
+  return nil;
+}
+
+///
+///  The path of the containing bundle, if any, always a prefix of `path`.
+///
+///  This is the single source of truth for the bundle location: `bundle` is derived from it, never
+///  the other way around, so the value doesn't depend on the order the two are called in. Unlike
+///  `bundle` this doesn't materialize an NSBundle, which is the expensive part.
+///
+- (NSString*)locatedBundlePath {
+  if (!self.bundlePathStorage) {
+    NSDictionary* d;
+    NSString* path = [self findBundlePathWithAncestor:self.useAncestorBundle infoDictionary:&d];
+    self.bundlePathStorage = path ?: (NSString*)[NSNull null];
+    self.bundleInfoDict = d;
+  }
+  return self.bundlePathStorage == (NSString*)[NSNull null] ? nil : self.bundlePathStorage;
 }
 
 - (NSBundle*)bundle {
   if (!self.bundleRef) {
-    self.bundleRef =
-        [self findBundleWithAncestor:self.useAncestorBundle] ?: (NSBundle*)[NSNull null];
+    NSString* path = [self locatedBundlePath];
+    self.bundleRef = (path ? [NSBundle bundleWithPath:path] : nil) ?: (NSBundle*)[NSNull null];
   }
   return self.bundleRef == (NSBundle*)[NSNull null] ? nil : self.bundleRef;
 }
 
 - (NSString*)bundlePath {
-  return [self.bundle bundlePath];
+  return [self locatedBundlePath];
 }
 
 - (void)setUseAncestorBundle:(BOOL)useAncestorBundle {
   if (self.useAncestorBundle != useAncestorBundle) {
     self.bundleRef = nil;
+    self.bundlePathStorage = nil;
+    self.bundleInfoDict = nil;
     self.infoDict = nil;
   }
   _useAncestorBundle = useAncestorBundle;
@@ -423,12 +486,11 @@ static const uint32_t kMaxFatArchCount = 64;
       return self.infoDict;
     }
 
-    // `-[NSBundle infoDictionary]` is heavily cached, changes to the Info.plist are not realized.
-    // Use `CFBundleCopyInfoDictionaryInDirectory` instead, which does not appear to cache.
-    NSString* bundlePath = [self bundlePath];
-    if (bundlePath.length) {
-      d = CFBridgingRelease(CFBundleCopyInfoDictionaryInDirectory(
-          (__bridge CFURLRef)[NSURL fileURLWithPath:bundlePath]));
+    NSString* bundlePath = [self locatedBundlePath];
+    // Locating the bundle already read its Info.plist. Reuse it rather than parsing it again.
+    d = self.bundleInfoDict;
+    if (!d.count && bundlePath.length) {
+      d = [self infoDictionaryForBundleDirectory:bundlePath];
     }
     if (d.count) {
       self.infoDict = d;
