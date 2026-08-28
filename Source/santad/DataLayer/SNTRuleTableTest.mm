@@ -57,6 +57,13 @@
   self.dbq = [[FMDatabaseQueue alloc] init];
   self.sut = [[SNTRuleTable alloc] initWithDatabaseQueue:self.dbq];
 
+  // -initializeDatabase:fromVersion: primes the static rule cache from the real SNTConfigurator,
+  // which happens before the mock below is installed. On a machine with a Santa configuration
+  // profile that sets StaticRules, those rules leak into every test in this class -- and static
+  // rules are consulted ahead of both the miss cache and the database in
+  // -executionRuleForIdentifiers:. Drop them so tests only ever see rules they set up themselves.
+  [self.sut updateStaticRules:nil];
+
   self.mockConfigurator = OCMClassMock([SNTConfigurator class]);
   OCMStub([self.mockConfigurator configurator]).andReturn(self.mockConfigurator);
 }
