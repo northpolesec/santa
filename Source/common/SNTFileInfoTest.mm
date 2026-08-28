@@ -23,9 +23,18 @@
 static const uint32_t kFatTestSliceSize = 8192;
 
 @interface SNTFileInfoTest : XCTestCase
+@property NSString* scratchDirPath;
 @end
 
 @implementation SNTFileInfoTest
+
+- (void)tearDown {
+  if (self.scratchDirPath) {
+    [[NSFileManager defaultManager] removeItemAtPath:self.scratchDirPath error:NULL];
+    self.scratchDirPath = nil;
+  }
+  [super tearDown];
+}
 
 - (NSString*)directoryBundle {
   NSString* rp = [[NSBundle bundleForClass:[self class]] resourcePath];
@@ -35,6 +44,70 @@ static const uint32_t kFatTestSliceSize = 8192;
 - (NSString*)bundleExample {
   NSString* rp = [[NSBundle bundleForClass:[self class]] resourcePath];
   return [rp stringByAppendingPathComponent:@"testdata/BundleExample.app"];
+}
+
+///
+///  Root of a per-test temporary directory, removed in -tearDown.
+///
+- (NSString*)scratchDir {
+  if (!self.scratchDirPath) {
+    self.scratchDirPath = [NSTemporaryDirectory()
+        stringByAppendingPathComponent:[NSString stringWithFormat:@"SNTFileInfoTest-%@",
+                                                                  NSUUID.UUID.UUIDString]];
+    XCTAssertTrue([[NSFileManager defaultManager] createDirectoryAtPath:self.scratchDirPath
+                                            withIntermediateDirectories:YES
+                                                             attributes:nil
+                                                                  error:NULL]);
+  }
+  return self.scratchDirPath;
+}
+
+///
+///  Write an Info.plist declaring `identifier` at `path`, creating parent directories.
+///
+- (void)writeInfoPlistAtPath:(NSString*)path identifier:(NSString*)identifier {
+  XCTAssertTrue([[NSFileManager defaultManager]
+            createDirectoryAtPath:[path stringByDeletingLastPathComponent]
+      withIntermediateDirectories:YES
+                       attributes:nil
+                            error:NULL]);
+  NSDictionary* plist = @{
+    @"CFBundleIdentifier" : identifier,
+    @"CFBundleName" : identifier,
+    @"CFBundleExecutable" : @"exe",
+  };
+  XCTAssertTrue([plist writeToFile:path atomically:YES]);
+}
+
+///
+///  Create a non-empty regular file at `path`, creating parent directories.
+///
+- (void)writeExecutableAtPath:(NSString*)path {
+  XCTAssertTrue([[NSFileManager defaultManager]
+            createDirectoryAtPath:[path stringByDeletingLastPathComponent]
+      withIntermediateDirectories:YES
+                       attributes:nil
+                            error:NULL]);
+  XCTAssertTrue([@"#!/bin/sh\nexit 0\n" writeToFile:path
+                                         atomically:YES
+                                           encoding:NSUTF8StringEncoding
+                                              error:NULL]);
+}
+
+///
+///  Build a bundle at `<scratch>/<name>` whose Info.plist sits at `relPlistPath`, containing an
+///  executable at `relExecPath`. Returns the path of the executable.
+///
+- (NSString*)bundleAtName:(NSString*)name
+             plistRelPath:(NSString*)relPlistPath
+              execRelPath:(NSString*)relExecPath
+               identifier:(NSString*)identifier {
+  NSString* bundlePath = [[self scratchDir] stringByAppendingPathComponent:name];
+  [self writeInfoPlistAtPath:[bundlePath stringByAppendingPathComponent:relPlistPath]
+                  identifier:identifier];
+  NSString* execPath = [bundlePath stringByAppendingPathComponent:relExecPath];
+  [self writeExecutableAtPath:execPath];
+  return execPath;
 }
 
 - (void)testPathStandardizing {
@@ -425,6 +498,199 @@ static const uint32_t kFatTestSliceSize = 8192;
   sut.useAncestorBundle = YES;
 
   XCTAssertNil([sut bundle]);
+}
+
+///
+///  CFBundle recognizes several Info.plist layouts. All of them must be found.
+///
+- (void)testBundleLayouts {
+  NSArray<NSArray<NSString*>*>* layouts = @[
+    @[ @"Contents.app", @"Contents/Info.plist", @"Contents/MacOS/exe" ],
+    @[ @"Flat.app", @"Info.plist", @"exe" ],
+    @[ @"Resources.app", @"Resources/Info.plist", @"exe" ],
+    @[ @"SupportFiles.app", @"Support Files/Info.plist", @"Support Files/exe" ],
+  ];
+
+  for (NSArray<NSString*>* layout in layouts) {
+    NSString* identifier = [@"com.northpolesec.santa.test." stringByAppendingString:layout[0]];
+    NSString* execPath = [self bundleAtName:layout[0]
+                               plistRelPath:layout[1]
+                                execRelPath:layout[2]
+                                 identifier:identifier];
+    SNTFileInfo* sut = [[SNTFileInfo alloc] initWithPath:execPath];
+
+    XCTAssertEqualObjects([sut bundleIdentifier], identifier, @"layout %@", layout[0]);
+    XCTAssertEqualObjects([sut bundlePath],
+                          [[self scratchDir] stringByAppendingPathComponent:layout[0]],
+                          @"layout %@", layout[0]);
+  }
+}
+
+///
+///  Without useAncestorBundle any extension is accepted, not just the known bundle extensions.
+///
+- (void)testNonAncestorAcceptsAnyExtension {
+  NSString* execPath = [self bundleAtName:@"Odd.someext"
+                             plistRelPath:@"Contents/Info.plist"
+                              execRelPath:@"Contents/MacOS/exe"
+                               identifier:@"com.northpolesec.santa.test.Odd"];
+  SNTFileInfo* sut = [[SNTFileInfo alloc] initWithPath:execPath];
+
+  XCTAssertEqualObjects([sut bundleIdentifier], @"com.northpolesec.santa.test.Odd");
+
+  // With useAncestorBundle only the known bundle extensions are considered, so this one is not.
+  sut.useAncestorBundle = YES;
+  XCTAssertNil([sut bundle]);
+  XCTAssertNil([sut bundlePath]);
+}
+
+///
+///  An extension-less directory can hold a valid Info.plist, but is never treated as the bundle.
+///  The search passes over it and keeps going, rather than stopping there and reporting nothing.
+///
+- (void)testExtensionlessBundleIsSkipped {
+  NSString* outer = [[self scratchDir] stringByAppendingPathComponent:@"Outer.app"];
+  [self writeInfoPlistAtPath:[outer stringByAppendingPathComponent:@"Contents/Info.plist"]
+                  identifier:@"com.northpolesec.santa.test.Outer"];
+
+  NSString* inner = [outer stringByAppendingPathComponent:@"Contents/Resources/Payload"];
+  [self writeInfoPlistAtPath:[inner stringByAppendingPathComponent:@"Contents/Info.plist"]
+                  identifier:@"com.northpolesec.santa.test.Payload"];
+
+  NSString* execPath = [inner stringByAppendingPathComponent:@"bin/exe"];
+  [self writeExecutableAtPath:execPath];
+
+  // Guard against this test passing for the wrong reason: the platform really does consider the
+  // extension-less directory a bundle, so skipping it has to be a decision, not an accident.
+  XCTAssertEqualObjects(
+      [[NSBundle bundleWithPath:inner] objectForInfoDictionaryKey:@"CFBundleIdentifier"],
+      @"com.northpolesec.santa.test.Payload");
+
+  SNTFileInfo* sut = [[SNTFileInfo alloc] initWithPath:execPath];
+  XCTAssertEqualObjects([sut bundleIdentifier], @"com.northpolesec.santa.test.Outer");
+  XCTAssertEqualObjects([sut bundlePath], outer);
+}
+
+///
+///  Bundle extensions are matched case insensitively, as macOS volumes usually are.
+///
+- (void)testAncestorExtensionIsCaseInsensitive {
+  NSString* execPath = [self bundleAtName:@"Upper.APP"
+                             plistRelPath:@"Contents/Info.plist"
+                              execRelPath:@"Contents/MacOS/exe"
+                               identifier:@"com.northpolesec.santa.test.Upper"];
+  SNTFileInfo* sut = [[SNTFileInfo alloc] initWithPath:execPath];
+  sut.useAncestorBundle = YES;
+
+  XCTAssertEqualObjects([sut bundleIdentifier], @"com.northpolesec.santa.test.Upper");
+  XCTAssertEqualObjects([sut bundlePath],
+                        [[self scratchDir] stringByAppendingPathComponent:@"Upper.APP"]);
+}
+
+///
+///  With nested bundles, useAncestorBundle selects the outermost and the default the innermost.
+///
+- (void)testNestedBundles {
+  NSString* outer = [[self scratchDir] stringByAppendingPathComponent:@"Outer.app"];
+  [self writeInfoPlistAtPath:[outer stringByAppendingPathComponent:@"Contents/Info.plist"]
+                  identifier:@"com.northpolesec.santa.test.Outer"];
+
+  NSString* inner = [outer stringByAppendingPathComponent:@"Contents/Library/LoginItems/Inner.app"];
+  [self writeInfoPlistAtPath:[inner stringByAppendingPathComponent:@"Contents/Info.plist"]
+                  identifier:@"com.northpolesec.santa.test.Inner"];
+
+  NSString* execPath = [inner stringByAppendingPathComponent:@"Contents/MacOS/exe"];
+  [self writeExecutableAtPath:execPath];
+
+  SNTFileInfo* sut = [[SNTFileInfo alloc] initWithPath:execPath];
+  XCTAssertEqualObjects([sut bundlePath], inner);
+  XCTAssertEqualObjects([sut bundleIdentifier], @"com.northpolesec.santa.test.Inner");
+
+  sut.useAncestorBundle = YES;
+  XCTAssertEqualObjects([sut bundlePath], outer);
+  XCTAssertEqualObjects([sut bundleIdentifier], @"com.northpolesec.santa.test.Outer");
+}
+
+///
+///  bundlePath is always a prefix of path, and doesn't change depending on whether the NSBundle
+///  has been materialized. Callers do string arithmetic against these two, so they must agree.
+///
+- (void)testBundlePathIsStablePrefixOfPath {
+  NSArray<NSString*>* paths = @[
+    [self bundleAtName:@"Prefix.app"
+          plistRelPath:@"Contents/Info.plist"
+           execRelPath:@"Contents/MacOS/exe"
+            identifier:@"com.northpolesec.santa.test.Prefix"],
+    [self bundleExample],
+  ];
+
+  for (NSString* path in paths) {
+    for (NSNumber* ancestor in @[ @NO, @YES ]) {
+      SNTFileInfo* sut = [[SNTFileInfo alloc] initWithPath:path];
+      sut.useAncestorBundle = ancestor.boolValue;
+
+      // Read the path first, then materialize the NSBundle, then read it again.
+      NSString* before = [sut bundlePath];
+      XCTAssertNotNil([sut bundle], @"%@", path);
+      NSString* after = [sut bundlePath];
+
+      XCTAssertEqualObjects(before, after, @"%@ ancestor=%@", path, ancestor);
+      XCTAssertTrue([sut.path hasPrefix:before], @"%@ is not a prefix of %@", before, sut.path);
+      XCTAssertEqualObjects([sut bundle].bundlePath, before, @"%@ ancestor=%@", path, ancestor);
+    }
+  }
+}
+
+///
+///  The prefix relationship holds even when the path given to the class contains a symlink.
+///  NSBundle resolves symlinks in the paths it hands back, so deriving bundlePath from an
+///  NSBundle would break the relationship that callers depend on.
+///
+- (void)testBundlePathIsPrefixOfPathThroughSymlink {
+  NSString* execPath = [self bundleAtName:@"Symlinked.app"
+                             plistRelPath:@"Contents/Info.plist"
+                              execRelPath:@"Contents/MacOS/exe"
+                               identifier:@"com.northpolesec.santa.test.Symlinked"];
+
+  // <scratch>/link -> <scratch>, so <scratch>/link/Symlinked.app/... names the same file by a
+  // path that is not fully resolved.
+  NSString* link = [[self scratchDir] stringByAppendingPathComponent:@"link"];
+  XCTAssertTrue([[NSFileManager defaultManager] createSymbolicLinkAtPath:link
+                                                     withDestinationPath:[self scratchDir]
+                                                                   error:NULL]);
+  NSString* linkedExecPath = [link
+      stringByAppendingPathComponent:[execPath substringFromIndex:[self scratchDir].length + 1]];
+
+  // initWithResolvedPath: takes the path as-is, so self.path keeps the symlink in it.
+  SNTFileInfo* sut = [[SNTFileInfo alloc] initWithResolvedPath:linkedExecPath error:NULL];
+  XCTAssertNotNil(sut);
+  XCTAssertEqualObjects(sut.path, linkedExecPath);
+
+  NSString* before = [sut bundlePath];
+  XCTAssertNotNil([sut bundle]);
+  NSString* after = [sut bundlePath];
+
+  XCTAssertEqualObjects(before, after);
+  XCTAssertTrue([sut.path hasPrefix:before], @"%@ is not a prefix of %@", before, sut.path);
+  XCTAssertEqualObjects(before, [link stringByAppendingPathComponent:@"Symlinked.app"]);
+}
+
+///
+///  A deep path with no bundle anywhere in it resolves to nothing.
+///
+- (void)testDeepNonBundlePath {
+  NSString* execPath =
+      [[self scratchDir] stringByAppendingPathComponent:@"one/two/three/four/five/six/seven/exe"];
+  [self writeExecutableAtPath:execPath];
+
+  SNTFileInfo* sut = [[SNTFileInfo alloc] initWithPath:execPath];
+  XCTAssertNil([sut bundle]);
+  XCTAssertNil([sut bundlePath]);
+  XCTAssertNil([sut bundleIdentifier]);
+
+  sut.useAncestorBundle = YES;
+  XCTAssertNil([sut bundle]);
+  XCTAssertNil([sut bundlePath]);
 }
 
 - (void)testEmbeddedInfoPlist {
