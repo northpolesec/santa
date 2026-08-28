@@ -47,6 +47,21 @@
   XCTAssertEqualObjects([got string], input);
 }
 
+// The GUI asks for the block message from inside a SwiftUI `body`, which re-runs on every state
+// change. The HTML importer behind it is main-thread-only and costs 10-140ms a call, so repeated
+// formatting of one message must not re-parse.
+- (void)testFormatMessageCachesRepeatedMessages {
+  NSString* input = @"Repeated message";
+  NSAttributedString* first = [SNTBlockMessage formatMessage:input withFallback:@""];
+  NSAttributedString* second = [SNTBlockMessage formatMessage:input withFallback:@""];
+  XCTAssertIdentical(first, second);
+
+  NSAttributedString* other = [SNTBlockMessage formatMessage:@"A different message"
+                                                withFallback:@""];
+  XCTAssertNotIdentical(first, other);
+  XCTAssertEqualObjects([other string], @"A different message");
+}
+
 - (void)testEventDetailURLForEvent {
   SNTStoredExecutionEvent* se = [[SNTStoredExecutionEvent alloc] init];
 

@@ -18,8 +18,8 @@
 #import <CommonCrypto/CommonDigest.h>
 #import <pthread/pthread.h>
 
+#import <algorithm>
 #import <atomic>
-#import <memory>
 #import <vector>
 
 #include "Source/common/Glob.h"
@@ -33,6 +33,10 @@
 
 @interface SNTBundleService ()
 @property(nonatomic) dispatch_queue_t queue;
+// Serializes the shared mutable state the concurrent bundle scan writes to. Previously the main
+// queue was used for this, which made bundle hashing contend with -- and stall -- this process's
+// UI thread for no reason. A private serial queue gives the same mutual exclusion off it.
+@property(nonatomic) dispatch_queue_t stateQueue;
 @end
 
 @implementation SNTBundleService
@@ -41,6 +45,8 @@
   self = [super init];
   if (self) {
     _queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_BACKGROUND, 0);
+    _stateQueue =
+        dispatch_queue_create("com.northpolesec.santa.bundleservice.state", DISPATCH_QUEUE_SERIAL);
   }
   return self;
 }
@@ -210,12 +216,29 @@
   //
   // Xcode.app has roughly 500k files, 8bytes per pointer is ~4MB for this array. This size to space
   // ratio seems appropriate as Xcode.app is in the upper bounds of bundle size.
-  // Using a shared pointer to make block capture easy.
-  __block auto fis = std::make_shared<std::vector<SNTFileInfo*>>(subpaths.count);
+  //
+  // dispatch_apply is synchronous, so the block cannot outlive this scope: these are plain locals
+  // captured by pointer rather than __block shared_ptrs. The vector still keeps its elements on the
+  // heap, so nothing large lands on the stack. (Removing the per-file main-queue hop below also
+  // removed the synchronization edge that was hiding the __block/shared_ptr capture from
+  // ThreadSanitizer; capturing by pointer needs no such edge to be obviously correct.)
+  std::vector<SNTFileInfo*> fis(subpaths.count);
+  auto* fisPtr = &fis;
 
   // Counts used as additional progress information in SantaGUI
-  __block auto binaryCount = std::make_shared<std::atomic<int64_t>>(0);
-  __block auto completedUnits = std::make_shared<std::atomic<int64_t>>(0);
+  std::atomic<int64_t> binaryCount{0};
+  std::atomic<int64_t> completedUnits{0};
+  // Highest count already reported to the GUI. Only ever moves forward, via the CAS below.
+  std::atomic<int64_t> reportedUnits{0};
+  auto* binaryCountPtr = &binaryCount;
+  auto* completedUnitsPtr = &completedUnits;
+  auto* reportedUnitsPtr = &reportedUnits;
+
+  // Report every 1% of work, as before, but derived once rather than recomputed per file. Also
+  // makes the throttle independent of `p`, which fixes a flood when `progress` is nil: the old
+  // condition compared against `p.completedUnitCount`, and messaging nil always returns 0, so
+  // past the 1% mark it reported on every single file.
+  const int64_t reportInterval = std::max<int64_t>(1, (int64_t)subpaths.count / 100);
 
   // Account for 80% of the work
   NSProgress* p;
@@ -229,18 +252,26 @@
     @autoreleasepool {
       if (progress.isCancelled) return;
 
-      dispatch_sync(dispatch_get_main_queue(), ^{
-        // Update the UI for every 1% of work completed.
-        completedUnits->fetch_add(1);
-        if ((((double)completedUnits->load() / subpaths.count) -
-             ((double)p.completedUnitCount / subpaths.count)) > 0.01) {
-          p.completedUnitCount = completedUnits->load();
-          [[clientListener remoteObjectProxy] updateCountsForEvent:event
-                                                       binaryCount:binaryCount->load()
-                                                         fileCount:i
-                                                       hashedCount:0];
-        }
-      });
+      // Update the UI for every 1% of work completed.
+      //
+      // This used to hop to the main queue for every file, purely to serialize the throttle
+      // check. For Xcode.app that is ~120k blocking round trips through the main thread, which
+      // serialized this otherwise-concurrent dispatch_apply and made the main thread the
+      // bottleneck for the whole scan. Nothing here needs a queue: completedUnits is already
+      // atomic, and NSProgress and NSXPCConnection are both documented thread-safe. Claim each
+      // 1% boundary with a compare-exchange so exactly one worker reports it.
+      int64_t done = completedUnitsPtr->fetch_add(1) + 1;
+      int64_t reported = reportedUnitsPtr->load();
+      if (done - reported >= reportInterval &&
+          reportedUnitsPtr->compare_exchange_strong(reported, done)) {
+        p.completedUnitCount = done;
+        // fileCount is how many have been scanned, not `i`: dispatch_apply does not hand out
+        // indices in order, so `i` made the displayed count jump around.
+        [[clientListener remoteObjectProxy] updateCountsForEvent:event
+                                                     binaryCount:binaryCountPtr->load()
+                                                       fileCount:done
+                                                     hashedCount:0];
+      }
 
       NSString* subpath = subpaths[i];
 
@@ -249,16 +280,16 @@
       SNTFileInfo* fi = [[SNTFileInfo alloc] initWithResolvedPath:file error:NULL];
       if (!fi.isExecutable) return;
 
-      fis->at(i) = fi;
-      binaryCount->fetch_add(1);
+      fisPtr->at(i) = fi;
+      binaryCountPtr->fetch_add(1);
     }
   });
 
   [progress resignCurrent];
 
-  NSMutableArray* fileInfos = [NSMutableArray arrayWithCapacity:binaryCount->load()];
+  NSMutableArray* fileInfos = [NSMutableArray arrayWithCapacity:binaryCount.load()];
   for (NSUInteger i = 0; i < subpaths.count; i++) {
-    if (fis->at(i)) [fileInfos addObject:fis->at(i)];
+    if (fis.at(i)) [fileInfos addObject:fis.at(i)];
   }
 
   return [self generateEventsFromBinaries:fileInfos
@@ -282,6 +313,14 @@
     p = [NSProgress progressWithTotalUnitCount:fis.count * 100];
   }
 
+  // Throttle GUI updates to every 1% of work, matching -findRelatedBinaries: above. Unthrottled,
+  // this sent one XPC message per binary -- 1822 of them for Xcode.app -- and each one lands on
+  // the GUI's main thread and re-renders the notification window, pinning that main thread for
+  // tens of seconds (beachball, unresponsive status item) while a large bundle is hashed.
+  // Both counters are only ever touched on stateQueue below, so no atomics needed.
+  __block int64_t completedBinaries = 0;
+  __block int64_t reportedBinaries = 0;
+
   dispatch_apply(fis.count, self.queue, ^(size_t i) {
     @autoreleasepool {
       if (progress.isCancelled) return;
@@ -297,14 +336,21 @@
       se.fileBundleVersion = event.fileBundleVersion;
       se.fileBundleVersionString = event.fileBundleVersionString;
 
-      dispatch_sync(dispatch_get_main_queue(), ^{
+      // stateQueue, not the main queue: this only needs mutual exclusion for the dictionary
+      // write and the two counters, which is no reason to involve the UI thread.
+      dispatch_sync(self.stateQueue, ^{
         relatedEvents[se.fileSHA256] = se;
         p.completedUnitCount++;
-        if (progress) {
+        completedBinaries++;
+        // hashedCount reports how many are done, not `i`: dispatch_apply does not hand out
+        // indices in order, so `i` made the displayed count jump around.
+        if (progress &&
+            ((double)(completedBinaries - reportedBinaries) / (double)fis.count) > 0.01) {
+          reportedBinaries = completedBinaries;
           [[clientListener remoteObjectProxy] updateCountsForEvent:event
                                                        binaryCount:fis.count
                                                          fileCount:0
-                                                       hashedCount:i];
+                                                       hashedCount:completedBinaries];
         }
       });
     }
