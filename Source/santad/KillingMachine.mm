@@ -33,8 +33,7 @@
 #import "Source/common/SNTSystemInfo.h"
 #include "Source/common/String.h"
 #include "Source/common/SystemResources.h"
-#include "absl/cleanup/cleanup.h"
-#include "absl/container/flat_hash_set.h"
+#include "absl/container/flat_hash_map.h"
 
 namespace santa {
 
@@ -133,12 +132,13 @@ SNTKilledProcessError LibprocSignalErrorToKilledProcessError(int error) {
 // Delivers `sig` to the process `token` identifies, or to that process's group
 // when the request targets process groups. `sig` is passed in rather than read
 // from the request so the term-then-kill path can drive two passes at different
-// signals through the same request. `signaledPgids` holds the groups this pass
-// has already signaled, so each group is signaled exactly once no matter how
-// many of its members matched: the first member signals the group and later
-// members return nil, having already been reached by that one signal.
+// signals through the same request. `signaledGroups` maps each group this pass
+// has already signaled to the errno that delivery returned, so a group is
+// signaled exactly once no matter how many of its members matched, while every
+// member is still reported: the one delivery reached all of them, so they all
+// share its outcome.
 SNTKilledProcess* KillProcess(SNTKillRequest* request, int sig, audit_token_t* token,
-                              const KillEnv& env, absl::flat_hash_set<pid_t>* signaledPgids) {
+                              const KillEnv& env, absl::flat_hash_map<pid_t, int>* signaledGroups) {
   static pid_t myPid = getpid();
   pid_t targetPid = Pid(*token);
   pid_t targetPidversion = Pidversion(*token);
@@ -170,23 +170,27 @@ SNTKilledProcess* KillProcess(SNTKillRequest* request, int sig, audit_token_t* t
     // signaling the one matched process, which is never broader than what was
     // asked for.
     if (targetPgid > 1 && targetPgid != getpgrp()) {
-      if (!signaledPgids->insert(targetPgid).second) {
-        // Signaled earlier in this pass, which reached this process too.
-        return nil;
+      // Only the first member of a group delivers; the rest reuse that
+      // delivery's outcome. Reporting it for every member keeps a failed
+      // delivery visible for each process it left unsignaled, and keeps a
+      // successful one from understating what a single kill(-pgid) reached.
+      auto [group, delivered] = signaledGroups->try_emplace(targetPgid, 0);
+      if (delivered) {
+        int error = env.signal_group(targetPgid, sig);
+        if (error == 0) {
+          LOGI(@"Signaled (%d) process group: %d (from kill command: %@)", sig, targetPgid,
+               request.uuid);
+        } else {
+          LOGW(@"Failed to signal (%d) process group: %d, error: %d (from kill command: %@)", sig,
+               targetPgid, error, request.uuid);
+        }
+        group->second = error;
       }
 
-      int error = env.signal_group(targetPgid, sig);
-      if (error == 0) {
-        LOGI(@"Signaled (%d) process group: %d (from kill command: %@)", sig, targetPgid,
-             request.uuid);
-      } else {
-        LOGW(@"Failed to signal (%d) process group: %d, error: %d (from kill command: %@)", sig,
-             targetPgid, error, request.uuid);
-      }
-
-      return [[SNTKilledProcess alloc] initWithPid:targetPid
-                                        pidversion:targetPidversion
-                                             error:LibprocSignalErrorToKilledProcessError(error)];
+      return [[SNTKilledProcess alloc]
+          initWithPid:targetPid
+           pidversion:targetPidversion
+                error:LibprocSignalErrorToKilledProcessError(group->second)];
     }
   }
 
@@ -205,7 +209,7 @@ SNTKilledProcess* KillProcess(SNTKillRequest* request, int sig, audit_token_t* t
 
 SNTKilledProcess* KillByRunningProcess(SNTKillRequestRunningProcess* request, int sig,
                                        const KillEnv& env,
-                                       absl::flat_hash_set<pid_t>* signaledPgids) {
+                                       absl::flat_hash_map<pid_t, int>* signaledGroups) {
   if (![[SNTSystemInfo bootSessionUUID] isEqualToString:request.bootSessionUUID]) {
     LOGW(@"Request to kill running process with non-matching boot session UUID");
     return [[SNTKilledProcess alloc] initWithPid:request.pid
@@ -216,7 +220,7 @@ SNTKilledProcess* KillByRunningProcess(SNTKillRequestRunningProcess* request, in
   audit_token_t token;
   if (env.token_for_pid(request.pid, &token)) {
     if (Pidversion(token) == request.pidversion) {
-      return KillProcess(request, sig, &token, env, signaledPgids);
+      return KillProcess(request, sig, &token, env, signaledGroups);
     } else {
       LOGW(@"Rejecting request to kill pid (%d) due to pidversion mismatch (got: %d, want: %d)",
            request.pid, Pidversion(token), request.pidversion);
@@ -267,12 +271,13 @@ std::optional<audit_token_t> MatchProcess(
 
 SNTKilledProcess* KillByMatchers(SNTKillRequest* request, int sig, pid_t pid,
                                  const std::vector<std::unique_ptr<ProcessMatcher>>& matchers,
-                                 const KillEnv& env, absl::flat_hash_set<pid_t>* signaledPgids) {
+                                 const KillEnv& env,
+                                 absl::flat_hash_map<pid_t, int>* signaledGroups) {
   std::optional<audit_token_t> token = MatchProcess(pid, matchers, env);
   if (!token) {
     return nil;
   }
-  return KillProcess(request, sig, &token.value(), env, signaledPgids);
+  return KillProcess(request, sig, &token.value(), env, signaledGroups);
 }
 
 // The matchers a request's criteria come down to, or nullopt when the request
@@ -312,13 +317,15 @@ std::optional<std::vector<std::unique_ptr<ProcessMatcher>>> BuildMatchers(SNTKil
 SNTKillResponse* RunKillPass(SNTKillRequest* request, int sig, const KillEnv& env) {
   NSMutableArray<SNTKilledProcess*>* killedProcs = [NSMutableArray array];
 
-  // Groups already signaled by this pass, so a group with several matching
-  // members is signaled once. Empty unless the request targets groups.
-  absl::flat_hash_set<pid_t> signaledPgids;
+  // Groups already signaled by this pass, mapped to the errno their one
+  // delivery returned, so a group with several matching members is signaled
+  // once and every member reports that outcome. Empty unless the request
+  // targets groups.
+  absl::flat_hash_map<pid_t, int> signaledGroups;
 
   if ([request isKindOfClass:[SNTKillRequestRunningProcess class]]) {
     SNTKilledProcess* killed =
-        KillByRunningProcess((SNTKillRequestRunningProcess*)request, sig, env, &signaledPgids);
+        KillByRunningProcess((SNTKillRequestRunningProcess*)request, sig, env, &signaledGroups);
     if (killed) {
       [killedProcs addObject:killed];
     }
@@ -340,7 +347,7 @@ SNTKillResponse* RunKillPass(SNTKillRequest* request, int sig, const KillEnv& en
         continue;
       }
 
-      SNTKilledProcess* killed = KillByMatchers(request, sig, pid, *matchers, env, &signaledPgids);
+      SNTKilledProcess* killed = KillByMatchers(request, sig, pid, *matchers, env, &signaledGroups);
       if (killed) {
         [killedProcs addObject:killed];
       }
