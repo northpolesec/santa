@@ -629,9 +629,6 @@
                        errors:&err];
   XCTAssertNil(err);
 
-  // This test is only concerned about sqlite's behavior. Ensure static rules are ignored.
-  [self.sut updateStaticRules:nil];
-
   // This test verifies that rule precedence ordering is correct.
   // The query uses UNION ALL with ORDER BY type ASC to guarantee the highest-priority
   // rule is returned. See the comment in SNTRuleTable#executionRuleForIdentifiers:
@@ -737,9 +734,6 @@
                        errors:&err];
   XCTAssertNil(err);
 
-  // Only sqlite's behavior is under test here. Ensure static rules are ignored.
-  [self.sut updateStaticRules:nil];
-
   NSString* transitiveID = [self _exampleTransitiveRule].identifier;
 
   // Each case pairs the transitive Binary rule with exactly one configured rule. The configured
@@ -829,7 +823,6 @@
                   ruleCleanup:SNTRuleCleanupNone
                        errors:&err];
   XCTAssertNil(err);
-  [self.sut updateStaticRules:nil];
 
   SNTRule* r = [self.sut
       executionRuleForIdentifiers:(struct RuleIdentifiers){
@@ -865,7 +858,6 @@
                   ruleCleanup:SNTRuleCleanupNone
                        errors:&err];
   XCTAssertNil(err);
-  [self.sut updateStaticRules:nil];
 
   NSString* transitiveID = [self _exampleTransitiveRule].identifier;
 
@@ -924,7 +916,6 @@
                   ruleCleanup:SNTRuleCleanupNone
                        errors:&err];
   XCTAssertNil(err);
-  [self.sut updateStaticRules:nil];
 
   SNTRule* r = [self.sut
       executionRuleForIdentifiers:
@@ -979,7 +970,6 @@
                   ruleCleanup:SNTRuleCleanupNone
                        errors:&err];
   XCTAssertNil(err);
-  [self.sut updateStaticRules:nil];
 
   SNTRule* r = [self.sut executionRuleForIdentifiers:(struct RuleIdentifiers){
                                                          .signingID = @"ABCDEFGHIJ:signingID",
