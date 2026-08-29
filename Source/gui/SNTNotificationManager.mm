@@ -258,7 +258,12 @@ static NSString* const silencedNotificationsKey = @"SilencedNotifications";
 
 - (void)hashBundleBinariesForEvent:(SNTStoredExecutionEvent*)event
                     withController:(SNTBinaryMessageWindowController*)withController {
-  withController.bundleProgress.label = @"Searching for files...";
+  // bundleProgress is an ObservableObject driving SwiftUI; this runs on hashBundleBinariesQueue,
+  // and publishing a change off the main thread mutates the view graph from under the renderer.
+  // Every other writer (-updateCountsForEvent:..., -updateBlockNotification:...) already hops.
+  dispatch_async(dispatch_get_main_queue(), ^{
+    withController.bundleProgress.label = @"Searching for files...";
+  });
 
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
   MOLXPCConnection* bc = [SNTXPCBundleServiceInterface configuredConnection];
