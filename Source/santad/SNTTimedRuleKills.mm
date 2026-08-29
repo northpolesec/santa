@@ -123,15 +123,13 @@ NSArray<NSNumber*>* WindowDaysFromValue(id value) {
   if (![value isKindOfClass:[NSArray class]]) {
     return nil;
   }
-  std::vector<int64_t> days;
-  days.reserve([value count]);
   for (NSNumber* day in value) {
-    if (![day isKindOfClass:[NSNumber class]] || (double)day.integerValue != day.doubleValue) {
+    if (![day isKindOfClass:[NSNumber class]] || (double)day.integerValue != day.doubleValue ||
+        day.integerValue < 0 || day.integerValue > 6) {
       return nil;
     }
-    days.push_back(day.integerValue);
   }
-  return santa::cel::ValidateDays(days).ok() ? value : nil;
+  return value;
 }
 
 NSString* WindowTimeFromValue(id value) {
@@ -338,7 +336,6 @@ SNTKillRequest* KillRequestForEntry(SNTTimedRuleKillEntry* entry) {
 @property uint32_t armedTimerSeconds;
 
 - (void)onDeadlineTimer;
-- (void)onClockRefresh;
 @end
 
 namespace {
@@ -394,12 +391,11 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
                                    DISPATCH_QUEUE_SERIAL);
     _timer = std::make_shared<DeadlineTimer>(self);
 
-    // The refresh runs on the uptime clock, so hanging the due question off it
-    // bounds how late a moved wall clock is noticed. Weak: this object owns the
-    // clock.
+    // The clock's tick asks the same due question the countdown does, on a
+    // cadence a moved wall clock cannot delay. Weak: this object owns the clock.
     __weak SNTTimedRuleKills* weakSelf = self;
     clock.refreshHandler = ^{
-      [weakSelf onClockRefresh];
+      [weakSelf onDeadlineTimer];
     };
   }
   return self;
@@ -517,22 +513,9 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
 }
 
 - (void)onDeadlineTimer {
-  // Runs on the Timer's queue. The work moves to our own queue: the kill blocks
-  // it for the term-then-kill grace period, and the entries are only touched
-  // there.
-  dispatch_async(self.queue, ^{
-    [self processDueEntriesSerialized];
-  });
-}
-
-- (void)onClockRefresh {
-  // Runs on the clock's tick, with the clock's lock released. The same question
-  // the countdown timer asks, on a cadence a moved wall clock cannot delay: an
-  // entry whose mach deadline has arrived is quit here, and the countdown, which
-  // runs on the wall clock, is re-armed from the believable one on the way
-  // through. Enqueued rather than run here, both because the entries are only
-  // touched on our own queue and because a kill would otherwise hold the clock's
-  // tick for the grace period.
+  // Called from the countdown's queue and from the clock's tick. The work is
+  // enqueued rather than run here: the entries are only touched on our own
+  // queue, and a kill would hold the caller for the grace period.
   dispatch_async(self.queue, ^{
     [self processDueEntriesSerialized];
   });

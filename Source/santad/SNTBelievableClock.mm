@@ -122,7 +122,6 @@ NSTimeInterval SecondsBetweenMach(uint64_t earlier, uint64_t later) {
     Reading reading;
     @synchronized(self) {
       reading = [self believableNowFromSavedReadingSynchronized];
-      [self raiseFloorSynchronizedTo:reading];
     }
     [self persistReading:reading];
 
@@ -144,7 +143,6 @@ NSTimeInterval SecondsBetweenMach(uint64_t earlier, uint64_t later) {
 
   @synchronized(self) {
     reading = [self believableNowSynchronized];
-    [self raiseFloorSynchronizedTo:reading];
   }
 
   return [NSDate dateWithTimeIntervalSince1970:reading.wall];
@@ -161,7 +159,6 @@ NSTimeInterval SecondsBetweenMach(uint64_t earlier, uint64_t later) {
 
   @synchronized(self) {
     reading = [self believableNowSynchronized];
-    [self raiseFloorSynchronizedTo:reading];
     handler = self.refreshHandler;
   }
 
@@ -213,9 +210,12 @@ NSTimeInterval SecondsBetweenMach(uint64_t earlier, uint64_t later) {
 /// forward to that same mach reading.
 - (Reading)believableNowSynchronized {
   uint64_t mach = self.machContinuous();
-  return {.wall = std::max(self.wallClock().timeIntervalSince1970,
-                           _floor.wall + SecondsBetweenMach(_floor.mach, mach)),
-          .mach = mach};
+  Reading reading = {.wall = std::max(self.wallClock().timeIntervalSince1970,
+                                      _floor.wall + SecondsBetweenMach(_floor.mach, mach)),
+                     .mach = mach};
+  // By construction never below the floor it replaces, so assigning raises it.
+  _floor = reading;
+  return reading;
 }
 
 /// The minimum believable time from the reading a previous daemon left on disk.
@@ -225,49 +225,42 @@ NSTimeInterval SecondsBetweenMach(uint64_t earlier, uint64_t later) {
 - (Reading)believableNowFromSavedReadingSynchronized {
   uint64_t mach = self.machContinuous();
   NSTimeInterval wall = self.wallClock().timeIntervalSince1970;
-  Reading systemClock = {.wall = wall, .mach = mach};
+  // The system clock is the answer unless a usable saved reading beats it.
+  Reading reading = {.wall = wall, .mach = mach};
 
   // The state file is on disk, so every field is validated rather than trusted;
   // an unusable reading is the same answer a missing one gives.
-  NSDictionary* reading = [self.configurator savedClockReading];
-  if (![reading isKindOfClass:[NSDictionary class]] ||
-      ![reading[kReadingWallKey] isKindOfClass:[NSNumber class]] ||
-      ![reading[kReadingMachKey] isKindOfClass:[NSNumber class]] ||
-      ![reading[kReadingBootSessionUUIDKey] isKindOfClass:[NSString class]]) {
-    return systemClock;
-  }
-
-  // A plist real round-trips both infinities and NaN, and neither can be compared
-  // its way out of a max(). A wall value that is not finite is no reading at all.
-  NSTimeInterval savedWall = [reading[kReadingWallKey] doubleValue];
-  if (!std::isfinite(savedWall)) {
-    LOGW(@"Discarding a saved clock reading: its wall time is not a finite number");
-    return systemClock;
-  }
-
-  // A nil current UUID compares equal to nothing, which lands here: no
-  // projection, which is the safe direction.
-  if (![reading[kReadingBootSessionUUIDKey] isEqualToString:self.bootSessionUUID()]) {
-    if (savedWall - wall > kMaxCrossBootLead) {
-      LOGW(@"Discarding a saved clock reading from an earlier boot session: %@ is more than %g "
-           @"days ahead of the system clock (%@)",
-           [NSDate dateWithTimeIntervalSince1970:savedWall], kMaxCrossBootLead / (24 * 60 * 60),
-           [NSDate dateWithTimeIntervalSince1970:wall]);
-      return systemClock;
+  NSDictionary* saved = [self.configurator savedClockReading];
+  if ([saved isKindOfClass:[NSDictionary class]] &&
+      [saved[kReadingWallKey] isKindOfClass:[NSNumber class]] &&
+      [saved[kReadingMachKey] isKindOfClass:[NSNumber class]] &&
+      [saved[kReadingBootSessionUUIDKey] isKindOfClass:[NSString class]]) {
+    // A plist real round-trips both infinities and NaN, and neither can be
+    // compared its way out of a max(). A wall value that is not finite is no
+    // reading at all.
+    NSTimeInterval savedWall = [saved[kReadingWallKey] doubleValue];
+    if (!std::isfinite(savedWall)) {
+      LOGW(@"Discarding a saved clock reading: its wall time is not a finite number");
+    } else if (![saved[kReadingBootSessionUUIDKey] isEqualToString:self.bootSessionUUID()]) {
+      // A nil current UUID compares equal to nothing, which lands here: no
+      // projection, which is the safe direction.
+      if (savedWall - wall > kMaxCrossBootLead) {
+        LOGW(@"Discarding a saved clock reading from an earlier boot session: %@ is more than %g "
+             @"days ahead of the system clock (%@)",
+             [NSDate dateWithTimeIntervalSince1970:savedWall], kMaxCrossBootLead / (24 * 60 * 60),
+             [NSDate dateWithTimeIntervalSince1970:wall]);
+      } else {
+        reading.wall = std::max(wall, savedWall);
+      }
+    } else {
+      uint64_t savedMach = [saved[kReadingMachKey] unsignedLongLongValue];
+      reading.wall = std::max(wall, savedWall + SecondsBetweenMach(savedMach, mach));
     }
-    return {.wall = std::max(wall, savedWall), .mach = mach};
   }
 
-  uint64_t savedMach = [reading[kReadingMachKey] unsignedLongLongValue];
-  return {.wall = std::max(wall, savedWall + SecondsBetweenMach(savedMach, mach)), .mach = mach};
-}
-
-/// Moves the floor to `reading`, whose wall value is by construction never below
-/// the floor it replaces: that is what a wall clock moved backwards runs into,
-/// and what makes a wall clock moved forwards stick. The mach value is the one
-/// that wall value was measured against, so nothing elapsed is lost here.
-- (void)raiseFloorSynchronizedTo:(Reading)reading {
+  // By construction never below the floor it replaces, so assigning raises it.
   _floor = reading;
+  return reading;
 }
 
 @end

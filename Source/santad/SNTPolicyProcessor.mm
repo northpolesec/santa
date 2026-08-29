@@ -55,6 +55,9 @@ struct CELEvaluationResult {
   bool succeeded;            // Whether CEL evaluation succeeded
   bool decisionMade;         // If !succeeded, whether a decision was made (fail-closed)
   SNTRuleState resultState;  // If succeeded, the resulting state
+  // The kill the expression asked for, carried back rather than written to the
+  // decision: only a rule that goes on to decide may record one.
+  std::optional<santa::cel::PendingKill> pendingKill;
 };
 
 static void ApplySilentBlock(SNTCachedDecision* cd, SNTRuleState state);
@@ -71,12 +74,9 @@ static NSArray<NSNumber*>* NSArrayFromDays(const std::vector<int64_t>& days) {
   return out;
 }
 
-// Drops whatever a CEL evaluation left on the decision about a timed rule kill.
-// Called before a rule is evaluated and on every path where an evaluated rule
-// does not go on to decide, because a deadline may only ever be attributed to
-// the rule that governed the execution recording it: a rule that falls through
-// to the fallback expressions, the platform allow, a scope allow or Monitor mode
-// must leave nothing behind for that allow to record.
+// Drops whatever an earlier rule left on the decision about a timed rule kill: a
+// deadline may only ever be attributed to the rule that governed the execution
+// recording it.
 static void ClearTimedRuleKill(SNTCachedDecision* cd) {
   cd.timedRuleKillDeadline = nil;
   cd.timedRuleKillNotifyAt = nil;
@@ -441,20 +441,15 @@ struct FallbackBatch {
 
   ApplySilentBlock(cd, resultState);
 
-  // The deadline rides the decision out to SNTExecutionController, which records
-  // it only once the exec proceeds. Fallbacks are skipped: no rule identity.
-  if (pendingKill.has_value() && !inFallbackContext) {
-    cd.timedRuleKillDeadline = NSDateFromAbslTime(pendingKill->deadline);
-    cd.timedRuleKillNotifyAt = NSDateFromAbslTime(pendingKill->notify_at);
-    if (!pendingKill->window_days.empty()) {
-      cd.timedRuleKillWindowDays = NSArrayFromDays(pendingKill->window_days);
-      cd.timedRuleKillWindowStart = santa::StringToNSString(pendingKill->window_start);
-      cd.timedRuleKillWindowEnd = santa::StringToNSString(pendingKill->window_end);
-      cd.timedRuleKillWindowZone = santa::StringToNSString(pendingKill->window_zone);
-    }
+  // Fallbacks are skipped: no rule identity for a deadline to be attributed to.
+  if (inFallbackContext) {
+    pendingKill.reset();
   }
 
-  return {.succeeded = true, .decisionMade = false, .resultState = resultState};
+  return {.succeeded = true,
+          .decisionMade = false,
+          .resultState = resultState,
+          .pendingKill = std::move(pendingKill)};
 }
 
 - (CELEvaluationResult)evaluateCELExpressionForRule:(SNTRule*)rule
@@ -529,17 +524,16 @@ static void ApplySilentBlock(SNTCachedDecision* cd, SNTRuleState state) {
   // evaluation may leave one, and only if this rule goes on to decide.
   ClearTimedRuleKill(cd);
 
+  std::optional<santa::cel::PendingKill> pendingKill;
   if ((state == SNTRuleStateCEL || state == SNTRuleStateCELv2) && activationCallback) {
     CELEvaluationResult celResult = [self evaluateCELExpressionForRule:rule
                                                         cachedDecision:cd
                                                     activationCallback:activationCallback];
     if (!celResult.succeeded) {
-      // The rule did not decide, so it leaves nothing behind: the same rule the
-      // unmapped-pair and transitive-disabled exits below follow.
-      ClearTimedRuleKill(cd);
       return celResult.decisionMade;
     }
     state = celResult.resultState;
+    pendingKill = std::move(celResult.pendingKill);
   }
 
   static const auto decisions =
@@ -594,10 +588,7 @@ static void ApplySilentBlock(SNTCachedDecision* cd, SNTRuleState state) {
   } else {
     // If we have an invalid state combination then either we have stale data in
     // the database or a programming error. We treat this as if the
-    // corresponding rule was not found, which includes forgetting any kill its
-    // expression asked for: whatever allows this execution instead is not this
-    // rule, and must not record against it.
-    ClearTimedRuleKill(cd);
+    // corresponding rule was not found.
     LOGE(@"Invalid rule type/state combination %ld/%ld", type, state);
     return NO;
   }
@@ -628,7 +619,6 @@ static void ApplySilentBlock(SNTCachedDecision* cd, SNTRuleState state) {
       // as if a matching rule was not found and set the state to unknown. Otherwise the
       // decision map will have already set the EventState to SNTEventStateAllowTransitive.
       if (!enableTransitiveRules) {
-        ClearTimedRuleKill(cd);
         cd.decision = SNTEventStateUnknown;
         return NO;
       }
@@ -651,12 +641,21 @@ static void ApplySilentBlock(SNTCachedDecision* cd, SNTRuleState state) {
   cd.staticRule = rule.staticRule;
   cd.ruleId = rule.ruleId;
 
-  // Named only here, where the rule is known to have decided. The identifier is
-  // taken as the rule table stores it: the fire-time re-check looks it up by that.
-  if (cd.timedRuleKillDeadline) {
+  // Recorded only here, where the rule is known to have decided: every exit above
+  // leaves the decision as the entry clear left it. The identifier is taken as
+  // the rule table stores it, since the fire-time re-check looks it up by that.
+  if (pendingKill.has_value()) {
+    cd.timedRuleKillDeadline = NSDateFromAbslTime(pendingKill->deadline);
+    cd.timedRuleKillNotifyAt = NSDateFromAbslTime(pendingKill->notify_at);
     cd.timedRuleKillRuleType = rule.type;
     cd.timedRuleKillIdentifier = rule.identifier;
     cd.timedRuleKillCELHash = [SNTTimedRuleKills celHashForExpression:rule.celExpr];
+    if (!pendingKill->window_days.empty()) {
+      cd.timedRuleKillWindowDays = NSArrayFromDays(pendingKill->window_days);
+      cd.timedRuleKillWindowStart = santa::StringToNSString(pendingKill->window_start);
+      cd.timedRuleKillWindowEnd = santa::StringToNSString(pendingKill->window_end);
+      cd.timedRuleKillWindowZone = santa::StringToNSString(pendingKill->window_zone);
+    }
   }
 
   return YES;

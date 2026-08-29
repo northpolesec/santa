@@ -120,11 +120,6 @@ absl::StatusOr<absl::TimeZone> ResolveTimeZone(absl::string_view zone);
 // strings it must accept are exactly the ones a window can be rebuilt from.
 std::optional<int> ParseHourMinute(absl::string_view time);
 
-// Checks a day list: every day is 0 (Sunday) through 6 (Saturday), and anything
-// else is an error naming the offending day. Exported alongside
-// ParseHourMinute() and for the same reason.
-absl::Status ValidateDays(absl::Span<const int64_t> days);
-
 // The window math, kept separate from the CEL plumbing so the calendar cases
 // are testable directly and so the notification lead formula can reuse it.
 //

@@ -220,7 +220,9 @@ std::optional<int> ParseHourMinute(absl::string_view time) {
   return hour * 60 + minute;
 }
 
-absl::Status ValidateDays(absl::Span<const int64_t> days) {
+// Every day is 0 (Sunday) through 6 (Saturday); anything else is an error
+// naming the offending day.
+static absl::Status ValidateDays(absl::Span<const int64_t> days) {
   for (int64_t day : days) {
     if (day < 0 || day > 6) {
       return absl::InvalidArgumentError(absl::StrCat(
