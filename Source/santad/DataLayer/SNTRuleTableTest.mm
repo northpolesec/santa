@@ -16,6 +16,7 @@
 
 #import <OCMock/OCMock.h>
 #import <XCTest/XCTest.h>
+#include <sqlite3.h>
 #include <stdint.h>
 #import "Source/common/SNTError.h"
 
@@ -48,6 +49,14 @@
 @property(readwrite) NSString* identifier;
 @property(readwrite) NSString* celExpr;
 @end
+
+// A progress handler that returns non-zero aborts whatever operation is running, making
+// sqlite3_step return SQLITE_INTERRUPT. sqlite3_prepare_v2 never invokes the handler, so this
+// reproduces the shape of a busy, corrupt or I/O failure: the statement compiles fine and only
+// fails once rows are actually read.
+static int InterruptStepProgressHandler(void* context) {
+  return 1;
+}
 
 @implementation SNTRuleTableTest
 
@@ -609,6 +618,34 @@
 
   SNTRule* r = [self.sut executionRuleForIdentifiers:ids useCache:YES];
   XCTAssertNotNil(r, @"a failed query must not be cached as a rule miss");
+  XCTAssertEqual(r.type, SNTRuleTypeBinary);
+}
+
+// As above, but for a failure that only surfaces once the statement is stepped, which is how
+// sqlite reports a busy or locked db, a bad page and an I/O error. `-[FMResultSet next]` signals
+// that with the same NO it uses for "no rows", so the lookup is indistinguishable from a miss
+// unless the step error is asked for explicitly.
+- (void)testExecutionRuleMissCacheIgnoresStepFailures {
+  [self.sut addExecutionRules:@[ [self _exampleBinaryRule] ]
+                  ruleCleanup:SNTRuleCleanupNone
+                       errors:nil];
+
+  struct RuleIdentifiers ids = {
+      .binarySHA256 = @"b7c1e3fd640c5f211c89b02c2c6122f78ce322aa5c56eb0bb54bc422a8f8b670",
+  };
+
+  [self.dbq inDatabase:^(FMDatabase* db) {
+    sqlite3_progress_handler((sqlite3*)db.sqliteHandle, 1, InterruptStepProgressHandler, NULL);
+  }];
+
+  XCTAssertNil([self.sut executionRuleForIdentifiers:ids useCache:YES]);
+
+  [self.dbq inDatabase:^(FMDatabase* db) {
+    sqlite3_progress_handler((sqlite3*)db.sqliteHandle, 0, NULL, NULL);
+  }];
+
+  SNTRule* r = [self.sut executionRuleForIdentifiers:ids useCache:YES];
+  XCTAssertNotNil(r, @"a query that failed while stepping must not be cached as a rule miss");
   XCTAssertEqual(r.type, SNTRuleTypeBinary);
 }
 

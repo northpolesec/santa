@@ -90,7 +90,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
   // query entirely. Only the SQL lookup is cached -- the static rules are an in-memory dictionary
   // and are checked on every call. Keyed on the binary SHA-256 alone -- it identifies the file
   // contents, and so determines every other identifier a lookup would match on. Entries are only
-  // ever cleared wholesale (see `clearExecutionRuleMissCache`) -- there is no per-entry
+  // ever cleared wholesale, by `addExecutionRules:...:errors:` -- there is no per-entry
   // invalidation.
   std::unique_ptr<SantaCache<std::string, bool>> _executionRuleMissCache;
 }
@@ -633,7 +633,6 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
   // planner and costs a temp B-tree sort on every lookup.
   //
   // clang-format off
-  __block BOOL queryFailed = NO;
   [self inDatabase:^(FMDatabase* db) {
     FMResultSet* rs = [db executeQuery:@"SELECT * FROM ("
                                       @"            SELECT 1 AS prio, * FROM execution_rules WHERE identifier=? AND type=500  "
@@ -648,26 +647,42 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
                                       identifiers.certificateSHA256, identifiers.teamID,
                                       identifiers.binarySHA256, @(SNTRuleStateAllowTransitive)];
     // A nil result set means the statement itself failed (e.g. a locked or corrupt db), not
-    // that the file has no rule. Note the failure so it isn't remembered as a miss below.
+    // that the file has no rule. Return without remembering it as a miss.
     if (!rs) {
-      queryFailed = YES;
       LOGE(@"Failed to query execution rules: %@", [db lastErrorMessage]);
       return;
     }
-    if ([rs next]) {
+
+    // Stepping fails for the same reasons preparing does. sqlite3_prepare_v2 succeeds and defers
+    // a busy, corrupt or I/O error to the first sqlite3_step, and `next` folds that into the same
+    // NO it returns for "no rows". Ask for the error explicitly so a transient db failure isn't
+    // mistaken for -- and then remembered as -- an absent rule.
+    BOOL queryFailed = NO;
+    NSError* stepErr;
+    if ([rs nextWithError:&stepErr]) {
       rule = [self executionRuleFromResultSet:rs];
+    } else if (stepErr) {
+      queryFailed = YES;
+      LOGE(@"Failed to step execution rules query: %@", stepErr);
     }
     [rs close];
+
+    // The query ran and found nothing, so cache that fact to avoid needlessly looking in the db
+    // during future execs. A failed query is deliberately not cached: the miss cache is only ever
+    // invalidated by a rule write, so caching a transient db error would pin it in place and deny
+    // this file its rule indefinitely.
+    //
+    // This must stay inside the db queue block. The queue is serial, so bundling the query with
+    // the set() makes the pair atomic with respect to a rule write: either both run before the
+    // write transaction, and the writer's subsequent clear() drops the entry, or both run after
+    // it, and the query finds the new rule so nothing is cached. Recording the miss outside the
+    // block instead admits the interleaving where a write commits and clears in between, pinning
+    // a miss that no later rule write invalidates.
+    if (!rule && !queryFailed && !missCacheKey.empty()) {
+      self->_executionRuleMissCache->set(missCacheKey, true);
+    }
   }];
   // clang-format on
-
-  // The query ran and found nothing, so cache that fact to avoid needlessly looking in the db
-  // during future execs. A failed query is deliberately not cached: the miss cache is only ever
-  // invalidated by a rule write, so caching a transient db error would pin it in place and deny
-  // this file its rule indefinitely.
-  if (!rule && !queryFailed && !missCacheKey.empty()) {
-    _executionRuleMissCache->set(missCacheKey, true);
-  }
 
   return rule;
 }
