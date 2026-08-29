@@ -46,8 +46,8 @@ static const int64_t kTransitiveRuleCullingThreshold = 500000;
 // Consider transitive rules out of date if they haven't been used in six months.
 static const NSUInteger kTransitiveRuleExpirationSeconds = 6 * 30 * 24 * 3600;
 
-// Maximum number of file hashes remembered by the execution rule miss cache.
-// Maxes out around 322KiB.
+// Maximum number of file hashes remembered by the execution rule miss cache. Measured at ~1.3MB
+// of live heap when full.
 static const uint64_t kExecutionRuleMissCacheSize = 10000;
 
 static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
@@ -563,6 +563,11 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
 }
 
 - (SNTRule*)executionRuleForIdentifiers:(struct RuleIdentifiers)identifiers {
+  return [self executionRuleForIdentifiers:identifiers useCache:NO];
+}
+
+- (SNTRule*)executionRuleForIdentifiers:(struct RuleIdentifiers)identifiers
+                               useCache:(BOOL)useCache {
   __block SNTRule* rule;
 
   // Look for a static rule that matches.
@@ -603,8 +608,8 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
   // If we already looked in the db during another exec and there was no rule,
   // return early. The cache will be cleared when new rules are added. Keyed by
   // file sha256. Using a cdhash is appealing, but a cdhash is not guaranteed
-  // unique across files.
-  std::string missCacheKey = identifiers.binarySHA256.length
+  // unique across files. An empty key means this lookup must not be cached.
+  std::string missCacheKey = (useCache && identifiers.binarySHA256.length)
                                  ? santa::NSStringToUTF8String(identifiers.binarySHA256)
                                  : std::string();
   if (!missCacheKey.empty() && _executionRuleMissCache->get(missCacheKey)) {

@@ -140,7 +140,7 @@ static const std::vector<std::string> kBlockedArgs = {"clang", "--link"};
   rule.celExpr = kCompilerCELExpr;
 
   struct RuleIdentifiers anyIdentifiers = {};
-  OCMStub([self.mockRuleDatabase executionRuleForIdentifiers:anyIdentifiers])
+  OCMStub([self.mockRuleDatabase executionRuleForIdentifiers:anyIdentifiers useCache:YES])
       .ignoringNonObjectArgs()
       .andReturn(rule);
 

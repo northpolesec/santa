@@ -113,6 +113,14 @@
 - (SNTRule*)executionRuleForIdentifiers:(struct RuleIdentifiers)identifiers;
 
 ///
+///  As `executionRuleForIdentifiers:`, but may answer from the negative miss cache.
+///
+///  @param useCache Pass YES only from the execution path, and only when these are all the
+///         identifiers the file has. NO behaves exactly like `executionRuleForIdentifiers:`.
+///
+- (SNTRule*)executionRuleForIdentifiers:(struct RuleIdentifiers)identifiers useCache:(BOOL)useCache;
+
+///
 ///  Add an array of execution rules, file access rules, and network flow rules to the database.
 ///  All rules across all three types are applied within a single transaction; the transaction
 ///  is aborted if any rule fails to apply.
