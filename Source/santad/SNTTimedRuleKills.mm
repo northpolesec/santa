@@ -70,10 +70,8 @@ static const NSTimeInterval kDueTolerance = 0.25;
 // How long a matched process has to exit after SIGTERM before it is SIGKILLed.
 static const NSTimeInterval kTermGrace = 5.0;
 
-// How far ahead a mach deadline may point. The pair is arithmetic on a tick
-// count, and a deadline centuries out would wrap it; a deadline past this is
-// beyond anything a pending kill means, so it carries no pair at all and its
-// wall instant governs alone.
+// How far ahead a mach deadline may point: the pair is arithmetic on a tick
+// count, and one further out than this carries no pair at all.
 static const NSTimeInterval kMaxMachDeadlineLead = 10 * 365 * 24 * 60 * 60;
 
 /// One pending kill: the rule it came from, when it fires, whether the user has
@@ -116,19 +114,11 @@ bool SupportedRuleType(SNTRuleType ruleType) {
          ruleType == SNTRuleTypeCDHash;
 }
 
-// The persisted window shape, checked rather than trusted, because the state
-// file is on disk: a day list must be an array of whole numbers 0 (Sunday)
-// through 6 (Saturday), each time a 24-hour "HH:MM", and the zone a string
-// policy_for_range()'s own resolver accepts. That is exactly what
-// policy_for_range() accepts, and so exactly what a window can be rebuilt from.
-// Anything else reads as no shape at all, which is the same answer a missing key
-// gives: the entry still loads and still holds its deadline, it just has no
-// window for a restart to re-check.
-//
-// Only the plist type checks are written here: a plist real round-trips where an
-// integer was written, and 2.5 is no day of the week. What counts as a day and
-// what counts as an HH:MM is asked of policy_for_range()'s own validators, the
-// same way the zone is asked of its resolver.
+// The persisted window shape, checked rather than trusted because the state file
+// is on disk: days 0 (Sunday) through 6 (Saturday), 24-hour "HH:MM" times, and a
+// zone policy_for_range()'s own resolver accepts. Anything else reads as no shape
+// at all, so the entry keeps its deadline but has no window for a restart to
+// re-check.
 NSArray<NSNumber*>* WindowDaysFromValue(id value) {
   if (![value isKindOfClass:[NSArray class]]) {
     return nil;
@@ -404,11 +394,9 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
                                    DISPATCH_QUEUE_SERIAL);
     _timer = std::make_shared<DeadlineTimer>(self);
 
-    // The clock's refresh runs on the uptime clock, which no change to the wall
-    // clock can delay, so hanging the due question off it is what bounds how
-    // late a moved clock can be noticed. Weakly captured: this object owns the
-    // clock, and a strong reference from a block the clock holds would be a
-    // cycle neither of them could break.
+    // The refresh runs on the uptime clock, so hanging the due question off it
+    // bounds how late a moved wall clock is noticed. Weak: this object owns the
+    // clock.
     __weak SNTTimedRuleKills* weakSelf = self;
     clock.refreshHandler = ^{
       [weakSelf onClockRefresh];
@@ -657,16 +645,9 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
   return YES;
 }
 
-/// Whether an entry has come due. Two clocks answer that: the wall instant it
-/// was recorded for, read from the believable clock, and the mach continuous
-/// instant captured alongside it. Whichever arrives first fires the kill, so a
-/// system clock moved backwards cannot hold a deadline open, and a daemon that
-/// restarts inside the same boot session picks up an instant nothing could have
-/// moved rather than one the wall clock could.
-///
-/// A pair from an earlier boot session says nothing at all: its tick count
-/// belongs to a counter that restarted, so the wall instant is left to govern
-/// alone. Everything the rule covered died with that reboot anyway.
+/// Whether an entry has come due. Two clocks answer that, the believable wall
+/// instant and the mach continuous instant captured alongside it, and whichever
+/// arrives first fires. A pair from an earlier boot session is ignored.
 - (BOOL)entryIsDue:(SNTTimedRuleKillEntry*)entry
                now:(NSDate*)now
            machNow:(uint64_t)machNow
@@ -683,12 +664,8 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
 }
 
 /// Pairs an entry's wall deadline with the mach continuous instant it falls on
-/// and the boot session that instant belongs to. Called wherever a deadline is
-/// set, since the pair only ever describes the deadline it was taken with.
-///
-/// A machine whose boot session cannot be read, or a deadline further out than a
-/// tick count can carry, stores no pair, which leaves the wall instant governing
-/// alone.
+/// and the boot session that instant belongs to. A host whose boot session cannot
+/// be read, or a deadline further out than a tick count carries, stores no pair.
 - (void)captureMachDeadlineForEntry:(SNTTimedRuleKillEntry*)entry from:(NSDate*)now {
   NSString* bootSession = [SNTSystemInfo bootSessionUUID];
   NSTimeInterval remaining = [entry.deadline timeIntervalSinceDate:now];
@@ -859,10 +836,8 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
 /// clock; the countdown itself is Timer.h's, which schedules on wall time, so a
 /// machine asleep at the deadline runs the kill on wake.
 ///
-/// Every pass re-arms it, including the ones the clock's refresh brings, and that
-/// is what corrects a countdown started before the wall clock moved: the distance
-/// is re-measured on a clock that only ever rises, so a rolled-back countdown is
-/// shortened back to the truth and can never be lengthened.
+/// Every pass re-arms it, so a countdown started before the wall clock moved is
+/// re-measured on a clock that only rises: shortened back, never lengthened.
 - (void)rescheduleTimerSerialized {
   NSDate* next = nil;
   for (SNTTimedRuleKillEntry* entry in self.entries.allValues) {

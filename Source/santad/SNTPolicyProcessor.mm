@@ -441,13 +441,8 @@ struct FallbackBatch {
 
   ApplySilentBlock(cd, resultState);
 
-  // policy_for_range() matched an open window and asked for whatever the rule
-  // covers to be quit when it closes. The entry may only be recorded once the
-  // execution is known to proceed, so the deadline rides the decision out to
-  // SNTExecutionController, which records it. The rule's identity is filled in
-  // by the caller, which is where the rule is in hand. Fallback expressions are
-  // skipped: they are compiled without policy_for_range() precisely because
-  // they carry no rule identity for a kill to match a running process against.
+  // The deadline rides the decision out to SNTExecutionController, which records
+  // it only once the exec proceeds. Fallbacks are skipped: no rule identity.
   if (pendingKill.has_value() && !inFallbackContext) {
     cd.timedRuleKillDeadline = NSDateFromAbslTime(pendingKill->deadline);
     cd.timedRuleKillNotifyAt = NSDateFromAbslTime(pendingKill->notify_at);
@@ -656,11 +651,8 @@ static void ApplySilentBlock(SNTCachedDecision* cd, SNTRuleState state) {
   cd.staticRule = rule.staticRule;
   cd.ruleId = rule.ruleId;
 
-  // A kill this rule's policy_for_range() asked for is named only here, where
-  // the rule is known to have decided: the identifier is what the fire-time
-  // re-check looks the rule up by, so it has to be the rule that governed the
-  // execution recording it, taken as the rule table stores it and never
-  // re-derived from the binary.
+  // Named only here, where the rule is known to have decided. The identifier is
+  // taken as the rule table stores it: the fire-time re-check looks it up by that.
   if (cd.timedRuleKillDeadline) {
     cd.timedRuleKillRuleType = rule.type;
     cd.timedRuleKillIdentifier = rule.identifier;

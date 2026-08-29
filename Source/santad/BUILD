@@ -1179,6 +1179,7 @@ santa_unit_test(
     name = "SNTBelievableClockTest",
     srcs = ["SNTBelievableClockTest.mm"],
     deps = [
+        ":KillEnvTestSupport",
         ":SNTBelievableClock",
         "//Source/common:SNTConfigurator",
         "//Source/common:SystemResources",
@@ -1603,8 +1604,10 @@ objc_library(
     hdrs = ["KillEnvTestSupport.h"],
     deps = [
         ":KillingMachine",
+        ":SNTBelievableClock",
         "//Source/common:AuditUtilities",
         "//Source/common:CSOpsHelper",
+        "//Source/common:SNTConfigurator",
         "//Source/common:SystemResources",
     ],
 )

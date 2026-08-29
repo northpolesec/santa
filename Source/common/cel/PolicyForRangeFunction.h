@@ -144,16 +144,10 @@ WindowEval EvalTimestampWindow(absl::Time start, absl::Time end,
 // always contains now. Callers reject a non-positive d before asking.
 WindowEval EvalDurationWindow(absl::Duration d, absl::Time now);
 
-// The kill an in-window evaluation with should_kill asked for: quit whatever
-// the rule covers at `deadline`, having warned the user at `notify_at`.
-//
-// The window shape is carried so a daemon that restarts before the deadline can
-// re-check that the window is still the one the deadline came from. The zone is
-// part of that shape: "09:00" names no instant without the calendar it was read
-// in, so a re-check that guessed the zone could land on a different occurrence
-// than the evaluation did. Both HH:MM overloads have a shape that recurs, and
-// the one without a zone argument records "local", which is what its window was
-// read in; the timestamp and duration overloads leave all of these empty.
+// The kill an in-window evaluation with should_kill asked for: quit what the
+// rule covers at `deadline`, having warned at `notify_at`. The window shape is
+// what a restart re-checks against: the zone string as written ("local" when
+// the overload takes none), and empty for the non-recurring overloads.
 struct PendingKill {
   absl::Time deadline;
   absl::Time notify_at;
@@ -174,10 +168,6 @@ PolicyForRangeDescriptors();
 // selects, and reports a pending kill when the window is open and should_kill
 // is set (keeping the earlier deadline if the same evaluation asks more than
 // once). Both sink pointers must outlive every evaluation.
-//
-// `now` is the only clock this function reads. The Activation supplies it, so
-// santad can hold every window evaluation to the minimum believable time
-// instead of whatever the system clock currently says.
 class PolicyForRangeFunction
     : public ::google::api::expr::runtime::CelFunction {
  public:

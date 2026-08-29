@@ -81,22 +81,10 @@
 @property BOOL silentTouchID;
 @property NSNumber* touchIDCooldownMinutes;  // nil = no caching (prompt every time)
 
-/// Set when the matching CEL rule's policy_for_range() evaluated inside its
-/// window with should_kill set: anything the rule covers that is still running
-/// at timedRuleKillDeadline is quit, with a warning window at
-/// timedRuleKillNotifyAt. The deadline is nil when no kill was asked for.
-///
-/// The entry is only recorded once the execution is known to be allowed, so
-/// these fields travel with the decision rather than being acted on where they
-/// are set. The identifier is copied from the matched rule byte for byte: the
-/// kill's re-check looks the rule up by it, case-sensitively.
-///
-/// The window fields describe the recurring window the deadline came from, so a
-/// daemon that restarts before the deadline can re-check it. They are empty for
-/// the timestamp and duration overloads, whose windows do not recur. The zone is
-/// the string the rule wrote ("local", an IANA name or a [+-]HH:MM offset), not a
-/// resolved zone: the re-check resolves it again, and "local" is whatever the
-/// host is set to at that point.
+/// Set when the matching rule's policy_for_range() evaluated in-window with
+/// should_kill: what the rule covers is quit at timedRuleKillDeadline, warned at
+/// timedRuleKillNotifyAt, and a nil deadline means no kill was asked for. The
+/// entry is recorded only once the execution is known to be allowed.
 @property NSDate* timedRuleKillDeadline;
 @property NSDate* timedRuleKillNotifyAt;
 @property SNTRuleType timedRuleKillRuleType;

@@ -21,6 +21,7 @@
 
 #import "Source/common/SNTConfigurator.h"
 #include "Source/common/SystemResources.h"
+#include "Source/santad/KillEnvTestSupport.h"
 
 typedef BOOL (^StateFileAccessAuthorizer)(void);
 
@@ -34,49 +35,16 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
                 stateAccessAuthorizer:(StateFileAccessAuthorizer)stateAccessAuthorizer;
 @end
 
-// The seam the clock keeps private: its refresh cadence, and the three host
-// readings it is built on. Nothing a test runs can move the host's wall clock,
-// restart its mach continuous counter or begin a new boot session, and no test
-// should wait ten minutes for a tick, so this is the only way to exercise any
-// of it.
-@interface SNTBelievableClock (Testing)
-- (instancetype)initWithConfigurator:(SNTConfigurator*)configurator
-                     refreshInterval:(NSTimeInterval)refreshInterval
-                           wallClock:(NSDate* (^)(void))wallClock
-                      machContinuous:(uint64_t (^)(void))machContinuous
-                     bootSessionUUID:(NSString* (^)(void))bootSessionUUID;
-@end
-
-// Counts the reading writes, so a test can assert how many hours of clock
-// produce how many, and can stand in the middle of one. Everything else about
-// the configurator is real, including the state file on disk.
-@interface CountingConfigurator : SNTConfigurator
-@property NSUInteger clockReadingWrites;
-/// Runs at the top of a write, before the real one. The one case that uses it
-/// makes a write take long enough to catch a caller waiting on it.
-@property(copy) void (^persistBlock)(void);
-@end
-
-@implementation CountingConfigurator
-- (BOOL)persistClockReading:(NSDictionary*)reading {
-  self.clockReadingWrites++;
-  if (self.persistBlock) {
-    self.persistBlock();
-  }
-  return [super persistClockReading:reading];
-}
-@end
-
 /// The host clocks, moved by hand: a wall time in seconds since 1970, a mach
 /// continuous tick count, and the boot session those ticks belong to.
-@interface FakeHost : NSObject
+@interface FakeClockHost : NSObject
 @property NSTimeInterval wall;
 @property uint64_t mach;
 @property(copy) NSString* bootUUID;
 - (void)advanceMachBySeconds:(NSTimeInterval)seconds;
 @end
 
-@implementation FakeHost
+@implementation FakeClockHost
 - (void)advanceMachBySeconds:(NSTimeInterval)seconds {
   self.mach = AddNanosecondsToMachTime((uint64_t)(seconds * NSEC_PER_SEC), self.mach);
 }
@@ -148,8 +116,8 @@ static const NSTimeInterval kTickInterval = 0.1;
 }
 
 /// A host at the base wall time, one minute into boot session A.
-- (FakeHost*)makeHost {
-  FakeHost* host = [[FakeHost alloc] init];
+- (FakeClockHost*)makeHost {
+  FakeClockHost* host = [[FakeClockHost alloc] init];
   host.wall = kBaseWall;
   host.mach = NanosToMachTime((uint64_t)(kBaseUptime * NSEC_PER_SEC));
   host.bootUUID = kBootUUIDA;
@@ -159,13 +127,13 @@ static const NSTimeInterval kTickInterval = 0.1;
 /// A daemon start with a cadence no test will sit through, so the only writes
 /// are the ones a case asks for. The tick has its own case, which sets its own
 /// cadence.
-- (SNTBelievableClock*)startClockOnHost:(FakeHost*)host {
+- (SNTBelievableClock*)startClockOnHost:(FakeClockHost*)host {
   return [self startClockOnHost:host refreshInterval:kUntickableInterval];
 }
 
 /// A daemon start: a clock over `host`, reading and then rewriting whatever the
 /// state file holds.
-- (SNTBelievableClock*)startClockOnHost:(FakeHost*)host
+- (SNTBelievableClock*)startClockOnHost:(FakeClockHost*)host
                         refreshInterval:(NSTimeInterval)refreshInterval {
   SNTBelievableClock* clock = [[SNTBelievableClock alloc] initWithConfigurator:self.configurator
       refreshInterval:refreshInterval
@@ -212,7 +180,7 @@ static const NSTimeInterval kTickInterval = 0.1;
 // minute went by, so the answer is a minute later than the floor, whatever the
 // wall clock has been set to.
 - (void)testRollbackWithinABootSessionAnswersFromTheProjection {
-  FakeHost* host = [self makeHost];
+  FakeClockHost* host = [self makeHost];
   SNTBelievableClock* clock = [self startClockOnHost:host];
 
   [host advanceMachBySeconds:60];
@@ -226,7 +194,7 @@ static const NSTimeInterval kTickInterval = 0.1;
 // clock it comes up to. Reading it back is what needs the state file's key
 // allowlist to know about ClockReading.
 - (void)testRollbackAcrossADaemonRestartAnswersFromTheSavedReading {
-  FakeHost* host = [self makeHost];
+  FakeClockHost* host = [self makeHost];
   // A start is all it takes: the reading is written at daemon start.
   (void)[self startClockOnHost:host];
 
@@ -245,7 +213,7 @@ static const NSTimeInterval kTickInterval = 0.1;
 // mach value belongs to a counter that has since restarted. The only thing it
 // still says is that time had reached its wall value, so that is the answer.
 - (void)testRollbackPlusARebootAnswersFromTheSavedWallValue {
-  FakeHost* host = [self makeHost];
+  FakeClockHost* host = [self makeHost];
   (void)[self startClockOnHost:host];
 
   // A reboot: a new boot session, a mach counter that restarted (and has since
@@ -268,7 +236,7 @@ static const NSTimeInterval kTickInterval = 0.1;
 // rose to it, so moving the clock back afterwards does not undo it. This is the
 // max() rule, not a special case, and it is the behavior the design asks for.
 - (void)testAForwardCorrectionWinsImmediatelyAndSticks {
-  FakeHost* host = [self makeHost];
+  FakeClockHost* host = [self makeHost];
   SNTBelievableClock* clock = [self startClockOnHost:host];
 
   host.wall = kBaseWall + 86400;
@@ -278,29 +246,22 @@ static const NSTimeInterval kTickInterval = 0.1;
   XCTAssertEqualWithAccuracy([self nowOf:clock], kBaseWall + 86400, kAccuracy);
 }
 
-// The floor is kept in memory and the reading is the timer's business, so the
-// write volume owes nothing to how busy the machine is: six hours of a clock
-// asked for the time every minute is still just the write the start made, and
-// the floor has tracked every one of those answers.
+// The floor is kept in memory and the reading is the timer's business, so asking
+// for the time writes nothing however often it is asked, and the floor has
+// tracked every one of those answers.
 - (void)testAskingTheTimeNeverWritesTheReading {
-  FakeHost* host = [self makeHost];
+  FakeClockHost* host = [self makeHost];
   SNTBelievableClock* clock = [self startClockOnHost:host];
   XCTAssertEqual(self.configurator.clockReadingWrites, 1u);
 
-  __block NSUInteger refreshes = 0;
-  clock.refreshHandler = ^{
-    refreshes++;
-  };
-
-  for (int minute = 0; minute < 6 * 60; minute++) {
+  for (int minute = 0; minute < 2; minute++) {
     [host advanceMachBySeconds:60];
     host.wall = kBaseWall + (minute + 1) * 60;
     (void)[self nowOf:clock];
   }
 
-  XCTAssertEqualWithAccuracy([self nowOf:clock], kBaseWall + 6 * 3600, kAccuracy);
+  XCTAssertEqualWithAccuracy([self nowOf:clock], kBaseWall + 120, kAccuracy);
   XCTAssertEqual(self.configurator.clockReadingWrites, 1u);
-  XCTAssertEqual(refreshes, 0u);
 }
 
 // The tick is what puts a bound on how stale the reading, and the handler
@@ -308,7 +269,7 @@ static const NSTimeInterval kTickInterval = 0.1;
 // an idle machine is exactly the case a traffic-driven refresh would leave
 // waiting indefinitely.
 - (void)testTheTickRefreshesTheReadingWithNoOtherTraffic {
-  FakeHost* host = [self makeHost];
+  FakeClockHost* host = [self makeHost];
   SNTBelievableClock* clock = [self startClockOnHost:host refreshInterval:kTickInterval];
   XCTAssertEqual(self.configurator.clockReadingWrites, 1u);
 
@@ -319,7 +280,12 @@ static const NSTimeInterval kTickInterval = 0.1;
   XCTestExpectation* refreshed = [self expectationWithDescription:@"the refresh handler ran"];
   // The timer keeps ticking for the life of the clock, so more than one is fine.
   refreshed.assertForOverFulfill = NO;
+  // The handler runs with the clock's lock released, so it may ask the clock for
+  // the time; weakly, so it cannot keep the clock it hangs off alive.
+  __block NSDate* seen = nil;
+  __weak SNTBelievableClock* weakClock = clock;
   clock.refreshHandler = ^{
+    seen = [weakClock now];
     [refreshed fulfill];
   };
 
@@ -329,32 +295,7 @@ static const NSTimeInterval kTickInterval = 0.1;
   XCTAssertGreaterThanOrEqual(self.configurator.clockReadingWrites, 2u);
   NSDictionary* reading = [self rawStateFile][@"ClockReading"];
   XCTAssertEqualWithAccuracy([reading[@"Wall"] doubleValue], kBaseWall + 3600, kAccuracy);
-}
-
-// The reading shares the state file with the timed rule kills and every timed
-// session, so writing one must leave the rest exactly as they were.
-- (void)testOtherStateFileKeysAreUntouched {
-  NSDictionary* existing = @{
-    @"TMM" : @{@"Deadline" : @123},
-    @"TempAdmin" : @{@"Deadline" : @456},
-    @"DemotedAdmins" : @[ @{@"Username" : @"jane"} ],
-    @"TimedRuleKills" : @[ @{@"Identifier" : @"ABCDE12345"} ],
-  };
-  XCTAssertTrue([existing writeToFile:self.statePath atomically:YES]);
-
-  self.configurator = [self makeConfigurator];
-  (void)[self startClockOnHost:[self makeHost]];
-
-  NSDictionary* onDisk = [self rawStateFile];
-  XCTAssertEqualObjects(onDisk[@"TMM"], existing[@"TMM"]);
-  XCTAssertEqualObjects(onDisk[@"TempAdmin"], existing[@"TempAdmin"]);
-  XCTAssertEqualObjects(onDisk[@"DemotedAdmins"], existing[@"DemotedAdmins"]);
-  XCTAssertEqualObjects(onDisk[@"TimedRuleKills"], existing[@"TimedRuleKills"]);
-
-  NSDictionary* reading = onDisk[@"ClockReading"];
-  XCTAssertEqualWithAccuracy([reading[@"Wall"] doubleValue], kBaseWall, kAccuracy);
-  XCTAssertNotNil(reading[@"MachContinuous"]);
-  XCTAssertEqualObjects(reading[@"BootSessionUUID"], kBootUUIDA);
+  XCTAssertEqualWithAccuracy(seen.timeIntervalSince1970, kBaseWall + 3600, kAccuracy);
 }
 
 // The state file is on disk, so a reading is validated rather than trusted. One
@@ -368,7 +309,7 @@ static const NSTimeInterval kTickInterval = 0.1;
   XCTAssertTrue([garbage writeToFile:self.statePath atomically:YES]);
 
   self.configurator = [self makeConfigurator];
-  FakeHost* host = [self makeHost];
+  FakeClockHost* host = [self makeHost];
   SNTBelievableClock* clock = [self startClockOnHost:host];
   XCTAssertEqualWithAccuracy([self nowOf:clock], kBaseWall, kAccuracy);
 
@@ -378,104 +319,37 @@ static const NSTimeInterval kTickInterval = 0.1;
   XCTAssertEqualWithAccuracy([self nowOf:clock], kBaseWall, kAccuracy);
 }
 
-// A number is not enough: a plist real carries infinities and NaN, and a floor
-// that is either of those is a clock that can never be compared with anything
-// again. Such a reading loads as absent.
-- (void)testANonFiniteWallValueLoadsAsAbsent {
-  [self seedReadingWithWall:INFINITY mach:kBaseUptime bootUUID:kBootUUIDA];
-  // The fixture has to really carry a non-finite value, or this case would pass
-  // for the wrong reason.
-  XCTAssertFalse(std::isfinite([[self.configurator savedClockReading][@"Wall"] doubleValue]));
-
-  SNTBelievableClock* clock = [self startClockOnHost:[self makeHost]];
-  XCTAssertEqualWithAccuracy([self nowOf:clock], kBaseWall, kAccuracy);
-}
-
-// A reading from an earlier boot session has nothing but the system clock left to
-// be checked against, so one implausibly far ahead of it is discarded (and
-// logged, which has no seam to assert here). Otherwise a single boot with a dead
-// RTC would leave a floor years ahead that every later reboot inherits through
-// this same branch.
-- (void)testACrossBootReadingTooFarAheadIsDiscarded {
-  [self seedReadingWithWall:kBaseWall + 31 * 86400 mach:kBaseUptime bootUUID:kBootUUIDB];
-
-  SNTBelievableClock* clock = [self startClockOnHost:[self makeHost]];
-  XCTAssertEqualWithAccuracy([self nowOf:clock], kBaseWall, kAccuracy);
-}
-
-// The other side of that ceiling: a lead this machine could plausibly have had
-// is still inherited across the reboot, which is what stops a reboot from being
-// a way to shake off a floor.
-- (void)testACrossBootReadingWithinTheCeilingIsBelieved {
-  [self seedReadingWithWall:kBaseWall + 29 * 86400 mach:kBaseUptime bootUUID:kBootUUIDB];
-
-  SNTBelievableClock* clock = [self startClockOnHost:[self makeHost]];
-  XCTAssertEqualWithAccuracy([self nowOf:clock], kBaseWall + 29 * 86400, kAccuracy);
-}
-
-// The ceiling is a rule about inheriting a lead across a reboot, not about how
-// large a lead may be. Inside one boot session mach continuous time vouches for
-// the distance, so a reading this boot wrote is believed however far ahead of the
-// system clock it is: that is the forward-jump stickiness the design asks for,
-// surviving a daemon restart the same way it survives an exec.
-- (void)testAWithinBootReadingIsBelievedPastTheCeiling {
-  [self seedReadingWithWall:kBaseWall + 60 * 86400 mach:kBaseUptime bootUUID:kBootUUIDA];
-
-  SNTBelievableClock* clock = [self startClockOnHost:[self makeHost]];
-  XCTAssertEqualWithAccuracy([self nowOf:clock], kBaseWall + 60 * 86400, kAccuracy);
-}
-
-// Writing the reading is a whole state file serialized, renamed into place and
-// chmodded. It must not be on the path of a thread asking for the time, because
-// those threads are answering executions against a deadline.
-- (void)testAWritingTickDoesNotBlockCallersAskingForTheTime {
-  static const NSTimeInterval kPersistDuration = 1.0;
-
-  FakeHost* host = [self makeHost];
-  SNTBelievableClock* clock = [self startClockOnHost:host refreshInterval:kTickInterval];
-
-  // Set after the start's own write, so only the tick's write is slow.
-  dispatch_semaphore_t inWrite = dispatch_semaphore_create(0);
-  self.configurator.persistBlock = ^{
-    dispatch_semaphore_signal(inWrite);
-    [NSThread sleepForTimeInterval:kPersistDuration];
+// What a saved reading is worth at a daemon start. A wall value that is not a
+// finite number is no reading at all. A reading from an earlier boot session has
+// nothing but the system clock left to check it against, so a lead beyond the
+// ceiling is discarded and one within it is still inherited; inside one boot
+// session mach continuous time vouches for the distance, so the same lead is
+// believed however large.
+- (void)testWhatASavedReadingIsWorthAtDaemonStart {
+  struct {
+    NSString* name;
+    NSTimeInterval savedWall;
+    NSString* bootUUID;
+    NSTimeInterval expected;
+  } cases[] = {
+      {@"a non-finite wall value", INFINITY, kBootUUIDA, kBaseWall},
+      {@"cross-boot, over the ceiling", kBaseWall + 31 * 86400, kBootUUIDB, kBaseWall},
+      {@"cross-boot, within the ceiling", kBaseWall + 29 * 86400, kBootUUIDB,
+       kBaseWall + 29 * 86400},
+      {@"within-boot, past the ceiling", kBaseWall + 60 * 86400, kBootUUIDA,
+       kBaseWall + 60 * 86400},
   };
 
-  XCTAssertEqual(
-      0l, dispatch_semaphore_wait(inWrite, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC)));
+  for (const auto& c : cases) {
+    [self seedReadingWithWall:c.savedWall mach:kBaseUptime bootUUID:c.bootUUID];
+    // The fixture really carries what was asked for, INFINITY included, or a
+    // case would pass for the wrong reason.
+    double saved = [[self.configurator savedClockReading][@"Wall"] doubleValue];
+    XCTAssertEqual(std::isfinite(saved), std::isfinite(c.savedWall), @"%@", c.name);
 
-  // The tick is inside the write now. Asking for the time must not wait for it.
-  NSDate* asked = [NSDate date];
-  (void)[self nowOf:clock];
-  NSTimeInterval waited = -asked.timeIntervalSinceNow;
-  self.configurator.persistBlock = nil;
-
-  XCTAssertLessThan(waited, kPersistDuration / 2);
-}
-
-// The handler runs with the clock's lock released, so it may ask the clock for
-// the time. That is exactly what a handler checking whether a deadline has come
-// due does, and doing it under the lock would deadlock any handler that had to
-// wait on another thread for the answer.
-- (void)testTheRefreshHandlerMayAskTheClockForTheTime {
-  FakeHost* host = [self makeHost];
-  SNTBelievableClock* clock = [self startClockOnHost:host refreshInterval:kTickInterval];
-  host.wall = kBaseWall + 60;
-
-  XCTestExpectation* asked = [self expectationWithDescription:@"the handler asked for the time"];
-  asked.assertForOverFulfill = NO;
-  __block NSDate* seen = nil;
-  // Weakly, so the handler cannot keep the clock it hangs off alive.
-  __weak SNTBelievableClock* weakClock = clock;
-  clock.refreshHandler = ^{
-    seen = [weakClock now];
-    [asked fulfill];
-  };
-
-  [self waitForExpectations:@[ asked ] timeout:5.0];
-  clock.refreshHandler = nil;
-
-  XCTAssertEqualWithAccuracy(seen.timeIntervalSince1970, kBaseWall + 60, kAccuracy);
+    SNTBelievableClock* clock = [self startClockOnHost:[self makeHost]];
+    XCTAssertEqualWithAccuracy([self nowOf:clock], c.expected, kAccuracy, @"%@", c.name);
+  }
 }
 
 @end

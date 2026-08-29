@@ -29,7 +29,9 @@
 
 #include "Source/common/AuditUtilities.h"
 #include "Source/common/CSOpsHelper.h"
+#import "Source/common/SNTConfigurator.h"
 #include "Source/santad/KillingMachine.h"
+#import "Source/santad/SNTBelievableClock.h"
 
 /// The fakes the kill suites (KillingMachineTest and SNTTimedRuleKillsTest) had
 /// a copy of each. One definition here, and a suite that discriminates on
@@ -164,16 +166,26 @@ NSArray<NSString*>* SignalDescriptions(const std::vector<FakeSignal>& signals);
 
 }  // namespace santa::testing
 
-/// The host clocks a test builds a believable clock over: a system wall clock it
-/// moves at will, and a mach continuous reading that tracks the real one plus an
-/// offset. Mach continuous time is the reading nothing on the machine can move,
-/// so a test only ever adds to it, which is how it says "this much time really
-/// did pass" while the wall clock says otherwise.
-@interface FakeHost : NSObject
-@property NSTimeInterval wall;
-@property NSTimeInterval machOffsetSeconds;
-@property(copy) NSString* bootUUID;
-@property(readonly) uint64_t mach;
+/// The seam the clock keeps private: its refresh cadence and the three host
+/// readings it is built on. Nothing a test runs can move the host's wall clock,
+/// restart its mach continuous counter or begin a new boot session, and no test
+/// should wait ten minutes for a refresh, so this is the only way to exercise
+/// any of it.
+@interface SNTBelievableClock (Testing)
+- (instancetype)initWithConfigurator:(SNTConfigurator*)configurator
+                     refreshInterval:(NSTimeInterval)refreshInterval
+                           wallClock:(NSDate* (^)(void))wallClock
+                      machContinuous:(uint64_t (^)(void))machContinuous
+                     bootSessionUUID:(NSString* (^)(void))bootSessionUUID;
+@end
+
+/// Counts the state file writes, so a test can assert that a repeated recording
+/// of the same deadline writes nothing, and can wait for a clock refresh to have
+/// happened rather than for a length of time. Everything else about the
+/// configurator is real, including the state file on disk.
+@interface CountingConfigurator : SNTConfigurator
+@property NSUInteger timedRuleKillWrites;
+@property NSUInteger clockReadingWrites;
 @end
 
 #endif  // SANTA_SANTAD_KILLENVTESTSUPPORT_H

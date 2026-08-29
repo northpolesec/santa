@@ -187,11 +187,7 @@ static bool SameBinary(const es_process_t* a, NSString* aSHA256, const es_proces
         return absl::UnixEpoch() + absl::Seconds([believableClock now].timeIntervalSince1970);
       };
     } else {
-      // Only tests reach this; the daemon always has a clock. It is logged at
-      // error level rather than tolerated quietly because a production path that
-      // arrived here would evaluate every time window against the system clock,
-      // which is the whole of what the parameter exists to prevent, and nothing
-      // else about the decision would look wrong.
+      // Only tests reach this; the daemon always has a clock.
       LOGE(@"No believable clock: CEL time windows will be evaluated against the system clock, "
            @"which a clock change can move");
       _celNow = absl::Now;
@@ -212,11 +208,8 @@ static bool SameBinary(const es_process_t* a, NSString* aSHA256, const es_proces
   return self;
 }
 
-/// Records the kill a CEL rule's policy_for_range(..., should_kill=true) asked
-/// for, if this decision carries one. Called only from the paths where the
-/// execution is permitted to run: being in window with should_kill set is
-/// already encoded in the deadline's presence on the decision, so what remains
-/// to be true here is that the execution actually proceeds.
+/// Records the kill this decision carries, if any. Called only from the paths
+/// where the execution actually proceeds.
 - (void)recordTimedRuleKillForDecision:(SNTCachedDecision*)cd {
   if (!cd.timedRuleKillDeadline) {
     return;
@@ -584,11 +577,8 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
     // Respond with the decision.
     postAction(action, cd);
 
-    // A CEL rule using policy_for_range(..., should_kill=true) evaluated inside
-    // its window, so this execution is due to be quit when the window closes.
-    // The entry is only recorded for an execution that proceeds: an in-window
-    // policy that blocks records nothing, and a held (TouchID) execution records
-    // it from the approval reply below instead.
+    // Only recorded for an execution that proceeds: an in-window policy that
+    // blocks records nothing, and a held exec records it from the reply below.
     if (ACTION_IS_ALLOW(action)) {
       [self recordTimedRuleKillForDecision:cd];
     }
@@ -750,11 +740,8 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
             // Allow the binary to begin running.
             bool resumed = self.processControlBlock(newProcPid, ProcessControl::Resume);
 
-            // Only now has the execution actually proceeded, which is the
-            // condition a pending kill from policy_for_range(...,
-            // should_kill=true) is waiting on: a hold that could not stop the
-            // process (it was killed instead) and a resume that failed both
-            // leave nothing running for the window to quit.
+            // Only now has the execution actually proceeded: a hold that could
+            // not stop the process, or a resume that failed, leaves nothing to quit.
             if (stoppedProc && resumed) {
               [self recordTimedRuleKillForDecision:cd];
             }

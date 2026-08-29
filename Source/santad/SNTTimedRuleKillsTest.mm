@@ -67,18 +67,6 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
 @property(readwrite) NSString* celExpr;
 @end
 
-// The seam the clock keeps private: its refresh cadence and the three host
-// readings it is built on. Nothing a test runs can move the host's wall clock,
-// and no test should wait ten minutes for a refresh, so this is the only way to
-// exercise either. Same declaration SNTBelievableClockTest uses.
-@interface SNTBelievableClock (Testing)
-- (instancetype)initWithConfigurator:(SNTConfigurator*)configurator
-                     refreshInterval:(NSTimeInterval)refreshInterval
-                           wallClock:(NSDate* (^)(void))wallClock
-                      machContinuous:(uint64_t (^)(void))machContinuous
-                     bootSessionUUID:(NSString* (^)(void))bootSessionUUID;
-@end
-
 // The seams SNTTimedRuleKills keeps private: the interval the countdown timer
 // was last armed for, which is how a test sees a rolled-back clock being
 // corrected, and the serial queue the component does all of its work on, which
@@ -88,25 +76,21 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
 @property(readonly) dispatch_queue_t queue;
 @end
 
-// Counts the writes the component makes, so a test can assert that a repeated
-// recording of the same deadline writes nothing, and the clock's, which is how a
-// test waits for a refresh to have happened rather than for a length of time.
-// Everything else about the configurator is real, including the state file on
-// disk.
-@interface CountingConfigurator : SNTConfigurator
-@property NSUInteger timedRuleKillWrites;
-@property NSUInteger clockReadingWrites;
+/// The host clocks a test builds a believable clock over: a system wall clock it
+/// moves at will, and a mach continuous reading that tracks the real one plus an
+/// offset. Mach continuous time is the reading nothing on the machine can move,
+/// so a test only ever adds to it, which is how it says "this much time really
+/// did pass" while the wall clock says otherwise.
+@interface FakeHost : NSObject
+@property NSTimeInterval wall;
+@property NSTimeInterval machOffsetSeconds;
+@property(readonly) uint64_t mach;
 @end
 
-@implementation CountingConfigurator
-- (BOOL)persistTimedRuleKills:(NSArray<NSDictionary*>*)entries {
-  self.timedRuleKillWrites++;
-  return [super persistTimedRuleKills:entries];
-}
-
-- (BOOL)persistClockReading:(NSDictionary*)reading {
-  self.clockReadingWrites++;
-  return [super persistClockReading:reading];
+@implementation FakeHost
+- (uint64_t)mach {
+  return AddNanosecondsToMachTime((uint64_t)(self.machOffsetSeconds * NSEC_PER_SEC),
+                                  mach_continuous_time());
 }
 @end
 
@@ -216,9 +200,6 @@ static NSString* const kOtherBootSessionUUID = @"6A2B4C8E-0000-0000-0000-0000000
 @property NSString* testDir;
 @property NSString* statePath;
 @property CountingConfigurator* configurator;
-/// The clock the last -makeSUTOnHost:refreshInterval: built, so a case can ask
-/// the component's own believable time.
-@property SNTBelievableClock* believableClock;
 @property SNTRuleTable* ruleTable;
 @property FMDatabaseQueue* dbq;
 @property id mockConfiguratorClass;
@@ -289,14 +270,11 @@ static NSString* const kOtherBootSessionUUID = @"6A2B4C8E-0000-0000-0000-0000000
   return cfg;
 }
 
-/// The component under test, wired to whatever notifier queue setUpNotifierProxy
-/// left behind: nil unless a test asked for one, which is the "no GUI running"
-/// case.
-- (SNTTimedRuleKills*)makeSUT {
-  // A real clock over the test's own state file: nothing here moves the host's
-  // clock, so the believable time is the system time, which is what these tests
-  // build their deadlines from.
-  SNTBelievableClock* clock = [[SNTBelievableClock alloc] initWithConfigurator:self.configurator];
+/// The component under test over `clock`, wired to whatever notifier queue
+/// setUpNotifierProxy left behind: nil unless a test asked for one, which is the
+/// "no GUI running" case.
+- (SNTTimedRuleKills*)makeSUTWithClock:(SNTBelievableClock*)clock {
+  XCTAssertNotNil(clock);
   SNTTimedRuleKills* sut = [[SNTTimedRuleKills alloc] initWithNotifierQueue:self.mockNotifierQueue
                                                                   ruleTable:self.ruleTable
                                                                configurator:self.configurator
@@ -306,12 +284,19 @@ static NSString* const kOtherBootSessionUUID = @"6A2B4C8E-0000-0000-0000-0000000
   return sut;
 }
 
-/// A host at the current wall time, in this machine's boot session, with no mach
-/// time pretended to have elapsed yet.
+/// A real clock over the test's own state file: nothing here moves the host's
+/// clock, so the believable time is the system time, which is what these tests
+/// build their deadlines from.
+- (SNTTimedRuleKills*)makeSUT {
+  return
+      [self makeSUTWithClock:[[SNTBelievableClock alloc] initWithConfigurator:self.configurator]];
+}
+
+/// A host at the current wall time, with no mach time pretended to have elapsed
+/// yet.
 - (FakeHost*)makeHost {
   FakeHost* host = [[FakeHost alloc] init];
   host.wall = [NSDate date].timeIntervalSince1970;
-  host.bootUUID = [SNTSystemInfo bootSessionUUID];
   return host;
 }
 
@@ -330,17 +315,9 @@ static NSString* const kOtherBootSessionUUID = @"6A2B4C8E-0000-0000-0000-0000000
         return host.mach;
       }
       bootSessionUUID:^NSString* {
-        return host.bootUUID;
+        return [SNTSystemInfo bootSessionUUID];
       }];
-  XCTAssertNotNil(clock);
-  self.believableClock = clock;
-  SNTTimedRuleKills* sut = [[SNTTimedRuleKills alloc] initWithNotifierQueue:self.mockNotifierQueue
-                                                                  ruleTable:self.ruleTable
-                                                               configurator:self.configurator
-                                                                      clock:clock
-                                                                    killEnv:MakeEnv(&_fake)];
-  XCTAssertNotNil(sut);
-  return sut;
+  return [self makeSUTWithClock:clock];
 }
 
 /// The two deliveries a kill makes to the matching process's group: SIGTERM,
@@ -1453,14 +1430,10 @@ static NSString* const kOtherBootSessionUUID = @"6A2B4C8E-0000-0000-0000-0000000
       MachSecondsBetween(machBefore, [saved[@"MachDeadline"] unsignedLongLongValue]), 3600, 5);
 }
 
-// The system clock goes back a day while an hour of mach continuous time passes.
-// The hour is the part a rolled-back clock cannot argue with, so the deadline an
-// hour out has come due, and the refresh is what notices: the countdown timer
-// runs on the system clock and is still counting the hour it was armed for.
-- (void)testARolledBackClockStillKillsAtTheNextRefresh {
+/// A fast-refreshing component over `host` with one kill recorded an hour out,
+/// which is where both rollback cases start from.
+- (SNTTimedRuleKills*)makeSUTWithAnHourOutKillOnHost:(FakeHost*)host {
   [self addRuleOfType:SNTRuleTypeTeamID identifier:kMatchingTeamID cel:kCELExpr];
-
-  FakeHost* host = [self makeHost];
   SNTTimedRuleKills* sut = [self makeSUTOnHost:host refreshInterval:kFastRefreshInterval];
 
   NSDate* deadline = [NSDate dateWithTimeIntervalSince1970:host.wall + 3600];
@@ -1474,6 +1447,16 @@ static NSString* const kOtherBootSessionUUID = @"6A2B4C8E-0000-0000-0000-0000000
                    windowEnd:nil
                   windowZone:nil];
   [self drain:sut];
+  return sut;
+}
+
+// The system clock goes back a day while an hour of mach continuous time passes.
+// The hour is the part a rolled-back clock cannot argue with, so the deadline an
+// hour out has come due, and the refresh is what notices: the countdown timer
+// runs on the system clock and is still counting the hour it was armed for.
+- (void)testARolledBackClockStillKillsAtTheNextRefresh {
+  FakeHost* host = [self makeHost];
+  SNTTimedRuleKills* sut = [self makeSUTWithAnHourOutKillOnHost:host];
   XCTAssertEqual(self.savedEntries.count, 1u);
 
   host.machOffsetSeconds = 3600;
@@ -1489,22 +1472,8 @@ static NSString* const kOtherBootSessionUUID = @"6A2B4C8E-0000-0000-0000-0000000
 // countdown for the ten minutes the believable clock says are left, rather than
 // leaving it counting the hour it was armed for on a clock that has since moved.
 - (void)testTheCountdownIsReArmedFromTheBelievableClockAfterARollback {
-  [self addRuleOfType:SNTRuleTypeTeamID identifier:kMatchingTeamID cel:kCELExpr];
-
   FakeHost* host = [self makeHost];
-  SNTTimedRuleKills* sut = [self makeSUTOnHost:host refreshInterval:kFastRefreshInterval];
-
-  NSDate* deadline = [NSDate dateWithTimeIntervalSince1970:host.wall + 3600];
-  [sut recordKillForRuleType:SNTRuleTypeTeamID
-                  identifier:kMatchingTeamID
-                     celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
-                    deadline:deadline
-                    notifyAt:deadline
-                  windowDays:nil
-                 windowStart:nil
-                   windowEnd:nil
-                  windowZone:nil];
-  [self drain:sut];
+  SNTTimedRuleKills* sut = [self makeSUTWithAnHourOutKillOnHost:host];
   XCTAssertEqual(sut.armedTimerSeconds, 3600u);
 
   host.machOffsetSeconds = 3000;
@@ -1520,25 +1489,37 @@ static NSString* const kOtherBootSessionUUID = @"6A2B4C8E-0000-0000-0000-0000000
   XCTAssertEqual(self.savedEntries.count, 1u);
 }
 
-// A daemon comes back up to an entry whose wall deadline is an hour out and whose
-// mach deadline is half a second out: whichever of the two arrives first fires
-// the kill, so this one fires at the next refresh rather than in an hour.
-- (void)testAMachDeadlineFiresWhileTheWallDeadlineIsStillOut {
+/// A fast-refreshing component resumed onto one saved entry whose wall deadline
+/// is an hour out and whose mach half is `machDeadline` in `bootSession`.
+- (SNTTimedRuleKills*)resumeOnHost:(FakeHost*)host
+                  withMachDeadline:(uint64_t)machDeadline
+                       bootSession:(NSString*)bootSession {
   [self addRuleOfType:SNTRuleTypeTeamID identifier:kMatchingTeamID cel:kCELExpr];
 
-  FakeHost* host = [self makeHost];
   NSMutableDictionary* entry = [[self
       entryDictForRuleType:SNTRuleTypeTeamID
                 identifier:kMatchingTeamID
                    celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
                   deadline:[NSDate dateWithTimeIntervalSince1970:host.wall + 3600]] mutableCopy];
-  entry[@"MachDeadline"] =
-      @(AddNanosecondsToMachTime((uint64_t)(0.5 * NSEC_PER_SEC), mach_continuous_time()));
-  entry[@"BootSessionUUID"] = [SNTSystemInfo bootSessionUUID];
+  entry[@"MachDeadline"] = @(machDeadline);
+  entry[@"BootSessionUUID"] = bootSession;
   XCTAssertTrue([self.configurator persistTimedRuleKills:@[ entry ]]);
 
   SNTTimedRuleKills* sut = [self makeSUTOnHost:host refreshInterval:kFastRefreshInterval];
   [sut resumeFromSavedState];
+  return sut;
+}
+
+// A mach deadline half a second out against a wall deadline an hour out:
+// whichever of the two arrives first fires the kill, so this one fires at the
+// next refresh rather than in an hour.
+- (void)testAMachDeadlineFiresWhileTheWallDeadlineIsStillOut {
+  FakeHost* host = [self makeHost];
+  SNTTimedRuleKills* sut =
+      [self resumeOnHost:host
+          withMachDeadline:AddNanosecondsToMachTime((uint64_t)(0.5 * NSEC_PER_SEC),
+                                                    mach_continuous_time())
+               bootSession:[SNTSystemInfo bootSessionUUID]];
 
   [self waitForEntriesToClear:sut];
   [self drain:sut];
@@ -1549,24 +1530,20 @@ static NSString* const kOtherBootSessionUUID = @"6A2B4C8E-0000-0000-0000-0000000
 // counter that has since restarted, so it says nothing at all and the wall
 // instant is left to govern: an hour out, so nothing is killed.
 - (void)testAMachDeadlineFromAnEarlierBootSessionIsIgnored {
-  [self addRuleOfType:SNTRuleTypeTeamID identifier:kMatchingTeamID cel:kCELExpr];
-
   FakeHost* host = [self makeHost];
-  NSMutableDictionary* entry = [[self
-      entryDictForRuleType:SNTRuleTypeTeamID
-                identifier:kMatchingTeamID
-                   celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
-                  deadline:[NSDate dateWithTimeIntervalSince1970:host.wall + 3600]] mutableCopy];
-  // Long past, and from a boot session that is not this machine's.
-  entry[@"MachDeadline"] = @1;
-  entry[@"BootSessionUUID"] = kOtherBootSessionUUID;
-  XCTAssertTrue([self.configurator persistTimedRuleKills:@[ entry ]]);
-
-  SNTTimedRuleKills* sut = [self makeSUTOnHost:host refreshInterval:kFastRefreshInterval];
-  [sut resumeFromSavedState];
+  // A mach deadline long past, from a boot session that is not this machine's.
+  SNTTimedRuleKills* sut = [self resumeOnHost:host
+                             withMachDeadline:1
+                                  bootSession:kOtherBootSessionUUID];
   [self drain:sut];
-  // Several refreshes go by, every one of them looking at the entry.
-  [self waitForRefreshCount:3];
+
+  // Several refreshes go by, every one of them looking at the entry. Every
+  // refresh rewrites the reading, and the clock's construction wrote one.
+  [self
+      waitUntil:^BOOL {
+        return self.configurator.clockReadingWrites > 3;
+      }
+      described:@"refreshes ran"];
   [self drain:sut];
 
   XCTAssertEqualObjects(SignalDescriptions(_fake.signals), @[]);
@@ -1745,18 +1722,6 @@ static NSString* const kOtherBootSessionUUID = @"6A2B4C8E-0000-0000-0000-0000000
         return self.savedEntries == nil;
       }
       described:@"entries cleared"];
-}
-
-/// Polls until the clock has refreshed `count` times, which is how a test that
-/// asserts a refresh did nothing waits for the refreshes to have happened rather
-/// than for a length of time. Every refresh rewrites the reading, and the clock's
-/// construction wrote one of its own.
-- (void)waitForRefreshCount:(NSUInteger)count {
-  [self
-      waitUntil:^BOOL {
-        return self.configurator.clockReadingWrites > count;
-      }
-      described:@"refreshes ran"];
 }
 
 @end

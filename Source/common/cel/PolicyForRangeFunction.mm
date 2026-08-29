@@ -148,11 +148,7 @@ absl::StatusOr<std::vector<int64_t>> DayList(const cel_runtime::CelValue& value,
 }
 
 // Reports the kill an in-window should_kill asked for. `days`, `start`, `end`
-// and `zone` carry the window's shape; they are empty for the overloads whose
-// window does not recur, which have nothing for a restart to re-check. The zone
-// travels with the times because "09:00" names no instant on its own, and it is
-// "local" for a window that took the default rather than empty: the default is a
-// calendar, not the absence of one.
+// and `zone` carry the window's shape, empty for the non-recurring overloads.
 void RecordPendingKill(std::optional<PendingKill>* sink, const WindowEval& window, absl::Time now,
                        absl::Span<const int64_t> days, absl::string_view start,
                        absl::string_view end, absl::string_view zone) {
@@ -378,11 +374,6 @@ absl::Status PolicyForRangeFunction::Evaluate(absl::Span<const cel_runtime::CelV
     size_t shouldKillIndex =
         zoneGiven ? kDaysZoneOverloadShouldKillIndex : kDaysOverloadShouldKillIndex;
     if (window->in_range && args[shouldKillIndex].BoolOrDie()) {
-      // The zone string, not the resolved zone: a re-check after a restart has to
-      // resolve the same name the rule wrote, and "local" is a different calendar
-      // on a host whose zone has since changed. A window that took the default
-      // records "local" for exactly that reason, so the re-check reads the host's
-      // zone the same way this evaluation did.
       RecordPendingKill(pending_kill_sink_, *window, now, *days, args[1].StringOrDie().value(),
                         args[2].StringOrDie().value(), zoneArg);
     }

@@ -103,10 +103,8 @@ cel_runtime::CelValue CreateCELValue(const std::map<K, V>& v, google::protobuf::
 // once per lazy call site per evaluation, so on every exec: building descriptors
 // only to discard them would allocate for nothing.
 //
-// `make` turns one descriptor into one implementation, because the two lazy
-// overload sets need different things besides it: today() takes only the
-// cacheability sink, policy_for_range() also takes the pending-kill sink and the
-// clock.
+// `make` builds one implementation: the two overload sets need different
+// constructor arguments.
 template <typename FunctionT, typename MakeFn>
 std::vector<const cel_runtime::CelFunction*> LazyOverloads(
     std::vector<std::unique_ptr<FunctionT>>& fns,

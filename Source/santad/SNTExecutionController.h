@@ -74,14 +74,9 @@ using LogExecutionBlock = void (^)(santa::Message esMsg);
 @interface SNTExecutionController : NSObject
 
 ///
-///  `believableClock` is required in production: without it the CEL time windows
-///  this controller evaluates are judged against the system clock, which a clock
-///  change can move. Tests that evaluate no time window may pass nil, which is
-///  logged.
-///
-///  `timedRuleKills` may be nil in tests, in which case no kill entries are
-///  recorded at all; the daemon always supplies one. Unlike the clock this is
-///  silent: the recording call is a message to nil.
+///  Both `timedRuleKills` and `believableClock` are non-nil in the daemon. In
+///  tests a nil clock falls back to the system clock and logs, and a nil
+///  timedRuleKills silently records nothing.
 ///
 - (instancetype)initWithRuleTable:(SNTRuleTable*)ruleTable
                        eventTable:(SNTEventTable*)eventTable

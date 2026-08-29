@@ -1541,49 +1541,47 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   XCTAssertEqualObjects(call[@"windowZone"], @"America/New_York");
 }
 
-// The window was open and the kill was asked for, but the policy in the window
-// blocks: nothing ran, so there is nothing to quit later.
-- (void)testTimedRuleKillNotRecordedWhenTheExecIsBlocked {
-  SNTCachedDecision* cd = [self decisionWithTimedRuleKill:SNTEventStateBlockBinary];
-  XCTAssertEqual([self recordedKillsForDecision:cd touchIDReply:nil].count, 0UL);
-}
+// Everything that stops the kill being recorded, all of it the same condition:
+// the execution has to actually proceed. A held (TouchID) execution proceeds at
+// the approval reply, and only if the process could be stopped and resumed.
+- (void)testTimedRuleKillIsRecordedOnlyWhenTheExecProceeds {
+  struct {
+    NSString* name;
+    SNTEventState state;
+    BOOL withDeadline;
+    BOOL holdAndAsk;
+    NSNumber* touchIDReply;
+    BOOL processControlSucceeds;
+    NSUInteger expected;
+  } cases[] = {
+      // In window with the kill asked for, but the policy in the window blocks.
+      {@"blocked", SNTEventStateBlockBinary, YES, NO, nil, YES, 0},
+      // What both an out-of-window exec and a should_kill of false leave behind.
+      {@"no deadline", SNTEventStateAllowBinary, NO, NO, nil, YES, 0},
+      {@"TouchID approves", SNTEventStateBlockSigningID, YES, YES, @YES, YES, 1},
+      {@"TouchID denies", SNTEventStateBlockSigningID, YES, YES, @NO, YES, 0},
+      {@"held process cannot resume", SNTEventStateBlockSigningID, YES, YES, @YES, NO, 0},
+  };
 
-// No deadline on the decision, which is what both an out-of-window exec and a
-// should_kill of false leave behind.
-- (void)testTimedRuleKillNotRecordedWithoutADeadline {
-  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
-  cd.decision = SNTEventStateAllowBinary;
-  cd.sha256 = @"a";
-  XCTAssertEqual([self recordedKillsForDecision:cd touchIDReply:nil].count, 0UL);
-}
+  for (const auto& c : cases) {
+    SNTCachedDecision* cd;
+    if (c.withDeadline) {
+      cd = [self decisionWithTimedRuleKill:c.state];
+    } else {
+      cd = [[SNTCachedDecision alloc] init];
+      cd.decision = c.state;
+      cd.sha256 = @"a";
+    }
+    cd.holdAndAsk = c.holdAndAsk;
 
-// A held execution proceeds only when the user authorizes it, so that is where
-// its kill is recorded.
-- (void)testTimedRuleKillRecordedWhenTouchIDApproves {
-  SNTCachedDecision* cd = [self decisionWithTimedRuleKill:SNTEventStateBlockSigningID];
-  cd.holdAndAsk = YES;
-  NSArray<NSDictionary*>* recorded = [self recordedKillsForDecision:cd touchIDReply:@YES];
-
-  XCTAssertEqual(recorded.count, 1UL);
-  XCTAssertEqualObjects(recorded.firstObject[@"identifier"], @"ABCDE12345");
-}
-
-- (void)testTimedRuleKillNotRecordedWhenTouchIDIsDenied {
-  SNTCachedDecision* cd = [self decisionWithTimedRuleKill:SNTEventStateBlockSigningID];
-  cd.holdAndAsk = YES;
-  XCTAssertEqual([self recordedKillsForDecision:cd touchIDReply:@NO].count, 0UL);
-}
-
-// An approval is not an execution: a hold that could not stop the process (it
-// was killed instead) or a resume that failed leaves nothing running, so there
-// is nothing for the window to quit.
-- (void)testTimedRuleKillNotRecordedWhenTheHeldProcessCannotResume {
-  SNTCachedDecision* cd = [self decisionWithTimedRuleKill:SNTEventStateBlockSigningID];
-  cd.holdAndAsk = YES;
-  NSArray<NSDictionary*>* recorded = [self recordedKillsForDecision:cd
-                                                       touchIDReply:@YES
-                                             processControlSucceeds:NO];
-  XCTAssertEqual(recorded.count, 0UL);
+    NSArray<NSDictionary*>* recorded = [self recordedKillsForDecision:cd
+                                                         touchIDReply:c.touchIDReply
+                                               processControlSucceeds:c.processControlSucceeds];
+    XCTAssertEqual(recorded.count, c.expected, @"%@", c.name);
+    if (c.expected) {
+      XCTAssertEqualObjects(recorded.firstObject[@"identifier"], @"ABCDE12345", @"%@", c.name);
+    }
+  }
 }
 
 // Test that flushTouchIDApprovalCache clears the cache

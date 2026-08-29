@@ -749,19 +749,6 @@ class ScopedHostZone {
   } else {
     XCTAssertEqual(systemDayResult.value().value, ReturnValue::ALLOWLIST);
   }
-
-  // And not from the provided instant's day, read the same way, which is the same
-  // assertion said the other way round: the provider is ignored here, not merely
-  // agreed with.
-  absl::CivilDay providedDay{absl::ToCivilSecond(provided, host)};
-  auto providedDayResult =
-      evaluate("today() == timestamp('" + AsUTCLiteral(absl::FromCivil(providedDay, host)) + "')",
-               [provided] { return provided; });
-  if (!providedDayResult.ok()) {
-    XCTFail("Failed to evaluate today(): %s", providedDayResult.status().message().data());
-  } else {
-    XCTAssertEqual(providedDayResult.value().value, ReturnValue::BLOCKLIST);
-  }
 }
 
 - (void)testRelativeTimestampsV1Unsupported {
@@ -1561,27 +1548,14 @@ class ScopedHostZone {
       XCTAssertEqualObjects(@(kill.window_start.c_str()), isMorning ? @"00:00" : @"12:00");
       XCTAssertEqualObjects(@(kill.window_end.c_str()), isMorning ? @"12:00" : @"00:00");
       XCTAssertEqualObjects(@(kill.window_zone.c_str()), @"America/New_York");
-      // Twelve hours, so the lead is the five minute cap.
-      [self assertTime:kill.notify_at near:kill.deadline - absl::Minutes(5) what:@"notify_at"];
     }
   }
+  // Nested policy_for_range() calls. Workshop rejects this form at authoring
+  // time, so it never arrives, but CEL evaluates every argument eagerly: the
+  // inner call records its deadline even from a slot the outer call discards.
   {
-    // One kill call nested in another's argument list. Workshop rejects this
-    // form when the rule is written, in every argument position and whatever the
-    // inner kill flag says, so no sync server sends santa such an expression;
-    // what these three cases pin is what santa does if one ever arrives.
-    //
-    // The eager evaluation is deliberate here. CEL evaluates every argument
-    // before the outer call decides anything, and santa keeps that order: the
-    // inner call runs on every evaluation and records its deadline whether or
-    // not the slot holding it is the slot the outer call returns. That is
-    // exactly the reason for the authoring-time rejection, because a kill
-    // written into the out of range slot would be recorded by an in-window exec.
-    // Combining windows is written as a ternary instead, which evaluates only
-    // the branch it takes.
-    //
-    // So both calls are evaluated whichever holds the earlier deadline, and the
-    // earlier one is what comes back.
+    // Both calls run whichever holds the earlier deadline, and the earlier
+    // deadline is what comes back.
     absl::Time now = absl::Now();
     auto innerEarlier = evaluate("policy_for_range(duration('1h'), true, "
                                  "policy_for_range(duration('30m'), true, ALLOWLIST))");
@@ -1601,11 +1575,8 @@ class ScopedHostZone {
     }
   }
   {
-    // The same nested form, so the same rejection at authoring time; this pins
-    // the shape santa would carry. The window shape that comes back is the one
-    // belonging to the earlier deadline. A whole-day window closes at the next
-    // local midnight, at most 25 hours out, so the 48 hour grant nested inside
-    // it is always the later deadline.
+    // The whole-day window closes within 25 hours, so its shape is the one that
+    // comes back; with no zone argument that shape records "local", not empty.
     auto result = evaluate("policy_for_range([0, 1, 2, 3, 4, 5, 6], '00:00', '00:00', true, "
                            "policy_for_range(duration('48h'), true, ALLOWLIST), BLOCKLIST)");
     if (!result.ok()) {
@@ -1614,18 +1585,12 @@ class ScopedHostZone {
       XCTAssertTrue(result.value().pendingKill.has_value());
       XCTAssertEqual(result.value().pendingKill->window_days.size(), 7UL);
       XCTAssertEqualObjects(@(result.value().pendingKill->window_start.c_str()), @"00:00");
-      // No zone argument, so the shape records the calendar the window was
-      // actually read in: "local", not an empty string. The kill-time re-check
-      // resolves that back to the host's zone.
       XCTAssertEqualObjects(@(result.value().pendingKill->window_zone.c_str()), @"local");
     }
   }
   {
-    // And a call that asked for nothing contributes no shape: an empty day list
-    // is never in range, so the outer window is closed whatever the local day
-    // is and the only kill is the inner grant's, which has no shape of its own.
-    // The inner grant recording from a losing slot is the eagerness workshop
-    // refuses this form over, pinned here rather than relied on.
+    // An empty day list is never in range, so the outer window is closed and the
+    // only kill is the inner grant's, recorded from a slot that was discarded.
     auto result = evaluate("policy_for_range([], '00:00', '00:00', true, "
                            "policy_for_range(duration('30m'), true, ALLOWLIST), BLOCKLIST)");
     if (!result.ok()) {

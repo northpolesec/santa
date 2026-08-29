@@ -124,11 +124,7 @@ absl::Status TodayFunction::Evaluate(absl::Span<const cel_runtime::CelValue> arg
   }
 
   // The start of the civil day that zone is in right now, off the system clock:
-  // today() is the date this machine says it is, in the calendar asked for. The
-  // system clock and not the activation's, which is what rules written before
-  // time windows existed already depend on; holding it to a believable clock
-  // would make a forward clock jump stick to the calendar for rules that asked
-  // for none of this.
+  // today() is the date this machine says it is, in the calendar asked for.
   absl::Time now = absl::Now();
   *result = cel_runtime::CelValue::CreateTimestamp(
       absl::FromCivil(absl::CivilDay{absl::ToCivilSecond(now, zone)}, zone));

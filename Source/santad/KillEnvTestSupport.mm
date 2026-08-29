@@ -14,8 +14,6 @@
 
 #include "Source/santad/KillEnvTestSupport.h"
 
-#include "Source/common/SystemResources.h"
-
 namespace santa::testing {
 
 NSArray<NSString*>* SignalDescriptions(const std::vector<FakeSignal>& signals) {
@@ -29,9 +27,14 @@ NSArray<NSString*>* SignalDescriptions(const std::vector<FakeSignal>& signals) {
 
 }  // namespace santa::testing
 
-@implementation FakeHost
-- (uint64_t)mach {
-  return AddNanosecondsToMachTime((uint64_t)(self.machOffsetSeconds * NSEC_PER_SEC),
-                                  mach_continuous_time());
+@implementation CountingConfigurator
+- (BOOL)persistTimedRuleKills:(NSArray<NSDictionary*>*)entries {
+  self.timedRuleKillWrites++;
+  return [super persistTimedRuleKills:entries];
+}
+
+- (BOOL)persistClockReading:(NSDictionary*)reading {
+  self.clockReadingWrites++;
+  return [super persistClockReading:reading];
 }
 @end

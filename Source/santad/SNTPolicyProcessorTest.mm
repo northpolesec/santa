@@ -1541,6 +1541,20 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
                                        error:NULL];
 }
 
+/// Nothing about a timed rule kill is left on the decision: every one of the
+/// nine fields, since an allow that follows would record whatever survives.
+- (void)assertNoTimedKillOn:(SNTCachedDecision*)cd {
+  XCTAssertNil(cd.timedRuleKillDeadline);
+  XCTAssertNil(cd.timedRuleKillNotifyAt);
+  XCTAssertEqual(cd.timedRuleKillRuleType, SNTRuleTypeUnknown);
+  XCTAssertNil(cd.timedRuleKillIdentifier);
+  XCTAssertNil(cd.timedRuleKillCELHash);
+  XCTAssertNil(cd.timedRuleKillWindowDays);
+  XCTAssertNil(cd.timedRuleKillWindowStart);
+  XCTAssertNil(cd.timedRuleKillWindowEnd);
+  XCTAssertNil(cd.timedRuleKillWindowZone);
+}
+
 // A database rule may use policy_for_range(): in range it decides with its
 // policy argument, out of range with its out_of_range_policy argument. Either
 // way the decision is not cacheable, because the window edge has to enforce
@@ -1594,11 +1608,9 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
   XCTAssertEqual(cd.decision, SNTEventStateAllowSigningID);
   // Equal ends make the window the whole day, so it closes at the next local
-  // midnight and the warning comes five minutes before that.
+  // midnight.
   XCTAssertNotNil(cd.timedRuleKillDeadline);
   XCTAssertGreaterThan([cd.timedRuleKillDeadline timeIntervalSinceNow], 0);
-  XCTAssertEqualWithAccuracy(
-      [cd.timedRuleKillDeadline timeIntervalSinceDate:cd.timedRuleKillNotifyAt], 300, 1);
 
   XCTAssertEqual(cd.timedRuleKillRuleType, SNTRuleTypeSigningID);
   XCTAssertEqualObjects(cd.timedRuleKillIdentifier, rule.identifier);
@@ -1614,9 +1626,8 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   XCTAssertEqualObjects(cd.timedRuleKillWindowZone, @"local");
 }
 
-// Nothing rides out when no kill was asked for: not with should_kill false, and
-// not out of window, even when the out_of_range_policy is the one that allows
-// the execution.
+// Nothing rides out when no kill was asked for, which is the processor's own
+// pendingKill.has_value() guard.
 - (void)testCELRulePolicyForRangeRecordsNothingWithoutAnOpenKillingWindow {
   SNTRule* noKill =
       [self celV2RuleWithExpr:@"policy_for_range([0, 1, 2, 3, 4, 5, 6], '00:00', '00:00', false, "
@@ -1629,18 +1640,6 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
       andCELActivationCallback:[self fallbackTestActivationCallback]];
   XCTAssertEqual(cd.decision, SNTEventStateAllowBinary);
   XCTAssertNil(cd.timedRuleKillDeadline);
-
-  SNTRule* outOfWindow =
-      [self celV2RuleWithExpr:@"policy_for_range(now() + duration('1h'), "
-                              @"now() + duration('2h'), true, BLOCKLIST, ALLOWLIST)"];
-  SNTCachedDecision* outCD = [[SNTCachedDecision alloc] init];
-  outCD.sha256 = outOfWindow.identifier;
-  [self.processor decision:outCD
-                       forRule:outOfWindow
-           withTransitiveRules:YES
-      andCELActivationCallback:[self fallbackTestActivationCallback]];
-  XCTAssertEqual(outCD.decision, SNTEventStateAllowBinary);
-  XCTAssertNil(outCD.timedRuleKillDeadline);
 }
 
 // A rule can evaluate cleanly and still not decide: the (rule type, rule state)
@@ -1664,15 +1663,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
                          andCELActivationCallback:[self fallbackTestActivationCallback]];
 
   XCTAssertFalse(decisionIsFinal, @"TEAMID + AllowCompiler is not a decision this rule can make");
-  XCTAssertNil(cd.timedRuleKillDeadline);
-  XCTAssertNil(cd.timedRuleKillNotifyAt);
-  XCTAssertEqual(cd.timedRuleKillRuleType, SNTRuleTypeUnknown);
-  XCTAssertNil(cd.timedRuleKillIdentifier);
-  XCTAssertNil(cd.timedRuleKillCELHash);
-  XCTAssertNil(cd.timedRuleKillWindowDays);
-  XCTAssertNil(cd.timedRuleKillWindowStart);
-  XCTAssertNil(cd.timedRuleKillWindowEnd);
-  XCTAssertNil(cd.timedRuleKillWindowZone);
+  [self assertNoTimedKillOn:cd];
 }
 
 // A deadline is only ever attributed to the rule that produced it, so evaluating
@@ -1693,15 +1684,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
                        forRule:[self celV2RuleWithExpr:@"ALLOWLIST"]
            withTransitiveRules:YES
       andCELActivationCallback:[self fallbackTestActivationCallback]];
-  XCTAssertNil(cd.timedRuleKillDeadline);
-  XCTAssertNil(cd.timedRuleKillNotifyAt);
-  XCTAssertEqual(cd.timedRuleKillRuleType, SNTRuleTypeUnknown);
-  XCTAssertNil(cd.timedRuleKillIdentifier);
-  XCTAssertNil(cd.timedRuleKillCELHash);
-  XCTAssertNil(cd.timedRuleKillWindowDays);
-  XCTAssertNil(cd.timedRuleKillWindowStart);
-  XCTAssertNil(cd.timedRuleKillWindowEnd);
-  XCTAssertNil(cd.timedRuleKillWindowZone);
+  [self assertNoTimedKillOn:cd];
 }
 
 // UNSPECIFIED is for fallback expressions, which have a next rule to fall

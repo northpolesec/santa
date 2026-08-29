@@ -57,8 +57,7 @@ class Activation : public ::google::api::expr::runtime::BaseActivation {
 
   // `now` is the evaluation time now() and policy_for_range() answer against. It
   // defaults to the system clock; santad passes the minimum believable time, so
-  // a rolled-back system clock cannot re-open a closed window. today() is not on
-  // it, deliberately: see RelativeTimeFunction.h.
+  // a rolled-back system clock cannot re-open a closed window.
   Activation(std::unique_ptr<ExecutableFileT> file, std::vector<std::string> (^args)(),
              std::map<std::string, std::string> (^envs)(), uid_t (^euid)(), std::string (^cwd)(),
              std::string (^path)(), std::vector<AncestorT> (^ancestors)(),

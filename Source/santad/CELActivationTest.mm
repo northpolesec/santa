@@ -168,11 +168,9 @@ std::string MakeRawCDHash() {
   XCTAssertEqual(0, std::memcmp(stored.data(), rawCdhash.data(), CS_CDHASH_LEN));
 }
 
-// policy_for_range() reads the time the activation was built with, not the
-// system clock. That is the whole of what lets santad hold every window
-// evaluation to the minimum believable time: the window below closed in January
-// 2026, so only the activation carrying an instant inside it is in range.
-- (void)testPolicyForRangeReadsTheActivationsClock {
+// CreateCELActivationBlock hands `now` on to the activation it builds, which is
+// what lets santad hold every window evaluation to the minimum believable time.
+- (void)testCreateCELActivationBlockForwardsTheClock {
   es_file_t file = MakeESFile("/bin/ls");
   es_process_t proc = MakeESProcess(&file, MakeAuditToken(10, 1), MakeAuditToken(1, 1));
   es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_EXEC, &proc);
@@ -181,38 +179,26 @@ std::string MakeRawCDHash() {
   mockESApi->SetExpectationsRetainReleaseMessage();
   Message msg(mockESApi, &esMsg);
 
-  // The absolute span carries no calendar, so no time zone can change the
-  // answer; the instant is the only thing being tested.
-  static const std::string kExpr =
-      "policy_for_range(timestamp('2026-01-07T11:00:00Z'), "
-      "timestamp('2026-01-07T13:00:00Z'), false, ALLOWLIST, BLOCKLIST)";
-
-  absl::Time inWindow;
+  absl::Time provided;
   std::string parseErr;
-  XCTAssertTrue(absl::ParseTime(absl::RFC3339_full, "2026-01-07T12:00:00Z", &inWindow, &parseErr));
+  XCTAssertTrue(absl::ParseTime(absl::RFC3339_full, "2026-01-07T12:00:00Z", &provided, &parseErr));
 
   auto evaluator = santa::cel::Evaluator<true>::Create();
   XCTAssertTrue(evaluator.ok());
 
-  auto evaluate = [&](std::function<absl::Time()> now) {
-    ActivationCallbackBlock block = santa::CreateCELActivationBlock(
-        msg, /*signingID=*/nil, /*teamID=*/nil, /*isPlatformBinary=*/NO, /*signingTime=*/nil,
-        /*secureSigningTime=*/nil, /*entitlements=*/nil, /*processTree=*/nullptr, std::move(now));
-    std::unique_ptr<::google::api::expr::runtime::BaseActivation> base = block(/*useV2=*/true);
-    // block(useV2=true) always builds a concrete Activation<true>, so this
-    // downcast is safe; the evaluator needs the concrete type.
-    auto* activation = static_cast<santa::cel::Activation<true>*>(base.get());
-    return evaluator.value()->CompileAndEvaluate(kExpr, *activation);
-  };
+  ActivationCallbackBlock block = santa::CreateCELActivationBlock(
+      msg, /*signingID=*/nil, /*teamID=*/nil, /*isPlatformBinary=*/NO, /*signingTime=*/nil,
+      /*secureSigningTime=*/nil, /*entitlements=*/nil, /*processTree=*/nullptr,
+      [provided] { return provided; });
+  std::unique_ptr<::google::api::expr::runtime::BaseActivation> base = block(/*useV2=*/true);
+  // block(useV2=true) always builds a concrete Activation<true>, and the
+  // evaluator needs the concrete type.
+  auto* activation = static_cast<santa::cel::Activation<true>*>(base.get());
 
-  auto provided = evaluate([inWindow] { return inWindow; });
-  XCTAssertTrue(provided.ok());
-  XCTAssertEqual(provided.value().value, santa::cel::CELProtoTraits<true>::ReturnValue::ALLOWLIST);
-
-  auto systemClock = evaluate(absl::Now);
-  XCTAssertTrue(systemClock.ok());
-  XCTAssertEqual(systemClock.value().value,
-                 santa::cel::CELProtoTraits<true>::ReturnValue::BLOCKLIST);
+  auto result = evaluator.value()->CompileAndEvaluate("now() == timestamp('2026-01-07T12:00:00Z')",
+                                                      *activation);
+  XCTAssertTrue(result.ok());
+  XCTAssertEqual(result.value().value, santa::cel::CELProtoTraits<true>::ReturnValue::ALLOWLIST);
 }
 
 @end

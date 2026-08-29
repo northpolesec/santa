@@ -942,13 +942,10 @@ extern NSString* _Nonnull const kStateTempAdminTargetUIDKey;
 #pragma mark - Clock Reading State
 
 ///
-///  Persist the clock reading that floors the believable current time: a
-///  dictionary with Wall (NSNumber, seconds since 1970), MachContinuous
-///  (NSNumber, the mach continuous time read at that same instant) and
-///  BootSessionUUID (NSString, the boot session the mach value belongs to).
-///  Returns NO when the record could not be written to disk; as with the timed
-///  rule kills the in-memory value is kept, since it still floors the clock for
-///  the rest of this daemon's lifetime.
+///  Persist the clock reading that floors the believable current time: Wall
+///  (NSNumber, seconds since 1970), MachContinuous (NSNumber, read at that same
+///  instant) and BootSessionUUID (NSString). Returns NO when the record could
+///  not be written; the in-memory value is kept, since it still floors the clock.
 ///
 - (BOOL)persistClockReading:(nonnull NSDictionary*)reading;
 

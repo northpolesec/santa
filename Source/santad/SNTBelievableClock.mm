@@ -31,10 +31,8 @@ static NSString* const kReadingWallKey = @"Wall";
 static NSString* const kReadingMachKey = @"MachContinuous";
 static NSString* const kReadingBootSessionUUIDKey = @"BootSessionUUID";
 
-// How often the reading is rewritten. Every write is a whole state file, and
-// this is the whole of what the floor can be behind: a restart recovers a time
-// at most this much earlier than the one the previous daemon had reached, and a
-// rolled-back deadline is noticed at most this late.
+// How often the reading is rewritten, and so the whole of what the floor can be
+// behind: a restart, or a rolled-back deadline, is at most this far out of date.
 static const NSTimeInterval kRefreshInterval = 600;
 
 // The timer is allowed to run this fraction of its interval late, which is what
@@ -42,14 +40,8 @@ static const NSTimeInterval kRefreshInterval = 600;
 static const uint64_t kLeewayDivisor = 10;
 
 // How far ahead of the system clock a reading from an earlier boot session may
-// be and still be believed. Nothing vouches for such a reading: its mach value
-// belongs to a dead timeline, so the system clock is the only thing left to
-// compare it against. Without a ceiling, one boot with a dead RTC or a bad time
-// sync leaves a floor years ahead, which every later reboot then preserves
-// through the same branch, and the daemon reads every window as closed and every
-// pending kill as past due with no way back short of deleting the state file.
-// Within a boot session mach continuous time does vouch for the distance, so
-// there the same jump is believed, and stays believed.
+// be and still be believed. Nothing vouches for one, so without a ceiling a
+// single bad clock leaves a floor years ahead that every later reboot preserves.
 static const NSTimeInterval kMaxCrossBootLead = 30 * 24 * 60 * 60;
 
 namespace {
@@ -76,10 +68,8 @@ NSTimeInterval SecondsBetweenMach(uint64_t earlier, uint64_t later) {
 
 @interface SNTBelievableClock ()
 @property SNTConfigurator* configurator;
-/// The three host readings this class is built on: the system wall clock, mach
-/// continuous time, and the boot session the mach value belongs to. Replaced
-/// wholesale by tests, which have no other way to move a clock; the public
-/// initializer passes the real ones.
+/// The three host readings this class is built on. Replaced wholesale by tests,
+/// which have no other way to move a clock.
 @property(copy) NSDate* (^wallClock)(void);
 @property(copy) uint64_t (^machContinuous)(void);
 @property(copy) NSString* (^bootSessionUUID)(void);
@@ -175,13 +165,7 @@ NSTimeInterval SecondsBetweenMach(uint64_t earlier, uint64_t later) {
     handler = self.refreshHandler;
   }
 
-  // Both of these run with the lock released. The write is a whole state file
-  // serialized, renamed into place and chmodded, and every thread asking this
-  // clock for the time -- including the authorization threads answering an exec
-  // against a deadline -- would otherwise wait on that disk I/O. The handler is
-  // free to ask this clock for the time itself, or to block on a queue that
-  // will, neither of which can invert against a lock this thread no longer
-  // holds.
+  // Both run unlocked: the write is disk I/O and the handler may re-enter.
   [self persistReading:reading];
   if (handler) {
     handler();
@@ -199,12 +183,7 @@ NSTimeInterval SecondsBetweenMach(uint64_t earlier, uint64_t later) {
   });
 
   // DISPATCH_TIME_NOW schedules on the uptime clock, so no change to the wall
-  // clock can move a tick: a rolled-back clock delays neither the refresh nor
-  // the handler hanging off it. (DISPATCH_WALLTIME, which Timer.h uses so its
-  // deadlines survive sleep, is exactly the clock this class exists not to
-  // trust.) The uptime clock stops while the machine sleeps, which costs
-  // nothing: a sleeping machine runs no executions, and the tick resumes on
-  // wake alongside the wall-clock timers that fire there.
+  // clock can move a tick. It stops while the machine sleeps, which costs nothing.
   uint64_t nanos = (uint64_t)(interval * NSEC_PER_SEC);
   dispatch_source_set_timer(_tickTimer, dispatch_time(DISPATCH_TIME_NOW, (int64_t)nanos), nanos,
                             nanos / kLeewayDivisor);
@@ -239,13 +218,10 @@ NSTimeInterval SecondsBetweenMach(uint64_t earlier, uint64_t later) {
           .mach = mach};
 }
 
-/// The minimum believable time from the reading a previous daemon left on disk,
-/// which is where this start picks up the time it had reached.
-///
-/// A reading whose boot session is not the current one carries no elapsed time:
-/// its mach value belongs to a timeline that ended at the reboot, so the only
-/// thing it still says is that time had reached its wall value, and only if that
-/// is close enough to the system clock to be worth anything.
+/// The minimum believable time from the reading a previous daemon left on disk.
+/// One whose boot session is not the current one carries no elapsed time: its
+/// mach value belongs to a timeline that ended at the reboot, so only its wall
+/// value is left, and only if it is close enough to the system clock.
 - (Reading)believableNowFromSavedReadingSynchronized {
   uint64_t mach = self.machContinuous();
   NSTimeInterval wall = self.wallClock().timeIntervalSince1970;
@@ -261,10 +237,8 @@ NSTimeInterval SecondsBetweenMach(uint64_t earlier, uint64_t later) {
     return systemClock;
   }
 
-  // A plist real round-trips both infinities and NaN, and neither can be
-  // compared its way out of a max(): an infinity wins it outright and a NaN
-  // makes the answer depend on argument order. A wall value that is not a finite
-  // number is no reading at all.
+  // A plist real round-trips both infinities and NaN, and neither can be compared
+  // its way out of a max(). A wall value that is not finite is no reading at all.
   NSTimeInterval savedWall = [reading[kReadingWallKey] doubleValue];
   if (!std::isfinite(savedWall)) {
     LOGW(@"Discarding a saved clock reading: its wall time is not a finite number");

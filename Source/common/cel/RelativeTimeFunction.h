@@ -85,22 +85,11 @@ namespace cel {
 //     numbering 0=Sunday through 6=Saturday. Pure and foldable, so it does not
 //     affect cacheability.
 //
-// The two read different clocks, deliberately. today() is calendar truth and
-// reads the system clock, as it has since before any of this existed: rules
-// already depend on it meaning "the date this machine says it is", and moving
-// it onto santad's believable clock would export that clock's roll-forward
-// stickiness onto rules that never asked for a time window. It is therefore not
-// rollback protected. now(), like policy_for_range(), reads the clock the
-// Activation supplies, so a rule that does ask for a window gets one that a
-// clock change cannot re-open.
-//
-// Mixing them is safe in the direction that matters. A today() edge handed to
-// policy_for_range(), as in policy_for_range(weekdays(), today(), today() +
-// days(1), ...), is tested for membership on the believable clock, so under
-// skew the window reads as out of range and the rule falls to its
-// out_of_range_policy: closed, not open. The other direction, a today()
-// comparison outside any window, keeps exactly the exposure today() already
-// had.
+// The two read different clocks, deliberately. today() is calendar truth on
+// the system clock and is not rollback protected; now(), like
+// policy_for_range(), reads the clock the Activation supplies. A today() edge
+// handed to policy_for_range() is still tested on the believable clock, so
+// under skew the window reads closed, not open.
 
 // Descriptors for the today() overloads, the bare form and today(zone), both
 // lazy. The runtime picks between them by descriptor shape, so both have to be
@@ -114,8 +103,7 @@ TodayDescriptors();
 // Lazy CEL function backing one today() overload. On evaluation it returns the
 // start of the current day by the system clock, in the host's zone or in the
 // one its argument names, and sets the supplied flag to true to mark the
-// evaluation as non-cacheable. Takes no clock: see above for why this one stays
-// on the system clock. The sink pointer must outlive every evaluation.
+// evaluation as non-cacheable. The sink pointer must outlive every evaluation.
 class TodayFunction : public ::google::api::expr::runtime::CelFunction {
  public:
   TodayFunction(::google::api::expr::runtime::CelFunctionDescriptor descriptor,
