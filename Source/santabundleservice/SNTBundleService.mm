@@ -46,7 +46,8 @@
   if (self) {
     _queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_BACKGROUND, 0);
     _stateQueue =
-        dispatch_queue_create("com.northpolesec.santa.bundleservice.state", DISPATCH_QUEUE_SERIAL);
+        dispatch_queue_create_with_target("com.northpolesec.santa.bundleservice.state",
+                                          DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL, _queue);
   }
   return self;
 }
@@ -228,7 +229,8 @@
   // Counts used as additional progress information in SantaGUI
   std::atomic<int64_t> binaryCount{0};
   std::atomic<int64_t> completedUnits{0};
-  // Highest count already reported to the GUI. Only ever moves forward, via the CAS below.
+  // Highest count already reported to the GUI. Only ever written on stateQueue, and only ever
+  // forward; atomic so the per-file fast path below can read it without taking that queue.
   std::atomic<int64_t> reportedUnits{0};
   auto* binaryCountPtr = &binaryCount;
   auto* completedUnitsPtr = &completedUnits;
@@ -257,20 +259,29 @@
       // This used to hop to the main queue for every file, purely to serialize the throttle
       // check. For Xcode.app that is ~120k blocking round trips through the main thread, which
       // serialized this otherwise-concurrent dispatch_apply and made the main thread the
-      // bottleneck for the whole scan. Nothing here needs a queue: completedUnits is already
-      // atomic, and NSProgress and NSXPCConnection are both documented thread-safe. Claim each
-      // 1% boundary with a compare-exchange so exactly one worker reports it.
+      // bottleneck for the whole scan. The per-file cost is now a lock-free atomic read; only a
+      // worker that actually crosses a boundary takes a queue, and never the main one.
       int64_t done = completedUnitsPtr->fetch_add(1) + 1;
-      int64_t reported = reportedUnitsPtr->load();
-      if (done - reported >= reportInterval &&
-          reportedUnitsPtr->compare_exchange_strong(reported, done)) {
-        p.completedUnitCount = done;
-        // fileCount is how many have been scanned, not `i`: dispatch_apply does not hand out
-        // indices in order, so `i` made the displayed count jump around.
-        [[clientListener remoteObjectProxy] updateCountsForEvent:event
-                                                     binaryCount:binaryCountPtr->load()
-                                                       fileCount:done
-                                                     hashedCount:0];
+      if (done - reportedUnitsPtr->load() >= reportInterval) {
+        // Claim and publish together. An atomic compare-exchange would pick one reporter per
+        // boundary but would not order the publish that follows it: a worker preempted between
+        // claiming 5000 and sending it lands after a worker that already sent 10000, and both
+        // the progress bar and the GUI's file count jump backwards -- a visible flicker on
+        // exactly the large bundles this throttle exists for. Serializing the pair keeps both
+        // monotonic. Reached ~100 times, not once per file.
+        dispatch_sync(self.stateQueue, ^{
+          // Re-check under serialization: a larger claim may have landed while this worker was
+          // waiting, in which case this one is stale and must not publish.
+          if (done - reportedUnitsPtr->load() < reportInterval) return;
+          reportedUnitsPtr->store(done);
+          p.completedUnitCount = done;
+          // fileCount is how many have been scanned, not `i`: dispatch_apply does not hand out
+          // indices in order, so `i` made the displayed count jump around.
+          [[clientListener remoteObjectProxy] updateCountsForEvent:event
+                                                       binaryCount:binaryCountPtr->load()
+                                                         fileCount:done
+                                                       hashedCount:0];
+        });
       }
 
       NSString* subpath = subpaths[i];
