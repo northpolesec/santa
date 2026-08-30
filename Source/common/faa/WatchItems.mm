@@ -1055,8 +1055,6 @@ void WatchItems::UpdateCurrentState(DataWatchItems new_data_watch_items,
         proc_watch_items_updated_callback_(proc_watch_items_.Count());
       });
     }
-  } else {
-    LOGD(@"No changes to set of watched paths.");
   }
 }
 
