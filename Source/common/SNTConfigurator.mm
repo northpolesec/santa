@@ -117,6 +117,7 @@ NSString* const kStateTempAdminModeKey = @"TempAdmin";
 NSString* const kStateTempAdminTargetUIDKey = @"TargetUID";
 static NSString* const kStateDemotedAdminsKey = @"DemotedAdmins";
 static NSString* const kStateLastBootUUIDKey = @"LastBootUUID";
+static NSString* const kStateTimedRuleKillsKey = @"TimedRuleKills";
 
 /// User defaults key for user override of the menu item enabled setting.
 NSString* const kEnableMenuItemUserOverride = @"EnableMenuItemUserOverride";
@@ -1015,6 +1016,16 @@ static SNTConfigurator* sharedConfigurator = nil;
 
 - (nullable NSArray<NSDictionary*>*)savedDemotedAdmins {
   return self.state[kStateDemotedAdminsKey];
+}
+
+- (BOOL)persistTimedRuleKills:(NSArray<NSDictionary*>*)entries {
+  @synchronized(self) {
+    return [self updateStateSynchronizedKey:kStateTimedRuleKillsKey value:entries];
+  }
+}
+
+- (nullable NSArray<NSDictionary*>*)savedTimedRuleKills {
+  return self.state[kStateTimedRuleKillsKey];
 }
 
 - (void)updateLastBootUUID:(NSString*)bootUUID {
@@ -2246,6 +2257,10 @@ static SNTConfigurator* sharedConfigurator = nil;
   if ([state[kStateLastBootUUIDKey] isKindOfClass:[NSString class]]) {
     _lastBootUUID = state[kStateLastBootUUIDKey];
     newState[kStateLastBootUUIDKey] = _lastBootUUID;
+  }
+
+  if ([state[kStateTimedRuleKillsKey] isKindOfClass:[NSArray class]]) {
+    newState[kStateTimedRuleKillsKey] = state[kStateTimedRuleKillsKey];
   }
 
   return newState;

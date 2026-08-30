@@ -1152,6 +1152,48 @@ objc_library(
         "//Source/common:String",
         "//Source/common:SystemResources",
         "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/container:flat_hash_set",
+    ],
+)
+
+objc_library(
+    name = "SNTTimedRuleKills",
+    srcs = ["SNTTimedRuleKills.mm"],
+    hdrs = ["SNTTimedRuleKills.h"],
+    deps = [
+        ":KillingMachine",
+        ":SNTNotificationQueue",
+        ":SNTRuleTable",
+        "//Source/common:MOLXPCConnection",
+        "//Source/common:SNTCommonEnums",
+        "//Source/common:SNTConfigurator",
+        "//Source/common:SNTKillCommand",
+        "//Source/common:SNTLogging",
+        "//Source/common:SNTRule",
+        "//Source/common:SNTRuleIdentifiers",
+        "//Source/common:SNTXPCNotifierInterface",
+        "//Source/common:String",
+        "//Source/common:Timer",
+    ],
+)
+
+santa_unit_test(
+    name = "SNTTimedRuleKillsTest",
+    srcs = ["SNTTimedRuleKillsTest.mm"],
+    deps = [
+        ":KillingMachine",
+        ":SNTNotificationQueue",
+        ":SNTRuleTable",
+        ":SNTTimedRuleKills",
+        "//Source/common:AuditUtilities",
+        "//Source/common:CSOpsHelper",
+        "//Source/common:MOLXPCConnection",
+        "//Source/common:SNTCommonEnums",
+        "//Source/common:SNTConfigurator",
+        "//Source/common:SNTRule",
+        "//Source/common:SNTXPCNotifierInterface",
+        "@FMDB",
+        "@OCMock",
     ],
 )
 
@@ -1391,6 +1433,7 @@ objc_library(
         ":SNTNotificationQueue",
         ":SNTRuleTable",
         ":SNTSyncdQueue",
+        ":SNTTimedRuleKills",
         ":SandboxExpectations",
         ":SignalScanner",
         ":SleighLauncher",
@@ -2127,6 +2170,7 @@ test_suite(
         ":SNTPolicyProcessorTest",
         ":SNTRuleTableTest",
         ":SNTSyncdQueueTest",
+        ":SNTTimedRuleKillsTest",
         ":SandboxExpectationsTest",
         ":SantadTest",
         ":SleighLauncherTest",
