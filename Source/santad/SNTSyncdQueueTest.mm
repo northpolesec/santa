@@ -53,6 +53,7 @@
 }
 
 - (void)tearDown {
+  [self drainMainQueue];
   // Both are class mocks, so retire them explicitly rather than leaving it to deallocation.
   [self.mockSyncServiceInterface stopMocking];
   [self.stubSyncConnection stopMocking];
@@ -201,6 +202,28 @@
     [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.01]];
   }
   return predicate();
+}
+
+/// Run the main queue until everything already enqueued on it has executed.
+///
+/// Both drop paths end in a `dispatch_async` to the main queue whose block captures no test state:
+/// it resolves `[SNTConfigurator configurator]` when it runs. That is right in production, where
+/// there is one configurator for the life of the process, but in tests a block enqueued by one
+/// test can execute during the next one and act on *its* mock -- clearing sync state that test
+/// expected to survive. Draining between tests is what keeps each test's async work its own.
+///
+/// Deterministic rather than a fixed sleep: the main queue is FIFO, so a sentinel enqueued now
+/// runs after everything already queued ahead of it.
+- (void)drainMainQueue {
+  __block BOOL drained = NO;
+  dispatch_async(dispatch_get_main_queue(), ^{
+    drained = YES;
+  });
+  XCTAssertTrue([self waitUpTo:5
+                    forCondition:^BOOL {
+                      return drained;
+                    }],
+                @"The main queue must drain between tests");
 }
 
 /// A reassessment timer is one-shot, so a non-NULL `timer` must mean "armed and not yet fired".
