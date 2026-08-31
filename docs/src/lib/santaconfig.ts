@@ -314,7 +314,9 @@ The following sequences will be replaced in the final URL:
     {
       key: "BrandingCompanyName",
       description: `The company name to display on Santa GUIs as well as in messages written to the TTY. For GUI
-      windows, this setting is ignored if \`BrandingCompanyLogo\` is set.`,
+      windows, this setting is ignored if \`BrandingCompanyLogo\` is set.
+
+See [Custom Branding](/configuration/branding) for examples of how this appears to users.`,
       type: "string",
       versionAdded: "2026.1",
     },
@@ -327,7 +329,9 @@ The following sequences will be replaced in the final URL:
 - \`file://\` - Local file path (e.g., \`file:///Library/Application%20Support/MyOrg/logo.png\`)
 - \`data:\` - Base64-encoded image data (e.g., \`data:image/png;base64,iVBORw0KG...\`)
 
-**Note:** HTTP/HTTPS URLs are not supported.`,
+**Note:** HTTP/HTTPS URLs are not supported.
+
+See [Custom Branding](/configuration/branding) for examples of how this appears to users.`,
       type: "string",
       versionAdded: "2026.1",
     },
@@ -341,7 +345,9 @@ The following sequences will be replaced in the final URL:
 - \`file://\` - Local file path (e.g., \`file:///Library/Application%20Support/MyOrg/logo-dark.png\`)
 - \`data:\` - Base64-encoded image data (e.g., \`data:image/png;base64,iVBORw0KG...\`)
 
-**Note:** HTTP/HTTPS URLs are not supported.`,
+**Note:** HTTP/HTTPS URLs are not supported.
+
+See [Custom Branding](/configuration/branding) for examples of how this appears to users.`,
       type: "string",
       versionAdded: "2026.1",
     },
