@@ -17,11 +17,13 @@
 #import <CommonCrypto/CommonDigest.h>
 #import <Foundation/Foundation.h>
 #include <libproc.h>
+#include <mach/mach_time.h>
 #include <signal.h>
 #include <sys/param.h>
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -34,12 +36,15 @@
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTRuleIdentifiers.h"
+#import "Source/common/SNTSystemInfo.h"
 #import "Source/common/SNTXPCNotifierInterface.h"
 #include "Source/common/String.h"
+#include "Source/common/SystemResources.h"
 #include "Source/common/Timer.h"
 #include "Source/common/cel/PolicyForRangeFunction.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
 #include "Source/santad/KillingMachine.h"
+#import "Source/santad/SNTBelievableClock.h"
 #import "Source/santad/SNTNotificationQueue.h"
 #include "absl/status/statusor.h"
 #include "absl/time/time.h"
@@ -55,6 +60,8 @@ static NSString* const kEntryWindowDaysKey = @"WindowDays";
 static NSString* const kEntryWindowStartKey = @"WindowStart";
 static NSString* const kEntryWindowEndKey = @"WindowEnd";
 static NSString* const kEntryWindowZoneKey = @"WindowZone";
+static NSString* const kEntryMachDeadlineKey = @"MachDeadline";
+static NSString* const kEntryBootSessionUUIDKey = @"BootSessionUUID";
 
 // A timer can fire marginally early; anything due within this window is treated
 // as due now rather than re-arming for a fraction of a second.
@@ -62,6 +69,10 @@ static const NSTimeInterval kDueTolerance = 0.25;
 
 // How long a matched process has to exit after SIGTERM before it is SIGKILLed.
 static const NSTimeInterval kTermGrace = 5.0;
+
+// How far ahead a mach deadline may point: the pair is arithmetic on a tick
+// count, and one further out than this carries no pair at all.
+static const NSTimeInterval kMaxMachDeadlineLead = 10 * 365 * 24 * 60 * 60;
 
 /// One pending kill: the rule it came from, when it fires, whether the user has
 /// already been warned, and the shape of the window the deadline came from (nil
@@ -77,6 +88,11 @@ static const NSTimeInterval kTermGrace = 5.0;
 @property(copy) NSString* windowStart;
 @property(copy) NSString* windowEnd;
 @property(copy) NSString* windowZone;
+/// The same deadline on the mach continuous clock, and the boot session that
+/// reading belongs to. Zero and nil together when there is no pair, which leaves
+/// the wall deadline above to govern on its own.
+@property uint64_t machDeadline;
+@property(copy) NSString* bootSessionUUID;
 
 /// Deserializes a persisted entry, or nil when it isn't one: the state file is
 /// on disk, so every field is validated rather than trusted.
@@ -98,21 +114,18 @@ bool SupportedRuleType(SNTRuleType ruleType) {
          ruleType == SNTRuleTypeCDHash;
 }
 
-// The persisted window shape, checked rather than trusted, because the state
-// file is on disk: a day list must be an array of whole numbers 0 (Sunday)
-// through 6 (Saturday), each time a 24-hour "HH:MM", and the zone a non-empty
-// string. Those are the deterministic parts of what policy_for_range() accepts,
-// so a value that fails one of them can never name a window on this host.
-// Anything else reads as no shape at all, which is the same answer a missing key
-// gives: the entry still loads and still holds its deadline, it just has no
-// window for a restart to re-check.
+// The persisted window shape, checked rather than trusted because the state file
+// is on disk: days 0 (Sunday) through 6 (Saturday), 24-hour "HH:MM" times, and a
+// non-empty zone string, the deterministic parts of what policy_for_range()
+// accepts. Anything else reads as no shape at all, so the entry keeps its
+// deadline but has no window for a restart to re-check.
 NSArray<NSNumber*>* WindowDaysFromValue(id value) {
   if (![value isKindOfClass:[NSArray class]]) {
     return nil;
   }
   for (NSNumber* day in value) {
-    if (![day isKindOfClass:[NSNumber class]] || day.integerValue < 0 || day.integerValue > 6 ||
-        (double)day.integerValue != day.doubleValue) {
+    if (![day isKindOfClass:[NSNumber class]] || (double)day.integerValue != day.doubleValue ||
+        day.integerValue < 0 || day.integerValue > 6) {
       return nil;
     }
   }
@@ -121,19 +134,10 @@ NSArray<NSNumber*>* WindowDaysFromValue(id value) {
 
 NSString* WindowTimeFromValue(id value) {
   NSString* time = [value isKindOfClass:[NSString class]] ? value : nil;
-  if (time.length != 5 || [time characterAtIndex:2] != ':') {
+  if (!time.length) {
     return nil;
   }
-  for (NSUInteger index : {0, 1, 3, 4}) {
-    unichar digit = [time characterAtIndex:index];
-    if (digit < '0' || digit > '9') {
-      return nil;
-    }
-  }
-
-  int hour = ([time characterAtIndex:0] - '0') * 10 + ([time characterAtIndex:1] - '0');
-  int minute = ([time characterAtIndex:3] - '0') * 10 + ([time characterAtIndex:4] - '0');
-  return (hour > 23 || minute > 59) ? nil : time;
+  return santa::cel::ParseHourMinute(time.UTF8String) ? time : nil;
 }
 
 // Any non-empty string, deliberately not resolved here. Whether the zone
@@ -145,6 +149,21 @@ NSString* WindowTimeFromValue(id value) {
 NSString* WindowZoneFromValue(id value) {
   NSString* zone = [value isKindOfClass:[NSString class]] ? value : nil;
   return zone.length ? zone : nil;
+}
+
+// The mach half of a deadline, checked rather than trusted like everything else
+// the state file holds: a tick count is a positive whole number, and a plist
+// real round-trips both infinities and NaN, neither of which converts to one.
+// Anything else reads as no mach deadline, and the wall deadline governs alone.
+uint64_t MachDeadlineFromValue(id value) {
+  if (![value isKindOfClass:[NSNumber class]]) {
+    return 0;
+  }
+  double asDouble = [value doubleValue];
+  if (!std::isfinite(asDouble) || asDouble <= 0) {
+    return 0;
+  }
+  return [value unsignedLongLongValue];
 }
 
 // Identifiers that fetch exactly the rule an entry came from: one field set, so
@@ -219,7 +238,15 @@ SNTKillRequest* KillRequestForEntry(SNTTimedRuleKillEntry* entry) {
   SNTRuleType ruleType = static_cast<SNTRuleType>([dict[kEntryRuleTypeKey] integerValue]);
   NSString* identifier = dict[kEntryIdentifierKey];
   NSString* celHash = dict[kEntryCELHashKey];
-  if (!SupportedRuleType(ruleType) || !identifier.length || !celHash.length) {
+  // A plist real round-trips both infinities and NaN, and neither is an instant.
+  // A NaN deadline is the worst of them: it answers false to every "has this
+  // come due" question and leaves the countdown arming for zero seconds, firing
+  // and re-arming for zero forever. An appointment that cannot be compared is no
+  // appointment, so the record is dropped.
+  NSTimeInterval deadline = [dict[kEntryDeadlineKey] doubleValue];
+  NSTimeInterval notifyAt = [dict[kEntryNotifyAtKey] doubleValue];
+  if (!SupportedRuleType(ruleType) || !identifier.length || !celHash.length ||
+      !std::isfinite(deadline) || !std::isfinite(notifyAt)) {
     return nil;
   }
 
@@ -227,8 +254,8 @@ SNTKillRequest* KillRequestForEntry(SNTTimedRuleKillEntry* entry) {
   entry.ruleType = ruleType;
   entry.identifier = identifier;
   entry.celHash = celHash;
-  entry.deadline = [NSDate dateWithTimeIntervalSince1970:[dict[kEntryDeadlineKey] doubleValue]];
-  entry.notifyAt = [NSDate dateWithTimeIntervalSince1970:[dict[kEntryNotifyAtKey] doubleValue]];
+  entry.deadline = [NSDate dateWithTimeIntervalSince1970:deadline];
+  entry.notifyAt = [NSDate dateWithTimeIntervalSince1970:notifyAt];
   // Guarded like every other field: a non-NSNumber value on disk must not reach
   // -boolValue and crash-loop the daemon at startup.
   id notified = dict[kEntryNotifiedKey];
@@ -245,6 +272,17 @@ SNTKillRequest* KillRequestForEntry(SNTTimedRuleKillEntry* entry) {
     entry.windowStart = windowStart;
     entry.windowEnd = windowEnd;
     entry.windowZone = windowZone;
+  }
+  // Also absent on an entry written before there was a mach deadline to write.
+  // A tick count says nothing without the boot session it was read in, so like
+  // the window shape this is taken whole or not at all.
+  uint64_t machDeadline = MachDeadlineFromValue(dict[kEntryMachDeadlineKey]);
+  NSString* bootSessionUUID = [dict[kEntryBootSessionUUIDKey] isKindOfClass:[NSString class]]
+                                  ? dict[kEntryBootSessionUUIDKey]
+                                  : nil;
+  if (machDeadline && bootSessionUUID.length) {
+    entry.machDeadline = machDeadline;
+    entry.bootSessionUUID = bootSessionUUID;
   }
   return entry;
 }
@@ -266,6 +304,10 @@ SNTKillRequest* KillRequestForEntry(SNTTimedRuleKillEntry* entry) {
     dict[kEntryWindowEndKey] = self.windowEnd;
     dict[kEntryWindowZoneKey] = self.windowZone;
   }
+  if (self.machDeadline && self.bootSessionUUID.length) {
+    dict[kEntryMachDeadlineKey] = @(self.machDeadline);
+    dict[kEntryBootSessionUUIDKey] = self.bootSessionUUID;
+  }
   return dict;
 }
 
@@ -280,10 +322,15 @@ SNTKillRequest* KillRequestForEntry(SNTTimedRuleKillEntry* entry) {
 @property SNTNotificationQueue* notifierQueue;
 @property SNTRuleTable* ruleTable;
 @property SNTConfigurator* configurator;
+@property SNTBelievableClock* clock;
 @property dispatch_queue_t queue;
 /// Entries keyed by rule type, identifier and CEL hash, so repeated execs under
 /// the same rule share one entry. Only ever touched on `queue`.
 @property NSMutableDictionary<NSString*, SNTTimedRuleKillEntry*>* entries;
+/// The interval the countdown was last armed for, in seconds, or zero when it
+/// was stopped. Written on every pass over the entries, so a test can see a
+/// countdown that was armed before the system clock moved being corrected.
+@property uint32_t armedTimerSeconds;
 
 - (void)onDeadlineTimer;
 @end
@@ -327,6 +374,7 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
 - (instancetype)initWithNotifierQueue:(SNTNotificationQueue*)notifierQueue
                             ruleTable:(SNTRuleTable*)ruleTable
                          configurator:(SNTConfigurator*)configurator
+                                clock:(SNTBelievableClock*)clock
                               killEnv:(santa::KillEnv)killEnv {
   self = [super init];
   if (self) {
@@ -334,10 +382,18 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
     _notifierQueue = notifierQueue;
     _ruleTable = ruleTable;
     _configurator = configurator;
+    _clock = clock;
     _entries = [NSMutableDictionary dictionary];
     _queue = dispatch_queue_create("com.northpolesec.santa.daemon.timed_rule_kills",
                                    DISPATCH_QUEUE_SERIAL);
     _timer = std::make_shared<DeadlineTimer>(self);
+
+    // The clock's tick asks the same due question the countdown does, on a
+    // cadence a moved wall clock cannot delay. Weak: this object owns the clock.
+    __weak SNTTimedRuleKills* weakSelf = self;
+    clock.refreshHandler = ^{
+      [weakSelf onDeadlineTimer];
+    };
   }
   return self;
 }
@@ -440,6 +496,10 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
            deadline);
     }
 
+    // Read here rather than above, so the common case of a binary executing
+    // repeatedly inside its window reads no clocks at all.
+    [self captureMachDeadlineForEntry:entry from:[self.clock now]];
+
     self.entries[entry.key] = entry;
     LOGI(@"Recorded timed rule kill for %@: quitting at %@, warning at %@", identifier, deadline,
          notifyAt);
@@ -450,9 +510,9 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
 }
 
 - (void)onDeadlineTimer {
-  // Runs on the Timer's queue. The work moves to our own queue: the kill blocks
-  // it for the term-then-kill grace period, and the entries are only touched
-  // there.
+  // Called from the countdown's queue and from the clock's tick. The work is
+  // enqueued rather than run here: the entries are only touched on our own
+  // queue, and a kill would hold the caller for the grace period.
   dispatch_async(self.queue, ^{
     [self processDueEntriesSerialized];
   });
@@ -467,25 +527,30 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
 /// delays a kill: the process snapshot behind a warning is the slow part, and
 /// no kill is waiting on it by the time it is taken. It also means an entry
 /// whose deadline has arrived is gone before the warning pass sees it, so
-/// nothing is warned about a kill that is already happening.
+/// nothing is warned about a kill that is already happening. A clock that jumped
+/// forward over both moments therefore quits what the rule covers without
+/// warning first, which is the only honest answer left once the deadline is
+/// behind us.
 ///
 /// Due entries are gathered and killed in one pass, sharing one grace period.
 /// An entry whose window is standing open again is not one of them: it goes back
 /// with a later deadline instead.
 - (void)processDueEntriesSerialized {
-  [self processDueEntriesSerializedAsOf:[NSDate date]];
+  [self processDueEntriesSerializedAsOf:[self.clock now]];
 }
 
 /// The pass itself, split from the clock read above so a test can run one at an
 /// instant of its choosing, including the fraction of a second before a deadline
 /// that a marginally early timer fires in.
 - (void)processDueEntriesSerializedAsOf:(NSDate*)now {
+  uint64_t machNow = mach_continuous_time();
+  NSString* bootSession = [SNTSystemInfo bootSessionUUID];
   BOOL changed = NO;
 
   NSMutableArray<SNTTimedRuleKillEntry*>* due = [NSMutableArray array];
   for (NSString* key in self.entries.allKeys) {
     SNTTimedRuleKillEntry* entry = self.entries[key];
-    if ([entry.deadline timeIntervalSinceDate:now] > kDueTolerance) {
+    if (![self entryIsDue:entry now:now machNow:machNow bootSession:bootSession]) {
       continue;
     }
 
@@ -574,6 +639,43 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
   return YES;
 }
 
+/// Whether an entry has come due. Two clocks answer that, the believable wall
+/// instant and the mach continuous instant captured alongside it, and whichever
+/// arrives first fires. A pair from an earlier boot session is ignored.
+- (BOOL)entryIsDue:(SNTTimedRuleKillEntry*)entry
+               now:(NSDate*)now
+           machNow:(uint64_t)machNow
+       bootSession:(NSString*)bootSession {
+  if ([entry.deadline timeIntervalSinceDate:now] <= kDueTolerance) {
+    return YES;
+  }
+  if (!entry.machDeadline || !bootSession.length ||
+      ![entry.bootSessionUUID isEqualToString:bootSession]) {
+    return NO;
+  }
+  return entry.machDeadline <=
+         AddNanosecondsToMachTime((uint64_t)(kDueTolerance * NSEC_PER_SEC), machNow);
+}
+
+/// Pairs an entry's wall deadline with the mach continuous instant it falls on
+/// and the boot session that instant belongs to. A host whose boot session cannot
+/// be read, or a deadline further out than a tick count carries, stores no pair.
+- (void)captureMachDeadlineForEntry:(SNTTimedRuleKillEntry*)entry from:(NSDate*)now {
+  NSString* bootSession = [SNTSystemInfo bootSessionUUID];
+  NSTimeInterval remaining = [entry.deadline timeIntervalSinceDate:now];
+  // Asked as a negated "within range" so that a NaN, which compares false
+  // against everything, reads as out of range rather than into the arithmetic.
+  if (!bootSession.length || !(remaining <= kMaxMachDeadlineLead)) {
+    entry.machDeadline = 0;
+    entry.bootSessionUUID = nil;
+    return;
+  }
+
+  entry.machDeadline = AddNanosecondsToMachTime((uint64_t)(std::max(0.0, remaining) * NSEC_PER_SEC),
+                                                mach_continuous_time());
+  entry.bootSessionUUID = bootSession;
+}
+
 /// The window re-check, asked of every entry on every pass: at its deadline, and
 /// again at the warning that leads it. An entry whose recurring window is
 /// standing open at its deadline is not killed: its deadline moves to the end of
@@ -621,8 +723,8 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
 
   // The same math the rule was evaluated with, in the zone the rule named, so a
   // re-check and the evaluation that recorded the entry cannot disagree about
-  // where the window is. Asked at the deadline once the pass has reached it, and
-  // at the deadline rather than at `now` when the timer got here first.
+  // where the window is. Asked at the deadline rather than at the believable
+  // `now` when the timer got here first.
   NSDate* asked = [now laterDate:entry.deadline];
   absl::StatusOr<santa::cel::WindowEval> window = santa::cel::EvalDaysHHMMWindow(
       days, entry.windowStart.UTF8String, entry.windowEnd.UTF8String,
@@ -655,6 +757,7 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
   // is set goes out on this pass rather than being dated in the past.
   entry.notifyAt = [now laterDate:[deadline dateByAddingTimeInterval:-lead]];
   entry.notified = NO;
+  [self captureMachDeadlineForEntry:entry from:now];
   return YES;
 }
 
@@ -729,8 +832,12 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
 
 /// Arms the one-shot timer for the earliest event across all entries, which is
 /// the earliest of every deadline and every warning still owed, or stops it
-/// when there are none. Timer.h schedules on wall time, so a machine asleep at
-/// the deadline runs the kill on wake.
+/// when there are none. The distance to that event is measured on the believable
+/// clock; the countdown itself is Timer.h's, which schedules on wall time, so a
+/// machine asleep at the deadline runs the kill on wake.
+///
+/// Every pass re-arms it, so a countdown started before the wall clock moved is
+/// re-measured on a clock that only rises: shortened back, never lengthened.
 - (void)rescheduleTimerSerialized {
   NSDate* next = nil;
   for (SNTTimedRuleKillEntry* entry in self.entries.allValues) {
@@ -743,17 +850,19 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
   }
 
   if (!next) {
+    self.armedTimerSeconds = 0;
     _timer->StopTimerAsync();
     return;
   }
 
   // Round up: firing a whole second early would find nothing due and re-arm.
-  NSTimeInterval remaining = next.timeIntervalSinceNow;
+  NSTimeInterval remaining = [next timeIntervalSinceDate:[self.clock now]];
   uint32_t seconds = 0;
   if (remaining > 0) {
     seconds = static_cast<uint32_t>(
         std::min(std::ceil(remaining), static_cast<double>(std::numeric_limits<uint32_t>::max())));
   }
+  self.armedTimerSeconds = seconds;
   _timer->StartTimerWithIntervalAsync(seconds);
 }
 

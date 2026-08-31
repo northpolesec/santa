@@ -16,6 +16,9 @@
 #define SANTA_COMMON_CEL_POLICYFORRANGEFUNCTION_H
 
 #include <cstdint>
+#include <functional>
+#include <optional>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -84,7 +87,8 @@ namespace cel {
 // evaluation.
 //
 // should_kill asks for anything still running when the window closes to be
-// quit. It is type-checked but has no effect yet.
+// quit. An in-window evaluation with it set reports a PendingKill, which the
+// caller records only if the execution is actually allowed to run.
 //
 // Every evaluation reads the current time, so any use marks the result
 // non-cacheable, exactly like today(): the next exec re-evaluates and the
@@ -108,6 +112,13 @@ struct WindowEval {
 // zoneinfo directory). Anything unresolved is an error naming the string.
 // Shared by policy_for_range() and today(zone) so the two cannot drift apart.
 absl::StatusOr<absl::TimeZone> ResolveTimeZone(absl::string_view zone);
+
+// Parses a strict 24-hour "HH:MM" into minutes after midnight, nullopt for
+// anything else: the width is exact, so no "9:00", no seconds field, and hour
+// and minute are in range. Exported for the same reason as ResolveTimeZone():
+// santad checks the window shape it read back from its state file, and the
+// strings it must accept are exactly the ones a window can be rebuilt from.
+std::optional<int> ParseHourMinute(absl::string_view time);
 
 // The window math, kept separate from the CEL plumbing so the calendar cases
 // are testable directly and so the notification lead formula can reuse it.
@@ -134,6 +145,19 @@ WindowEval EvalDurationWindow(absl::Duration d, absl::Time now);
 // kill and the re-check that moves one to a later occurrence cannot disagree.
 absl::Duration NotificationLead(absl::Duration window_length);
 
+// The kill an in-window evaluation with should_kill asked for: quit what the
+// rule covers at `deadline`, having warned at `notify_at`. The window shape is
+// what a restart re-checks against: the zone string as written ("local" when
+// the overload takes none), and empty for the non-recurring overloads.
+struct PendingKill {
+  absl::Time deadline;
+  absl::Time notify_at;
+  std::vector<int64_t> window_days;
+  std::string window_start;
+  std::string window_end;
+  std::string window_zone;
+};
+
 // Descriptors for the four policy_for_range() overloads, all registered lazily.
 // Their argument counts are all different, which is what the runtime dispatches
 // on.
@@ -141,16 +165,21 @@ std::vector<::google::api::expr::runtime::CelFunctionDescriptor>
 PolicyForRangeDescriptors();
 
 // Lazy CEL function backing one policy_for_range() overload. On evaluation it
-// marks the result non-cacheable and returns whichever policy argument the
-// window selects. The sink pointer must outlive every evaluation.
+// marks the result non-cacheable, returns whichever policy argument the window
+// selects, and reports a pending kill when the window is open and should_kill
+// is set (keeping the earlier deadline if the same evaluation asks more than
+// once). Both sink pointers must outlive every evaluation.
 class PolicyForRangeFunction
     : public ::google::api::expr::runtime::CelFunction {
  public:
   PolicyForRangeFunction(
       ::google::api::expr::runtime::CelFunctionDescriptor descriptor,
-      bool* used_sink)
+      bool* used_sink, std::optional<PendingKill>* pending_kill_sink,
+      std::function<absl::Time()> now)
       : ::google::api::expr::runtime::CelFunction(std::move(descriptor)),
-        used_sink_(used_sink) {}
+        used_sink_(used_sink),
+        pending_kill_sink_(pending_kill_sink),
+        now_(std::move(now)) {}
 
   absl::Status Evaluate(
       absl::Span<const ::google::api::expr::runtime::CelValue> args,
@@ -159,6 +188,8 @@ class PolicyForRangeFunction
 
  private:
   bool* used_sink_;
+  std::optional<PendingKill>* pending_kill_sink_;
+  std::function<absl::Time()> now_;
 };
 
 // Register the policy_for_range() decls with the type checker at compile time.
@@ -169,7 +200,7 @@ absl::Status AddPolicyForRangeCompilerLibrary(::cel::CompilerBuilder& builder);
 // Register policy_for_range() at runtime. All four overloads are lazy: their
 // implementations are provided by the Activation (see
 // Activation::FindFunctionOverloads) so they are never constant-folded and can
-// mark the evaluation non-cacheable.
+// mark the evaluation non-cacheable and report a pending kill back through it.
 // Only available in CELv2.
 absl::Status RegisterPolicyForRangeFunctions(
     ::google::api::expr::runtime::CelFunctionRegistry* registry,

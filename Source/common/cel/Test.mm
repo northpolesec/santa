@@ -24,9 +24,11 @@
 #include <cstdio>
 #include <cstdlib>
 
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "absl/status/statusor.h"
@@ -41,8 +43,13 @@ namespace {
 // The activation boilerplate the newer cases share. Callers take a fresh
 // activation per expression: the relative-time flag accumulates on the
 // activation, so reusing one leaks non-cacheability into the next case.
+//
+// `now` is the clock now() and policy_for_range() read (today() reads the system
+// clock, whatever this is); the default is the system clock, which is what every
+// case that isn't about the clock wants.
 template <bool IsV2>
-std::unique_ptr<santa::cel::Activation<IsV2>> MakeActivation() {
+std::unique_ptr<santa::cel::Activation<IsV2>> MakeActivation(
+    std::function<absl::Time()> now = absl::Now) {
   using ExecutableFileT = typename santa::cel::CELProtoTraits<IsV2>::ExecutableFileT;
   using AncestorT = typename santa::cel::CELProtoTraits<IsV2>::AncestorT;
   using FileDescriptorT = typename santa::cel::CELProtoTraits<IsV2>::FileDescriptorT;
@@ -69,7 +76,8 @@ std::unique_ptr<santa::cel::Activation<IsV2>> MakeActivation() {
       },
       ^std::vector<FileDescriptorT>() {
         return {};
-      });
+      },
+      std::move(now));
 }
 
 constexpr int kMinutesPerDay = 24 * 60;
@@ -638,8 +646,8 @@ class ScopedHostZone {
   // before that instant and ALLOWLIST after it: if now() were constant-folded
   // at compile time its value would be frozen before the threshold and both
   // evaluations would answer BLOCKLIST. The slack is for the compile and the
-  // first evaluation, which take milliseconds here but have to clear the
-  // threshold on a loaded CI machine too.
+  // first evaluation, which take milliseconds on an idle machine but can take
+  // far longer on a loaded CI one.
   // Quantized to the literal's millisecond precision so the compiled threshold,
   // the guard below, and the sleep all name the same instant.
   absl::Time thresholdTime =
@@ -673,6 +681,73 @@ class ScopedHostZone {
     XCTFail("Failed to evaluate: %s", after.status().message().data());
   } else {
     XCTAssertEqual(after.value().value, ReturnValue::ALLOWLIST);
+  }
+}
+
+// now() and policy_for_range() read the clock the activation was built with.
+// today() does not, and that is deliberate: it is calendar truth from the system
+// clock, which rules older than time windows already depend on, and putting it
+// on a clock that only ever moves forward would make a stuck forward jump the
+// date those rules see. The window case below is the mix that matters -- its
+// edges come from now(), so the comparison is on one clock throughout.
+- (void)testTheActivationsClockGovernsNowButNotToday {
+  using ReturnValue = santa::cel::CELProtoTraits<true>::ReturnValue;
+
+  auto sut = santa::cel::Evaluator<true>::Create();
+  XCTAssertTrue(sut.ok());
+
+  // A Wednesday noon UTC, an hour into a window that closed in January 2026 and
+  // so can never contain the system clock again.
+  absl::Time provided;
+  std::string parseErr;
+  XCTAssertTrue(absl::ParseTime(absl::RFC3339_full, "2026-01-07T12:00:00Z", &provided, &parseErr));
+
+  auto evaluate = [&sut](absl::string_view expr, std::function<absl::Time()> now) {
+    auto activation = MakeActivation<true>(std::move(now));
+    return sut.value()->CompileAndEvaluate(expr, *activation);
+  };
+
+  // Each of these is true on the provided instant and cannot be true on the
+  // system clock, so the answer says which clock was read.
+  std::vector<std::string> onTheActivationsClock = {
+      "now() == timestamp('2026-01-07T12:00:00Z')",
+      "policy_for_range(now() - duration('1h'), timestamp('2026-01-07T13:00:00Z'), false, "
+      "ALLOWLIST, BLOCKLIST)",
+  };
+
+  for (const std::string& expr : onTheActivationsClock) {
+    auto onProvided = evaluate(expr, [provided] { return provided; });
+    if (!onProvided.ok()) {
+      XCTFail("Failed to evaluate '%s': %s", expr.c_str(), onProvided.status().message().data());
+      continue;
+    }
+    XCTAssertEqual(onProvided.value().value, ReturnValue::ALLOWLIST, @"%s", expr.c_str());
+
+    // The same expression on the system clock, which is not that instant.
+    auto onSystemClock = evaluate(expr, absl::Now);
+    if (!onSystemClock.ok()) {
+      XCTFail("Failed to evaluate '%s': %s", expr.c_str(), onSystemClock.status().message().data());
+      continue;
+    }
+    XCTAssertEqual(onSystemClock.value().value, ReturnValue::BLOCKLIST, @"%s", expr.c_str());
+  }
+
+  // today() answers from the system clock's day even though the activation
+  // carries an instant months earlier. The day is the host's, computed here with
+  // absl against the same zone rather than assumed to be UTC. Both candidate day
+  // starts are accepted, because a local midnight landing between this clock read
+  // and the evaluation moves the answer on to the next one.
+  absl::TimeZone host = absl::LocalTimeZone();
+  absl::CivilDay systemDay{absl::ToCivilSecond(absl::Now(), host)};
+  auto systemDayResult =
+      evaluate("today() == timestamp('" + AsUTCLiteral(absl::FromCivil(systemDay, host)) +
+                   "') || today() == timestamp('" +
+                   AsUTCLiteral(absl::FromCivil(systemDay + 1, host)) + "')",
+               [provided] { return provided; });
+  if (!systemDayResult.ok()) {
+    XCTFail("Failed to evaluate today(): %s", systemDayResult.status().message().data());
+  } else {
+    XCTAssertEqual(systemDayResult.value().value, ReturnValue::ALLOWLIST);
   }
 }
 
@@ -1252,7 +1327,8 @@ class ScopedHostZone {
     }
   }
   {
-    // should_kill is type-checked but has no effect on the decision.
+    // should_kill records a pending kill (see testPolicyForRangePendingKill)
+    // but has no effect on the decision.
     auto result = evaluate("policy_for_range(duration('30m'), true, ALLOWLIST)");
     if (!result.ok()) {
       XCTFail(@"Failed to evaluate: %s", result.status().message().data());
@@ -1338,6 +1414,223 @@ class ScopedHostZone {
     // A non-positive duration fails the evaluation.
     auto result = evaluate("policy_for_range(duration('0s'), false, ALLOWLIST)");
     XCTAssertFalse(result.ok());
+  }
+}
+
+/// A pending kill's times are measured from the instant the expression was
+/// evaluated, a moment after the `now` the caller read. A few seconds of slack
+/// covers that gap while still failing on a wrong lead, the smallest of which is
+/// minutes.
+- (void)assertTime:(absl::Time)got near:(absl::Time)want what:(NSString*)what {
+  absl::Duration off = got - want;
+  XCTAssertTrue(off > -absl::Seconds(5) && off < absl::Seconds(5), @"%@ is off by %s", what,
+                absl::FormatDuration(off).c_str());
+}
+
+// The kill an in-window should_kill asks for: when it fires, when the user is
+// warned, and the window shape that rides along for a restart re-check.
+- (void)testPolicyForRangePendingKill {
+  using ReturnValue = santa::cel::CELProtoTraits<true>::ReturnValue;
+
+  auto sut = santa::cel::Evaluator<true>::Create();
+  XCTAssertTrue(sut.ok());
+
+  auto evaluate = [&sut](absl::string_view expr) {
+    auto activation = MakeActivation<true>();
+    return sut.value()->CompileAndEvaluate(expr, *activation);
+  };
+
+  // The day gate is not what any of these cases is probing, so they all name
+  // every day: a list pinned to the day this test process read would flip out
+  // from under an evaluation that straddles local midnight.
+  {
+    // A 30 minute grant: the lead is 10% of the window, three minutes.
+    absl::Time now = absl::Now();
+    auto result = evaluate("policy_for_range(duration('30m'), true, ALLOWLIST)");
+    if (!result.ok()) {
+      XCTFail(@"Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
+      XCTAssertTrue(result.value().pendingKill.has_value());
+      [self assertTime:result.value().pendingKill->deadline
+                  near:now + absl::Minutes(30)
+                  what:@"deadline"];
+      [self assertTime:result.value().pendingKill->notify_at
+                  near:now + absl::Minutes(27)
+                  what:@"notify_at"];
+      // The duration overload's window does not recur, so it carries no shape.
+      XCTAssertTrue(result.value().pendingKill->window_days.empty());
+      XCTAssertTrue(result.value().pendingKill->window_start.empty());
+      XCTAssertTrue(result.value().pendingKill->window_end.empty());
+      XCTAssertTrue(result.value().pendingKill->window_zone.empty());
+    }
+  }
+  {
+    // A nine hour window: 10% of it is longer than five minutes, so the lead is
+    // capped at five.
+    absl::Time now = absl::Now();
+    auto result = evaluate(
+        "policy_for_range(now() - duration('1h'), now() + duration('8h'), true, ALLOWLIST, "
+        "BLOCKLIST)");
+    if (!result.ok()) {
+      XCTFail(@"Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertTrue(result.value().pendingKill.has_value());
+      [self assertTime:result.value().pendingKill->deadline
+                  near:now + absl::Hours(8)
+                  what:@"deadline"];
+      [self assertTime:result.value().pendingKill->notify_at
+                  near:now + absl::Hours(8) - absl::Minutes(5)
+                  what:@"notify_at"];
+      // The absolute span names one occurrence, so it carries no shape either,
+      // zone included: there is no later occurrence to re-check, and no calendar
+      // was read to reach it.
+      XCTAssertTrue(result.value().pendingKill->window_days.empty());
+      XCTAssertTrue(result.value().pendingKill->window_zone.empty());
+    }
+  }
+  {
+    // An exec allowed in the window's last moments is warned about at once
+    // rather than at a notify time that has already passed.
+    absl::Time now = absl::Now();
+    auto result = evaluate(
+        "policy_for_range(now() - duration('1h'), now() + duration('1s'), true, ALLOWLIST, "
+        "BLOCKLIST)");
+    if (!result.ok()) {
+      XCTFail(@"Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertTrue(result.value().pendingKill.has_value());
+      [self assertTime:result.value().pendingKill->notify_at near:now what:@"notify_at"];
+      XCTAssertTrue(result.value().pendingKill->notify_at >= now);
+    }
+  }
+  {
+    // should_kill false asks for nothing, in window or not.
+    auto result = evaluate("policy_for_range(duration('30m'), false, ALLOWLIST)");
+    if (!result.ok()) {
+      XCTFail(@"Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertFalse(result.value().pendingKill.has_value());
+    }
+  }
+  {
+    // Out of window nothing is asked for, even when the out_of_range_policy is
+    // the one that allows the execution.
+    auto result = evaluate(
+        "policy_for_range(now() + duration('1h'), now() + duration('2h'), true, BLOCKLIST, "
+        "ALLOWLIST)");
+    if (!result.ok()) {
+      XCTFail(@"Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
+      XCTAssertFalse(result.value().pendingKill.has_value());
+    }
+  }
+  {
+    // The HH:MM overload recurs, so its shape is carried: the day list, both
+    // times and the zone, exactly as written. Whatever the time is in the named
+    // zone, exactly one of these two windows is open, so the one that recorded
+    // is the open one. The zone is a named one rather than "local" so the
+    // assertion below fails on a shape that defaulted its calendar instead of
+    // carrying the rule's.
+    auto morning = evaluate("policy_for_range([0, 1, 2, 3, 4, 5, 6], '00:00', '12:00', "
+                            "'America/New_York', true, ALLOWLIST, BLOCKLIST)");
+    auto afternoon = evaluate("policy_for_range([0, 1, 2, 3, 4, 5, 6], '12:00', '00:00', "
+                              "'America/New_York', true, ALLOWLIST, BLOCKLIST)");
+    if (!morning.ok() || !afternoon.ok()) {
+      XCTFail(@"Failed to evaluate HH:MM windows");
+    } else {
+      XCTAssertNotEqual(morning.value().pendingKill.has_value(),
+                        afternoon.value().pendingKill.has_value());
+      bool isMorning = morning.value().pendingKill.has_value();
+      const auto& kill = isMorning ? *morning.value().pendingKill : *afternoon.value().pendingKill;
+      XCTAssertTrue(kill.window_days == (std::vector<int64_t>{0, 1, 2, 3, 4, 5, 6}));
+      XCTAssertEqualObjects(@(kill.window_start.c_str()), isMorning ? @"00:00" : @"12:00");
+      XCTAssertEqualObjects(@(kill.window_end.c_str()), isMorning ? @"12:00" : @"00:00");
+      XCTAssertEqualObjects(@(kill.window_zone.c_str()), @"America/New_York");
+    }
+  }
+  // Nested policy_for_range() calls. Workshop rejects this form at authoring
+  // time, so it never arrives, but CEL evaluates every argument eagerly: the
+  // inner call records its deadline even from a slot the outer call discards.
+  {
+    // Both calls run whichever holds the earlier deadline, and the earlier
+    // deadline is what comes back.
+    absl::Time now = absl::Now();
+    auto innerEarlier = evaluate("policy_for_range(duration('1h'), true, "
+                                 "policy_for_range(duration('30m'), true, ALLOWLIST))");
+    auto outerEarlier = evaluate("policy_for_range(duration('30m'), true, "
+                                 "policy_for_range(duration('1h'), true, ALLOWLIST))");
+    if (!innerEarlier.ok() || !outerEarlier.ok()) {
+      XCTFail(@"Failed to evaluate nested policy_for_range()");
+    } else {
+      XCTAssertTrue(innerEarlier.value().pendingKill.has_value());
+      XCTAssertTrue(outerEarlier.value().pendingKill.has_value());
+      [self assertTime:innerEarlier.value().pendingKill->deadline
+                  near:now + absl::Minutes(30)
+                  what:@"inner-first deadline"];
+      [self assertTime:outerEarlier.value().pendingKill->deadline
+                  near:now + absl::Minutes(30)
+                  what:@"outer-first deadline"];
+    }
+  }
+  {
+    // The whole-day window closes within 25 hours, so its shape is the one that
+    // comes back; with no zone argument that shape records "local", not empty.
+    auto result = evaluate("policy_for_range([0, 1, 2, 3, 4, 5, 6], '00:00', '00:00', true, "
+                           "policy_for_range(duration('48h'), true, ALLOWLIST), BLOCKLIST)");
+    if (!result.ok()) {
+      XCTFail(@"Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertTrue(result.value().pendingKill.has_value());
+      XCTAssertEqual(result.value().pendingKill->window_days.size(), 7UL);
+      XCTAssertEqualObjects(@(result.value().pendingKill->window_start.c_str()), @"00:00");
+      XCTAssertEqualObjects(@(result.value().pendingKill->window_zone.c_str()), @"local");
+    }
+  }
+  {
+    // An empty day list is never in range, so the outer window is closed and the
+    // only kill is the inner grant's, recorded from a slot that was discarded.
+    auto result = evaluate("policy_for_range([], '00:00', '00:00', true, "
+                           "policy_for_range(duration('30m'), true, ALLOWLIST), BLOCKLIST)");
+    if (!result.ok()) {
+      XCTFail(@"Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::BLOCKLIST);
+      XCTAssertTrue(result.value().pendingKill.has_value());
+      XCTAssertTrue(result.value().pendingKill->window_days.empty());
+      XCTAssertTrue(result.value().pendingKill->window_start.empty());
+      XCTAssertTrue(result.value().pendingKill->window_zone.empty());
+    }
+  }
+}
+
+// One activation serving two evaluations: the kill sink is per-evaluation, so
+// the second result must not carry the first's kill. No caller reuses an
+// activation this way today, which is why this is the only place the property is
+// held.
+- (void)testReusedActivationDoesNotCarryPriorPendingKill {
+  using ReturnValue = santa::cel::CELProtoTraits<true>::ReturnValue;
+
+  auto sut = santa::cel::Evaluator<true>::Create();
+  XCTAssertTrue(sut.ok());
+
+  auto activation = MakeActivation<true>();
+  auto evaluate = [&sut, &activation](absl::string_view expr) {
+    return sut.value()->CompileAndEvaluate(expr, *activation);
+  };
+
+  auto withKill = evaluate("policy_for_range(duration('30m'), true, ALLOWLIST)");
+  auto withoutKill = evaluate("ALLOWLIST");
+  if (!withKill.ok() || !withoutKill.ok()) {
+    XCTFail(@"Failed to evaluate against a reused activation");
+  } else {
+    XCTAssertTrue(withKill.value().pendingKill.has_value());
+    XCTAssertEqual(withoutKill.value().value, ReturnValue::ALLOWLIST);
+    XCTAssertFalse(withoutKill.value().pendingKill.has_value());
+    // Cacheability is not reset with it: it records that this activation has
+    // already served a time-dependent expression, which stays true.
+    XCTAssertFalse(withoutKill.value().cacheable);
   }
 }
 

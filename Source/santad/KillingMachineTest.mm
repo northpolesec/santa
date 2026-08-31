@@ -33,6 +33,7 @@
 #include "Source/common/CSOpsHelper.h"
 #import "Source/common/SNTKillCommand.h"
 #import "Source/common/SNTSystemInfo.h"
+#include "Source/santad/KillEnvTestSupport.h"
 
 // Forward declare test-only functions exposed by KillingMachine.mm
 namespace santa {
@@ -46,118 +47,11 @@ extern bool TestStatusFlagsMatcher(pid_t pid, uint32_t mask, CSOpsFunc csops_fun
 
 namespace {
 
-// The team ID the fake csops reports for pids a test wants matched. Paired with
-// an SNTKillRequestTeamID for the same value, this is how a test chooses which
-// pids the real (unfaked) matching machinery matches.
-static NSString* const kMatchingTeamID = @"ABCDE12345";
-
-// A second team ID, for the cases that need two requests matching two different
-// processes. Same length as the first, so the fake blob math is the same.
-static NSString* const kSecondTeamID = @"FGHIJ67890";
-
-// One recorded signal delivery. `target` is a pid when `group` is false and a
-// pgid when it is true.
-struct FakeSignal {
-  pid_t target;
-  int sig;
-  bool group;
-};
-
-// State behind a fully faked santa::KillEnv. Every seam is replaced, so no test
-// can reach a real syscall (or signal a real process) by forgetting to override
-// one.
-struct FakeEnv {
-  // nullopt makes the pid snapshot fail.
-  std::optional<std::vector<pid_t>> pids = std::vector<pid_t>{};
-  // pid -> pidversion. A pid that isn't here has no audit token.
-  std::map<pid_t, int> pidversions;
-  // pids the fake csops reports kMatchingTeamID for.
-  std::set<pid_t> matching;
-  // pids it reports kSecondTeamID for instead, so a test can have two requests
-  // match two different processes.
-  std::set<pid_t> matchingSecond;
-  // pid -> pgid. A pid that isn't here has an unreadable process group.
-  std::map<pid_t, pid_t> pgids;
-  // pid -> the audit token read after which that pid is recycled: its live
-  // pidversion changes, modeling a different process taking over the pid.
-  // Reads are counted per pid across the whole call. Matching reads a pid's
-  // token twice, so 1 recycles mid-match and 2 recycles after it matched.
-  std::map<pid_t, int> recycleAfterNthRead;
-  // errno both signal seams return for a delivery that reaches its target.
-  int signalError = 0;
-
-  std::vector<FakeSignal> signals;
-  std::vector<NSTimeInterval> waits;
-  std::map<pid_t, int> tokenReads;
-  // Runs when the term-then-kill grace wait starts, so a test can retire the
-  // processes that died from SIGTERM.
-  std::function<void()> onWait = [] {};
-};
-
-santa::KillEnv MakeEnv(FakeEnv* fake) {
-  santa::KillEnv env;
-
-  env.list_pids = [fake] { return fake->pids; };
-
-  env.token_for_pid = [fake](pid_t pid, audit_token_t* token) {
-    auto it = fake->pidversions.find(pid);
-    if (it == fake->pidversions.end()) {
-      return false;
-    }
-    *token = santa::MakeStubAuditToken(pid, it->second);
-
-    auto recycle = fake->recycleAfterNthRead.find(pid);
-    if (recycle != fake->recycleAfterNthRead.end() && ++fake->tokenReads[pid] == recycle->second) {
-      it->second += 1;
-    }
-    return true;
-  };
-
-  env.csops_func = [fake](pid_t pid, unsigned int ops, void* useraddr, size_t usersize) {
-    NSString* teamID = fake->matching.count(pid)
-                           ? kMatchingTeamID
-                           : (fake->matchingSecond.count(pid) ? kSecondTeamID : nil);
-    if (ops != santa::kCsopTeamID || !teamID ||
-        usersize < sizeof(santa::csops_blob) + teamID.length) {
-      return -1;
-    }
-    santa::csops_blob* blob = (santa::csops_blob*)useraddr;
-    blob->type = 0;
-    blob->len = htonl(sizeof(santa::csops_blob) + 1 + teamID.length);
-    std::memcpy(blob->data, teamID.UTF8String, teamID.length);
-    return 0;
-  };
-
-  env.pgid_for_pid = [fake](pid_t pid) -> pid_t {
-    auto it = fake->pgids.find(pid);
-    return it == fake->pgids.end() ? -1 : it->second;
-  };
-
-  env.signal_token = [fake](audit_token_t* token, int sig) {
-    pid_t pid = santa::Pid(*token);
-    fake->signals.push_back({pid, sig, false});
-
-    // proc_signal_with_audittoken validates the token against the live
-    // process, so a token captured before the pid was recycled signals nothing.
-    auto it = fake->pidversions.find(pid);
-    if (it == fake->pidversions.end() || it->second != santa::Pidversion(*token)) {
-      return ESRCH;
-    }
-    return fake->signalError;
-  };
-
-  env.signal_group = [fake](pid_t pgid, int sig) {
-    fake->signals.push_back({pgid, sig, true});
-    return fake->signalError;
-  };
-
-  env.wait = [fake](NSTimeInterval seconds) {
-    fake->waits.push_back(seconds);
-    fake->onWait();
-  };
-
-  return env;
-}
+using FakeEnv = santa::testing::FakeKillEnv;
+using santa::testing::kMatchingTeamID;
+using santa::testing::kSecondTeamID;
+using santa::testing::MakeKillEnv;
+using santa::testing::SignalDescriptions;
 
 // The request pair the multi-request tests share: two team IDs matching two
 // different processes, both targeting process groups.
@@ -181,17 +75,6 @@ void TwoMatchesInOneGroup(FakeEnv* fake, pid_t pgid) {
   fake->matching = {10};
   fake->matchingSecond = {11};
   fake->pgids = {{10, pgid}, {11, pgid}};
-}
-
-// Renders recorded deliveries as "pid:10:9" / "group:100:15" so a failing
-// assertion prints the whole sequence instead of a count mismatch.
-NSArray<NSString*>* SignalDescriptions(const std::vector<FakeSignal>& signals) {
-  NSMutableArray<NSString*>* out = [NSMutableArray array];
-  for (const FakeSignal& signal : signals) {
-    [out addObject:[NSString stringWithFormat:@"%@:%d:%d", signal.group ? @"group" : @"pid",
-                                              signal.target, signal.sig]];
-  }
-  return out;
 }
 
 }  // namespace
@@ -359,7 +242,7 @@ NSArray<NSString*>* SignalDescriptions(const std::vector<FakeSignal>& signals) {
   XCTAssertEqual(request.signal, SIGKILL);
   XCTAssertFalse(request.targetProcessGroups);
 
-  SNTKillResponse* response = santa::KillingMachine(request, MakeEnv(&fake));
+  SNTKillResponse* response = santa::KillingMachine(request, MakeKillEnv(&fake));
 
   XCTAssertEqual(response.error, SNTKillResponseErrorNone);
   XCTAssertEqualObjects(SignalDescriptions(fake.signals),
@@ -381,7 +264,7 @@ NSArray<NSString*>* SignalDescriptions(const std::vector<FakeSignal>& signals) {
                                                                 signal:SIGTERM
                                                    targetProcessGroups:NO];
 
-  santa::KillingMachine(request, MakeEnv(&fake));
+  santa::KillingMachine(request, MakeKillEnv(&fake));
 
   XCTAssertEqualObjects(SignalDescriptions(fake.signals), (@[ @"pid:10:15" ]));
 }
@@ -405,7 +288,7 @@ NSArray<NSString*>* SignalDescriptions(const std::vector<FakeSignal>& signals) {
                                                                 signal:SIGTERM
                                                    targetProcessGroups:YES];
 
-  santa::KillingMachine(request, MakeEnv(&fake));
+  santa::KillingMachine(request, MakeKillEnv(&fake));
 
   XCTAssertEqualObjects(SignalDescriptions(fake.signals), (@[
                           [NSString stringWithFormat:@"group:%d:15", pgidA],
@@ -432,7 +315,7 @@ NSArray<NSString*>* SignalDescriptions(const std::vector<FakeSignal>& signals) {
                                                                 signal:SIGTERM
                                                    targetProcessGroups:YES];
 
-  SNTKillResponse* response = santa::KillingMachine(request, MakeEnv(&fake));
+  SNTKillResponse* response = santa::KillingMachine(request, MakeKillEnv(&fake));
 
   XCTAssertEqualObjects(SignalDescriptions(fake.signals),
                         (@[ [NSString stringWithFormat:@"group:%d:15", pgid] ]));
@@ -468,7 +351,7 @@ NSArray<NSString*>* SignalDescriptions(const std::vector<FakeSignal>& signals) {
                                                                 signal:SIGTERM
                                                    targetProcessGroups:YES];
 
-  SNTKillResponse* response = santa::KillingMachine(request, MakeEnv(&fake));
+  SNTKillResponse* response = santa::KillingMachine(request, MakeKillEnv(&fake));
 
   // Still one attempt: a group that could not be signaled is not retried once
   // per member.
@@ -499,7 +382,7 @@ NSArray<NSString*>* SignalDescriptions(const std::vector<FakeSignal>& signals) {
                                                                 signal:SIGKILL
                                                    targetProcessGroups:YES];
 
-  santa::KillingMachine(request, MakeEnv(&fake));
+  santa::KillingMachine(request, MakeKillEnv(&fake));
 
   XCTAssertEqualObjects(
       SignalDescriptions(fake.signals), (@[
@@ -519,7 +402,7 @@ NSArray<NSString*>* SignalDescriptions(const std::vector<FakeSignal>& signals) {
                                                                 signal:SIGKILL
                                                    targetProcessGroups:YES];
 
-  SNTKillResponse* response = santa::KillingMachine(request, MakeEnv(&fake));
+  SNTKillResponse* response = santa::KillingMachine(request, MakeKillEnv(&fake));
 
   XCTAssertEqualObjects(SignalDescriptions(fake.signals), (@[ @"pid:10:9" ]));
   XCTAssertEqual(response.killedProcesses.count, 1);
@@ -543,7 +426,7 @@ NSArray<NSString*>* SignalDescriptions(const std::vector<FakeSignal>& signals) {
                                                                 signal:SIGKILL
                                                    targetProcessGroups:YES];
 
-  SNTKillResponse* response = santa::KillingMachine(request, MakeEnv(&fake));
+  SNTKillResponse* response = santa::KillingMachine(request, MakeKillEnv(&fake));
 
   XCTAssertEqualObjects(SignalDescriptions(fake.signals),
                         (@[ [NSString stringWithFormat:@"group:%d:9", otherPgid] ]));
@@ -568,7 +451,7 @@ NSArray<NSString*>* SignalDescriptions(const std::vector<FakeSignal>& signals) {
   SNTKillRequest* request = [[SNTKillRequestTeamID alloc] initWithUUID:@"uuid"
                                                                 teamID:kMatchingTeamID];
 
-  SNTKillResponse* response = santa::KillingMachine(request, MakeEnv(&fake));
+  SNTKillResponse* response = santa::KillingMachine(request, MakeKillEnv(&fake));
 
   XCTAssertEqualObjects(SignalDescriptions(fake.signals), (@[ @"pid:11:9" ]));
   XCTAssertEqual(response.killedProcesses.count, 1);
@@ -587,7 +470,7 @@ NSArray<NSString*>* SignalDescriptions(const std::vector<FakeSignal>& signals) {
   SNTKillRequest* request = [[SNTKillRequestTeamID alloc] initWithUUID:@"uuid"
                                                                 teamID:kMatchingTeamID];
 
-  SNTKillResponse* response = santa::KillingMachine(request, MakeEnv(&fake));
+  SNTKillResponse* response = santa::KillingMachine(request, MakeKillEnv(&fake));
 
   XCTAssertEqualObjects(SignalDescriptions(fake.signals), (@[ @"pid:10:9" ]));
   XCTAssertEqual(response.killedProcesses.count, 1);
@@ -613,7 +496,7 @@ NSArray<NSString*>* SignalDescriptions(const std::vector<FakeSignal>& signals) {
                                      targetProcessGroups:YES];
   XCTAssertNotNil(request);
 
-  SNTKillResponse* response = santa::KillingMachine(request, MakeEnv(&fake));
+  SNTKillResponse* response = santa::KillingMachine(request, MakeKillEnv(&fake));
 
   XCTAssertEqual(response.error, SNTKillResponseErrorNone);
   XCTAssertEqualObjects(SignalDescriptions(fake.signals),
@@ -641,7 +524,7 @@ NSArray<NSString*>* SignalDescriptions(const std::vector<FakeSignal>& signals) {
   SNTKillRequest* request = [[SNTKillRequestTeamID alloc] initWithUUID:@"uuid"
                                                                 teamID:kMatchingTeamID];
 
-  SNTKillResponse* response = santa::KillingMachineTermThenKill(request, 5.0, MakeEnv(&fake));
+  SNTKillResponse* response = santa::KillingMachineTermThenKill(request, 5.0, MakeKillEnv(&fake));
 
   XCTAssertEqual(response.error, SNTKillResponseErrorNone);
   XCTAssertEqualObjects(SignalDescriptions(fake.signals),
@@ -673,7 +556,7 @@ NSArray<NSString*>* SignalDescriptions(const std::vector<FakeSignal>& signals) {
                                                                 signal:SIGKILL
                                                    targetProcessGroups:YES];
 
-  SNTKillResponse* response = santa::KillingMachineTermThenKill(request, 1.5, MakeEnv(&fake));
+  SNTKillResponse* response = santa::KillingMachineTermThenKill(request, 1.5, MakeKillEnv(&fake));
 
   XCTAssertEqualObjects(SignalDescriptions(fake.signals), (@[
                           [NSString stringWithFormat:@"group:%d:15", sharedPgid],
@@ -700,7 +583,7 @@ NSArray<NSString*>* SignalDescriptions(const std::vector<FakeSignal>& signals) {
   SNTKillRequest* request = [[SNTKillRequestTeamID alloc] initWithUUID:@"uuid"
                                                                 teamID:kMatchingTeamID];
 
-  SNTKillResponse* response = santa::KillingMachineTermThenKill(request, 5.0, MakeEnv(&fake));
+  SNTKillResponse* response = santa::KillingMachineTermThenKill(request, 5.0, MakeKillEnv(&fake));
 
   XCTAssertEqual(response.error, SNTKillResponseErrorNone);
   XCTAssertEqual(response.killedProcesses.count, 0);
@@ -719,7 +602,7 @@ NSArray<NSString*>* SignalDescriptions(const std::vector<FakeSignal>& signals) {
   SNTKillRequest* request = [[SNTKillRequestTeamID alloc] initWithUUID:@"uuid"
                                                                 teamID:kMatchingTeamID];
 
-  SNTKillResponse* response = santa::KillingMachineTermThenKill(request, 5.0, MakeEnv(&fake));
+  SNTKillResponse* response = santa::KillingMachineTermThenKill(request, 5.0, MakeKillEnv(&fake));
 
   XCTAssertEqualObjects(SignalDescriptions(fake.signals), (@[ @"pid:10:15" ]));
   XCTAssertEqual(fake.waits.size(), 0);
@@ -747,7 +630,7 @@ NSArray<NSString*>* SignalDescriptions(const std::vector<FakeSignal>& signals) {
   };
 
   NSArray<SNTKillResponse*>* responses =
-      santa::KillingMachineTermThenKill(TwoGroupTargetingRequests(), 5.0, MakeEnv(&fake));
+      santa::KillingMachineTermThenKill(TwoGroupTargetingRequests(), 5.0, MakeKillEnv(&fake));
 
   // Both SIGTERMs precede any SIGKILL, and there is one wait between them.
   XCTAssertEqualObjects(SignalDescriptions(fake.signals), (@[
@@ -773,7 +656,7 @@ NSArray<NSString*>* SignalDescriptions(const std::vector<FakeSignal>& signals) {
   TwoMatchesInOneGroup(&fake, sharedPgid);
 
   NSArray<SNTKillResponse*>* responses =
-      santa::KillingMachineTermThenKill(TwoGroupTargetingRequests(), 5.0, MakeEnv(&fake));
+      santa::KillingMachineTermThenKill(TwoGroupTargetingRequests(), 5.0, MakeKillEnv(&fake));
 
   XCTAssertEqualObjects(SignalDescriptions(fake.signals), (@[
                           [NSString stringWithFormat:@"group:%d:15", sharedPgid],
@@ -808,7 +691,7 @@ NSArray<NSString*>* SignalDescriptions(const std::vector<FakeSignal>& signals) {
   };
 
   NSArray<SNTKillResponse*>* responses =
-      santa::KillingMachineTermThenKill(TwoGroupTargetingRequests(), 5.0, MakeEnv(&fake));
+      santa::KillingMachineTermThenKill(TwoGroupTargetingRequests(), 5.0, MakeKillEnv(&fake));
 
   // The survivor's group is still SIGKILLed, and still only once.
   XCTAssertEqualObjects(SignalDescriptions(fake.signals), (@[
@@ -838,7 +721,7 @@ NSArray<NSString*>* SignalDescriptions(const std::vector<FakeSignal>& signals) {
   fake.signalError = ESRCH;
 
   NSArray<SNTKillResponse*>* responses =
-      santa::KillingMachineTermThenKill(TwoGroupTargetingRequests(), 5.0, MakeEnv(&fake));
+      santa::KillingMachineTermThenKill(TwoGroupTargetingRequests(), 5.0, MakeKillEnv(&fake));
 
   XCTAssertEqualObjects(SignalDescriptions(fake.signals), (@[
                           [NSString stringWithFormat:@"group:%d:15", sharedPgid],
@@ -857,7 +740,7 @@ NSArray<NSString*>* SignalDescriptions(const std::vector<FakeSignal>& signals) {
   SNTKillRequest* request = [[SNTKillRequestTeamID alloc] initWithUUID:@"uuid"
                                                                 teamID:kMatchingTeamID];
 
-  SNTKillResponse* response = santa::KillingMachineTermThenKill(request, 5.0, MakeEnv(&fake));
+  SNTKillResponse* response = santa::KillingMachineTermThenKill(request, 5.0, MakeKillEnv(&fake));
 
   XCTAssertEqual(response.error, SNTKillResponseErrorListPids);
   XCTAssertEqual(fake.waits.size(), 0);
@@ -877,7 +760,7 @@ NSArray<NSString*>* SignalDescriptions(const std::vector<FakeSignal>& signals) {
   SNTKillRequest* request = [[SNTKillRequestTeamID alloc] initWithUUID:@"uuid"
                                                                 teamID:kMatchingTeamID];
 
-  std::optional<pid_t> match = santa::KillingMachineAnyMatch(request, MakeEnv(&fake));
+  std::optional<pid_t> match = santa::KillingMachineAnyMatch(request, MakeKillEnv(&fake));
 
   XCTAssertTrue(match.has_value());
   XCTAssertEqual(*match, 11);
@@ -894,7 +777,7 @@ NSArray<NSString*>* SignalDescriptions(const std::vector<FakeSignal>& signals) {
   SNTKillRequest* request = [[SNTKillRequestTeamID alloc] initWithUUID:@"uuid"
                                                                 teamID:kMatchingTeamID];
 
-  XCTAssertFalse(santa::KillingMachineAnyMatch(request, MakeEnv(&fake)).has_value());
+  XCTAssertFalse(santa::KillingMachineAnyMatch(request, MakeKillEnv(&fake)).has_value());
   XCTAssertEqual(fake.signals.size(), 0);
 }
 
@@ -911,7 +794,7 @@ NSArray<NSString*>* SignalDescriptions(const std::vector<FakeSignal>& signals) {
   SNTKillRequest* request = [[SNTKillRequestTeamID alloc] initWithUUID:@"uuid"
                                                                 teamID:kMatchingTeamID];
 
-  XCTAssertFalse(santa::KillingMachineAnyMatch(request, MakeEnv(&fake)).has_value());
+  XCTAssertFalse(santa::KillingMachineAnyMatch(request, MakeKillEnv(&fake)).has_value());
 }
 
 - (void)testAnyMatchReturnsNothingWhenThePidSnapshotFails {
@@ -921,7 +804,7 @@ NSArray<NSString*>* SignalDescriptions(const std::vector<FakeSignal>& signals) {
   SNTKillRequest* request = [[SNTKillRequestTeamID alloc] initWithUUID:@"uuid"
                                                                 teamID:kMatchingTeamID];
 
-  XCTAssertFalse(santa::KillingMachineAnyMatch(request, MakeEnv(&fake)).has_value());
+  XCTAssertFalse(santa::KillingMachineAnyMatch(request, MakeKillEnv(&fake)).has_value());
 }
 
 // `platform` as a bare team ID is refused by the kill pass, so the match pass
@@ -934,7 +817,7 @@ NSArray<NSString*>* SignalDescriptions(const std::vector<FakeSignal>& signals) {
 
   SNTKillRequest* request = [[SNTKillRequestTeamID alloc] initWithUUID:@"uuid" teamID:@"platform"];
 
-  XCTAssertFalse(santa::KillingMachineAnyMatch(request, MakeEnv(&fake)).has_value());
+  XCTAssertFalse(santa::KillingMachineAnyMatch(request, MakeKillEnv(&fake)).has_value());
 }
 
 @end

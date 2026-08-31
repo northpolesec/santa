@@ -57,6 +57,9 @@ struct SNTTimedRuleKillMessageWindowView: View {
         .multilineTextAlignment(.center)
         .lineLimit(maxMessageLines)
         .fixedSize(horizontal: false, vertical: true)
+        // The other half of what TextWithLimit does with a bounded string: a
+        // name the bound elided is still recoverable by hovering it.
+        .help(application)
 
       Spacer()
 

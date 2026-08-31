@@ -16,6 +16,7 @@
 #define SANTA_COMMON_CEL_ACTIVATION_H
 
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <memory>
 #include <optional>
@@ -28,6 +29,8 @@
 #include "Source/common/cel/RelativeTimeFunction.h"
 
 #include "absl/strings/string_view.h"
+#include "absl/time/clock.h"
+#include "absl/time/time.h"
 
 // CEL headers have warnings and our config turns them into errors.
 // For some reason these can't be disabled with --per_file_copt.
@@ -52,10 +55,13 @@ class Activation : public ::google::api::expr::runtime::BaseActivation {
   using AncestorT = typename Traits::AncestorT;
   using FileDescriptorT = typename Traits::FileDescriptorT;
 
+  // `now` is the evaluation time now() and policy_for_range() answer against. It
+  // defaults to the system clock; santad passes the minimum believable time, so
+  // a rolled-back system clock cannot re-open a closed window.
   Activation(std::unique_ptr<ExecutableFileT> file, std::vector<std::string> (^args)(),
              std::map<std::string, std::string> (^envs)(), uid_t (^euid)(), std::string (^cwd)(),
              std::string (^path)(), std::vector<AncestorT> (^ancestors)(),
-             std::vector<FileDescriptorT> (^fds)())
+             std::vector<FileDescriptorT> (^fds)(), std::function<absl::Time()> now = absl::Now)
       : file_(std::move(file)),
         args_(args),
         envs_(envs),
@@ -63,7 +69,8 @@ class Activation : public ::google::api::expr::runtime::BaseActivation {
         cwd_(cwd),
         path_(path),
         ancestors_(ancestors),
-        fds_(fds) {};
+        fds_(fds),
+        now_(std::move(now)) {};
   ~Activation() = default;
 
   std::optional<::google::api::expr::runtime::CelValue> FindValue(
@@ -71,8 +78,8 @@ class Activation : public ::google::api::expr::runtime::BaseActivation {
 
   // Vends the lazy today(), now() and policy_for_range() functions for CELv2.
   // Resolving them here (rather than registering eager functions) keeps them out
-  // of constant folding and lets them flag the evaluation as non-cacheable on
-  // this activation as a side effect.
+  // of constant folding and lets them flag the evaluation as non-cacheable, and
+  // record a pending kill, on this activation as a side effect.
   std::vector<const ::google::api::expr::runtime::CelFunction*> FindFunctionOverloads(
       absl::string_view name) const override;
 
@@ -95,11 +102,18 @@ class Activation : public ::google::api::expr::runtime::BaseActivation {
   Memoizer<std::string> path_;
   Memoizer<std::vector<AncestorT>> ancestors_;
   Memoizer<std::vector<FileDescriptorT>> fds_;
+  // Not memoized: it is the evaluation time. Handed to the functions that judge
+  // a time window, now() and policy_for_range(), and not to today(), which is
+  // calendar truth from the system clock.
+  std::function<absl::Time()> now_;
 
   // Set during evaluation when a relative-time function (today(), now(),
   // policy_for_range()) is used, which makes the result non-cacheable. Mutable
   // so it can be updated from the const evaluation path.
   mutable bool usedRelativeTime_ = false;
+  // Set during evaluation when policy_for_range() matched an open window with
+  // should_kill set. The earlier deadline wins if it is set more than once.
+  mutable std::optional<PendingKill> pendingKill_;
   // Lazily-created implementations of the lazy functions, vended via
   // FindFunctionOverloads.
   mutable std::vector<std::unique_ptr<TodayFunction>> todayFns_;
@@ -107,6 +121,9 @@ class Activation : public ::google::api::expr::runtime::BaseActivation {
   mutable std::vector<std::unique_ptr<PolicyForRangeFunction>> policyForRangeFns_;
 
   bool IsResultCacheable() const;
+
+  // The kill policy_for_range() asked for during evaluation, if any.
+  const std::optional<PendingKill>& GetPendingKill() const { return pendingKill_; }
 
   static ::cel::Type CELType(google::protobuf::FieldDescriptor::CppType type,
                              const google::protobuf::Descriptor* messageType);

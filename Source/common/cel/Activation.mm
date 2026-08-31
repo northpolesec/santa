@@ -102,15 +102,18 @@ cel_runtime::CelValue CreateCELValue(const std::map<K, V>& v, google::protobuf::
 // The descriptors come in as a factory rather than a vector because this runs
 // once per lazy call site per evaluation, so on every exec: building descriptors
 // only to discard them would allocate for nothing.
-template <typename FunctionT>
+//
+// `make` builds one implementation: the two overload sets need different
+// constructor arguments.
+template <typename FunctionT, typename MakeFn>
 std::vector<const cel_runtime::CelFunction*> LazyOverloads(
     std::vector<std::unique_ptr<FunctionT>>& fns,
-    std::vector<cel_runtime::CelFunctionDescriptor> (*descriptors)(), bool* usedSink) {
+    std::vector<cel_runtime::CelFunctionDescriptor> (*descriptors)(), MakeFn&& make) {
   if (fns.empty()) {
     std::vector<cel_runtime::CelFunctionDescriptor> built = descriptors();
     fns.reserve(built.size());
     for (auto& descriptor : built) {
-      fns.push_back(std::make_unique<FunctionT>(std::move(descriptor), usedSink));
+      fns.push_back(make(std::move(descriptor)));
     }
   }
 
@@ -220,16 +223,23 @@ std::vector<const cel_runtime::CelFunction*> Activation<IsV2>::FindFunctionOverl
   // The relative-time functions and policy_for_range() are CELv2 only.
   if constexpr (IsV2) {
     if (name == "today") {
-      return LazyOverloads(todayFns_, TodayDescriptors, &usedRelativeTime_);
+      return LazyOverloads(
+          todayFns_, TodayDescriptors, [this](cel_runtime::CelFunctionDescriptor descriptor) {
+            return std::make_unique<TodayFunction>(std::move(descriptor), &usedRelativeTime_);
+          });
     }
     if (name == "now") {
       if (!nowFn_) {
-        nowFn_ = std::make_unique<NowFunction>(&usedRelativeTime_);
+        nowFn_ = std::make_unique<NowFunction>(&usedRelativeTime_, now_);
       }
       return {nowFn_.get()};
     }
     if (name == "policy_for_range") {
-      return LazyOverloads(policyForRangeFns_, PolicyForRangeDescriptors, &usedRelativeTime_);
+      return LazyOverloads(policyForRangeFns_, PolicyForRangeDescriptors,
+                           [this](cel_runtime::CelFunctionDescriptor descriptor) {
+                             return std::make_unique<PolicyForRangeFunction>(
+                                 std::move(descriptor), &usedRelativeTime_, &pendingKill_, now_);
+                           });
     }
   }
   return {};

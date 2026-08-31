@@ -23,6 +23,7 @@
 #include <utmpx.h>
 
 #include <cstring>
+#include <functional>
 #include <memory>
 #include <set>
 #include <string>
@@ -54,10 +55,14 @@
 #include "Source/santad/CELActivation.h"
 #import "Source/santad/DataLayer/SNTEventTable.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
+#import "Source/santad/SNTBelievableClock.h"
 #import "Source/santad/SNTDecisionCache.h"
 #import "Source/santad/SNTNotificationQueue.h"
 #import "Source/santad/SNTSyncdQueue.h"
+#import "Source/santad/SNTTimedRuleKills.h"
 #include "absl/synchronization/mutex.h"
+#include "absl/time/clock.h"
+#include "absl/time/time.h"
 
 using santa::Message;
 using santa::PrefixTree;
@@ -73,6 +78,7 @@ static const size_t kMaxAllowedPathLength = MAXPATHLEN - 1;  // -1 to account fo
 @property SNTPolicyProcessor* policyProcessor;
 @property(readwrite) SNTRuleTable* ruleTable;
 @property SNTSyncdQueue* syncdQueue;
+@property SNTTimedRuleKills* timedRuleKills;
 @property SNTMetricCounter* events;
 @property santa::ProcessControlBlock processControlBlock;
 
@@ -136,6 +142,10 @@ static bool SameBinary(const es_process_t* a, NSString* aSHA256, const es_proces
   // stale entries from exited processes are harmless because (pid, pidversion)
   // is globally unique and never recurs.
   std::unique_ptr<SantaCache<std::pair<pid_t, int>, bool>> _sandboxedSeatbeltProcs;
+
+  // The evaluation time every CEL activation this controller builds is given,
+  // which is what policy_for_range() judges its windows against.
+  std::function<absl::Time()> _celNow;
 }
 
 #pragma mark Initializers
@@ -150,7 +160,9 @@ static bool SameBinary(const es_process_t* a, NSString* aSHA256, const es_proces
               processControlBlock:(santa::ProcessControlBlock)processControlBlock
                       processTree:
                           (std::shared_ptr<santa::santad::process_tree::ProcessTree>)processTree
-              sandboxExpectations:(std::shared_ptr<santa::SandboxExpectations>)sandboxExpectations {
+              sandboxExpectations:(std::shared_ptr<santa::SandboxExpectations>)sandboxExpectations
+                   timedRuleKills:(SNTTimedRuleKills*)timedRuleKills
+                  believableClock:(SNTBelievableClock*)believableClock {
   self = [super init];
   if (self) {
     _ruleTable = ruleTable;
@@ -166,6 +178,20 @@ static bool SameBinary(const es_process_t* a, NSString* aSHA256, const es_proces
     _processControlBlock = processControlBlock;
     _processTree = std::move(processTree);
     _sandboxExpectations = std::move(sandboxExpectations);
+    _timedRuleKills = timedRuleKills;
+
+    // Built once: a time window must be judged against the believable clock, or
+    // a system clock moved backwards would re-open one that has closed.
+    if (believableClock) {
+      _celNow = [believableClock] {
+        return absl::UnixEpoch() + absl::Seconds([believableClock now].timeIntervalSince1970);
+      };
+    } else {
+      // Only tests reach this; the daemon always has a clock.
+      LOGE(@"No believable clock: CEL time windows will be evaluated against the system clock, "
+           @"which a clock change can move");
+      _celNow = absl::Now;
+    }
 
     _eventQueue =
         dispatch_queue_create("com.northpolesec.santa.daemon.event_upload", DISPATCH_QUEUE_SERIAL);
@@ -180,6 +206,24 @@ static bool SameBinary(const es_process_t* a, NSString* aSHA256, const es_proces
                                 helpText:@"Events processed by Santa per response"];
   }
   return self;
+}
+
+/// Records the kill this decision carries, if any. Called only from the paths
+/// where the execution actually proceeds.
+- (void)recordTimedRuleKillForDecision:(SNTCachedDecision*)cd {
+  if (!cd.timedRuleKillDeadline) {
+    return;
+  }
+
+  [self.timedRuleKills recordKillForRuleType:cd.timedRuleKillRuleType
+                                  identifier:cd.timedRuleKillIdentifier
+                                     celHash:cd.timedRuleKillCELHash
+                                    deadline:cd.timedRuleKillDeadline
+                                    notifyAt:cd.timedRuleKillNotifyAt
+                                  windowDays:cd.timedRuleKillWindowDays
+                                 windowStart:cd.timedRuleKillWindowStart
+                                   windowEnd:cd.timedRuleKillWindowEnd
+                                  windowZone:cd.timedRuleKillWindowZone];
 }
 
 - (void)incrementEventCounters:(SNTEventState)eventType {
@@ -360,13 +404,13 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
   // When re-evaluating with a cached decision, use the pre-computed signing
   // metadata to avoid expensive codesign verification.
   ActivationCallbackBlock activationBlock =
-      existingDecision
-          ? santa::CreateCELActivationBlock(
-                esMsg, existingDecision.rawSigningID, existingDecision.teamID,
-                existingDecision.platformBinary, existingDecision.signingTime,
-                existingDecision.secureSigningTime, existingDecision.rawEntitlements, _processTree)
-          : santa::CreateCELActivationBlock(esMsg, [binInfo codesignCheckerWithError:NULL],
-                                            _processTree);
+      existingDecision ? santa::CreateCELActivationBlock(
+                             esMsg, existingDecision.rawSigningID, existingDecision.teamID,
+                             existingDecision.platformBinary, existingDecision.signingTime,
+                             existingDecision.secureSigningTime, existingDecision.rawEntitlements,
+                             _processTree, _celNow)
+                       : santa::CreateCELActivationBlock(
+                             esMsg, [binInfo codesignCheckerWithError:NULL], _processTree, _celNow);
 
   cpu_type_t imageCPUType = esMsg->version >= 6 ? esMsg->event.exec.image_cputype : CPU_TYPE_ANY;
   SNTCachedDecision* cd = [self.policyProcessor decisionForFileInfo:binInfo
@@ -532,6 +576,12 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
   } else {
     // Respond with the decision.
     postAction(action, cd);
+
+    // Only recorded for an execution that proceeds: an in-window policy that
+    // blocks records nothing, and a held exec records it from the reply below.
+    if (ACTION_IS_ALLOW(action)) {
+      [self recordTimedRuleKillForDecision:cd];
+    }
   }
 
   // Increment metric counters
@@ -688,7 +738,13 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
             }
 
             // Allow the binary to begin running.
-            self.processControlBlock(newProcPid, ProcessControl::Resume);
+            bool resumed = self.processControlBlock(newProcPid, ProcessControl::Resume);
+
+            // Only now has the execution actually proceeded: a hold that could
+            // not stop the process, or a resume that failed, leaves nothing to quit.
+            if (stoppedProc && resumed) {
+              [self recordTimedRuleKillForDecision:cd];
+            }
           } else {
             // Decision stays as-is when TouchID is denied, just populate the extra field.
             cd.decisionExtra = @"TouchID Denied";

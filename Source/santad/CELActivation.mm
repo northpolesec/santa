@@ -17,6 +17,7 @@
 #include <bsm/libbsm.h>
 #include <sys/proc_info.h>
 
+#include <functional>
 #include <map>
 #include <memory>
 #include <string>
@@ -115,7 +116,8 @@ namespace santa {
 ActivationCallbackBlock CreateCELActivationBlock(
     const Message& esMsg, NSString* signingID, NSString* teamID, BOOL isPlatformBinary,
     NSDate* signingTime, NSDate* secureSigningTime, NSDictionary* entitlementsDict,
-    std::shared_ptr<santad::process_tree::ProcessTree> processTree) {
+    std::shared_ptr<santad::process_tree::ProcessTree> processTree,
+    std::function<absl::Time()> now) {
   std::shared_ptr<EndpointSecurityAPI> esApi = esMsg.ESAPI();
   NSString* formattedSigningID = FormatSigningID(signingID, teamID, isPlatformBinary);
 
@@ -210,7 +212,8 @@ ActivationCallbackBlock CreateCELActivationBlock(
             } else {
               return {};
             }
-          });
+          },
+          now);
     };
 
     if (useV2) {
@@ -223,10 +226,11 @@ ActivationCallbackBlock CreateCELActivationBlock(
 
 ActivationCallbackBlock CreateCELActivationBlock(
     const Message& esMsg, MOLCodesignChecker* csInfo,
-    std::shared_ptr<santad::process_tree::ProcessTree> processTree) {
+    std::shared_ptr<santad::process_tree::ProcessTree> processTree,
+    std::function<absl::Time()> now) {
   return CreateCELActivationBlock(esMsg, csInfo.signingID, csInfo.teamID, csInfo.platformBinary,
                                   csInfo.signingTime, csInfo.secureSigningTime, csInfo.entitlements,
-                                  std::move(processTree));
+                                  std::move(processTree), std::move(now));
 }
 
 }  // namespace santa

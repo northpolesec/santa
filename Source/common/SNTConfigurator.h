@@ -926,9 +926,11 @@ extern NSString* _Nonnull const kStateTempAdminTargetUIDKey;
 ///
 ///  Persist (or delete, when `entries` is nil) the pending timed rule kills:
 ///  one dictionary per entry, with RuleType, Identifier, CELHash, Deadline,
-///  NotifyAt and Notified. Returns NO when the record could not be written to
-///  disk; unlike the demoted-admins record the in-memory value is kept, since
-///  it still governs the kills this daemon owes.
+///  NotifyAt, Notified, optionally the recurring window shape (WindowDays,
+///  WindowStart, WindowEnd, WindowZone), and optionally the mach half of the
+///  deadline (MachDeadline, BootSessionUUID). Returns NO when the record could
+///  not be written to disk; unlike the demoted-admins record the in-memory
+///  value is kept, since it still governs the kills this daemon owes.
 ///
 - (BOOL)persistTimedRuleKills:(nullable NSArray<NSDictionary*>*)entries;
 
@@ -936,6 +938,21 @@ extern NSString* _Nonnull const kStateTempAdminTargetUIDKey;
 ///  Returns the persisted timed rule kill entries, or nil if none exist.
 ///
 - (nullable NSArray<NSDictionary*>*)savedTimedRuleKills;
+
+#pragma mark - Clock Reading State
+
+///
+///  Persist the clock reading that floors the believable current time: Wall
+///  (NSNumber, seconds since 1970), MachContinuous (NSNumber, read at that same
+///  instant) and BootSessionUUID (NSString). Returns NO when the record could
+///  not be written; the in-memory value is kept, since it still floors the clock.
+///
+- (BOOL)persistClockReading:(nonnull NSDictionary*)reading;
+
+///
+///  Returns the persisted clock reading, or nil if none exists.
+///
+- (nullable NSDictionary*)savedClockReading;
 
 #pragma mark - USB Settings
 

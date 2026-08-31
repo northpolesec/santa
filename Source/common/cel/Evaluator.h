@@ -18,9 +18,11 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <utility>
 
 #include "Source/common/cel/Activation.h"
 #include "Source/common/cel/CELProtoTraits.h"
+#include "Source/common/cel/PolicyForRangeFunction.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 
@@ -47,10 +49,17 @@ struct EvaluationResult {
   bool cacheable;
   std::optional<uint64_t>
       touchIDCooldownMinutes;  // nullopt = no caching (prompt every time)
+  // Set when policy_for_range() matched an open window with should_kill set.
+  // The deadline is only recorded if the execution is allowed to run.
+  std::optional<PendingKill> pendingKill;
 
   EvaluationResult(ReturnValue v, bool c,
-                   std::optional<uint64_t> cooldown = std::nullopt)
-      : value(v), cacheable(c), touchIDCooldownMinutes(cooldown) {}
+                   std::optional<uint64_t> cooldown = std::nullopt,
+                   std::optional<PendingKill> kill = std::nullopt)
+      : value(v),
+        cacheable(c),
+        touchIDCooldownMinutes(cooldown),
+        pendingKill(std::move(kill)) {}
 };
 
 template <bool IsV2>

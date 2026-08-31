@@ -37,6 +37,7 @@
 #import "Source/common/cel/Activation.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
 #include "Source/santad/EntitlementsFilter.h"
+#import "Source/santad/SNTTimedRuleKills.h"
 
 #include "cel/v1.pb.h"
 
@@ -1517,19 +1518,41 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 - (SNTRule*)celV2RuleWithExpr:(NSString*)expr {
-  return [[SNTRule alloc]
-         initWithIdentifier:@"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
-                      state:SNTRuleStateCELv2
-                       type:SNTRuleTypeBinary
-                  customMsg:nil
-                  customURL:nil
-      eventDetailButtonText:nil
-                  timestamp:0
-                    comment:nil
-                    celExpr:expr
-             seatbeltPolicy:nil
-                     ruleId:0
-                      error:NULL];
+  return
+      [self celV2RuleWithExpr:expr
+                         type:SNTRuleTypeBinary
+                   identifier:@"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"];
+}
+
+- (SNTRule*)celV2RuleWithExpr:(NSString*)expr
+                         type:(SNTRuleType)type
+                   identifier:(NSString*)identifier {
+  return [[SNTRule alloc] initWithIdentifier:identifier
+                                       state:SNTRuleStateCELv2
+                                        type:type
+                                   customMsg:nil
+                                   customURL:nil
+                       eventDetailButtonText:nil
+                                   timestamp:0
+                                     comment:nil
+                                     celExpr:expr
+                              seatbeltPolicy:nil
+                                      ruleId:0
+                                       error:NULL];
+}
+
+/// Nothing about a timed rule kill is left on the decision: every one of the
+/// nine fields, since an allow that follows would record whatever survives.
+- (void)assertNoTimedKillOn:(SNTCachedDecision*)cd {
+  XCTAssertNil(cd.timedRuleKillDeadline);
+  XCTAssertNil(cd.timedRuleKillNotifyAt);
+  XCTAssertEqual(cd.timedRuleKillRuleType, SNTRuleTypeUnknown);
+  XCTAssertNil(cd.timedRuleKillIdentifier);
+  XCTAssertNil(cd.timedRuleKillCELHash);
+  XCTAssertNil(cd.timedRuleKillWindowDays);
+  XCTAssertNil(cd.timedRuleKillWindowStart);
+  XCTAssertNil(cd.timedRuleKillWindowEnd);
+  XCTAssertNil(cd.timedRuleKillWindowZone);
 }
 
 // A database rule may use policy_for_range(): in range it decides with its
@@ -1560,6 +1583,108 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
       andCELActivationCallback:[self fallbackTestActivationCallback]];
   XCTAssertEqual(outCD.decision, SNTEventStateBlockBinary);
   XCTAssertFalse(outCD.cacheable);
+}
+
+// An in-window should_kill rides out on the decision, named by the rule it came
+// from: the rule type, the identifier exactly as the rule table stores it, and
+// the hash of the rule's own text. Recording it is SNTExecutionController's job,
+// once the execution is known to proceed.
+- (void)testCELRulePolicyForRangeRecordsTheKillOnTheDecision {
+  NSString* expr =
+      @"policy_for_range([0, 1, 2, 3, 4, 5, 6], '00:00', '00:00', true, ALLOWLIST, BLOCKLIST)";
+  // A lowercase team ID, which SNTRule uppercases: the identifier that travels
+  // with the kill has to be the rule's, since that is what the fire-time
+  // re-check looks up, case-sensitively.
+  SNTRule* rule = [self celV2RuleWithExpr:expr
+                                     type:SNTRuleTypeSigningID
+                               identifier:@"abcde12345:com.example.app"];
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+  cd.signingID = rule.identifier;
+
+  [self.processor decision:cd
+                       forRule:rule
+           withTransitiveRules:YES
+      andCELActivationCallback:[self fallbackTestActivationCallback]];
+
+  XCTAssertEqual(cd.decision, SNTEventStateAllowSigningID);
+  // Equal ends make the window the whole day, so it closes at the next local
+  // midnight.
+  XCTAssertNotNil(cd.timedRuleKillDeadline);
+  XCTAssertGreaterThan([cd.timedRuleKillDeadline timeIntervalSinceNow], 0);
+
+  XCTAssertEqual(cd.timedRuleKillRuleType, SNTRuleTypeSigningID);
+  XCTAssertEqualObjects(cd.timedRuleKillIdentifier, rule.identifier);
+  XCTAssertEqualObjects(cd.timedRuleKillIdentifier, @"ABCDE12345:com.example.app");
+  XCTAssertEqualObjects(cd.timedRuleKillCELHash, [SNTTimedRuleKills celHashForExpression:expr]);
+
+  XCTAssertEqual(cd.timedRuleKillWindowDays.count, 7u);
+  XCTAssertEqualObjects(cd.timedRuleKillWindowStart, @"00:00");
+  XCTAssertEqualObjects(cd.timedRuleKillWindowEnd, @"00:00");
+  // No zone argument, so the recorded shape carries the calendar the window was
+  // read in rather than nothing: "local", which the kill-time re-check resolves
+  // back to the host's zone.
+  XCTAssertEqualObjects(cd.timedRuleKillWindowZone, @"local");
+}
+
+// Nothing rides out when no kill was asked for, which is the processor's own
+// pendingKill.has_value() guard.
+- (void)testCELRulePolicyForRangeRecordsNothingWithoutAnOpenKillingWindow {
+  SNTRule* noKill =
+      [self celV2RuleWithExpr:@"policy_for_range([0, 1, 2, 3, 4, 5, 6], '00:00', '00:00', false, "
+                              @"ALLOWLIST, BLOCKLIST)"];
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+  cd.sha256 = noKill.identifier;
+  [self.processor decision:cd
+                       forRule:noKill
+           withTransitiveRules:YES
+      andCELActivationCallback:[self fallbackTestActivationCallback]];
+  XCTAssertEqual(cd.decision, SNTEventStateAllowBinary);
+  XCTAssertNil(cd.timedRuleKillDeadline);
+}
+
+// A rule can evaluate cleanly and still not decide: the (rule type, rule state)
+// pair may not be in the decisions map, in which case the execution falls
+// through to the fallback expressions, the platform allow, a scope allow or
+// Monitor mode. A TEAMID rule returning ALLOWLIST_COMPILER is exactly that case.
+// Whatever allows the execution then is not this rule, so nothing about it may
+// be left on the decision for that allow to record.
+- (void)testCELRuleThatDoesNotDecideLeavesNoTimedKill {
+  SNTRule* rule =
+      [self celV2RuleWithExpr:@"policy_for_range([0, 1, 2, 3, 4, 5, 6], '00:00', '00:00', true, "
+                              @"ALLOWLIST_COMPILER, BLOCKLIST)"
+                         type:SNTRuleTypeTeamID
+                   identifier:@"ABCDE12345"];
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+  cd.teamID = rule.identifier;
+
+  BOOL decisionIsFinal = [self.processor decision:cd
+                                          forRule:rule
+                              withTransitiveRules:YES
+                         andCELActivationCallback:[self fallbackTestActivationCallback]];
+
+  XCTAssertFalse(decisionIsFinal, @"TEAMID + AllowCompiler is not a decision this rule can make");
+  [self assertNoTimedKillOn:cd];
+}
+
+// A deadline is only ever attributed to the rule that produced it, so evaluating
+// another rule onto the same decision drops what the first one left.
+- (void)testCELRuleTimedKillIsClearedByTheNextEvaluation {
+  SNTRule* killing =
+      [self celV2RuleWithExpr:@"policy_for_range([0, 1, 2, 3, 4, 5, 6], '00:00', '00:00', true, "
+                              @"ALLOWLIST, BLOCKLIST)"];
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+  cd.sha256 = killing.identifier;
+  [self.processor decision:cd
+                       forRule:killing
+           withTransitiveRules:YES
+      andCELActivationCallback:[self fallbackTestActivationCallback]];
+  XCTAssertNotNil(cd.timedRuleKillDeadline);
+
+  [self.processor decision:cd
+                       forRule:[self celV2RuleWithExpr:@"ALLOWLIST"]
+           withTransitiveRules:YES
+      andCELActivationCallback:[self fallbackTestActivationCallback]];
+  [self assertNoTimedKillOn:cd];
 }
 
 // UNSPECIFIED is for fallback expressions, which have a next rule to fall

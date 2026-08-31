@@ -103,8 +103,9 @@ class SantadDeps {
   SNTExecutionController* exec_controller_;
   // Held here so the component outlives Create(): it keeps only weak references
   // to itself, so without this nothing retains it and every restored deadline
-  // is dropped. The accessor is the exec path's wiring point, and is also what
-  // keeps this field from tripping -Wunused-private-field until then.
+  // is dropped. The exec controller holds its own reference to record entries
+  // through, so the accessor has no caller yet; it is what keeps this field
+  // from tripping -Wunused-private-field.
   SNTTimedRuleKills* timed_rule_kills_;
   std::shared_ptr<santa::PrefixTree<santa::Unit>> prefix_tree_;
   std::shared_ptr<santa::TTYWriter> tty_writer_;

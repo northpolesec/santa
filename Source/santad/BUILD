@@ -279,6 +279,7 @@ objc_library(
     deps = [
         ":EntitlementsFilter",
         ":SNTRuleTable",
+        ":SNTTimedRuleKills",
         "//Source/common:CertificateHelpers",
         "//Source/common:CodeSigningIdentifierUtils",
         "//Source/common:MOLCertificate",
@@ -312,6 +313,7 @@ santa_unit_test(
         ":EntitlementsFilter",
         ":SNTPolicyProcessor",
         ":SNTRuleTable",
+        ":SNTTimedRuleKills",
         "//Source/common:SNTCELFallbackRule",
         "//Source/common:SNTCachedDecision",
         "//Source/common:SNTConfigState",
@@ -548,6 +550,7 @@ objc_library(
         "//Source/common/es:EndpointSecurityMessage",
         "//Source/common/processtree:process",
         "//Source/common/processtree:process_tree",
+        "@abseil-cpp//absl/time",
     ],
 )
 
@@ -568,6 +571,7 @@ santa_unit_test(
         "//Source/common/processtree:process",
         "//Source/common/processtree:process_tree",
         "//Source/common/processtree:process_tree_test_helpers",
+        "@abseil-cpp//absl/time",
         "@googletest//:gtest",
     ],
 )
@@ -579,12 +583,14 @@ objc_library(
     deps = [
         ":CELActivation",
         ":ProcessControl",
+        ":SNTBelievableClock",
         ":SNTDecisionCache",
         ":SNTEventTable",
         ":SNTNotificationQueue",
         ":SNTPolicyProcessor",
         ":SNTRuleTable",
         ":SNTSyncdQueue",
+        ":SNTTimedRuleKills",
         ":SandboxExpectations",
         ":TTYWriter",
         "//Source/common:AccountLookup",
@@ -610,6 +616,7 @@ objc_library(
         "//Source/common/processtree:process",
         "//Source/common/processtree:process_tree",
         "@abseil-cpp//absl/synchronization",
+        "@abseil-cpp//absl/time",
     ],
 )
 
@@ -1157,11 +1164,35 @@ objc_library(
 )
 
 objc_library(
+    name = "SNTBelievableClock",
+    srcs = ["SNTBelievableClock.mm"],
+    hdrs = ["SNTBelievableClock.h"],
+    deps = [
+        "//Source/common:SNTConfigurator",
+        "//Source/common:SNTLogging",
+        "//Source/common:SNTSystemInfo",
+        "//Source/common:SystemResources",
+    ],
+)
+
+santa_unit_test(
+    name = "SNTBelievableClockTest",
+    srcs = ["SNTBelievableClockTest.mm"],
+    deps = [
+        ":KillEnvTestSupport",
+        ":SNTBelievableClock",
+        "//Source/common:SNTConfigurator",
+        "//Source/common:SystemResources",
+    ],
+)
+
+objc_library(
     name = "SNTTimedRuleKills",
     srcs = ["SNTTimedRuleKills.mm"],
     hdrs = ["SNTTimedRuleKills.h"],
     deps = [
         ":KillingMachine",
+        ":SNTBelievableClock",
         ":SNTNotificationQueue",
         ":SNTRuleTable",
         "//Source/common:MOLXPCConnection",
@@ -1171,8 +1202,10 @@ objc_library(
         "//Source/common:SNTLogging",
         "//Source/common:SNTRule",
         "//Source/common:SNTRuleIdentifiers",
+        "//Source/common:SNTSystemInfo",
         "//Source/common:SNTXPCNotifierInterface",
         "//Source/common:String",
+        "//Source/common:SystemResources",
         "//Source/common:Timer",
         "//Source/common/cel:CEL",
         "@abseil-cpp//absl/status:statusor",
@@ -1184,7 +1217,9 @@ santa_unit_test(
     name = "SNTTimedRuleKillsTest",
     srcs = ["SNTTimedRuleKillsTest.mm"],
     deps = [
+        ":KillEnvTestSupport",
         ":KillingMachine",
+        ":SNTBelievableClock",
         ":SNTNotificationQueue",
         ":SNTRuleTable",
         ":SNTTimedRuleKills",
@@ -1194,7 +1229,9 @@ santa_unit_test(
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTRule",
+        "//Source/common:SNTSystemInfo",
         "//Source/common:SNTXPCNotifierInterface",
+        "//Source/common:SystemResources",
         "@FMDB",
         "@OCMock",
     ],
@@ -1248,6 +1285,7 @@ santa_unit_test(
         "KillingMachineTest.mm",
     ],
     deps = [
+        ":KillEnvTestSupport",
         ":KillingMachine",
         "//Source/common:AuditUtilities",
         "//Source/common:CSOpsHelper",
@@ -1427,6 +1465,7 @@ objc_library(
         ":EntitlementsFilter",
         ":Metrics",
         ":ProcessControl",
+        ":SNTBelievableClock",
         ":SNTCompilerController",
         ":SNTDatabaseController",
         ":SNTDecisionCache",
@@ -1555,6 +1594,21 @@ objc_library(
     deps = [
         ":TTYWriter",
         "@googletest//:gtest",
+    ],
+)
+
+objc_library(
+    name = "KillEnvTestSupport",
+    testonly = 1,
+    srcs = ["KillEnvTestSupport.mm"],
+    hdrs = ["KillEnvTestSupport.h"],
+    deps = [
+        ":KillingMachine",
+        ":SNTBelievableClock",
+        "//Source/common:AuditUtilities",
+        "//Source/common:CSOpsHelper",
+        "//Source/common:SNTConfigurator",
+        "//Source/common:SystemResources",
     ],
 )
 
@@ -1935,6 +1989,7 @@ santa_unit_test(
         ":SNTExecutionController",
         ":SNTPolicyProcessor",
         ":SNTRuleTable",
+        ":SNTTimedRuleKills",
         ":SandboxExpectations",
         "//Source/common:AuditUtilities",
         "//Source/common:MOLCertificate",
@@ -2154,6 +2209,7 @@ test_suite(
         ":MetricsTest",
         ":RateLimiterTest",
         ":SNTApplicationCoreMetricsTest",
+        ":SNTBelievableClockTest",
         ":SNTBinaryUploadControllerTest",
         ":SNTCompilerControllerTest",
         ":SNTDaemonControlControllerTest",

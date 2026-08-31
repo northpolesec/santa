@@ -29,7 +29,6 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/time/civil_time.h"
-#include "absl/time/clock.h"
 #include "absl/time/time.h"
 #include "google/protobuf/arena.h"
 
@@ -50,49 +49,39 @@ namespace cel {
 namespace {
 
 // Argument layouts, one group per overload. The argument counts are all
-// different, which is what the runtime dispatches on. should_kill (the argument
-// before the policies in every layout) is type-checked but not read: nothing
-// acts on it yet.
+// different, which is what the runtime dispatches on. should_kill is the
+// argument before the policies in every layout.
 //
 //   (d, should_kill, policy)
 constexpr size_t kDurationOverloadArgCount = 3;
+constexpr size_t kDurationOverloadShouldKillIndex = 1;
 constexpr size_t kDurationOverloadPolicyIndex = 2;
 //   (start, end, should_kill, policy, out_of_range_policy)
 constexpr size_t kTimestampOverloadArgCount = 5;
+constexpr size_t kTimestampOverloadShouldKillIndex = 2;
 constexpr size_t kTimestampOverloadPolicyIndex = 3;
 constexpr size_t kTimestampOverloadOutOfRangePolicyIndex = 4;
 //   (days, start, end, should_kill, policy, out_of_range_policy)
 constexpr size_t kDaysOverloadArgCount = 6;
+constexpr size_t kDaysOverloadShouldKillIndex = 3;
 constexpr size_t kDaysOverloadPolicyIndex = 4;
 constexpr size_t kDaysOverloadOutOfRangePolicyIndex = 5;
 //   (days, start, end, zone, should_kill, policy, out_of_range_policy)
 constexpr size_t kDaysZoneOverloadArgCount = 7;
 constexpr size_t kDaysZoneOverloadZoneIndex = 3;
+constexpr size_t kDaysZoneOverloadShouldKillIndex = 4;
 constexpr size_t kDaysZoneOverloadPolicyIndex = 5;
 constexpr size_t kDaysZoneOverloadOutOfRangePolicyIndex = 6;
 
-// The warning lead: min(5 minutes, 10% of the window's length).
+// The zone a window with no zone argument is read in, spelled the way the zone
+// argument spells it. Recorded on a pending kill so the kill-time re-check reads
+// the same calendar the evaluation did.
+constexpr absl::string_view kDefaultZone = "local";
+
+// The warning lead is min(5 minutes, 10% of the window's length), so a work-day
+// window warns 5 minutes out and a 30 minute grant 3 minutes out.
 constexpr absl::Duration kMaxNotificationLead = absl::Minutes(5);
 constexpr int64_t kNotificationLeadDivisor = 10;
-
-// Parses a strict 24-hour "HH:MM" into minutes after local midnight.
-std::optional<int> ParseHourMinute(absl::string_view time) {
-  if (time.size() != 5 || time[2] != ':') {
-    return std::nullopt;
-  }
-  for (int index : {0, 1, 3, 4}) {
-    if (time[index] < '0' || time[index] > '9') {
-      return std::nullopt;
-    }
-  }
-
-  int hour = (time[0] - '0') * 10 + (time[1] - '0');
-  int minute = (time[3] - '0') * 10 + (time[4] - '0');
-  if (hour > 23 || minute > 59) {
-    return std::nullopt;
-  }
-  return hour * 60 + minute;
-}
 
 // Parses a strict "[+-]HH:MM" fixed offset into seconds east of UTC. The width
 // is exact: no "+5:30", no seconds field, no bare "05:30". cel-cpp's own
@@ -122,16 +111,6 @@ int64_t DayOfWeek(absl::CivilDay day) {
     case absl::Weekday::friday: return 5;
     case absl::Weekday::saturday: return 6;
   }
-}
-
-absl::Status ValidateDays(absl::Span<const int64_t> days) {
-  for (int64_t day : days) {
-    if (day < 0 || day > 6) {
-      return absl::InvalidArgumentError(absl::StrCat(
-          "policy_for_range() day must be 0 (Sunday) through 6 (Saturday), got ", day));
-    }
-  }
-  return absl::OkStatus();
 }
 
 bool ContainsDay(absl::Span<const int64_t> days, absl::CivilDay day) {
@@ -168,6 +147,27 @@ absl::StatusOr<std::vector<int64_t>> DayList(const cel_runtime::CelValue& value,
   return days;
 }
 
+// Reports the kill an in-window should_kill asked for. `days`, `start`, `end`
+// and `zone` carry the window's shape, empty for the non-recurring overloads.
+void RecordPendingKill(std::optional<PendingKill>* sink, const WindowEval& window, absl::Time now,
+                       absl::Span<const int64_t> days, absl::string_view start,
+                       absl::string_view end, absl::string_view zone) {
+  absl::Duration lead = NotificationLead(window.window_length);
+  PendingKill kill = {.deadline = window.window_end,
+                      .notify_at = std::max(now, window.window_end - lead),
+                      .window_days = {days.begin(), days.end()},
+                      .window_start = std::string(start),
+                      .window_end = std::string(end),
+                      .window_zone = std::string(zone)};
+
+  // One expression can call policy_for_range() more than once (e.g. through a
+  // nested ternary); the earlier deadline governs everything the rule covers,
+  // and the window shape it came with goes with it.
+  if (!sink->has_value() || kill.deadline < (*sink)->deadline) {
+    *sink = std::move(kill);
+  }
+}
+
 absl::Status RegisterPolicyForRangeDecls(::cel::TypeCheckerBuilder& builder) {
   // Both policy arguments and the return value are santa.cel.Result, which is
   // what the policy names (ALLOWLIST and friends) bind as in V2. That is what
@@ -198,6 +198,38 @@ absl::Status RegisterPolicyForRangeDecls(::cel::TypeCheckerBuilder& builder) {
 }
 
 }  // namespace
+
+// Minutes after midnight, so a caller comparing two of them is comparing civil
+// times on the same day.
+std::optional<int> ParseHourMinute(absl::string_view time) {
+  if (time.size() != 5 || time[2] != ':') {
+    return std::nullopt;
+  }
+  for (int index : {0, 1, 3, 4}) {
+    if (time[index] < '0' || time[index] > '9') {
+      return std::nullopt;
+    }
+  }
+
+  int hour = (time[0] - '0') * 10 + (time[1] - '0');
+  int minute = (time[3] - '0') * 10 + (time[4] - '0');
+  if (hour > 23 || minute > 59) {
+    return std::nullopt;
+  }
+  return hour * 60 + minute;
+}
+
+// Every day is 0 (Sunday) through 6 (Saturday); anything else is an error
+// naming the offending day.
+static absl::Status ValidateDays(absl::Span<const int64_t> days) {
+  for (int64_t day : days) {
+    if (day < 0 || day > 6) {
+      return absl::InvalidArgumentError(absl::StrCat(
+          "policy_for_range() day must be 0 (Sunday) through 6 (Saturday), got ", day));
+    }
+  }
+  return absl::OkStatus();
+}
 
 absl::StatusOr<absl::TimeZone> ResolveTimeZone(absl::string_view zone) {
   // "local" is the only name that means "whatever this host is set to"; every
@@ -312,7 +344,7 @@ absl::Status PolicyForRangeFunction::Evaluate(absl::Span<const cel_runtime::CelV
   // outlive the window. Mark the evaluation non-cacheable.
   *used_sink_ = true;
 
-  absl::Time now = absl::Now();
+  absl::Time now = now_();
 
   if (args.size() == kDaysOverloadArgCount || args.size() == kDaysZoneOverloadArgCount) {
     absl::StatusOr<std::vector<int64_t>> days = DayList(args[0], arena);
@@ -327,10 +359,11 @@ absl::Status PolicyForRangeFunction::Evaluate(absl::Span<const cel_runtime::CelV
     // the resolver, which would put a status on a path that cannot fail; if what
     // "local" means ever changes there, change it here and in TodayFunction too.
     bool zoneGiven = args.size() == kDaysZoneOverloadArgCount;
+    absl::string_view zoneArg = kDefaultZone;
     absl::TimeZone zone = absl::LocalTimeZone();
     if (zoneGiven) {
-      absl::StatusOr<absl::TimeZone> named =
-          ResolveTimeZone(args[kDaysZoneOverloadZoneIndex].StringOrDie().value());
+      zoneArg = args[kDaysZoneOverloadZoneIndex].StringOrDie().value();
+      absl::StatusOr<absl::TimeZone> named = ResolveTimeZone(zoneArg);
       if (!named.ok()) {
         return named.status();
       }
@@ -341,6 +374,13 @@ absl::Status PolicyForRangeFunction::Evaluate(absl::Span<const cel_runtime::CelV
         *days, args[1].StringOrDie().value(), args[2].StringOrDie().value(), now, zone);
     if (!window.ok()) {
       return window.status();
+    }
+
+    size_t shouldKillIndex =
+        zoneGiven ? kDaysZoneOverloadShouldKillIndex : kDaysOverloadShouldKillIndex;
+    if (window->in_range && args[shouldKillIndex].BoolOrDie()) {
+      RecordPendingKill(pending_kill_sink_, *window, now, *days, args[1].StringOrDie().value(),
+                        args[2].StringOrDie().value(), zoneArg);
     }
 
     // Either way the answer is one of the policy arguments, passed through
@@ -354,8 +394,15 @@ absl::Status PolicyForRangeFunction::Evaluate(absl::Span<const cel_runtime::CelV
   }
 
   if (args.size() == kTimestampOverloadArgCount) {
+    // An absolute span names one occurrence outright, so there is no recurring
+    // shape for a restart to re-check: the deadline it records stands alone.
     WindowEval window =
         EvalTimestampWindow(args[0].TimestampOrDie(), args[1].TimestampOrDie(), now);
+
+    if (window.in_range && args[kTimestampOverloadShouldKillIndex].BoolOrDie()) {
+      RecordPendingKill(pending_kill_sink_, window, now, {}, "", "", "");
+    }
+
     *result = window.in_range ? args[kTimestampOverloadPolicyIndex]
                               : args[kTimestampOverloadOutOfRangePolicyIndex];
     return absl::OkStatus();
@@ -368,8 +415,11 @@ absl::Status PolicyForRangeFunction::Evaluate(absl::Span<const cel_runtime::CelV
     }
 
     // [now, now + d) always contains now, so there is no out_of_range_policy to
-    // choose between and nothing to compute: EvalDurationWindow() is only needed
-    // once the window's end is acted on.
+    // choose between; the window itself is only needed to place a deadline.
+    if (args[kDurationOverloadShouldKillIndex].BoolOrDie()) {
+      RecordPendingKill(pending_kill_sink_, EvalDurationWindow(length, now), now, {}, "", "", "");
+    }
+
     *result = args[kDurationOverloadPolicyIndex];
     return absl::OkStatus();
   }

@@ -81,6 +81,20 @@
 @property BOOL silentTouchID;
 @property NSNumber* touchIDCooldownMinutes;  // nil = no caching (prompt every time)
 
+/// Set when the matching rule's policy_for_range() evaluated in-window with
+/// should_kill: what the rule covers is quit at timedRuleKillDeadline, warned at
+/// timedRuleKillNotifyAt, and a nil deadline means no kill was asked for. The
+/// entry is recorded only once the execution is known to be allowed.
+@property NSDate* timedRuleKillDeadline;
+@property NSDate* timedRuleKillNotifyAt;
+@property SNTRuleType timedRuleKillRuleType;
+@property NSString* timedRuleKillIdentifier;
+@property NSString* timedRuleKillCELHash;
+@property NSArray<NSNumber*>* timedRuleKillWindowDays;
+@property NSString* timedRuleKillWindowStart;
+@property NSString* timedRuleKillWindowEnd;
+@property NSString* timedRuleKillWindowZone;
+
 /// YES if the matching CEL rule returned AUDIT. The execution itself is
 /// allowed (the decision is set to the underlying allow event state, e.g.
 /// SNTEventStateAllowBinary or SNTEventStateAllowCELFallback) but the event

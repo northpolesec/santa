@@ -20,6 +20,7 @@
 #import "Source/common/SNTCommonEnums.h"
 #include "Source/santad/KillingMachine.h"
 
+@class SNTBelievableClock;
 @class SNTConfigurator;
 @class SNTNotificationQueue;
 @class SNTRuleTable;
@@ -37,12 +38,17 @@
 ///  daemon restart: `resumeFromSavedState` runs the ones that came due while
 ///  the daemon was down and re-arms the timer for the rest.
 ///
+///  Every "has this come due" question is asked of `clock`, the minimum
+///  believable time, and re-asked on its refresh, so a rolled-back system clock
+///  delays a quit by at most one refresh interval whatever the size of the
+///  rollback.
+///
 ///  A deadline reached while the entry's recurring window is standing open is not
 ///  a kill but an appointment moved: the entry goes to the end of the occurrence
 ///  standing at the deadline, with a fresh warning lead. That is what a machine
-///  which slept through a deadline, or a daemon that was down across one, wakes
-///  up to. A window that closes at the deadline kills; only a back-to-back or
-///  24-hour occurrence runs past it and defers.
+///  which slept through a deadline wakes up to. A window that closes at the
+///  deadline kills; only a back-to-back or 24-hour occurrence runs past it and
+///  defers.
 ///
 @interface SNTTimedRuleKills : NSObject
 
@@ -53,6 +59,7 @@
 - (instancetype)initWithNotifierQueue:(SNTNotificationQueue*)notifierQueue
                             ruleTable:(SNTRuleTable*)ruleTable
                          configurator:(SNTConfigurator*)configurator
+                                clock:(SNTBelievableClock*)clock
                               killEnv:(santa::KillEnv)killEnv NS_DESIGNATED_INITIALIZER;
 
 - (instancetype)init NS_UNAVAILABLE;
