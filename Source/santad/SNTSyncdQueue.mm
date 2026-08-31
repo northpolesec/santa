@@ -131,23 +131,28 @@ static constexpr NSTimeInterval kDefaultClearSyncStateGracePeriod = 600;
       }
 
       self.previousSyncBaseURL = newSyncBaseURL;
-      if (newSyncBaseURL && ![self.lastSyncServerURL isEqual:newSyncBaseURL]) {
-        self.lastSyncServerURL = newSyncBaseURL;
-        // Written only on change: persisting rewrites the whole state file. A failure leaves the
-        // record stale, so the change is acted on now but missed after a restart.
-        if (![configurator persistLastSyncServerURL:newSyncBaseURL]) {
-          LOGW(@"Failed to record the current sync server; a change made while santad is not "
-               @"running may go unnoticed");
-        }
-      }
 
       // A SyncBaseURL is the only thing the sync service exists for.
       if (newSyncBaseURL) {
         // Runs once per change: the bounce above returns early, so this is the pass driven by
         // the old sync service's invalidation, i.e. after it exited and can no longer write.
         if (syncServerChanged) {
-          [self dropStateFromPreviousSyncServerSerialized];
+          // Persists the new server as the last sync server itself, once the drop has committed.
+          [self dropStateFromPreviousSyncServerSerialized:newSyncBaseURL];
+        } else if (!self.lastSyncServerURL) {
+          // The first sync server this host has seen: nothing to drop, so record it now. Any other
+          // server is either unchanged (nothing to write, and persisting rewrites the whole state
+          // file) or a change, handled above.
+          if (![configurator persistLastSyncServerURL:newSyncBaseURL]) {
+            LOGW(@"Failed to record the current sync server; a change made while santad is not "
+                 @"running may go unnoticed");
+          }
         }
+
+        // Tracked in memory as soon as the change is acted on, so a drop that fails to reach disk
+        // is not retried on every pass. The persisted record is what carries the retry: it still
+        // names the previous server, so the next launch detects the change again.
+        self.lastSyncServerURL = newSyncBaseURL;
 
         if (!self.syncConnection.isConnected) {
           [self establishSyncServiceConnectionSerialized];
@@ -177,17 +182,27 @@ static constexpr NSTimeInterval kDefaultClearSyncStateGracePeriod = 600;
 /// Drop the previous sync server's settings and ask the new one for a clean sync. Rules are left
 /// alone: the Clean sync replaces them in one transaction, so policy is never momentarily empty.
 ///
+/// `syncServerURL` is recorded as the last sync server only once the drop has committed. The two
+/// records have to move together: the persisted record is what stops the change being detected
+/// again after a restart, so marking it handled while the drop is still in the air would strand
+/// the departed server's settings on disk with nothing left to notice them.
+///
 /// Must be called on `syncdQueue`. The hop to main is async because the main thread may itself be
 /// blocked in `dispatch_sync(syncdQueue, ...)` via `reassessSyncServiceConnection`.
-- (void)dropStateFromPreviousSyncServerSerialized {
+- (void)dropStateFromPreviousSyncServerSerialized:(NSURL*)syncServerURL {
   dispatch_async(dispatch_get_main_queue(), ^{
     LOGI(@"SyncBaseURL now points at a different sync server, dropping the previous server's "
          @"synced settings and requesting a clean sync");
     SNTConfigurator* configurator = [SNTConfigurator configurator];
-    [configurator performSyncStateBatch:^{
-      [configurator clearSyncState];
-      [configurator setSyncTypeRequired:SNTSyncTypeClean];
-    }];
+    if (![configurator clearSyncStateRequiringSyncType:SNTSyncTypeClean]) {
+      LOGE(@"Failed to drop the previous sync server's synced settings. They will be dropped again "
+           @"on the next launch rather than reapplied.");
+      return;
+    }
+    if (![configurator persistLastSyncServerURL:syncServerURL]) {
+      LOGW(@"Failed to record the current sync server; this change will be detected again after a "
+           @"restart, costing a redundant clean sync");
+    }
   });
 }
 
@@ -230,15 +245,26 @@ static constexpr NSTimeInterval kDefaultClearSyncStateGracePeriod = 600;
         return;
       }
 
+      // Never synced, or already cleared by an earlier launch. Nothing to drop, and nothing worth
+      // recording: with no synced settings `syncTypeRequired` already answers Clean. Without this,
+      // every host that does not use a sync server writes a sync state plist it has no use for.
+      if (!configurator.hasSyncedSettings) {
+        LOGD(@"No SyncBaseURL configured");
+        return;
+      }
+
       LOGI(@"No SyncBaseURL configured for %g seconds, clearing synced state", gracePeriod);
-      [configurator clearSyncState];
 
       // The rules stay, so whichever server comes next must be asked to replace them. Recorded
       // explicitly because `syncTypeRequired`'s empty-state default lapses to Normal the moment
       // postflight writes any other key, and a server that declines the clean sync would then
-      // merge its rules onto the departed server's. Not batched with the clear above:
-      // `clearSyncState` only removes the plist when it runs outside a batch.
-      [configurator setSyncTypeRequired:SNTSyncTypeClean];
+      // merge its rules onto the departed server's. Cleared and recorded in one call because the
+      // ordinary sync-state write path is gated on a configured sync server, which is exactly what
+      // just went away.
+      if (![configurator clearSyncStateRequiringSyncType:SNTSyncTypeClean]) {
+        LOGE(@"Failed to clear the departed sync server's synced settings from disk. They are no "
+             @"longer in effect, and will be cleared again on the next launch.");
+      }
     });
   });
 

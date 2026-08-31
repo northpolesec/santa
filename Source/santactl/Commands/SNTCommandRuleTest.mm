@@ -45,22 +45,12 @@ static NSURL* SyncURL(void) {
   XCTAssertTrue(SNTCommandRuleChangesAreRefused(nil, 1, NO, NO, SNTRuleCleanupNone));
 }
 
-// --import adds rules, so combining it with a cleanup flag is not a cleanup-only operation.
-- (void)testImportIsRefusedWithStaticRulesEvenAlongsideCleanup {
+// --import adds rules, so it is refused on its own, and combining it with a cleanup flag does not
+// make it a cleanup-only operation.
+- (void)testImportIsRefusedWithStaticRules {
+  XCTAssertTrue(SNTCommandRuleChangesAreRefused(nil, 1, NO, YES, SNTRuleCleanupNone));
   XCTAssertTrue(SNTCommandRuleChangesAreRefused(nil, 1, NO, YES, SNTRuleCleanupNonTransitive));
   XCTAssertTrue(SNTCommandRuleChangesAreRefused(nil, 1, NO, YES, SNTRuleCleanupAll));
-}
-
-// Regression: a cleanup flag appearing in argv does not mean a cleanup was requested. In
-//
-//     santactl rule --allow --identifier <sha256> --comment --clean
-//
-// the parser consumes "--clean" as the value of --comment, leaving cleanupType unset and the
-// command an ordinary rule addition. Deciding from parsed options rather than from raw arguments
-// is what keeps that from reading as a cleanup and slipping past this gate.
-- (void)testCleanupFlagConsumedAsAnotherOptionsValueIsNotTreatedAsCleanup {
-  XCTAssertTrue(SNTCommandRuleChangesAreRefused(nil, 1, NO, NO, SNTRuleCleanupNone),
-                @"A rule addition must be refused no matter what its option values contain");
 }
 
 #pragma mark - SyncBaseURL

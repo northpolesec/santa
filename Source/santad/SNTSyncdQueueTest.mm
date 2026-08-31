@@ -36,9 +36,29 @@
 @end
 
 @interface SNTSyncdQueueTest : XCTestCase
+@property id mockSyncServiceInterface;
+@property id stubSyncConnection;
 @end
 
 @implementation SNTSyncdQueueTest
+
+- (void)setUp {
+  // Keep these tests off the real com.northpolesec.santa.syncservice mach service. Any
+  // reassessment that finds a SyncBaseURL and no live connection calls
+  // -establishSyncServiceConnectionSerialized, and a real MOLXPCConnection then blocks for two
+  // seconds failing to reach it -- or, on a Mac with Santa installed, actually launches it.
+  self.stubSyncConnection = OCMClassMock([MOLXPCConnection class]);
+  self.mockSyncServiceInterface = OCMClassMock([SNTXPCSyncServiceInterface class]);
+  OCMStub([self.mockSyncServiceInterface configuredConnection]).andReturn(self.stubSyncConnection);
+}
+
+- (void)tearDown {
+  // Both are class mocks, so retire them explicitly rather than leaving it to deallocation.
+  [self.mockSyncServiceInterface stopMocking];
+  [self.stubSyncConnection stopMocking];
+  self.mockSyncServiceInterface = nil;
+  self.stubSyncConnection = nil;
+}
 
 - (void)testBackoffForPrimaryHash {
   SNTSyncdQueue* sut = [[SNTSyncdQueue alloc] initWithCacheSize:256];
@@ -203,18 +223,28 @@
 }
 
 /// Stub the configurator singleton: SyncBaseURL from `urlProvider` (re-read on every call, so
-/// tests can change it), and `onClear` in place of clearSyncState.
+/// tests can change it), and `onDrop` in place of `clearSyncStateRequiringSyncType:`, which is how
+/// both transitions drop synced state -- removing a SyncBaseURL, and changing to a different one.
+/// `onDrop` receives the sync type being recorded alongside the clear, and returns what the real
+/// call would: NO when the new state did not reach disk.
 - (id)stubbedConfiguratorWithSyncBaseURLProvider:(NSURL* (^)(void))urlProvider
-                                         onClear:(void (^)(void))onClear {
+                                          onDrop:(BOOL (^)(SNTSyncType))onDrop {
   id mockConfigurator = OCMClassMock([SNTConfigurator class]);
   OCMStub([mockConfigurator configurator]).andReturn(mockConfigurator);
   OCMStub([mockConfigurator syncBaseURL]).andDo(^(NSInvocation* invocation) {
     NSURL* url = urlProvider();
     [invocation setReturnValue:&url];
   });
-  OCMStub([mockConfigurator clearSyncState]).andDo(^(NSInvocation* invocation) {
-    onClear();
-  });
+  // These tests are all about a host that does hold a departed server's settings.
+  OCMStub([mockConfigurator hasSyncedSettings]).andReturn(YES);
+  OCMStub([mockConfigurator clearSyncStateRequiringSyncType:SNTSyncTypeNormal])
+      .ignoringNonObjectArgs()
+      .andDo(^(NSInvocation* invocation) {
+        SNTSyncType syncType;
+        [invocation getArgument:&syncType atIndex:2];
+        BOOL committed = onDrop(syncType);
+        [invocation setReturnValue:&committed];
+      });
   return mockConfigurator;
 }
 
@@ -227,8 +257,9 @@
       stubbedConfiguratorWithSyncBaseURLProvider:^NSURL* {
         return nil;
       }
-      onClear:^{
+      onDrop:^BOOL(SNTSyncType syncType) {
         ++cleared;
+        return YES;
       }];
 
   [sut reassessSyncServiceConnectionImmediately];
@@ -237,7 +268,7 @@
                     forCondition:^BOOL {
                       return cleared > 0;
                     }],
-                @"clearSyncState must run once the grace period elapses with no SyncBaseURL");
+                @"Synced state must be dropped once the grace period elapses with no SyncBaseURL");
 
   [mockConfigurator stopMocking];
 }
@@ -257,16 +288,11 @@
       stubbedConfiguratorWithSyncBaseURLProvider:^NSURL* {
         return nil;
       }
-      onClear:^{
+      onDrop:^BOOL(SNTSyncType syncType) {
         ++cleared;
+        [syncTypesSet addObject:@(syncType)];
+        return YES;
       }];
-  OCMStub([mockConfigurator setSyncTypeRequired:SNTSyncTypeNormal])
-      .ignoringNonObjectArgs()
-      .andDo(^(NSInvocation* invocation) {
-        SNTSyncType type;
-        [invocation getArgument:&type atIndex:2];
-        [syncTypesSet addObject:@(type)];
-      });
 
   [sut reassessSyncServiceConnectionImmediately];
 
@@ -294,21 +320,14 @@
       stubbedConfiguratorWithSyncBaseURLProvider:^NSURL* {
         return syncBaseURL;
       }
-      onClear:^{
+      onDrop:^BOOL(SNTSyncType syncType) {
         ++cleared;
+        [syncTypesSet addObject:@(syncType)];
+        return YES;
       }];
-  // Let the batch body run so the clear and sync-type writes inside it are observable.
-  OCMStub([mockConfigurator performSyncStateBatch:[OCMArg invokeBlock]]);
-  OCMStub([mockConfigurator setSyncTypeRequired:SNTSyncTypeNormal])
-      .ignoringNonObjectArgs()
-      .andDo(^(NSInvocation* invocation) {
-        SNTSyncType type;
-        [invocation getArgument:&type atIndex:2];
-        [syncTypesSet addObject:@(type)];
-      });
 
-  // Pretend the sync service is up, so the first pass records server A without a real XPC
-  // connection.
+  // Pretend the sync service is up: a live connection is what makes the change below take the
+  // bounce path, and dropping it afterwards is what lets the pass after that proceed.
   __block BOOL connected = YES;
   id mockConnection = OCMClassMock([MOLXPCConnection class]);
   OCMStub([mockConnection remoteObjectProxy])
@@ -363,9 +382,9 @@
       stubbedConfiguratorWithSyncBaseURLProvider:^NSURL* {
         return syncBaseURL;
       }
-                                         onClear:^{
-                                         }];
-  OCMStub([mockConfigurator performSyncStateBatch:[OCMArg invokeBlock]]);
+      onDrop:^BOOL(SNTSyncType syncType) {
+        return YES;
+      }];
 
   // A connected sync service is what makes the change below take the bounce path.
   id mockConnection = OCMClassMock([MOLXPCConnection class]);
@@ -402,16 +421,15 @@
   SNTSyncdQueue* sut = [[SNTSyncdQueue alloc] initWithCacheSize:1];
   sut.clearSyncStateGracePeriod = 0.1;
 
-  id mockConfigurator = OCMClassMock([SNTConfigurator class]);
-  OCMStub([mockConfigurator configurator]).andReturn(mockConfigurator);
-  OCMStub([mockConfigurator syncBaseURL]).andDo(^(NSInvocation* invocation) {
-    NSURL* url = nil;
-    [invocation setReturnValue:&url];
-  });
+  id mockConfigurator = [self
+      stubbedConfiguratorWithSyncBaseURLProvider:^NSURL* {
+        return nil;
+      }
+      onDrop:^BOOL(SNTSyncType syncType) {
+        ++cleared;
+        return YES;
+      }];
   OCMStub([mockConfigurator enableTelemetryExport]).andReturn(YES);
-  OCMStub([mockConfigurator clearSyncState]).andDo(^(NSInvocation* invocation) {
-    ++cleared;
-  });
 
   [sut reassessSyncServiceConnectionImmediately];
 
@@ -435,20 +453,14 @@
       stubbedConfiguratorWithSyncBaseURLProvider:^NSURL* {
         return [NSURL URLWithString:@"https://server-b.example.com/"];
       }
-      onClear:^{
+      onDrop:^BOOL(SNTSyncType syncType) {
         ++cleared;
+        [syncTypesSet addObject:@(syncType)];
+        return YES;
       }];
   // Stands in for server A having been recorded before this launch.
   OCMStub([mockConfigurator savedLastSyncServerURL])
       .andReturn([NSURL URLWithString:@"https://server-a.example.com/"]);
-  OCMStub([mockConfigurator performSyncStateBatch:[OCMArg invokeBlock]]);
-  OCMStub([mockConfigurator setSyncTypeRequired:SNTSyncTypeNormal])
-      .ignoringNonObjectArgs()
-      .andDo(^(NSInvocation* invocation) {
-        SNTSyncType type;
-        [invocation getArgument:&type atIndex:2];
-        [syncTypesSet addObject:@(type)];
-      });
 
   // Constructed after the stub is in place: the queue seeds itself at init.
   SNTSyncdQueue* sut = [[SNTSyncdQueue alloc] initWithCacheSize:1];
@@ -462,6 +474,112 @@
                 @"A sync server change spanning a restart must drop the previous server's state");
   XCTAssertEqualObjects(syncTypesSet, (@[ @(SNTSyncTypeClean) ]),
                         @"It must request exactly one Clean sync");
+
+  [mockConfigurator stopMocking];
+}
+
+// A host that never had a sync server has nothing to drop. Recording a clean-sync requirement it
+// has no use for would materialise a sync state plist on every Mac that does not sync, which reads
+// as though the host held synced state when it holds none. Built without the shared helper so the
+// absence of synced settings is unambiguous.
+- (void)testNothingIsDroppedWhenThereAreNoSyncedSettings {
+  __block NSUInteger dropped = 0;
+
+  SNTSyncdQueue* sut = [[SNTSyncdQueue alloc] initWithCacheSize:1];
+  sut.clearSyncStateGracePeriod = 0.1;
+
+  id mockConfigurator = OCMClassMock([SNTConfigurator class]);
+  OCMStub([mockConfigurator configurator]).andReturn(mockConfigurator);
+  OCMStub([mockConfigurator syncBaseURL]).andDo(^(NSInvocation* invocation) {
+    NSURL* url = nil;
+    [invocation setReturnValue:&url];
+  });
+  OCMStub([mockConfigurator hasSyncedSettings]).andReturn(NO);
+  OCMStub([mockConfigurator clearSyncStateRequiringSyncType:SNTSyncTypeNormal])
+      .ignoringNonObjectArgs()
+      .andDo(^(NSInvocation* invocation) {
+        ++dropped;
+      });
+
+  [sut reassessSyncServiceConnectionImmediately];
+
+  XCTAssertTrue([self waitUpTo:5
+                    forCondition:^BOOL {
+                      return ![self clearIsArmedOn:sut];
+                    }],
+                @"The armed clear must fire rather than stay armed");
+  // The clear hops to the main queue, so give that block a chance to run before concluding it
+  // did nothing.
+  [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.2]];
+  XCTAssertEqual(dropped, 0u, @"A host with no synced settings must not write a sync state");
+
+  [mockConfigurator stopMocking];
+}
+
+// The persisted record of the current sync server is what stops a change being detected a second
+// time, so it must not be written until the drop it stands for has actually reached disk.
+- (void)testTheNewSyncServerIsRecordedOnceTheDropCommits {
+  NSURL* serverB = [NSURL URLWithString:@"https://server-b.example.com/"];
+  __block NSUInteger cleared = 0;
+
+  id mockConfigurator = [self
+      stubbedConfiguratorWithSyncBaseURLProvider:^NSURL* {
+        return serverB;
+      }
+      onDrop:^BOOL(SNTSyncType syncType) {
+        ++cleared;
+        return YES;
+      }];
+  OCMStub([mockConfigurator savedLastSyncServerURL])
+      .andReturn([NSURL URLWithString:@"https://server-a.example.com/"]);
+  OCMStub([mockConfigurator persistLastSyncServerURL:OCMOCK_ANY]).andReturn(YES);
+
+  // Constructed after the stub is in place: the queue seeds itself at init.
+  SNTSyncdQueue* sut = [[SNTSyncdQueue alloc] initWithCacheSize:1];
+  [sut reassessSyncServiceConnectionImmediately];
+
+  XCTAssertTrue([self waitUpTo:5
+                    forCondition:^BOOL {
+                      return cleared > 0;
+                    }],
+                @"Sanity: the change must be acted on");
+  OCMVerify(times(1), [mockConfigurator persistLastSyncServerURL:serverB]);
+
+  [mockConfigurator stopMocking];
+}
+
+// The dangerous ordering. Recording server B while the drop is still in the air, or after it
+// failed, leaves server A's settings on disk with nothing left to notice them: the next launch
+// compares B against B, sees no change, and reapplies a departed server's ClientMode and path
+// regexes for good. Leaving the record naming A costs a redundant clean sync and nothing worse.
+- (void)testAFailedDropLeavesThePreviousSyncServerRecorded {
+  __block NSUInteger attempted = 0;
+
+  id mockConfigurator = [self
+      stubbedConfiguratorWithSyncBaseURLProvider:^NSURL* {
+        return [NSURL URLWithString:@"https://server-b.example.com/"];
+      }
+      onDrop:^BOOL(SNTSyncType syncType) {
+        ++attempted;
+        return NO;
+      }];
+  OCMStub([mockConfigurator savedLastSyncServerURL])
+      .andReturn([NSURL URLWithString:@"https://server-a.example.com/"]);
+
+  SNTSyncdQueue* sut = [[SNTSyncdQueue alloc] initWithCacheSize:1];
+  [sut reassessSyncServiceConnectionImmediately];
+
+  XCTAssertTrue([self waitUpTo:5
+                    forCondition:^BOOL {
+                      return attempted > 0;
+                    }],
+                @"Sanity: the drop must be attempted");
+  // Give the main queue a chance to run anything the drop might have queued behind it.
+  [self waitUpTo:0.2
+      forCondition:^BOOL {
+        return NO;
+      }];
+  OCMVerify(never(), [mockConfigurator persistLastSyncServerURL:OCMOCK_ANY]);
 
   [mockConfigurator stopMocking];
 }
@@ -482,17 +600,11 @@
       stubbedConfiguratorWithSyncBaseURLProvider:^NSURL* {
         return syncBaseURL;
       }
-      onClear:^{
+      onDrop:^BOOL(SNTSyncType syncType) {
         ++cleared;
+        [syncTypesSet addObject:@(syncType)];
+        return YES;
       }];
-  OCMStub([mockConfigurator performSyncStateBatch:[OCMArg invokeBlock]]);
-  OCMStub([mockConfigurator setSyncTypeRequired:SNTSyncTypeNormal])
-      .ignoringNonObjectArgs()
-      .andDo(^(NSInvocation* invocation) {
-        SNTSyncType type;
-        [invocation getArgument:&type atIndex:2];
-        [syncTypesSet addObject:@(type)];
-      });
 
   // Observe server A. Reassessments coalesce, so this must be given time to land before the
   // removal below, or server A is never recorded in the first place.
@@ -540,8 +652,9 @@
       stubbedConfiguratorWithSyncBaseURLProvider:^NSURL* {
         return syncBaseURL;
       }
-      onClear:^{
+      onDrop:^BOOL(SNTSyncType syncType) {
         ++cleared;
+        return YES;
       }];
 
   // Arm a clear, and wait for it so restoring the URL below genuinely happens after arming.
@@ -578,8 +691,9 @@
       stubbedConfiguratorWithSyncBaseURLProvider:^NSURL* {
         return syncBaseURL;
       }
-      onClear:^{
+      onDrop:^BOOL(SNTSyncType syncType) {
         ++cleared;
+        return YES;
       }];
 
   // Wait for the clear to be armed, otherwise the cancellation below races nothing and the test

@@ -2162,7 +2162,16 @@ static SNTConfigurator* sharedConfigurator = nil;
   if (!self.syncStateAccessAuthorizerBlock()) {
     return NO;
   }
+  return [self writeSyncStateToDisk];
+}
 
+///
+///  Saves the current effective syncState to disk without consulting
+///  `syncStateAccessAuthorizerBlock`. Only for callers that have a documented
+///  reason to skip that gate; everything on the ordinary sync-server write path
+///  must go through `saveSyncStateToDisk` instead.
+///
+- (BOOL)writeSyncStateToDisk {
   NSMutableDictionary* syncState = self.syncState.mutableCopy;
 
   // An empty sync state and a missing plist mean the same thing, so keep only the one that says
@@ -2185,6 +2194,16 @@ static SNTConfigurator* sharedConfigurator = nil;
   return YES;
 }
 
+- (BOOL)hasSyncedSettings {
+  NSDictionary* syncState = self.syncState;
+  for (NSString* key in syncState) {
+    if (![key isEqualToString:kSyncTypeRequired]) {
+      return YES;
+    }
+  }
+  return NO;
+}
+
 - (void)clearSyncState {
   // Intentionally not gated on `syncStateAccessAuthorizerBlock`: the authorizer
   // requires `syncBaseURL != nil`, but the SNTSyncdQueue caller invokes this
@@ -2204,6 +2223,38 @@ static SNTConfigurator* sharedConfigurator = nil;
   } else {
     dispatch_sync(dispatch_get_main_queue(), block);
   }
+}
+
+- (BOOL)clearSyncStateRequiringSyncType:(SNTSyncType)syncType {
+  // One transition rather than `clearSyncState` plus `setSyncTypeRequired:`. That pairing cannot
+  // work here: `setSyncTypeRequired:` writes through `saveSyncStateToDisk`, whose authorizer
+  // requires `syncBaseURL != nil`, and the caller runs precisely *because* the URL went away. The
+  // write would be refused and the requirement would survive only in this process's memory, so a
+  // restarted daemon would fall back to `syncTypeRequired`'s empty-state default, which lapses to
+  // Normal the moment postflight writes any other key.
+  //
+  // Skipping the authorizer is the same exemption `clearSyncState` takes, for the same reason.
+  // Writing to `syncStateFilePath` still requires root, which santad has.
+  __block BOOL committed = NO;
+  void (^block)(void) = ^{
+    NSMutableDictionary* syncState = [NSMutableDictionary dictionaryWithObject:@(syncType)
+                                                                        forKey:kSyncTypeRequired];
+    if (self.batchedSyncState) {
+      [self.batchedSyncState removeAllObjects];
+      [self.batchedSyncState addEntriesFromDictionary:syncState];
+      // Durability is the enclosing batch's to report, not ours.
+      committed = YES;
+      return;
+    }
+    self.syncState = syncState;
+    committed = [self writeSyncStateToDisk];
+  };
+  if ([NSThread isMainThread]) {
+    block();
+  } else {
+    dispatch_sync(dispatch_get_main_queue(), block);
+  }
+  return committed;
 }
 
 - (NSArray*)entitlementsPrefixFilter {

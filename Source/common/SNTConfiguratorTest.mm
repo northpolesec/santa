@@ -444,6 +444,110 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
   XCTAssertTrue([self.fileMgr removeItemAtPath:plistPath error:nil]);
 }
 
+/// Unlike the other helpers here, this models the *production* sync-state authorizer, which is
+/// `syncBaseURL != nil && geteuid() == 0`. Tests that pin behaviour around a departing sync server
+/// have to use it: an authorizer that always says yes hides the very gate they are about.
+- (SNTConfigurator*)configuratorWithSyncStateAtPath:(NSString*)plistPath
+                               syncServerConfigured:(BOOL (^)(void))syncServerConfigured {
+  return [[SNTConfigurator alloc] initWithSyncStateFile:plistPath
+      stateFile:@"/does/not/need/to/exist"
+      syncStateAccessAuthorizer:^BOOL {
+        return syncServerConfigured();
+      }
+      stateAccessAuthorizer:^BOOL {
+        return NO;
+      }];
+}
+
+// The clean-sync requirement recorded when SyncBaseURL goes away has to reach disk. It cannot be
+// written through the ordinary path -- that path is gated on a configured sync server, and there
+// isn't one any more, which is the whole reason this is happening. If the write is dropped the
+// requirement lives only in the running daemon's memory, and a restart falls back to
+// `syncTypeRequired`'s empty-state default, which lapses to Normal the moment postflight writes
+// any other key (see testExplicitCleanSyncTypeSurvivesUnacknowledgedSync for that mechanism).
+- (void)testCleanSyncRequirementRecordedOnSyncBaseURLRemovalIsDurable {
+  NSString* plistPath = [NSString stringWithFormat:@"%@/removal-clean.plist", self.testDir];
+  __block BOOL syncServerConfigured = YES;
+  SNTConfigurator* cfg = [self configuratorWithSyncStateAtPath:plistPath
+                                          syncServerConfigured:^BOOL {
+                                            return syncServerConfigured;
+                                          }];
+
+  // A host that has been syncing: settings on disk, no clean sync pending.
+  [cfg setSyncTypeRequired:SNTSyncTypeNormal];
+  cfg.fullSyncLastSuccess = [NSDate now];
+  XCTAssertTrue([self.fileMgr fileExistsAtPath:plistPath], @"Sanity: synced state must be on disk");
+
+  // SyncBaseURL is removed and the grace period elapses.
+  syncServerConfigured = NO;
+  XCTAssertTrue([cfg clearSyncStateRequiringSyncType:SNTSyncTypeClean],
+                @"The requirement must be recorded even though no sync server is configured");
+
+  // A sync server is configured again and the daemon restarts, so everything is re-read from disk.
+  syncServerConfigured = YES;
+  SNTConfigurator* restarted = [self configuratorWithSyncStateAtPath:plistPath
+                                                syncServerConfigured:^BOOL {
+                                                  return syncServerConfigured;
+                                                }];
+
+  XCTAssertNil(restarted.fullSyncLastSuccess, @"The departed server's state must not come back");
+  XCTAssertEqual(restarted.syncTypeRequired, SNTSyncTypeClean);
+
+  // The decisive case: a server that declines the clean sync still writes other keys at postflight,
+  // which is what makes the empty-state default lapse. The recorded requirement must outlast it.
+  restarted.fullSyncLastSuccess = [NSDate now];
+  XCTAssertEqual(restarted.syncTypeRequired, SNTSyncTypeClean,
+                 @"The client must keep asking until a server actually performs the clean sync");
+
+  XCTAssertTrue([self.fileMgr removeItemAtPath:plistPath error:nil]);
+}
+
+// Nothing calls it inside a batch today, but the branch that handles one is what stops a future
+// caller from clobbering `syncState` and writing to disk mid-transaction, the way an unguarded
+// implementation would. `clearSyncState` guards the same way for the same reason.
+- (void)testClearSyncStateRequiringSyncTypeComposesWithABatch {
+  NSString* plistPath = [NSString stringWithFormat:@"%@/reset-in-batch.plist", self.testDir];
+  SNTConfigurator* cfg = [self configuratorWithEmptySyncStateAtPath:plistPath];
+
+  cfg.fullSyncLastSuccess = [NSDate now];
+
+  XCTAssertTrue([cfg performSyncStateBatch:^{
+    XCTAssertTrue([cfg clearSyncStateRequiringSyncType:SNTSyncTypeClean]);
+    // Still inside the transaction, so nothing has been published yet.
+    XCTAssertNotNil(cfg.fullSyncLastSuccess);
+  }]);
+
+  XCTAssertNil(cfg.fullSyncLastSuccess, @"The batch must commit the clear");
+  XCTAssertEqual(cfg.syncTypeRequired, SNTSyncTypeClean);
+  XCTAssertFalse(cfg.hasSyncedSettings);
+
+  XCTAssertTrue([self.fileMgr removeItemAtPath:plistPath error:nil]);
+}
+
+// `SyncTypeRequired` is this client's own bookkeeping, not something a server sent, so a state
+// holding nothing else has to read as "never synced". SNTRuleTable records one when it creates the
+// database, before any sync has happened, so counting it would make every host look like it holds
+// a departed server's settings.
+- (void)testHasSyncedSettingsIgnoresTheSyncTypeRequirement {
+  NSString* plistPath = [NSString stringWithFormat:@"%@/has-synced-settings.plist", self.testDir];
+  SNTConfigurator* cfg = [self configuratorWithEmptySyncStateAtPath:plistPath];
+
+  XCTAssertFalse(cfg.hasSyncedSettings, @"A host that has never synced holds no settings");
+
+  // Stands in for SNTRuleTable creating the rule database on a host with no sync server.
+  [cfg setSyncTypeRequired:SNTSyncTypeCleanAll];
+  XCTAssertFalse(cfg.hasSyncedSettings, @"The sync-type requirement alone is not a synced setting");
+
+  [cfg setSyncServerClientMode:SNTClientModeLockdown];
+  XCTAssertTrue(cfg.hasSyncedSettings);
+
+  XCTAssertTrue([cfg clearSyncStateRequiringSyncType:SNTSyncTypeClean]);
+  XCTAssertFalse(cfg.hasSyncedSettings,
+                 @"Clearing leaves only the requirement, so there is nothing left to clear again");
+
+  XCTAssertTrue([self.fileMgr removeItemAtPath:plistPath error:nil]);
+}
+
 // Sync-state writes are unconditional, so a no-op batch (e.g. a preflight whose config bundle
 // carries nothing) would otherwise leave an empty plist behind. An empty plist and a missing one
 // mean the same thing, so keep only the one that says so.

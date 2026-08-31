@@ -1219,9 +1219,27 @@ extern NSString* _Nonnull const kStateTempAdminTargetUIDKey;
 #endif
 
 ///
+///  Whether any state produced by a sync server is currently held. `SyncTypeRequired` does not
+///  count: it is this client's own bookkeeping rather than anything a server put there, so a state
+///  holding nothing else is indistinguishable from never having synced at all.
+///
+@property(readonly, nonatomic) BOOL hasSyncedSettings;
+
+///
 ///  Clear the sync server configuration from the effective configuration.
 ///
 - (void)clearSyncState;
+
+///
+///  Clear the sync server configuration and record, in the same transition, that the next sync
+///  must be a `syncType` one. Returns NO if the new state did not reach disk.
+///
+///  Exists because the two halves cannot be expressed as `clearSyncState` followed by
+///  `setSyncTypeRequired:`. The caller runs precisely because `SyncBaseURL` went away, and the
+///  ordinary sync-state write path is gated on a configured sync server, so the second half would
+///  be silently dropped and the requirement would live only in this process's memory.
+///
+- (BOOL)clearSyncStateRequiringSyncType:(SNTSyncType)syncType;
 
 ///
 ///  Buffer a series of sync-state mutations into a single atomic commit.
