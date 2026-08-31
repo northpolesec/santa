@@ -152,8 +152,7 @@ absl::StatusOr<std::vector<int64_t>> DayList(const cel_runtime::CelValue& value,
 void RecordPendingKill(std::optional<PendingKill>* sink, const WindowEval& window, absl::Time now,
                        absl::Span<const int64_t> days, absl::string_view start,
                        absl::string_view end, absl::string_view zone) {
-  absl::Duration lead =
-      std::min(kMaxNotificationLead, window.window_length / kNotificationLeadDivisor);
+  absl::Duration lead = NotificationLead(window.window_length);
   PendingKill kill = {.deadline = window.window_end,
                       .notify_at = std::max(now, window.window_end - lead),
                       .window_days = {days.begin(), days.end()},
@@ -307,6 +306,10 @@ WindowEval EvalTimestampWindow(absl::Time start, absl::Time end, absl::Time now)
 
 WindowEval EvalDurationWindow(absl::Duration d, absl::Time now) {
   return WindowEval{.in_range = true, .window_end = now + d, .window_length = d};
+}
+
+absl::Duration NotificationLead(absl::Duration window_length) {
+  return std::min(kMaxNotificationLead, window_length / kNotificationLeadDivisor);
 }
 
 std::vector<cel_runtime::CelFunctionDescriptor> PolicyForRangeDescriptors() {

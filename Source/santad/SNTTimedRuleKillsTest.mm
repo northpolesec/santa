@@ -69,11 +69,13 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
 
 // The seams SNTTimedRuleKills keeps private: the interval the countdown timer
 // was last armed for, which is how a test sees a rolled-back clock being
-// corrected, and the serial queue the component does all of its work on, which
-// a test drains to observe the result of a record.
+// corrected, the serial queue the component does all of its work on, which a
+// test drains to observe the result of a record, and the pass that queue runs,
+// so a test can run one as of an instant it chooses rather than as of the clock.
 @interface SNTTimedRuleKills (Testing)
 @property uint32_t armedTimerSeconds;
 @property(readonly) dispatch_queue_t queue;
+- (void)processDueEntriesSerializedAsOf:(NSDate*)now;
 @end
 
 /// The host clocks a test builds a believable clock over: a system wall clock it
@@ -360,6 +362,15 @@ static NSString* const kOtherBootSessionUUID = @"6A2B4C8E-0000-0000-0000-0000000
 - (void)drain:(SNTTimedRuleKills*)sut {
   dispatch_sync(sut.queue, ^{
                 });
+}
+
+/// Runs one pass as of `now`, on the queue every pass runs on. The clock is what
+/// arms the timer in production; a test that needs a pass at a particular instant
+/// relative to a deadline runs it here instead of waiting for one.
+- (void)runPassOn:(SNTTimedRuleKills*)sut asOf:(NSDate*)now {
+  dispatch_sync(sut.queue, ^{
+    [sut processDueEntriesSerializedAsOf:now];
+  });
 }
 
 - (NSArray<NSDictionary*>*)savedEntries {
@@ -664,8 +675,11 @@ static NSString* const kOtherBootSessionUUID = @"6A2B4C8E-0000-0000-0000-0000000
 
 // The window shape is part of the entry: written with it, read back with it and
 // written out again unchanged, which is what lets a restart re-check the window
-// a deadline came from. The kills recorded from a timestamp or duration window
-// carry no shape, so their entries have no window fields at all.
+// a deadline came from. A zone this host's loader refuses round-trips like any
+// other, because whether a zone resolves is asked at the re-check and not at
+// load: a load that dropped it would have the next write put the drop on disk
+// permanently. The kills recorded from a timestamp or duration window carry no
+// shape, so their entries have no window fields at all.
 - (void)testWindowShapePersistsAndSurvivesAReload {
   NSString* hash = [SNTTimedRuleKills celHashForExpression:kCELExpr];
   NSDate* deadline = [NSDate dateWithTimeIntervalSinceNow:3600];
@@ -681,9 +695,20 @@ static NSString* const kOtherBootSessionUUID = @"6A2B4C8E-0000-0000-0000-0000000
                  windowStart:@"09:00"
                    windowEnd:@"17:00"
                   windowZone:@"local"];
+  // A second shape whose zone no loader on this host knows, so the load path has
+  // to carry a zone it cannot resolve.
+  [sut recordKillForRuleType:SNTRuleTypeSigningID
+                  identifier:kMatchingSigningID
+                     celHash:hash
+                    deadline:deadline
+                    notifyAt:notifyAt
+                  windowDays:kEveryDay
+                 windowStart:@"09:00"
+                   windowEnd:@"17:00"
+                  windowZone:@"Mars/Olympus"];
   [self drain:sut];
 
-  NSDictionary* saved = self.savedEntries.firstObject;
+  NSDictionary* saved = [self savedEntryForIdentifier:kMatchingTeamID];
   XCTAssertEqualObjects(saved[@"WindowDays"], (@[ @1, @3, @5 ]));
   XCTAssertEqualObjects(saved[@"WindowStart"], @"09:00");
   XCTAssertEqualObjects(saved[@"WindowEnd"], @"17:00");
@@ -714,6 +739,14 @@ static NSString* const kOtherBootSessionUUID = @"6A2B4C8E-0000-0000-0000-0000000
   XCTAssertEqualObjects(reloaded[@"WindowStart"], @"09:00");
   XCTAssertEqualObjects(reloaded[@"WindowEnd"], @"17:00");
   XCTAssertEqualObjects(reloaded[@"WindowZone"], @"local");
+
+  // The unresolvable zone came back whole too, and is on disk again after the
+  // write above.
+  NSDictionary* unresolvableZone = [self savedEntryForIdentifier:kMatchingSigningID];
+  XCTAssertEqualObjects(unresolvableZone[@"WindowZone"], @"Mars/Olympus");
+  XCTAssertEqualObjects(unresolvableZone[@"WindowDays"], kEveryDay);
+  XCTAssertEqualObjects(unresolvableZone[@"WindowStart"], @"09:00");
+  XCTAssertEqualObjects(unresolvableZone[@"WindowEnd"], @"17:00");
 
   NSDictionary* shapeless = [self savedEntryForIdentifier:kMatchingCDHash];
   XCTAssertNotNil(shapeless);
@@ -765,9 +798,10 @@ static NSString* const kOtherBootSessionUUID = @"6A2B4C8E-0000-0000-0000-0000000
     // A shape missing its start time.
     @"5555555555555555555555555555555555555555" :
         @{@"WindowDays" : @[ @1, @3, @5 ], @"WindowEnd" : @"17:00", @"WindowZone" : @"local"},
-    // A zone that is not a string, which must not be sent -UTF8String. The other
-    // two ways a zone can be unusable, a name the resolver refuses and a shape
-    // whole but for the zone, are pinned at the kill seam instead by
+    // A zone that is not a string, which must never become the entry's zone: the
+    // re-check sends that -UTF8String. The other two ways a zone can be unusable,
+    // a name the resolver refuses and a shape whole but for the zone, are pinned
+    // at the kill seam instead by
     // testUnusablePersistedWindowShapesKillRatherThanRescheduling.
     @"6666666666666666666666666666666666666666" : @{
       @"WindowDays" : @[ @1, @3, @5 ],
@@ -1323,9 +1357,9 @@ static NSString* const kOtherBootSessionUUID = @"6A2B4C8E-0000-0000-0000-0000000
   NSDictionary* rescheduled = [self savedEntryForIdentifier:kMatchingTeamID];
   XCTAssertEqualWithAccuracy([rescheduled[@"Deadline"] doubleValue],
                              [self minuteFloor:now].timeIntervalSince1970 + 5 * 3600, 1);
-  // The lead the old deadline was warned with, carried onto the new one.
+  // The lead the new occurrence earns: min(5 minutes, a tenth of its 8 hours).
   XCTAssertEqualWithAccuracy([rescheduled[@"NotifyAt"] doubleValue],
-                             [rescheduled[@"Deadline"] doubleValue] - 60, 0.001);
+                             [rescheduled[@"Deadline"] doubleValue] - 300, 0.001);
   // The warning is owed again: this is a different deadline from the one the
   // user was already warned about.
   XCTAssertFalse([rescheduled[@"Notified"] boolValue]);
@@ -1333,13 +1367,14 @@ static NSString* const kOtherBootSessionUUID = @"6A2B4C8E-0000-0000-0000-0000000
   XCTAssertEqualObjects(rescheduled[@"WindowDays"], kEveryDay);
 }
 
-// A window shape that could not be rebuilt from the state file is no shape: the
-// entry has nothing to re-check, so its deadline stands. The first row stands at
-// 12:00 inside a 09:00 to 17:00 window, which is the arrangement the open row of
-// testTheStoredZoneGovernsTheWindowRecheck reschedules from, so it would
-// reschedule too if its day list could be read. The other two lose their shape at
-// the zone itself, which leaves no zone for them to stand in at all. Every row is
-// past due, so a kill is the defect being read as absent rather than as a window.
+// A window that cannot be asked is no window, and its deadline stands. The first
+// row would reschedule if its day list could be read: its zone reads the instant
+// as 12:00, inside 09:00 to 17:00, which is the arrangement the open row of
+// testTheStoredZoneGovernsTheWindowRecheck moves from. The rows differ in where
+// the shape gives out: the day list and the absent zone give out at load, the
+// unresolvable zone at the re-check, which is the one row of the three that
+// keeps its shape on the way in. Every row is past due, so a kill is the defect
+// being read as no window rather than as an open one.
 - (void)testUnusablePersistedWindowShapesKillRatherThanRescheduling {
   [self addRuleOfType:SNTRuleTypeTeamID identifier:kMatchingTeamID cel:kCELExpr];
 
@@ -1347,12 +1382,13 @@ static NSString* const kOtherBootSessionUUID = @"6A2B4C8E-0000-0000-0000-0000000
   NSDictionary<NSString*, NSDictionary*>* shapes = @{
     @"a day list holding something that isn't a number" :
         @{@"WindowDays" : @[ @1, @"Wednesday" ], @"WindowZone" : [self zoneReading:now asHour:12]},
-    // The zone cannot be resolved, so the window cannot be asked. The design
-    // calls that past-due, which means kill.
+    // The shape loads whole, and the resolver refuses the zone when the re-check
+    // asks: no zone, so no window to be inside. The design calls that past-due,
+    // which means kill.
     @"a zone the resolver refuses" : @{@"WindowDays" : kEveryDay, @"WindowZone" : @"Mars/Olympus"},
-    // What an upgraded daemon finds on disk: a shape whole but for the zone. It
-    // loses its shape, so it behaves exactly like an entry that never had one.
-    @"a shape written before the zone existed" : @{@"WindowDays" : kEveryDay},
+    // A partial shape, however it got there: "09:00" names no instant without a
+    // zone, so the entry behaves exactly like one that never had a shape.
+    @"a shape whole but for its zone" : @{@"WindowDays" : kEveryDay},
   };
 
   for (NSString* defect in shapes) {
@@ -1378,6 +1414,96 @@ static NSString* const kOtherBootSessionUUID = @"6A2B4C8E-0000-0000-0000-0000000
                           @"%@", defect);
     XCTAssertNil(self.savedEntries, @"%@", defect);
   }
+}
+
+// A window with no gap between occurrences, at a deadline the pass reached a
+// fraction of a second early, which is what a timer firing marginally early
+// looks like. The occurrence that closes at the deadline is still standing at
+// that instant, so asking the window there answers "open until the deadline" and
+// spends the deadline on a kill the window never asked for. The window is asked
+// at the deadline instead, where the occurrence standing is the next one, so the
+// appointment moves. Start equal to end is the 24-hour form of a contiguous
+// window; back-to-back occurrences behave the same way.
+- (void)testAnEarlyFireOnAContiguousWindowMovesTheDeadlineRatherThanKilling {
+  [self addRuleOfType:SNTRuleTypeTeamID identifier:kMatchingTeamID cel:kCELExpr];
+
+  // On a whole minute, which is where a window edge lands, and far enough ahead
+  // that the component's own timer cannot reach it while the test runs: the pass
+  // below is the one being driven.
+  NSDate* deadline = [[self minuteFloor:[NSDate date]] dateByAddingTimeInterval:120];
+  NSString* zone = [self zoneReading:deadline asHour:9];
+  NSMutableDictionary* entry =
+      [[self entryDictForRuleType:SNTRuleTypeTeamID
+                       identifier:kMatchingTeamID
+                          celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
+                         deadline:deadline] mutableCopy];
+  // 09:00 to 09:00 in a zone that reads the deadline as exactly 09:00: one
+  // occurrence ends there and the next begins there.
+  entry[@"WindowDays"] = kEveryDay;
+  entry[@"WindowStart"] = @"09:00";
+  entry[@"WindowEnd"] = @"09:00";
+  entry[@"WindowZone"] = zone;
+  entry[@"Notified"] = @YES;
+  XCTAssertTrue([self.configurator persistTimedRuleKills:@[ entry ]]);
+
+  self.configurator = [self makeConfigurator];
+  SNTTimedRuleKills* sut = [self makeSUT];
+  [sut resumeFromSavedState];
+  [self drain:sut];
+  XCTAssertEqual(self.savedEntries.count, 1u, @"not due yet");
+
+  // Inside the due tolerance, but before the deadline.
+  [self runPassOn:sut asOf:[deadline dateByAddingTimeInterval:-0.1]];
+
+  XCTAssertEqualObjects(SignalDescriptions(_fake.signals), @[],
+                        @"the window runs on, so nothing is quit");
+  XCTAssertEqual(self.savedEntries.count, 1u);
+  NSDictionary* rescheduled = self.savedEntries.firstObject;
+  // The end of the occurrence that stands at the deadline, a day on.
+  XCTAssertEqualWithAccuracy([rescheduled[@"Deadline"] doubleValue],
+                             deadline.timeIntervalSince1970 + 24 * 3600, 0.001);
+  XCTAssertFalse([rescheduled[@"Notified"] boolValue]);
+  XCTAssertEqualObjects(rescheduled[@"WindowZone"], zone);
+}
+
+// The notify time of an entry recorded within a lead of its window's close is
+// clamped to the exec, so the distance from it to the deadline is no measure of
+// anything. A reschedule takes the lead from the new occurrence's length, or that
+// clamp would follow the entry into every occurrence after it.
+- (void)testAClampedNotifyTimeIsNotCarriedOntoTheNextOccurrence {
+  [self addRuleOfType:SNTRuleTypeTeamID identifier:kMatchingTeamID cel:kCELExpr];
+
+  NSDate* now = [NSDate date];
+  NSDate* deadline = [now dateByAddingTimeInterval:-3600];
+  NSMutableDictionary* entry =
+      [[self entryDictForRuleType:SNTRuleTypeTeamID
+                       identifier:kMatchingTeamID
+                          celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
+                         deadline:deadline] mutableCopy];
+  // Recorded a second before the window closed, which is all the warning that
+  // exec could have had.
+  entry[@"NotifyAt"] = @(deadline.timeIntervalSince1970 - 1);
+  // A 30 minute occurrence standing open now, so the past-due deadline moves to
+  // its end.
+  entry[@"WindowDays"] = kEveryDay;
+  entry[@"WindowStart"] = @"09:00";
+  entry[@"WindowEnd"] = @"09:30";
+  entry[@"WindowZone"] = [self zoneReading:now asHour:9];
+  XCTAssertTrue([self.configurator persistTimedRuleKills:@[ entry ]]);
+
+  self.configurator = [self makeConfigurator];
+  SNTTimedRuleKills* sut = [self makeSUT];
+  [sut resumeFromSavedState];
+  [self drain:sut];
+
+  XCTAssertEqualObjects(SignalDescriptions(_fake.signals), @[]);
+  NSDictionary* rescheduled = self.savedEntries.firstObject;
+  XCTAssertEqualWithAccuracy([rescheduled[@"Deadline"] doubleValue],
+                             [self minuteFloor:now].timeIntervalSince1970 + 30 * 60, 1);
+  // min(5 minutes, a tenth of the 30 minute occurrence), not the one second the
+  // old notify time was clamped to.
+  XCTAssertEqualWithAccuracy([rescheduled[@"NotifyAt"] doubleValue],
+                             [rescheduled[@"Deadline"] doubleValue] - 180, 0.001);
 }
 
 // A shape the window math itself refuses, which is what a day outside 0 through
