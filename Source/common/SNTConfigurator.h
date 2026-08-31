@@ -935,6 +935,22 @@ extern NSString* _Nonnull const kEnableMenuItemUserOverride;
 extern NSString* _Nonnull const kStateTempAdminModeKey;
 extern NSString* _Nonnull const kStateTempAdminTargetUIDKey;
 
+#pragma mark - Timed Rule Kill State
+
+///
+///  Persist (or delete, when `entries` is nil) the pending timed rule kills:
+///  one dictionary per entry, with RuleType, Identifier, CELHash, Deadline,
+///  NotifyAt and Notified. Returns NO when the record could not be written to
+///  disk; unlike the demoted-admins record the in-memory value is kept, since
+///  it still governs the kills this daemon owes.
+///
+- (BOOL)persistTimedRuleKills:(nullable NSArray<NSDictionary*>*)entries;
+
+///
+///  Returns the persisted timed rule kill entries, or nil if none exist.
+///
+- (nullable NSArray<NSDictionary*>*)savedTimedRuleKills;
+
 #pragma mark - USB Settings
 
 ///

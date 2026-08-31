@@ -31,9 +31,13 @@
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTSignal.h"
 #import "Source/common/SNTXxhash.h"
+#import "Source/common/SantaCache.h"
 #import "Source/common/SigningIDHelpers.h"
 #include "Source/common/String.h"
 #include "Source/common/cel/Evaluator.h"
+
+#include <memory>
+#include <string>
 
 static const uint32_t kRuleTableCurrentVersion = 16;
 
@@ -41,6 +45,10 @@ static const uint32_t kRuleTableCurrentVersion = 16;
 static const int64_t kTransitiveRuleCullingThreshold = 500000;
 // Consider transitive rules out of date if they haven't been used in six months.
 static const NSUInteger kTransitiveRuleExpirationSeconds = 6 * 30 * 24 * 3600;
+
+// Maximum number of file hashes remembered by the execution rule miss cache.
+// Maxes out around 322KiB.
+static const uint64_t kExecutionRuleMissCacheSize = 10000;
 
 static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
   // Create a temporary ES client in order to grab the default set of muted paths.
@@ -77,6 +85,14 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
   std::unique_ptr<santa::cel::Evaluator<false>> _celEvaluator;
   std::unique_ptr<santa::cel::Evaluator<true>> _celV2Evaluator;
   dispatch_once_t _criticalSystemBinariesToken;
+  // Negative cache for the `execution_rules` query in `executionRuleForIdentifiers:`: records the
+  // file hashes that matched no row, so repeat executions of the same unruled binary skip the
+  // query entirely. Only the SQL lookup is cached -- the static rules are an in-memory dictionary
+  // and are checked on every call. Keyed on the binary SHA-256 alone -- it identifies the file
+  // contents, and so determines every other identifier a lookup would match on. Entries are only
+  // ever cleared wholesale (see `clearExecutionRuleMissCache`) -- there is no per-entry
+  // invalidation.
+  std::unique_ptr<SantaCache<std::string, bool>> _executionRuleMissCache;
 }
 @property MOLCodesignChecker* santadCSInfo;
 @property MOLCodesignChecker* launchdCSInfo;
@@ -247,6 +263,9 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
 }
 
 - (uint32_t)initializeDatabase:(FMDatabase*)db fromVersion:(uint32_t)version {
+  _executionRuleMissCache =
+      std::make_unique<SantaCache<std::string, bool>>(kExecutionRuleMissCacheSize);
+
   // Lock this database from other processes
   [[db executeQuery:@"PRAGMA locking_mode = EXCLUSIVE;"] close];
 
@@ -575,37 +594,75 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
     if (rule.type == SNTRuleTypeTeamID) {
       return rule;
     }
+
+    // A static rule found under one identifier but typed for another is not a
+    // match.
+    rule = nil;
+  }
+
+  // If we already looked in the db during another exec and there was no rule,
+  // return early. The cache will be cleared when new rules are added. Keyed by
+  // file sha256. Using a cdhash is appealing, but a cdhash is not guaranteed
+  // unique across files.
+  std::string missCacheKey = identifiers.binarySHA256.length
+                                 ? santa::NSStringToUTF8String(identifiers.binarySHA256)
+                                 : std::string();
+  if (!missCacheKey.empty() && _executionRuleMissCache->get(missCacheKey)) {
+    return nil;
   }
 
   // Now query the database.
   //
-  // The intended order of precedence is CDHash > Binaries > Signing IDs > Certificates > Team IDs.
-  // The UNION ALL structure lets SQLite evaluate each sub-select independently (potentially
-  // short-circuiting via LIMIT 1), while ORDER BY type ASC guarantees the highest-priority
-  // rule is returned regardless of query planner behavior.
+  // The intended order of precedence is
+  // CDHash > Binaries > Signing IDs > Certificates > Team IDs > transitive Binaries.
   //
-  // There is a test for this in SNTRuleTableTests in case SQLite behavior changes in the future.
+  // Transitive rules sort last because they are not a statement of policy: they are written
+  // locally by SNTCompilerController for whatever a compiler happened to produce, which makes
+  // them an allowance of last resort that must not shadow a rule an admin actually configured.
   //
+  // The UNION ALL structure lets SQLite evaluate each sub-select independently, while
+  // ORDER BY prio ASC guarantees the highest-priority rule is returned regardless of query
+  // planner behavior. `prio` is a constant per sub-select rather than an expression over `state`
+  // so that the compound query stays naturally ordered: SQLite then plans this as a streaming
+  // MERGE over indexed lookups. An equivalent `ORDER BY CASE WHEN state=... END` is opaque to the
+  // planner and costs a temp B-tree sort on every lookup.
+  //
+  // clang-format off
+  __block BOOL queryFailed = NO;
   [self inDatabase:^(FMDatabase* db) {
-    FMResultSet* rs =
-        [db executeQuery:@"SELECT * FROM ("
-                         @"  SELECT * FROM execution_rules WHERE identifier=? AND type=500 "
-                         @"  UNION ALL "
-                         @"  SELECT * FROM execution_rules WHERE identifier=? AND type=1000 "
-                         @"  UNION ALL "
-                         @"  SELECT * FROM execution_rules WHERE identifier=? AND type=2000 "
-                         @"  UNION ALL "
-                         @"  SELECT * FROM execution_rules WHERE identifier=? AND type=3000 "
-                         @"  UNION ALL "
-                         @"  SELECT * FROM execution_rules WHERE identifier=? AND type=4000"
-                         @") ORDER BY type ASC LIMIT 1",
-                         identifiers.cdhash, identifiers.binarySHA256, identifiers.signingID,
-                         identifiers.certificateSHA256, identifiers.teamID];
+    FMResultSet* rs = [db executeQuery:@"SELECT * FROM ("
+                                      @"            SELECT 1 AS prio, * FROM execution_rules WHERE identifier=? AND type=500  "
+                                      @"  UNION ALL SELECT 2 AS prio, * FROM execution_rules WHERE identifier=? AND type=1000 AND state<>? "
+                                      @"  UNION ALL SELECT 3 AS prio, * FROM execution_rules WHERE identifier=? AND type=2000 "
+                                      @"  UNION ALL SELECT 4 AS prio, * FROM execution_rules WHERE identifier=? AND type=3000 "
+                                      @"  UNION ALL SELECT 5 AS prio, * FROM execution_rules WHERE identifier=? AND type=4000 "
+                                      @"  UNION ALL SELECT 6 AS prio, * FROM execution_rules WHERE identifier=? AND type=1000 AND state=?"
+                                      @") ORDER BY prio ASC LIMIT 1",
+                                      identifiers.cdhash, identifiers.binarySHA256,
+                                      @(SNTRuleStateAllowTransitive), identifiers.signingID,
+                                      identifiers.certificateSHA256, identifiers.teamID,
+                                      identifiers.binarySHA256, @(SNTRuleStateAllowTransitive)];
+    // A nil result set means the statement itself failed (e.g. a locked or corrupt db), not
+    // that the file has no rule. Note the failure so it isn't remembered as a miss below.
+    if (!rs) {
+      queryFailed = YES;
+      LOGE(@"Failed to query execution rules: %@", [db lastErrorMessage]);
+      return;
+    }
     if ([rs next]) {
       rule = [self executionRuleFromResultSet:rs];
     }
     [rs close];
   }];
+  // clang-format on
+
+  // The query ran and found nothing, so cache that fact to avoid needlessly looking in the db
+  // during future execs. A failed query is deliberately not cached: the miss cache is only ever
+  // invalidated by a rule write, so caching a transient db error would pin it in place and deny
+  // this file its rule indefinitely.
+  if (!rule && !queryFailed && !missCacheKey.empty()) {
+    _executionRuleMissCache->set(missCacheKey, true);
+  }
 
   return rule;
 }
@@ -866,6 +923,10 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
     *errors = [blockErrors copy];
   }
 
+  // Clear the miss cache regardless of rule type. We could ignore clearing if
+  // there were only REMOVE rules, but it is not worth the effort.
+  _executionRuleMissCache->clear();
+
   // If the DB updated successfully, call the "rules changed" callbacks if appropriate
   if (!failed && self.fileAccessRulesChangedCallback &&
       ![faaRulesHashBefore isEqualToString:faaRulesHashAfter]) {
@@ -966,9 +1027,9 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
   [self inTransaction:^(FMDatabase* db, BOOL* rollback) {
     for (SNTRule* rule in rules) {
       if (rule.state != SNTRuleStateAllow) {
-        // If the rule is a CEL rule, block rule, silent block rule, or a compiler rule check if it
-        // already exists in the database. If it is a CEL rule also check the expression is the
-        // same.
+        // If the rule is a CEL rule, block rule, silent block rule, or a compiler rule check if
+        // it already exists in the database. If it is a CEL rule also check the expression is
+        // the same.
         //
         // If it does not then flush the cache. To ensure that the new rule is honored.
         if ([db longForQuery:
@@ -985,11 +1046,11 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
         // Skip certificate and TeamID rules as they cannot be compiler rules.
         if (rule.type == SNTRuleTypeCertificate || rule.type == SNTRuleTypeTeamID) continue;
 
-        if ([db longForQuery:
-                    @"SELECT COUNT(*) FROM execution_rules WHERE identifier=? AND type IN (?, ?, ?)"
-                    @" AND state=? LIMIT 1",
-                    rule.identifier, @(SNTRuleTypeCDHash), @(SNTRuleTypeBinary),
-                    @(SNTRuleTypeSigningID), @(SNTRuleStateAllowCompiler)] > 0) {
+        if ([db longForQuery:@"SELECT COUNT(*) FROM execution_rules WHERE identifier=? AND type "
+                             @"IN (?, ?, ?)"
+                             @" AND state=? LIMIT 1",
+                             rule.identifier, @(SNTRuleTypeCDHash), @(SNTRuleTypeBinary),
+                             @(SNTRuleTypeSigningID), @(SNTRuleStateAllowCompiler)] > 0) {
           flushDecisionCache = YES;
           return;
         }
@@ -1084,8 +1145,8 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
   }
 
   // Column order: 0=name, 1=rule_id, 2=rule_blob. Both `name` (field 1) and `rule_id` (field 2)
-  // of the NetworkFlowRule.Add proto are already part of rule_blob, so the hash need only fold in
-  // the blob bytes; ordering by name ASC makes it deterministic.
+  // of the NetworkFlowRule.Add proto are already part of rule_blob, so the hash need only fold
+  // in the blob bytes; ordering by name ASC makes it deterministic.
   santa::Xxhash128 h;
   FMResultSet* rs = [db executeQuery:@"SELECT name, rule_id, rule_blob FROM network_flow_rules "
                                      @"ORDER BY name ASC"];
@@ -1255,7 +1316,8 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
 
 - (NSString*)networkFlowRulesHashSerialized:(FMDatabase*)db {
   // Shares the single scan/filter used to materialize the ruleset, so this hash and the
-  // snapshot's hash can never drift apart. See -networkFlowRulesHashSerializedInDB:collectInto:.
+  // snapshot's hash can never drift apart. See
+  // -networkFlowRulesHashSerializedInDB:collectInto:.
   return [self networkFlowRulesHashSerializedInDB:db collectInto:nil];
 }
 

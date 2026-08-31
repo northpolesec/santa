@@ -27,7 +27,7 @@ MDM vendors so you may need to refer to your MDM documentation for assistance.
 Below is an example configuration profile that includes a _subset_ of the keys
 available.
 
-```xml showLineNumbers
+```xml showLineNumbers title="santa-configuration.mobileconfig"
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">

@@ -146,6 +146,17 @@ swift_library(
     ],
 )
 
+swift_library(
+    name = "SNTTimedRuleKillMessageWindowView",
+    srcs = [
+        "SNTTimedRuleKillMessageWindowView.swift",
+    ],
+    generates_header = 1,
+    deps = [
+        ":SNTMessageView",
+    ],
+)
+
 objc_library(
     name = "SNTSystemExtensionDelegate",
     srcs = ["SNTSystemExtensionDelegate.mm"],
@@ -319,6 +330,7 @@ objc_library(
         ":SNTNetworkFlowMessageWindowController",
         ":SNTNetworkMountMessageWindowController",
         ":SNTStatusItemManager",
+        ":SNTTimedRuleKillMessageWindowController",
         "//Source/common:MOLCertificate",
         "//Source/common:MOLXPCConnection",
         "//Source/common:SNTBlockMessage_SantaGUI",
@@ -365,6 +377,17 @@ objc_library(
 )
 
 objc_library(
+    name = "SNTTimedRuleKillMessageWindowController",
+    srcs = ["SNTTimedRuleKillMessageWindowController.mm"],
+    hdrs = ["SNTTimedRuleKillMessageWindowController.h"],
+    deps = [
+        ":SNTMessageWindowController",
+        ":SNTTimedRuleKillMessageWindowView",
+        "//Source/common:SNTStrengthify",
+    ],
+)
+
+objc_library(
     name = "SantaGUI_lib",
     srcs = ["main.mm"],
     sdk_frameworks = [
@@ -387,6 +410,7 @@ objc_library(
         ":SNTNotificationManager",
         ":SNTStatusItemManager",
         ":SNTSystemExtensionDelegate",
+        ":SNTTimedRuleKillMessageWindowController",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTLogging",
     ],
@@ -477,6 +501,7 @@ santa_unit_test(
     deps = [
         ":SNTNotificationManager",
         "//Source/common:SNTConfigBundle",
+        "//Source/common:SNTConfigurator",
         "//Source/common:SNTStoredExecutionEvent",
         "//Source/common:SNTStoredNetworkFlowEvent",
         "@OCMock",

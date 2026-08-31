@@ -63,13 +63,19 @@ class Evaluator {
 
   // allowUnspecified permits the expression to return UNSPECIFIED (fall through
   // to the next rule). Only fallback expressions should set this; regular rules
-  // leave it false so a UNSPECIFIED return fails to compile. No-op for V1.
+  // leave it false so a UNSPECIFIED return fails to compile. It also decides
+  // whether policy_for_range() is declared, which is the other way around: a
+  // fallback expression carries no rule identity for a time window to attach
+  // to, so only rules get the function. No-op for V1.
   static absl::StatusOr<std::unique_ptr<Evaluator>> Create(
       bool allowUnspecified = false);
 
   Evaluator(std::unique_ptr<::cel::Compiler> compiler,
-            std::unique_ptr<google::protobuf::Arena> arena)
-      : compiler_(std::move(compiler)), compiler_arena_(std::move(arena)) {};
+            std::unique_ptr<google::protobuf::Arena> arena,
+            bool allowUnspecified)
+      : compiler_(std::move(compiler)),
+        compiler_arena_(std::move(arena)),
+        allowUnspecified_(allowUnspecified) {};
   ~Evaluator() = default;
 
   Evaluator(Evaluator&& other) = default;
@@ -100,6 +106,9 @@ class Evaluator {
   std::unique_ptr<::cel::Compiler> compiler_;
   std::unique_ptr<google::protobuf::Arena>
       compiler_arena_;  // Kept alive for compiler type refs
+  // Kept so Compile() registers the same set of functions the compiler
+  // declared.
+  bool allowUnspecified_ = false;
 };
 
 }  // namespace cel

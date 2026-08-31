@@ -4,6 +4,9 @@
 /* Notification message shown when a known app has been unblocked */
 "%@ can now be run" = "%@ can now be run";
 
+/* Window message warning that an app will be quit at a time */
+"\"%@\" will quit at %@." = "\"%1$@\" will quit at %2$@.";
+
 /* Reason shown when a justification is required but not given */
 "a justification is required" = "a justification is required";
 

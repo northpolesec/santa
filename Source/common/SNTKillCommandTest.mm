@@ -16,11 +16,15 @@
 
 #import <Foundation/Foundation.h>
 #import <XCTest/XCTest.h>
+#include <sys/signal.h>
 
 #include "Source/common/CodeSigningIdentifierUtils.h"
 
 @interface SNTKillRequest (Testing)
 - (instancetype)initWithUUID:(NSString*)uuid;
+- (instancetype)initWithUUID:(NSString*)uuid
+                      signal:(int)signal
+         targetProcessGroups:(BOOL)targetProcessGroups;
 @end
 
 @interface SNTKillCommandTest : XCTestCase
@@ -273,6 +277,205 @@
   XCTAssertNotNil(decoded);
   XCTAssertEqualObjects(decoded.uuid, uuid);
   XCTAssertEqualObjects(decoded.teamID, teamID);
+}
+
+// Pins today's behavior: every existing initializer produces a request that
+// SIGKILLs matched processes one at a time.
+- (void)testSNTKillRequestSignalDefaults {
+  NSString* uuid = [[NSUUID UUID] UUIDString];
+
+  NSArray<SNTKillRequest*>* requests = @[
+    [[SNTKillRequest alloc] initWithUUID:uuid],
+    [[SNTKillRequestRunningProcess alloc] initWithUUID:uuid
+                                                   pid:1234
+                                            pidversion:5678
+                                       bootSessionUUID:@"2470862D-9913-4B95-A2BB-556EDC163069"],
+    [[SNTKillRequestCDHash alloc] initWithUUID:uuid
+                                        cdHash:@"a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0"],
+    [[SNTKillRequestSigningID alloc] initWithUUID:uuid signingID:@"ABCDEFGHIJ:com.example.app"],
+    [[SNTKillRequestTeamID alloc] initWithUUID:uuid teamID:@"ABCDEFGHIJ"],
+  ];
+
+  for (SNTKillRequest* request in requests) {
+    XCTAssertEqual(request.signal, SIGKILL, @"%@", [request class]);
+    XCTAssertFalse(request.targetProcessGroups, @"%@", [request class]);
+  }
+}
+
+- (void)testSNTKillRequestSignalAndTargetProcessGroups {
+  NSString* uuid = [[NSUUID UUID] UUIDString];
+  NSString* bootUUID = @"2470862D-9913-4B95-A2BB-556EDC163069";
+
+  NSArray<SNTKillRequest*>* requests = @[
+    [[SNTKillRequest alloc] initWithUUID:uuid signal:SIGTERM targetProcessGroups:YES],
+    [[SNTKillRequestRunningProcess alloc] initWithUUID:uuid
+                                                   pid:1234
+                                            pidversion:5678
+                                       bootSessionUUID:bootUUID
+                                                signal:SIGTERM
+                                   targetProcessGroups:YES],
+    [[SNTKillRequestCDHash alloc] initWithUUID:uuid
+                                        cdHash:@"a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0"
+                                        signal:SIGTERM
+                           targetProcessGroups:YES],
+    [[SNTKillRequestSigningID alloc] initWithUUID:uuid
+                                        signingID:@"ABCDEFGHIJ:com.example.app"
+                                           signal:SIGTERM
+                              targetProcessGroups:YES],
+    [[SNTKillRequestTeamID alloc] initWithUUID:uuid
+                                        teamID:@"ABCDEFGHIJ"
+                                        signal:SIGTERM
+                           targetProcessGroups:YES],
+  ];
+
+  for (SNTKillRequest* request in requests) {
+    XCTAssertEqual(request.signal, SIGTERM, @"%@", [request class]);
+    XCTAssertTrue(request.targetProcessGroups, @"%@", [request class]);
+
+    NSData* archived = [NSKeyedArchiver archivedDataWithRootObject:request
+                                             requiringSecureCoding:YES
+                                                             error:nil];
+    XCTAssertNotNil(archived, @"%@", [request class]);
+
+    SNTKillRequest* decoded = [NSKeyedUnarchiver unarchivedObjectOfClass:[request class]
+                                                                fromData:archived
+                                                                   error:nil];
+    XCTAssertNotNil(decoded, @"%@", [request class]);
+    XCTAssertEqual(decoded.signal, SIGTERM, @"%@", [request class]);
+    XCTAssertTrue(decoded.targetProcessGroups, @"%@", [request class]);
+  }
+}
+
+// A request carrying a signal that signals nothing would report success for
+// every process it matched, so no initializer may produce one.
+- (void)testSNTKillRequestRejectsUnusableSignals {
+  NSString* uuid = [[NSUUID UUID] UUIDString];
+  NSString* bootUUID = @"2470862D-9913-4B95-A2BB-556EDC163069";
+
+  // 0 is kill(2)'s liveness probe; the rest are outside the signal table.
+  for (NSNumber* boxed in @[ @0, @(-1), @(NSIG), @(NSIG + 1) ]) {
+    int sig = boxed.intValue;
+
+    XCTAssertNil([[SNTKillRequest alloc] initWithUUID:uuid signal:sig targetProcessGroups:NO],
+                 @"signal %d", sig);
+    XCTAssertNil([[SNTKillRequestRunningProcess alloc] initWithUUID:uuid
+                                                                pid:1234
+                                                         pidversion:5678
+                                                    bootSessionUUID:bootUUID
+                                                             signal:sig
+                                                targetProcessGroups:NO],
+                 @"signal %d", sig);
+    XCTAssertNil(
+        [[SNTKillRequestCDHash alloc] initWithUUID:uuid
+                                            cdHash:@"a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0"
+                                            signal:sig
+                               targetProcessGroups:NO],
+        @"signal %d", sig);
+    XCTAssertNil([[SNTKillRequestSigningID alloc] initWithUUID:uuid
+                                                     signingID:@"ABCDEFGHIJ:com.example.app"
+                                                        signal:sig
+                                           targetProcessGroups:NO],
+                 @"signal %d", sig);
+    XCTAssertNil([[SNTKillRequestTeamID alloc] initWithUUID:uuid
+                                                     teamID:@"ABCDEFGHIJ"
+                                                     signal:sig
+                                        targetProcessGroups:NO],
+                 @"signal %d", sig);
+  }
+}
+
+// The new fields didn't exist in earlier versions, so an archive that lacks
+// them must still describe today's behavior rather than signal 0, which kill(2)
+// treats as a liveness probe.
+- (void)testSNTKillRequestDecodesMissingSignalAsSigkill {
+  NSString* uuid = [[NSUUID UUID] UUIDString];
+  NSKeyedArchiver* archiver = [[NSKeyedArchiver alloc] initRequiringSecureCoding:YES];
+  [archiver encodeObject:uuid forKey:@"uuid"];
+  [archiver finishEncoding];
+
+  NSKeyedUnarchiver* unarchiver =
+      [[NSKeyedUnarchiver alloc] initForReadingFromData:archiver.encodedData error:nil];
+  unarchiver.requiresSecureCoding = YES;
+  SNTKillRequest* decoded = [[SNTKillRequest alloc] initWithCoder:unarchiver];
+
+  XCTAssertNotNil(decoded);
+  XCTAssertEqualObjects(decoded.uuid, uuid);
+  XCTAssertEqual(decoded.signal, SIGKILL);
+  XCTAssertFalse(decoded.targetProcessGroups);
+}
+
+// An archive that carries a signal no initializer would have accepted didn't
+// come from a version that predates the field, so it isn't decoded as SIGKILL.
+// It is rejected, exactly as construction would reject it.
+- (void)testSNTKillRequestDecodeRejectsUnusableSignals {
+  NSString* uuid = [[NSUUID UUID] UUIDString];
+
+  for (NSNumber* boxed in @[ @0, @(-1), @(NSIG), @(NSIG + 1) ]) {
+    NSKeyedArchiver* archiver = [[NSKeyedArchiver alloc] initRequiringSecureCoding:YES];
+    [archiver encodeObject:uuid forKey:@"uuid"];
+    [archiver encodeObject:boxed forKey:@"signal"];
+    [archiver finishEncoding];
+
+    NSKeyedUnarchiver* unarchiver =
+        [[NSKeyedUnarchiver alloc] initForReadingFromData:archiver.encodedData error:nil];
+    unarchiver.requiresSecureCoding = YES;
+
+    XCTAssertNil([[SNTKillRequest alloc] initWithCoder:unarchiver], @"signal %@", boxed);
+  }
+}
+
+// NSKeyedUnarchiver hands back an NSString for a key declared as NSNumber
+// without reporting an error, and -intValue would quietly turn it into the
+// signal to deliver. A signal key must hold an actual number.
+- (void)testSNTKillRequestDecodeRejectsSignalEncodedAsString {
+  NSKeyedArchiver* archiver = [[NSKeyedArchiver alloc] initRequiringSecureCoding:YES];
+  [archiver encodeObject:[[NSUUID UUID] UUIDString] forKey:@"uuid"];
+  [archiver encodeObject:@"17" forKey:@"signal"];
+  [archiver finishEncoding];
+
+  NSKeyedUnarchiver* unarchiver =
+      [[NSKeyedUnarchiver alloc] initForReadingFromData:archiver.encodedData error:nil];
+  unarchiver.requiresSecureCoding = YES;
+
+  XCTAssertNil([[SNTKillRequest alloc] initWithCoder:unarchiver]);
+}
+
+// When the signal key holds a class secure coding rejects, the decode yields
+// nil — the same thing an archive predating the field yields. Only the absence
+// of the key means "predates the field", so a key that is present but unusable
+// is treated as a malformed archive and rejected, not read as SIGKILL.
+- (void)testSNTKillRequestDecodeRejectsSignalOfRejectedClass {
+  NSKeyedArchiver* archiver = [[NSKeyedArchiver alloc] initRequiringSecureCoding:YES];
+  [archiver encodeObject:[[NSUUID UUID] UUIDString] forKey:@"uuid"];
+  [archiver encodeObject:@[ @9 ] forKey:@"signal"];
+  [archiver finishEncoding];
+
+  NSKeyedUnarchiver* unarchiver =
+      [[NSKeyedUnarchiver alloc] initForReadingFromData:archiver.encodedData error:nil];
+  unarchiver.requiresSecureCoding = YES;
+
+  XCTAssertNil([[SNTKillRequest alloc] initWithCoder:unarchiver]);
+}
+
+// The base class rejects the bad signal; subclasses reach that check through
+// [super initWithCoder:], so a concrete subclass carrying an invalid signal
+// must also decode to nil.
+- (void)testSNTKillRequestSubclassDecodeRejectsUnusableSignal {
+  NSString* uuid = [[NSUUID UUID] UUIDString];
+
+  for (NSNumber* boxed in @[ @0, @(-1), @(NSIG), @(NSIG + 1) ]) {
+    NSKeyedArchiver* archiver = [[NSKeyedArchiver alloc] initRequiringSecureCoding:YES];
+    [archiver encodeObject:uuid forKey:@"uuid"];
+    [archiver encodeObject:boxed forKey:@"signal"];
+    [archiver encodeObject:@"ABCDEFGHIJ" forKey:@"teamID"];
+    [archiver finishEncoding];
+
+    NSKeyedUnarchiver* unarchiver =
+        [[NSKeyedUnarchiver alloc] initForReadingFromData:archiver.encodedData error:nil];
+    unarchiver.requiresSecureCoding = YES;
+
+    XCTAssertNil([[SNTKillRequestTeamID alloc] initWithCoder:unarchiver], @"signal %@", boxed);
+  }
 }
 
 - (void)testSNTKilledProcess {

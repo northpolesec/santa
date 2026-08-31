@@ -44,6 +44,7 @@
 #import "Source/gui/SNTNetworkFlowMessageWindowController.h"
 #import "Source/gui/SNTNetworkMountMessageWindowController.h"
 #import "Source/gui/SNTStatusItemManager.h"
+#import "Source/gui/SNTTimedRuleKillMessageWindowController.h"
 #import "src/santanetd/SNDFilterConfigurationHelper.h"
 
 @interface SNTNotificationManager ()
@@ -257,7 +258,12 @@ static NSString* const silencedNotificationsKey = @"SilencedNotifications";
 
 - (void)hashBundleBinariesForEvent:(SNTStoredExecutionEvent*)event
                     withController:(SNTBinaryMessageWindowController*)withController {
-  withController.bundleProgress.label = @"Searching for files...";
+  // bundleProgress is an ObservableObject driving SwiftUI; this runs on hashBundleBinariesQueue,
+  // and publishing a change off the main thread mutates the view graph from under the renderer.
+  // Every other writer (-updateCountsForEvent:..., -updateBlockNotification:...) already hops.
+  dispatch_async(dispatch_get_main_queue(), ^{
+    withController.bundleProgress.label = @"Searching for files...";
+  });
 
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
   MOLXPCConnection* bc = [SNTXPCBundleServiceInterface configuredConnection];
@@ -406,6 +412,28 @@ static NSString* const silencedNotificationsKey = @"SilencedNotifications";
                                                                     trigger:nil];
 
   [un addNotificationRequest:req withCompletionHandler:nil];
+}
+
+// A window, not a UNUserNotificationCenter banner: Do Not Disturb and Focus
+// modes suppress banners, and a warning that something is about to be quit must
+// not be dropped that way.
+- (void)postTimedRuleKillNotificationForApplication:(NSString*)app deadline:(NSDate*)deadline {
+  // Length, not just nil: an empty name has no identity, so its window would
+  // both read absurdly and defeat the queue's dedup, stacking one focus-stealing
+  // window per repeated call. Logged like the other bad-input bails here, so a
+  // daemon-side regression is visible instead of silently dropping warnings.
+  if (!app.length || !deadline) {
+    LOGI(@"Error: Missing application name or deadline in message received from daemon!");
+    return;
+  }
+
+  SNTTimedRuleKillMessageWindowController* pendingMsg =
+      [[SNTTimedRuleKillMessageWindowController alloc] initWithApplication:app deadline:deadline];
+
+  // Silences are a block-event feature: a warning that an application is about
+  // to be quit is not something a user should be able to turn off per
+  // application. Silent mode still suppresses it, through the queue's own check.
+  [self queueMessage:pendingMsg enableSilences:NO];
 }
 
 - (void)postBlockNotification:(SNTStoredExecutionEvent*)event

@@ -59,6 +59,9 @@ NSArray* PathsFromProtoFAARulePaths(
 NSDictionary* OptionsFromProtoFAARuleAdd(const ::pbv2::FileAccessRule::Add& pbAddRule);
 NSArray* ProcessesFromProtoFAARuleProcesses(
     const google::protobuf::RepeatedPtrField<::pbv2::FileAccessRule::Process>& pbProcesses);
+NSArray* ProcessesWithOptionsFromProtoFAARuleProcesses(
+    const google::protobuf::RepeatedPtrField<::pbv2::FileAccessRule::ProcessWithOptions>&
+        pbProcesses);
 SNTNetworkFlowRule* NetworkFlowRuleFromProto(const ::pbv2::NetworkFlowRule& nr);
 SNTSignal* SignalFromProtoSignalRule(const ::pbv2::TelemetrySignalRule& sr);
 
@@ -260,32 +263,101 @@ NSDictionary* OptionsFromProtoFAARuleAdd(const ::pbv2::FileAccessRule::Add& pbAd
   return optionsDict;
 }
 
+/// Convert the identifier oneof of a single proto process into the config
+/// dictionary form. Returns nil if no identifier was set.
+NSMutableDictionary* ProcessDictFromProtoFAARuleProcess(
+    const ::pbv2::FileAccessRule::Process& process) {
+  NSMutableDictionary* processDict = [NSMutableDictionary dictionary];
+
+  switch (process.identifier_case()) {
+    case ::pbv2::FileAccessRule::Process::kBinaryPath:
+      processDict[kWatchItemConfigKeyProcessesBinaryPath] = StringToNSString(process.binary_path());
+      break;
+    case ::pbv2::FileAccessRule::Process::kCdHash:
+      processDict[kWatchItemConfigKeyProcessesCDHash] = StringToNSString(process.cd_hash());
+      break;
+    case ::pbv2::FileAccessRule::Process::kSigningId:
+      processDict[kWatchItemConfigKeyProcessesSigningID] = StringToNSString(process.signing_id());
+      break;
+    case ::pbv2::FileAccessRule::Process::kCertificateSha256:
+      processDict[kWatchItemConfigKeyProcessesCertificateSha256] =
+          StringToNSString(process.certificate_sha256());
+      break;
+    case ::pbv2::FileAccessRule::Process::kTeamId:
+      processDict[kWatchItemConfigKeyProcessesTeamID] = StringToNSString(process.team_id());
+      break;
+    default: return nil;
+  }
+
+  return processDict;
+}
+
 NSArray* ProcessesFromProtoFAARuleProcesses(
     const google::protobuf::RepeatedPtrField<::pbv2::FileAccessRule::Process>& pbProcesses) {
   NSMutableArray* processes = [NSMutableArray array];
 
   for (const ::pbv2::FileAccessRule::Process& process : pbProcesses) {
-    NSMutableDictionary* processDict = [NSMutableDictionary dictionary];
+    NSMutableDictionary* processDict = ProcessDictFromProtoFAARuleProcess(process);
+    if (!processDict) {
+      return nil;
+    }
 
-    switch (process.identifier_case()) {
-      case ::pbv2::FileAccessRule::Process::kBinaryPath:
-        processDict[kWatchItemConfigKeyProcessesBinaryPath] =
-            StringToNSString(process.binary_path());
+    [processes addObject:processDict];
+  }
+
+  return processes;
+}
+
+NSArray* ProcessesWithOptionsFromProtoFAARuleProcesses(
+    const google::protobuf::RepeatedPtrField<::pbv2::FileAccessRule::ProcessWithOptions>&
+        pbProcesses) {
+  NSMutableArray* processes = [NSMutableArray array];
+
+  for (const ::pbv2::FileAccessRule::ProcessWithOptions& process : pbProcesses) {
+    NSMutableDictionary* processDict = ProcessDictFromProtoFAARuleProcess(process.process());
+    if (!processDict) {
+      return nil;
+    }
+
+    switch (process.action()) {
+      // Unspecified means the outcome is inherited from the rule, which is
+      // conveyed by simply omitting the key.
+      case ::pbv2::FileAccessRule::ProcessWithOptions::ACTION_UNSPECIFIED: break;
+      case ::pbv2::FileAccessRule::ProcessWithOptions::ACTION_ALLOW:
+        processDict[kWatchItemConfigKeyProcessesAction] = kProcessActionAllow;
         break;
-      case ::pbv2::FileAccessRule::Process::kCdHash:
-        processDict[kWatchItemConfigKeyProcessesCDHash] = StringToNSString(process.cd_hash());
+      case ::pbv2::FileAccessRule::ProcessWithOptions::ACTION_AUDIT:
+        processDict[kWatchItemConfigKeyProcessesAction] = kProcessActionAudit;
         break;
-      case ::pbv2::FileAccessRule::Process::kSigningId:
-        processDict[kWatchItemConfigKeyProcessesSigningID] = StringToNSString(process.signing_id());
-        break;
-      case ::pbv2::FileAccessRule::Process::kCertificateSha256:
-        processDict[kWatchItemConfigKeyProcessesCertificateSha256] =
-            StringToNSString(process.certificate_sha256());
-        break;
-      case ::pbv2::FileAccessRule::Process::kTeamId:
-        processDict[kWatchItemConfigKeyProcessesTeamID] = StringToNSString(process.team_id());
+      case ::pbv2::FileAccessRule::ProcessWithOptions::ACTION_DENY:
+        processDict[kWatchItemConfigKeyProcessesAction] = kProcessActionDeny;
         break;
       default: return nil;
+    }
+
+    // Note: Only explicitly set fields are emitted. An absent key means the
+    // value is inherited from the rule.
+    if (process.has_allow_read_access()) {
+      processDict[kWatchItemConfigKeyOptionsAllowReadAccess] = @(process.allow_read_access());
+    }
+    if (process.has_enable_silent_mode()) {
+      processDict[kWatchItemConfigKeyOptionsEnableSilentMode] = @(process.enable_silent_mode());
+    }
+    if (process.has_enable_silent_tty_mode()) {
+      processDict[kWatchItemConfigKeyOptionsEnableSilentTTYMode] =
+          @(process.enable_silent_tty_mode());
+    }
+    if (process.has_block_message()) {
+      processDict[kWatchItemConfigKeyOptionsCustomMessage] =
+          StringToNSString(process.block_message());
+    }
+    if (process.has_event_detail_url()) {
+      processDict[kWatchItemConfigKeyOptionsEventDetailURL] =
+          StringToNSString(process.event_detail_url());
+    }
+    if (process.has_event_detail_text()) {
+      processDict[kWatchItemConfigKeyOptionsEventDetailText] =
+          StringToNSString(process.event_detail_text());
     }
 
     [processes addObject:processDict];
@@ -315,10 +387,20 @@ SNTFileAccessRule* FAARuleFromProtoFAARuleAdd(const ::pbv2::FileAccessRule::Add&
   }
   details[kWatchItemConfigKeyProcesses] = processes;
 
+  if (pbAddRule.processes_with_options_size() > 0) {
+    NSArray* processesWithOptions =
+        ProcessesWithOptionsFromProtoFAARuleProcesses(pbAddRule.processes_with_options());
+    if (!processesWithOptions) {
+      return nil;
+    }
+    details[kWatchItemConfigKeyProcessesWithOptions] = processesWithOptions;
+  }
+
   NSString* name = StringToNSString(pbAddRule.name());
 
   NSError* err;
-  if (santa::WatchItems::IsValidRule(name, details, &err)) {
+  if (santa::WatchItems::IsValidRule(name, details, santa::WatchItems::DataSource::kDatabase,
+                                     &err)) {
     return [[SNTFileAccessRule alloc] initAddRuleWithName:name details:details];
   } else {
     return nil;

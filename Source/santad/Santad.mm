@@ -205,9 +205,9 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
   auto faaPolicyProcessor = std::make_shared<santa::FAAPolicyProcessor>(
       [SNTDecisionCache sharedCache], enricher, logger, tty_writer, metrics,
       configurator.fileAccessGlobalLogsPerSec, configurator.fileAccessGlobalWindowSizeSec,
-      ^santa::FAAPolicyProcessor::URLTextPair(
-          const std::shared_ptr<santa::WatchItemPolicyBase>& policy) {
-        return watch_items->EventDetailLinkInfo(policy);
+      ^santa::FAAPolicyProcessor::URLTextPair(std::optional<NSString*> event_detail_url,
+                                              std::optional<NSString*> event_detail_text) {
+        return watch_items->EventDetailLinkInfo(event_detail_url, event_detail_text);
       },
       ^(SNTStoredFileAccessEvent* event, bool sendImmediately) {
         // Only store FAA events if a sync server is configured.

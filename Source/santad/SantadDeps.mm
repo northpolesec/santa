@@ -39,6 +39,7 @@
 #import "Source/santad/SNTDecisionCache.h"
 #import "Source/santad/SNTNetworkExtensionQueue.h"
 #import "Source/santad/SNTPolicyProcessor.h"
+#import "Source/santad/SNTTimedRuleKills.h"
 #include "Source/santad/SignalScanner.h"
 #include "Source/santad/SleighLauncher.h"
 #include "Source/santad/TTYWriter.h"
@@ -98,6 +99,21 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator* configurator,
     LOGE(@"Failed to initialize notification queue.");
     exit(EXIT_FAILURE);
   }
+
+  // Owns the kills asked for by CEL rules using policy_for_range(...,
+  // should_kill=true). Nothing records entries yet, so the only thing it does
+  // in production today is settle the entries a previous daemon left behind. A
+  // default-constructed KillEnv is the real syscalls.
+  SNTTimedRuleKills* timed_rule_kills =
+      [[SNTTimedRuleKills alloc] initWithNotifierQueue:notifier_queue
+                                             ruleTable:rule_table
+                                          configurator:configurator
+                                               killEnv:santa::KillEnv()];
+  if (!timed_rule_kills) {
+    LOGE(@"Failed to initialize timed rule kills.");
+    exit(EXIT_FAILURE);
+  }
+  [timed_rule_kills resumeFromSavedState];
 
   SNTSyncdQueue* syncd_queue = [[SNTSyncdQueue alloc] initWithCacheSize:1024];
   if (!syncd_queue) {
@@ -285,8 +301,8 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator* configurator,
   return std::make_unique<SantadDeps>(
       esapi, logger, std::move(metrics), std::move(watch_items), std::move(auth_result_cache),
       control_connection, compiler_controller, notifier_queue, syncd_queue, netext_queue,
-      exec_controller, prefix_tree, std::move(tty_writer), std::move(process_tree),
-      std::move(entitlements_filter), std::move(sandbox_expectations));
+      exec_controller, timed_rule_kills, prefix_tree, std::move(tty_writer),
+      std::move(process_tree), std::move(entitlements_filter), std::move(sandbox_expectations));
 }
 
 SantadDeps::SantadDeps(
@@ -295,8 +311,8 @@ SantadDeps::SantadDeps(
     std::shared_ptr<santa::AuthResultCache> auth_result_cache, MOLXPCConnection* control_connection,
     SNTCompilerController* compiler_controller, SNTNotificationQueue* notifier_queue,
     SNTSyncdQueue* syncd_queue, SNTNetworkExtensionQueue* netext_queue,
-    SNTExecutionController* exec_controller, std::shared_ptr<::PrefixTree<Unit>> prefix_tree,
-    std::shared_ptr<::TTYWriter> tty_writer,
+    SNTExecutionController* exec_controller, SNTTimedRuleKills* timed_rule_kills,
+    std::shared_ptr<::PrefixTree<Unit>> prefix_tree, std::shared_ptr<::TTYWriter> tty_writer,
     std::shared_ptr<santa::santad::process_tree::ProcessTree> process_tree,
     std::shared_ptr<santa::EntitlementsFilter> entitlements_filter,
     std::shared_ptr<santa::SandboxExpectations> sandbox_expectations)
@@ -312,6 +328,7 @@ SantadDeps::SantadDeps(
       syncd_queue_(syncd_queue),
       netext_queue_(netext_queue),
       exec_controller_(exec_controller),
+      timed_rule_kills_(timed_rule_kills),
       prefix_tree_(prefix_tree),
       tty_writer_(std::move(tty_writer)),
       process_tree_(std::move(process_tree)),
@@ -363,6 +380,10 @@ SNTNetworkExtensionQueue* SantadDeps::NetworkExtensionQueue() {
 
 SNTExecutionController* SantadDeps::ExecController() {
   return exec_controller_;
+}
+
+SNTTimedRuleKills* SantadDeps::TimedRuleKills() {
+  return timed_rule_kills_;
 }
 
 std::shared_ptr<PrefixTree<Unit>> SantadDeps::PrefixTree() {

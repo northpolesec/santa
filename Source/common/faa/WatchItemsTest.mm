@@ -49,28 +49,31 @@ using santa::ProcessWatchItemPolicy;
 using santa::SetPairPathAndType;
 using santa::SetSharedDataWatchItemPolicy;
 using santa::SetSharedProcessWatchItemPolicy;
-using santa::SetWatchItemProcess;
 using santa::Unit;
 using santa::WatchItemPathType;
 using santa::WatchItemProcess;
+using santa::WatchItemProcessList;
 using santa::WatchItemsState;
 
 namespace santa {
 
-extern bool ParseConfig(NSDictionary* config, SetSharedDataWatchItemPolicy* data_policies,
+extern bool ParseConfig(NSDictionary* config, WatchItems::DataSource data_source,
+                        SetSharedDataWatchItemPolicy* data_policies,
                         SetSharedProcessWatchItemPolicy* proc_policies, uint64_t* rules_loaded,
                         NSError** err);
 extern bool IsWatchItemNameValid(id key, NSError** err);
 extern bool ParseConfigSingleWatchItem(NSString* name, std::string_view policy_version,
-                                       NSDictionary* watch_item,
+                                       NSDictionary* watch_item, WatchItems::DataSource data_source,
                                        SetSharedDataWatchItemPolicy* data_policies,
                                        SetSharedProcessWatchItemPolicy* proc_policies,
                                        NSError** err);
 extern std::variant<Unit, SetPairPathAndType> VerifyConfigWatchItemPaths(NSArray<id>* paths,
                                                                          NSError** err);
-std::variant<Unit, SetWatchItemProcess> VerifyConfigWatchItemProcesses(NSDictionary* watch_item,
-                                                                       NSError** err);
+extern std::variant<Unit, WatchItemProcessList> VerifyConfigWatchItemProcesses(
+    NSDictionary* watch_item, NSString* key, const WatchItemProcessOptions* rule_options,
+    NSError** err);
 extern std::optional<WatchItemRuleType> GetRuleType(NSString* rule_type);
+extern std::optional<WatchItemProcessAction> GetProcessAction(NSString* action);
 extern std::vector<std::string> FindMatches(NSString* path);
 
 class WatchItemsPeer : public WatchItems {
@@ -86,7 +89,17 @@ class WatchItemsPeer : public WatchItems {
                    periodic_task_complete_f) {}
 
   using WatchItems::ForceSetIntervalForTestingUnsafe;
-  using WatchItems::ReloadConfig;
+
+  // Apply an in-memory config, leaving config_path_ alone. SetConfig would clear
+  // it, and some tests construct the peer with a path and assert on it.
+  void ReloadConfig(NSDictionary* config) {
+    {
+      absl::MutexLock lock(WatchItems::lock_);
+      WatchItems::embedded_config_ = config;
+    }
+    WatchItems::ReloadConfig();
+  }
+
   using WatchItems::SetConfig;
   using WatchItems::SetConfigPath;
 
@@ -97,14 +110,43 @@ class WatchItemsPeer : public WatchItems {
 }  // namespace santa
 
 using santa::FindMatches;
+using santa::GetProcessAction;
 using santa::GetRuleType;
 using santa::IsWatchItemNameValid;
-using santa::ParseConfig;
-using santa::ParseConfigSingleWatchItem;
+using santa::WatchItems;
+
+// Convenience wrappers so the many parser tests don't have to name a data
+// source. Rules from a sync server are the permissive case, so tests covering
+// the locally-managed restrictions name their source explicitly.
+static bool ParseConfig(NSDictionary* config, SetSharedDataWatchItemPolicy* data_policies,
+                        SetSharedProcessWatchItemPolicy* proc_policies, uint64_t* rules_loaded,
+                        NSError** err) {
+  return santa::ParseConfig(config, WatchItems::DataSource::kDatabase, data_policies, proc_policies,
+                            rules_loaded, err);
+}
+
+static bool ParseConfigSingleWatchItem(NSString* name, std::string_view policy_version,
+                                       NSDictionary* watch_item,
+                                       SetSharedDataWatchItemPolicy* data_policies,
+                                       SetSharedProcessWatchItemPolicy* proc_policies,
+                                       NSError** err) {
+  return santa::ParseConfigSingleWatchItem(name, policy_version, watch_item,
+                                           WatchItems::DataSource::kDatabase, data_policies,
+                                           proc_policies, err);
+}
 using santa::VerifyConfigWatchItemPaths;
-using santa::VerifyConfigWatchItemProcesses;
 using santa::WatchItemPolicyBase;
+using santa::WatchItemProcessAction;
+using santa::WatchItemProcessOptions;
 using santa::WatchItemsPeer;
+
+// Convenience wrapper for the common case of verifying the plain `Processes`
+// array, whose entries carry no option overrides.
+static std::variant<Unit, WatchItemProcessList> VerifyConfigWatchItemProcesses(
+    NSDictionary* watch_item, NSError** err) {
+  return santa::VerifyConfigWatchItemProcesses(watch_item, kWatchItemConfigKeyProcesses, nullptr,
+                                               err);
+}
 
 static constexpr std::string_view kBadPolicyName("__BAD_NAME__");
 static constexpr std::string_view kBadPolicyPath("__BAD_PATH__");
@@ -549,13 +591,13 @@ BlockGenResult CreatePolicyBlockGen() {
 }
 
 - (void)testVerifyConfigWatchItemProcesses {
-  std::variant<Unit, SetWatchItemProcess> proc_list;
+  std::variant<Unit, WatchItemProcessList> proc_list;
   NSError* err;
 
   // Non-existent process list parses successfully, but has no items
   proc_list = VerifyConfigWatchItemProcesses(@{}, &err);
-  XCTAssertTrue(std::holds_alternative<SetWatchItemProcess>(proc_list));
-  XCTAssertEqual(std::get<SetWatchItemProcess>(proc_list).size(), 0);
+  XCTAssertTrue(std::holds_alternative<WatchItemProcessList>(proc_list));
+  XCTAssertEqual(std::get<WatchItemProcessList>(proc_list).size(), 0);
 
   // Process list fails to parse if contains non-array type
   proc_list = VerifyConfigWatchItemProcesses(@{kWatchItemConfigKeyProcesses : @""}, &err);
@@ -565,7 +607,7 @@ BlockGenResult CreatePolicyBlockGen() {
   proc_list = VerifyConfigWatchItemProcesses(@{kWatchItemConfigKeyProcesses : @{}}, &err);
   XCTAssertTrue(std::holds_alternative<Unit>(proc_list));
   proc_list = VerifyConfigWatchItemProcesses(@{kWatchItemConfigKeyProcesses : @[]}, &err);
-  XCTAssertTrue(std::holds_alternative<SetWatchItemProcess>(proc_list));
+  XCTAssertTrue(std::holds_alternative<WatchItemProcessList>(proc_list));
 
   // Test a process dictionary with no valid attributes set
   proc_list = VerifyConfigWatchItemProcesses(@{kWatchItemConfigKeyProcesses : @[ @{} ]}, &err);
@@ -583,9 +625,9 @@ BlockGenResult CreatePolicyBlockGen() {
   proc_list = VerifyConfigWatchItemProcesses(
       @{kWatchItemConfigKeyProcesses : @[ @{kWatchItemConfigKeyProcessesBinaryPath : @"mypath"} ]},
       &err);
-  XCTAssertTrue(std::holds_alternative<SetWatchItemProcess>(proc_list));
-  XCTAssertEqual(std::get<SetWatchItemProcess>(proc_list).size(), 1);
-  XCTAssertEqual(*std::get<SetWatchItemProcess>(proc_list).begin(),
+  XCTAssertTrue(std::holds_alternative<WatchItemProcessList>(proc_list));
+  XCTAssertEqual(std::get<WatchItemProcessList>(proc_list).size(), 1);
+  XCTAssertEqual(*std::get<WatchItemProcessList>(proc_list).begin(),
                  WatchItemProcess("mypath", "", "", {}, "", false));
 
   // Test SigningID length limits
@@ -612,11 +654,11 @@ BlockGenResult CreatePolicyBlockGen() {
     } ],
   },
                                              &err);
-  XCTAssertTrue(std::holds_alternative<SetWatchItemProcess>(proc_list));
-  XCTAssertEqual(std::get<SetWatchItemProcess>(proc_list).size(), 1);
-  XCTAssertEqual(*std::get<SetWatchItemProcess>(proc_list).begin(),
+  XCTAssertTrue(std::holds_alternative<WatchItemProcessList>(proc_list));
+  XCTAssertEqual(std::get<WatchItemProcessList>(proc_list).size(), 1);
+  XCTAssertEqual(*std::get<WatchItemProcessList>(proc_list).begin(),
                  WatchItemProcess("", "com.northpolesec.test", "ABCDE12345", {}, "", false));
-  XCTAssertEqual((*std::get<SetWatchItemProcess>(proc_list).begin()).signing_id_wildcard_pos,
+  XCTAssertEqual((*std::get<WatchItemProcessList>(proc_list).begin()).signing_id_wildcard_pos,
                  std::string::npos);
 
   // Test SigningID prefix but PlatformBinary or TeamID are not set
@@ -657,11 +699,11 @@ BlockGenResult CreatePolicyBlockGen() {
     } ]
   },
                                              &err);
-  XCTAssertTrue(std::holds_alternative<SetWatchItemProcess>(proc_list));
-  XCTAssertEqual(std::get<SetWatchItemProcess>(proc_list).size(), 1);
-  XCTAssertEqual(*std::get<SetWatchItemProcess>(proc_list).begin(),
+  XCTAssertTrue(std::holds_alternative<WatchItemProcessList>(proc_list));
+  XCTAssertEqual(std::get<WatchItemProcessList>(proc_list).size(), 1);
+  XCTAssertEqual(*std::get<WatchItemProcessList>(proc_list).begin(),
                  WatchItemProcess("", "com.northpolesec.*", "", {}, "", true));
-  XCTAssertNotEqual((*std::get<SetWatchItemProcess>(proc_list).begin()).signing_id_wildcard_pos,
+  XCTAssertNotEqual((*std::get<WatchItemProcessList>(proc_list).begin()).signing_id_wildcard_pos,
                     std::string::npos);
 
   // Test SigningID prefix with TeamID set
@@ -672,11 +714,11 @@ BlockGenResult CreatePolicyBlockGen() {
     } ]
   },
                                              &err);
-  XCTAssertTrue(std::holds_alternative<SetWatchItemProcess>(proc_list));
-  XCTAssertEqual(std::get<SetWatchItemProcess>(proc_list).size(), 1);
-  XCTAssertEqual(*std::get<SetWatchItemProcess>(proc_list).begin(),
+  XCTAssertTrue(std::holds_alternative<WatchItemProcessList>(proc_list));
+  XCTAssertEqual(std::get<WatchItemProcessList>(proc_list).size(), 1);
+  XCTAssertEqual(*std::get<WatchItemProcessList>(proc_list).begin(),
                  WatchItemProcess("", "com.*.test", "myvalidtid", {}, "", false));
-  XCTAssertNotEqual((*std::get<SetWatchItemProcess>(proc_list).begin()).signing_id_wildcard_pos,
+  XCTAssertNotEqual((*std::get<WatchItemProcessList>(proc_list).begin()).signing_id_wildcard_pos,
                     std::string::npos);
 
   // Test SigningID with TeamID prefix
@@ -685,11 +727,11 @@ BlockGenResult CreatePolicyBlockGen() {
         @[ @{kWatchItemConfigKeyProcessesSigningID : @"ABCDE12345:com.northpolesec.*"} ]
   },
                                              &err);
-  XCTAssertTrue(std::holds_alternative<SetWatchItemProcess>(proc_list));
-  XCTAssertEqual(std::get<SetWatchItemProcess>(proc_list).size(), 1);
-  XCTAssertEqual(*std::get<SetWatchItemProcess>(proc_list).begin(),
+  XCTAssertTrue(std::holds_alternative<WatchItemProcessList>(proc_list));
+  XCTAssertEqual(std::get<WatchItemProcessList>(proc_list).size(), 1);
+  XCTAssertEqual(*std::get<WatchItemProcessList>(proc_list).begin(),
                  WatchItemProcess("", "com.northpolesec.*", "ABCDE12345", {}, "", false));
-  XCTAssertNotEqual((*std::get<SetWatchItemProcess>(proc_list).begin()).signing_id_wildcard_pos,
+  XCTAssertNotEqual((*std::get<WatchItemProcessList>(proc_list).begin()).signing_id_wildcard_pos,
                     std::string::npos);
 
   // Test SigningID with invalid TeamID prefix length (long)
@@ -714,11 +756,11 @@ BlockGenResult CreatePolicyBlockGen() {
         @[ @{kWatchItemConfigKeyProcessesSigningID : @"platform:com.northpolesec.*"} ]
   },
                                              &err);
-  XCTAssertTrue(std::holds_alternative<SetWatchItemProcess>(proc_list));
-  XCTAssertEqual(std::get<SetWatchItemProcess>(proc_list).size(), 1);
-  XCTAssertEqual(*std::get<SetWatchItemProcess>(proc_list).begin(),
+  XCTAssertTrue(std::holds_alternative<WatchItemProcessList>(proc_list));
+  XCTAssertEqual(std::get<WatchItemProcessList>(proc_list).size(), 1);
+  XCTAssertEqual(*std::get<WatchItemProcessList>(proc_list).begin(),
                  WatchItemProcess("", "com.northpolesec.*", "", {}, "", true));
-  XCTAssertNotEqual((*std::get<SetWatchItemProcess>(proc_list).begin()).signing_id_wildcard_pos,
+  XCTAssertNotEqual((*std::get<WatchItemProcessList>(proc_list).begin()).signing_id_wildcard_pos,
                     std::string::npos);
 
   // Test SigningID with multiple wildcards and TeamID set
@@ -729,11 +771,11 @@ BlockGenResult CreatePolicyBlockGen() {
     } ]
   },
                                              &err);
-  XCTAssertTrue(std::holds_alternative<SetWatchItemProcess>(proc_list));
-  XCTAssertEqual(std::get<SetWatchItemProcess>(proc_list).size(), 1);
-  XCTAssertEqual(*std::get<SetWatchItemProcess>(proc_list).begin(),
+  XCTAssertTrue(std::holds_alternative<WatchItemProcessList>(proc_list));
+  XCTAssertEqual(std::get<WatchItemProcessList>(proc_list).size(), 1);
+  XCTAssertEqual(*std::get<WatchItemProcessList>(proc_list).begin(),
                  WatchItemProcess("", "com.*.*test", "myvalidtid", {}, "", false));
-  XCTAssertNotEqual((*std::get<SetWatchItemProcess>(proc_list).begin()).signing_id_wildcard_pos,
+  XCTAssertNotEqual((*std::get<WatchItemProcessList>(proc_list).begin()).signing_id_wildcard_pos,
                     std::string::npos);
 
   // Test TeamID length limits
@@ -754,18 +796,18 @@ BlockGenResult CreatePolicyBlockGen() {
   proc_list = VerifyConfigWatchItemProcesses(
       @{kWatchItemConfigKeyProcesses : @[ @{kWatchItemConfigKeyProcessesTeamID : @"myvalidtid"} ]},
       &err);
-  XCTAssertTrue(std::holds_alternative<SetWatchItemProcess>(proc_list));
-  XCTAssertEqual(std::get<SetWatchItemProcess>(proc_list).size(), 1);
-  XCTAssertEqual(*std::get<SetWatchItemProcess>(proc_list).begin(),
+  XCTAssertTrue(std::holds_alternative<WatchItemProcessList>(proc_list));
+  XCTAssertEqual(std::get<WatchItemProcessList>(proc_list).size(), 1);
+  XCTAssertEqual(*std::get<WatchItemProcessList>(proc_list).begin(),
                  WatchItemProcess("", "", "myvalidtid", {}, "", false));
 
   // Test valid TeamID - "platform"
   proc_list = VerifyConfigWatchItemProcesses(
       @{kWatchItemConfigKeyProcesses : @[ @{kWatchItemConfigKeyProcessesTeamID : @"pLaTfOrM"} ]},
       &err);
-  XCTAssertTrue(std::holds_alternative<SetWatchItemProcess>(proc_list));
-  XCTAssertEqual(std::get<SetWatchItemProcess>(proc_list).size(), 1);
-  XCTAssertEqual(*std::get<SetWatchItemProcess>(proc_list).begin(),
+  XCTAssertTrue(std::holds_alternative<WatchItemProcessList>(proc_list));
+  XCTAssertEqual(std::get<WatchItemProcessList>(proc_list).size(), 1);
+  XCTAssertEqual(*std::get<WatchItemProcessList>(proc_list).begin(),
                  WatchItemProcess("", "", "", {}, "", true));
 
   // Test CDHash length limits
@@ -790,9 +832,9 @@ BlockGenResult CreatePolicyBlockGen() {
   std::fill(cdhashBytes.begin(), cdhashBytes.end(), 0xAA);
   proc_list = VerifyConfigWatchItemProcesses(
       @{kWatchItemConfigKeyProcesses : @[ @{kWatchItemConfigKeyProcessesCDHash : cdhash} ]}, &err);
-  XCTAssertTrue(std::holds_alternative<SetWatchItemProcess>(proc_list));
-  XCTAssertEqual(std::get<SetWatchItemProcess>(proc_list).size(), 1);
-  XCTAssertEqual(*std::get<SetWatchItemProcess>(proc_list).begin(),
+  XCTAssertTrue(std::holds_alternative<WatchItemProcessList>(proc_list));
+  XCTAssertEqual(std::get<WatchItemProcessList>(proc_list).size(), 1);
+  XCTAssertEqual(*std::get<WatchItemProcessList>(proc_list).begin(),
                  WatchItemProcess("", "", "", cdhashBytes, "", false));
 
   // Test Cert Hash length limits
@@ -821,9 +863,9 @@ BlockGenResult CreatePolicyBlockGen() {
     kWatchItemConfigKeyProcesses : @[ @{kWatchItemConfigKeyProcessesCertificateSha256 : certHash} ]
   },
                                              &err);
-  XCTAssertTrue(std::holds_alternative<SetWatchItemProcess>(proc_list));
-  XCTAssertEqual(std::get<SetWatchItemProcess>(proc_list).size(), 1);
-  XCTAssertEqual(*std::get<SetWatchItemProcess>(proc_list).begin(),
+  XCTAssertTrue(std::holds_alternative<WatchItemProcessList>(proc_list));
+  XCTAssertEqual(std::get<WatchItemProcessList>(proc_list).size(), 1);
+  XCTAssertEqual(*std::get<WatchItemProcessList>(proc_list).begin(),
                  WatchItemProcess("", "", "", {}, [certHash UTF8String], false));
 
   // Test valid invalid PlatformBinary type
@@ -836,9 +878,9 @@ BlockGenResult CreatePolicyBlockGen() {
   proc_list = VerifyConfigWatchItemProcesses(
       @{kWatchItemConfigKeyProcesses : @[ @{kWatchItemConfigKeyProcessesPlatformBinary : @(YES)} ]},
       &err);
-  XCTAssertTrue(std::holds_alternative<SetWatchItemProcess>(proc_list));
-  XCTAssertEqual(std::get<SetWatchItemProcess>(proc_list).size(), 1);
-  XCTAssertEqual(*std::get<SetWatchItemProcess>(proc_list).begin(),
+  XCTAssertTrue(std::holds_alternative<WatchItemProcessList>(proc_list));
+  XCTAssertEqual(std::get<WatchItemProcessList>(proc_list).size(), 1);
+  XCTAssertEqual(*std::get<WatchItemProcessList>(proc_list).begin(),
                  WatchItemProcess("", "", "", {}, "", true));
 
   // Test valid multiple attributes, multiple procs
@@ -864,18 +906,266 @@ BlockGenResult CreatePolicyBlockGen() {
   },
                                              &err);
 
-  SetWatchItemProcess expectedProcs{
+  WatchItemProcessList expectedProcs{
       WatchItemProcess("mypath1", "com.northpolesec.test1", "validtid_1", cdhashBytes,
                        [certHash UTF8String], false),
       WatchItemProcess("mypath2", "com.northpolesec.test2", "validtid_2", cdhashBytes,
                        [certHash UTF8String], false)};
 
-  XCTAssertTrue(std::holds_alternative<SetWatchItemProcess>(proc_list));
-  XCTAssertEqual(std::get<SetWatchItemProcess>(proc_list).size(), 2);
+  XCTAssertTrue(std::holds_alternative<WatchItemProcessList>(proc_list));
+  XCTAssertEqual(std::get<WatchItemProcessList>(proc_list), expectedProcs);
+}
 
-  // Ensure each of the procs in the set is in the set of expected procs
-  for (const auto& p : std::get<SetWatchItemProcess>(proc_list)) {
-    XCTAssertEqual(expectedProcs.count(p), 1);
+- (void)testGetProcessAction {
+  XCTAssertFalse(GetProcessAction(nil).has_value());
+  XCTAssertFalse(GetProcessAction(@"").has_value());
+  XCTAssertFalse(GetProcessAction(@"inherit").has_value());
+  XCTAssertFalse(GetProcessAction(@"allowed").has_value());
+
+  XCTAssertEqual(GetProcessAction(@"allow").value(), WatchItemProcessAction::kAllow);
+  XCTAssertEqual(GetProcessAction(@"AUDIT").value(), WatchItemProcessAction::kAudit);
+  XCTAssertEqual(GetProcessAction(@"Deny").value(), WatchItemProcessAction::kDeny);
+}
+
+- (void)testVerifyConfigWatchItemProcessesWithOptions {
+  // The rule's options that unset per-process overrides must inherit.
+  WatchItemProcessOptions ruleDefaults{
+      .action = WatchItemProcessAction::kInherit,
+      .allow_read_access = true,
+      .silent = true,
+      .silent_tty = true,
+      .custom_message = std::make_optional<std::string>("rule msg"),
+      .event_detail_url = std::make_optional<NSString*>(@"https://rule.example"),
+      .event_detail_text = std::make_optional<NSString*>(@"rule text"),
+  };
+
+  auto verify = [&ruleDefaults](NSArray* entries, NSError** err) {
+    return santa::VerifyConfigWatchItemProcesses(
+        @{kWatchItemConfigKeyProcessesWithOptions : entries},
+        kWatchItemConfigKeyProcessesWithOptions, &ruleDefaults, err);
+  };
+
+  NSError* err;
+
+  // Option overrides must be well typed / within bounds
+  XCTAssertTrue(
+      std::holds_alternative<Unit>(verify(@[ @{
+                                            kWatchItemConfigKeyProcessesBinaryPath : @"pa",
+                                            kWatchItemConfigKeyProcessesAction : @"nope",
+                                          } ],
+                                          &err)));
+  XCTAssertTrue(
+      std::holds_alternative<Unit>(verify(@[ @{
+                                            kWatchItemConfigKeyProcessesBinaryPath : @"pa",
+                                            kWatchItemConfigKeyProcessesAction : @(1),
+                                          } ],
+                                          &err)));
+  XCTAssertTrue(
+      std::holds_alternative<Unit>(verify(@[ @{
+                                            kWatchItemConfigKeyProcessesBinaryPath : @"pa",
+                                            kWatchItemConfigKeyOptionsEnableSilentMode : @"yes",
+                                          } ],
+                                          &err)));
+  XCTAssertTrue(std::holds_alternative<Unit>(
+      verify(@[ @{
+               kWatchItemConfigKeyProcessesBinaryPath : @"pa",
+               kWatchItemConfigKeyOptionsCustomMessage : RepeatedString(@"A", 2049),
+             } ],
+             &err)));
+  XCTAssertTrue(std::holds_alternative<Unit>(
+      verify(@[ @{
+               kWatchItemConfigKeyProcessesBinaryPath : @"pa",
+               kWatchItemConfigKeyOptionsEventDetailText : RepeatedString(@"A", 49),
+             } ],
+             &err)));
+
+  // Options that only make sense rule-wide are rejected, not ignored
+  for (NSString* key in @[
+         kWatchItemConfigKeyOptionsAuditOnly, kWatchItemConfigKeyOptionsRuleType,
+         kWatchItemConfigKeyOptionsInvertProcessExceptions
+       ]) {
+    XCTAssertTrue(std::holds_alternative<Unit>(
+        verify(@[ @{kWatchItemConfigKeyProcessesBinaryPath : @"pa", key : @(NO)} ], &err)));
+  }
+
+  // With no overrides set, every option is inherited from the rule
+  {
+    auto proc_list = verify(@[ @{kWatchItemConfigKeyProcessesBinaryPath : @"pa"} ], &err);
+    XCTAssertTrue(std::holds_alternative<WatchItemProcessList>(proc_list));
+    const WatchItemProcessList& procs = std::get<WatchItemProcessList>(proc_list);
+    XCTAssertEqual(procs.size(), 1);
+    XCTAssertTrue(procs[0].options.has_value());
+    XCTAssertEqual(procs[0].options->action, WatchItemProcessAction::kInherit);
+    XCTAssertTrue(procs[0].options->allow_read_access);
+    XCTAssertTrue(procs[0].options->silent);
+    XCTAssertTrue(procs[0].options->silent_tty);
+    XCTAssertCppStringEqual(procs[0].options->custom_message.value(), "rule msg");
+    XCTAssertEqualObjects(procs[0].options->event_detail_url.value(), @"https://rule.example");
+    XCTAssertEqualObjects(procs[0].options->event_detail_text.value(), @"rule text");
+  }
+
+  // Each set override wins over the rule's value
+  {
+    auto proc_list = verify(@[ @{
+                              kWatchItemConfigKeyProcessesBinaryPath : @"pa",
+                              kWatchItemConfigKeyProcessesAction : @"deny",
+                              kWatchItemConfigKeyOptionsAllowReadAccess : @(NO),
+                              kWatchItemConfigKeyOptionsEnableSilentMode : @(NO),
+                              kWatchItemConfigKeyOptionsEnableSilentTTYMode : @(NO),
+                              kWatchItemConfigKeyOptionsCustomMessage : @"proc msg",
+                              kWatchItemConfigKeyOptionsEventDetailURL : @"https://proc.example",
+                              kWatchItemConfigKeyOptionsEventDetailText : @"proc text",
+                            } ],
+                            &err);
+    XCTAssertTrue(std::holds_alternative<WatchItemProcessList>(proc_list));
+    const WatchItemProcessList& procs = std::get<WatchItemProcessList>(proc_list);
+    XCTAssertEqual(procs.size(), 1);
+    XCTAssertCppStringEqual(procs[0].binary_path, "pa");
+    XCTAssertTrue(procs[0].options.has_value());
+    XCTAssertEqual(procs[0].options->action, WatchItemProcessAction::kDeny);
+    XCTAssertFalse(procs[0].options->allow_read_access);
+    XCTAssertFalse(procs[0].options->silent);
+    XCTAssertFalse(procs[0].options->silent_tty);
+    XCTAssertCppStringEqual(procs[0].options->custom_message.value(), "proc msg");
+    XCTAssertEqualObjects(procs[0].options->event_detail_url.value(), @"https://proc.example");
+    XCTAssertEqualObjects(procs[0].options->event_detail_text.value(), @"proc text");
+  }
+
+  // Empty strings clear the inherited message/text, but an empty URL is kept so
+  // that an entry can hide the button.
+  {
+    auto proc_list = verify(@[ @{
+                              kWatchItemConfigKeyProcessesBinaryPath : @"pa",
+                              kWatchItemConfigKeyOptionsCustomMessage : @"",
+                              kWatchItemConfigKeyOptionsEventDetailURL : @"",
+                              kWatchItemConfigKeyOptionsEventDetailText : @"",
+                            } ],
+                            &err);
+    XCTAssertTrue(std::holds_alternative<WatchItemProcessList>(proc_list));
+    const WatchItemProcessList& procs = std::get<WatchItemProcessList>(proc_list);
+    XCTAssertEqual(procs.size(), 1);
+    XCTAssertFalse(procs[0].options->custom_message.has_value());
+    XCTAssertFalse(procs[0].options->event_detail_text.has_value());
+    XCTAssertTrue(procs[0].options->event_detail_url.has_value());
+    XCTAssertEqualObjects(procs[0].options->event_detail_url.value(), @"");
+  }
+
+  // Entries of the plain `Processes` array must never carry options, and the
+  // option keys are not treated as process attributes there.
+  {
+    auto proc_list = VerifyConfigWatchItemProcesses(
+        @{
+          kWatchItemConfigKeyProcesses : @[ @{
+            kWatchItemConfigKeyProcessesBinaryPath : @"pa",
+            kWatchItemConfigKeyProcessesAction : @"deny",
+          } ]
+        },
+        &err);
+    XCTAssertTrue(std::holds_alternative<WatchItemProcessList>(proc_list));
+    const WatchItemProcessList& procs = std::get<WatchItemProcessList>(proc_list);
+    XCTAssertEqual(procs.size(), 1);
+    XCTAssertFalse(procs[0].options.has_value());
+  }
+}
+
+- (void)testParseConfigSingleWatchItemProcessPrecedence {
+  SetSharedDataWatchItemPolicy data_policies;
+  SetSharedProcessWatchItemPolicy proc_policies;
+  NSError* err;
+
+  NSDictionary* singleWatchItemConfig = @{
+    kWatchItemConfigKeyPaths : @[ @"a" ],
+    kWatchItemConfigKeyOptions : @{
+      kWatchItemConfigKeyOptionsEnableSilentMode : @(NO),
+      kWatchItemConfigKeyOptionsRuleType : kRuleTypePathsWithAllowedProcesses,
+    },
+    kWatchItemConfigKeyProcesses : @[
+      @{kWatchItemConfigKeyProcessesBinaryPath : @"plain1"},
+      @{kWatchItemConfigKeyProcessesBinaryPath : @"plain2"},
+    ],
+    kWatchItemConfigKeyProcessesWithOptions : @[
+      @{
+        kWatchItemConfigKeyProcessesBinaryPath : @"withopts",
+        kWatchItemConfigKeyProcessesAction : @"deny",
+        kWatchItemConfigKeyOptionsEnableSilentMode : @(YES),
+      },
+    ],
+  };
+
+  XCTAssertTrue(ParseConfigSingleWatchItem(@"rule", kVersion, singleWatchItemConfig, &data_policies,
+                                           &proc_policies, &err));
+  XCTAssertEqual(data_policies.size(), 1);
+
+  const WatchItemProcessList& procs = (*data_policies.begin())->processes;
+  XCTAssertEqual(procs.size(), 3);
+
+  // ProcessesWithOptions entries are evaluated first, so they come first in the
+  // combined list that matching iterates.
+  XCTAssertCppStringEqual(procs[0].binary_path, "withopts");
+  XCTAssertTrue(procs[0].options.has_value());
+  XCTAssertEqual(procs[0].options->action, WatchItemProcessAction::kDeny);
+  XCTAssertTrue(procs[0].options->silent);
+
+  XCTAssertCppStringEqual(procs[1].binary_path, "plain1");
+  XCTAssertFalse(procs[1].options.has_value());
+  XCTAssertCppStringEqual(procs[2].binary_path, "plain2");
+  XCTAssertFalse(procs[2].options.has_value());
+}
+
+/// ProcessesWithOptions is a sync-only feature. A locally managed config using
+/// it must have the whole rule rejected, not have the array silently dropped.
+- (void)testProcessesWithOptionsRestrictedToSyncServer {
+  NSDictionary* watchItem = @{
+    kWatchItemConfigKeyPaths : @[ @"a" ],
+    kWatchItemConfigKeyProcessesWithOptions :
+        @[ @{kWatchItemConfigKeyProcessesBinaryPath : @"pa"} ],
+  };
+
+  for (WatchItems::DataSource dataSource :
+       {WatchItems::DataSource::kUnknown, WatchItems::DataSource::kEmbeddedConfig,
+        WatchItems::DataSource::kDetachedConfig}) {
+    SetSharedDataWatchItemPolicy data_policies;
+    SetSharedProcessWatchItemPolicy proc_policies;
+    NSError* err;
+
+    XCTAssertFalse(santa::ParseConfigSingleWatchItem(@"rule", kVersion, watchItem, dataSource,
+                                                     &data_policies, &proc_policies, &err));
+    XCTAssertEqual(data_policies.size(), 0);
+    XCTAssertEqual(proc_policies.size(), 0);
+
+    // The static validators are the entry points used by the configurator and
+    // the sync service, so they must apply the same gate.
+    XCTAssertFalse(
+        WatchItems::IsValidRule(@"rule", watchItem, dataSource, nil, @(kVersion.data())));
+  }
+
+  // The same rule from a sync server is accepted
+  {
+    SetSharedDataWatchItemPolicy data_policies;
+    SetSharedProcessWatchItemPolicy proc_policies;
+    NSError* err;
+
+    XCTAssertTrue(santa::ParseConfigSingleWatchItem(@"rule", kVersion, watchItem,
+                                                    WatchItems::DataSource::kDatabase,
+                                                    &data_policies, &proc_policies, &err));
+    XCTAssertEqual(data_policies.size(), 1);
+    XCTAssertEqual((*data_policies.begin())->processes.size(), 1);
+    XCTAssertTrue((*data_policies.begin())->processes[0].options.has_value());
+
+    XCTAssertTrue(WatchItems::IsValidRule(@"rule", watchItem, WatchItems::DataSource::kDatabase,
+                                          nil, @(kVersion.data())));
+  }
+
+  // A rule with only the plain Processes key is unaffected by the data source
+  NSDictionary* plainWatchItem = @{
+    kWatchItemConfigKeyPaths : @[ @"a" ],
+    kWatchItemConfigKeyProcesses : @[ @{kWatchItemConfigKeyProcessesBinaryPath : @"pa"} ],
+  };
+  for (WatchItems::DataSource dataSource :
+       {WatchItems::DataSource::kEmbeddedConfig, WatchItems::DataSource::kDetachedConfig,
+        WatchItems::DataSource::kDatabase}) {
+    XCTAssertTrue(
+        WatchItems::IsValidRule(@"rule", plainWatchItem, dataSource, nil, @(kVersion.data())));
   }
 }
 
@@ -1220,8 +1510,7 @@ BlockGenResult CreatePolicyBlockGen() {
   XCTAssertEqual(
       **data_policies.begin(),
       DataWatchItemPolicy("rule", kVersion, "a", kWatchItemPolicyDefaultPathType,
-                          kWatchItemPolicyDefaultAllowReadAccess, kWatchItemPolicyDefaultAuditOnly,
-                          kWatchItemPolicyDefaultRuleType));
+                          kWatchItemPolicyDefaultAuditOnly, kWatchItemPolicyDefaultRuleType));
 }
 
 - (void)testParseConfigSingleWatchItemPolicies {
@@ -1232,7 +1521,7 @@ BlockGenResult CreatePolicyBlockGen() {
   // Data FAA - Test multiple paths, options, and processes
   data_policies.clear();
   proc_policies.clear();
-  SetWatchItemProcess procs = {
+  WatchItemProcessList procs = {
       WatchItemProcess("pa", "", "", {}, "", false),
       WatchItemProcess("pb", "", "", {}, "", false),
   };
@@ -1259,13 +1548,18 @@ BlockGenResult CreatePolicyBlockGen() {
   XCTAssertTrue(ParseConfigSingleWatchItem(@"rule", kVersion, singleWatchItemConfig, &data_policies,
                                            &proc_policies, &err));
 
+  // Matches the Options dictionary above
+  WatchItemProcessOptions expectedOptions;
+  expectedOptions.allow_read_access = true;
+  expectedOptions.silent = true;
+
   SetSharedDataWatchItemPolicy expectedDataPolicies = {
       std::make_shared<DataWatchItemPolicy>(
-          "rule", kVersion, "a", kWatchItemPolicyDefaultPathType, true, false,
-          santa::WatchItemRuleType::kPathsWithDeniedProcesses, true, false, "", nil, nil, procs),
+          "rule", kVersion, "a", kWatchItemPolicyDefaultPathType, false,
+          santa::WatchItemRuleType::kPathsWithDeniedProcesses, expectedOptions, procs),
       std::make_shared<DataWatchItemPolicy>(
-          "rule", kVersion, "b", WatchItemPathType::kPrefix, true, false,
-          santa::WatchItemRuleType::kPathsWithDeniedProcesses, true, false, "", nil, nil, procs)};
+          "rule", kVersion, "b", WatchItemPathType::kPrefix, false,
+          santa::WatchItemRuleType::kPathsWithDeniedProcesses, expectedOptions, procs)};
 
   XCTAssertEqual(proc_policies.size(), 0);
   XCTAssertEqual(data_policies.size(), 2);
@@ -1288,9 +1582,8 @@ BlockGenResult CreatePolicyBlockGen() {
   XCTAssertTrue(**proc_policies.begin() ==
                 ProcessWatchItemPolicy(
                     "rule", kVersion,
-                    {{"a", WatchItemPathType::kLiteral}, {"b", WatchItemPathType::kPrefix}}, true,
-                    false, santa::WatchItemRuleType::kProcessesWithDeniedPaths, true, false, "",
-                    nil, nil, procs));
+                    {{"a", WatchItemPathType::kLiteral}, {"b", WatchItemPathType::kPrefix}}, false,
+                    santa::WatchItemRuleType::kProcessesWithDeniedPaths, expectedOptions, procs));
 }
 
 - (void)testState {

@@ -67,14 +67,40 @@ class FAAPolicyProcessor {
 
   using TargetPolicyPair = std::pair<size_t, std::optional<std::shared_ptr<WatchItemPolicyBase>>>;
 
+  /// The outcome of asking a client whether a policy applies to a message.
+  /// `options` points at the overrides of the process that was matched, when
+  /// that process had any. They are already merged against the rule's own
+  /// options by WatchItems, so they hold effective values.
+  ///
+  /// Note: `options` may be set even when `matched` is false. For process rule
+  /// types the process is matched once at exec time while `matched` reflects
+  /// the per-event path match, so the overrides still apply to the event even
+  /// though the path decided the outcome. Only `options.action` is conditional
+  /// on `matched`.
+  struct PolicyMatch {
+    bool matched = false;
+    const WatchItemProcessOptions* options = nullptr;
+  };
+
   /// When this block is called, the policy enforcement client must determine
   /// whether or not the given policy applies to the given ES message.
-  using CheckIfPolicyMatchesBlock = bool (^)(const santa::WatchItemPolicyBase& base_policy,
-                                             const Message::PathTarget& target, const Message& msg);
+  using CheckIfPolicyMatchesBlock = PolicyMatch (^)(const santa::WatchItemPolicyBase& base_policy,
+                                                    const Message::PathTarget& target,
+                                                    const Message& msg);
   using URLTextPair = std::pair<NSString*, NSString*>;
-  /// A block that generates custom URL and Text pairs from a given policy.
-  using GenerateEventDetailLinkBlock =
-      URLTextPair (^)(const std::shared_ptr<WatchItemPolicyBase>& watch_item);
+  /// A block that resolves the given event detail URL and text, filling in
+  /// global defaults for any value that is unset.
+  using GenerateEventDetailLinkBlock = URLTextPair (^)(std::optional<NSString*> event_detail_url,
+                                                       std::optional<NSString*> event_detail_text);
+
+  /// A decision paired with the effective options that produced it. `options`
+  /// points at either the matched process's overrides or the policy's own
+  /// options, both of which outlive the call. It is null only when no policy was
+  /// evaluated at all.
+  struct DecisionAndOptions {
+    FileAccessPolicyDecision decision;
+    const WatchItemProcessOptions* options = nullptr;
+  };
 
   using ReadsCacheKey = std::tuple<pid_t, int, FAAClientType>;
   using StoreAccessEventBlock = void (^)(SNTStoredFileAccessEvent*, bool);
@@ -126,11 +152,13 @@ class FAAPolicyProcessor {
   ///     1. Compute the FileAccessPolicyDecision (ApplyPolicy())
   ///         1. Ensure a policy exists
   ///         2. Ensure the process is valid or EnableBadSignatureProtection is false
-  ///         3. Check if policy allows for reading the target (PolicyAllowsReadsForTarget())
+  ///         3. Check if the policy applies to the current ES message (CheckIfPolicyMatchesBlock())
+  ///            and resolve the effective options for the match (ResolveOptions())
+  ///         4. Check if policy allows for reading the target (PolicyAllowsReadsForTarget())
   ///             1. For the current event type, ensure the policy allows reads and the current
   ///                target being evaluated is readable
-  ///         4. Check if the policy applies to the current ES message (CheckIfPolicyMatchesBlock())
-  ///         5. Invert results and/or set audit-only based on configured options
+  ///         5. Apply the matched process's action, or invert results and/or set audit-only
+  ///            based on configured options
   ///     2. Apply override if configured
   ///     3. Log telemetry if denied/audit-only and not rate-limited (LogTelemetry())
   ///     4. Notify the user if configured (SNTFileAccessDeniedBlock(), LogTTY())
@@ -149,19 +177,19 @@ class FAAPolicyProcessor {
   /// Used by callers to inform when a process has exited and will no longer process events.
   void NotifyExit(const audit_token_t& tok, FAAClientType client_type);
 
-  FileAccessPolicyDecision ProcessTargetAndPolicy(
-      const Message& msg, const TargetPolicyPair& target_policy_pair,
-      CheckIfPolicyMatchesBlock checkIfPolicyMatchesBlock,
-      SNTFileAccessDeniedBlock file_access_denied_block,
-      SNTOverrideFileAccessAction override_action);
+  DecisionAndOptions ProcessTargetAndPolicy(const Message& msg,
+                                            const TargetPolicyPair& target_policy_pair,
+                                            CheckIfPolicyMatchesBlock checkIfPolicyMatchesBlock,
+                                            SNTFileAccessDeniedBlock file_access_denied_block,
+                                            SNTOverrideFileAccessAction override_action);
 
-  virtual FileAccessPolicyDecision ApplyPolicy(
+  virtual DecisionAndOptions ApplyPolicy(
       const Message& msg, const Message::PathTarget& target,
       const std::optional<std::shared_ptr<WatchItemPolicyBase>> optional_policy,
       CheckIfPolicyMatchesBlock checkIfPolicyMatchesBlock);
 
   virtual bool PolicyAllowsReadsForTarget(const Message& msg, const Message::PathTarget& target,
-                                          std::shared_ptr<WatchItemPolicyBase> policy);
+                                          bool allow_read_access);
 
   /// Return true if the TTY was previously messaged for the given
   /// process/policy pair. Otherwise false.
@@ -170,7 +198,7 @@ class FAAPolicyProcessor {
   void LogTelemetry(const WatchItemPolicyBase& policy, const Message& msg, size_t target_index,
                     FileAccessPolicyDecision decision);
   void LogTTY(SNTStoredFileAccessEvent* event, URLTextPair link_info, const Message& msg,
-              const WatchItemPolicyBase& policy);
+              const WatchItemPolicyBase& policy, const WatchItemProcessOptions& options);
 };
 
 /// The proxy classes are used to wrap calls into the FAAPolicyProcessor and not expose

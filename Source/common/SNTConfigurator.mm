@@ -118,6 +118,7 @@ NSString* const kStateTempAdminTargetUIDKey = @"TargetUID";
 static NSString* const kStateDemotedAdminsKey = @"DemotedAdmins";
 static NSString* const kStateLastBootUUIDKey = @"LastBootUUID";
 static NSString* const kStateLastSyncServerURLKey = @"LastSyncServerURL";
+static NSString* const kStateTimedRuleKillsKey = @"TimedRuleKills";
 
 /// User defaults key for user override of the menu item enabled setting.
 NSString* const kEnableMenuItemUserOverride = @"EnableMenuItemUserOverride";
@@ -1028,6 +1029,16 @@ static SNTConfigurator* sharedConfigurator = nil;
 - (NSURL*)savedLastSyncServerURL {
   NSString* urlString = self.state[kStateLastSyncServerURLKey];
   return urlString.length > 0 ? [NSURL URLWithString:urlString] : nil;
+}
+
+- (BOOL)persistTimedRuleKills:(NSArray<NSDictionary*>*)entries {
+  @synchronized(self) {
+    return [self updateStateSynchronizedKey:kStateTimedRuleKillsKey value:entries];
+  }
+}
+
+- (nullable NSArray<NSDictionary*>*)savedTimedRuleKills {
+  return self.state[kStateTimedRuleKillsKey];
 }
 
 - (void)updateLastBootUUID:(NSString*)bootUUID {
@@ -2345,6 +2356,10 @@ static SNTConfigurator* sharedConfigurator = nil;
     newState[kStateLastSyncServerURLKey] = state[kStateLastSyncServerURLKey];
   }
 
+  if ([state[kStateTimedRuleKillsKey] isKindOfClass:[NSArray class]]) {
+    newState[kStateTimedRuleKillsKey] = state[kStateTimedRuleKillsKey];
+  }
+
   return newState;
 }
 
@@ -2615,9 +2630,12 @@ static SNTConfigurator* sharedConfigurator = nil;
 - (NSArray*)validateFileAccessPolicy:(NSDictionary*)policy {
   NSMutableArray* errors = [NSMutableArray array];
 
+  // Always a locally managed configuration, never a sync server's rules.
+  constexpr auto kDataSource = santa::WatchItems::DataSource::kEmbeddedConfig;
+
   // First validate top-level config structure.
   NSError* error;
-  if (!santa::WatchItems::IsValidConfig(policy, &error)) {
+  if (!santa::WatchItems::IsValidConfig(policy, kDataSource, &error)) {
     [errors addObject:[NSString stringWithFormat:@"FileAccessPolicy: %@",
                                                  error.localizedDescription ?: @"Unknown error"]];
   }
@@ -2634,7 +2652,8 @@ static SNTConfigurator* sharedConfigurator = nil;
         continue;
       }
       NSError* ruleError;
-      if (!santa::WatchItems::IsValidRule(name, watchItems[name], &ruleError, policyVersion)) {
+      if (!santa::WatchItems::IsValidRule(name, watchItems[name], kDataSource, &ruleError,
+                                          policyVersion)) {
         [errors addObject:[NSString
                               stringWithFormat:@"FileAccessPolicy rule '%@' is invalid: %@", name,
                                                ruleError.localizedDescription ?: @"Unknown error"]];

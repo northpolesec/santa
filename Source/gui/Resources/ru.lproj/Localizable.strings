@@ -4,6 +4,9 @@
 /* Notification message shown when a known app has been unblocked */
 "%@ can now be run" = "Теперь можно запустить %@";
 
+/* Window message warning that an app will be quit at a time */
+"\"%@\" will quit at %@." = "Приложение \"%1$@\" будет закрыто в %2$@.";
+
 /* Reason shown when a justification is required but not given */
 "a justification is required" = "требуется обоснование";
 
