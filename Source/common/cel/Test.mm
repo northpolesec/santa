@@ -1605,6 +1605,35 @@ class ScopedHostZone {
   }
 }
 
+// One activation serving two evaluations: the kill sink is per-evaluation, so
+// the second result must not carry the first's kill. No caller reuses an
+// activation this way today, which is why this is the only place the property is
+// held.
+- (void)testReusedActivationDoesNotCarryPriorPendingKill {
+  using ReturnValue = santa::cel::CELProtoTraits<true>::ReturnValue;
+
+  auto sut = santa::cel::Evaluator<true>::Create();
+  XCTAssertTrue(sut.ok());
+
+  auto activation = MakeActivation<true>();
+  auto evaluate = [&sut, &activation](absl::string_view expr) {
+    return sut.value()->CompileAndEvaluate(expr, *activation);
+  };
+
+  auto withKill = evaluate("policy_for_range(duration('30m'), true, ALLOWLIST)");
+  auto withoutKill = evaluate("ALLOWLIST");
+  if (!withKill.ok() || !withoutKill.ok()) {
+    XCTFail(@"Failed to evaluate against a reused activation");
+  } else {
+    XCTAssertTrue(withKill.value().pendingKill.has_value());
+    XCTAssertEqual(withoutKill.value().value, ReturnValue::ALLOWLIST);
+    XCTAssertFalse(withoutKill.value().pendingKill.has_value());
+    // Cacheability is not reset with it: it records that this activation has
+    // already served a time-dependent expression, which stays true.
+    XCTAssertFalse(withoutKill.value().cacheable);
+  }
+}
+
 // The zone argument, and its absence, reaching the window math through the full
 // rule path. Every case builds its zones and times from the current instant, so
 // they answer the same way whatever time it is; the cases that turn on what the
