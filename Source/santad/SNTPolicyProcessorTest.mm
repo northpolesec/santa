@@ -1064,6 +1064,137 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   [mockRuleTable stopMocking];
 }
 
+// The miss cache is keyed on the file hash alone, so the exec path may only opt in when the
+// identifier set CreateRuleIDs passes is the stable one for the file. A signature failure that was
+// not durable enough to record narrows that set to the hash, so such a lookup must not opt in --
+// these three tests pin the flag in each of the verdict states that decide it.
+- (BOOL)useCacheFlagForCachedDecision:(SNTCachedDecision*)cachedDecision
+                        codesignError:(NSError*)csError
+                     codesigningFlags:(uint32_t)codesigningFlags {
+  id mockRuleTable = OCMClassMock([SNTRuleTable class]);
+  SNTPolicyProcessor* processor =
+      [[SNTPolicyProcessor alloc] initWithRuleTable:mockRuleTable
+                                 entitlementsFilter:santa::EntitlementsFilter::Create(@[], @[])];
+  id mockConfigurator = OCMClassMock([SNTConfigurator class]);
+  OCMStub([mockConfigurator clientMode]).andReturn(SNTClientModeMonitor);
+  processor.configurator = mockConfigurator;
+
+  // ignoringNonObjectArgs() covers both the identifiers struct and the BOOL, so the flag has to be
+  // read back off the invocation rather than matched on.
+  __block BOOL useCache = NO;
+  __block int lookups = 0;
+  OCMStub([mockRuleTable executionRuleForIdentifiers:(struct RuleIdentifiers) {} useCache:NO])
+      .ignoringNonObjectArgs()
+      .andDo(^(NSInvocation* inv) {
+        BOOL got = NO;
+        [inv getArgument:&got atIndex:3];
+        useCache = got;
+        lookups++;
+      });
+
+  id mockFileInfo = OCMClassMock([SNTFileInfo class]);
+  if (csError) {
+    OCMExpect([mockFileInfo codesignCheckerWithError:[OCMArg setTo:csError]]).andReturn(nil);
+  } else {
+    OCMReject([mockFileInfo codesignCheckerWithError:[OCMArg setTo:nil]]);
+  }
+  OCMStub([mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([mockFileInfo SHA256])
+      .andReturn(@"a326a1fb48074202e9ad41e4cd1e389eeea372c8c6f7d7e80da81176d5d9430e");
+
+  es_file_t file = MakeESFile("/tmp/miss-cache-flag");
+  es_process_t proc = MakeESProcess(&file);
+  proc.is_platform_binary = false;
+  proc.codesigning_flags = codesigningFlags;
+  SNTConfigState* configState = [[SNTConfigState alloc] initWithConfig:mockConfigurator];
+
+  [processor decisionForFileInfo:mockFileInfo
+                   targetProcess:&proc
+                    imageCPUType:CPU_TYPE_ARM64
+                     configState:configState
+              activationCallback:nil
+                  cachedDecision:cachedDecision];
+
+  XCTAssertEqual(lookups, 1, @"the rule lookup must have happened for the flag to mean anything");
+  OCMVerifyAll(mockFileInfo);
+  [mockFileInfo stopMocking];
+  [mockConfigurator stopMocking];
+  [mockRuleTable stopMocking];
+
+  return useCache;
+}
+
+- (void)testExecutionRuleLookupSkipsMissCacheOnUnrecordedSignatureFailure {
+  // The fresh-failure path: the signature could not be read, the verdict is not recorded, and
+  // CreateRuleIDs is left with the SHA-256 only. Caching that miss under the file hash would
+  // suppress the Team ID and Signing ID rules on the next execution that reads the signature.
+  NSError* csError = [NSError errorWithDomain:NSOSStatusErrorDomain
+                                         code:errSecCSSignatureFailed
+                                     userInfo:nil];
+  XCTAssertFalse([self useCacheFlagForCachedDecision:nil
+                                       codesignError:csError
+                                    codesigningFlags:CS_SIGNED]);
+}
+
+- (void)testExecutionRuleLookupUsesMissCacheOnRecordedValidSignature {
+  SNTCachedDecision* cached = [[SNTCachedDecision alloc] init];
+  cached.sha256 = @"a326a1fb48074202e9ad41e4cd1e389eeea372c8c6f7d7e80da81176d5d9430e";
+  cached.codesignValidationStatus = @(errSecSuccess);
+
+  XCTAssertTrue([self useCacheFlagForCachedDecision:cached
+                                      codesignError:nil
+                                   codesigningFlags:CS_SIGNED | CS_VALID]);
+}
+
+- (void)testExecutionRuleLookupUsesMissCacheOnRecordedUnsignedVerdict {
+  // An unsigned binary passes a hash and nothing else, which is the whole question it can ask --
+  // and freshly built unsigned binaries in a build loop are what the cache exists for. A recorded
+  // unsigned verdict must keep its caching.
+  SNTCachedDecision* cached = [[SNTCachedDecision alloc] init];
+  cached.sha256 = @"a326a1fb48074202e9ad41e4cd1e389eeea372c8c6f7d7e80da81176d5d9430e";
+  cached.codesignValidationStatus = @(errSecCSUnsigned);
+
+  XCTAssertTrue([self useCacheFlagForCachedDecision:cached codesignError:nil codesigningFlags:0]);
+}
+
+- (void)testExecutionRuleLookupSkipsMissCacheWhenKernelRejectsValidlySignedImage {
+  // The kernel rejected the image, so the lookup is by hash alone even though the file validates.
+  // Caching that miss would shadow these contents' signature rules on a later healthy execution.
+  SNTCachedDecision* cached = [[SNTCachedDecision alloc] init];
+  cached.sha256 = @"a326a1fb48074202e9ad41e4cd1e389eeea372c8c6f7d7e80da81176d5d9430e";
+  cached.teamID = @"EQHXZ8M8AV";
+  cached.signingID = @"EQHXZ8M8AV:com.google.Chrome";
+  cached.codesignValidationStatus = @(errSecSuccess);
+
+  XCTAssertFalse([self useCacheFlagForCachedDecision:cached
+                                       codesignError:nil
+                                    codesigningFlags:CS_SIGNED]);
+}
+
+- (void)testExecutionRuleLookupSkipsMissCacheWhenKernelSeesUnsignedValidlySignedImage {
+  // Same narrowing, other route: the kernel sees no signature while the file validates
+  // statically, e.g. an exec of an unsigned slice of a binary whose native slice is signed.
+  SNTCachedDecision* cached = [[SNTCachedDecision alloc] init];
+  cached.sha256 = @"a326a1fb48074202e9ad41e4cd1e389eeea372c8c6f7d7e80da81176d5d9430e";
+  cached.teamID = @"EQHXZ8M8AV";
+  cached.signingID = @"EQHXZ8M8AV:com.google.Chrome";
+  cached.codesignValidationStatus = @(errSecSuccess);
+
+  XCTAssertFalse([self useCacheFlagForCachedDecision:cached codesignError:nil codesigningFlags:0]);
+}
+
+- (void)testExecutionRuleLookupUsesMissCacheOnRecordedUnsignedVerdictKernelKilled {
+  // An unsigned arm64 image reports invalid, not unsigned (see KernelWillKillForCodeSigning).
+  // The recorded unsigned verdict still means the hash is the whole identifier set.
+  SNTCachedDecision* cached = [[SNTCachedDecision alloc] init];
+  cached.sha256 = @"a326a1fb48074202e9ad41e4cd1e389eeea372c8c6f7d7e80da81176d5d9430e";
+  cached.codesignValidationStatus = @(errSecCSUnsigned);
+
+  XCTAssertTrue([self useCacheFlagForCachedDecision:cached
+                                      codesignError:nil
+                                   codesigningFlags:CS_SIGNED | CS_KILL]);
+}
+
 - (void)testDecisionDoesNotRecordUnsignedVerdictWhenKernelSaysSigned {
   // errSecCSUnsigned is only reusable when the kernel agrees the executable
   // itself carries no signature. When the running image is signed the two

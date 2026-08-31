@@ -36,6 +36,8 @@
 #include "Source/common/String.h"
 #include "Source/common/cel/Evaluator.h"
 
+#include <array>
+#include <cstring>
 #include <memory>
 #include <string>
 
@@ -46,9 +48,13 @@ static const int64_t kTransitiveRuleCullingThreshold = 500000;
 // Consider transitive rules out of date if they haven't been used in six months.
 static const NSUInteger kTransitiveRuleExpirationSeconds = 6 * 30 * 24 * 3600;
 
-// Maximum number of file hashes remembered by the execution rule miss cache.
-// Maxes out around 322KiB.
+// Maximum number of file hashes remembered by the execution rule miss cache. Measured at ~0.8MB
+// of live heap when full.
 static const uint64_t kExecutionRuleMissCacheSize = 10000;
+
+// Miss cache key: the binary SHA-256 as its 64 hex characters. Fixed size so the key is trivially
+// copyable into the db block and stored inline by the cache, leaving a lookup allocation-free.
+using ExecutionRuleMissCacheKey = std::array<char, 64>;
 
 static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
   // Create a temporary ES client in order to grab the default set of muted paths.
@@ -90,9 +96,9 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
   // query entirely. Only the SQL lookup is cached -- the static rules are an in-memory dictionary
   // and are checked on every call. Keyed on the binary SHA-256 alone -- it identifies the file
   // contents, and so determines every other identifier a lookup would match on. Entries are only
-  // ever cleared wholesale (see `clearExecutionRuleMissCache`) -- there is no per-entry
+  // ever cleared wholesale, by `addExecutionRules:...:errors:` -- there is no per-entry
   // invalidation.
-  std::unique_ptr<SantaCache<std::string, bool>> _executionRuleMissCache;
+  std::unique_ptr<SantaCache<ExecutionRuleMissCacheKey, bool>> _executionRuleMissCache;
 }
 @property MOLCodesignChecker* santadCSInfo;
 @property MOLCodesignChecker* launchdCSInfo;
@@ -264,7 +270,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
 
 - (uint32_t)initializeDatabase:(FMDatabase*)db fromVersion:(uint32_t)version {
   _executionRuleMissCache =
-      std::make_unique<SantaCache<std::string, bool>>(kExecutionRuleMissCacheSize);
+      std::make_unique<SantaCache<ExecutionRuleMissCacheKey, bool>>(kExecutionRuleMissCacheSize);
 
   // Lock this database from other processes
   [[db executeQuery:@"PRAGMA locking_mode = EXCLUSIVE;"] close];
@@ -563,6 +569,11 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
 }
 
 - (SNTRule*)executionRuleForIdentifiers:(struct RuleIdentifiers)identifiers {
+  return [self executionRuleForIdentifiers:identifiers useCache:NO];
+}
+
+- (SNTRule*)executionRuleForIdentifiers:(struct RuleIdentifiers)identifiers
+                               useCache:(BOOL)useCache {
   __block SNTRule* rule;
 
   // Look for a static rule that matches.
@@ -603,11 +614,16 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
   // If we already looked in the db during another exec and there was no rule,
   // return early. The cache will be cleared when new rules are added. Keyed by
   // file sha256. Using a cdhash is appealing, but a cdhash is not guaranteed
-  // unique across files.
-  std::string missCacheKey = identifiers.binarySHA256.length
-                                 ? santa::NSStringToUTF8String(identifiers.binarySHA256)
-                                 : std::string();
-  if (!missCacheKey.empty() && _executionRuleMissCache->get(missCacheKey)) {
+  // unique across files. A hash that is not exactly key-length cannot be keyed, so it is not
+  // cached.
+  ExecutionRuleMissCacheKey missCacheKey{};
+  const BOOL cacheable =
+      useCache && [identifiers.binarySHA256 lengthOfBytesUsingEncoding:NSUTF8StringEncoding] ==
+                      missCacheKey.size();
+  if (cacheable) {
+    memcpy(missCacheKey.data(), identifiers.binarySHA256.UTF8String, missCacheKey.size());
+  }
+  if (cacheable && _executionRuleMissCache->get(missCacheKey)) {
     return nil;
   }
 
@@ -628,7 +644,6 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
   // planner and costs a temp B-tree sort on every lookup.
   //
   // clang-format off
-  __block BOOL queryFailed = NO;
   [self inDatabase:^(FMDatabase* db) {
     FMResultSet* rs = [db executeQuery:@"SELECT * FROM ("
                                       @"            SELECT 1 AS prio, * FROM execution_rules WHERE identifier=? AND type=500  "
@@ -643,26 +658,42 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
                                       identifiers.certificateSHA256, identifiers.teamID,
                                       identifiers.binarySHA256, @(SNTRuleStateAllowTransitive)];
     // A nil result set means the statement itself failed (e.g. a locked or corrupt db), not
-    // that the file has no rule. Note the failure so it isn't remembered as a miss below.
+    // that the file has no rule. Return without remembering it as a miss.
     if (!rs) {
-      queryFailed = YES;
       LOGE(@"Failed to query execution rules: %@", [db lastErrorMessage]);
       return;
     }
-    if ([rs next]) {
+
+    // Stepping fails for the same reasons preparing does. sqlite3_prepare_v2 succeeds and defers
+    // a busy, corrupt or I/O error to the first sqlite3_step, and `next` folds that into the same
+    // NO it returns for "no rows". Ask for the error explicitly so a transient db failure isn't
+    // mistaken for -- and then remembered as -- an absent rule.
+    BOOL queryFailed = NO;
+    NSError* stepErr;
+    if ([rs nextWithError:&stepErr]) {
       rule = [self executionRuleFromResultSet:rs];
+    } else if (stepErr) {
+      queryFailed = YES;
+      LOGE(@"Failed to step execution rules query: %@", stepErr);
     }
     [rs close];
+
+    // The query ran and found nothing, so cache that fact to avoid needlessly looking in the db
+    // during future execs. A failed query is deliberately not cached: the miss cache is only ever
+    // invalidated by a rule write, so caching a transient db error would pin it in place and deny
+    // this file its rule indefinitely.
+    //
+    // This must stay inside the db queue block. The queue is serial, so bundling the query with
+    // the set() makes the pair atomic with respect to a rule write: either both run before the
+    // write transaction, and the writer's subsequent clear() drops the entry, or both run after
+    // it, and the query finds the new rule so nothing is cached. Recording the miss outside the
+    // block instead admits the interleaving where a write commits and clears in between, pinning
+    // a miss that no later rule write invalidates.
+    if (!rule && !queryFailed && cacheable) {
+      self->_executionRuleMissCache->set(missCacheKey, true);
+    }
   }];
   // clang-format on
-
-  // The query ran and found nothing, so cache that fact to avoid needlessly looking in the db
-  // during future execs. A failed query is deliberately not cached: the miss cache is only ever
-  // invalidated by a rule write, so caching a transient db error would pin it in place and deny
-  // this file its rule indefinitely.
-  if (!rule && !queryFailed && !missCacheKey.empty()) {
-    _executionRuleMissCache->set(missCacheKey, true);
-  }
 
   return rule;
 }

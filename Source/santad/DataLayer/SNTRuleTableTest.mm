@@ -16,6 +16,7 @@
 
 #import <OCMock/OCMock.h>
 #import <XCTest/XCTest.h>
+#include <sqlite3.h>
 #include <stdint.h>
 #import "Source/common/SNTError.h"
 
@@ -48,6 +49,14 @@
 @property(readwrite) NSString* identifier;
 @property(readwrite) NSString* celExpr;
 @end
+
+// A progress handler that returns non-zero aborts whatever operation is running, making
+// sqlite3_step return SQLITE_INTERRUPT. sqlite3_prepare_v2 never invokes the handler, so this
+// reproduces the shape of a busy, corrupt or I/O failure: the statement compiles fine and only
+// fails once rows are actually read.
+static int InterruptStepProgressHandler(void* context) {
+  return 1;
+}
 
 @implementation SNTRuleTableTest
 
@@ -512,18 +521,19 @@
   struct RuleIdentifiers missed = {
       .cdhash = @"ffffffffffffffffffffffffffffffffffffffff",
   };
-  XCTAssertNil([self.sut executionRuleForIdentifiers:missed]);
+  XCTAssertNil([self.sut executionRuleForIdentifiers:missed useCache:YES]);
 
-  SNTRule* r = [self.sut
-      executionRuleForIdentifiers:(struct RuleIdentifiers){
-                                      .cdhash = @"dbe8c39801f93e05fc7bc53a02af5b4d3cfc670a",
-                                  }];
+  struct RuleIdentifiers ids = {
+      .cdhash = @"dbe8c39801f93e05fc7bc53a02af5b4d3cfc670a",
+  };
+  SNTRule* r = [self.sut executionRuleForIdentifiers:ids useCache:YES];
   XCTAssertNotNil(r, @"a miss with no file hash must not be cached");
   XCTAssertEqual(r.type, SNTRuleTypeCDHash);
 }
 
-// A cached miss must only suppress lookups for the file it was recorded for. Note there is no
-// rule write between the two lookups here -- a write would clear the cache and hide the bug.
+// A cached miss must only suppress lookups for the file it was recorded for. Both lookups carry
+// the same Team ID, so only the file hash distinguishes them. Note there is no rule write between
+// them -- a write would clear the cache and hide the bug.
 - (void)testExecutionRuleMissCacheIsPerFileHash {
   [self.sut addExecutionRules:@[ [self _exampleBinaryRule] ]
                   ruleCleanup:SNTRuleCleanupNone
@@ -532,31 +542,29 @@
   struct RuleIdentifiers missed = {
       .binarySHA256 = @"b6ee1c3c5a715c049d14a8457faa6b6701b8507efe908300e238e0768bd759c2",
   };
-  XCTAssertNil([self.sut executionRuleForIdentifiers:missed]);
+  XCTAssertNil([self.sut executionRuleForIdentifiers:missed useCache:YES]);
 
   struct RuleIdentifiers ruled = {
       .binarySHA256 = @"b7c1e3fd640c5f211c89b02c2c6122f78ce322aa5c56eb0bb54bc422a8f8b670",
   };
-  SNTRule* r = [self.sut executionRuleForIdentifiers:ruled];
+  SNTRule* r = [self.sut executionRuleForIdentifiers:ruled useCache:YES];
   XCTAssertNotNil(r, @"a miss must only suppress lookups for the same file hash");
   XCTAssertEqual(r.type, SNTRuleTypeBinary);
 }
 
-// The only invalidation the miss cache has is a full clear on the rule write paths. Without it a
-// remembered miss would outlive the rule that resolves it -- which is exactly what happens to a
-// transitive rule SNTCompilerController writes after its own lookup missed.
+// The only invalidation the miss cache has is a full clear on the rule write paths.
 - (void)testExecutionRuleMissCacheClearedByRuleAdd {
   struct RuleIdentifiers ids = {
       .binarySHA256 = @"b7c1e3fd640c5f211c89b02c2c6122f78ce322aa5c56eb0bb54bc422a8f8b670",
   };
 
-  XCTAssertNil([self.sut executionRuleForIdentifiers:ids]);
+  XCTAssertNil([self.sut executionRuleForIdentifiers:ids useCache:YES]);
 
   [self.sut addExecutionRules:@[ [self _exampleBinaryRule] ]
                   ruleCleanup:SNTRuleCleanupNone
                        errors:nil];
 
-  SNTRule* r = [self.sut executionRuleForIdentifiers:ids];
+  SNTRule* r = [self.sut executionRuleForIdentifiers:ids useCache:YES];
   XCTAssertNotNil(r, @"a rule added after a cached miss must still be found");
   XCTAssertEqual(r.type, SNTRuleTypeBinary);
 }
@@ -574,13 +582,13 @@
   struct RuleIdentifiers missed = {
       .binarySHA256 = @"b6ee1c3c5a715c049d14a8457faa6b6701b8507efe908300e238e0768bd759c2",
   };
-  XCTAssertNil([self.sut executionRuleForIdentifiers:missed]);
+  XCTAssertNil([self.sut executionRuleForIdentifiers:missed useCache:YES]);
 
   struct RuleIdentifiers ruled = {
       .binarySHA256 = @"b6ee1c3c5a715c049d14a8457faa6b6701b8507efe908300e238e0768bd759c2",
       .teamID = @"ZZZZZZZZZZ",
   };
-  SNTRule* r = [self.sut executionRuleForIdentifiers:ruled];
+  SNTRule* r = [self.sut executionRuleForIdentifiers:ruled useCache:YES];
   XCTAssertNotNil(r, @"a cached miss must not shadow a static rule");
   XCTAssertEqual(r.type, SNTRuleTypeTeamID);
 }
@@ -604,15 +612,43 @@
         [db executeUpdate:@"ALTER TABLE execution_rules RENAME TO execution_rules_hidden"]);
   }];
 
-  XCTAssertNil([self.sut executionRuleForIdentifiers:ids]);
+  XCTAssertNil([self.sut executionRuleForIdentifiers:ids useCache:YES]);
 
   [self.dbq inDatabase:^(FMDatabase* db) {
     XCTAssertTrue(
         [db executeUpdate:@"ALTER TABLE execution_rules_hidden RENAME TO execution_rules"]);
   }];
 
-  SNTRule* r = [self.sut executionRuleForIdentifiers:ids];
+  SNTRule* r = [self.sut executionRuleForIdentifiers:ids useCache:YES];
   XCTAssertNotNil(r, @"a failed query must not be cached as a rule miss");
+  XCTAssertEqual(r.type, SNTRuleTypeBinary);
+}
+
+// As above, but for a failure that only surfaces once the statement is stepped, which is how
+// sqlite reports a busy or locked db, a bad page and an I/O error. `-[FMResultSet next]` signals
+// that with the same NO it uses for "no rows", so the lookup is indistinguishable from a miss
+// unless the step error is asked for explicitly.
+- (void)testExecutionRuleMissCacheIgnoresStepFailures {
+  [self.sut addExecutionRules:@[ [self _exampleBinaryRule] ]
+                  ruleCleanup:SNTRuleCleanupNone
+                       errors:nil];
+
+  struct RuleIdentifiers ids = {
+      .binarySHA256 = @"b7c1e3fd640c5f211c89b02c2c6122f78ce322aa5c56eb0bb54bc422a8f8b670",
+  };
+
+  [self.dbq inDatabase:^(FMDatabase* db) {
+    sqlite3_progress_handler((sqlite3*)db.sqliteHandle, 1, InterruptStepProgressHandler, NULL);
+  }];
+
+  XCTAssertNil([self.sut executionRuleForIdentifiers:ids useCache:YES]);
+
+  [self.dbq inDatabase:^(FMDatabase* db) {
+    sqlite3_progress_handler((sqlite3*)db.sqliteHandle, 0, NULL, NULL);
+  }];
+
+  SNTRule* r = [self.sut executionRuleForIdentifiers:ids useCache:YES];
+  XCTAssertNotNil(r, @"a query that failed while stepping must not be cached as a rule miss");
   XCTAssertEqual(r.type, SNTRuleTypeBinary);
 }
 

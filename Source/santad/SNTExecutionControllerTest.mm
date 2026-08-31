@@ -336,7 +336,7 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
 }
 
 - (void)stubRule:(SNTRule*)rule forIdentifiers:(struct RuleIdentifiers)wantIdentifiers {
-  OCMStub([self.mockRuleDatabase executionRuleForIdentifiers:wantIdentifiers])
+  OCMStub([self.mockRuleDatabase executionRuleForIdentifiers:wantIdentifiers useCache:YES])
       .ignoringNonObjectArgs()
       .andDo(^(NSInvocation* inv) {
         struct RuleIdentifiers gotIdentifiers = {};
