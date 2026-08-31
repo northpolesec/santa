@@ -1412,6 +1412,95 @@ static NSString* const kTMMStateKey = @"TMM";
   XCTAssertEqualObjects(rescheduled[@"WindowZone"], zone);
 }
 
+// The warning a lead window before a deadline the kill path will refuse to
+// spend. The occurrences of a 09:00 to 09:00 window abut, so at the deadline the
+// next one is standing and the appointment moves; the warning pass asks the
+// window too, so the deadline moves here instead of a banner promising a quit
+// that nothing five minutes later carries out. Without that check the banner
+// goes out at every notify time for as long as the window recurs.
+- (void)testAWarningOnAnAbuttingWindowMovesTheDeadlineRatherThanBannering {
+  [self addRuleOfType:SNTRuleTypeTeamID identifier:kMatchingTeamID cel:kCELExpr];
+  id proxy = [self setUpNotifierProxy];
+
+  SNTTimedRuleKills* sut = [self makeSUT];
+  NSMutableArray<NSDictionary*>* banners = [NSMutableArray array];
+  [self recordBannersOn:proxy into:banners expectation:nil];
+
+  // On a whole minute, where a window edge lands, and far enough ahead that the
+  // component's own timer cannot reach the notify time while the test runs: the
+  // pass below is the one being driven.
+  NSDate* deadline = [[self minuteFloor:[NSDate date]] dateByAddingTimeInterval:3600];
+  // The lead a 24 hour occurrence earns, which is where the warning pass runs.
+  NSDate* notifyAt = [deadline dateByAddingTimeInterval:-300];
+  [sut recordKillForRuleType:SNTRuleTypeTeamID
+                  identifier:kMatchingTeamID
+                     celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
+                    deadline:deadline
+                    notifyAt:notifyAt
+                  windowDays:kEveryDay
+                 windowStart:@"09:00"
+                   windowEnd:@"09:00"
+                  windowZone:[self zoneReading:deadline asHour:9]];
+
+  [self runPassOn:sut asOf:notifyAt];
+
+  // The fake process matches this rule, so a banner would have gone out if the
+  // pass had got as far as looking for something to name.
+  XCTAssertEqual(banners.count, 0u);
+  XCTAssertEqualObjects(SignalDescriptions(_fake.signals), @[]);
+  // The end of the occurrence standing at the old deadline, a day on, with the
+  // warning owed again against it.
+  NSDictionary* rescheduled = self.savedEntries.firstObject;
+  XCTAssertEqualWithAccuracy([rescheduled[@"Deadline"] doubleValue],
+                             deadline.timeIntervalSince1970 + 24 * 3600, 0.001);
+  XCTAssertFalse([rescheduled[@"Notified"] boolValue]);
+}
+
+// The defer above is the window's answer, not the presence of a window. Here the
+// day list leaves out the day the deadline lands on, so nothing stands there and
+// the occurrence before it closed at that instant: the last occurrence of a
+// bounded schedule, which is a weekdays-only window warning at 08:55 on the
+// Saturday. The deadline is real, so the banner goes out and is recorded.
+- (void)testAWarningOnTheLastOccurrenceOfABoundedWindowStillBanners {
+  [self addRuleOfType:SNTRuleTypeTeamID identifier:kMatchingTeamID cel:kCELExpr];
+  id proxy = [self setUpNotifierProxy];
+
+  SNTTimedRuleKills* sut = [self makeSUT];
+  NSMutableArray<NSDictionary*>* banners = [NSMutableArray array];
+  [self recordBannersOn:proxy into:banners expectation:nil];
+
+  NSDate* deadline = [[self minuteFloor:[NSDate date]] dateByAddingTimeInterval:3600];
+  NSDate* notifyAt = [deadline dateByAddingTimeInterval:-300];
+  // A fixed offset from -zoneReading:asHour: moves the clock without moving the
+  // date, so the day the deadline falls on in that zone is its UTC day. Epoch day
+  // zero was a Thursday, which is where the 4 comes from.
+  NSInteger deadlineDay = ((NSInteger)floor(deadline.timeIntervalSince1970 / 86400) + 4) % 7;
+  NSMutableArray<NSNumber*>* days = [NSMutableArray array];
+  for (NSInteger day = 0; day < 7; day++) {
+    if (day != deadlineDay) {
+      [days addObject:@(day)];
+    }
+  }
+
+  [sut recordKillForRuleType:SNTRuleTypeTeamID
+                  identifier:kMatchingTeamID
+                     celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
+                    deadline:deadline
+                    notifyAt:notifyAt
+                  windowDays:days
+                 windowStart:@"09:00"
+                   windowEnd:@"09:00"
+                  windowZone:[self zoneReading:deadline asHour:9]];
+
+  [self runPassOn:sut asOf:notifyAt];
+
+  XCTAssertEqual(banners.count, 1u);
+  // Named the deadline it was recorded for: nothing moved it.
+  XCTAssertEqualWithAccuracy([banners.firstObject[@"deadline"] timeIntervalSince1970],
+                             deadline.timeIntervalSince1970, 0.001);
+  XCTAssertTrue([self.savedEntries.firstObject[@"Notified"] boolValue]);
+}
+
 // The notify time of an entry recorded within a lead of its window's close is
 // clamped to the exec, so the distance from it to the deadline is no measure of
 // anything. A reschedule takes the lead from the new occurrence's length, or that
