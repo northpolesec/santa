@@ -272,9 +272,6 @@
 }
 
 - (void)testSyncStateIsClearedAfterSyncBaseURLIsRemoved {
-  SNTSyncdQueue* sut = [[SNTSyncdQueue alloc] initWithCacheSize:1];
-  sut.clearSyncStateGracePeriod = 0.1;
-
   __block NSUInteger cleared = 0;
   id mockConfigurator = [self
       stubbedConfiguratorWithSyncBaseURLProvider:^NSURL* {
@@ -284,6 +281,9 @@
         ++cleared;
         return YES;
       }];
+
+  SNTSyncdQueue* sut = [[SNTSyncdQueue alloc] initWithCacheSize:1];
+  sut.clearSyncStateGracePeriod = 0.1;
 
   [sut reassessSyncServiceConnectionImmediately];
 
@@ -304,9 +304,6 @@
   __block NSUInteger cleared = 0;
   __block NSMutableArray<NSNumber*>* syncTypesSet = [NSMutableArray array];
 
-  SNTSyncdQueue* sut = [[SNTSyncdQueue alloc] initWithCacheSize:1];
-  sut.clearSyncStateGracePeriod = 0.1;
-
   id mockConfigurator = [self
       stubbedConfiguratorWithSyncBaseURLProvider:^NSURL* {
         return nil;
@@ -316,6 +313,9 @@
         [syncTypesSet addObject:@(syncType)];
         return YES;
       }];
+
+  SNTSyncdQueue* sut = [[SNTSyncdQueue alloc] initWithCacheSize:1];
+  sut.clearSyncStateGracePeriod = 0.1;
 
   [sut reassessSyncServiceConnectionImmediately];
 
@@ -333,8 +333,6 @@
 // The old server is no longer an authority, so its settings must not carry over. Rules are left
 // alone: the requested Clean sync replaces them atomically during the new server's rule download.
 - (void)testChangingSyncServerDropsPreviousServerStateAndRequestsCleanSync {
-  SNTSyncdQueue* sut = [[SNTSyncdQueue alloc] initWithCacheSize:1];
-
   __block NSURL* syncBaseURL = [NSURL URLWithString:@"https://server-a.example.com/"];
   __block NSUInteger cleared = 0;
   __block NSMutableArray<NSNumber*>* syncTypesSet = [NSMutableArray array];
@@ -348,6 +346,8 @@
         [syncTypesSet addObject:@(syncType)];
         return YES;
       }];
+
+  SNTSyncdQueue* sut = [[SNTSyncdQueue alloc] initWithCacheSize:1];
 
   // Pretend the sync service is up: a live connection is what makes the change below take the
   // bounce path, and dropping it afterwards is what lets the pass after that proceed.
@@ -399,8 +399,6 @@
 - (void)testBouncingTheSyncServiceRetiresTheReassessmentTimer {
   __block NSURL* syncBaseURL = [NSURL URLWithString:@"https://server-a.example.com/"];
 
-  SNTSyncdQueue* sut = [[SNTSyncdQueue alloc] initWithCacheSize:1];
-
   id mockConfigurator = [self
       stubbedConfiguratorWithSyncBaseURLProvider:^NSURL* {
         return syncBaseURL;
@@ -408,6 +406,8 @@
       onDrop:^BOOL(SNTSyncType syncType) {
         return YES;
       }];
+
+  SNTSyncdQueue* sut = [[SNTSyncdQueue alloc] initWithCacheSize:1];
 
   // A connected sync service is what makes the change below take the bounce path.
   id mockConnection = OCMClassMock([MOLXPCConnection class]);
@@ -441,9 +441,6 @@
 - (void)testTelemetryExportDoesNotKeepSyncedStateAlive {
   __block NSUInteger cleared = 0;
 
-  SNTSyncdQueue* sut = [[SNTSyncdQueue alloc] initWithCacheSize:1];
-  sut.clearSyncStateGracePeriod = 0.1;
-
   id mockConfigurator = [self
       stubbedConfiguratorWithSyncBaseURLProvider:^NSURL* {
         return nil;
@@ -453,6 +450,9 @@
         return YES;
       }];
   OCMStub([mockConfigurator enableTelemetryExport]).andReturn(YES);
+
+  SNTSyncdQueue* sut = [[SNTSyncdQueue alloc] initWithCacheSize:1];
+  sut.clearSyncStateGracePeriod = 0.1;
 
   [sut reassessSyncServiceConnectionImmediately];
 
@@ -508,9 +508,6 @@
 - (void)testNothingIsDroppedWhenThereAreNoSyncedSettings {
   __block NSUInteger dropped = 0;
 
-  SNTSyncdQueue* sut = [[SNTSyncdQueue alloc] initWithCacheSize:1];
-  sut.clearSyncStateGracePeriod = 0.1;
-
   id mockConfigurator = OCMClassMock([SNTConfigurator class]);
   OCMStub([mockConfigurator configurator]).andReturn(mockConfigurator);
   OCMStub([mockConfigurator syncBaseURL]).andDo(^(NSInvocation* invocation) {
@@ -523,6 +520,9 @@
       .andDo(^(NSInvocation* invocation) {
         ++dropped;
       });
+
+  SNTSyncdQueue* sut = [[SNTSyncdQueue alloc] initWithCacheSize:1];
+  sut.clearSyncStateGracePeriod = 0.1;
 
   [sut reassessSyncServiceConnectionImmediately];
 
@@ -615,10 +615,6 @@
   __block NSUInteger cleared = 0;
   __block NSMutableArray<NSNumber*>* syncTypesSet = [NSMutableArray array];
 
-  SNTSyncdQueue* sut = [[SNTSyncdQueue alloc] initWithCacheSize:1];
-  // Long enough that the swap below lands well inside the grace period.
-  sut.clearSyncStateGracePeriod = 60;
-
   id mockConfigurator = [self
       stubbedConfiguratorWithSyncBaseURLProvider:^NSURL* {
         return syncBaseURL;
@@ -628,6 +624,10 @@
         [syncTypesSet addObject:@(syncType)];
         return YES;
       }];
+
+  SNTSyncdQueue* sut = [[SNTSyncdQueue alloc] initWithCacheSize:1];
+  // Long enough that the swap below lands well inside the grace period.
+  sut.clearSyncStateGracePeriod = 60;
 
   // Observe server A. Reassessments coalesce, so this must be given time to land before the
   // removal below, or server A is never recorded in the first place.
@@ -668,9 +668,6 @@
   __block NSURL* syncBaseURL = nil;
   __block NSUInteger cleared = 0;
 
-  SNTSyncdQueue* sut = [[SNTSyncdQueue alloc] initWithCacheSize:1];
-  sut.clearSyncStateGracePeriod = 1;
-
   id mockConfigurator = [self
       stubbedConfiguratorWithSyncBaseURLProvider:^NSURL* {
         return syncBaseURL;
@@ -679,6 +676,9 @@
         ++cleared;
         return YES;
       }];
+
+  SNTSyncdQueue* sut = [[SNTSyncdQueue alloc] initWithCacheSize:1];
+  sut.clearSyncStateGracePeriod = 1;
 
   // Arm a clear, and wait for it so restoring the URL below genuinely happens after arming.
   [sut reassessSyncServiceConnectionImmediately];
@@ -705,9 +705,6 @@
 }
 
 - (void)testPendingSyncStateClearIsCancelledWhenSyncBaseURLReturns {
-  SNTSyncdQueue* sut = [[SNTSyncdQueue alloc] initWithCacheSize:1];
-  sut.clearSyncStateGracePeriod = 30;
-
   __block NSURL* syncBaseURL = nil;
   __block NSUInteger cleared = 0;
   id mockConfigurator = [self
@@ -718,6 +715,9 @@
         ++cleared;
         return YES;
       }];
+
+  SNTSyncdQueue* sut = [[SNTSyncdQueue alloc] initWithCacheSize:1];
+  sut.clearSyncStateGracePeriod = 30;
 
   // Wait for the clear to be armed, otherwise the cancellation below races nothing and the test
   // is vacuous.
