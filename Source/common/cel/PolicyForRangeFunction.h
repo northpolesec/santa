@@ -128,6 +128,12 @@ WindowEval EvalTimestampWindow(absl::Time start, absl::Time end,
 // always contains now. Callers reject a non-positive d before asking.
 WindowEval EvalDurationWindow(absl::Duration d, absl::Time now);
 
+// How far before a window's close the user is warned: min(5 minutes, 10% of the
+// occurrence's length), so a work-day window warns 5 minutes out and a 30
+// minute grant 3 minutes out. One definition, so the evaluation that records a
+// kill and the re-check that moves one to a later occurrence cannot disagree.
+absl::Duration NotificationLead(absl::Duration window_length);
+
 // Descriptors for the four policy_for_range() overloads, all registered lazily.
 // Their argument counts are all different, which is what the runtime dispatches
 // on.

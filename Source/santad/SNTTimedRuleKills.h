@@ -37,6 +37,13 @@
 ///  daemon restart: `resumeFromSavedState` runs the ones that came due while
 ///  the daemon was down and re-arms the timer for the rest.
 ///
+///  A deadline reached while the entry's recurring window is standing open is not
+///  a kill but an appointment moved: the entry goes to the end of the occurrence
+///  standing at the deadline, with a fresh warning lead. That is what a machine
+///  which slept through a deadline, or a daemon that was down across one, wakes
+///  up to. A window that closes at the deadline kills; only a back-to-back or
+///  24-hour occurrence runs past it and defers.
+///
 @interface SNTTimedRuleKills : NSObject
 
 ///
@@ -52,7 +59,7 @@
 
 ///
 ///  Loads the persisted entries: past-due ones run the kill path immediately
-///  (rule re-check first), future ones arm the timer.
+///  (the rule re-checked first, then the window), future ones arm the timer.
 ///
 ///  Split out of the initializer because it starts the timer and can run kills,
 ///  neither of which may happen before construction is complete. This is the
@@ -88,11 +95,25 @@
 ///  CERTIFICATE rules are refused with a log line; their window still gates new
 ///  executions.
 ///
+///  `windowDays` (0=Sunday through 6=Saturday), `windowStart` and `windowEnd`
+///  ("HH:MM") and `windowZone` (the zone string the rule wrote: "local", an IANA
+///  name or a [+-]HH:MM offset) describe the recurring window the deadline came
+///  from, and are persisted with the entry so every later pass over it can
+///  re-check the window. Only the days plus HH:MM form of policy_for_range() has
+///  a window that recurs; for the timestamp and duration forms these are nil and
+///  the entry stores no shape. A shape is stored only when all four are given,
+///  and an entry with no shape is one whose deadline can only ever be met by a
+///  kill.
+///
 - (void)recordKillForRuleType:(SNTRuleType)ruleType
                    identifier:(NSString*)identifier
                       celHash:(NSString*)celHash
                      deadline:(NSDate*)deadline
-                     notifyAt:(NSDate*)notifyAt;
+                     notifyAt:(NSDate*)notifyAt
+                   windowDays:(NSArray<NSNumber*>*)windowDays
+                  windowStart:(NSString*)windowStart
+                    windowEnd:(NSString*)windowEnd
+                   windowZone:(NSString*)windowZone;
 
 ///
 ///  SHA-256 (lowercase hex) of a rule's CEL text, or nil when there is none.

@@ -1174,6 +1174,9 @@ objc_library(
         "//Source/common:SNTXPCNotifierInterface",
         "//Source/common:String",
         "//Source/common:Timer",
+        "//Source/common/cel:CEL",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/time",
     ],
 )
 
