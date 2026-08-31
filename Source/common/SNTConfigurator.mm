@@ -2205,14 +2205,28 @@ static SNTConfigurator* sharedConfigurator = nil;
   return YES;
 }
 
-- (BOOL)hasSyncedSettings {
-  NSDictionary* syncState = self.syncState;
+/// Whether `syncState` holds anything a sync server put there. `SyncTypeRequired` is this
+/// client's own bookkeeping, so a dictionary holding nothing else counts as empty.
+static BOOL HoldsSyncedSettings(NSDictionary* syncState) {
   for (NSString* key in syncState) {
     if (![key isEqualToString:kSyncTypeRequired]) {
       return YES;
     }
   }
   return NO;
+}
+
+- (BOOL)hasSyncedSettings {
+  if (HoldsSyncedSettings(self.syncState)) {
+    return YES;
+  }
+
+  // In-memory state is not the whole story. `readSyncStateFromDisk` is gated on a configured sync
+  // server, so a daemon that started *after* SyncBaseURL was removed holds nothing while the
+  // departed server's settings are still on disk -- which is exactly when they most need dropping,
+  // and the ordinary way a fleet retires a sync server. Read the file directly rather than through
+  // the authorizer, the same exemption `clearSyncState` takes and for the same reason.
+  return HoldsSyncedSettings([NSDictionary dictionaryWithContentsOfFile:self.syncStateFilePath]);
 }
 
 - (void)clearSyncState {

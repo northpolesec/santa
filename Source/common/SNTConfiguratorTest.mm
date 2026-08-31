@@ -502,6 +502,54 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
   XCTAssertTrue([self.fileMgr removeItemAtPath:plistPath error:nil]);
 }
 
+// The sync state file is only read when a sync server is configured, so a daemon that starts
+// *after* SyncBaseURL was removed holds nothing in memory while the departed server's settings are
+// still sitting on disk. Deciding from memory alone strands that file forever, and a later launch
+// with a sync server configured would read a departed server's policy straight back in. This is
+// the "removed while santad was not running" case, which is the ordinary way a fleet drops a sync
+// server.
+- (void)testSyncedSettingsAreFoundOnDiskWhenNoSyncServerIsConfigured {
+  NSString* plistPath = [NSString stringWithFormat:@"%@/removed-while-down.plist", self.testDir];
+  __block BOOL syncServerConfigured = YES;
+  BOOL (^authorizer)(void) = ^BOOL {
+    return syncServerConfigured;
+  };
+
+  SNTConfigurator* synced = [self configuratorWithSyncStateAtPath:plistPath
+                                             syncServerConfigured:authorizer];
+  [synced setSyncServerClientMode:SNTClientModeLockdown];
+  XCTAssertTrue([self.fileMgr fileExistsAtPath:plistPath],
+                @"Sanity: a synced setting must be on disk");
+
+  // SyncBaseURL is removed while santad is down, then santad starts.
+  syncServerConfigured = NO;
+  SNTConfigurator* restarted = [self configuratorWithSyncStateAtPath:plistPath
+                                                syncServerConfigured:authorizer];
+  XCTAssertEqual(restarted.syncState.count, 0u,
+                 @"Sanity: the file is not read into memory without a sync server");
+  XCTAssertTrue(restarted.hasSyncedSettings,
+                @"A departed server's settings still on disk must be recognised as droppable");
+
+  XCTAssertTrue([restarted clearSyncStateRequiringSyncType:SNTSyncTypeClean]);
+
+  // The next launch finds only the recorded requirement, which is not a synced setting, so it has
+  // nothing to redo.
+  SNTConfigurator* afterClear = [self configuratorWithSyncStateAtPath:plistPath
+                                                 syncServerConfigured:authorizer];
+  XCTAssertFalse(afterClear.hasSyncedSettings, @"Only the recorded clean-sync requirement is left");
+
+  // The harm this prevents: with a sync server configured again the file *is* read, and it must no
+  // longer carry the departed server's policy -- only the requirement that the next sync be clean.
+  syncServerConfigured = YES;
+  SNTConfigurator* nextServer = [self configuratorWithSyncStateAtPath:plistPath
+                                                 syncServerConfigured:authorizer];
+  XCTAssertEqual(nextServer.syncState.count, 1u,
+                 @"A departed server's settings must not be read back by the next launch");
+  XCTAssertEqual(nextServer.syncTypeRequired, SNTSyncTypeClean);
+
+  XCTAssertTrue([self.fileMgr removeItemAtPath:plistPath error:nil]);
+}
+
 // Nothing calls it inside a batch today, but the branch that handles one is what stops a future
 // caller from clobbering `syncState` and writing to disk mid-transaction, the way an unguarded
 // implementation would. `clearSyncState` guards the same way for the same reason.

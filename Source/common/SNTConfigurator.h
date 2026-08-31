@@ -1235,9 +1235,15 @@ extern NSString* _Nonnull const kStateTempAdminTargetUIDKey;
 #endif
 
 ///
-///  Whether any state produced by a sync server is currently held. `SyncTypeRequired` does not
-///  count: it is this client's own bookkeeping rather than anything a server put there, so a state
-///  holding nothing else is indistinguishable from never having synced at all.
+///  Whether any state produced by a sync server is currently held, in memory or on disk.
+///  `SyncTypeRequired` does not count: it is this client's own bookkeeping rather than anything a
+///  server put there, so state holding nothing else is indistinguishable from never having synced.
+///
+///  Consults the sync state file when memory holds nothing, so this may touch disk. That fallback
+///  is the point: the file is only read into memory when a sync server is configured, so a daemon
+///  that started after `SyncBaseURL` was removed would otherwise report no synced state while the
+///  departed server's settings sat on disk. A file that cannot be parsed reads as no state; it
+///  carries no policy either, since the same parse failure leaves the effective state empty.
 ///
 @property(readonly, nonatomic) BOOL hasSyncedSettings;
 
