@@ -100,9 +100,9 @@ bool SupportedRuleType(SNTRuleType ruleType) {
 
 // The persisted window shape, checked rather than trusted, because the state
 // file is on disk: a day list must be an array of whole numbers 0 (Sunday)
-// through 6 (Saturday), each time a 24-hour "HH:MM", and the zone a string
-// policy_for_range()'s own resolver accepts. That is exactly what
-// policy_for_range() accepts, and so exactly what a window can be rebuilt from.
+// through 6 (Saturday), each time a 24-hour "HH:MM", and the zone a non-empty
+// string. Those are the deterministic parts of what policy_for_range() accepts,
+// so a value that fails one of them can never name a window on this host.
 // Anything else reads as no shape at all, which is the same answer a missing key
 // gives: the entry still loads and still holds its deadline, it just has no
 // window for a restart to re-check.
@@ -136,18 +136,15 @@ NSString* WindowTimeFromValue(id value) {
   return (hour > 23 || minute > 59) ? nil : time;
 }
 
-// The zone is checked by asking the resolver the re-check will use, rather than
-// by matching its grammar here: a zone this daemon cannot resolve is one the
-// window cannot be rebuilt in, whatever it looks like. That includes a name the
-// host's zoneinfo no longer carries, so an entry can lose its shape between
-// writing and loading. Nil then, which the caller reads as no shape: the window
-// cannot be asked, so a past-due deadline is a kill.
+// Any non-empty string, deliberately not resolved here. Whether the zone
+// resolves is asked at the re-check instead, because the answer can change
+// between loads: a zone the host's loader refuses today, or refuses just once,
+// would otherwise drop the shape at load and the next write would put that drop
+// on disk for good. An unresolvable zone at the re-check leaves the deadline
+// standing, which is a kill; the shape survives to be asked again.
 NSString* WindowZoneFromValue(id value) {
   NSString* zone = [value isKindOfClass:[NSString class]] ? value : nil;
-  if (!zone.length) {
-    return nil;
-  }
-  return santa::cel::ResolveTimeZone(zone.UTF8String).ok() ? zone : nil;
+  return zone.length ? zone : nil;
 }
 
 // Identifiers that fetch exactly the rule an entry came from: one field set, so
@@ -476,7 +473,13 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
 /// An entry whose window is standing open again is not one of them: it goes back
 /// with a later deadline instead.
 - (void)processDueEntriesSerialized {
-  NSDate* now = [NSDate date];
+  [self processDueEntriesSerializedAsOf:[NSDate date]];
+}
+
+/// The pass itself, split from the clock read above so a test can run one at an
+/// instant of its choosing, including the fraction of a second before a deadline
+/// that a marginally early timer fires in.
+- (void)processDueEntriesSerializedAsOf:(NSDate*)now {
   BOOL changed = NO;
 
   NSMutableArray<SNTTimedRuleKillEntry*>* due = [NSMutableArray array];
@@ -564,21 +567,25 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
 }
 
 /// The window re-check, asked of every entry on every pass through the kill
-/// path. An entry whose recurring window is standing open right now is not
-/// killed: its deadline moves to the end of the occurrence in progress, keeping
-/// the lead its warning was recorded with, and the warning is owed again because
-/// this is a different deadline.
+/// path. An entry whose recurring window is standing open at its deadline is not
+/// killed: its deadline moves to the end of the occurrence standing there, with a
+/// fresh warning lead, and the warning is owed again because this is a different
+/// deadline.
 ///
 /// Asked on every pass rather than only at daemon start, because a machine that
 /// slept through a deadline wakes inside a later occurrence just as a daemon that
-/// was down comes back inside one. At a deadline that arrives on time the instant
-/// is the end of the occurrence, and a window holds from its start up to but not
-/// including its end, so that case reads as closed and the kill goes ahead.
+/// was down comes back inside one.
 ///
-/// Answers NO for an entry with no window, a window that is closed, a window the
-/// math refuses, and an open window whose end is not later than the deadline
-/// being replaced: all four mean the deadline stands. The caller persists and
-/// re-arms the timer either way.
+/// Asked at the deadline, not at `now`, whenever the deadline is still ahead: a
+/// timer can fire marginally early, and the occurrence that ends at the deadline
+/// is still standing in those last fractions of a second. Asking at the deadline
+/// itself reads what holds once it arrives, so a window that closes there is
+/// closed and kills, and one that runs on (a back-to-back occurrence, or a
+/// 24-hour window) moves the appointment instead.
+///
+/// Answers NO for an entry with no window, a window that is closed, and a window
+/// the math refuses, including a zone that no longer resolves: all three mean the
+/// deadline stands. The caller persists and re-arms the timer either way.
 - (BOOL)rescheduleForOpenWindowSerialized:(SNTTimedRuleKillEntry*)entry now:(NSDate*)now {
   if (!entry.windowDays.count || !entry.windowStart.length || !entry.windowEnd.length ||
       !entry.windowZone.length) {
@@ -602,12 +609,14 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
     days.push_back(day.longLongValue);
   }
 
-  // The same math the rule was evaluated with, at the time this pass started and
-  // in the zone the rule named, so a re-check and the evaluation that recorded
-  // the entry cannot disagree about where the window is.
+  // The same math the rule was evaluated with, in the zone the rule named, so a
+  // re-check and the evaluation that recorded the entry cannot disagree about
+  // where the window is. Asked at the deadline once the pass has reached it, and
+  // at the deadline rather than at `now` when the timer got here first.
+  NSDate* asked = [now laterDate:entry.deadline];
   absl::StatusOr<santa::cel::WindowEval> window = santa::cel::EvalDaysHHMMWindow(
       days, entry.windowStart.UTF8String, entry.windowEnd.UTF8String,
-      absl::UnixEpoch() + absl::Seconds(now.timeIntervalSince1970), *zone);
+      absl::UnixEpoch() + absl::Seconds(asked.timeIntervalSince1970), *zone);
   if (!window.ok()) {
     LOGW(@"Unable to re-check the window for %@ (%s); quitting what the rule covers",
          entry.identifier, std::string(window.status().message()).c_str());
@@ -617,26 +626,24 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
     return NO;
   }
 
+  // Always later than the deadline being replaced: the window was asked at an
+  // instant at or after it and holds up to but not including its own end.
   NSDate* deadline = [NSDate
       dateWithTimeIntervalSince1970:absl::ToDoubleSeconds(window->window_end - absl::UnixEpoch())];
 
-  // Only an occurrence ending later than the deadline being replaced is a
-  // reschedule. The two can name the same instant: the due tolerance treats an
-  // entry as due in the fraction of a second before its deadline, and a window
-  // still holds there, so this is the on-time fire arriving a hair early. Moving
-  // the deadline to where it already is would reset the warning and send a
-  // second banner for a kill that is happening now.
-  if ([deadline timeIntervalSinceDate:entry.deadline] <= 0) {
-    return NO;
-  }
-
-  NSTimeInterval lead = [entry.deadline timeIntervalSinceDate:entry.notifyAt];
+  // The lead the new occurrence's own length earns, not the one the old deadline
+  // carried: an exec recorded within a lead of its window's close has a notify
+  // time clamped to the exec, and re-deriving from that would carry the clamp
+  // into every later occurrence.
+  NSTimeInterval lead = absl::ToDoubleSeconds(santa::cel::NotificationLead(window->window_length));
 
   LOGI(@"Timed rule kill for %@ deferred: its window is open again until %@, nothing quit",
        entry.identifier, deadline);
 
   entry.deadline = deadline;
-  entry.notifyAt = [deadline dateByAddingTimeInterval:-lead];
+  // Against the real `now`: a warning already owed by the time the new deadline
+  // is set goes out on this pass rather than being dated in the past.
+  entry.notifyAt = [now laterDate:[deadline dateByAddingTimeInterval:-lead]];
   entry.notified = NO;
   return YES;
 }

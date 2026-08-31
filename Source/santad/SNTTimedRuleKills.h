@@ -37,12 +37,12 @@
 ///  daemon restart: `resumeFromSavedState` runs the ones that came due while
 ///  the daemon was down and re-arms the timer for the rest.
 ///
-///  A deadline reached while the entry's recurring window is standing open with a
-///  later end than the deadline itself is not a kill but an appointment moved:
-///  the entry goes to the end of the occurrence in progress, keeping the lead its
-///  warning was recorded with. That is what a machine which slept through a
-///  deadline, or a daemon that was down across one, wakes up to. A window whose
-///  end is the deadline is the deadline arriving on time, and it kills.
+///  A deadline reached while the entry's recurring window is standing open is not
+///  a kill but an appointment moved: the entry goes to the end of the occurrence
+///  standing at the deadline, with a fresh warning lead. That is what a machine
+///  which slept through a deadline, or a daemon that was down across one, wakes
+///  up to. A window that closes at the deadline kills; only a back-to-back or
+///  24-hour occurrence runs past it and defers.
 ///
 @interface SNTTimedRuleKills : NSObject
 

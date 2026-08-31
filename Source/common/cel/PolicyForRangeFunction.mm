@@ -71,6 +71,10 @@ constexpr size_t kDaysZoneOverloadZoneIndex = 3;
 constexpr size_t kDaysZoneOverloadPolicyIndex = 5;
 constexpr size_t kDaysZoneOverloadOutOfRangePolicyIndex = 6;
 
+// The warning lead: min(5 minutes, 10% of the window's length).
+constexpr absl::Duration kMaxNotificationLead = absl::Minutes(5);
+constexpr int64_t kNotificationLeadDivisor = 10;
+
 // Parses a strict 24-hour "HH:MM" into minutes after local midnight.
 std::optional<int> ParseHourMinute(absl::string_view time) {
   if (time.size() != 5 || time[2] != ':') {
@@ -270,6 +274,10 @@ WindowEval EvalTimestampWindow(absl::Time start, absl::Time end, absl::Time now)
 
 WindowEval EvalDurationWindow(absl::Duration d, absl::Time now) {
   return WindowEval{.in_range = true, .window_end = now + d, .window_length = d};
+}
+
+absl::Duration NotificationLead(absl::Duration window_length) {
+  return std::min(kMaxNotificationLead, window_length / kNotificationLeadDivisor);
 }
 
 std::vector<cel_runtime::CelFunctionDescriptor> PolicyForRangeDescriptors() {
