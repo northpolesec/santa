@@ -117,6 +117,7 @@ NSString* const kStateTempAdminModeKey = @"TempAdmin";
 NSString* const kStateTempAdminTargetUIDKey = @"TargetUID";
 static NSString* const kStateDemotedAdminsKey = @"DemotedAdmins";
 static NSString* const kStateLastBootUUIDKey = @"LastBootUUID";
+static NSString* const kStateLastSyncServerURLKey = @"LastSyncServerURL";
 static NSString* const kStateTimedRuleKillsKey = @"TimedRuleKills";
 static NSString* const kStateClockReadingKey = @"ClockReading";
 
@@ -1019,6 +1020,18 @@ static SNTConfigurator* sharedConfigurator = nil;
   return self.state[kStateDemotedAdminsKey];
 }
 
+- (BOOL)persistLastSyncServerURL:(NSURL*)syncServerURL {
+  @synchronized(self) {
+    return [self updateStateSynchronizedKey:kStateLastSyncServerURLKey
+                                      value:syncServerURL.absoluteString];
+  }
+}
+
+- (NSURL*)savedLastSyncServerURL {
+  NSString* urlString = self.state[kStateLastSyncServerURLKey];
+  return urlString.length > 0 ? [NSURL URLWithString:urlString] : nil;
+}
+
 - (BOOL)persistTimedRuleKills:(NSArray<NSDictionary*>*)entries {
   @synchronized(self) {
     return [self updateStateSynchronizedKey:kStateTimedRuleKillsKey value:entries];
@@ -1457,7 +1470,9 @@ static SNTConfigurator* sharedConfigurator = nil;
 
 - (SNTSyncType)syncTypeRequired {
   if (self.syncState.count == 0) {
-    return SNTSyncTypeCleanAll;
+    // Without synced state the client can't vouch for its rules. Clean, not CleanAll, so the
+    // server keeps the final say and can still escalate.
+    return SNTSyncTypeClean;
   }
   return (SNTSyncType)[self.syncState[kSyncTypeRequired] integerValue];
 }
@@ -2146,6 +2161,24 @@ static SNTConfigurator* sharedConfigurator = nil;
 }
 
 ///
+///  Removes the sync state plist, returning whether it is now gone. A missing file is the
+///  expected case on a host that never synced and counts as success; anything else means synced
+///  state survived on disk and would be read back on the next launch, so it must not fail
+///  silently.
+///
+- (BOOL)removeSyncStateFile {
+  NSError* error;
+  if ([[NSFileManager defaultManager] removeItemAtPath:self.syncStateFilePath error:&error]) {
+    return YES;
+  }
+  if ([error.domain isEqualToString:NSCocoaErrorDomain] && error.code == NSFileNoSuchFileError) {
+    return YES;
+  }
+  LOGE(@"Failed to remove sync state at %@: %@", self.syncStateFilePath, error);
+  return NO;
+}
+
+///
 ///  Saves the current effective syncState to disk. Returns YES if the write
 ///  succeeded; NO if the authorizer denied the operation or the underlying
 ///  file write failed.
@@ -2154,8 +2187,26 @@ static SNTConfigurator* sharedConfigurator = nil;
   if (!self.syncStateAccessAuthorizerBlock()) {
     return NO;
   }
+  return [self writeSyncStateToDisk];
+}
 
+///
+///  Saves the current effective syncState to disk without consulting
+///  `syncStateAccessAuthorizerBlock`. Only for callers that have a documented
+///  reason to skip that gate; everything on the ordinary sync-server write path
+///  must go through `saveSyncStateToDisk` instead.
+///
+- (BOOL)writeSyncStateToDisk {
   NSMutableDictionary* syncState = self.syncState.mutableCopy;
+
+  // An empty sync state and a missing plist mean the same thing, so keep only the one that says
+  // so. Sync-state writes are unconditional, so without this a no-op commit (e.g. a preflight
+  // whose config bundle carries nothing) leaves an empty plist behind, which reads as though the
+  // host holds synced state when it holds none.
+  if (syncState.count == 0) {
+    return [self removeSyncStateFile];
+  }
+
   syncState[kAllowedPathRegexKey] = [syncState[kAllowedPathRegexKey] pattern];
   syncState[kBlockedPathRegexKey] = [syncState[kBlockedPathRegexKey] pattern];
   if (![syncState writeToFile:self.syncStateFilePath atomically:YES]) {
@@ -2166,6 +2217,30 @@ static SNTConfigurator* sharedConfigurator = nil;
                                    ofItemAtPath:self.syncStateFilePath
                                           error:NULL];
   return YES;
+}
+
+/// Whether `syncState` holds anything a sync server put there. `SyncTypeRequired` is this
+/// client's own bookkeeping, so a dictionary holding nothing else counts as empty.
+static BOOL HoldsSyncedSettings(NSDictionary* syncState) {
+  for (NSString* key in syncState) {
+    if (![key isEqualToString:kSyncTypeRequired]) {
+      return YES;
+    }
+  }
+  return NO;
+}
+
+- (BOOL)hasSyncedSettings {
+  if (HoldsSyncedSettings(self.syncState)) {
+    return YES;
+  }
+
+  // In-memory state is not the whole story. `readSyncStateFromDisk` is gated on a configured sync
+  // server, so a daemon that started *after* SyncBaseURL was removed holds nothing while the
+  // departed server's settings are still on disk -- which is exactly when they most need dropping,
+  // and the ordinary way a fleet retires a sync server. Read the file directly rather than through
+  // the authorizer, the same exemption `clearSyncState` takes and for the same reason.
+  return HoldsSyncedSettings([NSDictionary dictionaryWithContentsOfFile:self.syncStateFilePath]);
 }
 
 - (void)clearSyncState {
@@ -2180,13 +2255,45 @@ static SNTConfigurator* sharedConfigurator = nil;
       return;
     }
     self.syncState = [NSMutableDictionary dictionary];
-    [[NSFileManager defaultManager] removeItemAtPath:self.syncStateFilePath error:NULL];
+    [self removeSyncStateFile];
   };
   if ([NSThread isMainThread]) {
     block();
   } else {
     dispatch_sync(dispatch_get_main_queue(), block);
   }
+}
+
+- (BOOL)clearSyncStateRequiringSyncType:(SNTSyncType)syncType {
+  // One transition rather than `clearSyncState` plus `setSyncTypeRequired:`. That pairing cannot
+  // work here: `setSyncTypeRequired:` writes through `saveSyncStateToDisk`, whose authorizer
+  // requires `syncBaseURL != nil`, and the caller runs precisely *because* the URL went away. The
+  // write would be refused and the requirement would survive only in this process's memory, so a
+  // restarted daemon would fall back to `syncTypeRequired`'s empty-state default, which lapses to
+  // Normal the moment postflight writes any other key.
+  //
+  // Skipping the authorizer is the same exemption `clearSyncState` takes, for the same reason.
+  // Writing to `syncStateFilePath` still requires root, which santad has.
+  __block BOOL committed = NO;
+  void (^block)(void) = ^{
+    NSMutableDictionary* syncState = [NSMutableDictionary dictionaryWithObject:@(syncType)
+                                                                        forKey:kSyncTypeRequired];
+    if (self.batchedSyncState) {
+      [self.batchedSyncState removeAllObjects];
+      [self.batchedSyncState addEntriesFromDictionary:syncState];
+      // Durability is the enclosing batch's to report, not ours.
+      committed = YES;
+      return;
+    }
+    self.syncState = syncState;
+    committed = [self writeSyncStateToDisk];
+  };
+  if ([NSThread isMainThread]) {
+    block();
+  } else {
+    dispatch_sync(dispatch_get_main_queue(), block);
+  }
+  return committed;
 }
 
 - (NSArray*)entitlementsPrefixFilter {
@@ -2271,6 +2378,10 @@ static SNTConfigurator* sharedConfigurator = nil;
   if ([state[kStateLastBootUUIDKey] isKindOfClass:[NSString class]]) {
     _lastBootUUID = state[kStateLastBootUUIDKey];
     newState[kStateLastBootUUIDKey] = _lastBootUUID;
+  }
+
+  if ([state[kStateLastSyncServerURLKey] isKindOfClass:[NSString class]]) {
+    newState[kStateLastSyncServerURLKey] = state[kStateLastSyncServerURLKey];
   }
 
   if ([state[kStateTimedRuleKillsKey] isKindOfClass:[NSArray class]]) {

@@ -392,6 +392,15 @@ santa_unit_test(
 )
 
 santa_unit_test(
+    name = "SNTCommandRuleTest",
+    srcs = ["Commands/SNTCommandRuleTest.mm"],
+    visibility = ["//:santa_package_group"],
+    deps = [
+        ":SNTCommandRule",
+    ],
+)
+
+santa_unit_test(
     name = "SNTCommandTest",
     srcs = ["SNTCommandTest.mm"],
     deps = [
@@ -409,6 +418,7 @@ test_suite(
         ":SNTCommandDoctorTest",
         ":SNTCommandFileInfoTest",
         ":SNTCommandMetricsTest",
+        ":SNTCommandRuleTest",
         ":SNTCommandTest",
     ],
     visibility = ["//:santa_package_group"],

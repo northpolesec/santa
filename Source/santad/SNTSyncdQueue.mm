@@ -26,11 +26,27 @@
 #include "Source/common/SantaCache.h"
 #include "Source/common/String.h"
 
+// How long a removed SyncBaseURL must stay removed before synced state is dropped. Gives
+// com.apple.ManagedClient time to settle if it is flapping.
+static constexpr NSTimeInterval kDefaultClearSyncStateGracePeriod = 600;
+
 @interface SNTSyncdQueue ()
 @property dispatch_queue_t syncdQueue;
 @property MOLXPCConnection* syncConnection;
 @property dispatch_source_t timer;
 @property NSURL* previousSyncBaseURL;
+
+/// Last non-nil SyncBaseURL seen. Unlike `previousSyncBaseURL` this survives the URL going away,
+/// so a server swap is still recognised when SyncBaseURL passes through nil on the way. Seeded
+/// from, and written back to, the configurator's persisted record so that a swap spanning a
+/// daemon restart is recognised too.
+@property NSURL* lastSyncServerURL;
+
+/// Pending clear of synced state, or NULL if none is armed. Only touched on `syncdQueue`.
+@property dispatch_source_t clearSyncStateTimer;
+
+/// A property, not the constant directly, so tests don't wait out the real grace period.
+@property NSTimeInterval clearSyncStateGracePeriod;
 @end
 
 @implementation SNTSyncdQueue {
@@ -44,6 +60,8 @@
     _uploadBackoff = std::make_unique<SantaCache<std::string, NSDate*>>(cacheSize);
     _syncdQueue = dispatch_queue_create("com.northpolesec.syncd_queue",
                                         DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL);
+    _clearSyncStateGracePeriod = kDefaultClearSyncStateGracePeriod;
+    _lastSyncServerURL = [[SNTConfigurator configurator] savedLastSyncServerURL];
   }
   return self;
 }
@@ -66,6 +84,8 @@
 - (void)reassessSyncServiceConnectionWithDelay:(uint32_t)seconds {
   WEAKIFY(self);
   dispatch_sync(self.syncdQueue, ^{
+    // Coalesce: a still-pending reassessment is superseded by this one. The handler retires its
+    // own source, so a non-NULL timer here always means one is genuinely still pending.
     if (self.timer) {
       dispatch_source_cancel(self.timer);
     }
@@ -78,10 +98,27 @@
     // WEAKIFY(self);
     dispatch_source_set_event_handler(self.timer, ^{
       STRONGIFY(self);
+      if (!self) {
+        return;
+      }
+
+      // One-shot: retire the source before doing any work, so that every exit path below is
+      // covered and a non-NULL `timer` always means "armed and not yet fired". Dropping our
+      // reference here is safe -- nothing touches the source afterwards, and dispatch keeps it
+      // alive for the duration of this handler.
+      dispatch_source_cancel(self.timer);
+      self.timer = NULL;
+
       SNTConfigurator* configurator = [SNTConfigurator configurator];
 
       NSURL* newSyncBaseURL = [configurator syncBaseURL];
-      BOOL telemetryExportEnabled = [configurator enableTelemetryExport];
+
+      // The server changed identity, rather than appearing or disappearing. Compared against the
+      // last non-nil URL, so removing one server and adding another still counts. Computed before
+      // the trackers are updated below, and independent of connection state. Only sees changes
+      // within this santad's lifetime: an edit made while it was down is missed.
+      BOOL syncServerChanged = self.lastSyncServerURL && newSyncBaseURL &&
+                               ![self.lastSyncServerURL isEqual:newSyncBaseURL];
 
       // If the SyncBaseURL was added or changed, and a connection already
       // exists, it must be bounced.
@@ -95,19 +132,34 @@
 
       self.previousSyncBaseURL = newSyncBaseURL;
 
-      // If newSyncBaseURL or telemetryExportEnabled is set, start the sync service
-      if (newSyncBaseURL || telemetryExportEnabled) {
+      // A SyncBaseURL is the only thing the sync service exists for.
+      if (newSyncBaseURL) {
+        // Runs once per change: the bounce above returns early, so this is the pass driven by
+        // the old sync service's invalidation, i.e. after it exited and can no longer write.
+        if (syncServerChanged) {
+          // Persists the new server as the last sync server itself, once the drop has committed.
+          [self dropStateFromPreviousSyncServerSerialized:newSyncBaseURL];
+        } else if (!self.lastSyncServerURL) {
+          // The first sync server this host has seen: nothing to drop, so record it now. Any other
+          // server is either unchanged (nothing to write, and persisting rewrites the whole state
+          // file) or a change, handled above.
+          if (![configurator persistLastSyncServerURL:newSyncBaseURL]) {
+            LOGW(@"Failed to record the current sync server; a change made while santad is not "
+                 @"running may go unnoticed");
+          }
+        }
+
+        // Tracked in memory as soon as the change is acted on, so a drop that fails to reach disk
+        // is not retried on every pass. The persisted record is what carries the retry: it still
+        // names the previous server, so the next launch detects the change again.
+        self.lastSyncServerURL = newSyncBaseURL;
+
         if (!self.syncConnection.isConnected) {
           [self establishSyncServiceConnectionSerialized];
         }
 
-        // Ensure any pending requests to clear sync state are cancelled, but
-        // only if there is a sync base URL set
-        if (newSyncBaseURL) {
-          [NSObject cancelPreviousPerformRequestsWithTarget:[SNTConfigurator configurator]
-                                                   selector:@selector(clearSyncState)
-                                                     object:nil];
-        }
+        // A sync server is configured again, so any pending clear is no longer wanted.
+        [self cancelPendingClearSyncStateSerialized];
       } else {
         if (self.syncConnection.isConnected) {
           // Note: Only teardown the connection if we're connected. This helps
@@ -117,20 +169,116 @@
           [self tearDownSyncServiceConnectionSerialized];
         }
 
-        // Keep the syncState active for 10 min in case com.apple.ManagedClient is
-        // flapping.
-        [[SNTConfigurator configurator] performSelector:@selector(clearSyncState)
-                                             withObject:nil
-                                             afterDelay:600];
+        // Keep the syncState active for the grace period in case
+        // com.apple.ManagedClient is flapping.
+        [self scheduleClearSyncStateSerialized];
       }
-
-      // Only run once
-      dispatch_source_cancel(self.timer);
-      self.timer = NULL;
     });
 
     dispatch_resume(self.timer);
   });
+}
+
+/// Drop the previous sync server's settings and ask the new one for a clean sync. Rules are left
+/// alone: the Clean sync replaces them in one transaction, so policy is never momentarily empty.
+///
+/// `syncServerURL` is recorded as the last sync server only once the drop has committed. The two
+/// records have to move together: the persisted record is what stops the change being detected
+/// again after a restart, so marking it handled while the drop is still in the air would strand
+/// the departed server's settings on disk with nothing left to notice them.
+///
+/// Must be called on `syncdQueue`. The hop to main is async because the main thread may itself be
+/// blocked in `dispatch_sync(syncdQueue, ...)` via `reassessSyncServiceConnection`.
+- (void)dropStateFromPreviousSyncServerSerialized:(NSURL*)syncServerURL {
+  dispatch_async(dispatch_get_main_queue(), ^{
+    LOGI(@"SyncBaseURL now points at a different sync server, dropping the previous server's "
+         @"synced settings and requesting a clean sync");
+    SNTConfigurator* configurator = [SNTConfigurator configurator];
+    if (![configurator clearSyncStateRequiringSyncType:SNTSyncTypeClean]) {
+      LOGE(@"Failed to drop the previous sync server's synced settings. They will be dropped again "
+           @"on the next launch rather than reapplied.");
+      return;
+    }
+    if (![configurator persistLastSyncServerURL:syncServerURL]) {
+      LOGW(@"Failed to record the current sync server; this change will be detected again after a "
+           @"restart, costing a redundant clean sync");
+    }
+  });
+}
+
+/// Arm a one-shot clear of synced state, `clearSyncStateGracePeriod` from now. An already-armed
+/// request is left alone so config churn can't push the deadline out indefinitely.
+///
+/// Must be called on `syncdQueue`. The hop to main is async because the main thread may itself be
+/// blocked in `dispatch_sync(syncdQueue, ...)` via `reassessSyncServiceConnection`.
+- (void)scheduleClearSyncStateSerialized {
+  if (self.clearSyncStateTimer) {
+    return;
+  }
+
+  self.clearSyncStateTimer =
+      dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, self.syncdQueue);
+  dispatch_source_set_timer(
+      self.clearSyncStateTimer,
+      dispatch_time(DISPATCH_TIME_NOW, (int64_t)(self.clearSyncStateGracePeriod * NSEC_PER_SEC)),
+      DISPATCH_TIME_FOREVER,  // won't repeat
+      1 * NSEC_PER_SEC);
+
+  WEAKIFY(self);
+  dispatch_source_set_event_handler(self.clearSyncStateTimer, ^{
+    STRONGIFY(self);
+    if (!self) {
+      return;
+    }
+
+    // Only run once.
+    dispatch_source_cancel(self.clearSyncStateTimer);
+    self.clearSyncStateTimer = NULL;
+
+    NSTimeInterval gracePeriod = self.clearSyncStateGracePeriod;
+    dispatch_async(dispatch_get_main_queue(), ^{
+      // Re-check after the hop: cancelPendingClearSyncStateSerialized only stops a clear that is
+      // still armed, so a URL landing between the timer firing and this block would be missed.
+      SNTConfigurator* configurator = [SNTConfigurator configurator];
+      if (configurator.syncBaseURL) {
+        LOGD(@"SyncBaseURL reappeared before synced state was cleared, keeping it");
+        return;
+      }
+
+      // Never synced, or already cleared by an earlier launch. Nothing to drop, and nothing worth
+      // recording: with no synced settings `syncTypeRequired` already answers Clean. Without this,
+      // every host that does not use a sync server writes a sync state plist it has no use for.
+      if (!configurator.hasSyncedSettings) {
+        LOGD(@"No SyncBaseURL configured");
+        return;
+      }
+
+      LOGI(@"No SyncBaseURL configured for %g seconds, clearing synced state", gracePeriod);
+
+      // The rules stay, so whichever server comes next must be asked to replace them. Recorded
+      // explicitly because `syncTypeRequired`'s empty-state default lapses to Normal the moment
+      // postflight writes any other key, and a server that declines the clean sync would then
+      // merge its rules onto the departed server's. Cleared and recorded in one call because the
+      // ordinary sync-state write path is gated on a configured sync server, which is exactly what
+      // just went away.
+      if (![configurator clearSyncStateRequiringSyncType:SNTSyncTypeClean]) {
+        LOGE(@"Failed to clear the departed sync server's synced settings from disk. They are no "
+             @"longer in effect, and will be cleared again on the next launch.");
+      }
+    });
+  });
+
+  dispatch_resume(self.clearSyncStateTimer);
+}
+
+/// Drop any armed request to clear synced state. Must be called on `syncdQueue`.
+- (void)cancelPendingClearSyncStateSerialized {
+  if (!self.clearSyncStateTimer) {
+    return;
+  }
+
+  dispatch_source_cancel(self.clearSyncStateTimer);
+  self.clearSyncStateTimer = NULL;
 }
 
 - (void)establishSyncServiceConnectionSerialized {

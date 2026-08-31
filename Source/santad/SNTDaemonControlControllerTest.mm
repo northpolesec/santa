@@ -12,6 +12,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
+#import "Source/common/SNTConfigurator.h"
 #import "Source/santad/SNTDaemonControlController.h"
 
 #import <Foundation/Foundation.h>
@@ -46,6 +47,7 @@ static NSString* const kBinarySHA256 =
 @end
 
 @interface SNTDaemonControlController (Testing)
+- (BOOL)shouldRejectManualRuleChangeAddingRules:(BOOL)addingRules;
 @property(readonly) dispatch_queue_t binaryUploadQ;
 @property(readonly) dispatch_queue_t packageInventoryQ;
 @end
@@ -383,6 +385,50 @@ static NSString* const kBinarySHA256 =
   }];
 
   XCTAssertEqual(got.networkFlow, 7);
+}
+
+// ---- Manual (santactl) rule change gate ------------------------------
+//
+// Enforcement itself is release-only (#ifndef DEBUG), so these cover the decision directly.
+
+- (void)testManualRuleChangesAreRefusedWhileASyncServerOwnsTheRuleDatabase {
+  id cfg = OCMClassMock([SNTConfigurator class]);
+  OCMStub([cfg configurator]).andReturn(cfg);
+  OCMStub([cfg syncBaseURL]).andReturn([NSURL URLWithString:@"https://example.com/"]);
+
+  XCTAssertTrue([self.sut shouldRejectManualRuleChangeAddingRules:YES],
+                @"A sync server owns the rule database, so manual additions must be refused");
+  XCTAssertTrue([self.sut shouldRejectManualRuleChangeAddingRules:NO],
+                @"Clearing is the sync server's job too: a clean sync is the supported reset");
+
+  [cfg stopMocking];
+}
+
+- (void)testManualRuleClearingIsAllowedWithStaticRulesButAddingIsNot {
+  id cfg = OCMClassMock([SNTConfigurator class]);
+  OCMStub([cfg configurator]).andReturn(cfg);
+  OCMStub([cfg syncBaseURL]).andReturn(nil);
+  OCMStub([cfg staticRules]).andReturn(@[ @{@"identifier" : @"abc"} ]);
+
+  XCTAssertTrue([self.sut shouldRejectManualRuleChangeAddingRules:YES],
+                @"Static rules are managed policy, so manual additions must still be refused");
+  XCTAssertFalse([self.sut shouldRejectManualRuleChangeAddingRules:NO],
+                 @"Clearing must stay possible, or a host moving to profile-only management is "
+                 @"stuck with a departed sync server's rules");
+
+  [cfg stopMocking];
+}
+
+- (void)testManualRuleChangesAreAllowedWhenNothingElseManagesPolicy {
+  id cfg = OCMClassMock([SNTConfigurator class]);
+  OCMStub([cfg configurator]).andReturn(cfg);
+  OCMStub([cfg syncBaseURL]).andReturn(nil);
+  OCMStub([cfg staticRules]).andReturn(@[]);
+
+  XCTAssertFalse([self.sut shouldRejectManualRuleChangeAddingRules:YES]);
+  XCTAssertFalse([self.sut shouldRejectManualRuleChangeAddingRules:NO]);
+
+  [cfg stopMocking];
 }
 
 @end

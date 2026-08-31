@@ -912,6 +912,20 @@ extern NSString* _Nonnull const kEnableMenuItemUserOverride;
 - (nullable NSArray<NSDictionary*>*)savedDemotedAdmins;
 
 ///
+///  Records the sync server most recently seen in `SyncBaseURL`, so that a change made while the
+///  daemon was not running is still recognisable on the next launch. Stored whole rather than by
+///  host, so that tenants sharing a host stay distinguishable.
+///
+///  Returns NO if the record could not be written to disk.
+///
+- (BOOL)persistLastSyncServerURL:(nullable NSURL*)syncServerURL;
+
+///
+///  Returns the sync server recorded by `persistLastSyncServerURL:`, or nil if none is recorded.
+///
+- (nullable NSURL*)savedLastSyncServerURL;
+
+///
 ///  State-file key under which Temporary Admin Mode persists its session state
 ///  (an active session, or a deadline-0 demote-retry residue after a failed
 ///  teardown), and the field within it naming the session's target uid.
@@ -1238,9 +1252,33 @@ extern NSString* _Nonnull const kStateTempAdminTargetUIDKey;
 #endif
 
 ///
+///  Whether any state produced by a sync server is currently held, in memory or on disk.
+///  `SyncTypeRequired` does not count: it is this client's own bookkeeping rather than anything a
+///  server put there, so state holding nothing else is indistinguishable from never having synced.
+///
+///  Consults the sync state file when memory holds nothing, so this may touch disk. That fallback
+///  is the point: the file is only read into memory when a sync server is configured, so a daemon
+///  that started after `SyncBaseURL` was removed would otherwise report no synced state while the
+///  departed server's settings sat on disk. A file that cannot be parsed reads as no state; it
+///  carries no policy either, since the same parse failure leaves the effective state empty.
+///
+@property(readonly, nonatomic) BOOL hasSyncedSettings;
+
+///
 ///  Clear the sync server configuration from the effective configuration.
 ///
 - (void)clearSyncState;
+
+///
+///  Clear the sync server configuration and record, in the same transition, that the next sync
+///  must be a `syncType` one. Returns NO if the new state did not reach disk.
+///
+///  Exists because the two halves cannot be expressed as `clearSyncState` followed by
+///  `setSyncTypeRequired:`. The caller runs precisely because `SyncBaseURL` went away, and the
+///  ordinary sync-state write path is gated on a configured sync server, so the second half would
+///  be silently dropped and the requirement would live only in this process's memory.
+///
+- (BOOL)clearSyncStateRequiringSyncType:(SNTSyncType)syncType;
 
 ///
 ///  Buffer a series of sync-state mutations into a single atomic commit.

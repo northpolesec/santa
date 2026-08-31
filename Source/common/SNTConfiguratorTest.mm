@@ -373,6 +373,295 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
   }
 }
 
+/// Unlike configuratorWithEmptySyncStateAtPath:, this permits state-file access, which is what
+/// the persisted last-sync-server record lives in.
+- (SNTConfigurator*)configuratorWithStateFileAtPath:(NSString*)stateFilePath {
+  return [[SNTConfigurator alloc] initWithSyncStateFile:@"/does/not/need/to/exist"
+      stateFile:stateFilePath
+      syncStateAccessAuthorizer:^{
+        return NO;
+      }
+      stateAccessAuthorizer:^BOOL {
+        return YES;
+      }];
+}
+
+// The record has to outlive the daemon: a SyncBaseURL edited while santad was not running is the
+// most common way a sync server changes, and in-memory tracking alone never sees it.
+- (void)testLastSyncServerURLSurvivesARestart {
+  NSString* statePath = [NSString stringWithFormat:@"%@/last-sync-server.plist", self.testDir];
+  SNTConfigurator* cfg = [self configuratorWithStateFileAtPath:statePath];
+
+  XCTAssertNil(cfg.savedLastSyncServerURL, @"Nothing is recorded before a sync server is seen");
+
+  XCTAssertTrue([cfg persistLastSyncServerURL:[NSURL URLWithString:@"https://a.example.com/"]]);
+  XCTAssertEqualObjects(cfg.savedLastSyncServerURL.absoluteString, @"https://a.example.com/");
+
+  // A second configurator over the same file stands in for the next launch.
+  SNTConfigurator* restarted = [self configuratorWithStateFileAtPath:statePath];
+  XCTAssertEqualObjects(restarted.savedLastSyncServerURL.absoluteString, @"https://a.example.com/",
+                        @"The recorded sync server must be readable after a restart");
+
+  XCTAssertTrue([self.fileMgr removeItemAtPath:statePath error:nil]);
+}
+
+// Stored whole rather than by host, so that two tenants served from one host are distinguishable.
+- (void)testLastSyncServerURLDistinguishesPathsOnTheSameHost {
+  NSString* statePath = [NSString stringWithFormat:@"%@/last-sync-server-path.plist", self.testDir];
+  SNTConfigurator* cfg = [self configuratorWithStateFileAtPath:statePath];
+
+  [cfg persistLastSyncServerURL:[NSURL URLWithString:@"https://sync.example.com/tenant-a/"]];
+
+  XCTAssertNotEqualObjects(cfg.savedLastSyncServerURL,
+                           [NSURL URLWithString:@"https://sync.example.com/tenant-b/"]);
+
+  XCTAssertTrue([self.fileMgr removeItemAtPath:statePath error:nil]);
+}
+
+- (void)testSyncTypeRequiredDefaultsToCleanWhenNoSyncStateExists {
+  NSString* plistPath = [NSString stringWithFormat:@"%@/sync-type-default.plist", self.testDir];
+  SNTConfigurator* cfg = [self configuratorWithEmptySyncStateAtPath:plistPath];
+
+  // Clean, not CleanAll: SNTSyncPreflight escalates a CLEAN response to CleanAll only when the
+  // client asked for CleanAll, so this leaves the server the final say.
+  XCTAssertEqual(cfg.syncTypeRequired, SNTSyncTypeClean);
+}
+
+// A clean sync stays required until a server actually performs one. Postflight stamps
+// FullSyncLastSuccess on every successful sync but only writes SyncTypeRequired when the server
+// acknowledged the clean sync, so an explicitly recorded requirement must survive that write.
+- (void)testExplicitCleanSyncTypeSurvivesUnacknowledgedSync {
+  NSString* plistPath = [NSString stringWithFormat:@"%@/sync-type-sticky.plist", self.testDir];
+  SNTConfigurator* cfg = [self configuratorWithEmptySyncStateAtPath:plistPath];
+
+  [cfg setSyncTypeRequired:SNTSyncTypeClean];
+  cfg.fullSyncLastSuccess = [NSDate now];
+
+  XCTAssertEqual(cfg.syncTypeRequired, SNTSyncTypeClean,
+                 @"A recorded clean-sync requirement must not lapse after a sync the server "
+                 @"declined to perform cleanly");
+
+  XCTAssertTrue([self.fileMgr removeItemAtPath:plistPath error:nil]);
+}
+
+/// Unlike the other helpers here, this models the *production* sync-state authorizer, which is
+/// `syncBaseURL != nil && geteuid() == 0`. Tests that pin behaviour around a departing sync server
+/// have to use it: an authorizer that always says yes hides the very gate they are about.
+- (SNTConfigurator*)configuratorWithSyncStateAtPath:(NSString*)plistPath
+                               syncServerConfigured:(BOOL (^)(void))syncServerConfigured {
+  return [[SNTConfigurator alloc] initWithSyncStateFile:plistPath
+      stateFile:@"/does/not/need/to/exist"
+      syncStateAccessAuthorizer:^BOOL {
+        return syncServerConfigured();
+      }
+      stateAccessAuthorizer:^BOOL {
+        return NO;
+      }];
+}
+
+// The clean-sync requirement recorded when SyncBaseURL goes away has to reach disk. It cannot be
+// written through the ordinary path -- that path is gated on a configured sync server, and there
+// isn't one any more, which is the whole reason this is happening. If the write is dropped the
+// requirement lives only in the running daemon's memory, and a restart falls back to
+// `syncTypeRequired`'s empty-state default, which lapses to Normal the moment postflight writes
+// any other key (see testExplicitCleanSyncTypeSurvivesUnacknowledgedSync for that mechanism).
+- (void)testCleanSyncRequirementRecordedOnSyncBaseURLRemovalIsDurable {
+  NSString* plistPath = [NSString stringWithFormat:@"%@/removal-clean.plist", self.testDir];
+  __block BOOL syncServerConfigured = YES;
+  SNTConfigurator* cfg = [self configuratorWithSyncStateAtPath:plistPath
+                                          syncServerConfigured:^BOOL {
+                                            return syncServerConfigured;
+                                          }];
+
+  // A host that has been syncing: settings on disk, no clean sync pending.
+  [cfg setSyncTypeRequired:SNTSyncTypeNormal];
+  cfg.fullSyncLastSuccess = [NSDate now];
+  XCTAssertTrue([self.fileMgr fileExistsAtPath:plistPath], @"Sanity: synced state must be on disk");
+
+  // SyncBaseURL is removed and the grace period elapses.
+  syncServerConfigured = NO;
+  XCTAssertTrue([cfg clearSyncStateRequiringSyncType:SNTSyncTypeClean],
+                @"The requirement must be recorded even though no sync server is configured");
+
+  // A sync server is configured again and the daemon restarts, so everything is re-read from disk.
+  syncServerConfigured = YES;
+  SNTConfigurator* restarted = [self configuratorWithSyncStateAtPath:plistPath
+                                                syncServerConfigured:^BOOL {
+                                                  return syncServerConfigured;
+                                                }];
+
+  XCTAssertNil(restarted.fullSyncLastSuccess, @"The departed server's state must not come back");
+  XCTAssertEqual(restarted.syncTypeRequired, SNTSyncTypeClean);
+
+  // The decisive case: a server that declines the clean sync still writes other keys at postflight,
+  // which is what makes the empty-state default lapse. The recorded requirement must outlast it.
+  restarted.fullSyncLastSuccess = [NSDate now];
+  XCTAssertEqual(restarted.syncTypeRequired, SNTSyncTypeClean,
+                 @"The client must keep asking until a server actually performs the clean sync");
+
+  XCTAssertTrue([self.fileMgr removeItemAtPath:plistPath error:nil]);
+}
+
+// The sync state file is only read when a sync server is configured, so a daemon that starts
+// *after* SyncBaseURL was removed holds nothing in memory while the departed server's settings are
+// still sitting on disk. Deciding from memory alone strands that file forever, and a later launch
+// with a sync server configured would read a departed server's policy straight back in. This is
+// the "removed while santad was not running" case, which is the ordinary way a fleet drops a sync
+// server.
+- (void)testSyncedSettingsAreFoundOnDiskWhenNoSyncServerIsConfigured {
+  NSString* plistPath = [NSString stringWithFormat:@"%@/removed-while-down.plist", self.testDir];
+  __block BOOL syncServerConfigured = YES;
+  BOOL (^authorizer)(void) = ^BOOL {
+    return syncServerConfigured;
+  };
+
+  SNTConfigurator* synced = [self configuratorWithSyncStateAtPath:plistPath
+                                             syncServerConfigured:authorizer];
+  [synced setSyncServerClientMode:SNTClientModeLockdown];
+  XCTAssertTrue([self.fileMgr fileExistsAtPath:plistPath],
+                @"Sanity: a synced setting must be on disk");
+
+  // SyncBaseURL is removed while santad is down, then santad starts.
+  syncServerConfigured = NO;
+  SNTConfigurator* restarted = [self configuratorWithSyncStateAtPath:plistPath
+                                                syncServerConfigured:authorizer];
+  XCTAssertEqual(restarted.syncState.count, 0u,
+                 @"Sanity: the file is not read into memory without a sync server");
+  XCTAssertTrue(restarted.hasSyncedSettings,
+                @"A departed server's settings still on disk must be recognised as droppable");
+
+  XCTAssertTrue([restarted clearSyncStateRequiringSyncType:SNTSyncTypeClean]);
+
+  // The next launch finds only the recorded requirement, which is not a synced setting, so it has
+  // nothing to redo.
+  SNTConfigurator* afterClear = [self configuratorWithSyncStateAtPath:plistPath
+                                                 syncServerConfigured:authorizer];
+  XCTAssertFalse(afterClear.hasSyncedSettings, @"Only the recorded clean-sync requirement is left");
+
+  // The harm this prevents: with a sync server configured again the file *is* read, and it must no
+  // longer carry the departed server's policy -- only the requirement that the next sync be clean.
+  syncServerConfigured = YES;
+  SNTConfigurator* nextServer = [self configuratorWithSyncStateAtPath:plistPath
+                                                 syncServerConfigured:authorizer];
+  XCTAssertEqual(nextServer.syncState.count, 1u,
+                 @"A departed server's settings must not be read back by the next launch");
+  XCTAssertEqual(nextServer.syncTypeRequired, SNTSyncTypeClean);
+
+  XCTAssertTrue([self.fileMgr removeItemAtPath:plistPath error:nil]);
+}
+
+// Nothing calls it inside a batch today, but the branch that handles one is what stops a future
+// caller from clobbering `syncState` and writing to disk mid-transaction, the way an unguarded
+// implementation would. `clearSyncState` guards the same way for the same reason.
+- (void)testClearSyncStateRequiringSyncTypeComposesWithABatch {
+  NSString* plistPath = [NSString stringWithFormat:@"%@/reset-in-batch.plist", self.testDir];
+  SNTConfigurator* cfg = [self configuratorWithEmptySyncStateAtPath:plistPath];
+
+  cfg.fullSyncLastSuccess = [NSDate now];
+
+  XCTAssertTrue([cfg performSyncStateBatch:^{
+    XCTAssertTrue([cfg clearSyncStateRequiringSyncType:SNTSyncTypeClean]);
+    // Still inside the transaction, so nothing has been published yet.
+    XCTAssertNotNil(cfg.fullSyncLastSuccess);
+  }]);
+
+  XCTAssertNil(cfg.fullSyncLastSuccess, @"The batch must commit the clear");
+  XCTAssertEqual(cfg.syncTypeRequired, SNTSyncTypeClean);
+  XCTAssertFalse(cfg.hasSyncedSettings);
+
+  XCTAssertTrue([self.fileMgr removeItemAtPath:plistPath error:nil]);
+}
+
+// `SyncTypeRequired` is this client's own bookkeeping, not something a server sent, so a state
+// holding nothing else has to read as "never synced". SNTRuleTable records one when it creates the
+// database, before any sync has happened, so counting it would make every host look like it holds
+// a departed server's settings.
+- (void)testHasSyncedSettingsIgnoresTheSyncTypeRequirement {
+  NSString* plistPath = [NSString stringWithFormat:@"%@/has-synced-settings.plist", self.testDir];
+  SNTConfigurator* cfg = [self configuratorWithEmptySyncStateAtPath:plistPath];
+
+  XCTAssertFalse(cfg.hasSyncedSettings, @"A host that has never synced holds no settings");
+
+  // Stands in for SNTRuleTable creating the rule database on a host with no sync server.
+  [cfg setSyncTypeRequired:SNTSyncTypeCleanAll];
+  XCTAssertFalse(cfg.hasSyncedSettings, @"The sync-type requirement alone is not a synced setting");
+
+  [cfg setSyncServerClientMode:SNTClientModeLockdown];
+  XCTAssertTrue(cfg.hasSyncedSettings);
+
+  XCTAssertTrue([cfg clearSyncStateRequiringSyncType:SNTSyncTypeClean]);
+  XCTAssertFalse(cfg.hasSyncedSettings,
+                 @"Clearing leaves only the requirement, so there is nothing left to clear again");
+
+  XCTAssertTrue([self.fileMgr removeItemAtPath:plistPath error:nil]);
+}
+
+// Sync-state writes are unconditional, so a no-op batch (e.g. a preflight whose config bundle
+// carries nothing) would otherwise leave an empty plist behind. An empty plist and a missing one
+// mean the same thing, so keep only the one that says so.
+- (void)testSavingEmptySyncStateRemovesThePlistRatherThanWritingAnEmptyOne {
+  NSString* plistPath = [NSString stringWithFormat:@"%@/empty-state.plist", self.testDir];
+  SNTConfigurator* cfg = [self configuratorWithEmptySyncStateAtPath:plistPath];
+
+  [cfg setSyncTypeRequired:SNTSyncTypeClean];
+  XCTAssertTrue([self.fileMgr fileExistsAtPath:plistPath],
+                @"Sanity: a populated sync state must be written to disk");
+
+  // Mirrors a no-op batch committing an empty dictionary.
+  XCTAssertTrue([cfg performSyncStateBatch:^{
+    [cfg clearSyncState];
+  }]);
+
+  XCTAssertFalse([self.fileMgr fileExistsAtPath:plistPath],
+                 @"An empty sync state must remove the plist, not write an empty one");
+}
+
+// Committing an empty state means removing the plist, so a removal that fails has not achieved
+// durability any more than a failed write would have. Callers gate post-commit side effects on
+// the returned flag, so it must not claim success.
+- (void)testSavingEmptySyncStateReportsFailureWhenThePlistCannotBeRemoved {
+  if (geteuid() == 0) {
+    XCTSkip(@"Running as root defeats the directory permissions this test relies on");
+  }
+
+  NSString* lockedDir = [NSString stringWithFormat:@"%@/locked", self.testDir];
+  XCTAssertTrue([self.fileMgr createDirectoryAtPath:lockedDir
+                        withIntermediateDirectories:YES
+                                         attributes:nil
+                                              error:nil]);
+  NSString* plistPath = [lockedDir stringByAppendingPathComponent:@"sync-state.plist"];
+  SNTConfigurator* cfg = [self configuratorWithEmptySyncStateAtPath:plistPath];
+
+  [cfg setSyncTypeRequired:SNTSyncTypeClean];
+  XCTAssertTrue([self.fileMgr fileExistsAtPath:plistPath], @"Sanity: the plist must exist");
+
+  // A directory without write permission cannot have entries unlinked from it.
+  XCTAssertTrue([self.fileMgr setAttributes:@{NSFilePosixPermissions : @0500}
+                               ofItemAtPath:lockedDir
+                                      error:nil]);
+  BOOL committed = [cfg performSyncStateBatch:^{
+    [cfg clearSyncState];
+  }];
+  XCTAssertTrue([self.fileMgr setAttributes:@{NSFilePosixPermissions : @0700}
+                               ofItemAtPath:lockedDir
+                                      error:nil]);
+
+  XCTAssertFalse(committed, @"A plist that could not be removed must not report a durable commit");
+
+  XCTAssertTrue([self.fileMgr removeItemAtPath:lockedDir error:nil]);
+}
+
+- (void)testSyncTypeRequiredReturnsCleanAfterSyncStateIsCleared {
+  NSString* plistPath = [NSString stringWithFormat:@"%@/sync-type-cleared.plist", self.testDir];
+  SNTConfigurator* cfg = [self configuratorWithEmptySyncStateAtPath:plistPath];
+
+  [cfg setSyncTypeRequired:SNTSyncTypeNormal];
+  XCTAssertEqual(cfg.syncTypeRequired, SNTSyncTypeNormal);
+
+  [cfg clearSyncState];
+  XCTAssertEqual(cfg.syncTypeRequired, SNTSyncTypeClean);
+}
+
 - (void)testPerformSyncStateBatchCommitsAsSingleKVOFire {
   NSString* plistPath = [NSString stringWithFormat:@"%@/batch-kvo.plist", self.testDir];
   SNTConfigurator* cfg = [self configuratorWithEmptySyncStateAtPath:plistPath];
