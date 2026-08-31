@@ -33,7 +33,7 @@
 #import "Source/common/SNTSystemInfo.h"
 #include "Source/common/String.h"
 #include "Source/common/SystemResources.h"
-#include "absl/cleanup/cleanup.h"
+#include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 
 namespace santa {
@@ -133,12 +133,19 @@ SNTKilledProcessError LibprocSignalErrorToKilledProcessError(int error) {
 // Delivers `sig` to the process `token` identifies, or to that process's group
 // when the request targets process groups. `sig` is passed in rather than read
 // from the request so the term-then-kill path can drive two passes at different
-// signals through the same request. `signaledPgids` holds the groups this pass
-// has already signaled, so each group is signaled exactly once no matter how
-// many of its members matched: the first member signals the group and later
-// members return nil, having already been reached by that one signal.
+// signals through the same request.
+//
+// Two scopes dedupe group deliveries. `requestAttempts` is this request's own,
+// mapping each group it tried to that attempt's errno; `passSignaledPgids` is
+// shared across the pass and holds the groups whose delivery landed, so a group
+// two requests both reach is delivered to once.
+//
+// Every matched member is reported, so a group member never returns nil: the
+// members of one request share its attempt's outcome, failures included, and a
+// member another request's landed delivery already reached reports success.
 SNTKilledProcess* KillProcess(SNTKillRequest* request, int sig, audit_token_t* token,
-                              const KillEnv& env, absl::flat_hash_set<pid_t>* signaledPgids) {
+                              const KillEnv& env, absl::flat_hash_set<pid_t>* passSignaledPgids,
+                              absl::flat_hash_map<pid_t, int>* requestAttempts) {
   static pid_t myPid = getpid();
   pid_t targetPid = Pid(*token);
   pid_t targetPidversion = Pidversion(*token);
@@ -170,13 +177,30 @@ SNTKilledProcess* KillProcess(SNTKillRequest* request, int sig, audit_token_t* t
     // signaling the one matched process, which is never broader than what was
     // asked for.
     if (targetPgid > 1 && targetPgid != getpgrp()) {
-      if (!signaledPgids->insert(targetPgid).second) {
-        // Signaled earlier in this pass, which reached this process too.
-        return nil;
+      // This request already tried this group, so its members all reuse that
+      // one attempt's outcome. Reporting a failure for each of them keeps a
+      // failed delivery visible for every process it left unsignaled.
+      if (auto attempt = requestAttempts->find(targetPgid); attempt != requestAttempts->end()) {
+        return [[SNTKilledProcess alloc]
+            initWithPid:targetPid
+             pidversion:targetPidversion
+                  error:LibprocSignalErrorToKilledProcessError(attempt->second)];
+      }
+
+      // Another request's delivery landed on this group, which reached this
+      // member too, so it is reported as signaled without delivering again.
+      if (passSignaledPgids->contains(targetPgid)) {
+        return [[SNTKilledProcess alloc] initWithPid:targetPid
+                                          pidversion:targetPidversion
+                                               error:SNTKilledProcessErrorNone];
       }
 
       int error = env.signal_group(targetPgid, sig);
+      (*requestAttempts)[targetPgid] = error;
       if (error == 0) {
+        // Only a landed delivery covers the pass: a failure must leave another
+        // request free to try the group itself.
+        passSignaledPgids->insert(targetPgid);
         LOGI(@"Signaled (%d) process group: %d (from kill command: %@)", sig, targetPgid,
              request.uuid);
       } else {
@@ -203,9 +227,14 @@ SNTKilledProcess* KillProcess(SNTKillRequest* request, int sig, audit_token_t* t
                                          error:LibprocSignalErrorToKilledProcessError(error)];
 }
 
+// `matched` is set when the named process was found. Not every record means
+// that: a boot session or pidversion mismatch reports an error for a process
+// this never matched.
 SNTKilledProcess* KillByRunningProcess(SNTKillRequestRunningProcess* request, int sig,
                                        const KillEnv& env,
-                                       absl::flat_hash_set<pid_t>* signaledPgids) {
+                                       absl::flat_hash_set<pid_t>* passSignaledPgids,
+                                       absl::flat_hash_map<pid_t, int>* requestAttempts,
+                                       bool* matched) {
   if (![[SNTSystemInfo bootSessionUUID] isEqualToString:request.bootSessionUUID]) {
     LOGW(@"Request to kill running process with non-matching boot session UUID");
     return [[SNTKilledProcess alloc] initWithPid:request.pid
@@ -216,7 +245,8 @@ SNTKilledProcess* KillByRunningProcess(SNTKillRequestRunningProcess* request, in
   audit_token_t token;
   if (env.token_for_pid(request.pid, &token)) {
     if (Pidversion(token) == request.pidversion) {
-      return KillProcess(request, sig, &token, env, signaledPgids);
+      *matched = true;
+      return KillProcess(request, sig, &token, env, passSignaledPgids, requestAttempts);
     } else {
       LOGW(@"Rejecting request to kill pid (%d) due to pidversion mismatch (got: %d, want: %d)",
            request.pid, Pidversion(token), request.pidversion);
@@ -265,14 +295,19 @@ std::optional<audit_token_t> MatchProcess(
   return token_after;
 }
 
+// `matched` is set when `pid` matched. That is what the SIGKILL pass reruns on,
+// so it has to mean matching rather than signaling: a match whose group
+// delivery failed still has a process left to escalate.
 SNTKilledProcess* KillByMatchers(SNTKillRequest* request, int sig, pid_t pid,
                                  const std::vector<std::unique_ptr<ProcessMatcher>>& matchers,
-                                 const KillEnv& env, absl::flat_hash_set<pid_t>* signaledPgids) {
+                                 const KillEnv& env, absl::flat_hash_set<pid_t>* passSignaledPgids,
+                                 absl::flat_hash_map<pid_t, int>* requestAttempts, bool* matched) {
   std::optional<audit_token_t> token = MatchProcess(pid, matchers, env);
   if (!token) {
     return nil;
   }
-  return KillProcess(request, sig, &token.value(), env, signaledPgids);
+  *matched = true;
+  return KillProcess(request, sig, &token.value(), env, passSignaledPgids, requestAttempts);
 }
 
 // The matchers a request's criteria come down to, or nullopt when the request
@@ -308,17 +343,30 @@ std::optional<std::vector<std::unique_ptr<ProcessMatcher>>> BuildMatchers(SNTKil
   return matchers;
 }
 
-// One kill pass at signal `sig`: match every process, then signal the matches.
-SNTKillResponse* RunKillPass(SNTKillRequest* request, int sig, const KillEnv& env) {
-  NSMutableArray<SNTKilledProcess*>* killedProcs = [NSMutableArray array];
+// One pass's response, plus whether the request matched anything. Matching is
+// not the same as signaling: a request whose matches all sit in a group the
+// delivery failed for still has processes to escalate at SIGKILL.
+struct PassOutcome {
+  SNTKillResponse* response;
+  bool matched;
+};
 
-  // Groups already signaled by this pass, so a group with several matching
-  // members is signaled once. Empty unless the request targets groups.
-  absl::flat_hash_set<pid_t> signaledPgids;
+// One kill pass at signal `sig`: match every process, then signal the matches.
+// `passSignaledPgids` is the caller's because a pass can span several requests:
+// a group two requests both reach must be delivered to once, not twice. Empty
+// unless a request targets groups.
+PassOutcome RunKillPass(SNTKillRequest* request, int sig, const KillEnv& env,
+                        absl::flat_hash_set<pid_t>* passSignaledPgids) {
+  NSMutableArray<SNTKilledProcess*>* killedProcs = [NSMutableArray array];
+  bool matched = false;
+  // This request's own attempts, mapped to the errno each returned; see
+  // KillProcess.
+  absl::flat_hash_map<pid_t, int> requestAttempts;
 
   if ([request isKindOfClass:[SNTKillRequestRunningProcess class]]) {
     SNTKilledProcess* killed =
-        KillByRunningProcess((SNTKillRequestRunningProcess*)request, sig, env, &signaledPgids);
+        KillByRunningProcess((SNTKillRequestRunningProcess*)request, sig, env, passSignaledPgids,
+                             &requestAttempts, &matched);
     if (killed) {
       [killedProcs addObject:killed];
     }
@@ -326,13 +374,16 @@ SNTKillResponse* RunKillPass(SNTKillRequest* request, int sig, const KillEnv& en
     std::optional<std::vector<pid_t>> pids = env.list_pids();
     if (!pids) {
       LOGE(@"Unable to get list of running processes");
-      return [[SNTKillResponse alloc] initWithError:SNTKillResponseErrorListPids];
+      return {.response = [[SNTKillResponse alloc] initWithError:SNTKillResponseErrorListPids],
+              .matched = false};
     }
 
     std::optional<std::vector<std::unique_ptr<ProcessMatcher>>> matchers =
         BuildMatchers(request, env);
     if (!matchers) {
-      return [[SNTKillResponse alloc] initWithError:SNTKillResponseErrorInvalidRequest];
+      return {
+          .response = [[SNTKillResponse alloc] initWithError:SNTKillResponseErrorInvalidRequest],
+          .matched = false};
     }
 
     for (pid_t pid : *pids) {
@@ -340,14 +391,26 @@ SNTKillResponse* RunKillPass(SNTKillRequest* request, int sig, const KillEnv& en
         continue;
       }
 
-      SNTKilledProcess* killed = KillByMatchers(request, sig, pid, *matchers, env, &signaledPgids);
+      SNTKilledProcess* killed = KillByMatchers(request, sig, pid, *matchers, env,
+                                                passSignaledPgids, &requestAttempts, &matched);
       if (killed) {
         [killedProcs addObject:killed];
       }
     }
   }
 
-  return [[SNTKillResponse alloc] initWithKilledProcesses:killedProcs];
+  return {.response = [[SNTKillResponse alloc] initWithKilledProcesses:killedProcs],
+          .matched = matched};
+}
+
+// Whether the pass delivered a signal to anything. An error response did not.
+bool AnySignalDelivered(SNTKillResponse* response) {
+  for (SNTKilledProcess* killedProc in response.killedProcesses) {
+    if (killedProc.error == SNTKilledProcessErrorNone) {
+      return true;
+    }
+  }
+  return false;
 }
 
 }  // namespace
@@ -381,7 +444,8 @@ SNTKillResponse* KillingMachine(SNTKillRequest* request) {
 }
 
 SNTKillResponse* KillingMachine(SNTKillRequest* request, const KillEnv& env) {
-  return RunKillPass(request, request.signal, env);
+  absl::flat_hash_set<pid_t> signaledPgids;
+  return RunKillPass(request, request.signal, env, &signaledPgids).response;
 }
 
 SNTKillResponse* KillingMachineTermThenKill(SNTKillRequest* request, NSTimeInterval grace) {
@@ -390,37 +454,55 @@ SNTKillResponse* KillingMachineTermThenKill(SNTKillRequest* request, NSTimeInter
 
 SNTKillResponse* KillingMachineTermThenKill(SNTKillRequest* request, NSTimeInterval grace,
                                             const KillEnv& env) {
-  SNTKillResponse* termed = RunKillPass(request, SIGTERM, env);
-  if (termed.error != SNTKillResponseErrorNone) {
-    return termed;
+  return KillingMachineTermThenKill(@[ request ], grace, env).firstObject;
+}
+
+NSArray<SNTKillResponse*>* KillingMachineTermThenKill(NSArray<SNTKillRequest*>* requests,
+                                                      NSTimeInterval grace, const KillEnv& env) {
+  // All SIGTERMs first, so one grace period covers every request.
+  NSMutableArray<SNTKillResponse*>* termed = [NSMutableArray arrayWithCapacity:requests.count];
+  std::vector<bool> matched;
+  matched.reserve(requests.count);
+  absl::flat_hash_set<pid_t> termedPgids;
+  BOOL anySignaled = NO;
+  for (SNTKillRequest* request in requests) {
+    PassOutcome outcome = RunKillPass(request, SIGTERM, env, &termedPgids);
+    [termed addObject:outcome.response];
+    matched.push_back(outcome.matched);
+    anySignaled = anySignaled || AnySignalDelivered(outcome.response);
   }
 
-  // Nothing was actually sent SIGTERM: nothing matched, or every match was
-  // rejected or already gone. Nothing can survive a signal that was never
-  // delivered, so don't hold the caller's queue for a second pass.
-  BOOL anySignaled = NO;
-  for (SNTKilledProcess* termedProc in termed.killedProcesses) {
-    if (termedProc.error == SNTKilledProcessErrorNone) {
-      anySignaled = YES;
-      break;
-    }
-  }
+  // Nothing was signaled, so nothing can survive it: skip the grace wait.
   if (!anySignaled) {
     return termed;
   }
 
   env.wait(grace);
 
-  SNTKillResponse* killed = RunKillPass(request, SIGKILL, env);
+  // The SIGKILL pass dedupes groups on a set of its own; SIGTERM's is done. Its
+  // results replace the SIGTERM responses in place, so `termed` ends up holding
+  // both passes.
+  absl::flat_hash_set<pid_t> killedPgids;
+  for (NSUInteger index = 0; index < requests.count; index++) {
+    // Re-match every request that matched, not only those that delivered a
+    // signal: the request that signaled a shared group may no longer match
+    // (its process honored SIGTERM), leaving this one's survivors to escalate.
+    if (!matched[index]) {
+      continue;
+    }
 
-  // Both passes are reported, in order: what was sent SIGTERM, then whichever
-  // of those survived long enough to be sent SIGKILL.
-  NSMutableArray<SNTKilledProcess*>* all = [NSMutableArray arrayWithArray:termed.killedProcesses];
-  if (killed.killedProcesses) {
-    [all addObjectsFromArray:killed.killedProcesses];
+    SNTKillResponse* killed = RunKillPass(requests[index], SIGKILL, env, &killedPgids).response;
+
+    // Report both passes in order: SIGTERM deliveries, then SIGKILL survivors.
+    NSMutableArray<SNTKilledProcess*>* both =
+        [NSMutableArray arrayWithArray:termed[index].killedProcesses];
+    if (killed.killedProcesses) {
+      [both addObjectsFromArray:killed.killedProcesses];
+    }
+    termed[index] = [[SNTKillResponse alloc] initWithError:killed.error killedProcesses:both];
   }
 
-  return [[SNTKillResponse alloc] initWithError:killed.error killedProcesses:all];
+  return termed;
 }
 
 std::optional<pid_t> KillingMachineAnyMatch(SNTKillRequest* request) {

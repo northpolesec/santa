@@ -91,6 +91,15 @@
   copy.holdAndAsk = _holdAndAsk;
   copy.silentTouchID = _silentTouchID;
   copy.touchIDCooldownMinutes = _touchIDCooldownMinutes;
+  copy.timedRuleKillDeadline = _timedRuleKillDeadline;
+  copy.timedRuleKillNotifyAt = _timedRuleKillNotifyAt;
+  copy.timedRuleKillRuleType = _timedRuleKillRuleType;
+  copy.timedRuleKillIdentifier = _timedRuleKillIdentifier;
+  copy.timedRuleKillCELHash = _timedRuleKillCELHash;
+  copy.timedRuleKillWindowDays = _timedRuleKillWindowDays;
+  copy.timedRuleKillWindowStart = _timedRuleKillWindowStart;
+  copy.timedRuleKillWindowEnd = _timedRuleKillWindowEnd;
+  copy.timedRuleKillWindowZone = _timedRuleKillWindowZone;
   copy.auditReturn = _auditReturn;
   return copy;
 }

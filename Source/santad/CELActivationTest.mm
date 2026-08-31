@@ -20,6 +20,7 @@
 #import <XCTest/XCTest.h>
 
 #include <cstring>
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -33,6 +34,8 @@
 #include "Source/common/processtree/SNTEndpointSecurityAdapter.h"
 #include "Source/common/processtree/process.h"
 #include "Source/common/processtree/process_tree_test_helpers.h"
+#include "absl/time/clock.h"
+#include "absl/time/time.h"
 
 using santa::Message;
 using santa::santad::process_tree::CodeSigningInfo;
@@ -163,6 +166,39 @@ std::string MakeRawCDHash() {
   const std::string& stored = (*execd)->program_->code_signing->cdhash;
   XCTAssertEqual(stored.size(), (size_t)CS_CDHASH_LEN);
   XCTAssertEqual(0, std::memcmp(stored.data(), rawCdhash.data(), CS_CDHASH_LEN));
+}
+
+// CreateCELActivationBlock hands `now` on to the activation it builds, which is
+// what lets santad hold every window evaluation to the minimum believable time.
+- (void)testCreateCELActivationBlockForwardsTheClock {
+  es_file_t file = MakeESFile("/bin/ls");
+  es_process_t proc = MakeESProcess(&file, MakeAuditToken(10, 1), MakeAuditToken(1, 1));
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_EXEC, &proc);
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+  Message msg(mockESApi, &esMsg);
+
+  absl::Time provided;
+  std::string parseErr;
+  XCTAssertTrue(absl::ParseTime(absl::RFC3339_full, "2026-01-07T12:00:00Z", &provided, &parseErr));
+
+  auto evaluator = santa::cel::Evaluator<true>::Create();
+  XCTAssertTrue(evaluator.ok());
+
+  ActivationCallbackBlock block = santa::CreateCELActivationBlock(
+      msg, /*signingID=*/nil, /*teamID=*/nil, /*isPlatformBinary=*/NO, /*signingTime=*/nil,
+      /*secureSigningTime=*/nil, /*entitlements=*/nil, /*processTree=*/nullptr,
+      [provided] { return provided; });
+  std::unique_ptr<::google::api::expr::runtime::BaseActivation> base = block(/*useV2=*/true);
+  // block(useV2=true) always builds a concrete Activation<true>, and the
+  // evaluator needs the concrete type.
+  auto* activation = static_cast<santa::cel::Activation<true>*>(base.get());
+
+  auto result = evaluator.value()->CompileAndEvaluate("now() == timestamp('2026-01-07T12:00:00Z')",
+                                                      *activation);
+  XCTAssertTrue(result.ok());
+  XCTAssertEqual(result.value().value, santa::cel::CELProtoTraits<true>::ReturnValue::ALLOWLIST);
 }
 
 @end

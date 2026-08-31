@@ -64,7 +64,10 @@
 - (instancetype)initWithResolvedPath:(NSString*)path error:(NSError**)error;
 
 ///
-///  @return Path of this file.
+///  @return Path of this file. Always a regular file, and expected to be absolute and resolved:
+///      the initializers either standardize the path or document that they take one already
+///      resolved. bundlePath is derived from this, so an unresolved path here yields an
+///      unresolved bundle path.
 ///
 - (NSString*)path;
 
@@ -147,8 +150,10 @@
 - (BOOL)isMissingPageZero;
 
 ///
-///  If set to YES, the bundle* and infoPlist methods will search for and use the highest NSBundle
-///  found in the tree. Defaults to NO, which uses the first found bundle, if any.
+///  If set to YES, the bundle* and infoPlist methods will search for and use the highest bundle
+///  found in the tree, and only bundles with one of a small set of known extensions (.app,
+///  .framework, .xpc, ...) are considered. Defaults to NO, which uses the first found bundle with
+///  any extension, if any.
 ///
 ///  @example:
 ///      An SNTFileInfo object that represents
@@ -156,18 +161,21 @@
 ///      useAncestorBundle is set to YES
 ///        /Applications/Photos.app will be used to get data backing all the bundle methods
 ///
-///  @note: The NSBundle object backing the bundle* and infoPlist methods is cached once found.
-///         Setting the useAncestorBundle propery will clear this cache and force a re-search.
+///  @note: The result backing the bundle* and infoPlist methods is cached once found. Setting the
+///         useAncestorBundle propery will clear this cache and force a re-search.
 ///
 @property(nonatomic) BOOL useAncestorBundle;
 
 ///
 ///  @return An NSBundle if this file is part of a bundle.
 ///
+///  @note: Prefer bundlePath when only the location is needed. Building the NSBundle is the
+///         expensive part of this, and it is deferred until this method is called.
+///
 - (NSBundle*)bundle;
 
 ///
-///  @return The path to the bundle this file is a part of, if any.
+///  @return The path to the bundle this file is a part of, if any. Always a prefix of `path`.
 ///
 - (NSString*)bundlePath;
 

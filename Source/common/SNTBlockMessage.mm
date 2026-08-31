@@ -67,12 +67,35 @@ static id EncodedValueOrNull(id value) {
   NSString* fullHTML = [NSString stringWithFormat:@"%@%@%@", htmlHeader, message, htmlFooter];
 
 #ifdef SANTAGUI
+  // NSHTMLTextDocumentType is the WebKit-backed importer: ~2.3s on first use in a process and
+  // 10-140ms on every use after, always on the main thread. Every message window asks for its
+  // block message from inside a SwiftUI `body`, which is re-evaluated on each state change --
+  // bundle-hash progress alone ticks many times a second -- so parsing per render pins the main
+  // thread and beachballs the whole GUI, menu bar item included.
+  //
+  // Cache on the exact HTML instead. The message is a pure function of the event and config, so
+  // a re-render is always a hit and only a genuinely new message pays for a parse.
+  // ponytail: NSCache, which is already thread-safe; no lock of our own.
+  static NSCache<NSString*, NSAttributedString*>* cache;
+  static dispatch_once_t onceToken;
+  dispatch_once(&onceToken, ^{
+    cache = [[NSCache alloc] init];
+    cache.countLimit = 32;
+  });
+
+  NSAttributedString* cached = [cache objectForKey:fullHTML];
+  if (cached) return cached;
+
   NSData* htmlData = [fullHTML dataUsingEncoding:NSUTF8StringEncoding];
   NSDictionary* options = @{
     NSDocumentTypeDocumentAttribute : NSHTMLTextDocumentType,
     NSCharacterEncodingDocumentAttribute : @(NSUTF8StringEncoding),
   };
-  return [[NSAttributedString alloc] initWithHTML:htmlData options:options documentAttributes:NULL];
+  NSAttributedString* formatted = [[NSAttributedString alloc] initWithHTML:htmlData
+                                                                   options:options
+                                                        documentAttributes:NULL];
+  if (formatted) [cache setObject:formatted forKey:fullHTML];
+  return formatted;
 #else
   NSString* strippedHTML = [self stringFromHTML:fullHTML];
   if (!strippedHTML) {

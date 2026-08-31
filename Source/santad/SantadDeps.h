@@ -39,6 +39,7 @@
 #import "Source/santad/SNTNetworkExtensionQueue.h"
 #import "Source/santad/SNTNotificationQueue.h"
 #import "Source/santad/SNTSyncdQueue.h"
+#import "Source/santad/SNTTimedRuleKills.h"
 #include "Source/santad/SandboxExpectations.h"
 #include "Source/santad/TTYWriter.h"
 
@@ -61,6 +62,7 @@ class SantadDeps {
       SNTNotificationQueue* notifier_queue, SNTSyncdQueue* syncd_queue,
       SNTNetworkExtensionQueue* netext_queue,
       SNTExecutionController* exec_controller,
+      SNTTimedRuleKills* timed_rule_kills,
       std::shared_ptr<santa::PrefixTree<santa::Unit>> prefix_tree,
       std::shared_ptr<santa::TTYWriter> tty_writer,
       std::shared_ptr<santa::santad::process_tree::ProcessTree> process_tree,
@@ -79,6 +81,7 @@ class SantadDeps {
   SNTSyncdQueue* SyncdQueue();
   SNTNetworkExtensionQueue* NetworkExtensionQueue();
   SNTExecutionController* ExecController();
+  SNTTimedRuleKills* TimedRuleKills();
   std::shared_ptr<santa::PrefixTree<santa::Unit>> PrefixTree();
   std::shared_ptr<santa::TTYWriter> TTYWriter();
   std::shared_ptr<santa::santad::process_tree::ProcessTree> ProcessTree();
@@ -98,6 +101,12 @@ class SantadDeps {
   SNTSyncdQueue* syncd_queue_;
   SNTNetworkExtensionQueue* netext_queue_;
   SNTExecutionController* exec_controller_;
+  // Held here so the component outlives Create(): it keeps only weak references
+  // to itself, so without this nothing retains it and every restored deadline
+  // is dropped. The exec controller holds its own reference to record entries
+  // through, so the accessor has no caller yet; it is what keeps this field
+  // from tripping -Wunused-private-field.
+  SNTTimedRuleKills* timed_rule_kills_;
   std::shared_ptr<santa::PrefixTree<santa::Unit>> prefix_tree_;
   std::shared_ptr<santa::TTYWriter> tty_writer_;
   std::shared_ptr<santa::santad::process_tree::ProcessTree> process_tree_;

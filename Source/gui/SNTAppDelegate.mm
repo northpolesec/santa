@@ -18,6 +18,7 @@
 #import <UserNotifications/UserNotifications.h>
 
 #import "Source/common/MOLXPCConnection.h"
+#import "Source/common/SNTBlockMessage.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTFileInfo.h"
 #import "Source/common/SNTKVOManager.h"
@@ -86,6 +87,14 @@
   // Connection setup runs off the main thread because it blocks on the handshake and then waits
   // up to 5s for the daemon to connect back.
   [self attemptDaemonReconnection];
+
+  // +formatMessage: is backed by the main-thread-only WebKit HTML importer, which costs ~2s the
+  // first time it runs in a process and ~10ms after. Pay that once here, as the first block of
+  // the running main queue, so the first block dialog is not preceded by a beachball. Deferred
+  // rather than called inline so launch finishes and the status bar item is live first.
+  dispatch_async(dispatch_get_main_queue(), ^{
+    (void)[SNTBlockMessage formatMessage:@"" withFallback:@"warm up the HTML importer"];
+  });
 }
 
 // Any visible window other than those backing the status bar item. The status bar windows should

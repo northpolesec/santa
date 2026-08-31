@@ -146,7 +146,7 @@ absl::Status NowFunction::Evaluate(absl::Span<const cel_runtime::CelValue> args,
   // immediately. Mark the evaluation non-cacheable.
   *used_sink_ = true;
 
-  *result = cel_runtime::CelValue::CreateTimestamp(absl::Now());
+  *result = cel_runtime::CelValue::CreateTimestamp(now_());
   return absl::OkStatus();
 }
 
@@ -156,7 +156,7 @@ absl::Status AddRelativeTimeCompilerLibrary(::cel::CompilerBuilder& builder) {
          CEL_ASSIGN_OR_RETURN(
              auto today_decl,
              ::cel::MakeFunctionDecl(
-                 "today", ::cel::MakeOverloadDecl("today", ::cel::TimestampType()),
+                 "today", ::cel::MakeOverloadDecl("today_timestamp", ::cel::TimestampType()),
                  ::cel::MakeOverloadDecl("today_timestamp_tz", ::cel::TimestampType(),
                                          ::cel::StringType())));
          CEL_ASSIGN_OR_RETURN(auto days_decl,

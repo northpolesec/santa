@@ -17,11 +17,14 @@
 
 #import <Foundation/Foundation.h>
 
+#include <functional>
 #include <memory>
 
 #include "Source/common/es/Message.h"
 #include "Source/common/processtree/process_tree.h"
 #import "Source/santad/SNTPolicyProcessor.h"
+#include "absl/time/clock.h"
+#include "absl/time/time.h"
 
 @class MOLCodesignChecker;
 
@@ -31,6 +34,10 @@ namespace santa {
 // Message and signing metadata. The block defines a bool parameter that
 // determines whether to create a v1 or v2 activation object.
 //
+// `now` is the evaluation time policy_for_range() judges its windows against.
+// santad passes the minimum believable time, so a system clock moved backwards
+// cannot re-open a window that has closed; it defaults to the system clock.
+//
 // Note: The returned block captures a reference to the Message object and must
 // not use it after the Message object is destroyed. Care must be taken to not
 // use this in an asynchronous context outside of the evaluation of that
@@ -39,11 +46,13 @@ ActivationCallbackBlock _Nonnull CreateCELActivationBlock(
     const Message& esMsg, NSString* _Nullable signingID, NSString* _Nullable teamID,
     BOOL isPlatformBinary, NSDate* _Nullable signingTime, NSDate* _Nullable secureSigningTime,
     NSDictionary* _Nullable entitlements,
-    std::shared_ptr<santad::process_tree::ProcessTree> processTree);
+    std::shared_ptr<santad::process_tree::ProcessTree> processTree,
+    std::function<absl::Time()> now = absl::Now);
 
 ActivationCallbackBlock _Nonnull CreateCELActivationBlock(
     const Message& esMsg, MOLCodesignChecker* _Nullable csInfo,
-    std::shared_ptr<santad::process_tree::ProcessTree> processTree);
+    std::shared_ptr<santad::process_tree::ProcessTree> processTree,
+    std::function<absl::Time()> now = absl::Now);
 
 }  // namespace santa
 

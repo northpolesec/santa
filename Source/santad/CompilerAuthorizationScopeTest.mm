@@ -165,7 +165,9 @@ static const std::vector<std::string> kBlockedArgs = {"clang", "--link"};
           policyProcessor:policyProcessor
       processControlBlock:santa::ProdSuspendResumeBlock()
               processTree:nullptr
-      sandboxExpectations:std::make_shared<santa::SandboxExpectations>()];
+      sandboxExpectations:std::make_shared<santa::SandboxExpectations>()
+           timedRuleKills:nil
+          believableClock:nil];
 
   _mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   _mockESApi->SetExpectationsESNewClient();

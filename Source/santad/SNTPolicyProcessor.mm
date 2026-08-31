@@ -37,8 +37,10 @@
 #include "Source/common/cel/CELPlanCache.h"
 #include "Source/common/cel/Evaluator.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
+#import "Source/santad/SNTTimedRuleKills.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/statusor.h"
+#include "absl/time/time.h"
 #include "cel/v1.pb.h"
 
 static constexpr uint64_t kCELPlanCacheMaxSize = 128;
@@ -53,9 +55,39 @@ struct CELEvaluationResult {
   bool succeeded;            // Whether CEL evaluation succeeded
   bool decisionMade;         // If !succeeded, whether a decision was made (fail-closed)
   SNTRuleState resultState;  // If succeeded, the resulting state
+  // The kill the expression asked for, carried back rather than written to the
+  // decision: only a rule that goes on to decide may record one.
+  std::optional<santa::cel::PendingKill> pendingKill;
 };
 
 static void ApplySilentBlock(SNTCachedDecision* cd, SNTRuleState state);
+
+static NSDate* NSDateFromAbslTime(absl::Time t) {
+  return [NSDate dateWithTimeIntervalSince1970:absl::ToDoubleSeconds(t - absl::UnixEpoch())];
+}
+
+static NSArray<NSNumber*>* NSArrayFromDays(const std::vector<int64_t>& days) {
+  NSMutableArray<NSNumber*>* out = [NSMutableArray arrayWithCapacity:days.size()];
+  for (int64_t day : days) {
+    [out addObject:@(day)];
+  }
+  return out;
+}
+
+// Drops whatever an earlier rule left on the decision about a timed rule kill: a
+// deadline may only ever be attributed to the rule that governed the execution
+// recording it.
+static void ClearTimedRuleKill(SNTCachedDecision* cd) {
+  cd.timedRuleKillDeadline = nil;
+  cd.timedRuleKillNotifyAt = nil;
+  cd.timedRuleKillRuleType = SNTRuleTypeUnknown;
+  cd.timedRuleKillIdentifier = nil;
+  cd.timedRuleKillCELHash = nil;
+  cd.timedRuleKillWindowDays = nil;
+  cd.timedRuleKillWindowStart = nil;
+  cd.timedRuleKillWindowEnd = nil;
+  cd.timedRuleKillWindowZone = nil;
+}
 
 struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd) {
   return [SNTRuleIdentifiers filterIdentifiers:{
@@ -291,6 +323,7 @@ struct FallbackBatch {
   int returnValue = 0;
   bool cacheable = true;
   std::optional<uint64_t> touchIDCooldownMinutes;
+  std::optional<santa::cel::PendingKill> pendingKill;
 
   if (useV2) {
     const auto& v2Activation = static_cast<const santa::cel::Activation<true>&>(activation);
@@ -310,6 +343,7 @@ struct FallbackBatch {
     returnValue = static_cast<int>(evalResult->value);
     cacheable = evalResult->cacheable;
     touchIDCooldownMinutes = evalResult->touchIDCooldownMinutes;
+    pendingKill = evalResult->pendingKill;
   } else {
     const auto& v1Activation = static_cast<const santa::cel::Activation<false>&>(activation);
     assert(dynamic_cast<const santa::cel::Activation<false>*>(&activation) != nullptr);
@@ -327,7 +361,8 @@ struct FallbackBatch {
 
     returnValue = static_cast<int>(evalResult->value);
     cacheable = evalResult->cacheable;
-    // V1 doesn't support TouchID, so cooldown is always nullopt
+    // V1 doesn't support TouchID or policy_for_range(), so the cooldown and the
+    // pending kill are always nullopt
   }
 
   // Apply cacheability before the switch below so that an early return from a
@@ -406,7 +441,15 @@ struct FallbackBatch {
 
   ApplySilentBlock(cd, resultState);
 
-  return {.succeeded = true, .decisionMade = false, .resultState = resultState};
+  // Fallbacks are skipped: no rule identity for a deadline to be attributed to.
+  if (inFallbackContext) {
+    pendingKill.reset();
+  }
+
+  return {.succeeded = true,
+          .decisionMade = false,
+          .resultState = resultState,
+          .pendingKill = std::move(pendingKill)};
 }
 
 - (CELEvaluationResult)evaluateCELExpressionForRule:(SNTRule*)rule
@@ -441,6 +484,9 @@ struct FallbackBatch {
   // Per-exec evaluation temporaries live on a stack arena; the plan's own
   // (cached) constant arena is long-lived and read-only here.
   google::protobuf::Arena evalArena;
+
+  // Whatever this evaluation asks for is named by the rule and committed in
+  // decision:forRule:, once that rule is known to have decided.
   return [self evaluateCompiledCELExpression:(*planResult)->expression.get()
                                        useV2:useV2
                               cachedDecision:cd
@@ -473,6 +519,12 @@ static void ApplySilentBlock(SNTCachedDecision* cd, SNTRuleState state) {
   SNTRuleState state = rule.state;
   SNTRuleType type = rule.type;
 
+  // A deadline is only ever attributed to the rule that produced it, so anything
+  // an earlier rule left on this decision goes now: only this call's own
+  // evaluation may leave one, and only if this rule goes on to decide.
+  ClearTimedRuleKill(cd);
+
+  std::optional<santa::cel::PendingKill> pendingKill;
   if ((state == SNTRuleStateCEL || state == SNTRuleStateCELv2) && activationCallback) {
     CELEvaluationResult celResult = [self evaluateCELExpressionForRule:rule
                                                         cachedDecision:cd
@@ -481,6 +533,7 @@ static void ApplySilentBlock(SNTCachedDecision* cd, SNTRuleState state) {
       return celResult.decisionMade;
     }
     state = celResult.resultState;
+    pendingKill = std::move(celResult.pendingKill);
   }
 
   static const auto decisions =
@@ -587,6 +640,23 @@ static void ApplySilentBlock(SNTCachedDecision* cd, SNTRuleState state) {
   cd.eventDetailButtonText = rule.eventDetailButtonText;
   cd.staticRule = rule.staticRule;
   cd.ruleId = rule.ruleId;
+
+  // Recorded only here, where the rule is known to have decided: every exit above
+  // leaves the decision as the entry clear left it. The identifier is taken as
+  // the rule table stores it, since the fire-time re-check looks it up by that.
+  if (pendingKill.has_value()) {
+    cd.timedRuleKillDeadline = NSDateFromAbslTime(pendingKill->deadline);
+    cd.timedRuleKillNotifyAt = NSDateFromAbslTime(pendingKill->notify_at);
+    cd.timedRuleKillRuleType = rule.type;
+    cd.timedRuleKillIdentifier = rule.identifier;
+    cd.timedRuleKillCELHash = [SNTTimedRuleKills celHashForExpression:rule.celExpr];
+    if (!pendingKill->window_days.empty()) {
+      cd.timedRuleKillWindowDays = NSArrayFromDays(pendingKill->window_days);
+      cd.timedRuleKillWindowStart = santa::StringToNSString(pendingKill->window_start);
+      cd.timedRuleKillWindowEnd = santa::StringToNSString(pendingKill->window_end);
+      cd.timedRuleKillWindowZone = santa::StringToNSString(pendingKill->window_zone);
+    }
+  }
 
   return YES;
 }

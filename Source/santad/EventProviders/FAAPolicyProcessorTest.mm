@@ -332,14 +332,16 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess& proc) {
 
   // If no policy exists, the operation is allowed
   {
-    XCTAssertEqual(
-        faaPolicyProcessor.ApplyPolicyWrapper(
-            Message(mockESApi, &esMsg), target, std::nullopt,
-            ^bool(const santa::WatchItemPolicyBase&, const Message::PathTarget&, const Message&) {
-              dispatch_semaphore_signal(sema);
-              return false;
-            }),
-        FileAccessPolicyDecision::kNoPolicy);
+    XCTAssertEqual(faaPolicyProcessor
+                       .ApplyPolicyWrapper(Message(mockESApi, &esMsg), target, std::nullopt,
+                                           ^FAAPolicyProcessor::PolicyMatch(
+                                               const santa::WatchItemPolicyBase&,
+                                               const Message::PathTarget&, const Message&) {
+                                             dispatch_semaphore_signal(sema);
+                                             return {false, nullptr};
+                                           })
+                       .decision,
+                   FileAccessPolicyDecision::kNoPolicy);
     XCTAssertSemaFalse(sema, "Semaphore should never have been signaled");
   }
 
@@ -352,14 +354,16 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess& proc) {
   {
     OCMExpect([self.mockConfigurator enableBadSignatureProtection]).andReturn(YES);
     esMsg.process->codesigning_flags = CS_SIGNED;
-    XCTAssertEqual(
-        faaPolicyProcessor.ApplyPolicyWrapper(
-            Message(mockESApi, &esMsg), target, optionalPolicy,
-            ^bool(const santa::WatchItemPolicyBase&, const Message::PathTarget&, const Message&) {
-              dispatch_semaphore_signal(sema);
-              return false;
-            }),
-        FileAccessPolicyDecision::kDeniedInvalidSignature);
+    XCTAssertEqual(faaPolicyProcessor
+                       .ApplyPolicyWrapper(Message(mockESApi, &esMsg), target, optionalPolicy,
+                                           ^FAAPolicyProcessor::PolicyMatch(
+                                               const santa::WatchItemPolicyBase&,
+                                               const Message::PathTarget&, const Message&) {
+                                             dispatch_semaphore_signal(sema);
+                                             return {false, nullptr};
+                                           })
+                       .decision,
+                   FileAccessPolicyDecision::kDeniedInvalidSignature);
     XCTAssertSemaFalse(sema, "Semaphore should never have been signaled");
   }
 
@@ -369,14 +373,16 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess& proc) {
   {
     OCMExpect([self.mockConfigurator enableBadSignatureProtection]).andReturn(NO);
     esMsg.process->codesigning_flags = CS_SIGNED;
-    XCTAssertEqual(
-        faaPolicyProcessor.ApplyPolicyWrapper(
-            Message(mockESApi, &esMsg), target, optionalPolicy,
-            ^bool(const santa::WatchItemPolicyBase&, const Message::PathTarget&, const Message&) {
-              dispatch_semaphore_signal(sema);
-              return true;
-            }),
-        FileAccessPolicyDecision::kAllowed);
+    XCTAssertEqual(faaPolicyProcessor
+                       .ApplyPolicyWrapper(Message(mockESApi, &esMsg), target, optionalPolicy,
+                                           ^FAAPolicyProcessor::PolicyMatch(
+                                               const santa::WatchItemPolicyBase&,
+                                               const Message::PathTarget&, const Message&) {
+                                             dispatch_semaphore_signal(sema);
+                                             return {true, nullptr};
+                                           })
+                       .decision,
+                   FileAccessPolicyDecision::kAllowed);
     XCTAssertSemaTrue(sema, 1, "CheckIfPolicyMatchesBlock was never called");
   }
 
@@ -386,28 +392,32 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess& proc) {
   // If no exceptions, operations are logged and denied
   {
     policy->audit_only = false;
-    XCTAssertEqual(
-        faaPolicyProcessor.ApplyPolicyWrapper(
-            Message(mockESApi, &esMsg), target, optionalPolicy,
-            ^bool(const santa::WatchItemPolicyBase&, const Message::PathTarget&, const Message&) {
-              dispatch_semaphore_signal(sema);
-              return false;
-            }),
-        FileAccessPolicyDecision::kDenied);
+    XCTAssertEqual(faaPolicyProcessor
+                       .ApplyPolicyWrapper(Message(mockESApi, &esMsg), target, optionalPolicy,
+                                           ^FAAPolicyProcessor::PolicyMatch(
+                                               const santa::WatchItemPolicyBase&,
+                                               const Message::PathTarget&, const Message&) {
+                                             dispatch_semaphore_signal(sema);
+                                             return {false, nullptr};
+                                           })
+                       .decision,
+                   FileAccessPolicyDecision::kDenied);
     XCTAssertSemaTrue(sema, 1, "CheckIfPolicyMatchesBlock was never called");
   }
 
   // For audit only policies with no exceptions, operations are logged but allowed
   {
     policy->audit_only = true;
-    XCTAssertEqual(
-        faaPolicyProcessor.ApplyPolicyWrapper(
-            Message(mockESApi, &esMsg), target, optionalPolicy,
-            ^bool(const santa::WatchItemPolicyBase&, const Message::PathTarget&, const Message&) {
-              dispatch_semaphore_signal(sema);
-              return false;
-            }),
-        FileAccessPolicyDecision::kAllowedAuditOnly);
+    XCTAssertEqual(faaPolicyProcessor
+                       .ApplyPolicyWrapper(Message(mockESApi, &esMsg), target, optionalPolicy,
+                                           ^FAAPolicyProcessor::PolicyMatch(
+                                               const santa::WatchItemPolicyBase&,
+                                               const Message::PathTarget&, const Message&) {
+                                             dispatch_semaphore_signal(sema);
+                                             return {false, nullptr};
+                                           })
+                       .decision,
+                   FileAccessPolicyDecision::kAllowedAuditOnly);
     XCTAssertSemaTrue(sema, 1, "CheckIfPolicyMatchesBlock was never called");
   }
 
@@ -419,14 +429,16 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess& proc) {
   // then the operation should be allowed.
   {
     policy->audit_only = false;
-    XCTAssertEqual(
-        faaPolicyProcessor.ApplyPolicyWrapper(
-            Message(mockESApi, &esMsg), target, optionalPolicy,
-            ^bool(const santa::WatchItemPolicyBase&, const Message::PathTarget&, const Message&) {
-              dispatch_semaphore_signal(sema);
-              return false;
-            }),
-        FileAccessPolicyDecision::kAllowed);
+    XCTAssertEqual(faaPolicyProcessor
+                       .ApplyPolicyWrapper(Message(mockESApi, &esMsg), target, optionalPolicy,
+                                           ^FAAPolicyProcessor::PolicyMatch(
+                                               const santa::WatchItemPolicyBase&,
+                                               const Message::PathTarget&, const Message&) {
+                                             dispatch_semaphore_signal(sema);
+                                             return {false, nullptr};
+                                           })
+                       .decision,
+                   FileAccessPolicyDecision::kAllowed);
     XCTAssertSemaTrue(sema, 1, "CheckIfPolicyMatchesBlock was never called");
   }
 
@@ -438,14 +450,16 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess& proc) {
   // then the operation should be allowed.
   {
     policy->audit_only = false;
-    XCTAssertEqual(
-        faaPolicyProcessor.ApplyPolicyWrapper(
-            Message(mockESApi, &esMsg), target, optionalPolicy,
-            ^bool(const santa::WatchItemPolicyBase&, const Message::PathTarget&, const Message&) {
-              dispatch_semaphore_signal(sema);
-              return false;
-            }),
-        FileAccessPolicyDecision::kAllowed);
+    XCTAssertEqual(faaPolicyProcessor
+                       .ApplyPolicyWrapper(Message(mockESApi, &esMsg), target, optionalPolicy,
+                                           ^FAAPolicyProcessor::PolicyMatch(
+                                               const santa::WatchItemPolicyBase&,
+                                               const Message::PathTarget&, const Message&) {
+                                             dispatch_semaphore_signal(sema);
+                                             return {false, nullptr};
+                                           })
+                       .decision,
+                   FileAccessPolicyDecision::kAllowed);
     XCTAssertSemaTrue(sema, 1, "CheckIfPolicyMatchesBlock was never called");
   }
 
@@ -453,14 +467,16 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess& proc) {
   // denied processes/paths, operations are allowed.
   {
     policy->audit_only = true;
-    XCTAssertEqual(
-        faaPolicyProcessor.ApplyPolicyWrapper(
-            Message(mockESApi, &esMsg), target, optionalPolicy,
-            ^bool(const santa::WatchItemPolicyBase&, const Message::PathTarget&, const Message&) {
-              dispatch_semaphore_signal(sema);
-              return false;
-            }),
-        FileAccessPolicyDecision::kAllowed);
+    XCTAssertEqual(faaPolicyProcessor
+                       .ApplyPolicyWrapper(Message(mockESApi, &esMsg), target, optionalPolicy,
+                                           ^FAAPolicyProcessor::PolicyMatch(
+                                               const santa::WatchItemPolicyBase&,
+                                               const Message::PathTarget&, const Message&) {
+                                             dispatch_semaphore_signal(sema);
+                                             return {false, nullptr};
+                                           })
+                       .decision,
+                   FileAccessPolicyDecision::kAllowed);
     XCTAssertSemaTrue(sema, 1, "CheckIfPolicyMatchesBlock was never called");
   }
 
@@ -468,14 +484,16 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess& proc) {
   // denied processes/paths, operations are allowed audit only.
   {
     policy->audit_only = true;
-    XCTAssertEqual(
-        faaPolicyProcessor.ApplyPolicyWrapper(
-            Message(mockESApi, &esMsg), target, optionalPolicy,
-            ^bool(const santa::WatchItemPolicyBase&, const Message::PathTarget&, const Message&) {
-              dispatch_semaphore_signal(sema);
-              return true;
-            }),
-        FileAccessPolicyDecision::kAllowedAuditOnly);
+    XCTAssertEqual(faaPolicyProcessor
+                       .ApplyPolicyWrapper(Message(mockESApi, &esMsg), target, optionalPolicy,
+                                           ^FAAPolicyProcessor::PolicyMatch(
+                                               const santa::WatchItemPolicyBase&,
+                                               const Message::PathTarget&, const Message&) {
+                                             dispatch_semaphore_signal(sema);
+                                             return {true, nullptr};
+                                           })
+                       .decision,
+                   FileAccessPolicyDecision::kAllowedAuditOnly);
     XCTAssertSemaTrue(sema, 1, "CheckIfPolicyMatchesBlock was never called");
   }
 
@@ -483,16 +501,362 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess& proc) {
   // denied processes/paths, operations are denied.
   {
     policy->audit_only = false;
-    XCTAssertEqual(
-        faaPolicyProcessor.ApplyPolicyWrapper(
-            Message(mockESApi, &esMsg), target, optionalPolicy,
-            ^bool(const santa::WatchItemPolicyBase&, const Message::PathTarget&, const Message&) {
-              dispatch_semaphore_signal(sema);
-              return true;
-            }),
-        FileAccessPolicyDecision::kDenied);
+    XCTAssertEqual(faaPolicyProcessor
+                       .ApplyPolicyWrapper(Message(mockESApi, &esMsg), target, optionalPolicy,
+                                           ^FAAPolicyProcessor::PolicyMatch(
+                                               const santa::WatchItemPolicyBase&,
+                                               const Message::PathTarget&, const Message&) {
+                                             dispatch_semaphore_signal(sema);
+                                             return {true, nullptr};
+                                           })
+                       .decision,
+                   FileAccessPolicyDecision::kDenied);
     XCTAssertSemaTrue(sema, 1, "CheckIfPolicyMatchesBlock was never called");
   }
+
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+}
+
+- (void)testApplyPolicyWithProcessOptions {
+  es_file_t esFile = MakeESFile("/some/binary");
+  es_process_t esProc = MakeESProcess(&esFile);
+  esProc.codesigning_flags = CS_SIGNED | CS_VALID;
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_OPEN, &esProc);
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+
+  MockFAAPolicyProcessor faaPolicyProcessor(self.dcMock, nullptr, nullptr, nullptr, nullptr, 0, 0,
+                                            nil, nil);
+  EXPECT_CALL(faaPolicyProcessor, PolicyAllowsReadsForTarget)
+      .WillRepeatedly(testing::Return(false));
+  OCMStub([self.mockConfigurator enableBadSignatureProtection]).andReturn(NO);
+
+  Message::PathTarget target = {.path = std::string_view("/some/random/path"), .is_readable = true};
+
+  auto policy = std::make_shared<WatchItemPolicyBase>("foo_policy", "ver", "/foo");
+  auto optionalPolicy = std::make_optional<std::shared_ptr<WatchItemPolicyBase>>(policy);
+
+  // Note: __block so that mutations below are visible to the already-created
+  // blocks. Without it the blocks would capture a frozen copy.
+  __block santa::WatchItemProcessOptions options;
+  auto matcher = ^FAAPolicyProcessor::PolicyMatch(const santa::WatchItemPolicyBase&,
+                                                  const Message::PathTarget&, const Message&) {
+    return {true, &options};
+  };
+  auto nonMatcher = ^FAAPolicyProcessor::PolicyMatch(const santa::WatchItemPolicyBase&,
+                                                     const Message::PathTarget&, const Message&) {
+    return {false, &options};
+  };
+
+  // For the path-centric rule types the entry describes the instigating
+  // process, so a match means the action states that process's outcome,
+  // bypassing both the rule type's inversion and the audit-only option.
+  for (santa::WatchItemRuleType ruleType : {santa::WatchItemRuleType::kPathsWithAllowedProcesses,
+                                            santa::WatchItemRuleType::kPathsWithDeniedProcesses}) {
+    policy->rule_type = ruleType;
+
+    for (bool auditOnly : {false, true}) {
+      policy->audit_only = auditOnly;
+
+      options.action = santa::WatchItemProcessAction::kAllow;
+      XCTAssertEqual(
+          faaPolicyProcessor
+              .ApplyPolicyWrapper(Message(mockESApi, &esMsg), target, optionalPolicy, matcher)
+              .decision,
+          FileAccessPolicyDecision::kAllowed);
+
+      options.action = santa::WatchItemProcessAction::kAudit;
+      XCTAssertEqual(
+          faaPolicyProcessor
+              .ApplyPolicyWrapper(Message(mockESApi, &esMsg), target, optionalPolicy, matcher)
+              .decision,
+          FileAccessPolicyDecision::kAllowedAuditOnly);
+
+      options.action = santa::WatchItemProcessAction::kDeny;
+      XCTAssertEqual(
+          faaPolicyProcessor
+              .ApplyPolicyWrapper(Message(mockESApi, &esMsg), target, optionalPolicy, matcher)
+              .decision,
+          FileAccessPolicyDecision::kDenied);
+    }
+  }
+
+  // For the process-centric rule types the entry describes the watched process
+  // while the match describes the path, so the action states what happens when
+  // the process violates the rule. The violating access is a path that didn't
+  // match for ProcessesWithAllowedPaths and one that did for
+  // ProcessesWithDeniedPaths. A compliant access is unaffected either way -
+  // without this distinction, an action of audit on a ProcessesWithAllowedPaths
+  // rule would audit every permitted access and still hard-deny the violations.
+  for (bool allowedPaths : {true, false}) {
+    policy->rule_type = allowedPaths ? santa::WatchItemRuleType::kProcessesWithAllowedPaths
+                                     : santa::WatchItemRuleType::kProcessesWithDeniedPaths;
+    auto violating = allowedPaths ? nonMatcher : matcher;
+    auto compliant = allowedPaths ? matcher : nonMatcher;
+
+    for (bool auditOnly : {false, true}) {
+      policy->audit_only = auditOnly;
+
+      options.action = santa::WatchItemProcessAction::kAllow;
+      XCTAssertEqual(
+          faaPolicyProcessor
+              .ApplyPolicyWrapper(Message(mockESApi, &esMsg), target, optionalPolicy, violating)
+              .decision,
+          FileAccessPolicyDecision::kAllowed);
+
+      options.action = santa::WatchItemProcessAction::kAudit;
+      XCTAssertEqual(
+          faaPolicyProcessor
+              .ApplyPolicyWrapper(Message(mockESApi, &esMsg), target, optionalPolicy, violating)
+              .decision,
+          FileAccessPolicyDecision::kAllowedAuditOnly);
+
+      options.action = santa::WatchItemProcessAction::kDeny;
+      XCTAssertEqual(
+          faaPolicyProcessor
+              .ApplyPolicyWrapper(Message(mockESApi, &esMsg), target, optionalPolicy, violating)
+              .decision,
+          FileAccessPolicyDecision::kDenied);
+
+      // The action never turns a compliant access into a violation, or logs one
+      options.action = santa::WatchItemProcessAction::kAudit;
+      XCTAssertEqual(
+          faaPolicyProcessor
+              .ApplyPolicyWrapper(Message(mockESApi, &esMsg), target, optionalPolicy, compliant)
+              .decision,
+          FileAccessPolicyDecision::kAllowed);
+    }
+  }
+
+  // An action only applies to an actual match. Overrides carried over from an
+  // earlier process match must not override the rule's path semantics.
+  policy->rule_type = santa::WatchItemRuleType::kProcessesWithDeniedPaths;
+  policy->audit_only = false;
+  options.action = santa::WatchItemProcessAction::kDeny;
+  XCTAssertEqual(
+      faaPolicyProcessor
+          .ApplyPolicyWrapper(Message(mockESApi, &esMsg), target, optionalPolicy, nonMatcher)
+          .decision,
+      FileAccessPolicyDecision::kAllowed);
+
+  // kInherit falls through to the rule's own behavior
+  policy->rule_type = santa::WatchItemRuleType::kPathsWithAllowedProcesses;
+  options.action = santa::WatchItemProcessAction::kInherit;
+  XCTAssertEqual(
+      faaPolicyProcessor
+          .ApplyPolicyWrapper(Message(mockESApi, &esMsg), target, optionalPolicy, matcher)
+          .decision,
+      FileAccessPolicyDecision::kAllowed);
+  XCTAssertEqual(
+      faaPolicyProcessor
+          .ApplyPolicyWrapper(Message(mockESApi, &esMsg), target, optionalPolicy, nonMatcher)
+          .decision,
+      FileAccessPolicyDecision::kDenied);
+
+  // The matched process's options are returned so callers can use them for the
+  // user notification, TTY message and reads cache.
+  options.silent = true;
+  options.silent_tty = true;
+  options.custom_message = std::make_optional<std::string>("proc msg");
+  FAAPolicyProcessor::DecisionAndOptions result = faaPolicyProcessor.ApplyPolicyWrapper(
+      Message(mockESApi, &esMsg), target, optionalPolicy, matcher);
+  XCTAssertTrue(result.options->silent);
+  XCTAssertTrue(result.options->silent_tty);
+  XCTAssertCppStringEqual(result.options->custom_message.value(), "proc msg");
+
+  // With no overrides, the rule's own options are returned
+  policy->options.silent = false;
+  policy->options.silent_tty = false;
+  policy->options.custom_message = std::make_optional<std::string>("rule msg");
+  result = faaPolicyProcessor.ApplyPolicyWrapper(
+      Message(mockESApi, &esMsg), target, optionalPolicy,
+      ^FAAPolicyProcessor::PolicyMatch(const santa::WatchItemPolicyBase&,
+                                       const Message::PathTarget&, const Message&) {
+        return {true, nullptr};
+      });
+  XCTAssertFalse(result.options->silent);
+  XCTAssertFalse(result.options->silent_tty);
+  XCTAssertCppStringEqual(result.options->custom_message.value(), "rule msg");
+
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+}
+
+/// The invalid-signature denial happens before the policy is evaluated, so the
+/// rule's own options must still be returned for the resulting notification.
+- (void)testApplyPolicyInvalidSignatureUsesRuleOptions {
+  es_file_t esFile = MakeESFile("/some/binary");
+  es_process_t esProc = MakeESProcess(&esFile);
+  esProc.codesigning_flags = CS_SIGNED;
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_OPEN, &esProc);
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+
+  MockFAAPolicyProcessor faaPolicyProcessor(self.dcMock, nullptr, nullptr, nullptr, nullptr, 0, 0,
+                                            nil, nil);
+  OCMExpect([self.mockConfigurator enableBadSignatureProtection]).andReturn(YES);
+
+  Message::PathTarget target = {.path = std::string_view("/some/random/path"), .is_readable = true};
+
+  auto policy = std::make_shared<WatchItemPolicyBase>("foo_policy", "ver", "/foo");
+  policy->options.silent = true;
+  policy->options.silent_tty = true;
+  policy->options.custom_message = std::make_optional<std::string>("rule msg");
+  auto optionalPolicy = std::make_optional<std::shared_ptr<WatchItemPolicyBase>>(policy);
+
+  FAAPolicyProcessor::DecisionAndOptions result = faaPolicyProcessor.ApplyPolicyWrapper(
+      Message(mockESApi, &esMsg), target, optionalPolicy,
+      ^FAAPolicyProcessor::PolicyMatch(const santa::WatchItemPolicyBase&,
+                                       const Message::PathTarget&, const Message&) {
+        XCTFail(@"Policy must not be evaluated for an invalid signature");
+        return {false, nullptr};
+      });
+
+  XCTAssertEqual(result.decision, FileAccessPolicyDecision::kDeniedInvalidSignature);
+  XCTAssertTrue(result.options->silent);
+  XCTAssertTrue(result.options->silent_tty);
+  XCTAssertCppStringEqual(result.options->custom_message.value(), "rule msg");
+
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+}
+
+/// A matched process can override the rule's allow_read_access option, which
+/// means the match must be evaluated before the read-access short circuit.
+- (void)testApplyPolicyProcessOptionsOverrideAllowReadAccess {
+  es_file_t esFile = MakeESFile("/some/binary");
+  es_process_t esProc = MakeESProcess(&esFile);
+  esProc.codesigning_flags = CS_SIGNED | CS_VALID;
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_OPEN, &esProc);
+  esMsg.event.open.fflag = FREAD;
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+
+  MockFAAPolicyProcessor faaPolicyProcessor(self.dcMock, nullptr, nullptr, nullptr, nullptr, 0, 0,
+                                            nil, nil);
+  EXPECT_CALL(faaPolicyProcessor, PolicyAllowsReadsForTarget)
+      .WillRepeatedly([&faaPolicyProcessor](const Message& msg, const Message::PathTarget& target,
+                                            bool allow_read_access) {
+        return faaPolicyProcessor.PolicyAllowsReadsForTargetWrapper(msg, target, allow_read_access);
+      });
+  OCMStub([self.mockConfigurator enableBadSignatureProtection]).andReturn(NO);
+
+  Message::PathTarget target = {.path = std::string_view("/some/random/path"), .is_readable = true};
+
+  // The configured process must carry the override for real, not just be handed
+  // to the matcher below - that is what sets has_read_access_override and so
+  // makes ApplyPolicy evaluate the match before the read-access short circuit.
+  santa::WatchItemProcessOptions ruleOptions;
+  ruleOptions.allow_read_access = false;
+  santa::WatchItemProcessOptions procOptions;
+  procOptions.allow_read_access = true;
+
+  auto policy = std::make_shared<WatchItemPolicyBase>(
+      "foo_policy", "ver", /*audit_only=*/false,
+      santa::WatchItemRuleType::kPathsWithAllowedProcesses, ruleOptions,
+      santa::WatchItemProcessList{
+          santa::WatchItemProcess("/some/binary", "", "", {}, "", false, procOptions)});
+  XCTAssertTrue(policy->has_read_access_override);
+  auto optionalPolicy = std::make_optional<std::shared_ptr<WatchItemPolicyBase>>(policy);
+
+  __block santa::WatchItemProcessOptions options;
+  __block bool matched = false;
+  auto matcher = ^FAAPolicyProcessor::PolicyMatch(const santa::WatchItemPolicyBase&,
+                                                  const Message::PathTarget&, const Message&) {
+    return {matched, &options};
+  };
+
+  // A process's overrides apply even when the match failed, which is the case
+  // for a process rule type whose path didn't match. The rule denies read
+  // access, but the matched process allows it.
+  options.allow_read_access = true;
+  XCTAssertEqual(
+      faaPolicyProcessor
+          .ApplyPolicyWrapper(Message(mockESApi, &esMsg), target, optionalPolicy, matcher)
+          .decision,
+      FileAccessPolicyDecision::kAllowedReadAccess);
+
+  // And the other direction: the rule allows read access, the process doesn't
+  policy->options.allow_read_access = true;
+  options.allow_read_access = false;
+  XCTAssertEqual(
+      faaPolicyProcessor
+          .ApplyPolicyWrapper(Message(mockESApi, &esMsg), target, optionalPolicy, matcher)
+          .decision,
+      FileAccessPolicyDecision::kDenied);
+
+  // The effective allow_read_access takes precedence over an explicit action, so
+  // a read-only operation is allowed even for an entry that says deny. Denying
+  // reads too requires the entry to also set allow_read_access false.
+  // Note: The match has to succeed for the action to be considered at all.
+  matched = true;
+  options.action = santa::WatchItemProcessAction::kDeny;
+  options.allow_read_access = true;
+  XCTAssertEqual(
+      faaPolicyProcessor
+          .ApplyPolicyWrapper(Message(mockESApi, &esMsg), target, optionalPolicy, matcher)
+          .decision,
+      FileAccessPolicyDecision::kAllowedReadAccess);
+
+  options.allow_read_access = false;
+  XCTAssertEqual(
+      faaPolicyProcessor
+          .ApplyPolicyWrapper(Message(mockESApi, &esMsg), target, optionalPolicy, matcher)
+          .decision,
+      FileAccessPolicyDecision::kDenied);
+
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+}
+
+/// With no per-process override of allow_read_access the rule's own value
+/// decides, so a readable target is answered without evaluating the match.
+- (void)testApplyPolicySkipsMatchWithoutReadAccessOverride {
+  es_file_t esFile = MakeESFile("/some/binary");
+  es_process_t esProc = MakeESProcess(&esFile);
+  esProc.codesigning_flags = CS_SIGNED | CS_VALID;
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_OPEN, &esProc);
+  esMsg.event.open.fflag = FREAD;
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+
+  MockFAAPolicyProcessor faaPolicyProcessor(self.dcMock, nullptr, nullptr, nullptr, nullptr, 0, 0,
+                                            nil, nil);
+  EXPECT_CALL(faaPolicyProcessor, PolicyAllowsReadsForTarget)
+      .WillRepeatedly([&faaPolicyProcessor](const Message& msg, const Message::PathTarget& target,
+                                            bool allow_read_access) {
+        return faaPolicyProcessor.PolicyAllowsReadsForTargetWrapper(msg, target, allow_read_access);
+      });
+  OCMStub([self.mockConfigurator enableBadSignatureProtection]).andReturn(NO);
+
+  Message::PathTarget target = {.path = std::string_view("/some/random/path"), .is_readable = true};
+
+  // The rule and its configured process agree, so there is nothing to override
+  santa::WatchItemProcessOptions allowReads;
+  allowReads.allow_read_access = true;
+
+  auto policy = std::make_shared<WatchItemPolicyBase>(
+      "foo_policy", "ver", /*audit_only=*/false,
+      santa::WatchItemRuleType::kPathsWithAllowedProcesses, allowReads,
+      santa::WatchItemProcessList{
+          santa::WatchItemProcess("/some/binary", "", "", {}, "", false, allowReads)});
+  XCTAssertFalse(policy->has_read_access_override);
+  auto optionalPolicy = std::make_optional<std::shared_ptr<WatchItemPolicyBase>>(policy);
+
+  __block bool matcherCalled = false;
+  auto matcher = ^FAAPolicyProcessor::PolicyMatch(const santa::WatchItemPolicyBase&,
+                                                  const Message::PathTarget&, const Message&) {
+    matcherCalled = true;
+    return {true, nullptr};
+  };
+
+  FAAPolicyProcessor::DecisionAndOptions result = faaPolicyProcessor.ApplyPolicyWrapper(
+      Message(mockESApi, &esMsg), target, optionalPolicy, matcher);
+
+  XCTAssertEqual(result.decision, FileAccessPolicyDecision::kAllowedReadAccess);
+  XCTAssertFalse(matcherCalled);
+  XCTAssertEqual(result.options, &policy->options);
 
   XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
 }
@@ -524,11 +888,11 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess& proc) {
   // The matcher block must NEVER be invoked for a truncated target — the
   // early-return branch bypasses ApplyPolicy entirely.
   dispatch_semaphore_t matcherSema = dispatch_semaphore_create(0);
-  auto matcher =
-      ^bool(const santa::WatchItemPolicyBase&, const Message::PathTarget&, const Message&) {
-        dispatch_semaphore_signal(matcherSema);
-        return false;
-      };
+  auto matcher = ^FAAPolicyProcessor::PolicyMatch(const santa::WatchItemPolicyBase&,
+                                                  const Message::PathTarget&, const Message&) {
+    dispatch_semaphore_signal(matcherSema);
+    return {false, nullptr};
+  };
 
   // The denied-block must NEVER be invoked either — telemetry is intentionally
   // skipped for truncated paths in this design.
@@ -541,22 +905,28 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess& proc) {
   FAAPolicyProcessor::TargetPolicyPair pair{0, std::nullopt};
 
   // Override = None → kDenied
-  XCTAssertEqual(faaPolicyProcessor.ProcessTargetAndPolicyWrapper(msg, pair, matcher, deniedBlock,
-                                                                  SNTOverrideFileAccessActionNone),
+  XCTAssertEqual(faaPolicyProcessor
+                     .ProcessTargetAndPolicyWrapper(msg, pair, matcher, deniedBlock,
+                                                    SNTOverrideFileAccessActionNone)
+                     .decision,
                  FileAccessPolicyDecision::kDenied);
   XCTAssertSemaFalse(matcherSema, "Matcher must not be invoked for truncated target");
   XCTAssertSemaFalse(deniedBlockSema, "Denied block must not be invoked for truncated target");
 
   // Override = AuditOnly → kAllowedAuditOnly (downgraded by ApplyOverrideToDecision)
-  XCTAssertEqual(faaPolicyProcessor.ProcessTargetAndPolicyWrapper(
-                     msg, pair, matcher, deniedBlock, SNTOverrideFileAccessActionAuditOnly),
+  XCTAssertEqual(faaPolicyProcessor
+                     .ProcessTargetAndPolicyWrapper(msg, pair, matcher, deniedBlock,
+                                                    SNTOverrideFileAccessActionAuditOnly)
+                     .decision,
                  FileAccessPolicyDecision::kAllowedAuditOnly);
   XCTAssertSemaFalse(matcherSema, "Matcher must not be invoked for truncated target");
   XCTAssertSemaFalse(deniedBlockSema, "Denied block must not be invoked for truncated target");
 
   // Override = Disable → kNoPolicy (defensive — handler short-circuits earlier in production)
-  XCTAssertEqual(faaPolicyProcessor.ProcessTargetAndPolicyWrapper(
-                     msg, pair, matcher, deniedBlock, SNTOverrideFileAccessActionDisable),
+  XCTAssertEqual(faaPolicyProcessor
+                     .ProcessTargetAndPolicyWrapper(msg, pair, matcher, deniedBlock,
+                                                    SNTOverrideFileAccessActionDisable)
+                     .decision,
                  FileAccessPolicyDecision::kNoPolicy);
   XCTAssertSemaFalse(matcherSema, "Matcher must not be invoked for truncated target");
   XCTAssertSemaFalse(deniedBlockSema, "Denied block must not be invoked for truncated target");
@@ -919,12 +1289,13 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess& proc) {
   // ApplyPolicy returns kAllowedAuditOnly so ShouldLogDecision is true and we
   // enter the block where GetCachedDecision and rehydrate are called.
   EXPECT_CALL(faaPolicyProcessor, ApplyPolicy)
-      .WillOnce(testing::Return(FileAccessPolicyDecision::kAllowedAuditOnly));
+      .WillOnce(testing::Return(
+          FAAPolicyProcessor::DecisionAndOptions{FileAccessPolicyDecision::kAllowedAuditOnly, {}}));
 
-  auto matcher =
-      ^bool(const santa::WatchItemPolicyBase&, const Message::PathTarget&, const Message&) {
-        return true;
-      };
+  auto matcher = ^FAAPolicyProcessor::PolicyMatch(const santa::WatchItemPolicyBase&,
+                                                  const Message::PathTarget&, const Message&) {
+    return {true, nullptr};
+  };
   SNTFileAccessDeniedBlock deniedBlock =
       ^(SNTStoredFileAccessEvent*, NSString*, NSString*, NSString*) {
       };
@@ -984,16 +1355,17 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess& proc) {
 
   // ApplyPolicy returns kAllowedAuditOnly so ShouldLogDecision is true.
   EXPECT_CALL(faaPolicyProcessor, ApplyPolicy)
-      .WillOnce(testing::Return(FileAccessPolicyDecision::kAllowedAuditOnly));
+      .WillOnce(testing::Return(
+          FAAPolicyProcessor::DecisionAndOptions{FileAccessPolicyDecision::kAllowedAuditOnly, {}}));
 
   // Crucial: rehydrateAndCacheDecisionForFileInfo: must NEVER be called on cache hit.
   // OCMStrictClassMock on self.dcMock ensures any unexpected call fails verification.
   // We do NOT add an OCMExpect for rehydrateAndCacheDecisionForFileInfo:.
 
-  auto matcher =
-      ^bool(const santa::WatchItemPolicyBase&, const Message::PathTarget&, const Message&) {
-        return true;
-      };
+  auto matcher = ^FAAPolicyProcessor::PolicyMatch(const santa::WatchItemPolicyBase&,
+                                                  const Message::PathTarget&, const Message&) {
+    return {true, nullptr};
+  };
   SNTFileAccessDeniedBlock deniedBlock =
       ^(SNTStoredFileAccessEvent*, NSString*, NSString*, NSString*) {
       };
@@ -1069,12 +1441,13 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess& proc) {
 
   EXPECT_CALL(faaPolicyProcessor, GetCachedDecision).WillOnce(testing::Return(nil));
   EXPECT_CALL(faaPolicyProcessor, ApplyPolicy)
-      .WillOnce(testing::Return(FileAccessPolicyDecision::kAllowedAuditOnly));
+      .WillOnce(testing::Return(
+          FAAPolicyProcessor::DecisionAndOptions{FileAccessPolicyDecision::kAllowedAuditOnly, {}}));
 
-  auto matcher =
-      ^bool(const santa::WatchItemPolicyBase&, const Message::PathTarget&, const Message&) {
-        return true;
-      };
+  auto matcher = ^FAAPolicyProcessor::PolicyMatch(const santa::WatchItemPolicyBase&,
+                                                  const Message::PathTarget&, const Message&) {
+    return {true, nullptr};
+  };
   SNTFileAccessDeniedBlock deniedBlock =
       ^(SNTStoredFileAccessEvent*, NSString*, NSString*, NSString*) {
       };

@@ -112,15 +112,17 @@ using santa::Message;
 
   FAAPolicyProcessor::ESResult result = _faaPolicyProcessorProxy->ProcessMessage(
       msg, targetPolicyPairs,
-      ^bool(const santa::WatchItemPolicyBase& base_policy, const Message::PathTarget& target,
-            const Message& msg) {
+      ^FAAPolicyProcessor::PolicyMatch(const santa::WatchItemPolicyBase& base_policy,
+                                       const Message::PathTarget& target, const Message& msg) {
+        // Note: Iteration order is meaningful. ProcessesWithOptions entries
+        // come first in this list so they take precedence over Processes.
         for (const santa::WatchItemProcess& process : base_policy.processes) {
           if ((*_faaPolicyProcessorProxy)->PolicyMatchesProcess(process, msg->process)) {
-            return true;
+            return {true, process.options.has_value() ? &process.options.value() : nullptr};
           }
         }
 
-        return false;
+        return {false, nullptr};
       },
       self.fileAccessDeniedBlock, overrideAction);
 
