@@ -36,6 +36,8 @@
 #include "Source/common/String.h"
 #include "Source/common/cel/Evaluator.h"
 
+#include <array>
+#include <cstring>
 #include <memory>
 #include <string>
 
@@ -46,9 +48,13 @@ static const int64_t kTransitiveRuleCullingThreshold = 500000;
 // Consider transitive rules out of date if they haven't been used in six months.
 static const NSUInteger kTransitiveRuleExpirationSeconds = 6 * 30 * 24 * 3600;
 
-// Maximum number of file hashes remembered by the execution rule miss cache. Measured at ~1.3MB
+// Maximum number of file hashes remembered by the execution rule miss cache. Measured at ~0.8MB
 // of live heap when full.
 static const uint64_t kExecutionRuleMissCacheSize = 10000;
+
+// Miss cache key: the binary SHA-256 as its 64 hex characters. Fixed size so the key is trivially
+// copyable into the db block and stored inline by the cache, leaving a lookup allocation-free.
+using ExecutionRuleMissCacheKey = std::array<char, 64>;
 
 static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
   // Create a temporary ES client in order to grab the default set of muted paths.
@@ -92,7 +98,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
   // contents, and so determines every other identifier a lookup would match on. Entries are only
   // ever cleared wholesale, by `addExecutionRules:...:errors:` -- there is no per-entry
   // invalidation.
-  std::unique_ptr<SantaCache<std::string, bool>> _executionRuleMissCache;
+  std::unique_ptr<SantaCache<ExecutionRuleMissCacheKey, bool>> _executionRuleMissCache;
 }
 @property MOLCodesignChecker* santadCSInfo;
 @property MOLCodesignChecker* launchdCSInfo;
@@ -264,7 +270,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
 
 - (uint32_t)initializeDatabase:(FMDatabase*)db fromVersion:(uint32_t)version {
   _executionRuleMissCache =
-      std::make_unique<SantaCache<std::string, bool>>(kExecutionRuleMissCacheSize);
+      std::make_unique<SantaCache<ExecutionRuleMissCacheKey, bool>>(kExecutionRuleMissCacheSize);
 
   // Lock this database from other processes
   [[db executeQuery:@"PRAGMA locking_mode = EXCLUSIVE;"] close];
@@ -608,11 +614,16 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
   // If we already looked in the db during another exec and there was no rule,
   // return early. The cache will be cleared when new rules are added. Keyed by
   // file sha256. Using a cdhash is appealing, but a cdhash is not guaranteed
-  // unique across files. An empty key means this lookup must not be cached.
-  std::string missCacheKey = (useCache && identifiers.binarySHA256.length)
-                                 ? santa::NSStringToUTF8String(identifiers.binarySHA256)
-                                 : std::string();
-  if (!missCacheKey.empty() && _executionRuleMissCache->get(missCacheKey)) {
+  // unique across files. A hash that is not exactly key-length cannot be keyed, so it is not
+  // cached.
+  ExecutionRuleMissCacheKey missCacheKey{};
+  const BOOL cacheable =
+      useCache && [identifiers.binarySHA256 lengthOfBytesUsingEncoding:NSUTF8StringEncoding] ==
+                      missCacheKey.size();
+  if (cacheable) {
+    memcpy(missCacheKey.data(), identifiers.binarySHA256.UTF8String, missCacheKey.size());
+  }
+  if (cacheable && _executionRuleMissCache->get(missCacheKey)) {
     return nil;
   }
 
@@ -678,7 +689,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
     // it, and the query finds the new rule so nothing is cached. Recording the miss outside the
     // block instead admits the interleaving where a write commits and clears in between, pinning
     // a miss that no later rule write invalidates.
-    if (!rule && !queryFailed && !missCacheKey.empty()) {
+    if (!rule && !queryFailed && cacheable) {
       self->_executionRuleMissCache->set(missCacheKey, true);
     }
   }];
