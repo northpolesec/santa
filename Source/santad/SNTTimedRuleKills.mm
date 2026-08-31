@@ -586,11 +586,19 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
       continue;
     }
 
-    // The same re-check the deadline makes, a lead window earlier. A rule that
-    // no longer governs has no kill coming, so there is nothing to warn about
-    // and no reason to hold the entry until its deadline.
+    // The same two re-checks the deadline makes, a lead window earlier. A rule
+    // that no longer governs has no kill coming, so there is nothing to warn
+    // about and no reason to hold the entry until its deadline.
     if (![self ruleStillGovernsSerialized:entry]) {
       [self.entries removeObjectForKey:key];
+      changed = YES;
+      continue;
+    }
+
+    // Then the window, asked at the deadline just as the kill path asks it: an
+    // occurrence standing there moves the deadline rather than quitting
+    // anything, so a banner would promise a quit that will not happen.
+    if ([self rescheduleForOpenWindowSerialized:entry now:now]) {
       changed = YES;
       continue;
     }
@@ -668,11 +676,11 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
   entry.bootSessionUUID = bootSession;
 }
 
-/// The window re-check, asked of every entry on every pass through the kill
-/// path. An entry whose recurring window is standing open at its deadline is not
-/// killed: its deadline moves to the end of the occurrence standing there, with a
-/// fresh warning lead, and the warning is owed again because this is a different
-/// deadline.
+/// The window re-check, asked of every entry on every pass: at its deadline, and
+/// again at the warning that leads it. An entry whose recurring window is
+/// standing open at its deadline is not killed: its deadline moves to the end of
+/// the occurrence standing there, with a fresh warning lead, and the warning is
+/// owed again because this is a different deadline.
 ///
 /// Asked on every pass rather than only at daemon start, because a machine that
 /// slept through a deadline wakes inside a later occurrence just as a daemon that
@@ -683,7 +691,9 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
 /// is still standing in those last fractions of a second. Asking at the deadline
 /// itself reads what holds once it arrives, so a window that closes there is
 /// closed and kills, and one that runs on (a back-to-back occurrence, or a
-/// 24-hour window) moves the appointment instead.
+/// 24-hour window) moves the appointment instead. The warning pass reads the same
+/// instant for the same reason: its `now` is a lead short of a deadline that has
+/// not arrived.
 ///
 /// Answers NO for an entry with no window, a window that is closed, and a window
 /// the math refuses, including a zone that no longer resolves: all three mean the
