@@ -646,6 +646,34 @@ static void ApplyCodesignValidationFailure(SNTCachedDecision* cd, OSStatus statu
                                                                    : SNTSigningStatusInvalid);
 }
 
+// Whether this execution searched every identifier these contents can produce, which is what the
+// SHA-256-keyed miss cache requires: a miss cached from a narrower set shadows the rules the
+// missing identifiers would have matched.
+static BOOL SignatureVerdictIsStable(SNTCachedDecision* cd) {
+  // No recorded verdict: the signature identifiers may be derived differently next time.
+  if (!cd.codesignValidationStatus) {
+    return NO;
+  }
+
+  // Unsigned contents can never offer more than their hash.
+  if (cd.codesignValidationStatus.intValue == errSecCSUnsigned) {
+    return YES;
+  }
+
+  // The file validates statically, but filterIdentifiers drops every signature identifier unless
+  // the kernel also considers the running image signed and valid.
+  BOOL kernelSeesValidSignature = NO;
+  switch (cd.signingStatus) {
+    case SNTSigningStatusProduction: OS_FALLTHROUGH;
+    case SNTSigningStatusDevelopment: OS_FALLTHROUGH;
+    case SNTSigningStatusAdhoc: kernelSeesValidSignature = YES; break;
+    case SNTSigningStatusInvalid: OS_FALLTHROUGH;
+    case SNTSigningStatusUnsigned: break;
+  }
+
+  return kernelSeesValidSignature;
+}
+
 - (nonnull SNTCachedDecision*)
            decisionForFileInfo:(nonnull SNTFileInfo*)fileInfo
                    configState:(nonnull SNTConfigState*)configState
@@ -703,7 +731,7 @@ static void ApplyCodesignValidationFailure(SNTCachedDecision* cd, OSStatus statu
     }
   }
 
-  BOOL signatureVerdictIsStable = (cd.codesignValidationStatus != nil);
+  BOOL signatureVerdictIsStable = SignatureVerdictIsStable(cd);
   SNTRule* rule = [self.ruleTable executionRuleForIdentifiers:CreateRuleIDs(cd)
                                                      useCache:signatureVerdictIsStable];
   if (rule) {

@@ -1156,6 +1156,44 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   XCTAssertTrue([self useCacheFlagForCachedDecision:cached codesignError:nil codesigningFlags:0]);
 }
 
+- (void)testExecutionRuleLookupSkipsMissCacheWhenKernelRejectsValidlySignedImage {
+  // The kernel rejected the image, so the lookup is by hash alone even though the file validates.
+  // Caching that miss would shadow these contents' signature rules on a later healthy execution.
+  SNTCachedDecision* cached = [[SNTCachedDecision alloc] init];
+  cached.sha256 = @"a326a1fb48074202e9ad41e4cd1e389eeea372c8c6f7d7e80da81176d5d9430e";
+  cached.teamID = @"EQHXZ8M8AV";
+  cached.signingID = @"EQHXZ8M8AV:com.google.Chrome";
+  cached.codesignValidationStatus = @(errSecSuccess);
+
+  XCTAssertFalse([self useCacheFlagForCachedDecision:cached
+                                       codesignError:nil
+                                    codesigningFlags:CS_SIGNED]);
+}
+
+- (void)testExecutionRuleLookupSkipsMissCacheWhenKernelSeesUnsignedValidlySignedImage {
+  // Same narrowing, other route: the kernel sees no signature while the file validates
+  // statically, e.g. an exec of an unsigned slice of a binary whose native slice is signed.
+  SNTCachedDecision* cached = [[SNTCachedDecision alloc] init];
+  cached.sha256 = @"a326a1fb48074202e9ad41e4cd1e389eeea372c8c6f7d7e80da81176d5d9430e";
+  cached.teamID = @"EQHXZ8M8AV";
+  cached.signingID = @"EQHXZ8M8AV:com.google.Chrome";
+  cached.codesignValidationStatus = @(errSecSuccess);
+
+  XCTAssertFalse([self useCacheFlagForCachedDecision:cached codesignError:nil codesigningFlags:0]);
+}
+
+- (void)testExecutionRuleLookupUsesMissCacheOnRecordedUnsignedVerdictKernelKilled {
+  // An unsigned arm64 image reports invalid, not unsigned (see KernelWillKillForCodeSigning).
+  // The recorded unsigned verdict still means the hash is the whole identifier set.
+  SNTCachedDecision* cached = [[SNTCachedDecision alloc] init];
+  cached.sha256 = @"a326a1fb48074202e9ad41e4cd1e389eeea372c8c6f7d7e80da81176d5d9430e";
+  cached.codesignValidationStatus = @(errSecCSUnsigned);
+
+  XCTAssertTrue([self useCacheFlagForCachedDecision:cached
+                                      codesignError:nil
+                                   codesigningFlags:CS_SIGNED | CS_KILL]);
+}
+
 - (void)testDecisionDoesNotRecordUnsignedVerdictWhenKernelSaysSigned {
   // errSecCSUnsigned is only reusable when the kernel agrees the executable
   // itself carries no signature. When the running image is signed the two
