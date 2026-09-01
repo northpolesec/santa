@@ -17,6 +17,7 @@
 #import "Source/gui/SNTTimedRuleKillMessageWindowView-Swift.h"
 
 #import "Source/common/SNTStrengthify.h"
+#import "Source/common/SNTTimedRuleKillDetails.h"
 
 @interface SNTTimedRuleKillMessageWindowController ()
 // One-shot close at the deadline, held so a dismissal before the deadline can
@@ -26,11 +27,10 @@
 
 @implementation SNTTimedRuleKillMessageWindowController
 
-- (instancetype)initWithApplication:(NSString*)application deadline:(NSDate*)deadline {
+- (instancetype)initWithDetails:(SNTTimedRuleKillDetails*)details {
   self = [super init];
   if (self) {
-    _application = application;
-    _deadline = deadline;
+    _details = details;
   }
   return self;
 }
@@ -46,7 +46,7 @@
   // that clears it, so a bare return would leave this warning holding the one
   // dialog slot and every dialog behind it waiting on it forever. The callback
   // re-enters the queue through dispatch_async, not recursion, so this is safe.
-  if (self.deadline.timeIntervalSinceNow <= 0) {
+  if (self.details.deadline.timeIntervalSinceNow <= 0) {
     [self.delegate windowDidCloseSilenceHash:nil withInterval:0];
     return;
   }
@@ -58,9 +58,7 @@
   // No uiStateCallback: this window offers no per-application silence, so there
   // is no UI state to carry back to the notification manager.
   self.window.contentViewController =
-      [SNTTimedRuleKillMessageWindowViewFactory createWithWindow:self.window
-                                                     application:self.application
-                                                        deadline:self.deadline];
+      [SNTTimedRuleKillMessageWindowViewFactory createWithWindow:self.window details:self.details];
   self.window.delegate = self;
 
   [super showWindow:sender];
@@ -77,16 +75,17 @@
   // loop.
   [self.deadlineTimer invalidate];
   WEAKIFY(self);
-  self.deadlineTimer = [NSTimer scheduledTimerWithTimeInterval:self.deadline.timeIntervalSinceNow
-                                                       repeats:NO
-                                                         block:^(NSTimer* timer) {
-                                                           STRONGIFY(self);
-                                                           // -close, not -closeWindow:, so the
-                                                           // window's delegate callback runs
-                                                           // exactly once and the queue advances
-                                                           // the same way a dismissal does.
-                                                           [self.window close];
-                                                         }];
+  self.deadlineTimer =
+      [NSTimer scheduledTimerWithTimeInterval:self.details.deadline.timeIntervalSinceNow
+                                      repeats:NO
+                                        block:^(NSTimer* timer) {
+                                          STRONGIFY(self);
+                                          // -close, not -closeWindow:, so the
+                                          // window's delegate callback runs
+                                          // exactly once and the queue advances
+                                          // the same way a dismissal does.
+                                          [self.window close];
+                                        }];
 }
 
 - (void)windowWillClose:(NSNotification*)notification {
@@ -103,9 +102,9 @@
   // deadline collapses in the queue instead of stacking a second window.
   // Return nil rather than a bare prefix when either half is missing, so
   // unidentified warnings do not collapse onto one shared key.
-  if (!self.application.length || !self.deadline) return nil;
-  return [NSString stringWithFormat:@"timedrulekill:%@|%f", self.application,
-                                    self.deadline.timeIntervalSince1970];
+  if (!self.details.application.length || !self.details.deadline) return nil;
+  return [NSString stringWithFormat:@"timedrulekill:%@|%f", self.details.application,
+                                    self.details.deadline.timeIntervalSince1970];
 }
 
 @end

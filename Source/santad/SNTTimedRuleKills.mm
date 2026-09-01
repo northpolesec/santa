@@ -30,14 +30,20 @@
 #include <string>
 #include <vector>
 
+#include "Source/common/AccountLookup.h"
+#import "Source/common/CertificateHelpers.h"
+#import "Source/common/MOLCodesignChecker.h"
 #import "Source/common/MOLXPCConnection.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTKillCommand.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTRuleIdentifiers.h"
+#import "Source/common/SNTRuleTimeWindow.h"
 #import "Source/common/SNTSystemInfo.h"
+#import "Source/common/SNTTimedRuleKillDetails.h"
 #import "Source/common/SNTXPCNotifierInterface.h"
+#import "Source/common/SigningIDHelpers.h"
 #include "Source/common/String.h"
 #include "Source/common/SystemResources.h"
 #include "Source/common/Timer.h"
@@ -192,6 +198,54 @@ NSString* DisplayNameForPid(pid_t pid) {
   }
 
   return nil;
+}
+
+// Fills the warning details from the matched process: proc info and its live
+// code object, never a root re-open of its path, which could be swapped under
+// the daemon or stall this queue, the one that fires kills. Everything is best
+// effort: a process gone mid-collection leaves fields nil and the GUI hides
+// those rows. Only application and deadline are guaranteed.
+static SNTTimedRuleKillDetails* DetailsForEntry(SNTTimedRuleKillEntry* entry, pid_t pid) {
+  SNTTimedRuleKillDetails* details = [[SNTTimedRuleKillDetails alloc] init];
+  details.deadline = entry.deadline;
+  details.ruleType = entry.ruleType;
+
+  char pathBuf[PROC_PIDPATHINFO_MAXSIZE] = {};
+  if (proc_pidpath(pid, pathBuf, sizeof(pathBuf)) > 0) {
+    details.path = @(pathBuf);
+  }
+
+  // The same name derivation as today, minus the second proc_pidpath that
+  // DisplayNameForPid would repeat.
+  NSString* app = details.path.lastPathComponent;
+  if (!app.length) app = DisplayNameForPid(pid);
+  details.application = app.length ? app : entry.identifier;
+
+  struct proc_bsdinfo bsdInfo;
+  if (proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &bsdInfo, sizeof(bsdInfo)) == sizeof(bsdInfo)) {
+    if (auto user = santa::account::UsernameForUID(bsdInfo.pbi_uid)) {
+      details.user = @(user->c_str());
+    }
+    details.ppid = @(bsdInfo.pbi_ppid);
+    details.parentName = DisplayNameForPid((pid_t)bsdInfo.pbi_ppid);
+  }
+
+  MOLCodesignChecker* csc = [[MOLCodesignChecker alloc] initWithPID:pid];
+  if (csc) {
+    details.signingID = FormatSigningID(csc);
+    details.cdhash = csc.cdhash;
+    details.publisher = Publisher(csc.certificates, csc.teamID);
+  }
+
+  if (entry.windowDays && entry.windowStart && entry.windowEnd && entry.windowZone) {
+    SNTRuleTimeWindow* window = [[SNTRuleTimeWindow alloc] init];
+    window.days = entry.windowDays;
+    window.startOfDay = entry.windowStart;
+    window.endOfDay = entry.windowEnd;
+    window.zoneName = entry.windowZone;
+    details.timeWindow = window;
+  }
+  return details;
 }
 
 // The kill is delivered to the process group of every match, with SIGKILL as
@@ -785,8 +839,8 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
 }
 
 /// The warning shortly before a deadline: find something the rule covers that
-/// is running, name it, and hand the banner to the GUI. Signals nothing. The
-/// caller has already confirmed the rule still governs.
+/// is running, collect what the dialog shows for it, and hand the banner to the
+/// GUI. Signals nothing. The caller has already confirmed the rule still governs.
 - (void)notifyForEntrySerialized:(SNTTimedRuleKillEntry*)entry {
   // Asked first because it is the cheap question: with no GUI to warn, there is
   // no reason to walk every process on the machine looking for a name for it.
@@ -803,16 +857,10 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
     return;
   }
 
-  // The rule's own identifier is the fallback for a process that matched but
-  // can't be named, which is mostly what one that exited in between looks like.
-  NSString* app = DisplayNameForPid(*pid);
-  if (!app.length) {
-    app = entry.identifier;
-  }
-
-  LOGI(@"Sending timed rule kill banner for %@ (%@), quitting at %@", app, entry.identifier,
-       entry.deadline);
-  [proxy postTimedRuleKillNotificationForApplication:app deadline:entry.deadline];
+  SNTTimedRuleKillDetails* details = DetailsForEntry(entry, *pid);
+  LOGI(@"Sending timed rule kill banner for %@ (%@), quitting at %@", details.application,
+       entry.identifier, entry.deadline);
+  [proxy postTimedRuleKillNotification:details];
 }
 
 /// Writes the current entry set, or clears the key when there are none. Callers

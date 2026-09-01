@@ -16,11 +16,12 @@
 
 #import "Source/gui/SNTMessageWindowController.h"
 
+@class SNTTimedRuleKillDetails;
+
 @interface SNTTimedRuleKillMessageWindowController : SNTMessageWindowController <NSWindowDelegate>
 
-@property(readonly) NSString* application;
-@property(readonly) NSDate* deadline;
+@property(readonly) SNTTimedRuleKillDetails* details;
 
-- (instancetype)initWithApplication:(NSString*)application deadline:(NSDate*)deadline;
+- (instancetype)initWithDetails:(SNTTimedRuleKillDetails*)details;
 
 @end

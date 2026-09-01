@@ -19,10 +19,12 @@
 #import <OCMock/OCMock.h>
 #import <XCTest/XCTest.h>
 #import <arpa/inet.h>
+#include <libproc.h>
 #include <mach/mach_time.h>
 #include <signal.h>
 #include <unistd.h>
 
+#include <climits>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -37,7 +39,9 @@
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTRule.h"
+#import "Source/common/SNTRuleTimeWindow.h"
 #import "Source/common/SNTSystemInfo.h"
+#import "Source/common/SNTTimedRuleKillDetails.h"
 #import "Source/common/SNTXPCNotifierInterface.h"
 #include "Source/common/SystemResources.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
@@ -428,31 +432,27 @@ static NSString* const kOtherBootSessionUUID = @"6A2B4C8E-0000-0000-0000-0000000
 }
 
 /// Records every banner the component sends, in order, as
-/// @{@"app": ..., @"deadline": ..., @"signals": ...}, fulfilling `expectation`
-/// for each one. `signals` is how many deliveries the kill pass had already made
-/// when the banner went out, which is what an ordering test reads. Pass a nil
-/// expectation when the test's point is that no banner arrives.
+/// @{@"details": ..., @"signals": ...}, fulfilling `expectation` for each one.
+/// `signals` is how many deliveries the kill pass had already made when the
+/// banner went out, which is what an ordering test reads. Pass a nil expectation
+/// when the test's point is that no banner arrives.
 - (void)recordBannersOn:(id)proxy
                    into:(NSMutableArray<NSDictionary*>*)banners
             expectation:(XCTestExpectation*)expectation {
   FakeEnv* fake = &_fake;
-  OCMStub([proxy postTimedRuleKillNotificationForApplication:OCMOCK_ANY deadline:OCMOCK_ANY])
-      .andDo(^(NSInvocation* invocation) {
-        __unsafe_unretained NSString* app;
-        __unsafe_unretained NSDate* deadline;
-        [invocation getArgument:&app atIndex:2];
-        [invocation getArgument:&deadline atIndex:3];
-        // Built key by key rather than as a literal: andDo() is a macro, and a
-        // comma inside a braced literal would be read as another argument to it.
-        NSMutableDictionary* banner = [NSMutableDictionary dictionary];
-        banner[@"app"] = app;
-        banner[@"deadline"] = deadline;
-        banner[@"signals"] = @(fake->signals.size());
-        @synchronized(banners) {
-          [banners addObject:banner];
-        }
-        [expectation fulfill];
-      });
+  OCMStub([proxy postTimedRuleKillNotification:OCMOCK_ANY]).andDo(^(NSInvocation* invocation) {
+    __unsafe_unretained SNTTimedRuleKillDetails* details;
+    [invocation getArgument:&details atIndex:2];
+    // Built key by key rather than as a literal: andDo() is a macro, and a
+    // comma inside a braced literal would be read as another argument to it.
+    NSMutableDictionary* banner = [NSMutableDictionary dictionary];
+    banner[@"details"] = details;
+    banner[@"signals"] = @(fake->signals.size());
+    @synchronized(banners) {
+      [banners addObject:banner];
+    }
+    [expectation fulfill];
+  });
 }
 
 - (NSDictionary*)entryDictForRuleType:(SNTRuleType)type
@@ -993,11 +993,12 @@ static NSString* const kOtherBootSessionUUID = @"6A2B4C8E-0000-0000-0000-0000000
   [self drain:sut];
 
   XCTAssertEqual(banners.count, 1u);
+  SNTTimedRuleKillDetails* details = banners.firstObject[@"details"];
   // Named from the process, not from the rule it matched.
-  XCTAssertGreaterThan([banners.firstObject[@"app"] length], 0u);
-  XCTAssertNotEqualObjects(banners.firstObject[@"app"], kMatchingTeamID);
-  XCTAssertEqualWithAccuracy([banners.firstObject[@"deadline"] timeIntervalSince1970],
-                             deadline.timeIntervalSince1970, 0.001);
+  XCTAssertGreaterThan(details.application.length, 0u);
+  XCTAssertNotEqualObjects(details.application, kMatchingTeamID);
+  XCTAssertEqualWithAccuracy(details.deadline.timeIntervalSince1970, deadline.timeIntervalSince1970,
+                             0.001);
   // The warning is the match pass on its own: nothing was signaled.
   XCTAssertEqualObjects(SignalDescriptions(_fake.signals), @[]);
 
@@ -1034,7 +1035,96 @@ static NSString* const kOtherBootSessionUUID = @"6A2B4C8E-0000-0000-0000-0000000
   [self waitForExpectations:@[ posted ] timeout:10];
 
   XCTAssertEqual(banners.count, 1u);
-  XCTAssertEqualObjects(banners.firstObject[@"app"], kMatchingTeamID);
+  XCTAssertEqualObjects([banners.firstObject[@"details"] application], kMatchingTeamID);
+}
+
+// What the banner carries beyond the name: every row but the deadline and the
+// window shape is read off the matched process, which is this test's own parent,
+// the one process the fake world holds. A match is never this process itself, so
+// the parent is the nearest one whose fields the test can check. The signing rows
+// are not pinned; how a given process is signed varies.
+- (void)testWarningDetailsComeFromTheMatchedProcess {
+  [self addRuleOfType:SNTRuleTypeTeamID identifier:kMatchingTeamID cel:kCELExpr];
+  id proxy = [self setUpNotifierProxy];
+
+  SNTTimedRuleKills* sut = [self makeSUT];
+  NSMutableArray<NSDictionary*>* banners = [NSMutableArray array];
+  [self recordBannersOn:proxy into:banners expectation:nil];
+
+  NSDate* deadline = [NSDate dateWithTimeIntervalSinceNow:3600];
+  NSDate* notifyAt = [deadline dateByAddingTimeInterval:-300];
+  // Reads the deadline as 18:00, past the window's close, so the warning pass
+  // leaves the deadline standing and the banner goes out.
+  NSString* zone = [self zoneReading:deadline asHour:18];
+  [sut recordKillForRuleType:SNTRuleTypeTeamID
+                  identifier:kMatchingTeamID
+                     celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
+                    deadline:deadline
+                    notifyAt:notifyAt
+                  windowDays:kEveryDay
+                 windowStart:@"09:00"
+                   windowEnd:@"17:00"
+                  windowZone:zone];
+
+  [self runPassOn:sut asOf:notifyAt];
+
+  char pathBuf[PROC_PIDPATHINFO_MAXSIZE] = {};
+  XCTAssertGreaterThan(proc_pidpath(getppid(), pathBuf, sizeof(pathBuf)), 0);
+  NSString* path = @(pathBuf);
+
+  XCTAssertEqual(banners.count, 1u);
+  SNTTimedRuleKillDetails* details = banners.firstObject[@"details"];
+  XCTAssertEqualObjects(details.path, path);
+  XCTAssertEqualObjects(details.application, path.lastPathComponent);
+  // The matched process launched this test, so it runs as the same user.
+  XCTAssertEqualObjects(details.user, NSUserName());
+  XCTAssertGreaterThan(details.ppid.intValue, 0);
+  // The shape the entry was recorded with, carried through for the dialog to
+  // spell out.
+  XCTAssertEqualObjects(details.timeWindow.days, kEveryDay);
+  XCTAssertEqualObjects(details.timeWindow.startOfDay, @"09:00");
+  XCTAssertEqualObjects(details.timeWindow.endOfDay, @"17:00");
+  XCTAssertEqualObjects(details.timeWindow.zoneName, zone);
+}
+
+// A pid nothing can be read for, which is mostly what a process that exited
+// between the match and the banner looks like. Only what the entry itself holds
+// is guaranteed; every row read off the process is absent, and the dialog hides
+// those.
+- (void)testWarningDetailsAreBestEffortForAProcessThatIsGone {
+  [self addRuleOfType:SNTRuleTypeTeamID identifier:kMatchingTeamID cel:kCELExpr];
+  id proxy = [self setUpNotifierProxy];
+
+  _fake = FakeEnv();
+  _fake.AddMatching(INT_MAX, self.matchingPgid);
+
+  SNTTimedRuleKills* sut = [self makeSUT];
+  NSMutableArray<NSDictionary*>* banners = [NSMutableArray array];
+  [self recordBannersOn:proxy into:banners expectation:nil];
+
+  NSDate* deadline = [NSDate dateWithTimeIntervalSinceNow:3600];
+  NSDate* notifyAt = [deadline dateByAddingTimeInterval:-300];
+  [sut recordKillForRuleType:SNTRuleTypeTeamID
+                  identifier:kMatchingTeamID
+                     celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
+                    deadline:deadline
+                    notifyAt:notifyAt
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
+
+  [self runPassOn:sut asOf:notifyAt];
+
+  XCTAssertEqual(banners.count, 1u);
+  SNTTimedRuleKillDetails* details = banners.firstObject[@"details"];
+  XCTAssertEqualObjects(details.application, kMatchingTeamID);
+  XCTAssertEqualWithAccuracy(details.deadline.timeIntervalSince1970, deadline.timeIntervalSince1970,
+                             0.001);
+  XCTAssertEqual(details.ruleType, SNTRuleTypeTeamID);
+  XCTAssertNil(details.path);
+  XCTAssertNil(details.user);
+  XCTAssertNil(details.publisher);
 }
 
 - (void)testNoWarningWhenNothingMatchingIsRunning {
@@ -1550,7 +1640,7 @@ static NSString* const kOtherBootSessionUUID = @"6A2B4C8E-0000-0000-0000-0000000
 
   XCTAssertEqual(banners.count, 1u);
   // Named the deadline it was recorded for: nothing moved it.
-  XCTAssertEqualWithAccuracy([banners.firstObject[@"deadline"] timeIntervalSince1970],
+  XCTAssertEqualWithAccuracy([[banners.firstObject[@"details"] deadline] timeIntervalSince1970],
                              deadline.timeIntervalSince1970, 0.001);
   XCTAssertTrue([self.savedEntries.firstObject[@"Notified"] boolValue]);
 }

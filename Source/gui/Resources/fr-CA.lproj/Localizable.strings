@@ -7,6 +7,12 @@
 /* Notification message shown when a known app has been unblocked */
 "%@ can now be run" = "%@ peut maintenant être exécuté";
 
+/* a time of day on a date */
+"%@ on %@" = "%1$@ le %2$@";
+
+/* Two ends of a time range */
+"%@ to %@" = "%1$@ à %2$@";
+
 /* Window message warning that an app will be quit at a time */
 "\"%@\" will quit at %@." = "\"%1$@\" se fermera à %2$@.";
 
@@ -103,6 +109,9 @@
 /* Temporary admin mode alert body */
 "Enter a justification for requesting admin privileges:" = "Saisissez une justification pour demander des privilèges d'administrateur :";
 
+/* All seven days */
+"every day" = "tous les jours";
+
 /* No comment provided by engineer. [QC] */
 "Failed to connect to the sync service. Please try again later." = "Échec de la connexion au service de synchronisation. Veuillez réessayer plus tard s.v.p.";
 
@@ -182,6 +191,9 @@
 "Publisher" = "Éditeur";
 
 /* No comment provided by engineer. */
+"Reason" = "Raison";
+
+/* No comment provided by engineer. */
 "Remount Mode" = "Mode de remontage";
 
 /* Temporary admin mode alert title */
@@ -210,6 +222,9 @@
 
 /* No comment provided by engineer. [QC] */
 "Santa is made with ❤️ by the elves at [North Pole Security](https://northpole.security)\nalong with contributions from our wonderful community" = "Santa est conçu avec ❤️ par les lutins de [North Pole Security](https://northpole.security)\navec les contributions de notre merveilleuse communauté";
+
+/* Lead line of the copied warning details */
+"Santa will quit %@ at %@" = "Santa fermera %1$@ à %2$@";
 
 /* No comment provided by engineer. */
 "SHA-256" = "SHA-256";
@@ -291,6 +306,12 @@
 
 /* Reason shown when requesting admin without a policy */
 "this machine does not currently allow temporary admin elevation" = "cet ordinateur ne permet pas présentement l'élévation temporaire des privilèges d'administrateur";
+
+/* quit reason */
+"Time based rule (%@): window ends at %@" = "Règle temporelle (%1$@) : la fenêtre se termine à %2$@";
+
+/* No comment provided by engineer. */
+"Time Window" = "Fenêtre horaire";
 
 /* No comment provided by engineer. [QC] */
 "Too many syncs are in progress. Please try again later." = "Trop de synchronisations sont en cours. Veuillez réessayer plus tard s.v.p.";

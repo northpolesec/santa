@@ -26,6 +26,7 @@
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
 #import "Source/common/SNTStoredNetworkFlowEvent.h"
+#import "Source/common/SNTTimedRuleKillDetails.h"
 
 @class SNTBinaryMessageWindowController;
 
@@ -64,6 +65,15 @@
 - (void)makeKeyAndOrderFront:(id)sender {
 }
 @end
+
+// The warning path reads only these two fields; every other field on the details
+// object is best effort and nothing here depends on one.
+static SNTTimedRuleKillDetails* TimedRuleKillDetails(NSString* application, NSDate* deadline) {
+  SNTTimedRuleKillDetails* details = [[SNTTimedRuleKillDetails alloc] init];
+  details.application = application;
+  details.deadline = deadline;
+  return details;
+}
 
 @interface SNTNotificationManagerTest : XCTestCase
 @property id mockConfigurator;
@@ -369,8 +379,8 @@
         queueMessage:[OCMArg isKindOfClass:[SNTTimedRuleKillMessageWindowController class]]
       enableSilences:NO]);
 
-  [mgr postTimedRuleKillNotificationForApplication:@"Calculator"
-                                          deadline:[NSDate dateWithTimeIntervalSinceNow:600]];
+  [mgr postTimedRuleKillNotification:TimedRuleKillDetails(
+                                         @"Calculator", [NSDate dateWithTimeIntervalSinceNow:600])];
 
   OCMVerifyAll(mgrMock);
   [mgrMock stopMocking];
@@ -381,13 +391,12 @@
   id mgrMock = OCMPartialMock(mgr);
   OCMReject([mgrMock queueMessage:OCMOCK_ANY enableSilences:NO]);
 
-  [mgr postTimedRuleKillNotificationForApplication:nil
-                                          deadline:[NSDate dateWithTimeIntervalSinceNow:600]];
+  [mgr postTimedRuleKillNotification:nil];
   // An empty name has no identity either: its messageHash is nil, so repeats
   // would stack rather than collapse.
-  [mgr postTimedRuleKillNotificationForApplication:@""
-                                          deadline:[NSDate dateWithTimeIntervalSinceNow:600]];
-  [mgr postTimedRuleKillNotificationForApplication:@"Calculator" deadline:nil];
+  [mgr postTimedRuleKillNotification:TimedRuleKillDetails(
+                                         @"", [NSDate dateWithTimeIntervalSinceNow:600])];
+  [mgr postTimedRuleKillNotification:TimedRuleKillDetails(@"Calculator", nil)];
 
   OCMVerifyAll(mgrMock);
   [mgrMock stopMocking];
@@ -399,8 +408,8 @@
 - (void)testTimedRuleKillWindowIdentityIsApplicationAndDeadline {
   NSDate* deadline = [NSDate dateWithTimeIntervalSince1970:1660221048];
   NSString* (^key)(NSString*, NSDate*) = ^(NSString* app, NSDate* d) {
-    return [[[SNTTimedRuleKillMessageWindowController alloc] initWithApplication:app deadline:d]
-        queueDedupeHash];
+    return [[[SNTTimedRuleKillMessageWindowController alloc]
+        initWithDetails:TimedRuleKillDetails(app, d)] queueDedupeHash];
   };
 
   XCTAssertEqualObjects(key(@"Calculator", deadline), key(@"Calculator", deadline));
@@ -422,8 +431,9 @@
     // the test cannot put anything on screen.
     OCMStub([mgrMock showQueuedWindow]).andDo(nil);
 
-    [mgr postTimedRuleKillNotificationForApplication:@"Calculator"
-                                            deadline:[NSDate dateWithTimeIntervalSinceNow:600]];
+    [mgr postTimedRuleKillNotification:TimedRuleKillDetails(
+                                           @"Calculator",
+                                           [NSDate dateWithTimeIntervalSinceNow:600])];
 
     // queueMessage: finishes its bookkeeping in a block on the main queue, so
     // hop through that queue to let the block run before asserting.
@@ -472,8 +482,8 @@
 - (void)testTimedRuleKillWindowClosesItselfAtTheDeadline {
   SNTTimedRuleKillMessageWindowController* controller =
       [[SNTTimedRuleKillMessageWindowController alloc]
-          initWithApplication:@"Calculator"
-                     deadline:[NSDate dateWithTimeIntervalSinceNow:0.25]];
+          initWithDetails:TimedRuleKillDetails(@"Calculator",
+                                               [NSDate dateWithTimeIntervalSinceNow:0.25])];
 
   // The window was stood up and its delegate wired, which is what the deadline
   // timer closed. windowWillClose: runs while the window is still in the screen
@@ -498,8 +508,8 @@
 - (void)testExpiredTimedRuleKillWindowIsRetiredWithoutBeingShown {
   SNTTimedRuleKillMessageWindowController* controller =
       [[SNTTimedRuleKillMessageWindowController alloc]
-          initWithApplication:@"Calculator"
-                     deadline:[NSDate dateWithTimeIntervalSinceNow:-1]];
+          initWithDetails:TimedRuleKillDetails(@"Calculator",
+                                               [NSDate dateWithTimeIntervalSinceNow:-1])];
 
   // No window was ever built, so there was nothing to order in, draw, or activate.
   dispatch_block_t noWindowAtAll = ^{

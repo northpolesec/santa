@@ -33,6 +33,7 @@
 #import "Source/common/SNTStoredNetworkMountEvent.h"
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTSyncConstants.h"
+#import "Source/common/SNTTimedRuleKillDetails.h"
 #import "Source/common/SNTXPCControlInterface.h"
 #import "Source/common/SNTXPCSyncServiceInterface.h"
 #import "Source/gui/SNTAuthorizationHelper.h"
@@ -417,18 +418,22 @@ static NSString* const silencedNotificationsKey = @"SilencedNotifications";
 // A window, not a UNUserNotificationCenter banner: Do Not Disturb and Focus
 // modes suppress banners, and a warning that something is about to be quit must
 // not be dropped that way.
-- (void)postTimedRuleKillNotificationForApplication:(NSString*)app deadline:(NSDate*)deadline {
+- (void)postTimedRuleKillNotification:(SNTTimedRuleKillDetails*)details {
   // Length, not just nil: an empty name has no identity, so its window would
   // both read absurdly and defeat the queue's dedup, stacking one focus-stealing
   // window per repeated call. Logged like the other bad-input bails here, so a
   // daemon-side regression is visible instead of silently dropping warnings.
-  if (!app.length || !deadline) {
+  //
+  // Nil details bail here too: application and deadline are declared nonnull but
+  // arrive through initWithCoder:, which cannot enforce that, and the Swift view
+  // reads both as non-optional.
+  if (!details.application.length || !details.deadline) {
     LOGI(@"Error: Missing application name or deadline in message received from daemon!");
     return;
   }
 
   SNTTimedRuleKillMessageWindowController* pendingMsg =
-      [[SNTTimedRuleKillMessageWindowController alloc] initWithApplication:app deadline:deadline];
+      [[SNTTimedRuleKillMessageWindowController alloc] initWithDetails:details];
 
   // Silences are a block-event feature: a warning that an application is about
   // to be quit is not something a user should be able to turn off per
