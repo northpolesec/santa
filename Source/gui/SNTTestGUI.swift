@@ -656,10 +656,144 @@ struct ContentView: View {
   }
 }
 
+// Renders the binary block dialog with the given config overrides, writes it to
+// a PNG and exits. Used to regenerate the dialog screenshots in
+// docs/static/img. Example:
+//
+//   SantaTestGUI.app/Contents/MacOS/SantaTestGUI --screenshot /tmp/dialog.png \
+//       --dark --config '{"BrandingCompanyName": "Acme, Inc."}'
+func CaptureScreenshot(path: String, appearance: AppearanceMode, config: [String: Any]) {
+  var configMap: [String: Any] = ["ClientMode": SNTClientMode.lockdown.rawValue as NSNumber]
+  configMap.merge(config) { _, new in new }
+  SNTConfigurator.overrideConfig(configMap)
+
+  let event = SNTDebugStoredEvent(staticPublisher: "Developer ID: Cozy Bear (X4P54F4992)")
+  event.decision = .blockUnknown
+  event.fileBundleName = "Bad Malware"
+  event.fileSHA256 = "60055b1f6fb276bfacf61f91505a72201987f20ad8b6867cce3058f4c0f0f5e5"
+  event.cdhash = "e38e71023d09c2e8e78a0e382669d1338ee8876a"
+  event.teamID = "9X9633G7QW"
+  event.filePath = "/Applications/Malware.app/Contents/MacOS"
+  event.parentName = "launchd"
+  event.pid = 12345
+  event.ppid = 2511
+  event.executingUser = "sasha"
+
+  let window = NSWindow()
+  ShowWindow(
+    SNTBinaryMessageWindowViewFactory.createWith(
+      window: window,
+      event: event,
+      customMsg: nil,
+      customURL: nil,
+      eventDetailButtonText: nil,
+      configState: SNTConfigState(config: SNTConfigurator.configurator()),
+      bundleProgress: SNTBundleProgress(),
+      silenceable: true,
+      uiStateCallback: nil,
+      replyCallback: nil
+    ),
+    window,
+    appearance: appearance
+  )
+
+  // Let SwiftUI lay out and draw before capturing.
+  RunLoop.main.run(until: Date().addingTimeInterval(2.0))
+
+  guard let frameView = window.contentView?.superview,
+    let rep = frameView.bitmapImageRepForCachingDisplay(in: frameView.bounds)
+  else {
+    print("Failed to snapshot window")
+    exit(1)
+  }
+  frameView.cacheDisplay(in: frameView.bounds, to: rep)
+
+  guard let data = ShadowedWindowImage(rep).representation(using: .png, properties: [:]) else {
+    print("Failed to encode PNG")
+    exit(1)
+  }
+  do {
+    try data.write(to: URL(fileURLWithPath: path))
+  } catch {
+    print("Failed to write \(path): \(error)")
+    exit(1)
+  }
+  exit(0)
+}
+
+// cacheDisplay(_:to:) captures the window's own drawing only: no rounded corners
+// and no drop shadow, both of which the window server composites. Re-add them so
+// the output matches an interactive screencapture(1) window grab.
+func ShadowedWindowImage(_ window: NSBitmapImageRep) -> NSBitmapImageRep {
+  let cornerRadius = 10.0
+  // Just enough room for the shadow below to fade out without being clipped.
+  let margin = 36.0
+  let scale = Double(window.pixelsWide) / window.size.width
+  let windowRect = NSMakeRect(margin, margin, window.size.width, window.size.height)
+  let canvas = NSMakeRect(0, 0, window.size.width + margin * 2, window.size.height + margin * 2)
+
+  let out = NSBitmapImageRep(
+    bitmapDataPlanes: nil,
+    pixelsWide: Int(canvas.width * scale),
+    pixelsHigh: Int(canvas.height * scale),
+    bitsPerSample: 8,
+    samplesPerPixel: 4,
+    hasAlpha: true,
+    isPlanar: false,
+    colorSpaceName: .deviceRGB,
+    bytesPerRow: 0,
+    bitsPerPixel: 0
+  )!
+  out.size = canvas.size
+
+  NSGraphicsContext.saveGraphicsState()
+  NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: out)
+  let shadow = NSShadow()
+  shadow.shadowBlurRadius = 26.0
+  shadow.shadowOffset = NSMakeSize(0, -9)
+  shadow.shadowColor = NSColor.black.withAlphaComponent(0.55)
+  shadow.set()
+  let clip = NSBezierPath(roundedRect: windowRect, xRadius: cornerRadius, yRadius: cornerRadius)
+  // Draw the rounded rect once to cast the shadow, then clip the capture to it.
+  NSColor.black.setFill()
+  clip.fill()
+  NSGraphicsContext.saveGraphicsState()
+  clip.addClip()
+  window.draw(in: windowRect)
+  NSGraphicsContext.restoreGraphicsState()
+  NSGraphicsContext.restoreGraphicsState()
+
+  return out
+}
+
 class AppDelegate: NSObject, NSApplicationDelegate {
   func applicationDidFinishLaunching(_ notification: Notification) {
     NSApp.setActivationPolicy(.regular)
     NSApp.activate()
+
+    let args = ProcessInfo.processInfo.arguments
+    guard let flag = args.firstIndex(of: "--screenshot") else { return }
+    guard flag + 1 < args.count, !args[flag + 1].hasPrefix("--") else {
+      print("--screenshot requires an output path")
+      exit(1)
+    }
+
+    var config: [String: Any] = [:]
+    if let i = args.firstIndex(of: "--config"), i + 1 < args.count {
+      guard let json = try? JSONSerialization.jsonObject(with: Data(args[i + 1].utf8)),
+        let dict = json as? [String: Any]
+      else {
+        print("--config must be a JSON object of config keys")
+        exit(1)
+      }
+      config = dict
+    }
+
+    CaptureScreenshot(
+      path: args[flag + 1],
+      appearance: args.contains("--dark") ? .dark : .light,
+      config: config
+    )
   }
 }
 
