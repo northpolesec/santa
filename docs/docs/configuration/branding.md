@@ -26,6 +26,7 @@ When any of them is set, Santa adds a "Managed by:" footer to the bottom of the 
 
 `BrandingCompanyLogo` replaces the name with an image.
 The image is scaled down to fit within 84x28 points, so a wide wordmark works better than a tall or square logo.
+Supply the artwork at twice that size so that it stays sharp on a Retina display.
 
 Only the `file://` and `data:` URL schemes are supported.
 HTTP and HTTPS URLs are not, as Santa will not fetch a logo over the network:
@@ -84,7 +85,7 @@ Set that key alongside the logo keys so that there is always something to displa
 
 Blocks that happen in a terminal are also branded, but only ever with `BrandingCompanyName`, as logos cannot be drawn on a TTY:
 
-```
+```text
 Santa
 
 The following application has been blocked from executing

@@ -772,7 +772,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     NSApp.activate()
 
     let args = ProcessInfo.processInfo.arguments
-    guard let flag = args.firstIndex(of: "--screenshot"), flag + 1 < args.count else { return }
+    guard let flag = args.firstIndex(of: "--screenshot") else { return }
+    guard flag + 1 < args.count, !args[flag + 1].hasPrefix("--") else {
+      print("--screenshot requires an output path")
+      exit(1)
+    }
 
     var config: [String: Any] = [:]
     if let i = args.firstIndex(of: "--config"), i + 1 < args.count {

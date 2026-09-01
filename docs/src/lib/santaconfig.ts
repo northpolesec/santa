@@ -323,7 +323,7 @@ See [Custom Branding](/configuration/branding) for examples of how this appears 
     {
       key: "BrandingCompanyLogo",
       description: `A URL referencing a logo image to display on Santa UIs. The image will be scaled down
-        appropriately to fit within image bounds (currently 84x28 pixels). If set, this overrides \`BrandingCompanyName\`.
+        appropriately to fit within image bounds (currently 84x28 points). If set, this overrides \`BrandingCompanyName\`.
 
 **Supported URL schemes:**
 - \`file://\` - Local file path (e.g., \`file:///Library/Application%20Support/MyOrg/logo.png\`)
@@ -339,7 +339,7 @@ See [Custom Branding](/configuration/branding) for examples of how this appears 
       key: "BrandingCompanyLogoDark",
       description: `A URL referencing a logo image to display on Santa UIs. When the UI is displayed in dark
         mode and this is set, it overrides both \`BrandingCompanyLogo\` and \`BrandingCompanyName\`.
-        The image will be scaled down appropriately to fit within image bounds (currently 84x28 pixels).
+        The image will be scaled down appropriately to fit within image bounds (currently 84x28 points).
 
 **Supported URL schemes:**
 - \`file://\` - Local file path (e.g., \`file:///Library/Application%20Support/MyOrg/logo-dark.png\`)
