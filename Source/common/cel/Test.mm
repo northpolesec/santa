@@ -1444,7 +1444,8 @@ class ScopedHostZone {
   // every day: a list pinned to the day this test process read would flip out
   // from under an evaluation that straddles local midnight.
   {
-    // A 30 minute grant: the lead is 10% of the window, three minutes.
+    // A 30 minute grant: 10% of the window is three minutes, under the floor,
+    // so the lead is the five minute minimum.
     absl::Time now = absl::Now();
     auto result = evaluate("policy_for_range(duration('30m'), true, ALLOWLIST)");
     if (!result.ok()) {
@@ -1456,7 +1457,7 @@ class ScopedHostZone {
                   near:now + absl::Minutes(30)
                   what:@"deadline"];
       [self assertTime:result.value().pendingKill->notify_at
-                  near:now + absl::Minutes(27)
+                  near:now + absl::Minutes(25)
                   what:@"notify_at"];
       // The duration overload's window does not recur, so it carries no shape.
       XCTAssertTrue(result.value().pendingKill->window_days.empty());
@@ -1466,8 +1467,8 @@ class ScopedHostZone {
     }
   }
   {
-    // A nine hour window: 10% of it is longer than five minutes, so the lead is
-    // capped at five.
+    // A nine hour window sits between the floor and the cap, so the lead is a
+    // plain 10%: 54 minutes.
     absl::Time now = absl::Now();
     auto result = evaluate(
         "policy_for_range(now() - duration('1h'), now() + duration('8h'), true, ALLOWLIST, "
@@ -1480,7 +1481,7 @@ class ScopedHostZone {
                   near:now + absl::Hours(8)
                   what:@"deadline"];
       [self assertTime:result.value().pendingKill->notify_at
-                  near:now + absl::Hours(8) - absl::Minutes(5)
+                  near:now + absl::Hours(8) - absl::Minutes(54)
                   what:@"notify_at"];
       // The absolute span names one occurrence, so it carries no shape either,
       // zone included: there is no later occurrence to re-check, and no calendar
@@ -1502,6 +1503,37 @@ class ScopedHostZone {
       XCTAssertTrue(result.value().pendingKill.has_value());
       [self assertTime:result.value().pendingKill->notify_at near:now what:@"notify_at"];
       XCTAssertTrue(result.value().pendingKill->notify_at >= now);
+    }
+  }
+  {
+    // A grant shorter than the five minute floor is warned about at launch.
+    absl::Time now = absl::Now();
+    auto result = evaluate("policy_for_range(duration('2m'), true, ALLOWLIST)");
+    if (!result.ok()) {
+      XCTFail(@"Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertTrue(result.value().pendingKill.has_value());
+      [self assertTime:result.value().pendingKill->deadline
+                  near:now + absl::Minutes(2)
+                  what:@"deadline"];
+      [self assertTime:result.value().pendingKill->notify_at near:now what:@"notify_at"];
+      XCTAssertTrue(result.value().pendingKill->notify_at >= now);
+    }
+  }
+  {
+    // A twelve hour window: 10% is 72 minutes, over the cap, so the lead is the
+    // one hour maximum.
+    absl::Time now = absl::Now();
+    auto result = evaluate(
+        "policy_for_range(now() - duration('1h'), now() + duration('11h'), true, ALLOWLIST, "
+        "BLOCKLIST)");
+    if (!result.ok()) {
+      XCTFail(@"Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertTrue(result.value().pendingKill.has_value());
+      [self assertTime:result.value().pendingKill->notify_at
+                  near:now + absl::Hours(10)
+                  what:@"notify_at"];
     }
   }
   {

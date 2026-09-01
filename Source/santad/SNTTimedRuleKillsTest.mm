@@ -1447,9 +1447,9 @@ static NSString* const kOtherBootSessionUUID = @"6A2B4C8E-0000-0000-0000-0000000
   NSDictionary* rescheduled = [self savedEntryForIdentifier:kMatchingTeamID];
   XCTAssertEqualWithAccuracy([rescheduled[@"Deadline"] doubleValue],
                              [self minuteFloor:now].timeIntervalSince1970 + 5 * 3600, 1);
-  // The lead the new occurrence earns: min(5 minutes, a tenth of its 8 hours).
+  // The lead the new occurrence earns: a tenth of its 8 hours, 48 minutes.
   XCTAssertEqualWithAccuracy([rescheduled[@"NotifyAt"] doubleValue],
-                             [rescheduled[@"Deadline"] doubleValue] - 300, 0.001);
+                             [rescheduled[@"Deadline"] doubleValue] - 2880, 0.001);
   // The warning is owed again: this is a different deadline from the one the
   // user was already warned about.
   XCTAssertFalse([rescheduled[@"Notified"] boolValue]);
@@ -1679,10 +1679,10 @@ static NSString* const kOtherBootSessionUUID = @"6A2B4C8E-0000-0000-0000-0000000
   NSDictionary* rescheduled = self.savedEntries.firstObject;
   XCTAssertEqualWithAccuracy([rescheduled[@"Deadline"] doubleValue],
                              [self minuteFloor:now].timeIntervalSince1970 + 30 * 60, 1);
-  // min(5 minutes, a tenth of the 30 minute occurrence), not the one second the
+  // The 30 minute occurrence earns the 5 minute floor, not the one second the
   // old notify time was clamped to.
   XCTAssertEqualWithAccuracy([rescheduled[@"NotifyAt"] doubleValue],
-                             [rescheduled[@"Deadline"] doubleValue] - 180, 0.001);
+                             [rescheduled[@"Deadline"] doubleValue] - 300, 0.001);
 }
 
 // A shape the window math itself refuses, which is what a day outside 0 through
