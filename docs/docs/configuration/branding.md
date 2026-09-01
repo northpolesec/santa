@@ -6,9 +6,10 @@ sidebar_position: 4
 
 Santa can display your organization's name or logo on every window it shows, so that users can tell who manages the machine and who to contact.
 Branding is configured with three keys, all documented on the [Configuration: Keys](/configuration/keys) page: `BrandingCompanyName`, `BrandingCompanyLogo`, and `BrandingCompanyLogoDark`.
+
 All three were added in Santa 2026.1.
 
-When any of them is set, Santa adds a "Managed by:" footer to the bottom of the binary block dialog, the file-access and removable-media dialogs, and the Santa.app about window.
+When any of them is set, Santa adds a "Managed by:" footer to the bottom of all notification dialogs (e.g. execution blocked, file access blocked, network flow blocked).
 
 ## Company name
 
