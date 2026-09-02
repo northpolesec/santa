@@ -361,6 +361,10 @@ REGISTER_COMMAND_NAME(@"status")
                                                 ? @"disabled by config"
                                                 : @"disabled by sync server";
   NSUInteger telemetryExportInterval = configurator.telemetryExportIntervalSec;
+  __block uint64_t telemetryFilterCount = 0;
+  [rop telemetryFilterCount:^(uint64_t count) {
+    telemetryFilterCount = count;
+  }];
 
   NSArray<NSString*>* allowedCommands = configurator.allowedSantaCommands;
   NSString* allowedStr = !allowedCommands ? @"All"
@@ -502,7 +506,7 @@ REGISTER_COMMAND_NAME(@"status")
 
     stats[@"telemetry"] = [@{
       @"signal_rules" : @(ruleCounts.signals),
-      @"filters" : @(configurator.telemetryFilterExpressions.count),
+      @"filters" : @(telemetryFilterCount),
       @"export_enabled" : @(telemetryExportEnabled),
     } mutableCopy];
     if (telemetryExportEnabled) {
@@ -624,8 +628,7 @@ REGISTER_COMMAND_NAME(@"status")
              [FormatInterval(telemetryExportInterval) UTF8String]);
     }
     printf("  %-40s | %lld\n", "Signal Rules", ruleCounts.signals);
-    printf("  %-40s | %lu\n", "Filters",
-           (unsigned long)configurator.telemetryFilterExpressions.count);
+    printf("  %-40s | %llu\n", "Filters", telemetryFilterCount);
 
     printf(">>> Sync\n");
     printf("  %-40s | %s\n", "Enabled", syncURLStr.length ? "Yes" : "No");

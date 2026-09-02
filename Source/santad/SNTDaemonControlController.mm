@@ -628,6 +628,10 @@ static NSString* TAMUsernameForUID(uid_t uid) {
   reply([SNTConfigurator configurator].exportConfig != nil);
 }
 
+- (void)telemetryFilterCount:(void (^)(uint64_t))reply {
+  reply([SNTConfigurator configurator].telemetryFilterExpressions.count);
+}
+
 - (void)enableBundles:(void (^)(BOOL))reply {
   reply([SNTConfigurator configurator].enableBundles);
 }
