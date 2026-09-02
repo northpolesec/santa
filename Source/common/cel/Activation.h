@@ -111,8 +111,9 @@ class Activation : public ::google::api::expr::runtime::BaseActivation {
   // policy_for_range()) is used, which makes the result non-cacheable. Mutable
   // so it can be updated from the const evaluation path.
   mutable bool usedRelativeTime_ = false;
-  // Set during evaluation when policy_for_range() matched an open window with
-  // should_kill set. The earlier deadline wins if it is set more than once.
+  // Set during evaluation when policy_for_range() matched an open window with a
+  // kill_on_expiry() policy. The earlier deadline wins if it is set more than
+  // once.
   mutable std::optional<PendingKill> pendingKill_;
   // Lazily-created implementations of the lazy functions, vended via
   // FindFunctionOverloads.

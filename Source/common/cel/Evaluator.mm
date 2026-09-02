@@ -88,6 +88,7 @@ static absl::StatusOr<std::unique_ptr<::cel::Compiler>> CreateCompiler(
   // Link Result message reflection for V2
   if constexpr (IsV2) {
     google::protobuf::LinkMessageReflection<::santa::cel::Result>();
+    google::protobuf::LinkMessageReflection<::santa::cel::Grant>();
   }
 
   // Add all the possible variables to the type checker.
@@ -170,7 +171,7 @@ absl::StatusOr<std::unique_ptr<::cel_runtime::CelExpression>> Evaluator<IsV2>::C
       return result;
     }
     // Matches the declarations above: only an evaluator for rules has
-    // policy_for_range().
+    // policy_for_range() and kill_on_expiry().
     if (!allowUnspecified_) {
       if (auto result =
               santa::cel::RegisterPolicyForRangeFunctions(builder->GetRegistry(), options);

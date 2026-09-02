@@ -27,9 +27,9 @@
 
 ///
 ///  Owns the kills asked for by CEL rules using policy_for_range(...,
-///  should_kill=true): one entry per rule, a timer for the next event across
-///  them, the warning banner shortly before a deadline, and the kill itself at
-///  the deadline.
+///  kill_on_expiry(policy)): one entry per rule, a timer for the next event
+///  across them, the warning banner shortly before a deadline, and the kill
+///  itself at the deadline.
 ///
 ///  Nothing running is touched except at a recorded deadline. A rule arriving,
 ///  a window opening, or a window closing never kills anything by itself.
