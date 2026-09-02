@@ -18,6 +18,7 @@
 #include <sys/types.h>
 
 #include <memory>
+#include <optional>
 
 #include "Source/common/PassKey.h"
 #import "Source/common/SNTConfigurator.h"
@@ -60,6 +61,18 @@ class TemporaryAdminMode : public TimedSyncSession, public PassKey<TemporaryAdmi
 
   // Whether `uid` is currently a member of the admin group.
   bool IsCurrentlyAdmin(uid_t uid);
+
+  // The uid of the currently active session, or nullopt when none is active.
+  // A failed-teardown residue is NOT an active session — that user is supposed
+  // to be demoted, and AdminUserState's sweep is what demotes them.
+  //
+  // Serialized against the whole grant path: TimedSyncSession::BeginGrant
+  // (reached from RequestMinutes) holds the base's lock_ across ApplyEffect and
+  // BeginSessionLocked, and SetupFromState holds it across ReapplyEffectOnRestart
+  // and BeginSessionLocked, so no grant or restart-resume has an instant where
+  // the target is in the admin group and this returns nullopt. (A failed-teardown
+  // residue is deliberately excluded — see above.)
+  std::optional<uid_t> ActiveSessionTargetUID();
 
   // On a Revoke policy, cancel any active session; always re-notify GUI availability.
   void NewPolicyReceived(SNTTemporaryAdminPolicy* policy);

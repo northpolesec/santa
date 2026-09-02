@@ -319,6 +319,13 @@ REGISTER_COMMAND_NAME(@"status")
     temporaryAdminModeSecondsRemaining = secs;
   }];
 
+  __block BOOL adminAllowlistEnforcing = NO;
+  __block NSArray<NSString*>* adminAllowlist = @[];
+  [rop temporaryAdminAllowlist:^(BOOL enforcing, NSArray<NSString*>* usernames) {
+    adminAllowlistEnforcing = enforcing;
+    adminAllowlist = usernames;
+  }];
+
   // Format dates
   NSDateFormatter* dateFormatter = [[NSDateFormatter alloc] init];
   dateFormatter.dateFormat = @"yyyy/MM/dd HH:mm:ss Z";
@@ -522,6 +529,8 @@ REGISTER_COMMAND_NAME(@"status")
     if (temporaryAdminModeSecondsRemaining != nil) {
       temporaryAdminMode[@"session_seconds_remaining"] = temporaryAdminModeSecondsRemaining;
     }
+    temporaryAdminMode[@"admin_group_enforced"] = @(adminAllowlistEnforcing);
+    temporaryAdminMode[@"allowed_admins"] = adminAllowlist;
     stats[@"temporary_admin_mode"] = temporaryAdminMode;
 
     NSData* statsData = [NSJSONSerialization dataWithJSONObject:stats
@@ -576,6 +585,12 @@ REGISTER_COMMAND_NAME(@"status")
       printf("  %-40s | %s\n", "Session Time Remaining",
              [FormatTimeRemaining([temporaryAdminModeSecondsRemaining unsignedLongLongValue])
                  UTF8String]);
+    }
+    printf("  %-40s | %s\n", "Admin Group Enforced", (adminAllowlistEnforcing ? "Yes" : "No"));
+    if (adminAllowlistEnforcing) {
+      printf("  %-40s | %s\n", "Allowed Admins",
+             adminAllowlist.count ? [[adminAllowlist componentsJoinedByString:@", "] UTF8String]
+                                  : "(none)");
     }
 
     printf(">>> Cache Info\n");
