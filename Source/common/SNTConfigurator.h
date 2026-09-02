@@ -98,8 +98,9 @@
 
 ///
 ///  Set the regex of allowed paths as received from a sync server.
+///  The pattern is normalized (anchored with ^) before being stored.
 ///
-- (void)setSyncServerAllowedPathRegex:(nonnull NSRegularExpression*)re;
+- (void)setSyncServerAllowedPathRegex:(nonnull NSString*)pattern;
 
 ///
 ///  The regex of blocked paths. Regexes are specified in ICU format.
@@ -112,8 +113,9 @@
 
 ///
 ///  Set the regex of blocked paths as received from a sync server.
+///  The pattern is normalized (anchored with ^) before being stored.
 ///
-- (void)setSyncServerBlockedPathRegex:(nonnull NSRegularExpression*)re;
+- (void)setSyncServerBlockedPathRegex:(nonnull NSString*)pattern;
 
 ///
 ///  The regex of paths to log file changes for. Regexes are specified in ICU format.

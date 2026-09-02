@@ -692,17 +692,11 @@ static NSString* TAMUsernameForUID(uid_t uid) {
     }];
 
     [result allowlistRegex:^(NSString* val) {
-      [configurator
-          setSyncServerAllowedPathRegex:[NSRegularExpression regularExpressionWithPattern:val
-                                                                                  options:0
-                                                                                    error:NULL]];
+      [configurator setSyncServerAllowedPathRegex:val];
     }];
 
     [result blocklistRegex:^(NSString* val) {
-      [configurator
-          setSyncServerBlockedPathRegex:[NSRegularExpression regularExpressionWithPattern:val
-                                                                                  options:0
-                                                                                    error:NULL]];
+      [configurator setSyncServerBlockedPathRegex:val];
     }];
 
     [result removableMediaAction:^(NSString* val) {
