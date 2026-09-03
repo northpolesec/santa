@@ -25,6 +25,7 @@
 @class SNTStoredFileAccessEvent;
 @class SNTStoredNetworkFlowEvent;
 @class SNTStoredNetworkMountEvent;
+@class SNTTimedRuleKillDetails;
 
 /// Protocol implemented by SantaGUI and utilized by santad
 @protocol SNTNotifierXPC
@@ -47,9 +48,9 @@
 - (void)postClientModeNotification:(SNTClientMode)clientmode;
 - (void)postRuleSyncNotificationForApplication:(NSString*)app;
 /// Warns that a rule's time window is about to close and the application will
-/// be quit at `deadline`. Fire-and-forget: the kill happens whether or not the
-/// warning window is shown.
-- (void)postTimedRuleKillNotificationForApplication:(NSString*)app deadline:(NSDate*)deadline;
+/// be quit at `details.deadline`. Fire-and-forget: the kill happens whether or
+/// not the warning window is shown.
+- (void)postTimedRuleKillNotification:(SNTTimedRuleKillDetails*)details;
 - (void)authorizeTemporaryMonitorMode:(void (^)(BOOL authenticated))reply;
 - (void)enterTemporaryMonitorMode:(NSDate*)expiration;
 - (void)leaveTemporaryMonitorMode;

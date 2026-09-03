@@ -92,9 +92,12 @@ constexpr absl::string_view kDurationGrantOverloadId = "policy_for_range_duratio
 // the same calendar the evaluation did.
 constexpr absl::string_view kDefaultZone = "local";
 
-// The warning lead is min(5 minutes, 10% of the window's length), so a work-day
-// window warns 5 minutes out and a 30 minute grant 3 minutes out.
-constexpr absl::Duration kMaxNotificationLead = absl::Minutes(5);
+// The warning lead is 10% of the window's length, at least 5 minutes and at
+// most an hour: a work-day window warns 48 minutes out, anything from 10 hours
+// up warns an hour out, and a window shorter than the floor warns at launch
+// because the notify time clamps to the evaluation.
+constexpr absl::Duration kMinNotificationLead = absl::Minutes(5);
+constexpr absl::Duration kMaxNotificationLead = absl::Hours(1);
 constexpr int64_t kNotificationLeadDivisor = 10;
 
 // Parses a strict "[+-]HH:MM" fixed offset into seconds east of UTC. The width
@@ -514,7 +517,8 @@ WindowEval EvalDurationWindow(absl::Duration d, absl::Time now) {
 }
 
 absl::Duration NotificationLead(absl::Duration window_length) {
-  return std::min(kMaxNotificationLead, window_length / kNotificationLeadDivisor);
+  return std::clamp(window_length / kNotificationLeadDivisor, kMinNotificationLead,
+                    kMaxNotificationLead);
 }
 
 std::vector<cel_runtime::CelFunctionDescriptor> PolicyForRangeDescriptors() {

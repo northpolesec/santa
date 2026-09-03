@@ -829,6 +829,46 @@ santa_unit_test(
 )
 
 objc_library(
+    name = "SNTRuleTimeWindow",
+    srcs = ["SNTRuleTimeWindow.mm"],
+    hdrs = ["SNTRuleTimeWindow.h"],
+    module_name = "santa_common_SNTRuleTimeWindow",
+    deps = [
+        ":CoderMacros",
+    ],
+)
+
+santa_unit_test(
+    name = "SNTRuleTimeWindowTest",
+    srcs = ["SNTRuleTimeWindowTest.mm"],
+    deps = [
+        ":SNTRuleTimeWindow",
+    ],
+)
+
+objc_library(
+    name = "SNTTimedRuleKillDetails",
+    srcs = ["SNTTimedRuleKillDetails.mm"],
+    hdrs = ["SNTTimedRuleKillDetails.h"],
+    module_name = "santa_common_SNTTimedRuleKillDetails",
+    deps = [
+        ":CoderMacros",
+        ":SNTCommonEnums",
+        ":SNTRuleTimeWindow",
+    ],
+)
+
+santa_unit_test(
+    name = "SNTTimedRuleKillDetailsTest",
+    srcs = ["SNTTimedRuleKillDetailsTest.mm"],
+    deps = [
+        ":SNTCommonEnums",
+        ":SNTRuleTimeWindow",
+        ":SNTTimedRuleKillDetails",
+    ],
+)
+
+objc_library(
     name = "SNTRuleIdentifiers",
     srcs = ["SNTRuleIdentifiers.mm"],
     hdrs = ["SNTRuleIdentifiers.h"],
@@ -1374,6 +1414,7 @@ test_suite(
         ":SNTNetworkFlowRuleTest",
         ":SNTProcessChainTest",
         ":SNTRuleTest",
+        ":SNTRuleTimeWindowTest",
         ":SNTSandboxExecRequestTest",
         ":SNTStoredEventTest",
         ":SNTStoredExecutionEventTest",
@@ -1384,6 +1425,7 @@ test_suite(
         ":SNTStoredTemporaryMonitorModeAuditEventTest",
         ":SNTStoredUSBMountEventTest",
         ":SNTTemporaryAdminPolicyTest",
+        ":SNTTimedRuleKillDetailsTest",
         ":SNTTimerTest",
         ":SNTXxhashTest",
         ":SantaCacheTest",

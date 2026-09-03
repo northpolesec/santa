@@ -760,10 +760,11 @@ void TwoMatchesInOneGroup(FakeEnv* fake, pid_t pgid) {
   SNTKillRequest* request = [[SNTKillRequestTeamID alloc] initWithUUID:@"uuid"
                                                                 teamID:kMatchingTeamID];
 
-  std::optional<pid_t> match = santa::KillingMachineAnyMatch(request, MakeKillEnv(&fake));
+  std::optional<audit_token_t> match = santa::KillingMachineAnyMatch(request, MakeKillEnv(&fake));
 
   XCTAssertTrue(match.has_value());
-  XCTAssertEqual(*match, 11);
+  XCTAssertEqual(santa::Pid(*match), 11);
+  XCTAssertEqual(santa::Pidversion(*match), 2);
   // A match pass is not a kill pass.
   XCTAssertEqual(fake.signals.size(), 0);
 }

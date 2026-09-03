@@ -4,6 +4,15 @@
 /* Notification message shown when a known app has been unblocked */
 "%@ can now be run" = "Теперь можно запустить %@";
 
+/* a time of day on a date */
+"%@ on %@" = "%1$@, %2$@";
+
+/* A gapless run of weekdays, e.g. Mon through Fri */
+"%@ through %@" = "с %1$@ по %2$@";
+
+/* Two ends of a time-of-day range, e.g. 9:00 AM to 5:00 PM */
+"%@ to %@" = "с %1$@ до %2$@";
+
 /* Window message warning that an app will be quit at a time */
 "\"%@\" will quit at %@." = "Приложение \"%1$@\" будет закрыто в %2$@.";
 
@@ -100,6 +109,9 @@
 /* Temporary admin mode alert body */
 "Enter a justification for requesting admin privileges:" = "Введите обоснование для запроса прав администратора:";
 
+/* All seven days */
+"every day" = "ежедневно";
+
 /* No comment provided by engineer. */
 "Failed to connect to the sync service. Please try again later." = "Не удалось подключиться к службе синхронизации. Пожалуйста, попробуйте позже.";
 
@@ -179,6 +191,9 @@
 "Publisher" = "Издатель";
 
 /* No comment provided by engineer. */
+"Reason" = "Причина";
+
+/* No comment provided by engineer. */
 "Remount Mode" = "Режим перемонтирования";
 
 /* Temporary admin mode alert title */
@@ -207,6 +222,9 @@
 
 /* No comment provided by engineer. */
 "Santa is made with ❤️ by the elves at [North Pole Security](https://northpole.security)\nalong with contributions from our wonderful community" = "Santa создана ❤️ эльфами из [North Pole Security](https://northpole.security)\nпри участии нашего замечательного сообщества";
+
+/* Lead line of the copied warning details */
+"Santa will quit %@ at %@" = "Santa закроет %1$@ в %2$@";
 
 /* No comment provided by engineer. */
 "SHA-256" = "SHA-256";
@@ -264,6 +282,15 @@
 
 /* No comment provided by engineer. */
 "The sync operation failed. Please try again." = "Не удалось выполнить синхронизацию. Пожалуйста, попробуйте снова.";
+
+/* quit reason */
+"Time based rule (%@): window ends at %@" = "Правило по времени (%1$@): окно заканчивается в %2$@";
+
+/* quit reason for a rule type this build cannot name */
+"Time based rule: window ends at %@" = "Правило по времени: окно заканчивается в %@";
+
+/* No comment provided by engineer. */
+"Time Window" = "Временное окно";
 
 /* No comment provided by engineer. */
 "Too many syncs are in progress. Please try again later." = "Уже выполняется слишком много операций синхронизации. Пожалуйста, попробуйте позже.";

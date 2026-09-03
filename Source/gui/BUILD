@@ -154,6 +154,8 @@ swift_library(
     generates_header = 1,
     deps = [
         ":SNTMessageView",
+        "//Source/common:SNTRuleTimeWindow",
+        "//Source/common:SNTTimedRuleKillDetails",
     ],
 )
 
@@ -345,6 +347,7 @@ objc_library(
         "//Source/common:SNTStoredNetworkMountEvent",
         "//Source/common:SNTStrengthify",
         "//Source/common:SNTSyncConstants",
+        "//Source/common:SNTTimedRuleKillDetails",
         "//Source/common:SNTXPCBundleServiceInterface",
         "//Source/common:SNTXPCControlInterface",
         "//Source/common:SNTXPCNotifierInterface",
@@ -384,6 +387,7 @@ objc_library(
         ":SNTMessageWindowController",
         ":SNTTimedRuleKillMessageWindowView",
         "//Source/common:SNTStrengthify",
+        "//Source/common:SNTTimedRuleKillDetails",
     ],
 )
 
@@ -470,6 +474,7 @@ swift_library(
         ":SNTFileAccessMessageWindowView",
         ":SNTMessageView",
         ":SNTNetworkFlowMessageWindowView",
+        ":SNTTimedRuleKillMessageWindowView",
         "//Source/common:SNTConfigBundle",
         "//Source/common:SNTDeviceEvent",
     ],
@@ -504,6 +509,7 @@ santa_unit_test(
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTStoredExecutionEvent",
         "//Source/common:SNTStoredNetworkFlowEvent",
+        "//Source/common:SNTTimedRuleKillDetails",
         "@OCMock",
     ],
 )

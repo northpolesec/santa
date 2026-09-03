@@ -118,10 +118,11 @@ WindowEval EvalTimestampWindow(absl::Time start, absl::Time end,
 // always contains now. Callers reject a non-positive d before asking.
 WindowEval EvalDurationWindow(absl::Duration d, absl::Time now);
 
-// How far before a window's close the user is warned: min(5 minutes, 10% of the
-// occurrence's length), so a work-day window warns 5 minutes out and a 30
-// minute grant 3 minutes out. One definition, so the evaluation that records a
-// kill and the re-check that moves one to a later occurrence cannot disagree.
+// How far before a window's close the user is warned: 10% of the occurrence's
+// length, at least 5 minutes and at most an hour. A window shorter than the
+// floor is warned about at launch, since the notify time never precedes the
+// evaluation. One definition, so the evaluation that records a kill and the
+// re-check that moves one to a later occurrence cannot disagree.
 absl::Duration NotificationLead(absl::Duration window_length);
 
 // The kill an in-window kill_on_expiry() asked for: quit what the rule covers

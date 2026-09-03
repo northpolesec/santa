@@ -19,12 +19,15 @@ import santa_common_SNTConfigState
 import santa_common_SNTConfigurator
 import santa_common_SNTCommonEnums
 import santa_common_SNTDeviceEvent
+import santa_common_SNTRuleTimeWindow
 import santa_common_SNTStoredExecutionEvent
 import santa_common_SNTStoredNetworkFlowEvent
+import santa_common_SNTTimedRuleKillDetails
 import Source_gui_SNTDeviceMessageWindowView
 import Source_gui_SNTBinaryMessageWindowView
 import Source_gui_SNTAboutWindowView
 import Source_gui_SNTNetworkFlowMessageWindowView
+import Source_gui_SNTTimedRuleKillMessageWindowView
 
 func ShowWindow(_ vc: NSViewController, _ window: NSWindow, appearance: AppearanceMode = .system) {
   window.contentRect(forFrameRect: NSMakeRect(0, 0, 0, 0))
@@ -644,6 +647,145 @@ struct NetworkFlowView: View {
   }
 }
 
+enum RuleWindowDays {
+  case everyDay
+  case weekdays
+  case monWedFri
+  case unset
+}
+
+struct TimedRuleKillView: View {
+  @State private var application: String = "Calculator"
+  @State private var publisher: String = "Apple Inc. - Software Signing"
+  @State private var user: String = NSUserName()
+  @State private var path: String = "/System/Applications/Calculator.app/Contents/MacOS/Calculator"
+  @State private var signingID: String = "platform:com.apple.calculator"
+  @State private var cdhash: String = "3143f4402b417986ad4df24ce68127f0716b7898"
+  @State private var parent: String = "launchd"
+  @State private var ppid: String = "1"
+  @State private var ruleType: SNTRuleType = .signingID
+  // Minutes, so a value past midnight also exercises the dated form of the sentence.
+  @State private var minutesUntilDeadline: String = "45"
+
+  @State private var includeTimeWindow: Bool = true
+  @State private var startOfDay: String = "09:00"
+  @State private var endOfDay: String = "17:00"
+  @State private var zoneName: String = "local"
+  @State private var windowDays: RuleWindowDays = .weekdays
+
+  @State private var brandingCompanyName: String = ""
+  @State private var brandingCompanyLogo: String = ""
+  @State private var brandingCompanyLogoDark: String = ""
+  @State private var appearanceMode: AppearanceMode = .system
+
+  var body: some View {
+    VStack {
+      GroupBox(label: Label("Warning Properties", systemImage: "")) {
+        Form {
+          TextField(text: $application, label: { Text(verbatim: "Application") })
+          TextField(text: $publisher, label: { Text(verbatim: "Publisher") })
+          TextField(text: $user, label: { Text(verbatim: "User") })
+          TextField(text: $path, label: { Text(verbatim: "Path") })
+          TextField(text: $signingID, label: { Text(verbatim: "Signing ID") })
+          TextField(text: $cdhash, label: { Text(verbatim: "CDHash") })
+          TextField(text: $parent, label: { Text(verbatim: "Parent") })
+          TextField(text: $ppid, label: { Text(verbatim: "PPID") })
+          TextField(text: $minutesUntilDeadline, label: { Text(verbatim: "Minutes Until Deadline") })
+          HStack {
+            Picker(selection: $ruleType, label: Text(verbatim: "Rule Type")) {
+              Text(verbatim: "Signing ID").tag(SNTRuleType.signingID)
+              Text(verbatim: "Team ID").tag(SNTRuleType.teamID)
+              Text(verbatim: "CDHash").tag(SNTRuleType.cdHash)
+              Text(verbatim: "Unknown").tag(SNTRuleType.unknown)
+            }.pickerStyle(.segmented)
+          }
+        }
+      }
+
+      GroupBox(label: Label("Time Window", systemImage: "")) {
+        Form {
+          HStack {
+            Toggle(isOn: $includeTimeWindow) { Text(verbatim: "Include a time window") }
+          }
+          TextField(text: $startOfDay, label: { Text(verbatim: "Start (HH:MM)") })
+          TextField(text: $endOfDay, label: { Text(verbatim: "End (HH:MM)") })
+          TextField(text: $zoneName, label: { Text(verbatim: "Zone") })
+          HStack {
+            Picker(selection: $windowDays, label: Text(verbatim: "Days")) {
+              Text(verbatim: "Every day").tag(RuleWindowDays.everyDay)
+              Text(verbatim: "Mon to Fri").tag(RuleWindowDays.weekdays)
+              Text(verbatim: "Mon, Wed, Fri").tag(RuleWindowDays.monWedFri)
+              Text(verbatim: "None").tag(RuleWindowDays.unset)
+            }.pickerStyle(.segmented)
+          }
+        }
+      }
+
+      GroupBox(label: Label("Config Overrides", systemImage: "")) {
+        Form {
+          CommonPropertiesView(
+            brandingCompanyName: $brandingCompanyName,
+            brandingCompanyLogo: $brandingCompanyLogo,
+            brandingCompanyLogoDark: $brandingCompanyLogoDark,
+            appearanceMode: $appearanceMode
+          )
+        }
+      }
+
+      Button("Display") {
+        var configMap: [String: Any] = [:]
+        if !brandingCompanyName.isEmpty {
+          configMap["BrandingCompanyName"] = brandingCompanyName
+        }
+        if !brandingCompanyLogo.isEmpty {
+          configMap["BrandingCompanyLogo"] = brandingCompanyLogo
+        }
+        if !brandingCompanyLogoDark.isEmpty {
+          configMap["BrandingCompanyLogoDark"] = brandingCompanyLogoDark
+        }
+        if !configMap.isEmpty {
+          SNTConfigurator.overrideConfig(configMap)
+        }
+
+        let details = SNTTimedRuleKillDetails()
+        details.application = application
+        details.deadline = Date(
+          timeIntervalSinceNow: (Double(minutesUntilDeadline) ?? 45.0) * 60.0
+        )
+        details.ruleType = ruleType
+        details.publisher = publisher.isEmpty ? nil : publisher
+        details.user = user.isEmpty ? nil : user
+        details.path = path.isEmpty ? nil : path
+        details.signingID = signingID.isEmpty ? nil : signingID
+        details.cdhash = cdhash.isEmpty ? nil : cdhash
+        details.parentName = parent.isEmpty ? nil : parent
+        details.ppid = ppid.isEmpty ? nil : NSNumber(value: Int(ppid) ?? 0)
+
+        if includeTimeWindow {
+          let timeWindow = SNTRuleTimeWindow()
+          timeWindow.startOfDay = startOfDay
+          timeWindow.endOfDay = endOfDay
+          timeWindow.zoneName = zoneName.isEmpty ? nil : zoneName
+          switch windowDays {
+          case .everyDay: timeWindow.days = [0, 1, 2, 3, 4, 5, 6].map { NSNumber(value: $0) }
+          case .weekdays: timeWindow.days = [1, 2, 3, 4, 5].map { NSNumber(value: $0) }
+          case .monWedFri: timeWindow.days = [1, 3, 5].map { NSNumber(value: $0) }
+          case .unset: timeWindow.days = nil
+          }
+          details.timeWindow = timeWindow
+        }
+
+        let window = NSWindow()
+        ShowWindow(
+          SNTTimedRuleKillMessageWindowViewFactory.createWith(window: window, details: details),
+          window,
+          appearance: appearanceMode
+        )
+      }
+    }
+  }
+}
+
 struct ContentView: View {
   var body: some View {
     TabView {
@@ -651,6 +793,7 @@ struct ContentView: View {
       FAAView().padding(15.0).tabItem({ Text("FAA") })
       DeviceView().padding(15.0).tabItem({ Text("Device") })
       NetworkFlowView().padding(15.0).tabItem({ Text("Network Flow") })
+      TimedRuleKillView().padding(15.0).tabItem({ Text("Timed Rule Kill") })
       AboutView().padding(15.0).tabItem({ Text("About") })
     }
   }
