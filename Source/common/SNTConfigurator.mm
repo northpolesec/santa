@@ -1163,8 +1163,8 @@ static SNTConfigurator* sharedConfigurator = nil;
   return self.configState[kAllowedPathRegexKeyDeprecated];
 }
 
-- (void)setSyncServerAllowedPathRegex:(NSRegularExpression*)re {
-  [self updateSyncStateForKey:kAllowedPathRegexKey value:re];
+- (void)setSyncServerAllowedPathRegex:(NSString*)pattern {
+  [self updateSyncStateForKey:kAllowedPathRegexKey value:[self expressionForPattern:pattern]];
 }
 
 - (NSRegularExpression*)blockedPathRegex {
@@ -1180,8 +1180,8 @@ static SNTConfigurator* sharedConfigurator = nil;
   return self.configState[kBlockedPathRegexKeyDeprecated];
 }
 
-- (void)setSyncServerBlockedPathRegex:(NSRegularExpression*)re {
-  [self updateSyncStateForKey:kBlockedPathRegexKey value:re];
+- (void)setSyncServerBlockedPathRegex:(NSString*)pattern {
+  [self updateSyncStateForKey:kBlockedPathRegexKey value:[self expressionForPattern:pattern]];
 }
 
 - (NSRegularExpression*)fileChangesRegex {
@@ -2422,7 +2422,9 @@ static BOOL HoldsSyncedSettings(NSDictionary* syncState) {
 #pragma mark - Private Defaults Methods
 
 - (NSRegularExpression*)expressionForPattern:(NSString*)pattern {
-  if (!pattern) return nil;
+  // An empty pattern must clear the regex, not become "^", which matches every
+  // path. Sync servers send "" to mean "no regex managed here".
+  if (!pattern.length) return nil;
   if (![pattern hasPrefix:@"^"]) pattern = [@"^" stringByAppendingString:pattern];
   return [NSRegularExpression regularExpressionWithPattern:pattern options:0 error:NULL];
 }

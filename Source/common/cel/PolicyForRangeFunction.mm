@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <string>
 #include <utility>
@@ -30,15 +31,22 @@
 #include "absl/strings/string_view.h"
 #include "absl/time/civil_time.h"
 #include "absl/time/time.h"
+#include "celv2/v2.pb.h"
 #include "google/protobuf/arena.h"
+#include "google/protobuf/message.h"
 
 // CEL headers have warnings and our config turns them into errors.
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshorten-64-to-32"
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#include "common/ast.h"
 #include "common/decl.h"
+#include "common/expr.h"
+#include "common/navigable_ast.h"
 #include "common/type.h"
+#include "eval/public/structs/cel_proto_wrapper.h"
 #include "internal/status_macros.h"
+#include "validator/validator.h"
 #pragma clang diagnostic pop
 
 namespace cel_runtime = ::google::api::expr::runtime;
@@ -48,30 +56,36 @@ namespace cel {
 
 namespace {
 
-// Argument layouts, one group per overload. The argument counts are all
-// different, which is what the runtime dispatches on. should_kill is the
-// argument before the policies in every layout.
+// Argument layouts, one per overload. The counts are all different, which is
+// what the runtime dispatches on; the policies are always the trailing arguments.
 //
-//   (d, should_kill, policy)
-constexpr size_t kDurationOverloadArgCount = 3;
-constexpr size_t kDurationOverloadShouldKillIndex = 1;
-constexpr size_t kDurationOverloadPolicyIndex = 2;
-//   (start, end, should_kill, policy, out_of_range_policy)
-constexpr size_t kTimestampOverloadArgCount = 5;
-constexpr size_t kTimestampOverloadShouldKillIndex = 2;
-constexpr size_t kTimestampOverloadPolicyIndex = 3;
-constexpr size_t kTimestampOverloadOutOfRangePolicyIndex = 4;
-//   (days, start, end, should_kill, policy, out_of_range_policy)
-constexpr size_t kDaysOverloadArgCount = 6;
-constexpr size_t kDaysOverloadShouldKillIndex = 3;
-constexpr size_t kDaysOverloadPolicyIndex = 4;
-constexpr size_t kDaysOverloadOutOfRangePolicyIndex = 5;
-//   (days, start, end, zone, should_kill, policy, out_of_range_policy)
-constexpr size_t kDaysZoneOverloadArgCount = 7;
+//   (d, policy)
+constexpr size_t kDurationOverloadArgCount = 2;
+constexpr size_t kDurationOverloadPolicyIndex = 1;
+//   (start, end, policy, out_of_range_policy)
+constexpr size_t kTimestampOverloadArgCount = 4;
+constexpr size_t kTimestampOverloadPolicyIndex = 2;
+constexpr size_t kTimestampOverloadOutOfRangePolicyIndex = 3;
+//   (days, start, end, policy, out_of_range_policy)
+constexpr size_t kDaysOverloadArgCount = 5;
+constexpr size_t kDaysOverloadPolicyIndex = 3;
+constexpr size_t kDaysOverloadOutOfRangePolicyIndex = 4;
+//   (days, start, end, zone, policy, out_of_range_policy)
+constexpr size_t kDaysZoneOverloadArgCount = 6;
 constexpr size_t kDaysZoneOverloadZoneIndex = 3;
-constexpr size_t kDaysZoneOverloadShouldKillIndex = 4;
-constexpr size_t kDaysZoneOverloadPolicyIndex = 5;
-constexpr size_t kDaysZoneOverloadOutOfRangePolicyIndex = 6;
+constexpr size_t kDaysZoneOverloadPolicyIndex = 4;
+constexpr size_t kDaysZoneOverloadOutOfRangePolicyIndex = 5;
+
+// Overload ids are matched by the sync server's version gate, so they are part
+// of the interface and must not be renamed.
+constexpr absl::string_view kKillOnExpiryOverloadId = "kill_on_expiry_result";
+constexpr absl::string_view kDaysStringOverloadId = "policy_for_range_days_string";
+constexpr absl::string_view kDaysStringGrantOverloadId = "policy_for_range_days_string_grant";
+constexpr absl::string_view kDaysStringTzOverloadId = "policy_for_range_days_string_tz";
+constexpr absl::string_view kDaysStringTzGrantOverloadId = "policy_for_range_days_string_tz_grant";
+constexpr absl::string_view kTimestampOverloadId = "policy_for_range_timestamp";
+constexpr absl::string_view kTimestampGrantOverloadId = "policy_for_range_timestamp_grant";
+constexpr absl::string_view kDurationGrantOverloadId = "policy_for_range_duration_grant";
 
 // The zone a window with no zone argument is read in, spelled the way the zone
 // argument spells it. Recorded on a pending kill so the kill-time re-check reads
@@ -150,8 +164,80 @@ absl::StatusOr<std::vector<int64_t>> DayList(const cel_runtime::CelValue& value,
   return days;
 }
 
-// Reports the kill an in-window should_kill asked for. `days`, `start`, `end`
-// and `zone` carry the window's shape, empty for the non-recurring overloads.
+// Policies that let a process start, and so leave something to quit at expiry.
+bool IsGrantable(::santa::cel::v2::ReturnValue value) {
+  switch (value) {
+    case ::santa::cel::v2::ALLOWLIST:
+    case ::santa::cel::v2::AUDIT:
+    case ::santa::cel::v2::SEATBELT:
+    case ::santa::cel::v2::REQUIRE_TOUCHID:
+    case ::santa::cel::v2::REQUIRE_TOUCHID_ONLY: return true;
+    default: return false;
+  }
+}
+
+// The Result a policy argument holds, or nullptr for any other value.
+const Result* AsResult(const cel_runtime::CelValue& value) {
+  return value.IsMessage() ? google::protobuf::DynamicCastMessage<Result>(value.MessageOrDie())
+                           : nullptr;
+}
+
+struct DecodedPolicy {
+  cel_runtime::CelValue result;
+  bool kill_on_expiry;
+};
+
+// Unwraps a policy argument. A Grant is only legal in the in-range slot and only
+// around a grantable Result; the checker guarantees both for compiled rules, so
+// this is the backstop for values that bypassed it.
+absl::StatusOr<DecodedPolicy> DecodePolicy(const cel_runtime::CelValue& value, bool grantAllowed,
+                                           google::protobuf::Arena* arena) {
+  if (AsResult(value)) {
+    return DecodedPolicy{.result = value, .kill_on_expiry = false};
+  }
+  const Grant* grant = value.IsMessage()
+                           ? google::protobuf::DynamicCastMessage<Grant>(value.MessageOrDie())
+                           : nullptr;
+  if (grant && grantAllowed && grant->has_policy() && IsGrantable(grant->policy().value())) {
+    return DecodedPolicy{
+        .result = cel_runtime::CelProtoWrapper::CreateMessage(&grant->policy(), arena),
+        .kill_on_expiry = true};
+  }
+  return absl::InvalidArgumentError(
+      grantAllowed ? "policy_for_range() expects a Result or kill_on_expiry() policy"
+                   : "policy_for_range() out-of-range policy must be a Result");
+}
+
+// kill_on_expiry(Result) -> Grant. Eager and pure: it checks the policy is
+// grantable and wraps it. policy_for_range() is what records the kill.
+class KillOnExpiryFunction : public cel_runtime::CelFunction {
+ public:
+  KillOnExpiryFunction()
+      : cel_runtime::CelFunction(cel_runtime::CelFunctionDescriptor(
+            "kill_on_expiry", /*receiver_style=*/false, {cel_runtime::CelValue::Type::kStruct},
+            /*is_strict=*/true)) {}
+
+  absl::Status Evaluate(absl::Span<const cel_runtime::CelValue> args, cel_runtime::CelValue* result,
+                        google::protobuf::Arena* arena) const override {
+    const Result* policy = AsResult(args[0]);
+    if (!policy) {
+      return absl::InvalidArgumentError("kill_on_expiry() expects a Result policy");
+    }
+    if (!IsGrantable(policy->value())) {
+      return absl::InvalidArgumentError(absl::StrCat(
+          ::santa::cel::v2::ReturnValue_Name(policy->value()),
+          " cannot be used with kill_on_expiry() because it does not allow a process to start"));
+    }
+    auto* grant = google::protobuf::Arena::Create<Grant>(arena);
+    *grant->mutable_policy() = *policy;
+    *result = cel_runtime::CelProtoWrapper::CreateMessage(grant, arena);
+    return absl::OkStatus();
+  }
+};
+
+// Reports the kill an in-window kill_on_expiry() asked for. `days`, `start`,
+// `end` and `zone` carry the window's shape, empty for the non-recurring
+// overloads.
 void RecordPendingKill(std::optional<PendingKill>* sink, const WindowEval& window, absl::Time now,
                        absl::Span<const int64_t> days, absl::string_view start,
                        absl::string_view end, absl::string_view zone) {
@@ -171,33 +257,152 @@ void RecordPendingKill(std::optional<PendingKill>* sink, const WindowEval& windo
   }
 }
 
-absl::Status RegisterPolicyForRangeDecls(::cel::TypeCheckerBuilder& builder) {
-  // Both policy arguments and the return value are santa.cel.Result, which is
-  // what the policy names (ALLOWLIST and friends) bind as in V2. That is what
-  // lets policy_for_range(..., require_touchid_with_cooldown_minutes(30),
-  // BLOCKLIST) type-check.
-  auto resultType = ::cel::MessageType(::santa::cel::Result::descriptor());
-  auto dayList = ::cel::ListType(builder.arena(), ::cel::IntType());
+// The in-range argument index of a grant overload, nullopt for anything else.
+std::optional<size_t> GrantPolicyIndex(absl::string_view overloadId) {
+  if (overloadId == kDaysStringGrantOverloadId) return kDaysOverloadPolicyIndex;
+  if (overloadId == kDaysStringTzGrantOverloadId) return kDaysZoneOverloadPolicyIndex;
+  if (overloadId == kTimestampGrantOverloadId) return kTimestampOverloadPolicyIndex;
+  if (overloadId == kDurationGrantOverloadId) return kDurationOverloadPolicyIndex;
+  return std::nullopt;
+}
 
-  // The overload ids are matched by the sync server's version gate, so they are
-  // part of the interface and must not be renamed.
+const ::cel::Reference* FindReference(const ::cel::Ast& ast, int64_t id) {
+  auto it = ast.reference_map().find(id);
+  return it == ast.reference_map().end() ? nullptr : &it->second;
+}
+
+bool HasMessageType(const ::cel::Ast& ast, int64_t id, absl::string_view name) {
+  auto it = ast.type_map().find(id);
+  return it != ast.type_map().end() && it->second.has_message_type() &&
+         it->second.message_type().type() == name;
+}
+
+bool IsCall(const ::cel::Expr& expr, absl::string_view function) {
+  return expr.has_call_expr() && expr.call_expr().function() == function;
+}
+
+// The wrapped policy must be a named allow-like policy or a Touch ID cooldown
+// helper, both recognizable from the checked references alone.
+bool ValidateWrappedPolicy(::cel::ValidationContext& context, const ::cel::Expr& policy) {
+  const ::cel::Reference* ref = FindReference(context.ast(), policy.id());
+  if (ref && policy.has_ident_expr()) {
+    ::santa::cel::v2::ReturnValue value;
+    if (::santa::cel::v2::ReturnValue_Parse(ref->name(), &value)) {
+      if (IsGrantable(value)) {
+        return true;
+      }
+      context.ReportErrorAt(
+          policy.id(), absl::StrCat(ref->name(), " cannot be used with kill_on_expiry() because it "
+                                                 "does not allow a process to start"));
+      return false;
+    }
+  }
+  if (ref && policy.has_call_expr() && ref->overload_id().size() == 1 &&
+      (ref->overload_id()[0] == "require_touchid_with_cooldown_minutes_int" ||
+       ref->overload_id()[0] == "require_touchid_only_with_cooldown_minutes_int")) {
+    return true;
+  }
+  context.ReportErrorAt(policy.id(),
+                        "kill_on_expiry() requires a statically known allow-like policy");
+  return false;
+}
+
+// The wrapper must be the in-range argument of a grant overload, and that call
+// must reach the root through ternary branches only, so the kill it asks for is
+// always attached to the rule's own decision.
+bool ValidatePlacement(::cel::ValidationContext& context, const ::cel::NavigableAstNode& wrapper) {
+  const ::cel::NavigableAstNode* range = wrapper.parent();
+  const ::cel::Reference* ref = range ? FindReference(context.ast(), range->expr()->id()) : nullptr;
+  std::optional<size_t> index;
+  if (ref && ref->overload_id().size() == 1) {
+    index = GrantPolicyIndex(ref->overload_id()[0]);
+  }
+  if (!index || wrapper.child_index() < 0 || static_cast<size_t>(wrapper.child_index()) != *index) {
+    context.ReportErrorAt(
+        wrapper.expr()->id(),
+        "kill_on_expiry() may only be used as the in-range policy of policy_for_range()");
+    return false;
+  }
+  for (const ::cel::NavigableAstNode* node = range; node->parent() != nullptr;
+       node = node->parent()) {
+    if (!IsCall(*node->parent()->expr(), "_?_:_") || node->child_index() == 0) {
+      context.ReportErrorAt(
+          range->expr()->id(),
+          "a policy_for_range() using kill_on_expiry() must produce the rule's result");
+      return false;
+    }
+  }
+  return true;
+}
+
+// Runs after type checking. Every kill_on_expiry() must wrap a recognizable
+// allow-like policy and sit in the in-range slot of a policy_for_range() on the
+// rule's result path; a rule using one must itself produce a Result, and Grant
+// is never constructed directly.
+bool ValidateKillOnExpiry(::cel::ValidationContext& context) {
+  const ::cel::Ast& ast = context.ast();
+  bool valid = true;
+  bool usesKillOnExpiry = false;
+  for (const ::cel::NavigableAstNode& node : context.navigable_ast().Root().DescendantsPreorder()) {
+    const ::cel::Expr& expr = *node.expr();
+    if (expr.has_struct_expr()) {
+      const ::cel::Reference* ref = FindReference(ast, expr.id());
+      if (ref && ref->name() == Grant::descriptor()->full_name()) {
+        context.ReportErrorAt(expr.id(), "santa.cel.Grant is internal; use kill_on_expiry()");
+        valid = false;
+      }
+    }
+    if (!IsCall(expr, "kill_on_expiry")) {
+      continue;
+    }
+    usesKillOnExpiry = true;
+    if (!ValidateWrappedPolicy(context, expr.call_expr().args()[0])) {
+      valid = false;
+    }
+    if (!ValidatePlacement(context, node)) {
+      valid = false;
+    }
+  }
+  if (usesKillOnExpiry &&
+      !HasMessageType(ast, ast.root_expr().id(), Result::descriptor()->full_name())) {
+    context.ReportErrorAt(ast.root_expr().id(),
+                          "a rule using kill_on_expiry() must produce a santa.cel.Result");
+    valid = false;
+  }
+  return valid;
+}
+
+absl::Status RegisterPolicyForRangeDecls(::cel::TypeCheckerBuilder& builder) {
+  // Named policies and the cooldown helpers are all santa.cel.Result. A Grant is
+  // only ever kill_on_expiry()'s result, so the checker alone keeps it out of the
+  // out-of-range slot and out of the rule's result.
+  auto result = ::cel::MessageType(::santa::cel::Result::descriptor());
+  auto grant = ::cel::MessageType(::santa::cel::Grant::descriptor());
+  auto dayList = ::cel::ListType(builder.arena(), ::cel::IntType());
+  auto str = ::cel::StringType();
+  auto ts = ::cel::TimestampType();
+
   CEL_ASSIGN_OR_RETURN(
-      auto decl,
+      auto killOnExpiry,
+      ::cel::MakeFunctionDecl("kill_on_expiry",
+                              ::cel::MakeOverloadDecl(kKillOnExpiryOverloadId, grant, result)));
+  CEL_RETURN_IF_ERROR(builder.AddFunction(std::move(killOnExpiry)));
+
+  CEL_ASSIGN_OR_RETURN(
+      auto policyForRange,
       ::cel::MakeFunctionDecl(
           "policy_for_range",
-          ::cel::MakeOverloadDecl("policy_for_range_days_string", resultType, dayList,
-                                  ::cel::StringType(), ::cel::StringType(), ::cel::BoolType(),
-                                  resultType, resultType),
-          ::cel::MakeOverloadDecl("policy_for_range_days_string_tz", resultType, dayList,
-                                  ::cel::StringType(), ::cel::StringType(), ::cel::StringType(),
-                                  ::cel::BoolType(), resultType, resultType),
-          ::cel::MakeOverloadDecl("policy_for_range_timestamp", resultType, ::cel::TimestampType(),
-                                  ::cel::TimestampType(), ::cel::BoolType(), resultType,
-                                  resultType),
-          ::cel::MakeOverloadDecl("policy_for_range_duration", resultType, ::cel::DurationType(),
-                                  ::cel::BoolType(), resultType)));
-
-  return builder.AddFunction(std::move(decl));
+          ::cel::MakeOverloadDecl(kDaysStringOverloadId, result, dayList, str, str, result, result),
+          ::cel::MakeOverloadDecl(kDaysStringGrantOverloadId, result, dayList, str, str, grant,
+                                  result),
+          ::cel::MakeOverloadDecl(kDaysStringTzOverloadId, result, dayList, str, str, str, result,
+                                  result),
+          ::cel::MakeOverloadDecl(kDaysStringTzGrantOverloadId, result, dayList, str, str, str,
+                                  grant, result),
+          ::cel::MakeOverloadDecl(kTimestampOverloadId, result, ts, ts, result, result),
+          ::cel::MakeOverloadDecl(kTimestampGrantOverloadId, result, ts, ts, grant, result),
+          ::cel::MakeOverloadDecl(kDurationGrantOverloadId, result, ::cel::DurationType(), grant)));
+  return builder.AddFunction(std::move(policyForRange));
 }
 
 }  // namespace
@@ -318,25 +523,25 @@ absl::Duration NotificationLead(absl::Duration window_length) {
 
 std::vector<cel_runtime::CelFunctionDescriptor> PolicyForRangeDescriptors() {
   using Type = cel_runtime::CelValue::Type;
-  // Messages (the policy arguments) are kStruct in the runtime's kinds.
+  // Result and Grant are both kStruct at runtime, so one descriptor per argument
+  // count covers the plain and grant overloads of a shape.
   return {
       cel_runtime::CelFunctionDescriptor(
           "policy_for_range", /*receiver_style=*/false,
           /*types=*/
-          {Type::kList, Type::kString, Type::kString, Type::kBool, Type::kStruct, Type::kStruct},
+          {Type::kList, Type::kString, Type::kString, Type::kStruct, Type::kStruct},
           /*is_strict=*/true),
-      cel_runtime::CelFunctionDescriptor("policy_for_range", /*receiver_style=*/false,
-                                         /*types=*/
-                                         {Type::kList, Type::kString, Type::kString, Type::kString,
-                                          Type::kBool, Type::kStruct, Type::kStruct},
-                                         /*is_strict=*/true),
       cel_runtime::CelFunctionDescriptor(
           "policy_for_range", /*receiver_style=*/false,
           /*types=*/
-          {Type::kTimestamp, Type::kTimestamp, Type::kBool, Type::kStruct, Type::kStruct},
+          {Type::kList, Type::kString, Type::kString, Type::kString, Type::kStruct, Type::kStruct},
+          /*is_strict=*/true),
+      cel_runtime::CelFunctionDescriptor(
+          "policy_for_range", /*receiver_style=*/false,
+          /*types=*/{Type::kTimestamp, Type::kTimestamp, Type::kStruct, Type::kStruct},
           /*is_strict=*/true),
       cel_runtime::CelFunctionDescriptor("policy_for_range", /*receiver_style=*/false,
-                                         /*types=*/{Type::kDuration, Type::kBool, Type::kStruct},
+                                         /*types=*/{Type::kDuration, Type::kStruct},
                                          /*is_strict=*/true),
   };
 }
@@ -351,18 +556,23 @@ absl::Status PolicyForRangeFunction::Evaluate(absl::Span<const cel_runtime::CelV
   absl::Time now = now_();
 
   if (args.size() == kDaysOverloadArgCount || args.size() == kDaysZoneOverloadArgCount) {
+    bool zoneGiven = args.size() == kDaysZoneOverloadArgCount;
+    size_t policyIndex = zoneGiven ? kDaysZoneOverloadPolicyIndex : kDaysOverloadPolicyIndex;
+    size_t outOfRangeIndex =
+        zoneGiven ? kDaysZoneOverloadOutOfRangePolicyIndex : kDaysOverloadOutOfRangePolicyIndex;
+    // Both policies are decoded on every evaluation so a bad argument fails the
+    // same way whether or not the window is open.
+    CEL_ASSIGN_OR_RETURN(DecodedPolicy policy, DecodePolicy(args[policyIndex], true, arena));
+    CEL_ASSIGN_OR_RETURN(DecodedPolicy outOfRange,
+                         DecodePolicy(args[outOfRangeIndex], false, arena));
+
     absl::StatusOr<std::vector<int64_t>> days = DayList(args[0], arena);
     if (!days.ok()) {
       return days.status();
     }
 
-    // Without a zone argument the window is read in the host's zone, which is
-    // the same zone "local" resolves to: a schedule written as clock time means
-    // the host's clock unless the rule says otherwise. This is deliberately the
-    // same call ResolveTimeZone()'s "local" branch makes rather than a call to
-    // the resolver, which would put a status on a path that cannot fail; if what
-    // "local" means ever changes there, change it here and in TodayFunction too.
-    bool zoneGiven = args.size() == kDaysZoneOverloadArgCount;
+    // Without a zone argument the window is read in the host's zone, the same
+    // zone "local" resolves to.
     absl::string_view zoneArg = kDefaultZone;
     absl::TimeZone zone = absl::LocalTimeZone();
     if (zoneGiven) {
@@ -380,51 +590,44 @@ absl::Status PolicyForRangeFunction::Evaluate(absl::Span<const cel_runtime::CelV
       return window.status();
     }
 
-    size_t shouldKillIndex =
-        zoneGiven ? kDaysZoneOverloadShouldKillIndex : kDaysOverloadShouldKillIndex;
-    if (window->in_range && args[shouldKillIndex].BoolOrDie()) {
+    if (window->in_range && policy.kill_on_expiry) {
       RecordPendingKill(pending_kill_sink_, *window, now, *days, args[1].StringOrDie().value(),
                         args[2].StringOrDie().value(), zoneArg);
     }
-
-    // Either way the answer is one of the policy arguments, passed through
-    // untouched so a composite policy (e.g. a TouchID cooldown) keeps its
-    // fields.
-    size_t policyIndex = zoneGiven ? kDaysZoneOverloadPolicyIndex : kDaysOverloadPolicyIndex;
-    size_t outOfRangePolicyIndex =
-        zoneGiven ? kDaysZoneOverloadOutOfRangePolicyIndex : kDaysOverloadOutOfRangePolicyIndex;
-    *result = window->in_range ? args[policyIndex] : args[outOfRangePolicyIndex];
+    *result = window->in_range ? policy.result : outOfRange.result;
     return absl::OkStatus();
   }
 
   if (args.size() == kTimestampOverloadArgCount) {
-    // An absolute span names one occurrence outright, so there is no recurring
-    // shape for a restart to re-check: the deadline it records stands alone.
+    CEL_ASSIGN_OR_RETURN(DecodedPolicy policy,
+                         DecodePolicy(args[kTimestampOverloadPolicyIndex], true, arena));
+    CEL_ASSIGN_OR_RETURN(DecodedPolicy outOfRange,
+                         DecodePolicy(args[kTimestampOverloadOutOfRangePolicyIndex], false, arena));
+
+    // An absolute span names one occurrence, so there is no recurring shape for
+    // a restart to re-check: the deadline it records stands alone.
     WindowEval window =
         EvalTimestampWindow(args[0].TimestampOrDie(), args[1].TimestampOrDie(), now);
-
-    if (window.in_range && args[kTimestampOverloadShouldKillIndex].BoolOrDie()) {
+    if (window.in_range && policy.kill_on_expiry) {
       RecordPendingKill(pending_kill_sink_, window, now, {}, "", "", "");
     }
-
-    *result = window.in_range ? args[kTimestampOverloadPolicyIndex]
-                              : args[kTimestampOverloadOutOfRangePolicyIndex];
+    *result = window.in_range ? policy.result : outOfRange.result;
     return absl::OkStatus();
   }
 
   if (args.size() == kDurationOverloadArgCount) {
+    CEL_ASSIGN_OR_RETURN(DecodedPolicy policy,
+                         DecodePolicy(args[kDurationOverloadPolicyIndex], true, arena));
     absl::Duration length = args[0].DurationOrDie();
     if (length <= absl::ZeroDuration()) {
       return absl::InvalidArgumentError("policy_for_range() duration must be positive");
     }
 
-    // [now, now + d) always contains now, so there is no out_of_range_policy to
-    // choose between; the window itself is only needed to place a deadline.
-    if (args[kDurationOverloadShouldKillIndex].BoolOrDie()) {
+    // [now, now + d) always contains now, so the window only places a deadline.
+    if (policy.kill_on_expiry) {
       RecordPendingKill(pending_kill_sink_, EvalDurationWindow(length, now), now, {}, "", "", "");
     }
-
-    *result = args[kDurationOverloadPolicyIndex];
+    *result = policy.result;
     return absl::OkStatus();
   }
 
@@ -433,14 +636,17 @@ absl::Status PolicyForRangeFunction::Evaluate(absl::Span<const cel_runtime::CelV
 }
 
 absl::Status AddPolicyForRangeCompilerLibrary(::cel::CompilerBuilder& builder) {
+  builder.GetValidator().AddValidation(::cel::Validation(&ValidateKillOnExpiry, "kill_on_expiry"));
   return builder.AddLibrary(::cel::CompilerLibrary::FromCheckerLibrary(
       {"policy_for_range", &RegisterPolicyForRangeDecls}));
 }
 
 absl::Status RegisterPolicyForRangeFunctions(cel_runtime::CelFunctionRegistry* registry,
                                              const cel_runtime::InterpreterOptions&) {
-  // Lazy, like today(): the Activation vends the implementations so the calls
-  // are never constant-folded and can mark the evaluation non-cacheable.
+  // kill_on_expiry() is eager: it has no side effect, so folding it is harmless.
+  // The policy_for_range() overloads stay lazy, vended by the Activation, so they
+  // are never folded and can mark the evaluation non-cacheable.
+  CEL_RETURN_IF_ERROR(registry->Register(std::make_unique<KillOnExpiryFunction>()));
   for (const auto& descriptor : PolicyForRangeDescriptors()) {
     CEL_RETURN_IF_ERROR(registry->RegisterLazyFunction(descriptor));
   }

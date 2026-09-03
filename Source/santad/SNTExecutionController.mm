@@ -712,7 +712,16 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
         replyBlock = ^(BOOL authenticated) {
           LOGD(@"User responded to block event for %@ with authenticated: %d", se.filePath,
                authenticated);
-          if (authenticated) {
+          // The window closed while the prompt was up: its kill is already due,
+          // so the process never runs.
+          BOOL allowed = authenticated;
+          if (authenticated && cd.timedRuleKillDeadline) {
+            NSDate* now =
+                [NSDate dateWithTimeIntervalSince1970:absl::ToDoubleSeconds(self->_celNow() -
+                                                                            absl::UnixEpoch())];
+            allowed = [cd.timedRuleKillDeadline compare:now] == NSOrderedDescending;
+          }
+          if (allowed) {
             if (cd.decisionClientMode == SNTClientModeStandalone &&
                 cd.decision == SNTEventStateBlockUnknown) {
               // Create a rule for the binary that was allowed by the user in
@@ -746,12 +755,15 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
               [self recordTimedRuleKillForDecision:cd];
             }
           } else {
-            // Decision stays as-is when TouchID is denied, just populate the extra field.
-            cd.decisionExtra = @"TouchID Denied";
+            // Decision stays as-is; only the extra field says why.
+            cd.decisionExtra = authenticated ? @"TouchID Approved After Expiry" : @"TouchID Denied";
 
-            // The user did not approve, so kill the stopped process.
+            // Nothing approved this execution in time, so kill the stopped process.
             if (stoppedProc) {
-              _ttyWriter->Write(targetProc, @"Authorization not given, denying execution\n---\n\n");
+              _ttyWriter->Write(
+                  targetProc,
+                  authenticated ? @"Authorized after the window closed, denying execution\n---\n\n"
+                                : @"Authorization not given, denying execution\n---\n\n");
             }
             self.processControlBlock(newProcPid, ProcessControl::Kill);
           }
@@ -764,7 +776,7 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
           self->_logger(std::move(esMsgCopy));
 
           _procSignalCache->remove(pidAndVersion);
-          postAction(authenticated ? SNTActionHoldAllowed : SNTActionHoldDenied, cd);
+          postAction(allowed ? SNTActionHoldAllowed : SNTActionHoldDenied, cd);
         };
       }
 

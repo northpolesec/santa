@@ -1361,8 +1361,8 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
 #pragma mark Timed rule kills
 
 /// A decision carrying the kill an in-window policy_for_range(...,
-/// should_kill=true) asked for, as SNTPolicyProcessor would have left it. Never
-/// cacheable: the window edge has to enforce itself on the next exec.
+/// kill_on_expiry(policy)) asked for, as SNTPolicyProcessor would have left it.
+/// Never cacheable: the window edge has to enforce itself on the next exec.
 - (SNTCachedDecision*)decisionWithTimedRuleKill:(SNTEventState)state {
   SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
   cd.decision = state;
@@ -1556,7 +1556,7 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   } cases[] = {
       // In window with the kill asked for, but the policy in the window blocks.
       {@"blocked", SNTEventStateBlockBinary, YES, NO, nil, YES, 0},
-      // What both an out-of-window exec and a should_kill of false leave behind.
+      // What both an out-of-window exec and an unwrapped policy leave behind.
       {@"no deadline", SNTEventStateAllowBinary, NO, NO, nil, YES, 0},
       {@"TouchID approves", SNTEventStateBlockSigningID, YES, YES, @YES, YES, 1},
       {@"TouchID denies", SNTEventStateBlockSigningID, YES, YES, @NO, YES, 0},
@@ -1582,6 +1582,20 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
       XCTAssertEqualObjects(recorded.firstObject[@"identifier"], @"ABCDE12345", @"%@", c.name);
     }
   }
+}
+
+// An approval that arrives after the window closed neither resumes the process
+// nor records a kill: the one it would record is already due.
+- (void)testTimedRuleKillTouchIDApprovalAfterDeadlineIsDenied {
+  SNTCachedDecision* cd = [self decisionWithTimedRuleKill:SNTEventStateBlockSigningID];
+  cd.holdAndAsk = YES;
+  cd.timedRuleKillDeadline = [NSDate dateWithTimeIntervalSinceNow:-1];
+
+  NSArray<NSDictionary*>* recorded = [self recordedKillsForDecision:cd touchIDReply:@YES];
+
+  XCTAssertEqual(recorded.count, 0UL);
+  XCTAssertEqual(cd.decision, SNTEventStateBlockSigningID);
+  XCTAssertEqualObjects(cd.decisionExtra, @"TouchID Approved After Expiry");
 }
 
 // Test that flushTouchIDApprovalCache clears the cache

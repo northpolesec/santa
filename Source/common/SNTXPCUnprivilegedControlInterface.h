@@ -88,6 +88,7 @@ struct RuleCounts {
 // Whether the daemon holds a (non-revoked) sync-server export config. Sync state is root-only, so
 // unprivileged callers can't read it directly and must ask the daemon.
 - (void)telemetryExportConfigured:(void (^)(BOOL))reply;
+- (void)telemetryFilterCount:(void (^)(uint64_t))reply;
 
 ///
 /// FAA Retrieval ops

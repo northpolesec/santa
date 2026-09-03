@@ -46,53 +46,32 @@ namespace cel {
 // the window is open and another while it is closed.
 //
 //   policy_for_range(list<int> days, string start, string end,
-//                    bool should_kill, policy, out_of_range_policy)
+//                    policy, out_of_range_policy)
 //   policy_for_range(list<int> days, string start, string end, string zone,
-//                    bool should_kill, policy, out_of_range_policy)
+//                    policy, out_of_range_policy)
 //   policy_for_range(timestamp start, timestamp end,
-//                    bool should_kill, policy, out_of_range_policy)
-//   policy_for_range(duration d, bool should_kill, policy)
+//                    policy, out_of_range_policy)
+//   policy_for_range(duration d, kill_on_expiry(policy))
 //
-// The bare call is a complete expression, e.g.
+// Policies are santa.cel.Result, so the policy names (ALLOWLIST and friends)
+// and require_touchid_with_cooldown_minutes(30) fit either slot and pass
+// through untouched. Wrapping the in-range policy in kill_on_expiry() asks for
+// anything still running when the window closes to be quit; the wrapper only
+// accepts policies that let a process start. The duration form is [now, now +
+// d), which always holds at evaluation, so it exists only to place a deadline
+// and is grant-only. A compile-time validation pass keeps kill_on_expiry() in
+// the in-range slot of a call that produces the rule's result.
 //
-//     policy_for_range(weekdays(), "09:00", "17:00", false,
-//                      ALLOWLIST, BLOCKLIST)
+// Days are 0=Sunday through 6=Saturday. For both HH:MM overloads an `end` at or
+// before `start` crosses midnight and the day list applies to the day the
+// window starts. The timestamp overload takes absolute instants, so no day list
+// and no zone. zone is "local" (the default), a [+-]HH:MM offset, or a name the
+// platform's zone loader accepts, except names holding a colon or ".." or
+// starting with "/", which the loader would open as a file.
 //
-// Both policy arguments and the return value are santa.cel.Result, the type the
-// policy names (ALLOWLIST and friends) bind as in V2, so a composite policy
-// such as require_touchid_with_cooldown_minutes(30) can sit in either position
-// and is passed through untouched.
-//
-// Days are 0=Sunday through 6=Saturday, matching getDayOfWeek(). For both HH:MM
-// overloads an `end` at or before `start` crosses midnight and the day list
-// applies to the day the window starts. The timestamp overload takes absolute
-// instants and so has no day list and no zone: a timestamp literal already
-// carries its zone in its offset as it is written, and day-gating an absolute
-// span is a composition with one of the HH:MM forms. The duration overload is
-// [now, now + d), which always holds at evaluation, so it takes no calendar and
-// no out_of_range_policy.
-//
-// zone is optional on the HH:MM window and defaults to the host's zone: a
-// schedule written as clock time is most naturally the host's clock. The zone
-// argument is for the windows that have to mean one instant fleet-wide, and it
-// also lets an expression spell its calendar when it mixes in something that
-// reads a different one, since the standard library's getDayOfWeek() and its
-// siblings default to UTC. The zone is "local" for the host's zone (the
-// default, spelled out), a signed fixed offset from UTC written as [+-]HH:MM,
-// or a name the platform's zone loader accepts: IANA names such as
-// "America/New_York", "UTC", and whatever else that loader takes, so long as
-// the name holds no colon, holds no "..", and does not start with a slash.
-// Those three shapes are rejected because they are the loader's ways of opening
-// a rule-named path as a tzfile. Anything the loader does not know fails the
-// evaluation.
-//
-// should_kill asks for anything still running when the window closes to be
-// quit. An in-window evaluation with it set reports a PendingKill, which the
-// caller records only if the execution is actually allowed to run.
-//
-// Every evaluation reads the current time, so any use marks the result
-// non-cacheable, exactly like today(): the next exec re-evaluates and the
-// window edge enforces itself.
+// Timed kills are rule-scoped and honored only for CDHash, SigningID and TeamID
+// rules; the sync server enforces that before a rule is distributed. Every
+// evaluation reads the clock, so any use marks the result non-cacheable.
 
 // The result of testing a window at one instant.
 struct WindowEval {
@@ -146,10 +125,10 @@ WindowEval EvalDurationWindow(absl::Duration d, absl::Time now);
 // re-check that moves one to a later occurrence cannot disagree.
 absl::Duration NotificationLead(absl::Duration window_length);
 
-// The kill an in-window evaluation with should_kill asked for: quit what the
-// rule covers at `deadline`, having warned at `notify_at`. The window shape is
-// what a restart re-checks against: the zone string as written ("local" when
-// the overload takes none), and empty for the non-recurring overloads.
+// The kill an in-window kill_on_expiry() asked for: quit what the rule covers
+// at `deadline`, having warned at `notify_at`. The window shape is what a
+// restart re-checks against: the zone string as written ("local" when the
+// overload takes none), and empty for the non-recurring overloads.
 struct PendingKill {
   absl::Time deadline;
   absl::Time notify_at;
@@ -159,17 +138,17 @@ struct PendingKill {
   std::string window_zone;
 };
 
-// Descriptors for the four policy_for_range() overloads, all registered lazily.
-// Their argument counts are all different, which is what the runtime dispatches
-// on.
+// Descriptors for the four policy_for_range() argument counts (2, 4, 5 and 6),
+// all registered lazily. The count is what the runtime dispatches on, and it
+// covers the plain and grant overloads of a shape together.
 std::vector<::google::api::expr::runtime::CelFunctionDescriptor>
 PolicyForRangeDescriptors();
 
 // Lazy CEL function backing one policy_for_range() overload. On evaluation it
 // marks the result non-cacheable, returns whichever policy argument the window
-// selects, and reports a pending kill when the window is open and should_kill
-// is set (keeping the earlier deadline if the same evaluation asks more than
-// once). Both sink pointers must outlive every evaluation.
+// selects, and reports a pending kill when the window is open and the in-range
+// policy is a Grant (keeping the earlier deadline if the same evaluation asks
+// more than once). Both sink pointers must outlive every evaluation.
 class PolicyForRangeFunction
     : public ::google::api::expr::runtime::CelFunction {
  public:
@@ -193,13 +172,14 @@ class PolicyForRangeFunction
   std::function<absl::Time()> now_;
 };
 
-// Register the policy_for_range() decls with the type checker at compile time.
-// Only available in CELv2, and only for rules: fallback expressions have no
-// rule identity for a window to attach to.
+// Declares policy_for_range() and kill_on_expiry() and installs the validation
+// pass that keeps a wrapper in the in-range slot of a call on the rule's result
+// path. Only available in CELv2, and only for rules: fallback expressions have
+// no rule identity for a window to attach to.
 absl::Status AddPolicyForRangeCompilerLibrary(::cel::CompilerBuilder& builder);
 
-// Register policy_for_range() at runtime. All four overloads are lazy: their
-// implementations are provided by the Activation (see
+// Registers kill_on_expiry() eagerly and the four lazy policy_for_range()
+// descriptors, whose implementations are provided by the Activation (see
 // Activation::FindFunctionOverloads) so they are never constant-folded and can
 // mark the evaluation non-cacheable and report a pending kill back through it.
 // Only available in CELv2.

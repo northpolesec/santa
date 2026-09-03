@@ -31,3 +31,9 @@ message Result {
   // If set to > 0, cache the approval for that many minutes.
   optional uint64 cooldown_minutes = 2;
 }
+
+// Grant is the internal carrier kill_on_expiry() produces and policy_for_range()
+// consumes. It is not a decision by itself.
+message Grant {
+  Result policy = 1;
+}

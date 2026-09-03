@@ -49,8 +49,8 @@ struct EvaluationResult {
   bool cacheable;
   std::optional<uint64_t>
       touchIDCooldownMinutes;  // nullopt = no caching (prompt every time)
-  // Set when policy_for_range() matched an open window with should_kill set.
-  // The deadline is only recorded if the execution is allowed to run.
+  // Set when policy_for_range() matched an open window with a kill_on_expiry()
+  // policy. The deadline is only recorded if the execution is allowed to run.
   std::optional<PendingKill> pendingKill;
 
   EvaluationResult(ReturnValue v, bool c,
