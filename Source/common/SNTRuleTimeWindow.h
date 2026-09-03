@@ -14,9 +14,9 @@
 
 #import <Foundation/Foundation.h>
 
-/// One rule time window, in one of two forms. The recurring form carries the
-/// strings exactly as the rule wrote them; the absolute form carries resolved
-/// instants. Exactly one form is populated.
+/// One recurring rule time window, carrying the strings exactly as the rule
+/// wrote them: the days it recurs on, its HH:MM bounds and the zone they are
+/// read in.
 @interface SNTRuleTimeWindow : NSObject <NSSecureCoding>
 
 NS_ASSUME_NONNULL_BEGIN
@@ -27,9 +27,6 @@ NS_ASSUME_NONNULL_BEGIN
 // Named zoneName, not zone: -zone is an NSObject protocol requirement, and a
 // member of that name on an NSObject subclass is unreachable from Swift.
 @property(nullable) NSString* zoneName;  // "local", IANA name, or [+-]HH:MM
-@property(nullable) NSDate* startDate;   // absolute form
-@property(nullable) NSDate* endDate;     // absolute form
-@property BOOL open;                     // whether the asked instant was inside
 
 - (NSString*)displayStringWithLocale:(NSLocale*)locale;
 - (NSString*)displayString;  // displayStringWithLocale: with the current locale

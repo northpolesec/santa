@@ -16,6 +16,7 @@
 
 #import <CommonCrypto/CommonDigest.h>
 #import <Foundation/Foundation.h>
+#include <Kernel/kern/cs_blobs.h>
 #include <libproc.h>
 #include <mach/mach_time.h>
 #include <signal.h>
@@ -31,6 +32,8 @@
 #include <vector>
 
 #include "Source/common/AccountLookup.h"
+#include "Source/common/AuditUtilities.h"
+#include "Source/common/CSOpsHelper.h"
 #import "Source/common/CertificateHelpers.h"
 #import "Source/common/MOLCodesignChecker.h"
 #import "Source/common/MOLXPCConnection.h"
@@ -200,42 +203,21 @@ NSString* DisplayNameForPid(pid_t pid) {
   return nil;
 }
 
-// Fills the warning details from the matched process: proc info and its live
-// code object, never a root re-open of its path, which could be swapped under
-// the daemon or stall this queue, the one that fires kills. Everything is best
-// effort: a process gone mid-collection leaves fields nil and the GUI hides
-// those rows. Only application and deadline are guaranteed.
-static SNTTimedRuleKillDetails* DetailsForEntry(SNTTimedRuleKillEntry* entry, pid_t pid) {
+// Fills the warning details from the matched process. Identity comes from the
+// kernel through csops, the same source the match used, and Publisher alone
+// from a signature check that must pass, as in the block dialog; that check
+// validates only the identity components of the running code and takes
+// milliseconds, unlike a static check with default flags. Every process read
+// is re-checked against the audit token, so a pid gone or recycled
+// mid-collection leaves the process fields nil rather than describing a
+// stranger.
+static SNTTimedRuleKillDetails* DetailsForEntry(SNTTimedRuleKillEntry* entry,
+                                                const audit_token_t& token,
+                                                const santa::KillEnv& env) {
   SNTTimedRuleKillDetails* details = [[SNTTimedRuleKillDetails alloc] init];
   details.deadline = entry.deadline;
   details.ruleType = entry.ruleType;
-
-  char pathBuf[PROC_PIDPATHINFO_MAXSIZE] = {};
-  if (proc_pidpath(pid, pathBuf, sizeof(pathBuf)) > 0) {
-    details.path = @(pathBuf);
-  }
-
-  // The same name derivation as today, minus the second proc_pidpath that
-  // DisplayNameForPid would repeat.
-  NSString* app = details.path.lastPathComponent;
-  if (!app.length) app = DisplayNameForPid(pid);
-  details.application = app.length ? app : entry.identifier;
-
-  struct proc_bsdinfo bsdInfo;
-  if (proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &bsdInfo, sizeof(bsdInfo)) == sizeof(bsdInfo)) {
-    if (auto user = santa::account::UsernameForUID(bsdInfo.pbi_uid)) {
-      details.user = @(user->c_str());
-    }
-    details.ppid = @(bsdInfo.pbi_ppid);
-    details.parentName = DisplayNameForPid((pid_t)bsdInfo.pbi_ppid);
-  }
-
-  MOLCodesignChecker* csc = [[MOLCodesignChecker alloc] initWithPID:pid];
-  if (csc) {
-    details.signingID = FormatSigningID(csc);
-    details.cdhash = csc.cdhash;
-    details.publisher = Publisher(csc.certificates, csc.teamID);
-  }
+  details.application = entry.identifier;
 
   if (entry.windowDays && entry.windowStart && entry.windowEnd && entry.windowZone) {
     SNTRuleTimeWindow* window = [[SNTRuleTimeWindow alloc] init];
@@ -245,6 +227,57 @@ static SNTTimedRuleKillDetails* DetailsForEntry(SNTTimedRuleKillEntry* entry, pi
     window.zoneName = entry.windowZone;
     details.timeWindow = window;
   }
+
+  pid_t pid = santa::Pid(token);
+
+  NSString* path;
+  char pathBuf[PROC_PIDPATHINFO_MAXSIZE] = {};
+  if (proc_pidpath(pid, pathBuf, sizeof(pathBuf)) > 0) {
+    path = @(pathBuf);
+  }
+  NSString* application = path.lastPathComponent;
+  if (!application.length) application = DisplayNameForPid(pid);
+
+  NSString* user;
+  NSNumber* ppid;
+  NSString* parentName;
+  struct proc_bsdinfo bsdInfo;
+  if (proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &bsdInfo, sizeof(bsdInfo)) == sizeof(bsdInfo)) {
+    if (auto name = santa::account::UsernameForUID(bsdInfo.pbi_uid)) {
+      user = @(name->c_str());
+    }
+    ppid = @(bsdInfo.pbi_ppid);
+    parentName = DisplayNameForPid((pid_t)bsdInfo.pbi_ppid);
+  }
+
+  std::optional<std::string> signingID = santa::CSOpsGetSigningID(pid, env.csops_func);
+  std::optional<std::string> teamID = santa::CSOpsGetTeamID(pid, env.csops_func);
+  std::optional<uint32_t> flags = santa::CSOpsStatusFlags(pid, env.csops_func);
+  std::optional<std::string> cdhash = santa::CSOpsGetCDHash(pid, env.csops_func);
+
+  NSString* publisher;
+  MOLCodesignChecker* csc = [[MOLCodesignChecker alloc] initWithPID:pid];
+  if (csc) {
+    publisher = Publisher(csc.certificates, csc.teamID);
+  }
+
+  audit_token_t after;
+  if (!env.token_for_pid(pid, &after) || santa::Pidversion(after) != santa::Pidversion(token)) {
+    LOGD(@"Pid %d is gone or was recycled while collecting timed rule kill details for %@", pid,
+         entry.identifier);
+    return details;
+  }
+
+  if (application.length) details.application = application;
+  details.path = path;
+  details.user = user;
+  details.ppid = ppid;
+  details.parentName = parentName;
+  details.signingID = FormatSigningID(santa::OptionalStringToNSString(signingID),
+                                      santa::OptionalStringToNSString(teamID),
+                                      flags.has_value() && (*flags & CS_PLATFORM_BINARY) != 0);
+  details.cdhash = santa::OptionalStringToNSString(cdhash);
+  details.publisher = publisher;
   return details;
 }
 
@@ -850,14 +883,15 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
     return;
   }
 
-  std::optional<pid_t> pid = santa::KillingMachineAnyMatch(KillRequestForEntry(entry), _killEnv);
-  if (!pid) {
+  std::optional<audit_token_t> token =
+      santa::KillingMachineAnyMatch(KillRequestForEntry(entry), _killEnv);
+  if (!token) {
     // Nothing the rule covers is running, so there is nothing to warn about.
     LOGD(@"No running process matches %@; skipping timed rule kill banner", entry.identifier);
     return;
   }
 
-  SNTTimedRuleKillDetails* details = DetailsForEntry(entry, *pid);
+  SNTTimedRuleKillDetails* details = DetailsForEntry(entry, *token, _killEnv);
   LOGI(@"Sending timed rule kill banner for %@ (%@), quitting at %@", details.application,
        entry.identifier, entry.deadline);
   [proxy postTimedRuleKillNotification:details];

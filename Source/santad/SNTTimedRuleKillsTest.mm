@@ -1041,8 +1041,9 @@ static NSString* const kOtherBootSessionUUID = @"6A2B4C8E-0000-0000-0000-0000000
 // What the banner carries beyond the name: every row but the deadline and the
 // window shape is read off the matched process, which is this test's own parent,
 // the one process the fake world holds. A match is never this process itself, so
-// the parent is the nearest one whose fields the test can check. The signing rows
-// are not pinned; how a given process is signed varies.
+// the parent is the nearest one whose fields the test can check. The identity
+// rows come from the fake csops, which answers for the matched pid, so they are
+// pinned; Publisher comes from a real signature check on the parent and is not.
 - (void)testWarningDetailsComeFromTheMatchedProcess {
   [self addRuleOfType:SNTRuleTypeTeamID identifier:kMatchingTeamID cel:kCELExpr];
   id proxy = [self setUpNotifierProxy];
@@ -1085,12 +1086,16 @@ static NSString* const kOtherBootSessionUUID = @"6A2B4C8E-0000-0000-0000-0000000
   XCTAssertEqualObjects(details.timeWindow.startOfDay, @"09:00");
   XCTAssertEqualObjects(details.timeWindow.endOfDay, @"17:00");
   XCTAssertEqualObjects(details.timeWindow.zoneName, zone);
+  NSString* expectedSigningID =
+      [NSString stringWithFormat:@"%@:%@", kMatchingTeamID, kMatchingSigningID];
+  XCTAssertEqualObjects(details.signingID, expectedSigningID);
+  XCTAssertEqualObjects(details.cdhash, kMatchingCDHash);
 }
 
-// A pid nothing can be read for, which is mostly what a process that exited
-// between the match and the banner looks like. Only what the entry itself holds
-// is guaranteed; every row read off the process is absent, and the dialog hides
-// those.
+// A pid libproc cannot read, standing in for a process that exited between the
+// match and the banner. The fake still answers its token and csops, so the
+// identity rows stay; every row read through libproc is absent and the dialog
+// hides those.
 - (void)testWarningDetailsAreBestEffortForAProcessThatIsGone {
   [self addRuleOfType:SNTRuleTypeTeamID identifier:kMatchingTeamID cel:kCELExpr];
   id proxy = [self setUpNotifierProxy];
@@ -1124,6 +1129,52 @@ static NSString* const kOtherBootSessionUUID = @"6A2B4C8E-0000-0000-0000-0000000
   XCTAssertEqual(details.ruleType, SNTRuleTypeTeamID);
   XCTAssertNil(details.path);
   XCTAssertNil(details.user);
+  XCTAssertNil(details.publisher);
+  NSString* expectedSigningID =
+      [NSString stringWithFormat:@"%@:%@", kMatchingTeamID, kMatchingSigningID];
+  XCTAssertEqualObjects(details.signingID, expectedSigningID);
+  XCTAssertEqualObjects(details.cdhash, kMatchingCDHash);
+}
+
+// The match brackets its reads with the audit token, and the details read after
+// it are bracketed the same way: a pid a different process takes over between
+// the two describes that process, so every field read off it is dropped and the
+// banner falls back to naming the rule.
+- (void)testWarningDetailsAreDroppedWhenThePidIsRecycledAfterTheMatch {
+  [self addRuleOfType:SNTRuleTypeTeamID identifier:kMatchingTeamID cel:kCELExpr];
+  id proxy = [self setUpNotifierProxy];
+
+  // Matching reads the token twice; the details read it a third time.
+  _fake.recycleAfterNthRead[getppid()] = 2;
+
+  SNTTimedRuleKills* sut = [self makeSUT];
+  NSMutableArray<NSDictionary*>* banners = [NSMutableArray array];
+  [self recordBannersOn:proxy into:banners expectation:nil];
+
+  NSDate* deadline = [NSDate dateWithTimeIntervalSinceNow:3600];
+  NSDate* notifyAt = [deadline dateByAddingTimeInterval:-300];
+  [sut recordKillForRuleType:SNTRuleTypeTeamID
+                  identifier:kMatchingTeamID
+                     celHash:[SNTTimedRuleKills celHashForExpression:kCELExpr]
+                    deadline:deadline
+                    notifyAt:notifyAt
+                  windowDays:nil
+                 windowStart:nil
+                   windowEnd:nil
+                  windowZone:nil];
+
+  [self runPassOn:sut asOf:notifyAt];
+
+  XCTAssertEqual(banners.count, 1u);
+  SNTTimedRuleKillDetails* details = banners.firstObject[@"details"];
+  XCTAssertEqualObjects(details.application, kMatchingTeamID);
+  XCTAssertEqual(details.ruleType, SNTRuleTypeTeamID);
+  XCTAssertNil(details.path);
+  XCTAssertNil(details.user);
+  XCTAssertNil(details.ppid);
+  XCTAssertNil(details.parentName);
+  XCTAssertNil(details.signingID);
+  XCTAssertNil(details.cdhash);
   XCTAssertNil(details.publisher);
 }
 

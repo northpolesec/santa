@@ -61,18 +61,28 @@ func deadlineText(_ deadline: Date) -> String {
 
 // The rule identifier is not repeated here: the Signing ID row already shows it
 // for Signing ID and Team ID rules, and the CDHash row shows it for CDHash ones.
+// A type without a case here carries the deadline alone rather than an empty
+// parenthetical.
 func reasonText(_ details: SNTTimedRuleKillDetails) -> String {
+  let ends = deadlineText(details.deadline)
   let type: String
   switch details.ruleType {
   case .signingID: type = NSLocalizedString("Signing ID", comment: "")
   case .teamID: type = NSLocalizedString("Team ID", comment: "")
   case .cdHash: type = NSLocalizedString("CDHash", comment: "")
-  default: type = ""
+  default:
+    return String(
+      format: NSLocalizedString(
+        "Time based rule: window ends at %@",
+        comment: "quit reason for a rule type this build cannot name"
+      ),
+      ends
+    )
   }
   return String(
     format: NSLocalizedString("Time based rule (%@): window ends at %@", comment: "quit reason"),
     type,
-    deadlineText(details.deadline)
+    ends
   )
 }
 
@@ -112,8 +122,8 @@ func copyDetailsToClipboard(details: SNTTimedRuleKillDetails) {
   if let cdhash = details.cdhash, !cdhash.isEmpty {
     s += "\nCDHash     : \(cdhash)"
   }
-  if let ppid = details.ppid {
-    s += "\nParent     : \(details.parentName ?? "") (\(ppid.stringValue))"
+  if let parentName = details.parentName, !parentName.isEmpty, let ppid = details.ppid {
+    s += "\nParent     : \(parentName) (\(ppid.stringValue))"
   }
   s += "\n"
 
@@ -171,11 +181,11 @@ struct SNTTimedRuleKillMoreDetailsView: View {
           }
         }
 
-        if let ppid = details.ppid {
+        if let parentName = details.parentName, !parentName.isEmpty, let ppid = details.ppid {
           Divider()
           addLabel {
             Text("Parent").bold().font(Font.system(size: 12.0))
-            Text(verbatim: "\(details.parentName ?? "") (\(ppid.stringValue))")
+            Text(verbatim: "\(parentName) (\(ppid.stringValue))")
               .textSelection(.enabled)
           }
         }

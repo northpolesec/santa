@@ -7,7 +7,10 @@
 /* a time of day on a date */
 "%@ on %@" = "%1$@ le %2$@";
 
-/* Two ends of a time range */
+/* A gapless run of weekdays, e.g. Mon through Fri */
+"%@ through %@" = "du %1$@ au %2$@";
+
+/* Two ends of a time-of-day range, e.g. 9:00 AM to 5:00 PM */
 "%@ to %@" = "%1$@ à %2$@";
 
 /* Window message warning that an app will be quit at a time */
@@ -306,6 +309,9 @@
 
 /* quit reason */
 "Time based rule (%@): window ends at %@" = "Règle temporelle (%1$@) : la fenêtre se termine à %2$@";
+
+/* quit reason for a rule type this build cannot name */
+"Time based rule: window ends at %@" = "Règle temporelle : la fenêtre se termine à %@";
 
 /* No comment provided by engineer. */
 "Time Window" = "Fenêtre horaire";

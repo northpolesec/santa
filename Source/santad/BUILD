@@ -1196,6 +1196,8 @@ objc_library(
         ":SNTNotificationQueue",
         ":SNTRuleTable",
         "//Source/common:AccountLookup",
+        "//Source/common:AuditUtilities",
+        "//Source/common:CSOpsHelper",
         "//Source/common:CertificateHelpers",
         "//Source/common:MOLCodesignChecker",
         "//Source/common:MOLXPCConnection",

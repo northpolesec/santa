@@ -37,9 +37,22 @@ static BOOL ParseHHMM(NSString* hhmm, int* hour, int* minute) {
   return *hour <= 23 && *minute <= 59;
 }
 
-static NSString* JoinRange(NSString* start, NSString* end) {
+// Two ends of a time-of-day range. Its own key, apart from DayRange's: several
+// languages join two times and two days with different words.
+static NSString* TimeRange(NSString* start, NSString* end) {
+  return
+      [NSString stringWithFormat:NSLocalizedString(
+                                     @"%@ to %@",
+                                     @"Two ends of a time-of-day range, e.g. 9:00 AM to 5:00 PM"),
+                                 start, end];
+}
+
+// A gapless run of weekdays, by its first and last.
+static NSString* DayRange(NSString* first, NSString* last) {
   return [NSString
-      stringWithFormat:NSLocalizedString(@"%@ to %@", @"Two ends of a time range"), start, end];
+      stringWithFormat:NSLocalizedString(@"%@ through %@",
+                                         @"A gapless run of weekdays, e.g. Mon through Fri"),
+                       first, last];
 }
 
 // Renders "HH:MM" as a locale short time without converting the instant: the
@@ -77,7 +90,7 @@ static NSIndexSet* NormalizedDays(NSArray<NSNumber*>* days) {
 // wraps past Saturday included, reads as a list.
 static NSString* DaysReading(NSIndexSet* days, NSArray<NSString*>* symbols) {
   if (days.count > 1 && days.lastIndex - days.firstIndex + 1 == days.count) {
-    return JoinRange(symbols[days.firstIndex], symbols[days.lastIndex]);
+    return DayRange(symbols[days.firstIndex], symbols[days.lastIndex]);
   }
   NSMutableArray<NSString*>* names = [NSMutableArray array];
   [days enumerateIndexesUsingBlock:^(NSUInteger day, BOOL* stop) {
@@ -97,9 +110,6 @@ static NSString* DaysReading(NSIndexSet* days, NSArray<NSString*>* symbols) {
   ENCODE(coder, startOfDay);
   ENCODE(coder, endOfDay);
   ENCODE(coder, zoneName);
-  ENCODE(coder, startDate);
-  ENCODE(coder, endDate);
-  ENCODE_BOXABLE(coder, open);
 }
 
 - (instancetype)initWithCoder:(NSCoder*)decoder {
@@ -109,9 +119,6 @@ static NSString* DaysReading(NSIndexSet* days, NSArray<NSString*>* symbols) {
     DECODE(decoder, startOfDay, NSString);
     DECODE(decoder, endOfDay, NSString);
     DECODE(decoder, zoneName, NSString);
-    DECODE(decoder, startDate, NSDate);
-    DECODE(decoder, endDate, NSDate);
-    DECODE_SELECTOR(decoder, open, NSNumber, boolValue);
   }
   return self;
 }
@@ -121,15 +128,6 @@ static NSString* DaysReading(NSIndexSet* days, NSArray<NSString*>* symbols) {
 }
 
 - (NSString*)displayStringWithLocale:(NSLocale*)locale {
-  if (self.startDate && self.endDate) {
-    NSDateFormatter* formatter = [[NSDateFormatter alloc] init];
-    formatter.locale = locale;
-    formatter.dateStyle = NSDateFormatterMediumStyle;
-    formatter.timeStyle = NSDateFormatterShortStyle;
-    return JoinRange([formatter stringFromDate:self.startDate],
-                     [formatter stringFromDate:self.endDate]);
-  }
-
   if (!self.startOfDay || !self.endOfDay) {
     return @"";
   }
@@ -146,7 +144,7 @@ static NSString* DaysReading(NSIndexSet* days, NSArray<NSString*>* symbols) {
   formatter.timeZone = calendar.timeZone;
 
   NSMutableString* display =
-      [JoinRange(TimeReading(self.startOfDay, formatter, calendar),
+      [TimeRange(TimeReading(self.startOfDay, formatter, calendar),
                  TimeReading(self.endOfDay, formatter, calendar)) mutableCopy];
 
   NSIndexSet* days = NormalizedDays(self.days);

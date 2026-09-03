@@ -505,11 +505,11 @@ NSArray<SNTKillResponse*>* KillingMachineTermThenKill(NSArray<SNTKillRequest*>* 
   return termed;
 }
 
-std::optional<pid_t> KillingMachineAnyMatch(SNTKillRequest* request) {
+std::optional<audit_token_t> KillingMachineAnyMatch(SNTKillRequest* request) {
   return KillingMachineAnyMatch(request, KillEnv());
 }
 
-std::optional<pid_t> KillingMachineAnyMatch(SNTKillRequest* request, const KillEnv& env) {
+std::optional<audit_token_t> KillingMachineAnyMatch(SNTKillRequest* request, const KillEnv& env) {
   // Before listing processes, unlike the kill pass: nothing here distinguishes
   // one failure from another, so a request that can never match shouldn't pay
   // for the snapshot.
@@ -535,7 +535,7 @@ std::optional<pid_t> KillingMachineAnyMatch(SNTKillRequest* request, const KillE
     }
 
     if (std::optional<audit_token_t> token = MatchProcess(pid, *matchers, env)) {
-      return Pid(*token);
+      return token;
     }
   }
 
