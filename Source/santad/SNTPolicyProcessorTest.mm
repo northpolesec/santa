@@ -1691,9 +1691,8 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 // way the decision is not cacheable, because the window edge has to enforce
 // itself on the next exec.
 - (void)testCELRulePolicyForRange {
-  SNTRule* inRange =
-      [self celV2RuleWithExpr:@"policy_for_range(now() - duration('1h'), "
-                              @"now() + duration('1h'), false, ALLOWLIST, BLOCKLIST)"];
+  SNTRule* inRange = [self celV2RuleWithExpr:@"policy_for_range(now() - duration('1h'), "
+                                             @"now() + duration('1h'), ALLOWLIST, BLOCKLIST)"];
   SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
   cd.sha256 = inRange.identifier;
   [self.processor decision:cd
@@ -1703,9 +1702,8 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   XCTAssertEqual(cd.decision, SNTEventStateAllowBinary);
   XCTAssertFalse(cd.cacheable);
 
-  SNTRule* outOfRange =
-      [self celV2RuleWithExpr:@"policy_for_range(now() + duration('1h'), "
-                              @"now() + duration('2h'), false, ALLOWLIST, BLOCKLIST)"];
+  SNTRule* outOfRange = [self celV2RuleWithExpr:@"policy_for_range(now() + duration('1h'), "
+                                                @"now() + duration('2h'), ALLOWLIST, BLOCKLIST)"];
   SNTCachedDecision* outCD = [[SNTCachedDecision alloc] init];
   outCD.sha256 = outOfRange.identifier;
   [self.processor decision:outCD
@@ -1716,13 +1714,13 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   XCTAssertFalse(outCD.cacheable);
 }
 
-// An in-window should_kill rides out on the decision, named by the rule it came
-// from: the rule type, the identifier exactly as the rule table stores it, and
+// An in-window kill_on_expiry() rides out on the decision, named by the rule it
+// came from: the rule type, the identifier exactly as the rule table stores it, and
 // the hash of the rule's own text. Recording it is SNTExecutionController's job,
 // once the execution is known to proceed.
 - (void)testCELRulePolicyForRangeRecordsTheKillOnTheDecision {
-  NSString* expr =
-      @"policy_for_range([0, 1, 2, 3, 4, 5, 6], '00:00', '00:00', true, ALLOWLIST, BLOCKLIST)";
+  NSString* expr = @"policy_for_range([0, 1, 2, 3, 4, 5, 6], '00:00', '00:00', "
+                   @"kill_on_expiry(ALLOWLIST), BLOCKLIST)";
   // A lowercase team ID, which SNTRule uppercases: the identifier that travels
   // with the kill has to be the rule's, since that is what the fire-time
   // re-check looks up, case-sensitively.
@@ -1761,7 +1759,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 // pendingKill.has_value() guard.
 - (void)testCELRulePolicyForRangeRecordsNothingWithoutAnOpenKillingWindow {
   SNTRule* noKill =
-      [self celV2RuleWithExpr:@"policy_for_range([0, 1, 2, 3, 4, 5, 6], '00:00', '00:00', false, "
+      [self celV2RuleWithExpr:@"policy_for_range([0, 1, 2, 3, 4, 5, 6], '00:00', '00:00', "
                               @"ALLOWLIST, BLOCKLIST)"];
   SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
   cd.sha256 = noKill.identifier;
@@ -1781,7 +1779,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 // be left on the decision for that allow to record.
 - (void)testCELRuleThatDoesNotDecideLeavesNoTimedKill {
   SNTRule* rule =
-      [self celV2RuleWithExpr:@"policy_for_range([0, 1, 2, 3, 4, 5, 6], '00:00', '00:00', true, "
+      [self celV2RuleWithExpr:@"policy_for_range([0, 1, 2, 3, 4, 5, 6], '00:00', '00:00', "
                               @"ALLOWLIST_COMPILER, BLOCKLIST)"
                          type:SNTRuleTypeTeamID
                    identifier:@"ABCDE12345"];
@@ -1801,8 +1799,8 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 // another rule onto the same decision drops what the first one left.
 - (void)testCELRuleTimedKillIsClearedByTheNextEvaluation {
   SNTRule* killing =
-      [self celV2RuleWithExpr:@"policy_for_range([0, 1, 2, 3, 4, 5, 6], '00:00', '00:00', true, "
-                              @"ALLOWLIST, BLOCKLIST)"];
+      [self celV2RuleWithExpr:@"policy_for_range([0, 1, 2, 3, 4, 5, 6], '00:00', '00:00', "
+                              @"kill_on_expiry(ALLOWLIST), BLOCKLIST)"];
   SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
   cd.sha256 = killing.identifier;
   [self.processor decision:cd
@@ -2311,7 +2309,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 // a chance and the empty batch published at init still stands.
 - (void)testCELFallbackCannotUsePolicyForRange {
   [[SNTConfigurator configurator] setSyncServerCELFallbackRules:@[
-    [self ruleWithExpr:@"policy_for_range(duration('30m'), false, ALLOWLIST)"],
+    [self ruleWithExpr:@"policy_for_range(duration('30m'), kill_on_expiry(ALLOWLIST))"],
     [self ruleWithExpr:@"ALLOWLIST"],
   ]];
   SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];

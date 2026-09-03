@@ -32,6 +32,7 @@
 #include <vector>
 
 #include "absl/status/statusor.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/time/civil_time.h"
 #include "absl/time/clock.h"
@@ -711,7 +712,7 @@ class ScopedHostZone {
   // system clock, so the answer says which clock was read.
   std::vector<std::string> onTheActivationsClock = {
       "now() == timestamp('2026-01-07T12:00:00Z')",
-      "policy_for_range(now() - duration('1h'), timestamp('2026-01-07T13:00:00Z'), false, "
+      "policy_for_range(now() - duration('1h'), timestamp('2026-01-07T13:00:00Z'), "
       "ALLOWLIST, BLOCKLIST)",
   };
 
@@ -1184,9 +1185,9 @@ class ScopedHostZone {
   {
     // In range (the timestamp overload straddles now) returns the policy
     // argument, and any use of policy_for_range() is non-cacheable.
-    auto result = evaluate(
-        "policy_for_range(now() - duration('1h'), now() + duration('1h'), false, ALLOWLIST, "
-        "BLOCKLIST)");
+    auto result =
+        evaluate("policy_for_range(now() - duration('1h'), now() + duration('1h'), ALLOWLIST, "
+                 "BLOCKLIST)");
     if (!result.ok()) {
       XCTFail(@"Failed to evaluate: %s", result.status().message().data());
     } else {
@@ -1197,9 +1198,9 @@ class ScopedHostZone {
   {
     // Out of range returns the out_of_range_policy argument, not a hardcoded
     // BLOCKLIST: SILENT_BLOCKLIST here proves the argument is what comes back.
-    auto result = evaluate(
-        "policy_for_range(now() + duration('1h'), now() + duration('2h'), false, ALLOWLIST, "
-        "SILENT_BLOCKLIST)");
+    auto result =
+        evaluate("policy_for_range(now() + duration('1h'), now() + duration('2h'), ALLOWLIST, "
+                 "SILENT_BLOCKLIST)");
     if (!result.ok()) {
       XCTFail(@"Failed to evaluate: %s", result.status().message().data());
     } else {
@@ -1220,7 +1221,7 @@ class ScopedHostZone {
 
     auto result = evaluate("policy_for_range(timestamp('" + literal(now - absl::Minutes(30)) +
                            "'), timestamp('" + literal(now + absl::Minutes(30)) +
-                           "'), false, ALLOWLIST, BLOCKLIST)");
+                           "'), ALLOWLIST, BLOCKLIST)");
     if (!result.ok()) {
       XCTFail(@"Failed to evaluate: %s", result.status().message().data());
     } else {
@@ -1229,7 +1230,7 @@ class ScopedHostZone {
   }
   {
     // An empty day list is never in range.
-    auto result = evaluate("policy_for_range([], '00:00', '00:00', false, ALLOWLIST, BLOCKLIST)");
+    auto result = evaluate("policy_for_range([], '00:00', '00:00', ALLOWLIST, BLOCKLIST)");
     if (!result.ok()) {
       XCTFail(@"Failed to evaluate: %s", result.status().message().data());
     } else {
@@ -1239,10 +1240,10 @@ class ScopedHostZone {
   {
     // Day list membership, HH:MM overload. Equal ends make the window the whole
     // day starting at 00:00, so the day it starts on is always today.
-    auto inList = evaluate("policy_for_range([" + today +
-                           "], '00:00', '00:00', false, ALLOWLIST, BLOCKLIST)");
-    auto notInList = evaluate("policy_for_range([" + notToday +
-                              "], '00:00', '00:00', false, ALLOWLIST, BLOCKLIST)");
+    auto inList =
+        evaluate("policy_for_range([" + today + "], '00:00', '00:00', ALLOWLIST, BLOCKLIST)");
+    auto notInList =
+        evaluate("policy_for_range([" + notToday + "], '00:00', '00:00', ALLOWLIST, BLOCKLIST)");
     if (!inList.ok() || !notInList.ok()) {
       XCTFail(@"Failed to evaluate day list membership");
     } else {
@@ -1253,10 +1254,10 @@ class ScopedHostZone {
   {
     // HH:MM windows: whatever the local time is, exactly one of the morning
     // window and the midnight-crossing afternoon window contains it.
-    auto morning = evaluate(
-        "policy_for_range([0, 1, 2, 3, 4, 5, 6], '00:00', '12:00', false, ALLOWLIST, BLOCKLIST)");
-    auto crosser = evaluate(
-        "policy_for_range([0, 1, 2, 3, 4, 5, 6], '12:00', '00:00', false, ALLOWLIST, BLOCKLIST)");
+    auto morning =
+        evaluate("policy_for_range([0, 1, 2, 3, 4, 5, 6], '00:00', '12:00', ALLOWLIST, BLOCKLIST)");
+    auto crosser =
+        evaluate("policy_for_range([0, 1, 2, 3, 4, 5, 6], '12:00', '00:00', ALLOWLIST, BLOCKLIST)");
     if (!morning.ok() || !crosser.ok()) {
       XCTFail(@"Failed to evaluate HH:MM windows");
     } else {
@@ -1267,8 +1268,8 @@ class ScopedHostZone {
   }
   {
     // Double-quoted times, exactly as the rule editor writes them.
-    auto result = evaluate(
-        "policy_for_range([1, 2, 3, 4, 5], \"09:00\", \"17:00\", false, ALLOWLIST, BLOCKLIST)");
+    auto result =
+        evaluate("policy_for_range([1, 2, 3, 4, 5], \"09:00\", \"17:00\", ALLOWLIST, BLOCKLIST)");
     if (!result.ok()) {
       XCTFail(@"Failed to evaluate: %s", result.status().message().data());
     } else {
@@ -1280,8 +1281,8 @@ class ScopedHostZone {
   {
     // Block during the window, allow outside it: the policies are just
     // arguments, so the gate works in either direction.
-    auto result = evaluate(
-        "policy_for_range([0, 1, 2, 3, 4, 5, 6], '00:00', '00:00', false, BLOCKLIST, ALLOWLIST)");
+    auto result =
+        evaluate("policy_for_range([0, 1, 2, 3, 4, 5, 6], '00:00', '00:00', BLOCKLIST, ALLOWLIST)");
     if (!result.ok()) {
       XCTFail(@"Failed to evaluate: %s", result.status().message().data());
     } else {
@@ -1291,9 +1292,8 @@ class ScopedHostZone {
   {
     // The policy argument passes through untouched, so a TouchID policy keeps
     // its cooldown in range.
-    auto result =
-        evaluate("policy_for_range(now() - duration('1h'), now() + duration('1h'), false, "
-                 "require_touchid_with_cooldown_minutes(30), BLOCKLIST)");
+    auto result = evaluate("policy_for_range(now() - duration('1h'), now() + duration('1h'), "
+                           "require_touchid_with_cooldown_minutes(30), BLOCKLIST)");
     if (!result.ok()) {
       XCTFail(@"Failed to evaluate: %s", result.status().message().data());
     } else {
@@ -1304,9 +1304,9 @@ class ScopedHostZone {
   }
   {
     // And the same holds in the out_of_range_policy position.
-    auto result = evaluate(
-        "policy_for_range(now() + duration('1h'), now() + duration('2h'), false, ALLOWLIST, "
-        "require_touchid_with_cooldown_minutes(15))");
+    auto result =
+        evaluate("policy_for_range(now() + duration('1h'), now() + duration('2h'), ALLOWLIST, "
+                 "require_touchid_with_cooldown_minutes(15))");
     if (!result.ok()) {
       XCTFail(@"Failed to evaluate: %s", result.status().message().data());
     } else {
@@ -1316,20 +1316,11 @@ class ScopedHostZone {
     }
   }
   {
-    // The duration overload is always in range, so it always returns its policy.
-    // It takes no out_of_range_policy for that reason.
-    auto result = evaluate("policy_for_range(duration('30m'), false, ALLOWLIST)");
-    if (!result.ok()) {
-      XCTFail(@"Failed to evaluate: %s", result.status().message().data());
-    } else {
-      XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
-      XCTAssertFalse(result.value().cacheable);
-    }
-  }
-  {
-    // should_kill records a pending kill (see testPolicyForRangePendingKill)
-    // but has no effect on the decision.
-    auto result = evaluate("policy_for_range(duration('30m'), true, ALLOWLIST)");
+    // The duration overload is always in range, so it always returns its policy;
+    // it takes no out_of_range_policy for that reason. The wrapper records a
+    // pending kill (see testPolicyForRangePendingKill) but the decision is the
+    // policy it wraps.
+    auto result = evaluate("policy_for_range(duration('30m'), kill_on_expiry(ALLOWLIST))");
     if (!result.ok()) {
       XCTFail(@"Failed to evaluate: %s", result.status().message().data());
     } else {
@@ -1339,16 +1330,15 @@ class ScopedHostZone {
   }
   {
     // weekdays() composes as the day list.
-    auto result =
-        evaluate("policy_for_range(weekdays(), '00:00', '00:00', false, ALLOWLIST, BLOCKLIST)");
+    auto result = evaluate("policy_for_range(weekdays(), '00:00', '00:00', ALLOWLIST, BLOCKLIST)");
     if (!result.ok()) {
       XCTFail(@"Failed to evaluate: %s", result.status().message().data());
     }
   }
   {
     // Ternary composition with another condition.
-    auto result =
-        evaluate("'-y' in args ? policy_for_range(duration('30m'), true, ALLOWLIST) : BLOCKLIST");
+    auto result = evaluate(
+        "'-y' in args ? policy_for_range(duration('30m'), kill_on_expiry(ALLOWLIST)) : BLOCKLIST");
     if (!result.ok()) {
       XCTFail(@"Failed to evaluate: %s", result.status().message().data());
     } else {
@@ -1362,8 +1352,8 @@ class ScopedHostZone {
     // ALLOWLIST held by the policy_for_range() call. Cacheability says nothing
     // here either way, since the 'in args' guard alone makes the result
     // non-cacheable.
-    auto result =
-        evaluate("'-z' in args ? policy_for_range(duration('30m'), true, ALLOWLIST) : BLOCKLIST");
+    auto result = evaluate(
+        "'-z' in args ? policy_for_range(duration('30m'), kill_on_expiry(ALLOWLIST)) : BLOCKLIST");
     if (!result.ok()) {
       XCTFail(@"Failed to evaluate: %s", result.status().message().data());
     } else {
@@ -1373,24 +1363,25 @@ class ScopedHostZone {
   {
     // policy_for_range() returns a decision, not a bool, so && composition is
     // rejected at compile time; the ternary is the supported form.
-    auto result = evaluate("policy_for_range(duration('30m'), false, ALLOWLIST) && '-y' in args");
+    auto result =
+        evaluate("policy_for_range(duration('30m'), kill_on_expiry(ALLOWLIST)) && '-y' in args");
     XCTAssertFalse(result.ok());
   }
   {
     // Malformed HH:MM fails the evaluation.
-    auto result = evaluate("policy_for_range([1], '9:00', '17:00', false, ALLOWLIST, BLOCKLIST)");
+    auto result = evaluate("policy_for_range([1], '9:00', '17:00', ALLOWLIST, BLOCKLIST)");
     XCTAssertFalse(result.ok());
   }
   {
     // A day outside 0-6 fails the evaluation.
-    auto result = evaluate("policy_for_range([7], '09:00', '17:00', false, ALLOWLIST, BLOCKLIST)");
+    auto result = evaluate("policy_for_range([7], '09:00', '17:00', ALLOWLIST, BLOCKLIST)");
     XCTAssertFalse(result.ok());
   }
   {
     // So does a zone that is neither "local", nor a name absl can load, nor a
     // [+-]HH:MM offset.
-    auto result = evaluate(
-        "policy_for_range([1], '09:00', '17:00', 'Mars/Olympus', false, ALLOWLIST, BLOCKLIST)");
+    auto result =
+        evaluate("policy_for_range([1], '09:00', '17:00', 'Mars/Olympus', ALLOWLIST, BLOCKLIST)");
     XCTAssertFalse(result.ok());
   }
   {
@@ -1398,22 +1389,113 @@ class ScopedHostZone {
     // and no zone form either: both fail to compile rather than silently
     // ignoring the extra arguments.
     XCTAssertFalse(
-        evaluate("policy_for_range([1], now(), now() + duration('1h'), false, ALLOWLIST, "
-                 "BLOCKLIST)")
+        evaluate("policy_for_range([1], now(), now() + duration('1h'), ALLOWLIST, BLOCKLIST)")
             .ok());
-    XCTAssertFalse(evaluate("policy_for_range([1], now(), now() + duration('1h'), 'local', false, "
+    XCTAssertFalse(evaluate("policy_for_range([1], now(), now() + duration('1h'), 'local', "
                             "ALLOWLIST, BLOCKLIST)")
                        .ok());
     // Including the likeliest version of the mistake, a zone appended to the
     // span with no day list in front of it.
-    XCTAssertFalse(evaluate("policy_for_range(now(), now() + duration('1h'), 'local', false, "
+    XCTAssertFalse(evaluate("policy_for_range(now(), now() + duration('1h'), 'local', "
                             "ALLOWLIST, BLOCKLIST)")
                        .ok());
   }
   {
     // A non-positive duration fails the evaluation.
-    auto result = evaluate("policy_for_range(duration('0s'), false, ALLOWLIST)");
+    auto result = evaluate("policy_for_range(duration('0s'), kill_on_expiry(ALLOWLIST))");
     XCTAssertFalse(result.ok());
+  }
+}
+
+// Every grantable policy and every window shape compiles and evaluates with a
+// Grant in the in-range slot.
+- (void)testKillOnExpiryAccepted {
+  auto sut = santa::cel::Evaluator<true>::Create();
+  XCTAssertTrue(sut.ok());
+  auto evaluate = [&sut](absl::string_view expr) {
+    auto activation = MakeActivation<true>();
+    return sut.value()->CompileAndEvaluate(expr, *activation);
+  };
+
+  for (const char* policy : {"ALLOWLIST", "AUDIT", "SEATBELT", "REQUIRE_TOUCHID",
+                             "REQUIRE_TOUCHID_ONLY", "require_touchid_with_cooldown_minutes(30)",
+                             "require_touchid_only_with_cooldown_minutes(5)"}) {
+    std::string expr =
+        absl::StrCat("policy_for_range(duration('30m'), kill_on_expiry(", policy, "))");
+    XCTAssertTrue(evaluate(expr).ok(), @"%s", expr.c_str());
+  }
+
+  for (const char* expr : {
+           "policy_for_range(weekdays(), '09:00', '12:00', ALLOWLIST, BLOCKLIST)",
+           "policy_for_range(weekdays(), '09:00', '12:00', kill_on_expiry(ALLOWLIST), BLOCKLIST)",
+           "policy_for_range(weekdays(), '09:00', '17:00', 'America/New_York', AUDIT, BLOCKLIST)",
+           "policy_for_range([1, 2, 3, 4, 5], '22:00', '06:00', '+05:30', "
+           "kill_on_expiry(require_touchid_with_cooldown_minutes(30)), BLOCKLIST)",
+           "policy_for_range(timestamp('2026-09-02T09:00:00Z'), timestamp('2026-09-02T12:00:00Z'), "
+           "SEATBELT, BLOCKLIST)",
+           "policy_for_range(timestamp('2026-09-02T09:00:00Z'), timestamp('2026-09-02T12:00:00Z'), "
+           "kill_on_expiry(SEATBELT), BLOCKLIST)",
+           "'-y' in args ? policy_for_range(duration('30m'), kill_on_expiry(ALLOWLIST)) : "
+           "BLOCKLIST",
+       }) {
+    XCTAssertTrue(evaluate(expr).ok(), @"%s", expr);
+  }
+
+  // The complete Result survives wrapping and unwrapping.
+  auto cooldown = evaluate("policy_for_range(duration('30m'), "
+                           "kill_on_expiry(require_touchid_with_cooldown_minutes(30)))");
+  XCTAssertTrue(cooldown.ok());
+  XCTAssertEqual(cooldown.value().value,
+                 santa::cel::CELProtoTraits<true>::ReturnValue::REQUIRE_TOUCHID);
+  XCTAssertTrue(cooldown.value().touchIDCooldownMinutes.has_value());
+  XCTAssertEqual(*cooldown.value().touchIDCooldownMinutes, 30ULL);
+  XCTAssertTrue(cooldown.value().pendingKill.has_value());
+}
+
+// Everything the checker or the validation pass refuses. Each line is one rule:
+// the old Boolean form, a Grant outside the in-range slot, a non-grantable or
+// indirect wrapped policy, a range off the result path, direct Grant construction.
+- (void)testKillOnExpiryRejected {
+  auto sut = santa::cel::Evaluator<true>::Create();
+  XCTAssertTrue(sut.ok());
+  auto evaluate = [&sut](absl::string_view expr) {
+    auto activation = MakeActivation<true>();
+    return sut.value()->CompileAndEvaluate(expr, *activation);
+  };
+
+  for (const char* policy : {"ALLOWLIST_COMPILER", "BLOCKLIST", "SILENT_BLOCKLIST",
+                             "SILENT_GUI_BLOCKLIST", "SILENT_TTY_BLOCKLIST", "UNSPECIFIED"}) {
+    std::string expr =
+        absl::StrCat("policy_for_range(duration('30m'), kill_on_expiry(", policy, "))");
+    XCTAssertFalse(evaluate(expr).ok(), @"%s", expr.c_str());
+  }
+
+  for (const char* expr : {
+           "policy_for_range(weekdays(), '09:00', '12:00', false, ALLOWLIST, BLOCKLIST)",
+           "policy_for_range(duration('30m'), ALLOWLIST)",
+           "policy_for_range(weekdays(), '09:00', '17:00', 'UTC', ALLOWLIST, "
+           "kill_on_expiry(ALLOWLIST))",
+           "kill_on_expiry(ALLOWLIST)",
+           "dyn(policy_for_range(duration('30m'), kill_on_expiry(ALLOWLIST)))",
+           "policy_for_range(duration('30m'), kill_on_expiry(ALLOWLIST)) == ALLOWLIST",
+           "size([policy_for_range(duration('30m'), kill_on_expiry(ALLOWLIST))]) > 0 ? ALLOWLIST : "
+           "BLOCKLIST",
+           "policy_for_range(duration('30m'), kill_on_expiry(ALLOWLIST)) == ALLOWLIST ? ALLOWLIST "
+           ": "
+           "BLOCKLIST",
+           "policy_for_range(timestamp('2026-09-02T09:00:00Z'), timestamp('2026-09-02T12:00:00Z'), "
+           "dyn(kill_on_expiry(SEATBELT)), BLOCKLIST)",
+           "policy_for_range(duration('30m'), kill_on_expiry('--audit' in args ? AUDIT : "
+           "ALLOWLIST))",
+           "policy_for_range(duration('30m'), kill_on_expiry(dyn(ALLOWLIST)))",
+           "policy_for_range(duration('1h'), kill_on_expiry(policy_for_range(duration('30m'), "
+           "kill_on_expiry(ALLOWLIST))))",
+           "policy_for_range([0, 1, 2, 3, 4, 5, 6], '00:00', '00:00', "
+           "policy_for_range(duration('30m'), kill_on_expiry(ALLOWLIST)), BLOCKLIST)",
+           "santa.cel.Grant{policy: ALLOWLIST}",
+           "policy_for_range(duration('30m'), santa.cel.Grant{policy: ALLOWLIST})",
+       }) {
+    XCTAssertFalse(evaluate(expr).ok(), @"%s", expr);
   }
 }
 
@@ -1427,8 +1509,8 @@ class ScopedHostZone {
                 absl::FormatDuration(off).c_str());
 }
 
-// The kill an in-window should_kill asks for: when it fires, when the user is
-// warned, and the window shape that rides along for a restart re-check.
+// The kill an in-window kill_on_expiry() asks for: when it fires, when the user
+// is warned, and the window shape that rides along for a restart re-check.
 - (void)testPolicyForRangePendingKill {
   using ReturnValue = santa::cel::CELProtoTraits<true>::ReturnValue;
 
@@ -1446,7 +1528,7 @@ class ScopedHostZone {
   {
     // A 30 minute grant: the lead is 10% of the window, three minutes.
     absl::Time now = absl::Now();
-    auto result = evaluate("policy_for_range(duration('30m'), true, ALLOWLIST)");
+    auto result = evaluate("policy_for_range(duration('30m'), kill_on_expiry(ALLOWLIST))");
     if (!result.ok()) {
       XCTFail(@"Failed to evaluate: %s", result.status().message().data());
     } else {
@@ -1469,9 +1551,8 @@ class ScopedHostZone {
     // A nine hour window: 10% of it is longer than five minutes, so the lead is
     // capped at five.
     absl::Time now = absl::Now();
-    auto result = evaluate(
-        "policy_for_range(now() - duration('1h'), now() + duration('8h'), true, ALLOWLIST, "
-        "BLOCKLIST)");
+    auto result = evaluate("policy_for_range(now() - duration('1h'), now() + duration('8h'), "
+                           "kill_on_expiry(ALLOWLIST), BLOCKLIST)");
     if (!result.ok()) {
       XCTFail(@"Failed to evaluate: %s", result.status().message().data());
     } else {
@@ -1493,9 +1574,8 @@ class ScopedHostZone {
     // An exec allowed in the window's last moments is warned about at once
     // rather than at a notify time that has already passed.
     absl::Time now = absl::Now();
-    auto result = evaluate(
-        "policy_for_range(now() - duration('1h'), now() + duration('1s'), true, ALLOWLIST, "
-        "BLOCKLIST)");
+    auto result = evaluate("policy_for_range(now() - duration('1h'), now() + duration('1s'), "
+                           "kill_on_expiry(ALLOWLIST), BLOCKLIST)");
     if (!result.ok()) {
       XCTFail(@"Failed to evaluate: %s", result.status().message().data());
     } else {
@@ -1505,8 +1585,9 @@ class ScopedHostZone {
     }
   }
   {
-    // should_kill false asks for nothing, in window or not.
-    auto result = evaluate("policy_for_range(duration('30m'), false, ALLOWLIST)");
+    // An unwrapped in-range policy asks for nothing, in window or not.
+    auto result =
+        evaluate("policy_for_range([0, 1, 2, 3, 4, 5, 6], '00:00', '00:00', ALLOWLIST, BLOCKLIST)");
     if (!result.ok()) {
       XCTFail(@"Failed to evaluate: %s", result.status().message().data());
     } else {
@@ -1515,10 +1596,10 @@ class ScopedHostZone {
   }
   {
     // Out of window nothing is asked for, even when the out_of_range_policy is
-    // the one that allows the execution.
-    auto result = evaluate(
-        "policy_for_range(now() + duration('1h'), now() + duration('2h'), true, BLOCKLIST, "
-        "ALLOWLIST)");
+    // the one that allows the execution: what records a kill is the window being
+    // open, not the decision that came back being allow-like.
+    auto result = evaluate("policy_for_range(now() + duration('1h'), now() + duration('2h'), "
+                           "kill_on_expiry(AUDIT), ALLOWLIST)");
     if (!result.ok()) {
       XCTFail(@"Failed to evaluate: %s", result.status().message().data());
     } else {
@@ -1534,9 +1615,9 @@ class ScopedHostZone {
     // assertion below fails on a shape that defaulted its calendar instead of
     // carrying the rule's.
     auto morning = evaluate("policy_for_range([0, 1, 2, 3, 4, 5, 6], '00:00', '12:00', "
-                            "'America/New_York', true, ALLOWLIST, BLOCKLIST)");
+                            "'America/New_York', kill_on_expiry(ALLOWLIST), BLOCKLIST)");
     auto afternoon = evaluate("policy_for_range([0, 1, 2, 3, 4, 5, 6], '12:00', '00:00', "
-                              "'America/New_York', true, ALLOWLIST, BLOCKLIST)");
+                              "'America/New_York', kill_on_expiry(ALLOWLIST), BLOCKLIST)");
     if (!morning.ok() || !afternoon.ok()) {
       XCTFail(@"Failed to evaluate HH:MM windows");
     } else {
@@ -1550,35 +1631,12 @@ class ScopedHostZone {
       XCTAssertEqualObjects(@(kill.window_zone.c_str()), @"America/New_York");
     }
   }
-  // Nested policy_for_range() calls. Workshop rejects this form at authoring
-  // time, so it never arrives, but CEL evaluates every argument eagerly: the
-  // inner call records its deadline even from a slot the outer call discards.
   {
-    // Both calls run whichever holds the earlier deadline, and the earlier
-    // deadline is what comes back.
-    absl::Time now = absl::Now();
-    auto innerEarlier = evaluate("policy_for_range(duration('1h'), true, "
-                                 "policy_for_range(duration('30m'), true, ALLOWLIST))");
-    auto outerEarlier = evaluate("policy_for_range(duration('30m'), true, "
-                                 "policy_for_range(duration('1h'), true, ALLOWLIST))");
-    if (!innerEarlier.ok() || !outerEarlier.ok()) {
-      XCTFail(@"Failed to evaluate nested policy_for_range()");
-    } else {
-      XCTAssertTrue(innerEarlier.value().pendingKill.has_value());
-      XCTAssertTrue(outerEarlier.value().pendingKill.has_value());
-      [self assertTime:innerEarlier.value().pendingKill->deadline
-                  near:now + absl::Minutes(30)
-                  what:@"inner-first deadline"];
-      [self assertTime:outerEarlier.value().pendingKill->deadline
-                  near:now + absl::Minutes(30)
-                  what:@"outer-first deadline"];
-    }
-  }
-  {
-    // The whole-day window closes within 25 hours, so its shape is the one that
-    // comes back; with no zone argument that shape records "local", not empty.
-    auto result = evaluate("policy_for_range([0, 1, 2, 3, 4, 5, 6], '00:00', '00:00', true, "
-                           "policy_for_range(duration('48h'), true, ALLOWLIST), BLOCKLIST)");
+    // With no zone argument the shape records "local" rather than nothing: the
+    // kill-time re-check has to read the calendar the evaluation read. The
+    // whole-day window is open on every day, so it always records.
+    auto result = evaluate("policy_for_range([0, 1, 2, 3, 4, 5, 6], '00:00', '00:00', "
+                           "kill_on_expiry(ALLOWLIST), BLOCKLIST)");
     if (!result.ok()) {
       XCTFail(@"Failed to evaluate: %s", result.status().message().data());
     } else {
@@ -1586,21 +1644,6 @@ class ScopedHostZone {
       XCTAssertEqual(result.value().pendingKill->window_days.size(), 7UL);
       XCTAssertEqualObjects(@(result.value().pendingKill->window_start.c_str()), @"00:00");
       XCTAssertEqualObjects(@(result.value().pendingKill->window_zone.c_str()), @"local");
-    }
-  }
-  {
-    // An empty day list is never in range, so the outer window is closed and the
-    // only kill is the inner grant's, recorded from a slot that was discarded.
-    auto result = evaluate("policy_for_range([], '00:00', '00:00', true, "
-                           "policy_for_range(duration('30m'), true, ALLOWLIST), BLOCKLIST)");
-    if (!result.ok()) {
-      XCTFail(@"Failed to evaluate: %s", result.status().message().data());
-    } else {
-      XCTAssertEqual(result.value().value, ReturnValue::BLOCKLIST);
-      XCTAssertTrue(result.value().pendingKill.has_value());
-      XCTAssertTrue(result.value().pendingKill->window_days.empty());
-      XCTAssertTrue(result.value().pendingKill->window_start.empty());
-      XCTAssertTrue(result.value().pendingKill->window_zone.empty());
     }
   }
 }
@@ -1620,7 +1663,7 @@ class ScopedHostZone {
     return sut.value()->CompileAndEvaluate(expr, *activation);
   };
 
-  auto withKill = evaluate("policy_for_range(duration('30m'), true, ALLOWLIST)");
+  auto withKill = evaluate("policy_for_range(duration('30m'), kill_on_expiry(ALLOWLIST))");
   auto withoutKill = evaluate("ALLOWLIST");
   if (!withKill.ok() || !withoutKill.ok()) {
     XCTFail(@"Failed to evaluate against a reused activation");
@@ -1661,9 +1704,9 @@ class ScopedHostZone {
     std::string midnight = FixedOffsetZone(OffsetWhereNowReads(now, 0, 0));
 
     auto inZone = evaluate("policy_for_range([0, 1, 2, 3, 4, 5, 6], '11:00', '13:00', '" + noon +
-                           "', false, ALLOWLIST, BLOCKLIST)");
+                           "', ALLOWLIST, BLOCKLIST)");
     auto outOfZone = evaluate("policy_for_range([0, 1, 2, 3, 4, 5, 6], '11:00', '13:00', '" +
-                              midnight + "', false, ALLOWLIST, BLOCKLIST)");
+                              midnight + "', ALLOWLIST, BLOCKLIST)");
     if (!inZone.ok() || !outOfZone.ok()) {
       XCTFail(@"Failed to evaluate HH:MM window under a named zone");
     } else {
@@ -1687,9 +1730,9 @@ class ScopedHostZone {
     std::string end = hostLocalHourMinute(now + absl::Hours(1));
 
     auto defaulted = evaluate("policy_for_range([0, 1, 2, 3, 4, 5, 6], '" + start + "', '" + end +
-                              "', false, ALLOWLIST, BLOCKLIST)");
+                              "', ALLOWLIST, BLOCKLIST)");
     auto spelled = evaluate("policy_for_range([0, 1, 2, 3, 4, 5, 6], '" + start + "', '" + end +
-                            "', 'local', false, ALLOWLIST, BLOCKLIST)");
+                            "', 'local', ALLOWLIST, BLOCKLIST)");
     if (!defaulted.ok() || !spelled.ok()) {
       XCTFail(@"Failed to evaluate the defaulted and spelled out local forms");
     } else {
@@ -1703,7 +1746,7 @@ class ScopedHostZone {
     // zone argument is for, so it is worth asserting rather than assuming.
     std::string expr = "policy_for_range([0, 1, 2, 3, 4, 5, 6], '11:00', '13:00', '" +
                        FixedOffsetZone(OffsetWhereNowReads(now, 12, 0)) +
-                       "', false, ALLOWLIST, BLOCKLIST)";
+                       "', ALLOWLIST, BLOCKLIST)";
 
     auto evaluateOnHost = [&evaluate](const char* hostZone, absl::string_view expression) {
       ScopedHostZone pinned(hostZone);
@@ -1962,7 +2005,8 @@ class ScopedHostZone {
   // policy_for_range() is CELv2 only.
   XCTAssertFalse(
       sut.value()
-          ->CompileAndEvaluate("policy_for_range(duration('30m'), false, ALLOWLIST)", *activation)
+          ->CompileAndEvaluate("policy_for_range(duration('30m'), kill_on_expiry(ALLOWLIST))",
+                               *activation)
           .ok());
 }
 

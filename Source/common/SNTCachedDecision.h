@@ -81,10 +81,11 @@
 @property BOOL silentTouchID;
 @property NSNumber* touchIDCooldownMinutes;  // nil = no caching (prompt every time)
 
-/// Set when the matching rule's policy_for_range() evaluated in-window with
-/// should_kill: what the rule covers is quit at timedRuleKillDeadline, warned at
-/// timedRuleKillNotifyAt, and a nil deadline means no kill was asked for. The
-/// entry is recorded only once the execution is known to be allowed.
+/// Set when the matching rule's policy_for_range() evaluated in-window with a
+/// kill_on_expiry() policy: what the rule covers is quit at
+/// timedRuleKillDeadline, warned at timedRuleKillNotifyAt, and a nil deadline
+/// means no kill was asked for. The entry is recorded only once the execution is
+/// known to be allowed.
 @property NSDate* timedRuleKillDeadline;
 @property NSDate* timedRuleKillNotifyAt;
 @property SNTRuleType timedRuleKillRuleType;
