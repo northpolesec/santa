@@ -14,7 +14,6 @@
 
 #import "Source/santad/SNTTimedRuleKills.h"
 
-#import <CommonCrypto/CommonDigest.h>
 #import <Foundation/Foundation.h>
 #include <Kernel/kern/cs_blobs.h>
 #include <libproc.h>
@@ -37,6 +36,7 @@
 #import "Source/common/CertificateHelpers.h"
 #import "Source/common/MOLCodesignChecker.h"
 #import "Source/common/MOLXPCConnection.h"
+#import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTKillCommand.h"
 #import "Source/common/SNTLogging.h"
@@ -61,7 +61,7 @@
 // Fields of a persisted entry.
 static NSString* const kEntryRuleTypeKey = @"RuleType";
 static NSString* const kEntryIdentifierKey = @"Identifier";
-static NSString* const kEntryCELHashKey = @"CELHash";
+static NSString* const kEntryRuleIDKey = @"RuleID";
 static NSString* const kEntryDeadlineKey = @"Deadline";
 static NSString* const kEntryNotifyAtKey = @"NotifyAt";
 static NSString* const kEntryNotifiedKey = @"Notified";
@@ -71,12 +71,15 @@ static NSString* const kEntryWindowEndKey = @"WindowEnd";
 static NSString* const kEntryWindowZoneKey = @"WindowZone";
 static NSString* const kEntryMachDeadlineKey = @"MachDeadline";
 static NSString* const kEntryBootSessionUUIDKey = @"BootSessionUUID";
+static NSString* const kEntryProcessesKey = @"Processes";
+static NSString* const kProcessPidKey = @"Pid";
+static NSString* const kProcessPidversionKey = @"Pidversion";
 
 // A timer can fire marginally early; anything due within this window is treated
 // as due now rather than re-arming for a fraction of a second.
 static const NSTimeInterval kDueTolerance = 0.25;
 
-// How long a matched process has to exit after SIGTERM before it is SIGKILLed.
+// How long a recorded process has to exit after SIGTERM before it is SIGKILLed.
 static const NSTimeInterval kTermGrace = 5.0;
 
 // How far ahead a mach deadline may point: the pair is arithmetic on a tick
@@ -84,12 +87,12 @@ static const NSTimeInterval kTermGrace = 5.0;
 static const NSTimeInterval kMaxMachDeadlineLead = 10 * 365 * 24 * 60 * 60;
 
 /// One pending kill: the rule it came from, when it fires, whether the user has
-/// already been warned, and the shape of the window the deadline came from (nil
-/// for a window that does not recur).
+/// already been warned, the shape of the window the deadline came from (nil for
+/// a window that does not recur), and the executions recorded under it.
 @interface SNTTimedRuleKillEntry : NSObject
 @property SNTRuleType ruleType;
 @property(copy) NSString* identifier;
-@property(copy) NSString* celHash;
+@property int64_t ruleId;
 @property NSDate* deadline;
 @property NSDate* notifyAt;
 @property BOOL notified;
@@ -97,11 +100,15 @@ static const NSTimeInterval kMaxMachDeadlineLead = 10 * 365 * 24 * 60 * 60;
 @property(copy) NSString* windowStart;
 @property(copy) NSString* windowEnd;
 @property(copy) NSString* windowZone;
-/// The same deadline on the mach continuous clock, and the boot session that
-/// reading belongs to. Zero and nil together when there is no pair, which leaves
-/// the wall deadline above to govern on its own.
-@property uint64_t machDeadline;
+/// The boot the mach deadline and the process list belong to: always the current
+/// one on an entry in memory, set at load and at record. On disk it says which
+/// boot those two fields were read in. `machDeadline` is zero when there is none,
+/// which leaves the wall deadline above to govern on its own.
 @property(copy) NSString* bootSessionUUID;
+@property uint64_t machDeadline;
+/// The (pid, pidversion) pairs of every execution recorded under the rule, each
+/// `@{Pid, Pidversion}`. Never nil on an entry that exists.
+@property NSMutableArray<NSDictionary*>* processes;
 
 /// Deserializes a persisted entry, or nil when it isn't one: the state file is
 /// on disk, so every field is validated rather than trusted.
@@ -109,18 +116,18 @@ static const NSTimeInterval kMaxMachDeadlineLead = 10 * 365 * 24 * 60 * 60;
 
 @property(readonly) NSDictionary* dictionaryRepresentation;
 
-/// Opaque map key: rule type, identifier and CEL hash. Never parsed back.
+/// Opaque map key: rule type, identifier and rule id. Never parsed back.
 @property(readonly) NSString* key;
 @end
 
 namespace {
 
-// Only the rule types KillingMachine can match against a running process. A
-// BINARY or CERTIFICATE rule would mean hashing the executable of every process
-// at the deadline.
+// Every execution rule type. The kill is by recorded process, so no type needs a
+// matcher; this rejects a non-execution type read off state or a decision.
 bool SupportedRuleType(SNTRuleType ruleType) {
-  return ruleType == SNTRuleTypeSigningID || ruleType == SNTRuleTypeTeamID ||
-         ruleType == SNTRuleTypeCDHash;
+  return ruleType == SNTRuleTypeCDHash || ruleType == SNTRuleTypeBinary ||
+         ruleType == SNTRuleTypeSigningID || ruleType == SNTRuleTypeCertificate ||
+         ruleType == SNTRuleTypeTeamID;
 }
 
 // The persisted window shape, checked rather than trusted because the state file
@@ -175,12 +182,66 @@ uint64_t MachDeadlineFromValue(id value) {
   return [value unsignedLongLongValue];
 }
 
+// A positive whole number read off the state file, at most `max`, or nullopt.
+// Gated through the double like the mach deadline above, so a plist real that
+// round-tripped an infinity, a NaN, a fraction or a value past the type never
+// reaches the integer conversion, whose result for those is platform-defined.
+std::optional<int64_t> PositiveIntegerFromValue(id value, int64_t max) {
+  if (![value isKindOfClass:[NSNumber class]]) {
+    return std::nullopt;
+  }
+  double asDouble = [value doubleValue];
+  if (!std::isfinite(asDouble) || asDouble <= 0 || asDouble != std::floor(asDouble) ||
+      asDouble > static_cast<double>(max)) {
+    return std::nullopt;
+  }
+  // (double)INT64_MAX rounds up to 2^63, so an id at the top of its type passes
+  // the bound above and is checked exactly here.
+  int64_t asInt = [value longLongValue];
+  return (asInt > 0 && asInt <= max) ? std::optional<int64_t>(asInt) : std::nullopt;
+}
+
+// The recorded processes, checked rather than trusted like everything else the
+// state file holds. A bad element is dropped and the rest of the list loads.
+// Always a mutable array, so the entry can append without a nil check.
+NSMutableArray<NSDictionary*>* ProcessesFromValue(id value) {
+  NSMutableArray<NSDictionary*>* out = [NSMutableArray array];
+  if (![value isKindOfClass:[NSArray class]]) {
+    return out;
+  }
+  for (id element in value) {
+    if (![element isKindOfClass:[NSDictionary class]]) {
+      continue;
+    }
+    std::optional<int64_t> pid =
+        PositiveIntegerFromValue(element[kProcessPidKey], std::numeric_limits<int>::max());
+    std::optional<int64_t> pidversion =
+        PositiveIntegerFromValue(element[kProcessPidversionKey], std::numeric_limits<int>::max());
+    if (!pid || !pidversion) {
+      continue;
+    }
+    [out addObject:@{
+      kProcessPidKey : @(static_cast<int>(*pid)),
+      kProcessPidversionKey : @(static_cast<int>(*pidversion))
+    }];
+  }
+  return out;
+}
+
+// The opaque map key: rule type, identifier and rule id. One builder, so the
+// entry's own key and a lookup made before the entry exists cannot disagree.
+NSString* EntryKey(SNTRuleType ruleType, NSString* identifier, int64_t ruleId) {
+  return [NSString stringWithFormat:@"%ld|%@|%lld", (long)ruleType, identifier, (long long)ruleId];
+}
+
 // Identifiers that fetch exactly the rule an entry came from: one field set, so
 // the rule table's type precedence never picks a different rule type.
 struct RuleIdentifiers IdentifiersForEntry(SNTTimedRuleKillEntry* entry) {
   switch (entry.ruleType) {
     case SNTRuleTypeCDHash: return {.cdhash = entry.identifier};
+    case SNTRuleTypeBinary: return {.binarySHA256 = entry.identifier};
     case SNTRuleTypeSigningID: return {.signingID = entry.identifier};
+    case SNTRuleTypeCertificate: return {.certificateSHA256 = entry.identifier};
     case SNTRuleTypeTeamID: return {.teamID = entry.identifier};
     default: return {};
   }
@@ -203,14 +264,13 @@ NSString* DisplayNameForPid(pid_t pid) {
   return nil;
 }
 
-// Fills the warning details from the matched process. Identity comes from the
-// kernel through csops, the same source the match used, and Publisher alone
-// from a signature check that must pass, as in the block dialog; that check
-// validates only the identity components of the running code and takes
-// milliseconds, unlike a static check with default flags. Every process read
-// is re-checked against the audit token, so a pid gone or recycled
-// mid-collection leaves the process fields nil rather than describing a
-// stranger.
+// Fills the warning details from the recorded process. Identity comes from the
+// kernel through csops, and Publisher alone from a signature check that must
+// pass, as in the block dialog; that check validates only the identity
+// components of the running code and takes milliseconds, unlike a static check
+// with default flags. Every process read is re-checked against the audit token,
+// so a pid gone or recycled mid-collection yields nil rather than describing a
+// stranger, and the caller can try another pair.
 static SNTTimedRuleKillDetails* DetailsForEntry(SNTTimedRuleKillEntry* entry,
                                                 const audit_token_t& token,
                                                 const santa::KillEnv& env) {
@@ -265,7 +325,7 @@ static SNTTimedRuleKillDetails* DetailsForEntry(SNTTimedRuleKillEntry* entry,
   if (!env.token_for_pid(pid, &after) || santa::Pidversion(after) != santa::Pidversion(token)) {
     LOGD(@"Pid %d is gone or was recycled while collecting timed rule kill details for %@", pid,
          entry.identifier);
-    return details;
+    return nil;
   }
 
   if (application.length) details.application = application;
@@ -281,33 +341,6 @@ static SNTTimedRuleKillDetails* DetailsForEntry(SNTTimedRuleKillEntry* entry,
   return details;
 }
 
-// The kill is delivered to the process group of every match, with SIGKILL as
-// the nominal signal; the term-then-kill path sends SIGTERM and SIGKILL itself
-// and ignores this field. Never nil for an entry that exists: every write site
-// gates on SupportedRuleType, so only the switch needs the default arm.
-SNTKillRequest* KillRequestForEntry(SNTTimedRuleKillEntry* entry) {
-  NSString* uuid = [[NSUUID UUID] UUIDString];
-
-  switch (entry.ruleType) {
-    case SNTRuleTypeCDHash:
-      return [[SNTKillRequestCDHash alloc] initWithUUID:uuid
-                                                 cdHash:entry.identifier
-                                                 signal:SIGKILL
-                                    targetProcessGroups:YES];
-    case SNTRuleTypeSigningID:
-      return [[SNTKillRequestSigningID alloc] initWithUUID:uuid
-                                                 signingID:entry.identifier
-                                                    signal:SIGKILL
-                                       targetProcessGroups:YES];
-    case SNTRuleTypeTeamID:
-      return [[SNTKillRequestTeamID alloc] initWithUUID:uuid
-                                                 teamID:entry.identifier
-                                                 signal:SIGKILL
-                                    targetProcessGroups:YES];
-    default: return nil;
-  }
-}
-
 }  // namespace
 
 @implementation SNTTimedRuleKillEntry
@@ -316,7 +349,6 @@ SNTKillRequest* KillRequestForEntry(SNTTimedRuleKillEntry* entry) {
   if (![dict isKindOfClass:[NSDictionary class]] ||
       ![dict[kEntryRuleTypeKey] isKindOfClass:[NSNumber class]] ||
       ![dict[kEntryIdentifierKey] isKindOfClass:[NSString class]] ||
-      ![dict[kEntryCELHashKey] isKindOfClass:[NSString class]] ||
       ![dict[kEntryDeadlineKey] isKindOfClass:[NSNumber class]] ||
       ![dict[kEntryNotifyAtKey] isKindOfClass:[NSNumber class]]) {
     return nil;
@@ -324,7 +356,8 @@ SNTKillRequest* KillRequestForEntry(SNTTimedRuleKillEntry* entry) {
 
   SNTRuleType ruleType = static_cast<SNTRuleType>([dict[kEntryRuleTypeKey] integerValue]);
   NSString* identifier = dict[kEntryIdentifierKey];
-  NSString* celHash = dict[kEntryCELHashKey];
+  std::optional<int64_t> ruleId =
+      PositiveIntegerFromValue(dict[kEntryRuleIDKey], std::numeric_limits<int64_t>::max());
   // A plist real round-trips both infinities and NaN, and neither is an instant.
   // A NaN deadline is the worst of them: it answers false to every "has this
   // come due" question and leaves the countdown arming for zero seconds, firing
@@ -332,15 +365,15 @@ SNTKillRequest* KillRequestForEntry(SNTTimedRuleKillEntry* entry) {
   // appointment, so the record is dropped.
   NSTimeInterval deadline = [dict[kEntryDeadlineKey] doubleValue];
   NSTimeInterval notifyAt = [dict[kEntryNotifyAtKey] doubleValue];
-  if (!SupportedRuleType(ruleType) || !identifier.length || !celHash.length ||
-      !std::isfinite(deadline) || !std::isfinite(notifyAt)) {
+  if (!SupportedRuleType(ruleType) || !identifier.length || !ruleId || !std::isfinite(deadline) ||
+      !std::isfinite(notifyAt)) {
     return nil;
   }
 
   SNTTimedRuleKillEntry* entry = [[SNTTimedRuleKillEntry alloc] init];
   entry.ruleType = ruleType;
   entry.identifier = identifier;
-  entry.celHash = celHash;
+  entry.ruleId = *ruleId;
   entry.deadline = [NSDate dateWithTimeIntervalSince1970:deadline];
   entry.notifyAt = [NSDate dateWithTimeIntervalSince1970:notifyAt];
   // Guarded like every other field: a non-NSNumber value on disk must not reach
@@ -360,16 +393,22 @@ SNTKillRequest* KillRequestForEntry(SNTTimedRuleKillEntry* entry) {
     entry.windowEnd = windowEnd;
     entry.windowZone = windowZone;
   }
-  // Also absent on an entry written before there was a mach deadline to write.
-  // A tick count says nothing without the boot session it was read in, so like
-  // the window shape this is taken whole or not at all.
-  uint64_t machDeadline = MachDeadlineFromValue(dict[kEntryMachDeadlineKey]);
-  NSString* bootSessionUUID = [dict[kEntryBootSessionUUIDKey] isKindOfClass:[NSString class]]
-                                  ? dict[kEntryBootSessionUUIDKey]
-                                  : nil;
-  if (machDeadline && bootSessionUUID.length) {
-    entry.machDeadline = machDeadline;
-    entry.bootSessionUUID = bootSessionUUID;
+  // The stored stamp says which boot the mach deadline and the process list
+  // belong to. Pidversions and mach ticks both restart at reboot, so under
+  // another boot's stamp both are meaningless: dropped, and the wall schedule
+  // governs alone. The entry itself is stamped with this boot, which anything
+  // recorded on it is.
+  NSString* currentBoot = [SNTSystemInfo bootSessionUUID];
+  NSString* storedBoot = [dict[kEntryBootSessionUUIDKey] isKindOfClass:[NSString class]]
+                             ? dict[kEntryBootSessionUUIDKey]
+                             : nil;
+  entry.processes = [NSMutableArray array];
+  if (currentBoot.length) {
+    entry.bootSessionUUID = currentBoot;
+    if ([storedBoot isEqualToString:currentBoot]) {
+      entry.machDeadline = MachDeadlineFromValue(dict[kEntryMachDeadlineKey]);
+      entry.processes = ProcessesFromValue(dict[kEntryProcessesKey]);
+    }
   }
   return entry;
 }
@@ -378,7 +417,7 @@ SNTKillRequest* KillRequestForEntry(SNTTimedRuleKillEntry* entry) {
   NSMutableDictionary* dict = [@{
     kEntryRuleTypeKey : @(self.ruleType),
     kEntryIdentifierKey : self.identifier,
-    kEntryCELHashKey : self.celHash,
+    kEntryRuleIDKey : @(self.ruleId),
     kEntryDeadlineKey : @(self.deadline.timeIntervalSince1970),
     kEntryNotifyAtKey : @(self.notifyAt.timeIntervalSince1970),
     kEntryNotifiedKey : @(self.notified),
@@ -391,16 +430,20 @@ SNTKillRequest* KillRequestForEntry(SNTTimedRuleKillEntry* entry) {
     dict[kEntryWindowEndKey] = self.windowEnd;
     dict[kEntryWindowZoneKey] = self.windowZone;
   }
-  if (self.machDeadline && self.bootSessionUUID.length) {
-    dict[kEntryMachDeadlineKey] = @(self.machDeadline);
+  if (self.bootSessionUUID.length) {
     dict[kEntryBootSessionUUIDKey] = self.bootSessionUUID;
+  }
+  if (self.machDeadline) {
+    dict[kEntryMachDeadlineKey] = @(self.machDeadline);
+  }
+  if (self.processes.count) {
+    dict[kEntryProcessesKey] = [self.processes copy];
   }
   return dict;
 }
 
 - (NSString*)key {
-  return
-      [NSString stringWithFormat:@"%ld|%@|%@", (long)self.ruleType, self.identifier, self.celHash];
+  return EntryKey(self.ruleType, self.identifier, self.ruleId);
 }
 
 @end
@@ -411,7 +454,7 @@ SNTKillRequest* KillRequestForEntry(SNTTimedRuleKillEntry* entry) {
 @property SNTConfigurator* configurator;
 @property SNTBelievableClock* clock;
 @property dispatch_queue_t queue;
-/// Entries keyed by rule type, identifier and CEL hash, so repeated execs under
+/// Entries keyed by rule type, identifier and rule id, so repeated execs under
 /// the same rule share one entry. Only ever touched on `queue`.
 @property NSMutableDictionary<NSString*, SNTTimedRuleKillEntry*>* entries;
 /// The interval the countdown was last armed for, in seconds, or zero when it
@@ -454,7 +497,7 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
 
 @implementation SNTTimedRuleKills {
   std::shared_ptr<DeadlineTimer> _timer;
-  /// The syscalls every kill and every match here go through.
+  /// The syscalls every kill and every process lookup here go through.
   santa::KillEnv _killEnv;
 }
 
@@ -483,17 +526,6 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
     };
   }
   return self;
-}
-
-+ (NSString*)celHashForExpression:(NSString*)celExpr {
-  if (!celExpr.length) {
-    return nil;
-  }
-
-  NSData* text = [celExpr dataUsingEncoding:NSUTF8StringEncoding];
-  uint8_t digest[CC_SHA256_DIGEST_LENGTH];
-  CC_SHA256(text.bytes, (CC_LONG)text.length, digest);
-  return santa::StringToNSString(santa::BufToHexString(digest, sizeof(digest)));
 }
 
 - (void)resumeFromSavedState {
@@ -533,66 +565,107 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
   });
 }
 
-- (void)recordKillForRuleType:(SNTRuleType)ruleType
-                   identifier:(NSString*)identifier
-                      celHash:(NSString*)celHash
-                     deadline:(NSDate*)deadline
-                     notifyAt:(NSDate*)notifyAt
-                   windowDays:(NSArray<NSNumber*>*)windowDays
-                  windowStart:(NSString*)windowStart
-                    windowEnd:(NSString*)windowEnd
-                   windowZone:(NSString*)windowZone {
-  if (!identifier.length || !celHash.length || !deadline || !notifyAt) {
+- (void)recordKillForDecision:(SNTCachedDecision*)cd process:(audit_token_t)token {
+  NSDate* deadline = cd.timedRuleKillDeadline;
+  if (!deadline) {
+    return;
+  }
+
+  // Read here, on the caller's thread; the block below captures values only.
+  SNTRuleType ruleType = cd.timedRuleKillRuleType;
+  NSString* identifier = cd.timedRuleKillIdentifier;
+  int64_t ruleId = cd.ruleId;
+  NSDate* notifyAt = cd.timedRuleKillNotifyAt;
+  NSArray<NSNumber*>* windowDays = cd.timedRuleKillWindowDays;
+  NSString* windowStart = cd.timedRuleKillWindowStart;
+  NSString* windowEnd = cd.timedRuleKillWindowEnd;
+  NSString* windowZone = cd.timedRuleKillWindowZone;
+
+  if (!identifier.length || !notifyAt) {
     LOGW(@"Ignoring incomplete timed rule kill for %@", identifier);
     return;
   }
-
+  if (ruleId <= 0) {
+    LOGW(@"Ignoring timed rule kill for %@: no server-assigned rule id (%lld); the feature "
+         @"requires CELv2 rules from a v2 sync server",
+         identifier, (long long)ruleId);
+    return;
+  }
   if (!SupportedRuleType(ruleType)) {
-    LOGW(@"Ignoring timed rule kill for unsupported rule type %ld (%@); only SIGNINGID, TEAMID "
-         @"and CDHASH rules can be matched against a running process",
-         (long)ruleType, identifier);
+    LOGW(@"Ignoring timed rule kill for unsupported rule type %ld (%@)", (long)ruleType,
+         identifier);
+    return;
+  }
+  NSString* bootSession = [SNTSystemInfo bootSessionUUID];
+  if (!bootSession.length) {
+    LOGW(@"Ignoring timed rule kill for %@: the boot session UUID is unreadable, so nothing "
+         @"recorded here could ever be quit",
+         identifier);
     return;
   }
 
+  pid_t pid = santa::Pid(token);
+  int pidversion = santa::Pidversion(token);
+
   dispatch_async(self.queue, ^{
-    SNTTimedRuleKillEntry* entry = [[SNTTimedRuleKillEntry alloc] init];
-    entry.ruleType = ruleType;
-    entry.identifier = identifier;
-    entry.celHash = celHash;
-    entry.deadline = deadline;
-    entry.notifyAt = notifyAt;
-    // A window shape is only usable whole, so a partial one is no shape. The
-    // zone is part of the whole: "09:00" names no instant without it.
-    if (windowDays.count && windowStart.length && windowEnd.length && windowZone.length) {
-      entry.windowDays = windowDays;
-      entry.windowStart = windowStart;
-      entry.windowEnd = windowEnd;
-      entry.windowZone = windowZone;
+    NSString* key = EntryKey(ruleType, identifier, ruleId);
+    SNTTimedRuleKillEntry* entry = self.entries[key];
+    BOOL created = !entry;
+    if (created) {
+      entry = [[SNTTimedRuleKillEntry alloc] init];
+      entry.ruleType = ruleType;
+      entry.identifier = identifier;
+      entry.ruleId = ruleId;
+      entry.processes = [NSMutableArray array];
+      self.entries[key] = entry;
     }
 
-    SNTTimedRuleKillEntry* existing = self.entries[entry.key];
-    if (existing) {
-      if ([existing.deadline compare:deadline] != NSOrderedDescending) {
-        // The pending deadline is the earlier one; it governs everything the
-        // rule covers, including this execution. Nothing changed, so nothing is
-        // written: this is the common case of a binary executing repeatedly
-        // inside its window.
-        return;
+    // A new entry takes the captured schedule. An existing one takes it only
+    // when the captured deadline is earlier, since the earlier deadline governs
+    // everything the rule covers. The process list is untouched either way.
+    BOOL scheduleReplaced = created || [deadline compare:entry.deadline] == NSOrderedAscending;
+    if (scheduleReplaced) {
+      if (!created) {
+        LOGD(@"Timed rule kill for %@ moved earlier: %@ -> %@", identifier, entry.deadline,
+             deadline);
       }
-      LOGD(@"Timed rule kill for %@ moved earlier: %@ -> %@", identifier, existing.deadline,
-           deadline);
+      entry.deadline = deadline;
+      entry.notifyAt = notifyAt;
+      entry.notified = NO;
+      // A window shape is only usable whole, so a partial one is no shape.
+      BOOL whole = windowDays.count && windowStart.length && windowEnd.length && windowZone.length;
+      entry.windowDays = whole ? windowDays : nil;
+      entry.windowStart = whole ? windowStart : nil;
+      entry.windowEnd = whole ? windowEnd : nil;
+      entry.windowZone = whole ? windowZone : nil;
     }
 
-    // Read here rather than above, so the common case of a binary executing
-    // repeatedly inside its window reads no clocks at all.
-    [self captureMachDeadlineForEntry:entry from:[self.clock now]];
+    // Every entry carries this boot's stamp. The mach half is anchored once:
+    // captured when the entry has none (created, or loaded without a usable one)
+    // or when the deadline just moved, and otherwise left alone so a later clock
+    // move cannot push it out.
+    entry.bootSessionUUID = bootSession;
+    if (!entry.machDeadline || scheduleReplaced) {
+      [self captureMachDeadlineForEntry:entry from:[self.clock now]];
+    }
 
-    self.entries[entry.key] = entry;
-    LOGI(@"Recorded timed rule kill for %@: quitting at %@, warning at %@", identifier, deadline,
-         notifyAt);
+    [entry.processes addObject:@{kProcessPidKey : @(pid), kProcessPidversionKey : @(pidversion)}];
+    [self pruneDeadProcessesFromEntry:entry];
+
+    if (created) {
+      LOGI(@"Recorded timed rule kill for %@: quitting at %@, warning at %@", identifier, deadline,
+           notifyAt);
+    } else {
+      LOGD(@"Recorded execution under timed rule kill for %@ (pid %d, pidversion %d)", identifier,
+           pid, pidversion);
+    }
 
     [self persistSerialized];
-    [self rescheduleTimerSerialized];
+    // An append does not change the next warning or deadline. Re-arming the
+    // relative timer here would add queue traffic and reset its firing instant.
+    if (scheduleReplaced) {
+      [self rescheduleTimerSerialized];
+    }
   });
 }
 
@@ -615,9 +688,9 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
 /// no kill is waiting on it by the time it is taken. It also means an entry
 /// whose deadline has arrived is gone before the warning pass sees it, so
 /// nothing is warned about a kill that is already happening. A clock that jumped
-/// forward over both moments therefore quits what the rule covers without
-/// warning first, which is the only honest answer left once the deadline is
-/// behind us.
+/// forward over both moments therefore quits the rule's recorded executions
+/// without warning first, which is the only honest answer left once the deadline
+/// is behind us.
 ///
 /// Due entries are gathered and killed in one pass, sharing one grace period.
 /// An entry whose window is standing open again is not one of them: it goes back
@@ -706,9 +779,9 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
   [self rescheduleTimerSerialized];
 }
 
-/// Whether the rule an entry came from still exists with the text its deadline
-/// was computed from. A rule that is gone, or whose text changed, cancels the
-/// pending kill: the next allowed exec under the new text records a fresh entry.
+/// Whether the rule an entry came from still exists under the id its deadline
+/// was recorded for. A rule that is gone, or whose id changed, cancels the
+/// pending kill: the next allowed exec under the new rule records a fresh entry.
 ///
 /// Checked at the warning as well as at the deadline, so a rule withdrawn during
 /// the lead window neither warns about a quit that will not happen nor leaves a
@@ -719,8 +792,9 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
     LOGI(@"Timed rule kill for %@ cancelled: the rule is gone", entry.identifier);
     return NO;
   }
-  if (![[SNTTimedRuleKills celHashForExpression:rule.celExpr] isEqualToString:entry.celHash]) {
-    LOGI(@"Timed rule kill for %@ cancelled: the rule's expression changed", entry.identifier);
+  if (rule.ruleId != entry.ruleId) {
+    LOGI(@"Timed rule kill for %@ cancelled: the rule changed (rule id %lld -> %lld)",
+         entry.identifier, (long long)entry.ruleId, (long long)rule.ruleId);
     return NO;
   }
   return YES;
@@ -744,23 +818,36 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
          AddNanosecondsToMachTime((uint64_t)(kDueTolerance * NSEC_PER_SEC), machNow);
 }
 
-/// Pairs an entry's wall deadline with the mach continuous instant it falls on
-/// and the boot session that instant belongs to. A host whose boot session cannot
-/// be read, or a deadline further out than a tick count carries, stores no pair.
+/// Pairs an entry's wall deadline with the mach continuous instant it falls on.
+/// A host whose boot session cannot be read, or a deadline further out than a
+/// tick count carries, stores no mach deadline and the wall deadline governs
+/// alone. The boot the instant belongs to is the entry's stamp.
 - (void)captureMachDeadlineForEntry:(SNTTimedRuleKillEntry*)entry from:(NSDate*)now {
-  NSString* bootSession = [SNTSystemInfo bootSessionUUID];
   NSTimeInterval remaining = [entry.deadline timeIntervalSinceDate:now];
   // Asked as a negated "within range" so that a NaN, which compares false
   // against everything, reads as out of range rather than into the arithmetic.
-  if (!bootSession.length || !(remaining <= kMaxMachDeadlineLead)) {
+  if (![SNTSystemInfo bootSessionUUID].length || !(remaining <= kMaxMachDeadlineLead)) {
     entry.machDeadline = 0;
-    entry.bootSessionUUID = nil;
     return;
   }
 
   entry.machDeadline = AddNanosecondsToMachTime((uint64_t)(std::max(0.0, remaining) * NSEC_PER_SEC),
                                                 mach_continuous_time());
-  entry.bootSessionUUID = bootSession;
+}
+
+/// Drops every recorded pair whose token lookup fails or whose pidversion no
+/// longer matches. Called only at record, for the entry recorded into, since
+/// only that entry grows; the warning and the kill skip a dead pair themselves.
+- (void)pruneDeadProcessesFromEntry:(SNTTimedRuleKillEntry*)entry {
+  NSMutableArray<NSDictionary*>* live = [NSMutableArray arrayWithCapacity:entry.processes.count];
+  for (NSDictionary* proc in entry.processes) {
+    audit_token_t token;
+    if (_killEnv.token_for_pid([proc[kProcessPidKey] intValue], &token) &&
+        santa::Pidversion(token) == [proc[kProcessPidversionKey] intValue]) {
+      [live addObject:proc];
+    }
+  }
+  entry.processes = live;
 }
 
 /// The window re-check, asked of every entry on every pass: at its deadline, and
@@ -797,7 +884,7 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
   // same answer a missing shape gives.
   absl::StatusOr<absl::TimeZone> zone = santa::cel::ResolveTimeZone(entry.windowZone.UTF8String);
   if (!zone.ok()) {
-    LOGW(@"Unable to resolve the window zone '%@' for %@; quitting what the rule covers",
+    LOGW(@"Unable to resolve the window zone '%@' for %@; quitting the rule's recorded executions",
          entry.windowZone, entry.identifier);
     return NO;
   }
@@ -817,7 +904,7 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
       days, entry.windowStart.UTF8String, entry.windowEnd.UTF8String,
       absl::UnixEpoch() + absl::Seconds(asked.timeIntervalSince1970), *zone);
   if (!window.ok()) {
-    LOGW(@"Unable to re-check the window for %@ (%s); quitting what the rule covers",
+    LOGW(@"Unable to re-check the window for %@ (%s); quitting the rule's recorded executions",
          entry.identifier, std::string(window.status().message()).c_str());
     return NO;
   }
@@ -848,53 +935,75 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
   return YES;
 }
 
-/// The kill at a deadline: one pass over every due entry, sharing the grace
-/// period. The rule and the window have already been re-checked.
+/// The kill at a deadline: one running-process request per recorded pair of every
+/// due entry, all sent in one pass so they share the grace period. The rule and
+/// the window have already been re-checked; a dead pair fails its lookup inside
+/// the KillingMachine, so the entries are not pruned first. One summary per
+/// entry at info, one line per request at debug carrying the uuid every
+/// KillingMachine outcome logs.
 - (void)killEntriesSerialized:(NSArray<SNTTimedRuleKillEntry*>*)entries {
-  NSMutableArray<SNTKillRequest*>* requests = [NSMutableArray arrayWithCapacity:entries.count];
+  NSString* bootSession = [SNTSystemInfo bootSessionUUID];
+  NSMutableArray<SNTKillRequest*>* requests = [NSMutableArray array];
   for (SNTTimedRuleKillEntry* entry in entries) {
-    [requests addObject:KillRequestForEntry(entry)];
+    LOGI(@"Timed rule kill firing for %@: %lu recorded process(es)", entry.identifier,
+         (unsigned long)entry.processes.count);
+    for (NSDictionary* proc in entry.processes) {
+      NSString* uuid = [[NSUUID UUID] UUIDString];
+      SNTKillRequestRunningProcess* request =
+          [[SNTKillRequestRunningProcess alloc] initWithUUID:uuid
+                                                         pid:[proc[kProcessPidKey] intValue]
+                                                  pidversion:[proc[kProcessPidversionKey] intValue]
+                                             bootSessionUUID:bootSession
+                                                      signal:SIGKILL
+                                         targetProcessGroups:YES];
+      if (!request) {
+        // Only when the boot session reads empty at fire time; the pair itself
+        // passed validation. Rare enough to be worth a line when it happens.
+        LOGW(@"Timed rule kill for %@ could not build request %@ for pid %@, pidversion %@",
+             entry.identifier, uuid, proc[kProcessPidKey], proc[kProcessPidversionKey]);
+        continue;
+      }
+      LOGD(@"Timed rule kill target for %@: pid %@, pidversion %@ (request %@)", entry.identifier,
+           proc[kProcessPidKey], proc[kProcessPidversionKey], uuid);
+      [requests addObject:request];
+    }
   }
 
-  NSArray<SNTKillResponse*>* responses =
-      santa::KillingMachineTermThenKill(requests, kTermGrace, _killEnv);
-
-  // One response per request, in order, so `entries` indexes them.
-  // killedProcesses counts one record per matched process per pass, not one per
-  // delivery: the members of a group shared with another entry report under
-  // every entry that matched them, and a survivor of SIGTERM appears once per
-  // pass.
-  for (NSUInteger index = 0; index < responses.count; index++) {
-    LOGI(@"Timed rule kill fired for %@: %lu matched process result(s), error: %ld",
-         entries[index].identifier, (unsigned long)responses[index].killedProcesses.count,
-         (long)responses[index].error);
-  }
+  // An empty list is a call that does nothing.
+  santa::KillingMachineTermThenKill(requests, kTermGrace, _killEnv);
 }
 
-/// The warning shortly before a deadline: find something the rule covers that
-/// is running, collect what the dialog shows for it, and hand the banner to the
-/// GUI. Signals nothing. The caller has already confirmed the rule still governs.
+/// The warning shortly before a deadline: name the first recorded process still
+/// running and hand the banner to the GUI. Signals nothing and changes nothing on
+/// the entry. A pair whose lookup fails is skipped, and one whose process exits
+/// while its details are read yields nil and the next is tried. The caller has
+/// already confirmed the rule still governs.
 - (void)notifyForEntrySerialized:(SNTTimedRuleKillEntry*)entry {
   // Asked first because it is the cheap question: with no GUI to warn, there is
-  // no reason to walk every process on the machine looking for a name for it.
+  // no reason to read any process.
   id<SNTNotifierXPC> proxy = self.notifierQueue.notifierConnection.remoteObjectProxy;
   if (!proxy) {
     LOGD(@"No GUI connection; skipping timed rule kill banner for %@", entry.identifier);
     return;
   }
 
-  std::optional<audit_token_t> token =
-      santa::KillingMachineAnyMatch(KillRequestForEntry(entry), _killEnv);
-  if (!token) {
-    // Nothing the rule covers is running, so there is nothing to warn about.
-    LOGD(@"No running process matches %@; skipping timed rule kill banner", entry.identifier);
+  for (NSDictionary* proc in entry.processes) {
+    audit_token_t token;
+    if (!_killEnv.token_for_pid([proc[kProcessPidKey] intValue], &token) ||
+        santa::Pidversion(token) != [proc[kProcessPidversionKey] intValue]) {
+      continue;
+    }
+    SNTTimedRuleKillDetails* details = DetailsForEntry(entry, token, _killEnv);
+    if (!details) {
+      continue;
+    }
+    LOGI(@"Sending timed rule kill banner for %@ (%@), quitting at %@", details.application,
+         entry.identifier, entry.deadline);
+    [proxy postTimedRuleKillNotification:details];
     return;
   }
 
-  SNTTimedRuleKillDetails* details = DetailsForEntry(entry, *token, _killEnv);
-  LOGI(@"Sending timed rule kill banner for %@ (%@), quitting at %@", details.application,
-       entry.identifier, entry.deadline);
-  [proxy postTimedRuleKillNotification:details];
+  LOGD(@"No running recorded process for %@; skipping timed rule kill banner", entry.identifier);
 }
 
 /// Writes the current entry set, or clears the key when there are none. Callers

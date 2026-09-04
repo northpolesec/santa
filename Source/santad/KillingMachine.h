@@ -85,16 +85,6 @@ SNTKillResponse* KillingMachineTermThenKill(SNTKillRequest* request, NSTimeInter
 NSArray<SNTKillResponse*>* KillingMachineTermThenKill(NSArray<SNTKillRequest*>* requests,
                                                       NSTimeInterval grace, const KillEnv& env);
 
-// The audit token of one process the request matches, or nullopt when nothing
-// does. Signals nothing: this is the match pass on its own, so a caller can
-// find out whether a kill would hit anything before the kill is due, and the
-// token lets it re-check, after reading the process, that the pid was not
-// recycled underneath it. Which of several matches comes back is unspecified.
-// Running-process requests are not supported here, as they already name the
-// process the caller wants.
-std::optional<audit_token_t> KillingMachineAnyMatch(SNTKillRequest* request);
-std::optional<audit_token_t> KillingMachineAnyMatch(SNTKillRequest* request, const KillEnv& env);
-
 }  // namespace santa
 
 #endif  // SANTA_SANTAD_KILLINGMACHINE_H

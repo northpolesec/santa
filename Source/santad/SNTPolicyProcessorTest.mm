@@ -37,11 +37,15 @@
 #import "Source/common/cel/Activation.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
 #include "Source/santad/EntitlementsFilter.h"
-#import "Source/santad/SNTTimedRuleKills.h"
 
 #include "cel/v1.pb.h"
 
 extern struct RuleIdentifiers CreateRuleIDs(SNTCachedDecision* cd);
+
+// The server-assigned id of the rule whose timed kill is asserted on below. A
+// rule with id zero would make the assertion that the decision carries the
+// deciding rule's id vacuous.
+static const int64_t kDecidingRuleID = 48213;
 
 @interface SNTPolicyProcessor (Testing)
 @property SNTConfigurator* configurator;
@@ -1649,15 +1653,16 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 - (SNTRule*)celV2RuleWithExpr:(NSString*)expr {
-  return
-      [self celV2RuleWithExpr:expr
-                         type:SNTRuleTypeBinary
-                   identifier:@"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"];
+  return [self celV2RuleWithExpr:expr
+                            type:SNTRuleTypeBinary
+                      identifier:@"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+                          ruleId:0];
 }
 
 - (SNTRule*)celV2RuleWithExpr:(NSString*)expr
                          type:(SNTRuleType)type
-                   identifier:(NSString*)identifier {
+                   identifier:(NSString*)identifier
+                       ruleId:(int64_t)ruleId {
   return [[SNTRule alloc] initWithIdentifier:identifier
                                        state:SNTRuleStateCELv2
                                         type:type
@@ -1668,18 +1673,17 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
                                      comment:nil
                                      celExpr:expr
                               seatbeltPolicy:nil
-                                      ruleId:0
+                                      ruleId:ruleId
                                        error:NULL];
 }
 
 /// Nothing about a timed rule kill is left on the decision: every one of the
-/// nine fields, since an allow that follows would record whatever survives.
+/// eight fields, since an allow that follows would record whatever survives.
 - (void)assertNoTimedKillOn:(SNTCachedDecision*)cd {
   XCTAssertNil(cd.timedRuleKillDeadline);
   XCTAssertNil(cd.timedRuleKillNotifyAt);
   XCTAssertEqual(cd.timedRuleKillRuleType, SNTRuleTypeUnknown);
   XCTAssertNil(cd.timedRuleKillIdentifier);
-  XCTAssertNil(cd.timedRuleKillCELHash);
   XCTAssertNil(cd.timedRuleKillWindowDays);
   XCTAssertNil(cd.timedRuleKillWindowStart);
   XCTAssertNil(cd.timedRuleKillWindowEnd);
@@ -1715,9 +1719,10 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 }
 
 // An in-window kill_on_expiry() rides out on the decision, named by the rule it
-// came from: the rule type, the identifier exactly as the rule table stores it, and
-// the hash of the rule's own text. Recording it is SNTExecutionController's job,
-// once the execution is known to proceed.
+// came from: the rule type, the identifier exactly as the rule table stores it,
+// and the deciding rule's server-assigned id, which is the version the kill is
+// recorded under. Recording it is SNTExecutionController's job, once the
+// execution is known to proceed.
 - (void)testCELRulePolicyForRangeRecordsTheKillOnTheDecision {
   NSString* expr = @"policy_for_range([0, 1, 2, 3, 4, 5, 6], '00:00', '00:00', "
                    @"kill_on_expiry(ALLOWLIST), BLOCKLIST)";
@@ -1726,7 +1731,8 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   // re-check looks up, case-sensitively.
   SNTRule* rule = [self celV2RuleWithExpr:expr
                                      type:SNTRuleTypeSigningID
-                               identifier:@"abcde12345:com.example.app"];
+                               identifier:@"abcde12345:com.example.app"
+                                   ruleId:kDecidingRuleID];
   SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
   cd.signingID = rule.identifier;
 
@@ -1744,7 +1750,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   XCTAssertEqual(cd.timedRuleKillRuleType, SNTRuleTypeSigningID);
   XCTAssertEqualObjects(cd.timedRuleKillIdentifier, rule.identifier);
   XCTAssertEqualObjects(cd.timedRuleKillIdentifier, @"ABCDE12345:com.example.app");
-  XCTAssertEqualObjects(cd.timedRuleKillCELHash, [SNTTimedRuleKills celHashForExpression:expr]);
+  XCTAssertEqual(cd.ruleId, kDecidingRuleID);
 
   XCTAssertEqual(cd.timedRuleKillWindowDays.count, 7u);
   XCTAssertEqualObjects(cd.timedRuleKillWindowStart, @"00:00");
@@ -1782,7 +1788,8 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
       [self celV2RuleWithExpr:@"policy_for_range([0, 1, 2, 3, 4, 5, 6], '00:00', '00:00', "
                               @"ALLOWLIST_COMPILER, BLOCKLIST)"
                          type:SNTRuleTypeTeamID
-                   identifier:@"ABCDE12345"];
+                   identifier:@"ABCDE12345"
+                       ruleId:0];
   SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
   cd.teamID = rule.identifier;
 
