@@ -80,7 +80,10 @@
 @property(readonly) BOOL staticRule;
 
 ///
-///  The server-assigned rule ID, used to correlate events back to rules.
+///  The server-assigned rule ID. It correlates events back to rules, and it is
+///  the rule's version: the sync server mints a new id for every change to a
+///  rule and keeps it across an identical re-save, so a change to any field
+///  cancels a pending timed rule kill recorded under the old id.
 ///
 @property(readonly) int64_t ruleId;
 

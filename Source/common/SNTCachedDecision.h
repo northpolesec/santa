@@ -82,7 +82,7 @@
 @property NSNumber* touchIDCooldownMinutes;  // nil = no caching (prompt every time)
 
 /// Set when the matching rule's policy_for_range() evaluated in-window with a
-/// kill_on_expiry() policy: what the rule covers is quit at
+/// kill_on_expiry() policy: the executions recorded under the rule are quit at
 /// timedRuleKillDeadline, warned at timedRuleKillNotifyAt, and a nil deadline
 /// means no kill was asked for. The entry is recorded only once the execution is
 /// known to be allowed.
@@ -90,7 +90,6 @@
 @property NSDate* timedRuleKillNotifyAt;
 @property SNTRuleType timedRuleKillRuleType;
 @property NSString* timedRuleKillIdentifier;
-@property NSString* timedRuleKillCELHash;
 @property NSArray<NSNumber*>* timedRuleKillWindowDays;
 @property NSString* timedRuleKillWindowStart;
 @property NSString* timedRuleKillWindowEnd;

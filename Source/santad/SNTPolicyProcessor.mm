@@ -37,7 +37,6 @@
 #include "Source/common/cel/CELPlanCache.h"
 #include "Source/common/cel/Evaluator.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
-#import "Source/santad/SNTTimedRuleKills.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/statusor.h"
 #include "absl/time/time.h"
@@ -82,7 +81,6 @@ static void ClearTimedRuleKill(SNTCachedDecision* cd) {
   cd.timedRuleKillNotifyAt = nil;
   cd.timedRuleKillRuleType = SNTRuleTypeUnknown;
   cd.timedRuleKillIdentifier = nil;
-  cd.timedRuleKillCELHash = nil;
   cd.timedRuleKillWindowDays = nil;
   cd.timedRuleKillWindowStart = nil;
   cd.timedRuleKillWindowEnd = nil;
@@ -639,6 +637,8 @@ static void ApplySilentBlock(SNTCachedDecision* cd, SNTRuleState state) {
   cd.customURL = rule.customURL;
   cd.eventDetailButtonText = rule.eventDetailButtonText;
   cd.staticRule = rule.staticRule;
+  // Also the version the timed kill below is keyed and re-checked under, so a
+  // matched but not deciding rule must never reach this line.
   cd.ruleId = rule.ruleId;
 
   // Recorded only here, where the rule is known to have decided: every exit above
@@ -649,7 +649,6 @@ static void ApplySilentBlock(SNTCachedDecision* cd, SNTRuleState state) {
     cd.timedRuleKillNotifyAt = NSDateFromAbslTime(pendingKill->notify_at);
     cd.timedRuleKillRuleType = rule.type;
     cd.timedRuleKillIdentifier = rule.identifier;
-    cd.timedRuleKillCELHash = [SNTTimedRuleKills celHashForExpression:rule.celExpr];
     if (!pendingKill->window_days.empty()) {
       cd.timedRuleKillWindowDays = NSArrayFromDays(pendingKill->window_days);
       cd.timedRuleKillWindowStart = santa::StringToNSString(pendingKill->window_start);

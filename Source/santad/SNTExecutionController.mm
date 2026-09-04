@@ -208,22 +208,13 @@ static bool SameBinary(const es_process_t* a, NSString* aSHA256, const es_proces
   return self;
 }
 
-/// Records the kill this decision carries, if any. Called only from the paths
-/// where the execution actually proceeds.
-- (void)recordTimedRuleKillForDecision:(SNTCachedDecision*)cd {
+/// Records the kill this decision carries, if any, for the process `token` names.
+/// Called only from the paths where the execution actually proceeds.
+- (void)recordTimedRuleKillForDecision:(SNTCachedDecision*)cd process:(audit_token_t)token {
   if (!cd.timedRuleKillDeadline) {
     return;
   }
-
-  [self.timedRuleKills recordKillForRuleType:cd.timedRuleKillRuleType
-                                  identifier:cd.timedRuleKillIdentifier
-                                     celHash:cd.timedRuleKillCELHash
-                                    deadline:cd.timedRuleKillDeadline
-                                    notifyAt:cd.timedRuleKillNotifyAt
-                                  windowDays:cd.timedRuleKillWindowDays
-                                 windowStart:cd.timedRuleKillWindowStart
-                                   windowEnd:cd.timedRuleKillWindowEnd
-                                  windowZone:cd.timedRuleKillWindowZone];
+  [self.timedRuleKills recordKillForDecision:cd process:token];
 }
 
 - (void)incrementEventCounters:(SNTEventState)eventType {
@@ -580,7 +571,7 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
     // Only recorded for an execution that proceeds: an in-window policy that
     // blocks records nothing, and a held exec records it from the reply below.
     if (ACTION_IS_ALLOW(action)) {
-      [self recordTimedRuleKillForDecision:cd];
+      [self recordTimedRuleKillForDecision:cd process:targetProc->audit_token];
     }
   }
 
@@ -747,13 +738,13 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
             }
 
             // Allow the binary to begin running.
-            bool resumed = self.processControlBlock(newProcPid, ProcessControl::Resume);
+            self.processControlBlock(newProcPid, ProcessControl::Resume);
 
-            // Only now has the execution actually proceeded: a hold that could
-            // not stop the process, or a resume that failed, leaves nothing to quit.
-            if (stoppedProc && resumed) {
-              [self recordTimedRuleKillForDecision:cd];
-            }
+            // The execution is allowed, so record it whatever the suspend or
+            // resume reported: a hold that could not stop the process left it
+            // running, a resume that failed left it stopped, and SIGKILL takes a
+            // stopped process at the deadline.
+            [self recordTimedRuleKillForDecision:cd process:targetProc->audit_token];
           } else {
             // Decision stays as-is; only the extra field says why.
             cd.decisionExtra = authenticated ? @"TouchID Approved After Expiry" : @"TouchID Denied";

@@ -69,9 +69,11 @@ namespace cel {
 // platform's zone loader accepts, except names holding a colon or ".." or
 // starting with "/", which the loader would open as a file.
 //
-// Timed kills are rule-scoped and honored only for CDHash, SigningID and TeamID
-// rules; the sync server enforces that before a rule is distributed. Every
-// evaluation reads the clock, so any use marks the result non-cacheable.
+// Timed kills are rule-scoped and honored for every execution rule type. Every
+// evaluation reads the clock, so any use marks the result non-cacheable; that
+// is load-bearing, because the kill quits the executions Santa recorded inside
+// the window, and a cacheable windowed decision would let a process run
+// unrecorded and so unkillable.
 
 // The result of testing a window at one instant.
 struct WindowEval {
