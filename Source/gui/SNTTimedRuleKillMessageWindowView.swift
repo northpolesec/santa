@@ -61,8 +61,10 @@ func deadlineText(_ deadline: Date) -> String {
 
 // The rule identifier is not repeated here: the Signing ID row already shows it
 // for Signing ID and Team ID rules, and the CDHash row shows it for CDHash ones.
-// A type without a case here carries the deadline alone rather than an empty
-// parenthetical.
+// Binary and Certificate rules show no row carrying their identifier, and
+// deliberately: the path, publisher and signing rows describe what was quit
+// better than a bare hash would. A type without a case here carries the deadline
+// alone rather than an empty parenthetical.
 func reasonText(_ details: SNTTimedRuleKillDetails) -> String {
   let ends = deadlineText(details.deadline)
   let type: String
@@ -70,6 +72,8 @@ func reasonText(_ details: SNTTimedRuleKillDetails) -> String {
   case .signingID: type = NSLocalizedString("Signing ID", comment: "")
   case .teamID: type = NSLocalizedString("Team ID", comment: "")
   case .cdHash: type = NSLocalizedString("CDHash", comment: "")
+  case .binary: type = NSLocalizedString("Binary", comment: "")
+  case .certificate: type = NSLocalizedString("Certificate", comment: "")
   default:
     return String(
       format: NSLocalizedString(

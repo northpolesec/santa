@@ -1373,7 +1373,7 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   cd.timedRuleKillNotifyAt = [NSDate dateWithTimeIntervalSinceNow:3300];
   cd.timedRuleKillRuleType = SNTRuleTypeTeamID;
   cd.timedRuleKillIdentifier = @"ABCDE12345";
-  cd.timedRuleKillCELHash = @"c0ffee";
+  cd.ruleId = 48213;
   cd.timedRuleKillWindowDays = @[ @1, @2, @3, @4, @5 ];
   cd.timedRuleKillWindowStart = @"09:00";
   cd.timedRuleKillWindowEnd = @"17:00";
@@ -1383,19 +1383,23 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
 
 - (NSArray<NSDictionary*>*)recordedKillsForDecision:(SNTCachedDecision*)cd
                                        touchIDReply:(NSNumber*)touchIDReply {
-  return [self recordedKillsForDecision:cd touchIDReply:touchIDReply processControlSucceeds:YES];
+  return [self recordedKillsForDecision:cd
+                           touchIDReply:touchIDReply
+                        suspendSucceeds:YES
+                         resumeSucceeds:YES];
 }
 
 /// Runs one exec whose policy decision is `cd` through a controller wired to a
 /// mocked SNTTimedRuleKills, and returns the kills it recorded, one dictionary
-/// of arguments per call. `touchIDReply` is nil unless the decision holds for
-/// TouchID, in which case the captured reply block is invoked with it.
-/// `processControlSucceeds` is what suspending and resuming the held process
-/// report back; NO is a hold that could not stop the process, or a resume that
-/// failed.
+/// per call holding the decision and the pid and pidversion of the token passed.
+/// `touchIDReply` is nil unless the decision holds for TouchID, in which case
+/// the captured reply block is invoked with it. `suspendSucceeds` and
+/// `resumeSucceeds` are what suspending and resuming the held process report
+/// back; NO is a hold that could not stop the process, or a resume that failed.
 - (NSArray<NSDictionary*>*)recordedKillsForDecision:(SNTCachedDecision*)cd
                                        touchIDReply:(NSNumber*)touchIDReply
-                             processControlSucceeds:(BOOL)processControlSucceeds {
+                                    suspendSucceeds:(BOOL)suspendSucceeds
+                                     resumeSucceeds:(BOOL)resumeSucceeds {
   OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
   OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
   OCMStub([self.mockConfigurator clientMode]).andReturn(SNTClientModeLockdown);
@@ -1416,47 +1420,20 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
 
   NSMutableArray<NSDictionary*>* recorded = [NSMutableArray array];
   id mockTimedRuleKills = OCMClassMock([SNTTimedRuleKills class]);
-  OCMStub([mockTimedRuleKills recordKillForRuleType:SNTRuleTypeUnknown
-                                         identifier:OCMOCK_ANY
-                                            celHash:OCMOCK_ANY
-                                           deadline:OCMOCK_ANY
-                                           notifyAt:OCMOCK_ANY
-                                         windowDays:OCMOCK_ANY
-                                        windowStart:OCMOCK_ANY
-                                          windowEnd:OCMOCK_ANY
-                                         windowZone:OCMOCK_ANY])
+  audit_token_t anyToken = {};
+  OCMStub([mockTimedRuleKills recordKillForDecision:OCMOCK_ANY process:anyToken])
       .ignoringNonObjectArgs()
       .andDo(^(NSInvocation* invocation) {
-        SNTRuleType ruleType = SNTRuleTypeUnknown;
-        __unsafe_unretained NSString* identifier;
-        __unsafe_unretained NSString* celHash;
-        __unsafe_unretained NSDate* deadline;
-        __unsafe_unretained NSDate* notifyAt;
-        __unsafe_unretained NSArray* windowDays;
-        __unsafe_unretained NSString* windowStart;
-        __unsafe_unretained NSString* windowEnd;
-        __unsafe_unretained NSString* windowZone;
-        [invocation getArgument:&ruleType atIndex:2];
-        [invocation getArgument:&identifier atIndex:3];
-        [invocation getArgument:&celHash atIndex:4];
-        [invocation getArgument:&deadline atIndex:5];
-        [invocation getArgument:&notifyAt atIndex:6];
-        [invocation getArgument:&windowDays atIndex:7];
-        [invocation getArgument:&windowStart atIndex:8];
-        [invocation getArgument:&windowEnd atIndex:9];
-        [invocation getArgument:&windowZone atIndex:10];
+        __unsafe_unretained SNTCachedDecision* decision;
+        audit_token_t token;
+        [invocation getArgument:&decision atIndex:2];
+        [invocation getArgument:&token atIndex:3];
         // Built key by key rather than as a literal: andDo() is a macro, and a
         // comma inside a braced literal would be read as another argument to it.
         NSMutableDictionary* call = [NSMutableDictionary dictionary];
-        call[@"ruleType"] = @(ruleType);
-        call[@"identifier"] = identifier;
-        call[@"celHash"] = celHash;
-        call[@"deadline"] = deadline;
-        call[@"notifyAt"] = notifyAt;
-        call[@"windowDays"] = windowDays;
-        call[@"windowStart"] = windowStart;
-        call[@"windowEnd"] = windowEnd;
-        call[@"windowZone"] = windowZone;
+        call[@"decision"] = decision;
+        call[@"pid"] = @(audit_token_to_pid(token));
+        call[@"pidversion"] = @(audit_token_to_pidversion(token));
         [recorded addObject:call];
       });
 
@@ -1465,7 +1442,9 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   es_file_t file = MakeESFile("foo");
   es_process_t proc = MakeESProcess(&file);
   es_file_t fileExec = MakeESFile("bar", {.st_dev = 12, .st_ino = 34});
-  es_process_t procExec = MakeESProcess(&fileExec);
+  // A known token, so both record sites can be shown to forward the exec
+  // target's rather than the parent's.
+  es_process_t procExec = MakeESProcess(&fileExec, MakeAuditToken(4242, 7));
   procExec.is_platform_binary = false;
   procExec.codesigning_flags = CS_SIGNED | CS_VALID;
   es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_EXEC, &proc);
@@ -1490,7 +1469,11 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
           ttyWriter:santa::TTYWriter::Create(true)
           policyProcessor:mockPolicyProcessor
           processControlBlock:^bool(pid_t pid, santa::ProcessControl control) {
-            return processControlSucceeds;
+            switch (control) {
+              case santa::ProcessControl::Suspend: return suspendSucceeds;
+              case santa::ProcessControl::Resume: return resumeSucceeds;
+              case santa::ProcessControl::Kill: return true;
+            }
           }
           processTree:nullptr
           sandboxExpectations:std::make_shared<santa::SandboxExpectations>()
@@ -1521,29 +1504,34 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   return recorded;
 }
 
-// An allowed in-window exec records the kill, with everything the decision
-// carried passed through untouched: the identifier especially, which the
-// fire-time re-check looks the rule up by, case-sensitively.
+// An allowed in-window exec records the kill: the decision passed through
+// untouched (the identifier especially, which the fire-time re-check looks the
+// rule up by, case-sensitively) and the exec target's own audit token.
 - (void)testTimedRuleKillRecordedWhenTheExecIsAllowed {
   SNTCachedDecision* cd = [self decisionWithTimedRuleKill:SNTEventStateAllowBinary];
   NSArray<NSDictionary*>* recorded = [self recordedKillsForDecision:cd touchIDReply:nil];
 
   XCTAssertEqual(recorded.count, 1UL);
   NSDictionary* call = recorded.firstObject;
-  XCTAssertEqualObjects(call[@"ruleType"], @(SNTRuleTypeTeamID));
-  XCTAssertEqualObjects(call[@"identifier"], @"ABCDE12345");
-  XCTAssertEqualObjects(call[@"celHash"], @"c0ffee");
-  XCTAssertEqualObjects(call[@"deadline"], cd.timedRuleKillDeadline);
-  XCTAssertEqualObjects(call[@"notifyAt"], cd.timedRuleKillNotifyAt);
-  XCTAssertEqualObjects(call[@"windowDays"], (@[ @1, @2, @3, @4, @5 ]));
-  XCTAssertEqualObjects(call[@"windowStart"], @"09:00");
-  XCTAssertEqualObjects(call[@"windowEnd"], @"17:00");
-  XCTAssertEqualObjects(call[@"windowZone"], @"America/New_York");
+  SNTCachedDecision* decision = call[@"decision"];
+  XCTAssertEqual(decision.timedRuleKillRuleType, SNTRuleTypeTeamID);
+  XCTAssertEqualObjects(decision.timedRuleKillIdentifier, @"ABCDE12345");
+  XCTAssertEqual(decision.ruleId, 48213LL);
+  XCTAssertEqualObjects(decision.timedRuleKillDeadline, cd.timedRuleKillDeadline);
+  XCTAssertEqualObjects(decision.timedRuleKillNotifyAt, cd.timedRuleKillNotifyAt);
+  XCTAssertEqualObjects(decision.timedRuleKillWindowDays, (@[ @1, @2, @3, @4, @5 ]));
+  XCTAssertEqualObjects(decision.timedRuleKillWindowStart, @"09:00");
+  XCTAssertEqualObjects(decision.timedRuleKillWindowEnd, @"17:00");
+  XCTAssertEqualObjects(decision.timedRuleKillWindowZone, @"America/New_York");
+  XCTAssertEqualObjects(call[@"pid"], @4242);
+  XCTAssertEqualObjects(call[@"pidversion"], @7);
 }
 
 // Everything that stops the kill being recorded, all of it the same condition:
-// the execution has to actually proceed. A held (TouchID) execution proceeds at
-// the approval reply, and only if the process could be stopped and resumed.
+// the execution has to be allowed. A held (TouchID) execution is allowed at the
+// approval reply, whatever the suspend or resume reported: a hold that could not
+// stop the process left it running, and a resume that failed left it stopped for
+// SIGKILL to take at the deadline.
 - (void)testTimedRuleKillIsRecordedOnlyWhenTheExecProceeds {
   struct {
     NSString* name;
@@ -1551,16 +1539,20 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
     BOOL withDeadline;
     BOOL holdAndAsk;
     NSNumber* touchIDReply;
-    BOOL processControlSucceeds;
+    BOOL suspendSucceeds;
+    BOOL resumeSucceeds;
     NSUInteger expected;
   } cases[] = {
       // In window with the kill asked for, but the policy in the window blocks.
-      {@"blocked", SNTEventStateBlockBinary, YES, NO, nil, YES, 0},
+      {@"blocked", SNTEventStateBlockBinary, YES, NO, nil, YES, YES, 0},
       // What both an out-of-window exec and an unwrapped policy leave behind.
-      {@"no deadline", SNTEventStateAllowBinary, NO, NO, nil, YES, 0},
-      {@"TouchID approves", SNTEventStateBlockSigningID, YES, YES, @YES, YES, 1},
-      {@"TouchID denies", SNTEventStateBlockSigningID, YES, YES, @NO, YES, 0},
-      {@"held process cannot resume", SNTEventStateBlockSigningID, YES, YES, @YES, NO, 0},
+      {@"no deadline", SNTEventStateAllowBinary, NO, NO, nil, YES, YES, 0},
+      {@"TouchID approves", SNTEventStateBlockSigningID, YES, YES, @YES, YES, YES, 1},
+      {@"TouchID denies", SNTEventStateBlockSigningID, YES, YES, @NO, YES, YES, 0},
+      // A hold that could not stop the process left it running: recorded.
+      {@"suspend failed, approved", SNTEventStateBlockSigningID, YES, YES, @YES, NO, YES, 1},
+      // A resume that failed left it stopped, and SIGKILL takes it: recorded.
+      {@"resume failed, approved", SNTEventStateBlockSigningID, YES, YES, @YES, YES, NO, 1},
   };
 
   for (const auto& c : cases) {
@@ -1576,10 +1568,16 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
 
     NSArray<NSDictionary*>* recorded = [self recordedKillsForDecision:cd
                                                          touchIDReply:c.touchIDReply
-                                               processControlSucceeds:c.processControlSucceeds];
+                                                      suspendSucceeds:c.suspendSucceeds
+                                                       resumeSucceeds:c.resumeSucceeds];
     XCTAssertEqual(recorded.count, c.expected, @"%@", c.name);
     if (c.expected) {
-      XCTAssertEqualObjects(recorded.firstObject[@"identifier"], @"ABCDE12345", @"%@", c.name);
+      // The TouchID site forwards the exec target's token just as the allow
+      // site does.
+      XCTAssertEqualObjects([recorded.firstObject[@"decision"] timedRuleKillIdentifier],
+                            @"ABCDE12345", @"%@", c.name);
+      XCTAssertEqualObjects(recorded.firstObject[@"pid"], @4242, @"%@", c.name);
+      XCTAssertEqualObjects(recorded.firstObject[@"pidversion"], @7, @"%@", c.name);
     }
   }
 }

@@ -151,7 +151,8 @@ SNTKilledProcess* KillProcess(SNTKillRequest* request, int sig, audit_token_t* t
   pid_t targetPidversion = Pidversion(*token);
 
   if (targetPid == myPid || targetPid == 1) {
-    LOGW(@"Rejecting request to kill disallowed process");
+    LOGW(@"Rejecting request to kill disallowed process %d (from kill command: %@)", targetPid,
+         request.uuid);
     return [[SNTKilledProcess alloc] initWithPid:targetPid
                                       pidversion:targetPidversion
                                            error:SNTKilledProcessErrorInvalidTarget];
@@ -236,7 +237,9 @@ SNTKilledProcess* KillByRunningProcess(SNTKillRequestRunningProcess* request, in
                                        absl::flat_hash_map<pid_t, int>* requestAttempts,
                                        bool* matched) {
   if (![[SNTSystemInfo bootSessionUUID] isEqualToString:request.bootSessionUUID]) {
-    LOGW(@"Request to kill running process with non-matching boot session UUID");
+    LOGW(@"Request to kill running process with non-matching boot session UUID (from kill "
+         @"command: %@)",
+         request.uuid);
     return [[SNTKilledProcess alloc] initWithPid:request.pid
                                       pidversion:request.pidversion
                                            error:SNTKilledProcessErrorBootSessionMismatch];
@@ -248,19 +251,21 @@ SNTKilledProcess* KillByRunningProcess(SNTKillRequestRunningProcess* request, in
       *matched = true;
       return KillProcess(request, sig, &token, env, passSignaledPgids, requestAttempts);
     } else {
-      LOGW(@"Rejecting request to kill pid (%d) due to pidversion mismatch (got: %d, want: %d)",
-           request.pid, Pidversion(token), request.pidversion);
+      LOGW(@"Rejecting request to kill pid (%d) due to pidversion mismatch (got: %d, want: %d) "
+           @"(from kill command: %@)",
+           request.pid, Pidversion(token), request.pidversion, request.uuid);
       return [[SNTKilledProcess alloc] initWithPid:request.pid
                                         pidversion:request.pidversion
                                              error:SNTKilledProcessErrorNoSuchProcess];
     }
   }
+  LOGD(@"No process found for pid (%d) to kill; it has likely exited (from kill command: %@)",
+       request.pid, request.uuid);
   return nil;
 }
 
 // Returns the audit token to signal when every matcher matches `pid`, or
-// nullopt otherwise. Signals nothing: this is the match half on its own, so
-// both the kill loop and the banner's is-anything-running check share it.
+// nullopt otherwise. Signals nothing: this is the match half on its own.
 std::optional<audit_token_t> MatchProcess(
     pid_t pid, const std::vector<std::unique_ptr<ProcessMatcher>>& matchers, const KillEnv& env) {
   // To protect against pid wrap races, we must grab the audit token before
@@ -503,43 +508,6 @@ NSArray<SNTKillResponse*>* KillingMachineTermThenKill(NSArray<SNTKillRequest*>* 
   }
 
   return termed;
-}
-
-std::optional<audit_token_t> KillingMachineAnyMatch(SNTKillRequest* request) {
-  return KillingMachineAnyMatch(request, KillEnv());
-}
-
-std::optional<audit_token_t> KillingMachineAnyMatch(SNTKillRequest* request, const KillEnv& env) {
-  // Before listing processes, unlike the kill pass: nothing here distinguishes
-  // one failure from another, so a request that can never match shouldn't pay
-  // for the snapshot.
-  std::optional<std::vector<std::unique_ptr<ProcessMatcher>>> matchers =
-      BuildMatchers(request, env);
-  if (!matchers) {
-    return std::nullopt;
-  }
-
-  std::optional<std::vector<pid_t>> pids = env.list_pids();
-  if (!pids) {
-    LOGE(@"Unable to get list of running processes");
-    return std::nullopt;
-  }
-
-  // The processes KillProcess refuses to signal are skipped here too: reporting
-  // one of them as a match would promise a kill that never happens.
-  const pid_t myPid = getpid();
-
-  for (pid_t pid : *pids) {
-    if (pid == 0 || pid == 1 || pid == myPid) {
-      continue;
-    }
-
-    if (std::optional<audit_token_t> token = MatchProcess(pid, *matchers, env)) {
-      return token;
-    }
-  }
-
-  return std::nullopt;
 }
 
 }  // namespace santa

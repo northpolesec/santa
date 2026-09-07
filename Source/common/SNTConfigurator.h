@@ -941,12 +941,13 @@ extern NSString* _Nonnull const kStateTempAdminTargetUIDKey;
 
 ///
 ///  Persist (or delete, when `entries` is nil) the pending timed rule kills:
-///  one dictionary per entry, with RuleType, Identifier, CELHash, Deadline,
+///  one dictionary per entry, with RuleType, Identifier, RuleID, Deadline,
 ///  NotifyAt, Notified, optionally the recurring window shape (WindowDays,
-///  WindowStart, WindowEnd, WindowZone), and optionally the mach half of the
-///  deadline (MachDeadline, BootSessionUUID). Returns NO when the record could
-///  not be written to disk; unlike the demoted-admins record the in-memory
-///  value is kept, since it still governs the kills this daemon owes.
+///  WindowStart, WindowEnd, WindowZone), and optionally the boot-bound fields:
+///  BootSessionUUID, the entry's boot stamp, and under it MachDeadline and
+///  Processes, an array of Pid/Pidversion dictionaries. Returns NO when the
+///  record could not be written to disk; unlike the demoted-admins record the
+///  in-memory value is kept, since it still governs the kills this daemon owes.
 ///
 - (BOOL)persistTimedRuleKills:(nullable NSArray<NSDictionary*>*)entries;
 

@@ -339,3 +339,9 @@
 
 /* Notification shown when a temporary admin session ends and the user reverts to standard */
 "Switching to Standard User" = "Перехід до стандартного користувача";
+
+/* Timed rule kill reason: bare Binary rule type name */
+"Binary" = "Бінарний файл";
+
+/* Timed rule kill reason: bare Certificate rule type name */
+"Certificate" = "Сертифікат";

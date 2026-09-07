@@ -21,6 +21,7 @@
 #include "Source/santad/KillingMachine.h"
 
 @class SNTBelievableClock;
+@class SNTCachedDecision;
 @class SNTConfigurator;
 @class SNTNotificationQueue;
 @class SNTRuleTable;
@@ -53,7 +54,7 @@
 @interface SNTTimedRuleKills : NSObject
 
 ///
-///  `killEnv` is the syscall environment kills and match checks run against:
+///  `killEnv` is the syscall environment kills and process lookups run against:
 ///  santa::KillEnv() in production, faked in tests.
 ///
 - (instancetype)initWithNotifierQueue:(SNTNotificationQueue*)notifierQueue
@@ -75,59 +76,52 @@
 - (void)resumeFromSavedState;
 
 ///
-///  Records a kill for the rule identified by (ruleType, identifier, celHash).
-///  Repeated execs inside the same window recompute the same deadline and
-///  change nothing, including writing nothing; when the deadlines differ the
-///  earlier one wins, so everything the rule covers is quit at the first
-///  pending deadline.
+///  Records the kill a decision carries, if any, for the process an allowed exec
+///  produced. `token` is the exec target's audit token. Called wherever Santa's
+///  answer lets the process run: the allow response, and the TouchID reply once
+///  the user has authenticated in time. A decision with no deadline records
+///  nothing, which is every exec not under a windowed rule.
 ///
-///  `celHash` is the rule's CEL text hashed with +celHashForExpression:. It is
-///  part of the key and it is re-checked when the timer fires, so editing the
-///  rule cancels the pending kill rather than quitting things under text that
-///  no longer exists.
+///  The rule-side fields come off `cd`: `timedRuleKillRuleType`,
+///  `timedRuleKillIdentifier`, `ruleId`, the deadline, the warning time and the
+///  window shape. `timedRuleKillIdentifier` must be byte-for-byte what the rule
+///  table stores: the fire-time re-check looks the rule up by it, which SQLite
+///  compares case-sensitively.
 ///
-///  `identifier` must be byte-for-byte what the rule table stores for the rule:
-///  the re-check looks the rule up with `identifier = ?`, which SQLite compares
-///  case-sensitively. A caller that normalizes case or whitespace on the way in
-///  will find nothing at fire time, and every kill for that rule is silently
-///  cancelled instead of running.
+///  `ruleId` is the rule's server-assigned id, which the sync server changes for
+///  every edit to the rule. It is part of the key and it is re-checked when the
+///  timer fires, so editing the rule cancels the pending kill rather than quitting
+///  things under a rule that no longer exists.
 ///
-///  At `notifyAt` the user is warned that whatever the rule covers will be
-///  quit, once per (rule, deadline) and only when something the rule covers is
-///  actually running. A warning is never allowed to hold up a kill: one owed at
-///  a moment the deadline has already arrived is dropped, not delivered late.
+///  Every exec is a new (pid, pidversion) pair on the rule's entry, so every
+///  record writes. When the deadlines differ the earlier one wins for the whole
+///  entry. Recording is refused, with a log line, when `ruleId` is at or below
+///  zero (static rules, `santactl rule --cel`, v1-protocol sync rules) and when
+///  the boot session UUID is unreadable, since nothing recorded without one could
+///  ever be quit.
 ///
-///  Only the rule types that can be matched against a running process are
-///  supported: SIGNINGID (including `platform:`), TEAMID and CDHASH. BINARY and
-///  CERTIFICATE rules are refused with a log line; their window still gates new
-///  executions.
+///  At `timedRuleKillNotifyAt` the user is warned that the recorded executions
+///  will be quit, once per (rule, deadline) and only when one of them is still
+///  running. A warning is never allowed to hold up a kill: one owed at a moment
+///  the deadline has already arrived is dropped, not delivered late.
 ///
-///  `windowDays` (0=Sunday through 6=Saturday), `windowStart` and `windowEnd`
-///  ("HH:MM") and `windowZone` (the zone string the rule wrote: "local", an IANA
-///  name or a [+-]HH:MM offset) describe the recurring window the deadline came
-///  from, and are persisted with the entry so every later pass over it can
+///  Every execution rule type is supported (CDHASH, BINARY, SIGNINGID including
+///  `platform:`, CERTIFICATE and TEAMID), since the kill is by recorded execution
+///  rather than by identity; a type that is not one of those is refused with a
+///  log line.
+///
+///  The window shape (`timedRuleKillWindowDays`, 0=Sunday through 6=Saturday;
+///  `timedRuleKillWindowStart` and `timedRuleKillWindowEnd`, "HH:MM"; and
+///  `timedRuleKillWindowZone`, the zone string the rule wrote: "local", an IANA
+///  name or a [+-]HH:MM offset) describes the recurring window the deadline came
+///  from, and is persisted with the entry so every later pass over it can
 ///  re-check the window. Only the days plus HH:MM form of policy_for_range() has
 ///  a window that recurs; for the timestamp and duration forms these are nil and
 ///  the entry stores no shape. A shape is stored only when all four are given,
 ///  and an entry with no shape is one whose deadline can only ever be met by a
 ///  kill.
 ///
-- (void)recordKillForRuleType:(SNTRuleType)ruleType
-                   identifier:(NSString*)identifier
-                      celHash:(NSString*)celHash
-                     deadline:(NSDate*)deadline
-                     notifyAt:(NSDate*)notifyAt
-                   windowDays:(NSArray<NSNumber*>*)windowDays
-                  windowStart:(NSString*)windowStart
-                    windowEnd:(NSString*)windowEnd
-                   windowZone:(NSString*)windowZone;
-
-///
-///  SHA-256 (lowercase hex) of a rule's CEL text, or nil when there is none.
-///  Exposed so the caller that records an entry and the fire-time re-check
-///  derive CELHash the same way.
-///
-+ (NSString*)celHashForExpression:(NSString*)celExpr;
+- (void)recordKillForDecision:(SNTCachedDecision*)cd process:(audit_token_t)token;
 
 @end
 
