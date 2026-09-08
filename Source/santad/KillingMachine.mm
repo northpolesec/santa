@@ -159,16 +159,6 @@ SNTKilledProcess* KillProcess(SNTKillRequest* request, int sig, audit_token_t* t
   }
 
   if (request.targetProcessGroups) {
-    // The group is read here, immediately after the caller verified the audit
-    // token that brackets the match, so the raw syscall adjacency (token_after
-    // -> getpgid) matches the direct path's. The safety is NOT equivalent,
-    // though: the direct path's proc_signal_with_audittoken re-validates the
-    // token at delivery, so a pid recycled after matching yields ESRCH and its
-    // effective window is ~zero. kill(-pgid) cannot re-validate anything, so
-    // here the adjacency is the sole protection: a pid recycled in the narrow
-    // token_after -> getpgid window would put a stranger's group in scope. That
-    // residual is inherent to kill(-pgid) and is accepted; re-reading the token
-    // around this lookup would not remove it.
     pid_t targetPgid = env.pgid_for_pid(targetPid);
 
     // A group is only a legitimate target above pgid 1 and outside our own:
@@ -178,6 +168,21 @@ SNTKilledProcess* KillProcess(SNTKillRequest* request, int sig, audit_token_t* t
     // signaling the one matched process, which is never broader than what was
     // asked for.
     if (targetPgid > 1 && targetPgid != getpgrp()) {
+      // Re-read the token so the lookup above sits between two matching reads:
+      // a (pid, pidversion) pair never recurs, so the group provably belongs to
+      // the process that matched. kill(-pgid) re-validates nothing at delivery
+      // the way the direct signal below does, so this is the only guard against
+      // a pid recycled since the match putting a stranger's group in scope.
+      audit_token_t current;
+      if (!env.token_for_pid(targetPid, &current) || Pidversion(current) != targetPidversion) {
+        LOGW(@"Not signaling (%d) process group %d: pid %d no longer holds the matched process "
+             @"(from kill command: %@)",
+             sig, targetPgid, targetPid, request.uuid);
+        return [[SNTKilledProcess alloc] initWithPid:targetPid
+                                          pidversion:targetPidversion
+                                               error:SNTKilledProcessErrorNoSuchProcess];
+      }
+
       // This request already tried this group, so its members all reuse that
       // one attempt's outcome. Reporting a failure for each of them keeps a
       // failed delivery visible for every process it left unsignaled.

@@ -477,6 +477,31 @@ void TwoMatchesInOneGroup(FakeEnv* fake, pid_t pgid) {
   XCTAssertEqual(response.killedProcesses[0].error, SNTKilledProcessErrorNoSuchProcess);
 }
 
+// The pgid lookup is bracketed by two token reads, so a pid recycled between the
+// match and the lookup never puts a stranger's group in scope: nothing is
+// signaled at all.
+- (void)testGroupTargetingSkipsAGroupWhosePidWasRecycledDuringTheLookup {
+  FakeEnv fake;
+  fake.pidversions = {{10, 7}};
+  fake.pgids = {{10, getpgrp() + 1}};
+  // The match reads pidversion 7; the re-read after the pgid lookup sees 8.
+  fake.recycleAfterNthRead = {{10, 1}};
+
+  SNTKillRequest* request =
+      [[SNTKillRequestRunningProcess alloc] initWithUUID:@"uuid"
+                                                     pid:10
+                                              pidversion:7
+                                         bootSessionUUID:[SNTSystemInfo bootSessionUUID]
+                                                  signal:SIGKILL
+                                     targetProcessGroups:YES];
+
+  SNTKillResponse* response = santa::KillingMachine(request, MakeKillEnv(&fake));
+
+  XCTAssertTrue(fake.signals.empty());
+  XCTAssertEqual(response.killedProcesses.count, 1);
+  XCTAssertEqual(response.killedProcesses[0].error, SNTKilledProcessErrorNoSuchProcess);
+}
+
 - (void)testRunningProcessRequestHonorsSignalAndGroupTargeting {
   pid_t pgid = getpgrp() + 3;
 

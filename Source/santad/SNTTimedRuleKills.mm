@@ -18,7 +18,6 @@
 #include <Kernel/kern/cs_blobs.h>
 #include <libproc.h>
 #include <mach/mach_time.h>
-#include <signal.h>
 #include <sys/param.h>
 
 #include <algorithm>
@@ -936,11 +935,13 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
 }
 
 /// The kill at a deadline: one running-process request per recorded pair of every
-/// due entry, all sent in one pass so they share the grace period. The rule and
-/// the window have already been re-checked; a dead pair fails its lookup inside
-/// the KillingMachine, so the entries are not pruned first. One summary per
-/// entry at info, one line per request at debug carrying the uuid every
-/// KillingMachine outcome logs.
+/// due entry, all sent in one pass so they share the grace period. Each request
+/// names the recorded execution alone; its process group is deliberately not
+/// taken, so a child it spawned survives unless it was recorded in its own
+/// right. The rule and the window have already been re-checked; a dead pair
+/// fails its lookup inside the KillingMachine, so the entries are not pruned
+/// first. One summary per entry at info, one line per request at debug carrying
+/// the uuid every KillingMachine outcome logs.
 - (void)killEntriesSerialized:(NSArray<SNTTimedRuleKillEntry*>*)entries {
   NSString* bootSession = [SNTSystemInfo bootSessionUUID];
   NSMutableArray<SNTKillRequest*>* requests = [NSMutableArray array];
@@ -953,9 +954,7 @@ class DeadlineTimer : public santa::Timer<DeadlineTimer> {
           [[SNTKillRequestRunningProcess alloc] initWithUUID:uuid
                                                          pid:[proc[kProcessPidKey] intValue]
                                                   pidversion:[proc[kProcessPidversionKey] intValue]
-                                             bootSessionUUID:bootSession
-                                                      signal:SIGKILL
-                                         targetProcessGroups:YES];
+                                             bootSessionUUID:bootSession];
       if (!request) {
         // Only when the boot session reads empty at fire time; the pair itself
         // passed validation. Rare enough to be worth a line when it happens.
