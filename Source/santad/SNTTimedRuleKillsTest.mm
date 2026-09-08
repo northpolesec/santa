@@ -332,12 +332,13 @@ static NSString* const kOtherBootSessionUUID = @"6A2B4C8E-0000-0000-0000-0000000
   return [self makeSUTWithClock:clock];
 }
 
-/// The two deliveries a kill makes to the matching process's group: SIGTERM,
-/// then SIGKILL to whatever survived the grace period.
-- (NSArray<NSString*>*)termThenKillOfTheProcessGroup {
+/// The two deliveries a kill makes to the recorded process: SIGTERM, then
+/// SIGKILL if it survived the grace period. Its process group is deliberately
+/// not taken, so nothing else is signaled.
+- (NSArray<NSString*>*)termThenKillOfTheRecordedProcess {
   return @[
-    [NSString stringWithFormat:@"group:%d:%d", self.matchingPgid, SIGTERM],
-    [NSString stringWithFormat:@"group:%d:%d", self.matchingPgid, SIGKILL],
+    [NSString stringWithFormat:@"pid:%d:%d", getppid(), SIGTERM],
+    [NSString stringWithFormat:@"pid:%d:%d", getppid(), SIGKILL],
   ];
 }
 
@@ -964,12 +965,12 @@ static NSString* const kOtherBootSessionUUID = @"6A2B4C8E-0000-0000-0000-0000000
 
 #pragma mark The kill
 
-// Every execution rule type quits the process group of the execution recorded
-// under it: SIGTERM, five seconds, then SIGKILL to whatever is still there. The
-// five types take one path; the only per-type code left is the fire-time rule
-// lookup through IdentifiersForEntry, which each row exercises by its own
-// identifier, the `platform:` SIGNINGID form included.
-- (void)testEveryRuleTypeTermsThenKillsTheRecordedProcessGroup {
+// Every execution rule type quits the execution recorded under it: SIGTERM,
+// five seconds, then SIGKILL if it is still there. The five types take one
+// path; the only per-type code left is the fire-time rule lookup through
+// IdentifiersForEntry, which each row exercises by its own identifier, the
+// `platform:` SIGNINGID form included.
+- (void)testEveryRuleTypeTermsThenKillsTheRecordedProcess {
   NSArray<NSArray*>* rows = @[
     @[ @(SNTRuleTypeTeamID), kMatchingTeamID ],
     @[ @(SNTRuleTypeSigningID), [NSString stringWithFormat:@"platform:%@", kMatchingSigningID] ],
@@ -993,8 +994,8 @@ static NSString* const kOtherBootSessionUUID = @"6A2B4C8E-0000-0000-0000-0000000
     [self waitForEntriesToClear:sut];
     [self drain:sut];
 
-    XCTAssertEqualObjects(SignalDescriptions(_fake.signals), [self termThenKillOfTheProcessGroup],
-                          @"%@", identifier);
+    XCTAssertEqualObjects(SignalDescriptions(_fake.signals),
+                          [self termThenKillOfTheRecordedProcess], @"%@", identifier);
     XCTAssertEqual(_fake.waits.size(), 1u, @"%@", identifier);
     XCTAssertEqualWithAccuracy(_fake.waits.front(), 5.0, 0.001);
     // The clear reached disk, not just the configurator's in-memory state.
@@ -1002,9 +1003,9 @@ static NSString* const kOtherBootSessionUUID = @"6A2B4C8E-0000-0000-0000-0000000
   }
 }
 
-// Two deadlines landing in one pass share one grace period: every due entry
-// is collected into a single kill call. Both rules cover the one process, so
-// the shared group is also signaled once per pass.
+// Two deadlines landing in one pass share one grace period: every due entry is
+// collected into a single kill call. Both rules cover the one process, and each
+// entry is its own request, so it is signaled once per entry per pass.
 - (void)testDeadlinesInOnePassShareTheGracePeriod {
   [self addRuleOfType:SNTRuleTypeTeamID identifier:kMatchingTeamID ruleId:kRuleID];
   [self addRuleOfType:SNTRuleTypeCDHash identifier:kMatchingCDHash ruleId:kRuleID];
@@ -1018,15 +1019,18 @@ static NSString* const kOtherBootSessionUUID = @"6A2B4C8E-0000-0000-0000-0000000
   [self drain:sut];
 
   XCTAssertEqual(_fake.waits.size(), 1u);
-  XCTAssertEqualObjects(SignalDescriptions(_fake.signals), [self termThenKillOfTheProcessGroup]);
+  XCTAssertEqualObjects(SignalDescriptions(_fake.signals), (@[
+                          [NSString stringWithFormat:@"pid:%d:%d", getppid(), SIGTERM],
+                          [NSString stringWithFormat:@"pid:%d:%d", getppid(), SIGTERM],
+                          [NSString stringWithFormat:@"pid:%d:%d", getppid(), SIGKILL],
+                          [NSString stringWithFormat:@"pid:%d:%d", getppid(), SIGKILL],
+                        ]));
 }
 
 - (void)testFireBuildsOneRequestPerRecordedPairAndSharesOneGrace {
   [self addRuleOfType:SNTRuleTypeTeamID identifier:kMatchingTeamID ruleId:kRuleID];
   _fake.pidversions[6001] = 1;
-  _fake.pgids[6001] = self.matchingPgid;
   _fake.pidversions[6002] = 1;
-  _fake.pgids[6002] = self.matchingPgid + 1;
 
   SNTTimedRuleKills* sut = [self makeSUT];
   NSDate* due = [NSDate dateWithTimeIntervalSinceNow:0.5];
@@ -1048,15 +1052,14 @@ static NSString* const kOtherBootSessionUUID = @"6A2B4C8E-0000-0000-0000-0000000
   [self waitForEntriesToClear:sut];
   [self drain:sut];
 
-  // Both groups are termed, one grace period passes, both are killed.
+  // Both processes are termed, one grace period passes, both are killed.
   XCTAssertEqual(_fake.waits.size(), 1u);
-  XCTAssertEqualObjects(
-      SignalDescriptions(_fake.signals), (@[
-        [NSString stringWithFormat:@"group:%d:%d", self.matchingPgid, SIGTERM],
-        [NSString stringWithFormat:@"group:%d:%d", self.matchingPgid + 1, SIGTERM],
-        [NSString stringWithFormat:@"group:%d:%d", self.matchingPgid, SIGKILL],
-        [NSString stringWithFormat:@"group:%d:%d", self.matchingPgid + 1, SIGKILL],
-      ]));
+  XCTAssertEqualObjects(SignalDescriptions(_fake.signals), (@[
+                          [NSString stringWithFormat:@"pid:%d:%d", 6001, SIGTERM],
+                          [NSString stringWithFormat:@"pid:%d:%d", 6002, SIGTERM],
+                          [NSString stringWithFormat:@"pid:%d:%d", 6001, SIGKILL],
+                          [NSString stringWithFormat:@"pid:%d:%d", 6002, SIGKILL],
+                        ]));
 }
 
 - (void)testAnEntryWhosePairsAreAllDeadKillsNothingAndIsSpent {
@@ -1440,7 +1443,7 @@ static NSString* const kOtherBootSessionUUID = @"6A2B4C8E-0000-0000-0000-0000000
   // the process snapshot behind the warning never held the kill up.
   XCTAssertEqual(banners.count, 1u);
   XCTAssertEqualObjects(banners.firstObject[@"signals"], @2);
-  XCTAssertEqualObjects(SignalDescriptions(_fake.signals), [self termThenKillOfTheProcessGroup]);
+  XCTAssertEqualObjects(SignalDescriptions(_fake.signals), [self termThenKillOfTheRecordedProcess]);
 }
 
 #pragma mark Restart
@@ -1523,7 +1526,7 @@ static NSString* const kOtherBootSessionUUID = @"6A2B4C8E-0000-0000-0000-0000000
 
   [self waitForEntriesToClear:sut];
   [self drain:sut];
-  XCTAssertEqualObjects(SignalDescriptions(_fake.signals), [self termThenKillOfTheProcessGroup]);
+  XCTAssertEqualObjects(SignalDescriptions(_fake.signals), [self termThenKillOfTheRecordedProcess]);
   XCTAssertNil(self.savedEntries);
 }
 
@@ -1544,7 +1547,7 @@ static NSString* const kOtherBootSessionUUID = @"6A2B4C8E-0000-0000-0000-0000000
 
   [self waitForEntriesToClear:sut];
   [self drain:sut];
-  XCTAssertEqualObjects(SignalDescriptions(_fake.signals), [self termThenKillOfTheProcessGroup]);
+  XCTAssertEqualObjects(SignalDescriptions(_fake.signals), [self termThenKillOfTheRecordedProcess]);
 }
 
 - (void)testRestartDropsMalformedEntries {
@@ -1714,7 +1717,7 @@ static NSString* const kOtherBootSessionUUID = @"6A2B4C8E-0000-0000-0000-0000000
 
   // One rule's worth of deliveries: the row whose window had ended. The
   // rescheduled row covers the same process and would have doubled them.
-  XCTAssertEqualObjects(SignalDescriptions(_fake.signals), [self termThenKillOfTheProcessGroup]);
+  XCTAssertEqualObjects(SignalDescriptions(_fake.signals), [self termThenKillOfTheRecordedProcess]);
 
   // The other moved to 17:00 in its own zone, five hours on from the clock, and
   // kept the shape so the next pass can ask again.
@@ -1777,8 +1780,8 @@ static NSString* const kOtherBootSessionUUID = @"6A2B4C8E-0000-0000-0000-0000000
     [sut resumeFromSavedState];
     [self drain:sut];
 
-    XCTAssertEqualObjects(SignalDescriptions(_fake.signals), [self termThenKillOfTheProcessGroup],
-                          @"%@", defect);
+    XCTAssertEqualObjects(SignalDescriptions(_fake.signals),
+                          [self termThenKillOfTheRecordedProcess], @"%@", defect);
     XCTAssertNil(self.savedEntries, @"%@", defect);
   }
 }
@@ -1986,7 +1989,7 @@ static NSString* const kOtherBootSessionUUID = @"6A2B4C8E-0000-0000-0000-0000000
 
   [self waitForEntriesToClear:sut];
   [self drain:sut];
-  XCTAssertEqualObjects(SignalDescriptions(_fake.signals), [self termThenKillOfTheProcessGroup]);
+  XCTAssertEqualObjects(SignalDescriptions(_fake.signals), [self termThenKillOfTheRecordedProcess]);
 }
 
 #pragma mark A moved clock
@@ -2042,7 +2045,7 @@ static NSString* const kOtherBootSessionUUID = @"6A2B4C8E-0000-0000-0000-0000000
 
   [self waitForEntriesToClear:sut];
   [self drain:sut];
-  XCTAssertEqualObjects(SignalDescriptions(_fake.signals), [self termThenKillOfTheProcessGroup]);
+  XCTAssertEqualObjects(SignalDescriptions(_fake.signals), [self termThenKillOfTheRecordedProcess]);
 }
 
 // The same rollback with less mach time behind it leaves the deadline in the
@@ -2103,7 +2106,7 @@ static NSString* const kOtherBootSessionUUID = @"6A2B4C8E-0000-0000-0000-0000000
 
   [self waitForEntriesToClear:sut];
   [self drain:sut];
-  XCTAssertEqualObjects(SignalDescriptions(_fake.signals), [self termThenKillOfTheProcessGroup]);
+  XCTAssertEqualObjects(SignalDescriptions(_fake.signals), [self termThenKillOfTheRecordedProcess]);
 }
 
 // The same entry from an earlier boot session. Its mach value belongs to a
@@ -2250,7 +2253,7 @@ static NSString* const kOtherBootSessionUUID = @"6A2B4C8E-0000-0000-0000-0000000
   [self waitForEntriesToClear:sut];
   [self drain:sut];
 
-  XCTAssertEqualObjects(SignalDescriptions(_fake.signals), [self termThenKillOfTheProcessGroup]);
+  XCTAssertEqualObjects(SignalDescriptions(_fake.signals), [self termThenKillOfTheRecordedProcess]);
   XCTAssertEqual(banners.count, 0u);
 }
 
@@ -2284,7 +2287,7 @@ static NSString* const kOtherBootSessionUUID = @"6A2B4C8E-0000-0000-0000-0000000
 
   [self waitForEntriesToClear:sut];
   [self drain:sut];
-  XCTAssertEqualObjects(SignalDescriptions(_fake.signals), [self termThenKillOfTheProcessGroup]);
+  XCTAssertEqualObjects(SignalDescriptions(_fake.signals), [self termThenKillOfTheRecordedProcess]);
 }
 
 - (void)testAnEntryLoadedFromAForeignBootGetsItsMachDeadlineBackOnTheNextRecord {

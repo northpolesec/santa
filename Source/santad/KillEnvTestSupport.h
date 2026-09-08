@@ -75,7 +75,8 @@ struct FakeKillEnv {
   // pid -> the audit token read after which that pid is recycled: its live
   // pidversion changes, modeling a different process taking over the pid.
   // Reads are counted per pid across the whole call. Matching reads a pid's
-  // token twice, so 1 recycles mid-match and 2 recycles after it matched.
+  // token twice, so 1 recycles mid-match and 2 recycles after it matched;
+  // group targeting reads once more, before it signals the group.
   std::map<pid_t, int> recycleAfterNthRead;
   // errno both signal seams return for a delivery that reaches its target.
   int signalError = 0;

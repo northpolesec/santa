@@ -159,16 +159,6 @@ SNTKilledProcess* KillProcess(SNTKillRequest* request, int sig, audit_token_t* t
   }
 
   if (request.targetProcessGroups) {
-    // The group is read here, immediately after the caller verified the audit
-    // token that brackets the match, so the raw syscall adjacency (token_after
-    // -> getpgid) matches the direct path's. The safety is NOT equivalent,
-    // though: the direct path's proc_signal_with_audittoken re-validates the
-    // token at delivery, so a pid recycled after matching yields ESRCH and its
-    // effective window is ~zero. kill(-pgid) cannot re-validate anything, so
-    // here the adjacency is the sole protection: a pid recycled in the narrow
-    // token_after -> getpgid window would put a stranger's group in scope. That
-    // residual is inherent to kill(-pgid) and is accepted; re-reading the token
-    // around this lookup would not remove it.
     pid_t targetPgid = env.pgid_for_pid(targetPid);
 
     // A group is only a legitimate target above pgid 1 and outside our own:
@@ -196,22 +186,35 @@ SNTKilledProcess* KillProcess(SNTKillRequest* request, int sig, audit_token_t* t
                                                error:SNTKilledProcessErrorNone];
       }
 
-      int error = env.signal_group(targetPgid, sig);
-      (*requestAttempts)[targetPgid] = error;
-      if (error == 0) {
-        // Only a landed delivery covers the pass: a failure must leave another
-        // request free to try the group itself.
-        passSignaledPgids->insert(targetPgid);
-        LOGI(@"Signaled (%d) process group: %d (from kill command: %@)", sig, targetPgid,
-             request.uuid);
-      } else {
-        LOGW(@"Failed to signal (%d) process group: %d, error: %d (from kill command: %@)", sig,
-             targetPgid, error, request.uuid);
+      // Re-read the token just before delivering, so the pgid lookup above sits
+      // between two matching reads: kill(-pgid) re-validates nothing at
+      // delivery the way the direct signal does. The dedupe returns above
+      // deliver nothing, so only this delivery needs the re-read. A failed
+      // re-read falls through to the direct signal like every other lookup
+      // failure in this branch; that path validates its token at delivery.
+      audit_token_t current;
+      if (env.token_for_pid(targetPid, &current) && Pidversion(current) == targetPidversion) {
+        int error = env.signal_group(targetPgid, sig);
+        (*requestAttempts)[targetPgid] = error;
+        if (error == 0) {
+          // Only a landed delivery covers the pass: a failure must leave
+          // another request free to try the group itself.
+          passSignaledPgids->insert(targetPgid);
+          LOGI(@"Signaled (%d) process group: %d (from kill command: %@)", sig, targetPgid,
+               request.uuid);
+        } else {
+          LOGW(@"Failed to signal (%d) process group: %d, error: %d (from kill command: %@)", sig,
+               targetPgid, error, request.uuid);
+        }
+
+        return [[SNTKilledProcess alloc] initWithPid:targetPid
+                                          pidversion:targetPidversion
+                                               error:LibprocSignalErrorToKilledProcessError(error)];
       }
 
-      return [[SNTKilledProcess alloc] initWithPid:targetPid
-                                        pidversion:targetPidversion
-                                             error:LibprocSignalErrorToKilledProcessError(error)];
+      LOGW(@"Not signaling (%d) process group %d: pid %d no longer holds the matched process, "
+           @"falling back to the direct signal (from kill command: %@)",
+           sig, targetPgid, targetPid, request.uuid);
     }
   }
 
