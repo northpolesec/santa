@@ -477,10 +477,9 @@ void TwoMatchesInOneGroup(FakeEnv* fake, pid_t pgid) {
   XCTAssertEqual(response.killedProcesses[0].error, SNTKilledProcessErrorNoSuchProcess);
 }
 
-// The pgid lookup is bracketed by two token reads, so a pid recycled between the
-// match and the lookup never puts a stranger's group in scope: nothing is
-// signaled at all.
-- (void)testGroupTargetingSkipsAGroupWhosePidWasRecycledDuringTheLookup {
+// A pid recycled between the match and the pgid lookup is never delivered a
+// group signal: the kill falls back to the direct signal, which lands nowhere.
+- (void)testGroupTargetingFallsBackWhenPidRecycledDuringTheLookup {
   FakeEnv fake;
   fake.pidversions = {{10, 7}};
   fake.pgids = {{10, getpgrp() + 1}};
@@ -497,9 +496,39 @@ void TwoMatchesInOneGroup(FakeEnv* fake, pid_t pgid) {
 
   SNTKillResponse* response = santa::KillingMachine(request, MakeKillEnv(&fake));
 
-  XCTAssertTrue(fake.signals.empty());
+  XCTAssertEqualObjects(SignalDescriptions(fake.signals), (@[ @"pid:10:9" ]));
   XCTAssertEqual(response.killedProcesses.count, 1);
   XCTAssertEqual(response.killedProcesses[0].error, SNTKilledProcessErrorNoSuchProcess);
+}
+
+// The same recycle on the matcher path: only the recycled match falls back to
+// the direct signal; a live match in the same group still delivers to the group.
+- (void)testGroupTargetingFallsBackOnlyForTheRecycledMatch {
+  pid_t pgid = getpgrp() + 1;
+
+  FakeEnv fake;
+  fake.pids = std::vector<pid_t>{10, 11};
+  fake.pidversions = {{10, 1}, {11, 2}};
+  fake.matching = {10, 11};
+  fake.pgids = {{10, pgid}, {11, pgid}};
+  // Reads one and two bracket pid 10's match; the re-read before the group
+  // delivery sees the change.
+  fake.recycleAfterNthRead = {{10, 2}};
+
+  SNTKillRequest* request = [[SNTKillRequestTeamID alloc] initWithUUID:@"uuid"
+                                                                teamID:kMatchingTeamID
+                                                                signal:SIGKILL
+                                                   targetProcessGroups:YES];
+
+  SNTKillResponse* response = santa::KillingMachine(request, MakeKillEnv(&fake));
+
+  XCTAssertEqualObjects(SignalDescriptions(fake.signals),
+                        (@[ @"pid:10:9", [NSString stringWithFormat:@"group:%d:9", pgid] ]));
+  XCTAssertEqual(response.killedProcesses.count, 2);
+  XCTAssertEqual(response.killedProcesses[0].pid, 10);
+  XCTAssertEqual(response.killedProcesses[0].error, SNTKilledProcessErrorNoSuchProcess);
+  XCTAssertEqual(response.killedProcesses[1].pid, 11);
+  XCTAssertEqual(response.killedProcesses[1].error, SNTKilledProcessErrorNone);
 }
 
 - (void)testRunningProcessRequestHonorsSignalAndGroupTargeting {

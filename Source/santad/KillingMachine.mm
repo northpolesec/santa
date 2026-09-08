@@ -168,21 +168,6 @@ SNTKilledProcess* KillProcess(SNTKillRequest* request, int sig, audit_token_t* t
     // signaling the one matched process, which is never broader than what was
     // asked for.
     if (targetPgid > 1 && targetPgid != getpgrp()) {
-      // Re-read the token so the lookup above sits between two matching reads:
-      // a (pid, pidversion) pair never recurs, so the group provably belongs to
-      // the process that matched. kill(-pgid) re-validates nothing at delivery
-      // the way the direct signal below does, so this is the only guard against
-      // a pid recycled since the match putting a stranger's group in scope.
-      audit_token_t current;
-      if (!env.token_for_pid(targetPid, &current) || Pidversion(current) != targetPidversion) {
-        LOGW(@"Not signaling (%d) process group %d: pid %d no longer holds the matched process "
-             @"(from kill command: %@)",
-             sig, targetPgid, targetPid, request.uuid);
-        return [[SNTKilledProcess alloc] initWithPid:targetPid
-                                          pidversion:targetPidversion
-                                               error:SNTKilledProcessErrorNoSuchProcess];
-      }
-
       // This request already tried this group, so its members all reuse that
       // one attempt's outcome. Reporting a failure for each of them keeps a
       // failed delivery visible for every process it left unsignaled.
@@ -201,22 +186,35 @@ SNTKilledProcess* KillProcess(SNTKillRequest* request, int sig, audit_token_t* t
                                                error:SNTKilledProcessErrorNone];
       }
 
-      int error = env.signal_group(targetPgid, sig);
-      (*requestAttempts)[targetPgid] = error;
-      if (error == 0) {
-        // Only a landed delivery covers the pass: a failure must leave another
-        // request free to try the group itself.
-        passSignaledPgids->insert(targetPgid);
-        LOGI(@"Signaled (%d) process group: %d (from kill command: %@)", sig, targetPgid,
-             request.uuid);
-      } else {
-        LOGW(@"Failed to signal (%d) process group: %d, error: %d (from kill command: %@)", sig,
-             targetPgid, error, request.uuid);
+      // Re-read the token just before delivering, so the pgid lookup above sits
+      // between two matching reads: kill(-pgid) re-validates nothing at
+      // delivery the way the direct signal does. The dedupe returns above
+      // deliver nothing, so only this delivery needs the re-read. A failed
+      // re-read falls through to the direct signal like every other lookup
+      // failure in this branch; that path validates its token at delivery.
+      audit_token_t current;
+      if (env.token_for_pid(targetPid, &current) && Pidversion(current) == targetPidversion) {
+        int error = env.signal_group(targetPgid, sig);
+        (*requestAttempts)[targetPgid] = error;
+        if (error == 0) {
+          // Only a landed delivery covers the pass: a failure must leave
+          // another request free to try the group itself.
+          passSignaledPgids->insert(targetPgid);
+          LOGI(@"Signaled (%d) process group: %d (from kill command: %@)", sig, targetPgid,
+               request.uuid);
+        } else {
+          LOGW(@"Failed to signal (%d) process group: %d, error: %d (from kill command: %@)", sig,
+               targetPgid, error, request.uuid);
+        }
+
+        return [[SNTKilledProcess alloc] initWithPid:targetPid
+                                          pidversion:targetPidversion
+                                               error:LibprocSignalErrorToKilledProcessError(error)];
       }
 
-      return [[SNTKilledProcess alloc] initWithPid:targetPid
-                                        pidversion:targetPidversion
-                                             error:LibprocSignalErrorToKilledProcessError(error)];
+      LOGW(@"Not signaling (%d) process group %d: pid %d no longer holds the matched process, "
+           @"falling back to the direct signal (from kill command: %@)",
+           sig, targetPgid, targetPid, request.uuid);
     }
   }
 
