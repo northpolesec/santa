@@ -192,7 +192,7 @@ public struct SNTNotificationSilenceView: View {
 
   let dateFormatter: DateComponentsFormatter = {
     let df = DateComponentsFormatter()
-    df.unitsStyle = .spellOut
+    df.unitsStyle = .full
     df.allowedUnits = [.day, .month, .weekOfMonth]
     return df
   }()
