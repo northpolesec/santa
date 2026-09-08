@@ -16,8 +16,11 @@
 #include "Source/common/SystemResources.h"
 
 #include <dispatch/dispatch.h>
+#include <errno.h>
 #include <libproc.h>
 #include <mach/kern_return.h>
+#include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #include <optional>
 #include <vector>
@@ -79,6 +82,53 @@ std::optional<SantaTaskInfo> GetTaskInfo() {
       .total_system_nanos = MachTimeToNanos(pti.pti_total_system),
   };
 }
+
+#ifdef DEBUG
+
+namespace {
+
+std::optional<dev_t> gBootVolumeGroupDevOverride;
+bool gBootVolumeGroupDevUnavailable = false;
+
+}  // namespace
+
+#endif  // DEBUG
+
+std::optional<dev_t> GetBootVolumeGroupDev() {
+#ifdef DEBUG
+  if (gBootVolumeGroupDevUnavailable) {
+    return std::nullopt;
+  }
+  if (gBootVolumeGroupDevOverride.has_value()) {
+    return gBootVolumeGroupDevOverride;
+  }
+#endif  // DEBUG
+
+  static std::optional<dev_t> cached;
+  static dispatch_once_t once_token;
+  dispatch_once(&once_token, ^{
+    struct stat sb;
+    if (stat("/", &sb) == 0) {
+      cached = sb.st_dev;
+    } else {
+      LOGE(@"Unable to determine boot volume device: %s", strerror(errno));
+    }
+  });
+
+  return cached;
+}
+
+#ifdef DEBUG
+
+void SetBootVolumeGroupDevForTesting(std::optional<dev_t> dev) {
+  gBootVolumeGroupDevOverride = dev;
+}
+
+void SetBootVolumeGroupDevUnavailableForTesting(bool unavailable) {
+  gBootVolumeGroupDevUnavailable = unavailable;
+}
+
+#endif  // DEBUG
 
 std::optional<std::vector<pid_t>> GetPidList() {
   int n_procs = proc_listpids(PROC_ALL_PIDS, 0, NULL, 0);

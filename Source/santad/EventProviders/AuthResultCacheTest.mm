@@ -122,6 +122,42 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
   XCTAssertEqual(cache->CheckCache(&nonrootFile).action, SNTActionRespondDeny);
 }
 
+- (void)testDenyOnceLeavesNoEntry {
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  // A long deny interval so that a retained deny could not expire on its own
+  // during the test.
+  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(mockESApi, nil, 600000);
+
+  es_file_t rootFile = MakeCacheableFile(RootDevno(), 111);
+
+  // Like the other terminal actions, this one is only reachable from the
+  // in-flight state.
+  XCTAssertFalse(cache->AddToCache(&rootFile, SNTActionRespondDenyOnce));
+
+  XCTAssertTrue(cache->AddToCache(&rootFile, SNTActionRequestBinary));
+  XCTAssertEqual(cache->CheckCache(&rootFile).action, SNTActionRequestBinary);
+
+  XCTAssertTrue(cache->AddToCache(&rootFile, SNTActionRespondDenyOnce));
+
+  // No entry is left behind at all, so the result cannot be applied to a later
+  // execution of the same vnode and does not depend on elapsed time.
+  XCTAssertEqual(cache->CheckCache(&rootFile).action, SNTActionUnset);
+  AssertCacheCounts(cache, 0, 0);
+}
+
+- (void)testDenyIsStillRetained {
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(mockESApi, nil, 600000);
+
+  es_file_t rootFile = MakeCacheableFile(RootDevno(), 111);
+
+  XCTAssertTrue(cache->AddToCache(&rootFile, SNTActionRequestBinary));
+  XCTAssertTrue(cache->AddToCache(&rootFile, SNTActionRespondDeny));
+
+  XCTAssertEqual(cache->CheckCache(&rootFile).action, SNTActionRespondDeny);
+  AssertCacheCounts(cache, 1, 0);
+}
+
 - (void)testFlushCache {
   id<SNTEndpointSecurityClientBase> client =
       OCMProtocolMock(@protocol(SNTEndpointSecurityClientBase));
@@ -370,6 +406,43 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
 
   XCTAssertThrows(FlushCacheReasonToString(
       (FlushCacheReason)(static_cast<int>(FlushCacheReason::kTransitiveRulesChanged) + 1)));
+}
+
+- (void)testUnconfirmedIdentityIsNotStoredForReuse {
+  // AuthResultCache keeps the identity from a no-cache allow so the next
+  // execution can skip recomputing it. An unconfirmed identity must not be kept.
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(mockESApi, nil);
+
+  es_file_t file = MakeCacheableFile(RootDevno(), 456);
+
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+  cd.sha256 = @"unconfirmed-hash";
+  cd.identityMismatched = YES;
+
+  XCTAssertTrue(cache->AddToCache(&file, SNTActionRequestBinary));
+  XCTAssertTrue(cache->AddToCache(&file, SNTActionRespondAllowNoCache, cd));
+
+  santa::CachedAuthResult entry = cache->CheckCache(&file);
+  XCTAssertEqual(entry.action, SNTActionRespondAllowNoCache);
+  XCTAssertNil(entry.cached_decision);
+}
+
+- (void)testConfirmedIdentityIsStillStoredForReuse {
+  // Regression guard for the above: a confirmed identity must still be kept.
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(mockESApi, nil);
+
+  es_file_t file = MakeCacheableFile(RootDevno(), 457);
+
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+  cd.sha256 = @"confirmed-hash";
+
+  XCTAssertTrue(cache->AddToCache(&file, SNTActionRequestBinary));
+  XCTAssertTrue(cache->AddToCache(&file, SNTActionRespondAllowNoCache, cd));
+
+  santa::CachedAuthResult entry = cache->CheckCache(&file);
+  XCTAssertEqualObjects(entry.cached_decision.sha256, @"confirmed-hash");
 }
 
 @end

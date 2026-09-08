@@ -318,6 +318,7 @@ message Execution {
     REASON_CDHASH = 12;
     REASON_CEL_FALLBACK = 13;
     REASON_PLATFORM = 14;
+    REASON_BINARY_MISMATCH = 15;
   }
   optional Reason reason = 10;
 

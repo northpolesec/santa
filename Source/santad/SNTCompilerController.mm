@@ -191,6 +191,15 @@ static constexpr std::string_view kIgnoredCompilerProcessPathPrefix = "/dev/";
 
   // If we get here, we need to update transitve rules
   if (targetFile) {
+    if (targetFile.identityVerification == SNTFileInfoIdentityMismatch) {
+      // A transitive rule names a file by content hash and persists, so it must
+      // not be written from an unconfirmed read. Checked explicitly rather than
+      // left to the fallbacks above: those fire only when no SNTFileInfo could
+      // be built at all, and an unconfirmed read still produces one.
+      LOGW(@"Not creating transitive rule for %@: identity could not be confirmed",
+           targetFile.path);
+      return NO;
+    }
     [self createTransitiveRule:esMsg target:targetFile logger:logger];
     return YES;
   } else {

@@ -73,6 +73,7 @@ struct ProtoTraits<false> {
   static constexpr Decision BLOCK_TEAMID = ::santa::sync::v1::BLOCK_TEAMID;
   static constexpr Decision BLOCK_SIGNINGID = ::santa::sync::v1::BLOCK_SIGNINGID;
   static constexpr Decision BLOCK_CDHASH = ::santa::sync::v1::BLOCK_CDHASH;
+  static constexpr Decision BLOCK_BINARY_MISMATCH = ::santa::sync::v1::BLOCK_BINARY_MISMATCH;
   static constexpr Decision BUNDLE_BINARY = ::santa::sync::v1::BUNDLE_BINARY;
   // v1 doesn't have CEL fallback decisions; fall back to UNKNOWN.
   static constexpr Decision ALLOW_CEL_FALLBACK = ::santa::sync::v1::ALLOW_UNKNOWN;
@@ -175,6 +176,7 @@ struct ProtoTraits<true> {
   static constexpr Decision BLOCK_TEAMID = ::santa::sync::v2::BLOCK_TEAMID;
   static constexpr Decision BLOCK_SIGNINGID = ::santa::sync::v2::BLOCK_SIGNINGID;
   static constexpr Decision BLOCK_CDHASH = ::santa::sync::v2::BLOCK_CDHASH;
+  static constexpr Decision BLOCK_BINARY_MISMATCH = ::santa::sync::v2::BLOCK_BINARY_MISMATCH;
   static constexpr Decision BUNDLE_BINARY = ::santa::sync::v2::BUNDLE_BINARY;
   static constexpr Decision ALLOW_CEL_FALLBACK = ::santa::sync::v2::ALLOW_CEL_FALLBACK;
   static constexpr Decision BLOCK_CEL_FALLBACK = ::santa::sync::v2::BLOCK_CEL_FALLBACK;

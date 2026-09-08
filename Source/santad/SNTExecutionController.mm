@@ -86,6 +86,10 @@ static const size_t kMaxAllowedPathLength = MAXPATHLEN - 1;  // -1 to account fo
 @end
 
 // Convert a block decision to the corresponding allow decision, preserving the rule type.
+//
+// The result is not merely a label: the caller assigns it to cd.decision and the action is
+// formulated from (SNTEventStateAllow & cd.decision), so mapping a state to an allow here
+// authorizes the execution.
 static SNTEventState BlockToAllowDecision(SNTEventState blockDecision) {
   switch (blockDecision) {
     case SNTEventStateBlockUnknown: return SNTEventStateAllowUnknown;
@@ -97,7 +101,10 @@ static SNTEventState BlockToAllowDecision(SNTEventState blockDecision) {
     case SNTEventStateBlockCDHash: return SNTEventStateAllowCDHash;
     case SNTEventStateBlockCELFallback: return SNTEventStateAllowCELFallback;
     case SNTEventStateBlockLongPath: return SNTEventStateAllowUnknown;  // No direct equivalent
-    default: return SNTEventStateAllowUnknown;
+    default:
+      // No allow counterpart, so do not invent one: returning the block state unchanged
+      // leaves the SNTEventStateAllow bit clear and denies.
+      return blockDecision;
   }
 }
 
@@ -242,6 +249,7 @@ static bool SameBinary(const es_process_t* a, NSString* aSHA256, const es_proces
     case SNTEventStateAllowTransitive: eventTypeStr = kAllowTransitive; break;
     case SNTEventStateBlockLongPath: eventTypeStr = kBlockLongPath; break;
     case SNTEventStateBlockCELFallback: eventTypeStr = kBlockCELFallback; break;
+    case SNTEventStateBlockBinaryMismatch: eventTypeStr = kBlockBinaryMismatch; break;
     case SNTEventStateAllowCELFallback: eventTypeStr = kAllowCELFallback; break;
     case SNTEventStateAllowPlatform: eventTypeStr = kAllowPlatform; break;
     default: eventTypeStr = kUnknownEventState; break;
@@ -329,22 +337,59 @@ static bool SameBinary(const es_process_t* a, NSString* aSHA256, const es_proces
 // strictly cdhash-enforced binaries the cdhash is authoritative, so the
 // (relatively expensive) source-hash lookup is skipped. Otherwise the SHA-256
 // Santa computed for the instigator's image is read back from SNTDecisionCache
-// (nil if no decision is cached) and compared against the target's.
+// and compared against the target's. A recorded hash whose identity was never
+// confirmed is skipped: it describes a different file.
 - (BOOL)isSameBinaryAsInstigator:(const es_process_t*)instigator
                           target:(const es_process_t*)target
                     targetSHA256:(NSString*)targetSHA256 {
-  NSString* instigatorSHA256 =
-      santa::CdhashStrictlyEnforced(instigator->codesigning_flags)
-          ? nil
-          : [[SNTDecisionCache sharedCache]
-                cachedDecisionForVnode:SantaVnode::VnodeForFile(instigator->executable)]
-                .sha256;
+  if (santa::CdhashStrictlyEnforced(instigator->codesigning_flags)) {
+    return SameBinary(instigator, nil, target, targetSHA256);
+  }
+
+  SNTCachedDecision* instigatorCd = [[SNTDecisionCache sharedCache]
+      cachedDecisionForVnode:SantaVnode::VnodeForFile(instigator->executable)];
+  // Not fail-closed: SameBinary does not reject a nil hash, it falls back to the
+  // kernel-reported identity of both processes.
+  NSString* instigatorSHA256 = instigatorCd.identityMismatched ? nil : instigatorCd.sha256;
   return SameBinary(instigator, instigatorSHA256, target, targetSHA256);
 }
 
 - (void)forgetSandboxedSeatbeltProc:(const audit_token_t&)token {
   _sandboxedSeatbeltProcs->remove(
       std::make_pair(audit_token_to_pid(token), audit_token_to_pidversion(token)));
+}
+
+// Whether the file on disk presents the same signed identity the kernel reported
+// for the image it loaded.
+//
+// Only a qualified identity counts: a signing identifier alone is chosen freely
+// by whoever signed, so it must be qualified by a team identifier or platform
+// status -- the same form Santa treats as an identity everywhere else.
+//
+// An absent value on any side is never a match. CS_SIGNED and CS_VALID are set
+// for signatures carrying no team identifier, so the presence checks below are
+// not implied by the flags check.
+static BOOL SignedIdentityMatchesReported(const es_process_t* targetProc,
+                                          MOLCodesignChecker* csInfo) {
+  if (!(targetProc->codesigning_flags & CS_SIGNED) || !(targetProc->codesigning_flags & CS_VALID)) {
+    return NO;
+  }
+
+  if (targetProc->signing_id.length == 0 || csInfo.signingID.length == 0 ||
+      santa::StringTokenToStringView(targetProc->signing_id) !=
+          santa::NSStringToUTF8StringView(csInfo.signingID)) {
+    return NO;
+  }
+
+  if (targetProc->team_id.length > 0 && csInfo.teamID.length > 0) {
+    return santa::StringTokenToStringView(targetProc->team_id) ==
+           santa::NSStringToUTF8StringView(csInfo.teamID);
+  }
+
+  // Reached by system code carrying no team identifier. Live, not vestigial:
+  // cryptex-resident binaries are system protected but sit on the Preboot
+  // device, which SNTFileInfo's zero-syscall path excludes.
+  return targetProc->is_platform_binary && csInfo.platformBinary;
 }
 
 // Returns YES when the decision grants compiler status
@@ -370,11 +415,36 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
 
   const es_process_t* targetProc = esMsg->event.exec.target;
 
+  // A carried-over decision is reused to skip recomputing identity. If that
+  // identity was never confirmed, it cannot stand in for this execution's.
+  // Cleared unconditionally, not just when this execution is itself
+  // unconfirmed: the restrictions on the evaluation that produced these values
+  // do not travel with them.
+  if (unlikely(existingDecision.identityMismatched)) {
+    existingDecision = nil;
+  }
+
   // Get info about the file. If we can't get this info, respond appropriately and log an error.
   NSError* fileInfoError;
   SNTFileInfo* binInfo = [[SNTFileInfo alloc] initWithEndpointSecurityFile:targetProc->executable
                                                                      error:&fileInfoError];
   if (unlikely(!binInfo)) {
+    // The initializer can return nil after establishing a mismatch. That is not
+    // the same condition as being unable to read a file, so it must not be
+    // routed through failClosed.
+    if (fileInfoError.code == SNTErrorCodeIdentityMismatch) {
+      LOGE(@"Failed to confirm identity of %@ and denying action",
+           @(targetProc->executable->path.data));
+      SNTCachedDecision* cd = [self mismatchDecisionForProcess:targetProc configState:configState];
+      [self denyAndReportEarlyDenialForDecision:cd
+                                        binInfo:binInfo
+                                     targetProc:targetProc
+                                          esMsg:esMsg
+                                    configState:configState
+                                     postAction:postAction];
+      return;
+    }
+
     if (config.failClosed) {
       LOGE(@"Failed to read file %@: %@ and denying action", @(targetProc->executable->path.data),
            fileInfoError.localizedDescription);
@@ -387,6 +457,32 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
       [self.events incrementForFieldValues:@[ (NSString*)kAllowNoFileInfo ]];
     }
     return;
+  }
+
+  // The stat the event carried did not describe the file that was opened, so
+  // every content-derived value below describes a different file. Proceed only
+  // when the file on disk still presents the signing vendor the kernel
+  // reported, keeping the evaluation within a vendor an administrator has
+  // already made a policy statement about.
+  BOOL identityMismatched = binInfo.identityVerification == SNTFileInfoIdentityMismatch;
+  if (unlikely(identityMismatched)) {
+    MOLCodesignChecker* csInfo = [binInfo codesignCheckerWithError:NULL];
+    if (!SignedIdentityMatchesReported(targetProc, csInfo)) {
+      // Denied irrespective of client mode, including Monitor: this is a
+      // tampering condition, and Santa already responds to those without
+      // consulting the mode. See SNTEndpointSecurityTamperResistance.
+      SNTCachedDecision* cd = [self mismatchDecisionForProcess:targetProc configState:configState];
+      [self denyAndReportEarlyDenialForDecision:cd
+                                        binInfo:binInfo
+                                     targetProc:targetProc
+                                          esMsg:esMsg
+                                    configState:configState
+                                     postAction:postAction];
+      return;
+    }
+    // Vendor matches. Identity carried by a decision from a previous evaluation
+    // describes a different file, so it cannot be reused for this one.
+    existingDecision = nil;
   }
 
   // TODO(markowsky): Maybe add a metric here for how many large executables we're seeing.
@@ -413,6 +509,27 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
 
   cd.codesigningFlags = targetProc->codesigning_flags;
   cd.vnodeId = SantaVnode::VnodeForFile(targetProc->executable);
+
+  if (unlikely(identityMismatched)) {
+    cd.identityMismatched = YES;
+    // Matched to the event by signing vendor only, so the result applies to
+    // this invocation alone.
+    cd.cacheable = NO;
+    // Compiler status is a statement about a specific file, so it cannot follow
+    // from an evaluation of a different one. Clearing the bits matters:
+    // cacheable = NO alone still yields a compiler action at the mapping below.
+    if (DecisionIsCompiler(cd.decision)) {
+      switch (cd.decision) {
+        case SNTEventStateAllowCompilerBinary: cd.decision = SNTEventStateAllowBinary; break;
+        case SNTEventStateAllowCompilerSigningID: cd.decision = SNTEventStateAllowSigningID; break;
+        case SNTEventStateAllowCompilerCDHash: cd.decision = SNTEventStateAllowCDHash; break;
+        default: break;
+      }
+    }
+    NSString* extra = @"Executable identity confirmed by signing vendor only";
+    cd.decisionExtra =
+        cd.decisionExtra ? [NSString stringWithFormat:@"%@; %@", cd.decisionExtra, extra] : extra;
+  }
 
   // Seatbelt expectation check: the sandboxed exec is authorized iff
   // santactl pre-registered an expectation for the caller's audit token,
@@ -447,6 +564,26 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
   // so the action below becomes SNTActionRespondAllowNoCache rather than
   // SNTActionRespondAllow.
   if (cd.seatbeltRequired) {
+    // A profile is registered for a specific file, so an expectation match
+    // against an unconfirmed read does not establish that the loaded image is
+    // the one it was registered for. Not redundant with the comparisons that
+    // follow: the strict one uses kernel-reported values, the fallback does not.
+    //
+    // It cannot live in the identity gate earlier in this method:
+    // cd.seatbeltRequired is only known once rule evaluation has run.
+    if (unlikely(identityMismatched)) {
+      cd.decision = SNTEventStateBlockBinaryMismatch;
+      cd.cacheable = NO;
+      cd.decisionExtra = @"Sandbox profile requires a confirmed executable identity";
+      [self denyAndReportEarlyDenialForDecision:cd
+                                        binInfo:binInfo
+                                     targetProc:targetProc
+                                          esMsg:esMsg
+                                    configState:configState
+                                     postAction:postAction];
+      return;
+    }
+
     auto maybeExp = _sandboxExpectations->Consume(esMsg->process->audit_token);
     bool authorized = false;
 
@@ -582,58 +719,11 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
   if (config.enableAllEventUpload ||
       (cd.decision == SNTEventStateAllowUnknown && !config.disableUnknownEventUpload) ||
       cd.auditReturn || (cd.decision & SNTEventStateAllow) == 0) {
-    SNTStoredExecutionEvent* se = [[SNTStoredExecutionEvent alloc] init];
-    se.occurrenceDate = [[NSDate alloc] init];
-    se.fileSHA256 = cd.sha256;
-    se.filePath = binInfo.path;
-    se.decision = cd.decision;
-    se.auditReturn = cd.auditReturn;
-    se.holdAndAsk = cd.holdAndAsk;
-    se.silentTouchID = cd.silentTouchID;
-    se.seatbeltRequired = cd.seatbeltRequired;
-    se.staticRule = cd.staticRule;
-    se.ruleId = cd.ruleId;
-
-    se.signingChain = cd.certChain;
-    se.teamID = cd.teamID;
-    se.signingID = cd.signingID;
-    se.cdhash = cd.cdhash;
-    se.codesigningFlags = cd.codesigningFlags;
-    se.signingStatus = cd.signingStatus;
-    se.pid = @(newProcPid);
-    se.ppid = @(audit_token_to_pid(targetProc->parent_audit_token));
-    se.parentName = @(esMsg.ParentProcessName().c_str());
-    se.entitlements = cd.entitlements;
-    se.entitlementsFiltered = cd.entitlementsFiltered;
-    se.secureSigningTime = cd.secureSigningTime;
-    se.signingTime = cd.signingTime;
-
-    // Bundle data
-    se.fileBundleID = [binInfo bundleIdentifier];
-    se.fileBundleName = [binInfo bundleName];
-    se.fileBundlePath = [binInfo bundlePath];
-    if ([binInfo bundleShortVersionString]) {
-      se.fileBundleVersionString = [binInfo bundleShortVersionString];
-    }
-    if ([binInfo bundleVersion]) {
-      se.fileBundleVersion = [binInfo bundleVersion];
-    }
-
-    // User data
-    std::optional<std::string> user =
-        santa::account::UsernameForUID(audit_token_to_ruid(targetProc->audit_token));
-    if (user.has_value()) se.executingUser = @(user->c_str());
-    NSArray *loggedInUsers, *currentSessions;
-    [self loggedInUsers:&loggedInUsers sessions:&currentSessions];
-    se.currentSessions = currentSessions;
-    se.loggedInUsers = loggedInUsers;
-
-    // Quarantine data
-    se.quarantineDataURL = binInfo.quarantineDataURL;
-    se.quarantineRefererURL = binInfo.quarantineRefererURL;
-    se.quarantineTimestamp = binInfo.quarantineTimestamp;
-    se.quarantineAgentBundleID = binInfo.quarantineAgentBundleID;
-
+    SNTStoredExecutionEvent* se = [self storedExecutionEventForDecision:cd
+                                                                binInfo:binInfo
+                                                             targetProc:targetProc
+                                                                  esMsg:esMsg
+                                                                    pid:newProcPid];
     // Only store events if there is a sync server configured.
     if (config.syncBaseURL) {
       dispatch_async(_eventQueue, ^{
@@ -643,55 +733,6 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
 
     // If binary was blocked, do the needful
     if (!ACTION_IS_ALLOW(action)) {
-      if (config.enableBundles && binInfo.bundle) {
-        // If the binary is part of a bundle, find and hash all the related binaries in the bundle.
-        // Let the GUI know hashing is needed. Once the hashing is complete the GUI will send a
-        // message to santad to perform the upload logic for bundles.
-        // See syncBundleEvent:relatedEvents: for more info.
-        se.needsBundleHash = YES;
-      } else if (config.syncBaseURL) {
-        // So the server has something to show the user straight away, initiate an event
-        // upload for the blocked binary rather than waiting for the next sync.
-        dispatch_async(_eventQueue, ^{
-          [self.syncdQueue addStoredEvent:se];
-        });
-      }
-
-      if (!cd.silentBlockTTY) {
-        _ttyWriter->Write(targetProc, ^NSString* {
-          if (cd.holdAndAsk) {
-            if (stoppedProc) {
-              return @"---\n\033[1mSanta\033[0m\n\nHolding execution of this "
-                     @"binary until approval is granted in the GUI...\n";
-            } else {
-              return @"---\n\033[1mSanta\033[0m\n\nUnable to hold execution so "
-                     @"the process was killed\n---\n\n";
-            }
-          }
-
-          // Let the user know what happened on the terminal
-          NSAttributedString* s = [SNTBlockMessage attributedBlockMessageForEvent:se
-                                                                    customMessage:cd.customMsg];
-
-          NSMutableString* msg = [NSMutableString stringWithCapacity:1024];
-          // Escape sequences `\033[1m` and `\033[0m` begin/end bold lettering
-          [msg appendFormat:@"\n\033[1mSanta\033[0m\n\n%@\n\n", s.string];
-          [msg appendFormat:@"\033[1mReason:    \033[0m %@\n"
-                            @"\033[1mPath:      \033[0m %@\n"
-                            @"\033[1mIdentifier:\033[0m %@\n"
-                            @"\033[1mParent:    \033[0m %@ (%@)\n\n",
-                            [SNTBlockMessage blockReasonForEvent:se], se.filePath, se.fileSHA256,
-                            se.parentName, se.ppid];
-          NSURL* detailURL =
-              [SNTBlockMessage eventDetailURLForEvent:se
-                                            customURL:(cd.customURL ?: config.eventDetailURL)];
-          if (detailURL) {
-            [msg appendFormat:@"More info:\n%@\n", detailURL.absoluteString];
-          }
-          return msg;
-        });
-      }
-
       NotificationReplyBlock replyBlock = nil;
 
       // holdAndAsk (TouchID) is never combined with a silent block, so its reply
@@ -717,7 +758,7 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
                 cd.decision == SNTEventStateBlockUnknown) {
               // Create a rule for the binary that was allowed by the user in
               // standalone mode and notify the sync service.
-              [self createRuleForStandaloneModeEvent:se];
+              [self createRuleForStandaloneModeEvent:se identityMismatched:cd.identityMismatched];
             }
 
             // Update decision to reflect that it was allowed via TouchID,
@@ -727,7 +768,10 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
 
             // Cache the TouchID approval so subsequent executions within the cooldown period
             // don't require re-authorization - only if cooldown was specified and > 0
-            if (cd.sha256 && cd.touchIDCooldownMinutes != nil &&
+            // The cooldown cache is keyed on the content hash, which names the
+            // file that was read. Skip it for an unconfirmed read, so a later
+            // execution is not matched against someone else's approval.
+            if (cd.sha256 && !cd.identityMismatched && cd.touchIDCooldownMinutes != nil &&
                 [cd.touchIDCooldownMinutes unsignedLongLongValue] > 0) {
               std::string sha256Key = santa::NSStringToUTF8String(cd.sha256);
               self->_touchIDApprovalCache->set(sha256Key, GetCurrentUptime());
@@ -771,19 +815,228 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
         };
       }
 
-      // Suppress the GUI for a silent-GUI block, but never when holding for
-      // approval: a held process depends on the GUI reply to resume or be killed,
-      // so it must always be shown even if the flags were somehow combined.
-      if (!cd.silentBlockGUI || cd.holdAndAsk) {
-        // Let the user know what happened in the GUI.
-        [self.notifierQueue addEvent:se
-                   withCustomMessage:cd.customMsg
-                           customURL:cd.customURL ?: config.eventDetailURL
-               eventDetailButtonText:cd.eventDetailButtonText
-                         configState:configState
-                            andReply:replyBlock];
-      }
+      [self reportBlockedExecutionEvent:se
+                               decision:cd
+                                binInfo:binInfo
+                             targetProc:targetProc
+                            configState:configState
+                            stoppedProc:stoppedProc
+                             replyBlock:replyBlock];
     }
+  }
+}
+
+// Decision for an execution denied because the file's identity could not be
+// confirmed. Everything here is kernel-reported, so it is available even when
+// the file could not be read; content-derived values are the caller's to add.
+- (SNTCachedDecision*)mismatchDecisionForProcess:(const es_process_t*)targetProc
+                                     configState:(SNTConfigState*)configState {
+  SNTCachedDecision* cd =
+      [[SNTCachedDecision alloc] initWithEndpointSecurityFile:targetProc->executable];
+  cd.decision = SNTEventStateBlockBinaryMismatch;
+  cd.decisionClientMode = configState.clientMode;
+  cd.cacheable = NO;
+  cd.identityMismatched = YES;
+  cd.codesigningFlags = targetProc->codesigning_flags;
+  cd.teamID = santa::StringTokenToNSString(targetProc->team_id);
+  cd.signingID = santa::StringTokenToNSString(targetProc->signing_id);
+  cd.decisionExtra = @"Executable identity could not be confirmed";
+  return cd;
+}
+
+// Denies an execution that returns before the common reporting path at the end
+// of -validateExecEvent:cachedDecision:postAction:, then reports it.
+//
+// The order matches the common path, and both halves of it matter. Cache the
+// decision, respond, then report. Reporting is unbounded work and must never
+// precede the response. Caching precedes the response because ES delivers
+// NOTIFY_EXEC even for a denied exec and that telemetry recovers the decision
+// by vnode.
+//
+// SNTActionRespondDenyOnce, never SNTActionRespondDeny: the latter is retained
+// for the deny cache interval and would apply to later executions of the vnode.
+- (void)denyAndReportEarlyDenialForDecision:(SNTCachedDecision*)cd
+                                    binInfo:(SNTFileInfo*)binInfo
+                                 targetProc:(const es_process_t*)targetProc
+                                      esMsg:(const Message&)esMsg
+                                configState:(SNTConfigState*)configState
+                                 postAction:(bool (^)(SNTAction, SNTCachedDecision*))postAction {
+  [[SNTDecisionCache sharedCache] cacheDecision:cd];
+  postAction(SNTActionRespondDenyOnce, cd);
+
+  // Report-only: this names the file that was read, not the image the kernel
+  // loaded, which is why this denies. Hashing is proportional to file size, so
+  // it waits for the response.
+  //
+  // It mutates the decision already in SNTDecisionCache, which is how the
+  // telemetry picks the hash up. Nothing authorizes on it: DenyOnce leaves no
+  // AuthResultCache entry to reuse, and readers that could act on it test
+  // identityMismatched first.
+  if (!cd.sha256) {
+    cd.sha256 = binInfo.SHA256;
+  }
+
+  [self incrementEventCounters:cd.decision];
+
+  SNTStoredExecutionEvent* se =
+      [self storedExecutionEventForDecision:cd
+                                    binInfo:binInfo
+                                 targetProc:targetProc
+                                      esMsg:esMsg
+                                        pid:audit_token_to_pid(targetProc->audit_token)];
+
+  SNTConfigurator* config = [SNTConfigurator configurator];
+  if (config.syncBaseURL) {
+    dispatch_async(_eventQueue, ^{
+      [self.eventTable addStoredEvent:se];
+    });
+  }
+
+  [self reportBlockedExecutionEvent:se
+                           decision:cd
+                            binInfo:binInfo
+                         targetProc:targetProc
+                        configState:configState
+                        stoppedProc:false
+                         replyBlock:nil];
+}
+
+// Builds the stored event describing an execution. Shared by the common
+// reporting path and by the early-return denials, so both describe an
+// execution the same way.
+- (SNTStoredExecutionEvent*)storedExecutionEventForDecision:(SNTCachedDecision*)cd
+                                                    binInfo:(SNTFileInfo*)binInfo
+                                                 targetProc:(const es_process_t*)targetProc
+                                                      esMsg:(const Message&)esMsg
+                                                        pid:(pid_t)newProcPid {
+  SNTStoredExecutionEvent* se = [[SNTStoredExecutionEvent alloc] init];
+  se.occurrenceDate = [[NSDate alloc] init];
+  se.fileSHA256 = cd.sha256;
+  // binInfo is nil when the file could not be read at all; fall back to the
+  // path the event carried so the event still identifies something.
+  se.filePath = binInfo.path ?: santa::StringTokenToNSString(targetProc->executable->path);
+  se.decision = cd.decision;
+  se.auditReturn = cd.auditReturn;
+  se.holdAndAsk = cd.holdAndAsk;
+  se.silentTouchID = cd.silentTouchID;
+  se.seatbeltRequired = cd.seatbeltRequired;
+  se.staticRule = cd.staticRule;
+  se.ruleId = cd.ruleId;
+
+  se.signingChain = cd.certChain;
+  se.teamID = cd.teamID;
+  se.signingID = cd.signingID;
+  se.cdhash = cd.cdhash;
+  se.codesigningFlags = cd.codesigningFlags;
+  se.signingStatus = cd.signingStatus;
+  se.pid = @(newProcPid);
+  se.ppid = @(audit_token_to_pid(targetProc->parent_audit_token));
+  se.parentName = @(esMsg.ParentProcessName().c_str());
+  se.entitlements = cd.entitlements;
+  se.entitlementsFiltered = cd.entitlementsFiltered;
+  se.secureSigningTime = cd.secureSigningTime;
+  se.signingTime = cd.signingTime;
+
+  // Bundle data
+  se.fileBundleID = [binInfo bundleIdentifier];
+  se.fileBundleName = [binInfo bundleName];
+  se.fileBundlePath = [binInfo bundlePath];
+  if ([binInfo bundleShortVersionString]) {
+    se.fileBundleVersionString = [binInfo bundleShortVersionString];
+  }
+  if ([binInfo bundleVersion]) {
+    se.fileBundleVersion = [binInfo bundleVersion];
+  }
+
+  // User data
+  std::optional<std::string> user =
+      santa::account::UsernameForUID(audit_token_to_ruid(targetProc->audit_token));
+  if (user.has_value()) se.executingUser = @(user->c_str());
+  NSArray *loggedInUsers, *currentSessions;
+  [self loggedInUsers:&loggedInUsers sessions:&currentSessions];
+  se.currentSessions = currentSessions;
+  se.loggedInUsers = loggedInUsers;
+
+  // Quarantine data
+  se.quarantineDataURL = binInfo.quarantineDataURL;
+  se.quarantineRefererURL = binInfo.quarantineRefererURL;
+  se.quarantineTimestamp = binInfo.quarantineTimestamp;
+  se.quarantineAgentBundleID = binInfo.quarantineAgentBundleID;
+
+  return se;
+}
+
+// Reports an execution that was blocked: bundle hashing or an immediate sync
+// upload, the TTY message, and the GUI notification. `replyBlock` is non-nil
+// only for an execution being held for approval.
+- (void)reportBlockedExecutionEvent:(SNTStoredExecutionEvent*)se
+                           decision:(SNTCachedDecision*)cd
+                            binInfo:(SNTFileInfo*)binInfo
+                         targetProc:(const es_process_t*)targetProc
+                        configState:(SNTConfigState*)configState
+                        stoppedProc:(bool)stoppedProc
+                         replyBlock:(NotificationReplyBlock)replyBlock {
+  SNTConfigurator* config = [SNTConfigurator configurator];
+  if (config.enableBundles && binInfo.bundle) {
+    // If the binary is part of a bundle, find and hash all the related binaries in the bundle.
+    // Let the GUI know hashing is needed. Once the hashing is complete the GUI will send a
+    // message to santad to perform the upload logic for bundles.
+    // See syncBundleEvent:relatedEvents: for more info.
+    se.needsBundleHash = YES;
+  } else if (config.syncBaseURL) {
+    // So the server has something to show the user straight away, initiate an event
+    // upload for the blocked binary rather than waiting for the next sync.
+    dispatch_async(_eventQueue, ^{
+      [self.syncdQueue addStoredEvent:se];
+    });
+  }
+
+  if (!cd.silentBlockTTY) {
+    _ttyWriter->Write(targetProc, ^NSString* {
+      if (cd.holdAndAsk) {
+        if (stoppedProc) {
+          return @"---\n\033[1mSanta\033[0m\n\nHolding execution of this "
+                 @"binary until approval is granted in the GUI...\n";
+        } else {
+          return @"---\n\033[1mSanta\033[0m\n\nUnable to hold execution so "
+                 @"the process was killed\n---\n\n";
+        }
+      }
+
+      // Let the user know what happened on the terminal
+      NSAttributedString* s = [SNTBlockMessage attributedBlockMessageForEvent:se
+                                                                customMessage:cd.customMsg];
+
+      NSMutableString* msg = [NSMutableString stringWithCapacity:1024];
+      // Escape sequences `\033[1m` and `\033[0m` begin/end bold lettering
+      [msg appendFormat:@"\n\033[1mSanta\033[0m\n\n%@\n\n", s.string];
+      [msg appendFormat:@"\033[1mReason:    \033[0m %@\n"
+                        @"\033[1mPath:      \033[0m %@\n"
+                        @"\033[1mIdentifier:\033[0m %@\n"
+                        @"\033[1mParent:    \033[0m %@ (%@)\n\n",
+                        [SNTBlockMessage blockReasonForEvent:se], se.filePath, se.fileSHA256,
+                        se.parentName, se.ppid];
+      NSURL* detailURL =
+          [SNTBlockMessage eventDetailURLForEvent:se
+                                        customURL:(cd.customURL ?: config.eventDetailURL)];
+      if (detailURL) {
+        [msg appendFormat:@"More info:\n%@\n", detailURL.absoluteString];
+      }
+      return msg;
+    });
+  }
+
+  // Suppress the GUI for a silent-GUI block, but never when holding for
+  // approval: a held process depends on the GUI reply to resume or be killed,
+  // so it must always be shown even if the flags were somehow combined.
+  if (!cd.silentBlockGUI || cd.holdAndAsk) {
+    // Let the user know what happened in the GUI.
+    [self.notifierQueue addEvent:se
+               withCustomMessage:cd.customMsg
+                       customURL:cd.customURL ?: config.eventDetailURL
+           eventDetailButtonText:cd.eventDetailButtonText
+                     configState:configState
+                        andReply:replyBlock];
   }
 }
 
@@ -828,7 +1081,13 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
 }
 
 // Creates a rule for the binary that was allowed by the user in standalone mode.
-- (void)createRuleForStandaloneModeEvent:(SNTStoredExecutionEvent*)se {
+//
+// `identityMismatched` gates only the identifiers derived from the file that was
+// read. A signing ID is kernel-reported for the loaded image, so it names the
+// right file either way; a content hash names whatever was read and must not be
+// turned into a rule.
+- (void)createRuleForStandaloneModeEvent:(SNTStoredExecutionEvent*)se
+                      identityMismatched:(BOOL)identityMismatched {
   SNTRuleType ruleType;
   NSString* ruleIdentifier;
   SNTRuleState newRuleState;
@@ -837,7 +1096,7 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
     ruleType = SNTRuleTypeSigningID;
     ruleIdentifier = se.signingID;
     newRuleState = SNTRuleStateAllowLocalSigningID;
-  } else if (se.fileSHA256) {
+  } else if (se.fileSHA256 && !identityMismatched) {
     ruleType = SNTRuleTypeBinary;
     ruleIdentifier = se.fileSHA256;
     newRuleState = SNTRuleStateAllowLocalBinary;

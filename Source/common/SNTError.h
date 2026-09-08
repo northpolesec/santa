@@ -29,6 +29,7 @@ typedef NS_ENUM(NSInteger, SNTErrorCode) {
   SNTErrorCodeEmptyPath = 220,
   SNTErrorCodeFailedToOpen = 230,
   SNTErrorCodeNonRegularFile = 240,
+  SNTErrorCodeIdentityMismatch = 250,
 
   // Sync errors
   SNTErrorCodeFailedToParseJSON = 310,

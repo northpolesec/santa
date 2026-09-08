@@ -140,7 +140,13 @@
 }
 
 - (nullable SNTCachedDecision*)buildDecisionForFileInfo:(SNTFileInfo*)fi {
-  if (!fi || !fi.SHA256) {
+  // On a mismatch every value read below describes a different file than the
+  // vnode this decision is keyed on, and readers treat a decision as the
+  // identity of the file they asked about. Refuse to build one rather than
+  // label it: callers already handle nil, whereas a label is only as good as
+  // every reader remembering to test it. Ordered ahead of `SHA256`, which reads
+  // the whole file on first access.
+  if (!fi || fi.identityVerification == SNTFileInfoIdentityMismatch || !fi.SHA256) {
     return nil;
   }
 

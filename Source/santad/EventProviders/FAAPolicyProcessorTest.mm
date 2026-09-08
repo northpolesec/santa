@@ -1048,6 +1048,101 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess& proc) {
   XCTAssertTrue(OCMVerifyAll(self.dcMock));
 }
 
+// The step-2 sibling of testGetCertificateHashStillAnswersWhenIdentityIsUnconfirmed.
+// A decision from an unconfirmed read carries the certificate of the file that
+// was read. The returned value gates policy matching and the local cache it
+// primes is terminal for the vnode, so neither may come from such a decision.
+- (void)testGetCertificateHashSkipsUnconfirmedDecisionCacheEntry {
+  es_file_t esFile = MakeESFile("foo", MakeStat(100));
+  NSString* unconfirmedHash = @"deadbeef";
+  NSString* freshHash = @"cafef00d";
+
+  MockFAAPolicyProcessor faaPolicyProcessor(self.dcMock, nullptr, nullptr, nullptr, nullptr, 0, 0,
+                                            nil, nil);
+
+  EXPECT_CALL(faaPolicyProcessor, GetCertificateHash)
+      .WillRepeatedly([&faaPolicyProcessor](const es_file_t* es_file) {
+        return faaPolicyProcessor.GetCertificateHashWrapper(es_file);
+      });
+
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+  cd.certSHA256 = unconfirmedHash;
+  cd.identityMismatched = YES;
+  OCMExpect([self.dcMock cachedDecisionForFile:esFile.stat]).ignoringNonObjectArgs().andReturn(cd);
+
+  // No SNTFileInfo mock is installed and "foo" is not a real path, so step 3
+  // cannot construct one and the lookup lands on the fresh codesign read.
+  id certMock = OCMClassMock([MOLCertificate class]);
+  [self addTeardownBlock:^{
+    [certMock stopMocking];
+  }];
+  OCMExpect([self.cscMock initWithBinaryPath:OCMOCK_ANY]).andReturn(self.cscMock);
+  OCMExpect([self.cscMock leafCertificate]).andReturn(certMock);
+  OCMExpect([certMock SHA256]).andReturn(freshHash);
+
+  XCTAssertEqualObjects(faaPolicyProcessor.GetCertificateHash(&esFile), freshHash);
+
+  // The terminal entry is the freshly read hash, not the unconfirmed decision's.
+  // A second call answers from it without another decision-cache lookup (no
+  // second OCMExpect for cachedDecisionForFile:).
+  XCTAssertEqualObjects(faaPolicyProcessor.GetCertificateHash(&esFile), freshHash);
+  XCTAssertTrue(OCMVerifyAll(self.dcMock));
+  XCTAssertTrue(OCMVerifyAll(self.cscMock));
+}
+
+// A rehydrate over an existing entry returns that entry, so "no cert info" must
+// not be read as "unsigned": that records the terminal sentinel for a signed
+// binary, which a policy naming a certificate then never matches.
+- (void)testGetCertificateHashDoesNotRehydrateOverAnExistingEntry {
+  es_file_t esFile = MakeESFile("foo", MakeStat(100));
+  NSString* freshHash = @"cafef00d";
+
+  MockFAAPolicyProcessor faaPolicyProcessor(self.dcMock, nullptr, nullptr, nullptr, nullptr, 0, 0,
+                                            nil, nil);
+  EXPECT_CALL(faaPolicyProcessor, GetCertificateHash)
+      .WillRepeatedly([&faaPolicyProcessor](const es_file_t* es_file) {
+        return faaPolicyProcessor.GetCertificateHashWrapper(es_file);
+      });
+
+  // Shaped like the long-path block, which sets decision/customMsg/teamID only.
+  SNTCachedDecision* certless = [[SNTCachedDecision alloc] init];
+  certless.decision = SNTEventStateBlockLongPath;
+  certless.teamID = @"myteamid";
+  XCTAssertNil(certless.certSHA256);
+
+  OCMExpect([self.dcMock cachedDecisionForFile:esFile.stat])
+      .ignoringNonObjectArgs()
+      .andReturn(certless);
+  // Load-bearing: without it the SNTFileInfo init fails and the rehydrate is
+  // unreachable, so the assertions hold with or without the guard.
+  id sntFileInfoMock = OCMClassMock([SNTFileInfo class]);
+  [self addTeardownBlock:^{
+    [sntFileInfoMock stopMocking];
+  }];
+  OCMStub([sntFileInfoMock alloc]).andReturn(sntFileInfoMock);
+  OCMStub([sntFileInfoMock initWithEndpointSecurityFile:(const es_file_t*)[OCMArg anyPointer]
+                                                  error:[OCMArg anyObjectRef]])
+      .andReturn(sntFileInfoMock);
+  OCMStub([sntFileInfoMock fileSize]).andReturn((NSUInteger)1024);
+  OCMStub([sntFileInfoMock identityVerification]).andReturn(SNTFileInfoIdentityVerified);
+
+  OCMReject([self.dcMock rehydrateAndCacheDecisionForFileInfo:OCMOCK_ANY]);
+  OCMReject([self.dcMock asyncRehydrateAndCacheDecisionForFileInfo:OCMOCK_ANY]);
+
+  id certMock = OCMClassMock([MOLCertificate class]);
+  [self addTeardownBlock:^{
+    [certMock stopMocking];
+  }];
+  OCMExpect([self.cscMock initWithBinaryPath:OCMOCK_ANY]).andReturn(self.cscMock);
+  OCMExpect([self.cscMock leafCertificate]).andReturn(certMock);
+  OCMExpect([certMock SHA256]).andReturn(freshHash);
+
+  // The path is read as it is now, instead of the sentinel being recorded.
+  XCTAssertEqualObjects(faaPolicyProcessor.GetCertificateHash(&esFile), freshHash);
+  XCTAssertTrue(OCMVerifyAll(self.dcMock));
+  XCTAssertTrue(OCMVerifyAll(self.cscMock));
+}
+
 - (void)testPolicyMatchesProcess {
   const char* instigatingCertHash = "abc123";
   const char* teamId = "myvalidtid";
@@ -1461,6 +1556,204 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess& proc) {
 
   // Event still emits the placeholder for this event; the async rehydrate
   // only warms the cache for future events.
+  XCTAssertNotNil(observedEvent);
+  XCTAssertEqualObjects(observedEvent.process.fileSHA256, @"<unknown sha>");
+  XCTAssertTrue(OCMVerifyAll(self.dcMock));
+
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+}
+
+- (void)testGetCertificateHashStillAnswersWhenIdentityIsUnconfirmed {
+  // The rehydrate must be skipped: it writes a decision keyed on this vnode into
+  // SNTDecisionCache that readers on other paths consume as this process's
+  // identity. But the function must still answer -- a nil hash is not neutral
+  // when policy is matched against it.
+  es_file_t esFile = MakeESFile("foo", MakeStat(100));
+  NSString* certHash = @"cafef00d";
+
+  id sntFileInfoMock = OCMClassMock([SNTFileInfo class]);
+  [self addTeardownBlock:^{
+    [sntFileInfoMock stopMocking];
+  }];
+  OCMStub([sntFileInfoMock alloc]).andReturn(sntFileInfoMock);
+  OCMStub([sntFileInfoMock initWithEndpointSecurityFile:(const es_file_t*)[OCMArg anyPointer]
+                                                  error:[OCMArg anyObjectRef]])
+      .andReturn(sntFileInfoMock);
+  OCMStub([sntFileInfoMock fileSize]).andReturn((NSUInteger)1024);
+  OCMStub([sntFileInfoMock identityVerification]).andReturn(SNTFileInfoIdentityMismatch);
+
+  id certMock = OCMClassMock([MOLCertificate class]);
+  [self addTeardownBlock:^{
+    [certMock stopMocking];
+  }];
+
+  MockFAAPolicyProcessor faaPolicyProcessor(self.dcMock, nullptr, nullptr, nullptr, nullptr, 0, 0,
+                                            nil, nil);
+  EXPECT_CALL(faaPolicyProcessor, GetCertificateHash)
+      .WillRepeatedly([&faaPolicyProcessor](const es_file_t* es_file) {
+        return faaPolicyProcessor.GetCertificateHashWrapper(es_file);
+      });
+
+  OCMReject([self.dcMock rehydrateAndCacheDecisionForFileInfo:OCMOCK_ANY]);
+  OCMReject([self.dcMock asyncRehydrateAndCacheDecisionForFileInfo:OCMOCK_ANY]);
+
+  OCMExpect([self.dcMock cachedDecisionForFile:esFile.stat]).ignoringNonObjectArgs().andReturn(nil);
+  OCMExpect([self.cscMock initWithBinaryPath:OCMOCK_ANY]).andReturn(self.cscMock);
+  OCMExpect([self.cscMock leafCertificate]).andReturn(certMock);
+  OCMExpect([certMock SHA256]).andReturn(certHash);
+
+  XCTAssertEqualObjects(faaPolicyProcessor.GetCertificateHash(&esFile), certHash);
+  XCTAssertTrue(OCMVerifyAll(self.dcMock));
+}
+
+// As above: a rehydrate cannot supply a hash an existing entry lacks, so trying
+// re-hashes the whole file on every event to no effect.
+- (void)testTelemetryRehydrateIsSkippedWhenADecisionIsAlreadyCached {
+  es_file_t esFile = MakeESFile("/proc/instigator");
+  esFile.stat = MakeStat();
+  esFile.stat.st_size = 1024;
+  es_process_t esProc = MakeESProcess(&esFile);
+  esProc.codesigning_flags = CS_SIGNED | CS_VALID;
+  esProc.team_id = MakeESStringToken("");
+  esProc.signing_id = MakeESStringToken("");
+
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_OPEN, &esProc);
+  es_file_t targetFile = MakeESFile("/etc/hosts");
+  esMsg.event.open.file = &targetFile;
+  esMsg.event.open.fflag = FWRITE;
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+  Message msg(mockESApi, &esMsg);
+
+  std::vector<Message::PathTarget> targets = msg.PathTargets();
+  XCTAssertEqual(targets.size(), 1);
+
+  // Load-bearing: without it the SNTFileInfo init fails and the rehydrate is
+  // unreachable, so the assertions hold with or without the guard.
+  id sntFileInfoMock = OCMClassMock([SNTFileInfo class]);
+  [self addTeardownBlock:^{
+    [sntFileInfoMock stopMocking];
+  }];
+  OCMStub([sntFileInfoMock alloc]).andReturn(sntFileInfoMock);
+  OCMStub([sntFileInfoMock initWithEndpointSecurityFile:(const es_file_t*)[OCMArg anyPointer]
+                                                  error:[OCMArg anyObjectRef]])
+      .andReturn(sntFileInfoMock);
+  OCMStub([sntFileInfoMock fileSize]).andReturn((NSUInteger)1024);
+  OCMStub([sntFileInfoMock identityVerification]).andReturn(SNTFileInfoIdentityVerified);
+
+  OCMReject([self.dcMock rehydrateAndCacheDecisionForFileInfo:OCMOCK_ANY]);
+  OCMReject([self.dcMock asyncRehydrateAndCacheDecisionForFileInfo:OCMOCK_ANY]);
+
+  // Shaped like the long-path block: a real decision that carries no hash.
+  SNTCachedDecision* hashless = [[SNTCachedDecision alloc] init];
+  hashless.decision = SNTEventStateBlockLongPath;
+  XCTAssertNil(hashless.sha256);
+
+  __block SNTStoredFileAccessEvent* observedEvent;
+  FAAPolicyProcessor::StoreAccessEventBlock storeBlock = ^(SNTStoredFileAccessEvent* event, bool) {
+    observedEvent = event;
+  };
+
+  MockFAAPolicyProcessor faaPolicyProcessor(self.dcMock, nullptr, nullptr, nullptr, nullptr, 0, 0,
+                                            nil, storeBlock);
+
+  EXPECT_CALL(faaPolicyProcessor, GetCachedDecision).WillOnce(testing::Return(hashless));
+  EXPECT_CALL(faaPolicyProcessor, ApplyPolicy)
+      .WillOnce(testing::Return(
+          FAAPolicyProcessor::DecisionAndOptions{FileAccessPolicyDecision::kAllowedAuditOnly, {}}));
+
+  auto matcher = ^FAAPolicyProcessor::PolicyMatch(const santa::WatchItemPolicyBase&,
+                                                  const Message::PathTarget&, const Message&) {
+    return {true, nullptr};
+  };
+  SNTFileAccessDeniedBlock deniedBlock =
+      ^(SNTStoredFileAccessEvent*, NSString*, NSString*, NSString*) {
+      };
+
+  auto policy = std::make_shared<santa::WatchItemPolicyBase>("test-policy", "v1");
+  policy->audit_only = true;
+  FAAPolicyProcessor::TargetPolicyPair pair{0, policy};
+
+  faaPolicyProcessor.ProcessTargetAndPolicyWrapper(msg, pair, matcher, deniedBlock,
+                                                   SNTOverrideFileAccessActionNone);
+
+  // Unchanged: there is no hash to report either way. What changes is that the
+  // file is no longer hashed to find that out.
+  XCTAssertNotNil(observedEvent);
+  XCTAssertEqualObjects(observedEvent.process.fileSHA256, @"<unknown sha>");
+  XCTAssertTrue(OCMVerifyAll(self.dcMock));
+
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+}
+
+- (void)testTelemetryRehydrateIsSkippedWhenIdentityIsUnconfirmed {
+  es_file_t esFile = MakeESFile("/proc/instigator");
+  esFile.stat = MakeStat();
+  esFile.stat.st_size = 1024;
+  es_process_t esProc = MakeESProcess(&esFile);
+  esProc.codesigning_flags = CS_SIGNED | CS_VALID;
+  // Provide non-null string tokens to avoid null-cstring crashes in StringTokenToNSString.
+  esProc.team_id = MakeESStringToken("");
+  esProc.signing_id = MakeESStringToken("");
+
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_OPEN, &esProc);
+  es_file_t targetFile = MakeESFile("/etc/hosts");
+  esMsg.event.open.file = &targetFile;
+  esMsg.event.open.fflag = FWRITE;
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+  Message msg(mockESApi, &esMsg);
+
+  std::vector<Message::PathTarget> targets = msg.PathTargets();
+  XCTAssertEqual(targets.size(), 1);
+
+  // A decision rehydrated from an unconfirmed read lands in SNTDecisionCache
+  // keyed on this vnode, where exec-adjacent readers consume it as this
+  // process's identity.
+  OCMReject([self.dcMock rehydrateAndCacheDecisionForFileInfo:OCMOCK_ANY]);
+  OCMReject([self.dcMock asyncRehydrateAndCacheDecisionForFileInfo:OCMOCK_ANY]);
+
+  id sntFileInfoMock = OCMClassMock([SNTFileInfo class]);
+  [self addTeardownBlock:^{
+    [sntFileInfoMock stopMocking];
+  }];
+  OCMStub([sntFileInfoMock alloc]).andReturn(sntFileInfoMock);
+  OCMStub([sntFileInfoMock initWithEndpointSecurityFile:(const es_file_t*)[OCMArg anyPointer]
+                                                  error:[OCMArg anyObjectRef]])
+      .andReturn(sntFileInfoMock);
+  OCMStub([sntFileInfoMock fileSize]).andReturn((NSUInteger)1024);
+  OCMStub([sntFileInfoMock identityVerification]).andReturn(SNTFileInfoIdentityMismatch);
+
+  __block SNTStoredFileAccessEvent* observedEvent;
+  FAAPolicyProcessor::StoreAccessEventBlock storeBlock = ^(SNTStoredFileAccessEvent* event, bool) {
+    observedEvent = event;
+  };
+
+  MockFAAPolicyProcessor faaPolicyProcessor(self.dcMock, nullptr, nullptr, nullptr, nullptr, 0, 0,
+                                            nil, storeBlock);
+
+  EXPECT_CALL(faaPolicyProcessor, GetCachedDecision).WillOnce(testing::Return(nil));
+  EXPECT_CALL(faaPolicyProcessor, ApplyPolicy)
+      .WillOnce(testing::Return(
+          FAAPolicyProcessor::DecisionAndOptions{FileAccessPolicyDecision::kAllowedAuditOnly, {}}));
+
+  auto matcher = ^FAAPolicyProcessor::PolicyMatch(const santa::WatchItemPolicyBase&,
+                                                  const Message::PathTarget&, const Message&) {
+    return {true, nullptr};
+  };
+  SNTFileAccessDeniedBlock deniedBlock =
+      ^(SNTStoredFileAccessEvent*, NSString*, NSString*, NSString*) {
+      };
+
+  auto policy = std::make_shared<santa::WatchItemPolicyBase>("test-policy", "v1");
+  policy->audit_only = true;
+  FAAPolicyProcessor::TargetPolicyPair pair{0, policy};
+
+  faaPolicyProcessor.ProcessTargetAndPolicyWrapper(msg, pair, matcher, deniedBlock,
+                                                   SNTOverrideFileAccessActionNone);
+
   XCTAssertNotNil(observedEvent);
   XCTAssertEqualObjects(observedEvent.process.fileSHA256, @"<unknown sha>");
   XCTAssertTrue(OCMVerifyAll(self.dcMock));

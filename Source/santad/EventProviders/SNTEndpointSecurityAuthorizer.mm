@@ -260,7 +260,18 @@ using santa::Message;
       authResult = ES_AUTH_RESULT_ALLOW;
       break;
     case SNTActionRespondAllow: authResult = ES_AUTH_RESULT_ALLOW; break;
-    case SNTActionRespondDeny: authResult = ES_AUTH_RESULT_DENY; break;
+    case SNTActionRespondDeny: OS_FALLTHROUGH;
+    case SNTActionRespondDenyOnce:
+      // Stated here rather than relied upon: -respondToMessage:withAuthResult:
+      // forcePreventCache: already refuses to cache anything but an ALLOW, so
+      // this is not what stops a denial reaching the ES framework cache. Set it
+      // so the intent is local to the case and survives that method changing.
+      // The local AuthResultCache is keyed on the action above and is
+      // unaffected -- SNTActionRespondDeny is still held for the deny cache
+      // interval, and SNTActionRespondDenyOnce still stores no entry at all.
+      cacheable = false;
+      authResult = ES_AUTH_RESULT_DENY;
+      break;
 
     // Not setting `authResult` intentionally as no ES response takes place
     case SNTActionHoldAllowed: OS_FALLTHROUGH;

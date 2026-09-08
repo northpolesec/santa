@@ -167,11 +167,24 @@ REGISTER_COMMAND_NAME(@"sandbox")
   }
   NSString* fdPath = [NSString stringWithFormat:@"/dev/fd/%d", fd];
 
+  // Hand over the stat just read from the pinned descriptor rather than letting
+  // the initializer take one from fdPath: devfs reports a synthetic st_dev for
+  // an fdesc node, which describes no volume and matches nothing in any cache.
+  // The stat above is the authoritative one, and supplying it also ties the two
+  // halves of the expectation together -- fsDev/fsIno below come from it, while
+  // cdhash and sha256 come from reopening fdPath, and nothing else establishes
+  // that both describe the same vnode.
   NSError* fileInfoError;
-  SNTFileInfo* fileInfo = [[SNTFileInfo alloc] initWithResolvedPath:fdPath error:&fileInfoError];
+  SNTFileInfo* fileInfo = [[SNTFileInfo alloc] initWithResolvedPath:fdPath
+                                                               stat:&sb
+                                                              error:&fileInfoError];
   if (!fileInfo) {
     fprintf(stderr, "Error: unable to read binary at %s: %s\n", resolvedPath.UTF8String,
             fileInfoError.localizedDescription.UTF8String);
+    exit(EXIT_FAILURE);
+  }
+  if (fileInfo.identityVerification == SNTFileInfoIdentityMismatch) {
+    fprintf(stderr, "Error: unable to confirm the identity of %s\n", resolvedPath.UTF8String);
     exit(EXIT_FAILURE);
   }
   MOLCodesignChecker* csc = [fileInfo codesignCheckerWithError:nil];

@@ -33,6 +33,7 @@
 #import "Source/common/MOLCodesignChecker.h"
 #import "Source/common/SNTError.h"
 #import "Source/common/SNTLogging.h"
+#include "Source/common/SystemResources.h"
 
 // Largest architecture count Santa will read from a universal header. Real
 // universal binaries carry a handful.
@@ -73,7 +74,34 @@ static const uint32_t kMaxFatArchCount = 64;
 @property NSDictionary* cachedHeaders;
 @property MOLCodesignChecker* cachedCodesignChecker;
 @property(nonatomic) NSError* codesignCheckerError;
+@property SNTFileInfoIdentityVerification identityVerification;
 @end
+
+///
+///  Whether a caller-supplied stat can be accepted without comparing it against
+///  the descriptor.
+///
+///  Both conditions are required and neither is sufficient alone. Do not drop
+///  either one:
+///
+///  * SF_RESTRICTED means the system protects the file, and every directory on
+///    the way to such a file is protected too, so the path cannot be made to
+///    resolve elsewhere while those protections are in force.
+///  * Requiring the boot volume group excludes any filesystem mounted after
+///    boot, which gets its own device number. Note the sealed system volume and
+///    the writable data volume share one device number, so this admits both,
+///    which is intended: the protected files that ship outside the system
+///    volume live on the latter.
+///
+///  Reads no state from the descriptor, so this costs nothing.
+///
+static bool ESStatIsTrustworthy(const struct stat* sb) {
+  if (!sb || !(sb->st_flags & SF_RESTRICTED)) {
+    return false;
+  }
+  std::optional<dev_t> bootDev = GetBootVolumeGroupDev();
+  return bootDev.has_value() && sb->st_dev == *bootDev;
+}
 
 @implementation SNTFileInfo
 
@@ -118,19 +146,11 @@ static const uint32_t kMaxFatArchCount = 64;
       return nil;
     }
 
-    _fileSize = fileStat->st_size;
-    _vnode = (SantaVnode){.fsid = fileStat->st_dev, .fileid = fileStat->st_ino};
-
-    if (_fileSize == 0) return nil;
-
-    if (fileStat->st_uid != 0) {
-      std::optional<std::string> homeDir = santa::account::HomeDirForUID(fileStat->st_uid);
-      if (homeDir.has_value()) {
-        _fileOwnerHomeDir = @(homeDir->c_str());
-      }
-    }
-
-    int fd = open([_path UTF8String], O_RDONLY | O_CLOEXEC);
+    // O_NONBLOCK: the check above used the caller's stat, which describes what
+    // the caller saw rather than what is at this path now. Opening some
+    // non-regular files without it can block indefinitely; it is ignored for
+    // reads on regular files.
+    int fd = open([_path UTF8String], O_RDONLY | O_CLOEXEC | O_NONBLOCK);
     if (fd < 0) {
       [SNTError populateError:error
                      withCode:SNTErrorCodeFailedToOpen
@@ -138,6 +158,75 @@ static const uint32_t kMaxFatArchCount = 64;
       return nil;
     }
     _fileHandle = [[NSFileHandle alloc] initWithFileDescriptor:fd closeOnDealloc:YES];
+
+    // Establish whether the supplied stat describes the file just opened. Every
+    // content-derived value is read through the descriptor, so anything
+    // size-driven must use the descriptor's size.
+    struct stat actualStat;
+    const struct stat* effectiveStat = fileStat;
+
+    if (ESStatIsTrustworthy(fileStat)) {
+      // No descriptor state is read, so the supplied values stand as given,
+      // including the size that drives the read loop. That is this path's
+      // premise, not an oversight: the file cannot be replaced at this path.
+      _identityVerification = SNTFileInfoIdentityTrustedUnverified;
+    } else {
+      if (fstat(fd, &actualStat) != 0) {
+        [SNTError populateError:error
+                       withCode:SNTErrorCodeFailedToOpen
+                         format:@"Unable to stat file: %s", strerror(errno)];
+        return nil;
+      }
+      // (dev, ino, size) only; st_ino is the load-bearing field, because the
+      // filesystem assigns it. Both timestamps are excluded, for different
+      // reasons: mtime is settable by the file's owner, so it establishes
+      // nothing about identity, while ctime is not settable backwards but
+      // advances for metadata-only changes that leave content alone. A mismatch
+      // here can deny irrespective of client mode, so the comparison is
+      // deliberately limited to substitution.
+      if (actualStat.st_dev == fileStat->st_dev && actualStat.st_ino == fileStat->st_ino &&
+          actualStat.st_size == fileStat->st_size) {
+        _identityVerification = SNTFileInfoIdentityVerified;
+      } else {
+        _identityVerification = SNTFileInfoIdentityMismatch;
+        effectiveStat = &actualStat;
+        LOGW(@"Executable identity not confirmed for %@", _path);
+      }
+    }
+
+    // Every return below can be reached after a mismatch is determined, and a
+    // nil result alone is indistinguishable from an ordinary read failure, so
+    // surface the mismatch through the error in every one of them.
+    BOOL unconfirmed = _identityVerification == SNTFileInfoIdentityMismatch;
+
+    if (!((S_IFMT & effectiveStat->st_mode) == S_IFREG)) {
+      [SNTError
+          populateError:error
+               withCode:unconfirmed ? SNTErrorCodeIdentityMismatch : SNTErrorCodeNonRegularFile
+                 format:@"Non-regular file"];
+      return nil;
+    }
+
+    _fileSize = effectiveStat->st_size;
+    // Vnode identity stays as the caller reported it: consumers key their caches
+    // on the file the caller asked about.
+    _vnode = (SantaVnode){.fsid = fileStat->st_dev, .fileid = fileStat->st_ino};
+
+    if (_fileSize == 0) {
+      if (unconfirmed) {
+        [SNTError populateError:error
+                       withCode:SNTErrorCodeIdentityMismatch
+                         format:@"Executable identity could not be confirmed"];
+      }
+      return nil;
+    }
+
+    if (effectiveStat->st_uid != 0) {
+      std::optional<std::string> homeDir = santa::account::HomeDirForUID(effectiveStat->st_uid);
+      if (homeDir.has_value()) {
+        _fileOwnerHomeDir = @(homeDir->c_str());
+      }
+    }
   }
 
   return self;

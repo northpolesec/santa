@@ -32,6 +32,13 @@ typedef NS_ENUM(NSInteger, SNTAction) {
   SNTActionRespondAllow,
   SNTActionRespondAllowNoCache,
   SNTActionRespondDeny,
+
+  // Deny this execution without retaining a reusable result for the vnode.
+  // Distinct from SNTActionRespondDeny, which AuthResultCache holds for the deny
+  // cache interval: a denial reflecting one invocation's state rather than a
+  // property of the file must not reach a later one.
+  SNTActionRespondDenyOnce,
+
   SNTActionRespondAllowCompiler,
 
   // Allow this execution and mark the executing process as a compiler, but do
@@ -53,8 +60,9 @@ typedef NS_ENUM(NSInteger, SNTAction) {
 };
 
 // Actions representing a terminal, reusable authorization: a cached entry
-// holding one of these is applied directly to a later execution of the same
-// vnode without re-evaluating policy.
+// holding one of these is applied directly to a later execution without
+// re-evaluating policy, provided that execution matches the entry's vnode and
+// cpu slice and its observed content identity matches the entry's.
 //
 // Context-dependent authorizations must NEVER appear here. In particular, do
 // not add SNTActionRespondAllowCompilerNoCache: such a decision describes the
@@ -136,6 +144,10 @@ typedef NS_ENUM(uint64_t, SNTEventState) {
   SNTEventStateBlockSigningID = 1ULL << 22,
   SNTEventStateBlockCDHash = 1ULL << 23,
   SNTEventStateBlockCELFallback = 1ULL << 24,
+
+  // Set when the file backing the execution could not be confirmed to be the
+  // file the authorization was evaluated against.
+  SNTEventStateBlockBinaryMismatch = 1ULL << 25,
 
   // Bits 40-63 store allow decision types
   SNTEventStateAllowUnknown = 1ULL << 40,

@@ -76,4 +76,35 @@
   XCTAssertEqualObjects(copy.codesignValidationStatus, @(errSecCSUnsigned));
 }
 
+- (void)testIdentityUnverifiedDefaultsToNo {
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] initWithVnode:(SantaVnode){}];
+
+  XCTAssertFalse(cd.identityMismatched);
+}
+
+- (void)testIdentityUnverifiedSurvivesCopy {
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] initWithVnode:(SantaVnode){}];
+  cd.identityMismatched = YES;
+  cd.sha256 = @"abc";
+
+  SNTCachedDecision* copy = [cd copy];
+
+  XCTAssertTrue(copy.identityMismatched);
+  XCTAssertEqualObjects(copy.sha256, @"abc");
+}
+
+- (void)testIdentityUnverifiedSurvivesCachedIdentityInit {
+  // The flag describes how the identity fields were obtained, so it has to
+  // travel with them. Dropping it here would let a re-evaluation present an
+  // unconfirmed identity as a confirmed one.
+  SNTCachedDecision* previous = [[SNTCachedDecision alloc] initWithVnode:(SantaVnode){}];
+  previous.identityMismatched = YES;
+  previous.sha256 = @"abc";
+
+  SNTCachedDecision* derived = [[SNTCachedDecision alloc] initWithCachedIdentity:previous];
+
+  XCTAssertTrue(derived.identityMismatched);
+  XCTAssertEqualObjects(derived.sha256, @"abc");
+}
+
 @end

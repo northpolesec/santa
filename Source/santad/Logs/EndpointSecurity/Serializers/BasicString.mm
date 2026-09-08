@@ -104,6 +104,7 @@ std::string GetReasonString(SNTEventState event_state) {
     case SNTEventStateBlockSigningID: return "SIGNINGID";
     case SNTEventStateBlockCDHash: return "CDHASH";
     case SNTEventStateBlockCELFallback: return "CEL_FALLBACK";
+    case SNTEventStateBlockBinaryMismatch: return "BINARY_MISMATCH";
     case SNTEventStateBlockLongPath: return "LONG_PATH";
     case SNTEventStateBlockUnknown: return "UNKNOWN";
     case SNTEventStateUnknown: return "UNKNOWN";

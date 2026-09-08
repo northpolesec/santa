@@ -50,6 +50,7 @@ const static NSString* kAllowNoFileInfo = @"AllowNoFileInfo";
 const static NSString* kDenyNoFileInfo = @"DenyNoFileInfo";
 const static NSString* kBlockLongPath = @"BlockLongPath";
 const static NSString* kBlockCELFallback = @"BlockCELFallback";
+const static NSString* kBlockBinaryMismatch = @"BlockBinaryMismatch";
 const static NSString* kAllowCELFallback = @"AllowCELFallback";
 const static NSString* kAllowPlatform = @"AllowPlatform";
 

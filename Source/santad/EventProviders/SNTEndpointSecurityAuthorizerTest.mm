@@ -424,6 +424,8 @@ class MockAuthResultCache : public AuthResultCache {
       .WillOnce(testing::Return(true));
   EXPECT_CALL(*mockAuthCache, AddToCache(&execFile, SNTActionRespondDeny, testing::_))
       .WillOnce(testing::Return(true));
+  EXPECT_CALL(*mockAuthCache, AddToCache(&execFile, SNTActionRespondDenyOnce, testing::_))
+      .WillOnce(testing::Return(true));
   EXPECT_CALL(*mockAuthCache, AddToCache(&execFile, SNTActionRespondHold, testing::_))
       .WillOnce(testing::Return(true));
   EXPECT_CALL(*mockAuthCache, AddToCache(&execFile, SNTActionRespondAllowNoCache, testing::_))
@@ -458,6 +460,7 @@ class MockAuthResultCache : public AuthResultCache {
         {SNTActionRespondAllowCompilerNoCache, ES_AUTH_RESULT_ALLOW},
         {SNTActionRespondAllow, ES_AUTH_RESULT_ALLOW},
         {SNTActionRespondDeny, ES_AUTH_RESULT_DENY},
+        {SNTActionRespondDenyOnce, ES_AUTH_RESULT_DENY},
         {SNTActionRespondHold, ES_AUTH_RESULT_ALLOW},
         {SNTActionRespondAllowNoCache, ES_AUTH_RESULT_ALLOW},
     };

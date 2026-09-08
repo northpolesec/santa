@@ -116,8 +116,29 @@ bool AuthResultCache::AddToCache(const es_file_t* es_file, SNTAction decision,
       return cache->set(vnode_id, CachedAuthResult{decision, GetCurrentUptime(), nil},
                         requestBinary);
 
+    case SNTActionRespondDenyOnce:
+      // Transition out of the in-flight marker to no entry at all, so this
+      // denial can never be applied to a later execution of the same vnode.
+      //
+      // Storing an entry with a zeroed timestamp to force expiry does not work:
+      // timestamp is a creation time and GetCurrentUptime() is monotonic time
+      // since boot, so such an entry would not be considered expired for the
+      // first deny interval after boot. The three-argument form is used rather
+      // than remove() so the transition out of SNTActionRequestBinary stays
+      // atomic for a concurrent waiter, which then sees no entry and evaluates
+      // independently.
+      return cache->set(vnode_id, CachedAuthResult{}, requestBinary);
+
     case SNTActionRespondAllowNoCache: {
-      CachedAuthResult entry = {SNTActionRespondAllowNoCache, GetCurrentUptime(), [cd copy]};
+      // The stored decision lets the next execution of this vnode reuse the
+      // identity work instead of redoing it. Identity that could not be
+      // confirmed to describe the file the event named must not be reused that
+      // way: the next execution is evaluated on its own merits and would
+      // otherwise inherit these values without any of the restrictions that
+      // applied to the execution they came from. Keep the entry, drop the
+      // identity, so the next execution recomputes it.
+      CachedAuthResult entry = {SNTActionRespondAllowNoCache, GetCurrentUptime(),
+                                cd.identityMismatched ? nil : [cd copy]};
       return cache->set(vnode_id, entry, requestBinary);
     }
 
@@ -127,7 +148,10 @@ bool AuthResultCache::AddToCache(const es_file_t* es_file, SNTAction decision,
       // reuse the identity data but must still run policy again.
       //
       // Because this action is never stored, no cache reader can observe it.
-      CachedAuthResult entry = {SNTActionRespondAllowNoCache, GetCurrentUptime(), [cd copy]};
+      //
+      // Unconfirmed identity is dropped for the same reason as above.
+      CachedAuthResult entry = {SNTActionRespondAllowNoCache, GetCurrentUptime(),
+                                cd.identityMismatched ? nil : [cd copy]};
       return cache->set(vnode_id, entry, requestBinary);
     }
 
