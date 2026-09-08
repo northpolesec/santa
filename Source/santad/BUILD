@@ -655,7 +655,6 @@ objc_library(
     srcs = ["EventProviders/SNTEndpointSecurityRecorder.mm"],
     hdrs = ["EventProviders/SNTEndpointSecurityRecorder.h"],
     deps = [
-        ":AuthResultCache",
         ":EndpointSecurityLogger",
         ":SNTCompilerController",
         ":SNTEndpointSecurityTreeAwareClient",
@@ -839,6 +838,7 @@ objc_library(
     srcs = ["EventProviders/AuthResultCache.mm"],
     hdrs = ["EventProviders/AuthResultCache.h"],
     deps = [
+        "//Source/common:CodeSigningIdentifierUtils",
         "//Source/common:SNTCachedDecision",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTLogging",
@@ -1977,6 +1977,7 @@ santa_unit_test(
         "//Source/common:SNTMetricSet",
         "//Source/common:SNTRule",
         "//Source/common:SNTRuleIdentifiers",
+        "//Source/common:SantaVnode",
         "//Source/common:TestUtils",
         "//Source/common/es:EndpointSecurityMessage",
         "//Source/common/es:MockEndpointSecurityAPI",
@@ -2039,6 +2040,7 @@ santa_unit_test(
         ":TTYWriter",
         "//Source/common:SNTCachedDecision",
         "//Source/common:SNTCommonEnums",
+        "//Source/common:SantaVnode",
         "//Source/common:TestUtils",
         "//Source/common/es:EndpointSecurityClient",
         "//Source/common/es:EndpointSecurityMessage",
@@ -2130,7 +2132,6 @@ santa_unit_test(
         "EndpointSecurity",
     ],
     deps = [
-        ":AuthResultCache",
         ":EndpointSecurityLogger",
         ":Metrics",
         ":MockLogger",

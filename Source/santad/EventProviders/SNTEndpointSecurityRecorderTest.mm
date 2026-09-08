@@ -36,14 +36,12 @@
 #include "Source/common/es/Message.h"
 #include "Source/common/es/MockEndpointSecurityAPI.h"
 #include "Source/common/es/MockEnricher.h"
-#import "Source/santad/EventProviders/AuthResultCache.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityRecorder.h"
 #include "Source/santad/Logs/EndpointSecurity/MockLogger.h"
 #include "Source/santad/Metrics.h"
 #import "Source/santad/SNTCompilerController.h"
 #import "Source/santad/SNTDecisionCache.h"
 
-using santa::AuthResultCache;
 using santa::EnrichedMessage;
 using santa::EventDisposition;
 using santa::Message;
@@ -51,13 +49,6 @@ using santa::PrefixTree;
 using santa::Processor;
 using santa::TelemetryEvent;
 using santa::Unit;
-
-class MockAuthResultCache : public AuthResultCache {
- public:
-  using AuthResultCache::AuthResultCache;
-
-  MOCK_METHOD(void, RemoveFromCache, (const es_file_t*));
-};
 
 @interface SNTEndpointSecurityRecorderTest : XCTestCase
 @property id mockConfigurator;
@@ -161,7 +152,6 @@ es_file_t targetFileMatchesAlsoRegex = MakeESFile("/foo/matches_also");
 es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
 
 - (void)handleMessageShouldLog:(BOOL)shouldLog
-         shouldRemoveFromCache:(BOOL)shouldRemoveFromCache
                      withBlock:(TestHelperBlock)testBlock
                  telemetryMask:(TelemetryEvent)telemetryMask {
   es_file_t file = MakeESFile("foo");
@@ -181,12 +171,6 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
 
   auto mockEnricher = std::make_shared<santa::MockEnricher>();
 
-  auto mockAuthCache = std::make_shared<MockAuthResultCache>(nullptr, nil);
-  if (shouldRemoveFromCache) {
-    EXPECT_CALL(*mockAuthCache, RemoveFromCache).Times(1);
-  } else {
-    EXPECT_CALL(*mockAuthCache, RemoveFromCache).Times(0);
-  }
   dispatch_semaphore_t semaMetrics = dispatch_semaphore_create(0);
 
   // NOTE: Currently unable to create a partial mock of the
@@ -218,7 +202,6 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
                                                 enricher:mockEnricher
                                       compilerController:mockCC
                                loginWindowSessionHandler:nil
-                                         authResultCache:mockAuthCache
                                               prefixTree:prefixTree
                                              processTree:nullptr];
 
@@ -231,7 +214,6 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
 
   XCTAssertTrue(OCMVerifyAll(mockCC));
 
-  XCTBubbleMockVerifyAndClearExpectations(mockAuthCache.get());
   XCTBubbleMockVerifyAndClearExpectations(mockEnricher.get());
   XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
   XCTBubbleMockVerifyAndClearExpectations(mockLogger.get());
@@ -239,18 +221,14 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
   [mockCC stopMocking];
 }
 
-- (void)handleMessageShouldLog:(BOOL)shouldLog
-         shouldRemoveFromCache:(BOOL)shouldRemoveFromCache
-                     withBlock:(TestHelperBlock)testBlock {
+- (void)handleMessageShouldLog:(BOOL)shouldLog withBlock:(TestHelperBlock)testBlock {
   [self handleMessageShouldLog:shouldLog
-         shouldRemoveFromCache:shouldRemoveFromCache
                      withBlock:testBlock
                  telemetryMask:TelemetryEvent::kEverything];
 }
 
 - (void)testHandleEventCloseMappedWritableMatchesRegex {
-  // CLOSE not modified, but was_mapped_writable, should remove from cache,
-  // and matches fileChangesRegex
+  // CLOSE not modified, but was_mapped_writable, and matches fileChangesRegex
   TestHelperBlock testBlock =
       ^(es_message_t* esMsg, std::shared_ptr<MockEndpointSecurityAPI> mockESApi, id mockCC,
         SNTEndpointSecurityRecorder* recorderClient, std::shared_ptr<PrefixTree<Unit>> prefixTree,
@@ -273,12 +251,11 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
         XCTAssertSemaTrue(*sema, 5, "Log wasn't called within expected time window");
       };
 
-  [self handleMessageShouldLog:YES shouldRemoveFromCache:YES withBlock:testBlock];
+  [self handleMessageShouldLog:YES withBlock:testBlock];
 }
 
 - (void)testHandleEventCloseMappedWritableMissesRegex {
-  // CLOSE not modified, but was_mapped_writable, remove from cache, and does not match
-  // fileChangesRegex
+  // CLOSE not modified, but was_mapped_writable, and does not match fileChangesRegex
   TestHelperBlock testBlock =
       ^(es_message_t* esMsg, std::shared_ptr<MockEndpointSecurityAPI> mockESApi, id mockCC,
         SNTEndpointSecurityRecorder* recorderClient, std::shared_ptr<PrefixTree<Unit>> prefixTree,
@@ -298,7 +275,7 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
                                     }]);
       };
 
-  [self handleMessageShouldLog:NO shouldRemoveFromCache:YES withBlock:testBlock];
+  [self handleMessageShouldLog:NO withBlock:testBlock];
 }
 
 - (void)testHandleMessage {
@@ -318,9 +295,9 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
                                     }]);
       };
 
-  [self handleMessageShouldLog:NO shouldRemoveFromCache:NO withBlock:testBlock];
+  [self handleMessageShouldLog:NO withBlock:testBlock];
 
-  // CLOSE modified, remove from cache, and matches fileChangesRegex
+  // CLOSE modified, and matches fileChangesRegex
   testBlock =
       ^(es_message_t* esMsg, std::shared_ptr<MockEndpointSecurityAPI> mockESApi, id mockCC,
         SNTEndpointSecurityRecorder* recorderClient, std::shared_ptr<PrefixTree<Unit>> prefixTree,
@@ -343,9 +320,9 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
         XCTAssertSemaTrue(*sema, 5, "Log wasn't called within expected time window");
       };
 
-  [self handleMessageShouldLog:YES shouldRemoveFromCache:YES withBlock:testBlock];
+  [self handleMessageShouldLog:YES withBlock:testBlock];
 
-  // CLOSE modified, remove from cache, but doesn't match fileChangesRegex
+  // CLOSE modified, but doesn't match fileChangesRegex
   testBlock =
       ^(es_message_t* esMsg, std::shared_ptr<MockEndpointSecurityAPI> mockESApi, id mockCC,
         SNTEndpointSecurityRecorder* recorderClient, std::shared_ptr<PrefixTree<Unit>> prefixTree,
@@ -362,7 +339,7 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
                                     }]);
       };
 
-  [self handleMessageShouldLog:NO shouldRemoveFromCache:YES withBlock:testBlock];
+  [self handleMessageShouldLog:NO withBlock:testBlock];
 
   // CLONE Prefix match, bail early
   testBlock =
@@ -385,7 +362,7 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
         XCTAssertSemaTrue(*semaMetrics, 5, "Metrics not recorded within expected window");
       };
 
-  [self handleMessageShouldLog:NO shouldRemoveFromCache:NO withBlock:testBlock];
+  [self handleMessageShouldLog:NO withBlock:testBlock];
 
   // COPYFILE Matches regex, not prefix, handle message
   testBlock =
@@ -407,9 +384,9 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
         XCTAssertSemaTrue(*sema, 5, "Log wasn't called within expected time window");
       };
 
-  [self handleMessageShouldLog:YES shouldRemoveFromCache:NO withBlock:testBlock];
+  [self handleMessageShouldLog:YES withBlock:testBlock];
 
-  // UNLINK, remove from cache, but doesn't match fileChangesRegex
+  // UNLINK, but doesn't match fileChangesRegex
   testBlock =
       ^(es_message_t* esMsg, std::shared_ptr<MockEndpointSecurityAPI> mockESApi, id mockCC,
         SNTEndpointSecurityRecorder* recorderClient, std::shared_ptr<PrefixTree<Unit>> prefixTree,
@@ -425,7 +402,7 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
                                     }]);
       };
 
-  [self handleMessageShouldLog:NO shouldRemoveFromCache:NO withBlock:testBlock];
+  [self handleMessageShouldLog:NO withBlock:testBlock];
 
   // EXCHANGEDATA, Prefix match, bail early
   testBlock =
@@ -447,7 +424,7 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
         XCTAssertSemaTrue(*semaMetrics, 5, "Metrics not recorded within expected window");
       };
 
-  [self handleMessageShouldLog:NO shouldRemoveFromCache:NO withBlock:testBlock];
+  [self handleMessageShouldLog:NO withBlock:testBlock];
 
   // LINK, Prefix match, bail early
   testBlock = ^(
@@ -472,7 +449,7 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
     XCTAssertSemaTrue(*semaMetrics, 5, "Metrics not recorded within expected window");
   };
 
-  [self handleMessageShouldLog:NO shouldRemoveFromCache:NO withBlock:testBlock];
+  [self handleMessageShouldLog:NO withBlock:testBlock];
 
   // EXIT, message handled
   testBlock = ^(
@@ -497,7 +474,6 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
 
   // Use a bitmask without EXIT specified
   [self handleMessageShouldLog:NO
-         shouldRemoveFromCache:NO
                      withBlock:testBlock
                  telemetryMask:santa::TelemetryConfigToBitmask(@[ @"execution" ])];
 
@@ -522,7 +498,7 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
     XCTAssertSemaTrue(*semaMetrics, 5, "Metrics not recorded within expected window");
   };
 
-  [self handleMessageShouldLog:YES shouldRemoveFromCache:NO withBlock:testBlock];
+  [self handleMessageShouldLog:YES withBlock:testBlock];
 
   XCTAssertTrue(OCMVerifyAll(self.mockConfigurator));
 }
@@ -594,7 +570,6 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
   mockESApi->SetExpectationsRetainReleaseMessage();
 
   auto mockEnricher = std::make_shared<santa::MockEnricher>();
-  auto mockAuthCache = std::make_shared<MockAuthResultCache>(nullptr, nil);
   auto mockLogger = std::make_shared<MockLogger>();
   mockLogger->SetTelemetryMask(TelemetryEvent::kEverything);
   auto prefixTree = std::make_shared<PrefixTree<Unit>>();
@@ -623,7 +598,6 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
                                                 enricher:mockEnricher
                                       compilerController:mockCC
                                loginWindowSessionHandler:nil
-                                         authResultCache:mockAuthCache
                                               prefixTree:prefixTree
                                              processTree:nullptr];
 
@@ -664,7 +638,6 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
       santa::EnrichedExit(Message(mockESApi, &fakeEnrichedMsg), santa::EnrichedProcess())));
 
   auto mockEnricher = std::make_shared<santa::MockEnricher>();
-  auto mockAuthCache = std::make_shared<MockAuthResultCache>(nullptr, nil);
   auto mockLogger = std::make_shared<MockLogger>();
   mockLogger->SetTelemetryMask(TelemetryEvent::kEverything);
   auto prefixTree = std::make_shared<PrefixTree<Unit>>();
@@ -697,7 +670,6 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
                                                 enricher:mockEnricher
                                       compilerController:mockCC
                                loginWindowSessionHandler:nil
-                                         authResultCache:mockAuthCache
                                               prefixTree:prefixTree
                                              processTree:nullptr];
 
@@ -739,7 +711,6 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
       santa::EnrichedExit(Message(mockESApi, &fakeEnrichedMsg), santa::EnrichedProcess())));
 
   auto mockEnricher = std::make_shared<santa::MockEnricher>();
-  auto mockAuthCache = std::make_shared<MockAuthResultCache>(nullptr, nil);
   auto mockLogger = std::make_shared<MockLogger>();
   mockLogger->SetTelemetryMask(TelemetryEvent::kEverything);
   auto prefixTree = std::make_shared<PrefixTree<Unit>>();
@@ -770,7 +741,6 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
                                                 enricher:mockEnricher
                                       compilerController:mockCC
                                loginWindowSessionHandler:nil
-                                         authResultCache:mockAuthCache
                                               prefixTree:prefixTree
                                              processTree:nullptr];
 

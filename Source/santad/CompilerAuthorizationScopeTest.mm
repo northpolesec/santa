@@ -42,6 +42,7 @@
 #import "Source/common/SNTMetricSet.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTRuleIdentifiers.h"
+#include "Source/common/SantaVnode.h"
 #include "Source/common/TestUtils.h"
 #include "Source/common/es/Message.h"
 #include "Source/common/es/MockEndpointSecurityAPI.h"
@@ -196,8 +197,12 @@ static const std::vector<std::string> kBlockedArgs = {"clang", "--link"};
 // Drives one complete execution through the authorizer and returns the
 // Endpoint Security auth result Santa responded with.
 //
-// `dev`/`ino` select the vnode, which is the AuthResultCache key, so passing
-// the same pair twice models re-executing the same binary.
+// `dev`/`ino` select the vnode. The AuthResultCache is keyed by (vnode, cpu
+// slice) and verifies content identity on every hit, so passing the same pair
+// twice models re-executing the same binary only because this fixture leaves
+// the cpu and identity fields zeroed -- exactly what the value-initialized
+// `ExecTarget probe{}` below carries. Setting any of them on the message
+// without also setting them on the probe would turn the probe into a miss.
 - (es_auth_result_t)runExecWithArgs:(std::vector<std::string>)args
                                 dev:(uint64_t)dev
                                 ino:(uint64_t)ino {
@@ -245,8 +250,9 @@ static const std::vector<std::string> kBlockedArgs = {"clang", "--link"};
   // The non-cacheable entry must retain the completed validation. The mock
   // checker has no leaf certificate, so certSHA256 is nil — the shape that
   // previously forced a full re-validation on the next execution.
-  es_file_t cachedFile = MakeESFile("clang", {.st_dev = 12, .st_ino = 34});
-  santa::CachedAuthResult cachedResult = _authResultCache->CheckCache(&cachedFile);
+  santa::ExecTarget probe{};
+  probe.key.vnode = SantaVnode{.fsid = 12, .fileid = 34};
+  santa::CachedAuthResult cachedResult = _authResultCache->CheckCache(probe);
   XCTAssertEqual(cachedResult.action, SNTActionRespondAllowNoCache);
   XCTAssertNotNil(cachedResult.cached_decision);
   XCTAssertNil(cachedResult.cached_decision.certSHA256);
