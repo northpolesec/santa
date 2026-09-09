@@ -339,6 +339,77 @@ static es_file_t MakeESFile(NSString* path, const struct stat* sb) {
   XCTAssertTrue(sut.isFat);
 }
 
+///  Writes a universal binary declaring |archCount| architecture records. The
+///  record at |realIndex| points at a genuine x86_64 slice; the rest are padding
+///  records with distinct cputype/cpusubtype tuples and zero size. The real slice
+///  is written via seek so the file stays sparse.
+- (NSString*)writeFatFixtureWithArchCount:(uint32_t)archCount realIndex:(uint32_t)realIndex {
+  NSString* path = [NSTemporaryDirectory()
+      stringByAppendingPathComponent:[NSString stringWithFormat:@"SNTFileInfoFatMany-%@",
+                                                                NSUUID.UUID.UUIDString]];
+
+  const uint32_t kHeaderSize = sizeof(struct fat_header) + sizeof(struct fat_arch) * archCount;
+  // Place the real slice on a page boundary past the arch table.
+  const uint32_t kSliceOffset = (kHeaderSize + 0xFFF) & ~0xFFFu;
+
+  struct fat_header fh = {
+      .magic = OSSwapHostToBigInt32(FAT_MAGIC),
+      .nfat_arch = OSSwapHostToBigInt32(archCount),
+  };
+  NSMutableData* contents = [NSMutableData dataWithBytes:&fh length:sizeof(fh)];
+  for (uint32_t i = 0; i < archCount; ++i) {
+    struct fat_arch fa = {0};
+    if (i == realIndex) {
+      fa.cputype = (cpu_type_t)OSSwapHostToBigInt32((uint32_t)CPU_TYPE_X86_64);
+      fa.cpusubtype = (cpu_subtype_t)OSSwapHostToBigInt32((uint32_t)CPU_SUBTYPE_X86_64_ALL);
+      fa.offset = OSSwapHostToBigInt32(kSliceOffset);
+      fa.size = OSSwapHostToBigInt32(kFatTestSliceSize);
+      fa.align = OSSwapHostToBigInt32(12);
+    } else {
+      // Distinct, deliberately non-real tuple; zero size so it claims no bytes.
+      fa.cputype = (cpu_type_t)OSSwapHostToBigInt32(0x02000000u | i);
+      fa.cpusubtype = (cpu_subtype_t)OSSwapHostToBigInt32(i);
+      fa.offset = OSSwapHostToBigInt32(kHeaderSize);
+      fa.size = 0;
+    }
+    [contents appendBytes:&fa length:sizeof(fa)];
+  }
+  XCTAssertTrue([[NSFileManager defaultManager] createFileAtPath:path
+                                                        contents:contents
+                                                      attributes:nil]);
+  [self addTeardownBlock:^{
+    [[NSFileManager defaultManager] removeItemAtPath:path error:nil];
+  }];
+
+  NSMutableData* slice = [NSMutableData dataWithLength:kFatTestSliceSize];
+  struct mach_header_64* mh = (struct mach_header_64*)slice.mutableBytes;
+  mh->magic = MH_MAGIC_64;
+  mh->cputype = CPU_TYPE_X86_64;
+  mh->cpusubtype = CPU_SUBTYPE_X86_64_ALL;
+  mh->filetype = MH_EXECUTE;
+
+  NSFileHandle* handle = [NSFileHandle fileHandleForWritingAtPath:path];
+  XCTAssertNotNil(handle);
+  [handle seekToFileOffset:kSliceOffset];
+  [handle writeData:slice];
+  [handle closeFile];
+
+  return path;
+}
+
+- (void)testFatManyArchesIsRecognized {
+  // A universal binary may carry many architecture records; the kernel parses as
+  // many as fit in a page. Santa should recognize the same binaries, so a
+  // large-but-valid count is still parsed. The real slice is placed last to
+  // exercise the full table.
+  const uint32_t kArchCount = 100;
+  NSString* path = [self writeFatFixtureWithArchCount:kArchCount realIndex:kArchCount - 1];
+  SNTFileInfo* sut = [[SNTFileInfo alloc] initWithPath:path];
+  XCTAssertNotNil(sut);
+  XCTAssertTrue(sut.isMachO, @"a universal binary with 100 arch records must be recognized");
+  XCTAssertTrue([sut.architectures containsObject:@"x86_64"]);
+}
+
 #pragma mark Thin Mach-O identification
 
 ///  Writes a thin little-endian 64-bit MH_EXECUTE of exactly |totalSize| bytes.

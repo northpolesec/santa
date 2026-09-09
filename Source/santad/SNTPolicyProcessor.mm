@@ -745,6 +745,7 @@ static BOOL SignatureVerdictIsStable(SNTCachedDecision* cd) {
 
 - (nonnull SNTCachedDecision*)
            decisionForFileInfo:(nonnull SNTFileInfo*)fileInfo
+                  imageCPUType:(cpu_type_t)imageCPUType
                    configState:(nonnull SNTConfigState*)configState
                 cachedDecision:(nonnull SNTCachedDecision*)cd
            platformBinaryState:(PlatformBinaryState)platformBinaryState
@@ -833,7 +834,7 @@ static BOOL SignatureVerdictIsStable(SNTCachedDecision* cd) {
     return cd;
   }
 
-  NSString* msg = [self fileIsScopeBlocked:fileInfo];
+  NSString* msg = [self fileIsScopeBlocked:fileInfo imageCPUType:imageCPUType];
   if (msg) {
     cd.decisionExtra = msg;
     cd.decision = SNTEventStateBlockScope;
@@ -915,6 +916,7 @@ static BOOL SignatureVerdictIsStable(SNTCachedDecision* cd) {
   }
 
   return [self decisionForFileInfo:fileInfo
+      imageCPUType:imageCPUType
       configState:configState
       cachedDecision:cd
       platformBinaryState:pbs
@@ -946,10 +948,10 @@ static BOOL SignatureVerdictIsStable(SNTCachedDecision* cd) {
 ///  Checks whether the file at @c path is in-scope for checking with Santa.
 ///
 ///  Files that are out of scope:
-///    + Non Mach-O files that are not part of an installer package.
-///    + Files in allowed path.
+///    + Files in an allowed path.
 ///
-///  @return @c YES if file is in scope, @c NO otherwise.
+///  @return @c nil if the file is in scope, otherwise a string describing why
+///  it is out of scope.
 ///
 - (NSString*)fileIsScopeAllowed:(SNTFileInfo*)fi {
   if (!fi) return nil;
@@ -967,15 +969,10 @@ static BOOL SignatureVerdictIsStable(SNTCachedDecision* cd) {
     }
   }
 
-  // If file is not a Mach-O file, we're not interested.
-  if (!fi.isMachO) {
-    return @"Not a Mach-O";
-  }
-
   return nil;
 }
 
-- (NSString*)fileIsScopeBlocked:(SNTFileInfo*)fi {
+- (NSString*)fileIsScopeBlocked:(SNTFileInfo*)fi imageCPUType:(cpu_type_t)imageCPUType {
   if (!fi) return nil;
 
   // Guard on a non-nil regex; see fileIsScopeAllowed: for why the nil case
@@ -989,7 +986,13 @@ static BOOL SignatureVerdictIsStable(SNTCachedDecision* cd) {
     }
   }
 
-  if ([self.configurator enablePageZeroProtection] && fi.isMissingPageZero) {
+  // The kernel hard-enforces __PAGEZERO for every image it loads except i386,
+  // which it exempts under #if __x86_64__ (bsd/kern/mach_loader.c). Gate on the
+  // CPU type of the image that actually executed, so this applies exactly where
+  // the kernel leaves off. isMissingPageZero reads the file's i386 slice, which
+  // a universal binary can carry alongside the slice that ran.
+  if (imageCPUType == CPU_TYPE_X86 && [self.configurator enablePageZeroProtection] &&
+      fi.isMissingPageZero) {
     return @"Missing __PAGEZERO";
   }
 

@@ -53,7 +53,7 @@ static const int64_t kDecidingRuleID = 48213;
                     activationCallback:(ActivationCallbackBlock)activationCallback;
 - (void)compileFallbackRules:(NSArray<SNTCELFallbackRule*>*)rules;
 - (NSString*)fileIsScopeAllowed:(SNTFileInfo*)fi;
-- (NSString*)fileIsScopeBlocked:(SNTFileInfo*)fi;
+- (NSString*)fileIsScopeBlocked:(SNTFileInfo*)fi imageCPUType:(cpu_type_t)imageCPUType;
 @end
 
 BOOL CompareMaybeNilStrings(NSString* s1, NSString* s2) {
@@ -924,6 +924,62 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     } else {
       XCTAssertEqualObjects(cd.decisionExtra, expectedExtra);
     }
+
+    OCMVerifyAll(mockFileInfo);
+    [mockFileInfo stopMocking];
+    [mockConfigurator stopMocking];
+    [mockRuleTable stopMocking];
+  }
+}
+
+- (void)testDecisionForUnparseableExecutable {
+  // An executable Santa cannot parse as Mach-O is evaluated against rules and
+  // the client-mode default like any other executable.
+  NSArray<NSDictionary*>* cases = @[
+    @{
+      @"mode" : @(SNTClientModeLockdown),
+      @"expected_decision" : @(SNTEventStateBlockUnknown),
+    },
+    @{
+      @"mode" : @(SNTClientModeMonitor),
+      @"expected_decision" : @(SNTEventStateAllowUnknown),
+    },
+  ];
+
+  for (NSDictionary* testCase in cases) {
+    id mockRuleTable = OCMClassMock([SNTRuleTable class]);
+    SNTPolicyProcessor* processor =
+        [[SNTPolicyProcessor alloc] initWithRuleTable:mockRuleTable
+                                   entitlementsFilter:santa::EntitlementsFilter::Create(@[], @[])];
+    id mockConfigurator = OCMClassMock([SNTConfigurator class]);
+    OCMStub([mockConfigurator clientMode])
+        .andReturn((SNTClientMode)[testCase[@"mode"] integerValue]);
+    processor.configurator = mockConfigurator;
+
+    id mockFileInfo = OCMClassMock([SNTFileInfo class]);
+    // The scope check no longer consults isMachO, so the decision path never
+    // parses the file's headers. This pins that.
+    OCMReject([mockFileInfo isMachO]);
+
+    SNTCachedDecision* cached = [[SNTCachedDecision alloc] init];
+    cached.sha256 = @"a326a1fb48074202e9ad41e4cd1e389eeea372c8c6f7d7e80da81176d5d9430e";
+    cached.codesignValidationStatus = @(errSecSuccess);
+
+    es_file_t file = MakeESFile("/tmp/unparseable");
+    es_process_t proc = MakeESProcess(&file);
+    proc.is_platform_binary = false;
+    proc.codesigning_flags = CS_SIGNED | CS_VALID | CS_ADHOC | CS_LINKER_SIGNED;
+    SNTConfigState* configState = [[SNTConfigState alloc] initWithConfig:mockConfigurator];
+
+    SNTCachedDecision* cd = [processor decisionForFileInfo:mockFileInfo
+                                             targetProcess:&proc
+                                              imageCPUType:CPU_TYPE_ARM64
+                                               configState:configState
+                                        activationCallback:nil
+                                            cachedDecision:cached];
+
+    XCTAssertEqual(cd.decision, (SNTEventState)[testCase[@"expected_decision"] integerValue]);
+    XCTAssertNil(cd.decisionExtra);
 
     OCMVerifyAll(mockFileInfo);
     [mockFileInfo stopMocking];
@@ -2613,7 +2669,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
   // No blocked-path regex: a normal Mach-O must not be reported as
   // blocked-by-path. (Guards against a nil regex being treated as a match.)
-  XCTAssertNil([self.processor fileIsScopeBlocked:[self lsFileInfo]]);
+  XCTAssertNil([self.processor fileIsScopeBlocked:[self lsFileInfo] imageCPUType:CPU_TYPE_X86_64]);
 
   [mockConfigurator stopMocking];
 }
@@ -2624,9 +2680,31 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
       .andReturn([NSRegularExpression regularExpressionWithPattern:@"^/bin/" options:0 error:NULL]);
   self.processor.configurator = mockConfigurator;
 
-  XCTAssertEqualObjects([self.processor fileIsScopeBlocked:[self lsFileInfo]],
+  XCTAssertEqualObjects([self.processor fileIsScopeBlocked:[self lsFileInfo]
+                                              imageCPUType:CPU_TYPE_X86_64],
                         @"Blocked Path Regex");
 
+  [mockConfigurator stopMocking];
+}
+
+- (void)testFileIsScopeBlockedMissingPageZero {
+  id mockConfigurator = OCMClassMock([SNTConfigurator class]);
+  OCMStub([mockConfigurator enablePageZeroProtection]).andReturn(YES);
+  self.processor.configurator = mockConfigurator;
+
+  id mockFileInfo = OCMClassMock([SNTFileInfo class]);
+  OCMStub([mockFileInfo isMissingPageZero]).andReturn(YES);
+
+  // The kernel exempts only i386 from its own __PAGEZERO enforcement, so this
+  // applies to an i386 image and to nothing else. isMissingPageZero reports on
+  // the file's i386 slice, which a universal binary can carry alongside the
+  // slice that actually ran, so the executing image's CPU type is what decides.
+  XCTAssertEqualObjects([self.processor fileIsScopeBlocked:mockFileInfo imageCPUType:CPU_TYPE_X86],
+                        @"Missing __PAGEZERO");
+  XCTAssertNil([self.processor fileIsScopeBlocked:mockFileInfo imageCPUType:CPU_TYPE_X86_64]);
+  XCTAssertNil([self.processor fileIsScopeBlocked:mockFileInfo imageCPUType:CPU_TYPE_ARM64]);
+
+  [mockFileInfo stopMocking];
   [mockConfigurator stopMocking];
 }
 

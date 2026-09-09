@@ -914,27 +914,53 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   [self checkMetricCounters:kDenyNoFileInfo expected:@1];
 }
 
-- (void)testMissingShasum {
+- (void)testMissingShasumUsesClientModeDefault {
+  // No SHA-256 is stubbed; the decision must still complete via the client
+  // mode default.
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockConfigurator clientMode]).andReturn(SNTClientModeMonitor);
+
   [self validateExecEvent:SNTActionRespondAllow];
-  [self checkMetricCounters:kAllowScope expected:@1];
+  [self checkMetricCounters:kAllowUnknown expected:@1];
 }
 
-- (void)testOutOfScope {
+- (void)testUnparseableBlockedInLockdownByDefault {
   OCMStub([self.mockFileInfo isMachO]).andReturn(NO);
   OCMStub([self.mockConfigurator clientMode]).andReturn(SNTClientModeLockdown);
-
-  [self validateExecEvent:SNTActionRespondAllow];
-  [self checkMetricCounters:kAllowScope expected:@1];
-}
-
-- (void)testPageZero {
-  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
-  OCMStub([self.mockFileInfo isMissingPageZero]).andReturn(YES);
   OCMExpect([self.mockEventDatabase addStoredEvent:OCMOCK_ANY]);
 
   [self validateExecEvent:SNTActionRespondDeny];
   OCMVerifyAllWithDelay(self.mockEventDatabase, 1);
   [self checkMetricCounters:kBlockUnknown expected:@1];
+}
+
+- (void)testPageZero {
+  OCMStub([self.mockConfigurator enablePageZeroProtection]).andReturn(YES);
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo isMissingPageZero]).andReturn(YES);
+  OCMExpect([self.mockEventDatabase addStoredEvent:OCMOCK_ANY]);
+
+  [self validateExecEvent:SNTActionRespondDeny
+             messageSetup:^(es_message_t* msg) {
+               msg->event.exec.image_cputype = CPU_TYPE_X86;
+             }];
+  OCMVerifyAllWithDelay(self.mockEventDatabase, 1);
+  [self checkMetricCounters:kBlockScope expected:@1];
+}
+
+- (void)testPageZeroNotEnforcedForNonI386Image {
+  OCMStub([self.mockConfigurator enablePageZeroProtection]).andReturn(YES);
+  OCMStub([self.mockConfigurator clientMode]).andReturn(SNTClientModeMonitor);
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo isMissingPageZero]).andReturn(YES);
+
+  // Same file, but a 64-bit image executed. The kernel enforces __PAGEZERO for
+  // those itself, so the file's i386 slice must not block this execution.
+  [self validateExecEvent:SNTActionRespondAllow
+             messageSetup:^(es_message_t* msg) {
+               msg->event.exec.image_cputype = CPU_TYPE_X86_64;
+             }];
+  [self checkMetricCounters:kAllowUnknown expected:@1];
 }
 
 - (void)testAllEventUpload {

@@ -35,9 +35,13 @@
 #import "Source/common/SNTLogging.h"
 #include "Source/common/SystemResources.h"
 
-// Largest architecture count Santa will read from a universal header. Real
-// universal binaries carry a handful.
-static const uint32_t kMaxFatArchCount = 64;
+// Upper bound on the architecture count read from a universal header, used to
+// cap the slice-table read. Sized from the kernel loader, which parses the fat
+// header within a single page (bsd/kern/mach_fat.c). The largest page macOS
+// uses is 16 KiB, hence (16 KiB - fat_header) / fat_arch. Keep in sync with the
+// kernel; do not lower.
+static const uint32_t kMaxFatArchCount =
+    (16 * 1024 - sizeof(struct fat_header)) / sizeof(struct fat_arch);
 
 // Simple class to hold the data of a mach_header and the offset within the file
 // in which that header was found.

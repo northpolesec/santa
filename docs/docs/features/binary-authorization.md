@@ -606,7 +606,6 @@ evaluation preceding allow.
 | Blocked Path Regex       | Block       | [Yes](/configuration/keys#BlockedPathRegex)             | A regex which the binary path is executed from is matched against. If the path matches the regex, the execution is blocked. |
 | Bad Signature Protection | Block       | [Yes](/configuration/keys#EnableBadSignatureProtection) | If enabled, a binary that is executed with a bad signing chain will be blocked.                                             |
 | Allowed Path Regex       | Allow       | [Yes](/configuration/keys#AllowedPathRegex)             | A regex which the binary path is executed from is matched against. If the path matches the regex, the execution is allowed. |
-| Not a Mach-O             | Allow       | No                                                      | Files which are not Mach-O binaries are ignored.                                                                            |
 
 :::note[A note about scripts]
 
