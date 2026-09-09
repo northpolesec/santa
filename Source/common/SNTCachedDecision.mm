@@ -60,6 +60,7 @@
   SNTCachedDecision* copy = [[SNTCachedDecision alloc] initWithVnode:_vnodeId];
   copy.decision = _decision;
   copy.decisionClientMode = _decisionClientMode;
+  copy.decisionTemporaryMonitorMode = _decisionTemporaryMonitorMode;
   copy.decisionExtra = _decisionExtra;
   copy.sha256 = _sha256;
   copy.certSHA256 = _certSHA256;

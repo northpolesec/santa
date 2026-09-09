@@ -23,6 +23,10 @@
 // Properties here mirror the SNTConfigurator at a point in time
 //
 @property(readonly) SNTClientMode clientMode;
+
+// YES when `clientMode` is Monitor only because a Temporary Monitor Mode
+// session is active.
+@property(readonly) BOOL inTemporaryMonitorMode;
 @property(readonly) BOOL enableNotificationSilences;
 @property(readonly) NSString* eventDetailText;
 @property(readonly) NSString* fileAccessEventDetailURL;

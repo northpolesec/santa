@@ -600,6 +600,10 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedExec& msg, SNTCach
   pb_exec->set_reason(GetReasonEnum(cd.decision));
   pb_exec->set_mode(GetModeEnum(cd.decisionClientMode));
 
+  if (cd.decisionTemporaryMonitorMode) {
+    pb_exec->set_temporary_monitor_mode(true);
+  }
+
   if (cd.certSHA256 || cd.certCommonName) {
     EncodeCertificateInfo(pb_exec->mutable_certificate_info(), cd.certSHA256, cd.certCommonName);
   }

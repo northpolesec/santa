@@ -758,6 +758,7 @@ static BOOL SignatureVerdictIsStable(SNTCachedDecision* cd) {
   SNTCachedDecision* systemCd = [self.ruleTable.criticalSystemBinaries[cd.signingID] copy];
   if (systemCd) {
     systemCd.decisionClientMode = configState.clientMode;
+    systemCd.decisionTemporaryMonitorMode = configState.inTemporaryMonitorMode;
     return systemCd;
   }
 
@@ -767,6 +768,7 @@ static BOOL SignatureVerdictIsStable(SNTCachedDecision* cd) {
   cd.signingStatus = signingStatusCallback();
   cd.platformBinary = (platformBinaryState == PlatformBinaryState::kRuntimeTrue);
   cd.decisionClientMode = configState.clientMode;
+  cd.decisionTemporaryMonitorMode = configState.inTemporaryMonitorMode;
   cd.quarantineURL = fileInfo.quarantineDataURL;
 
   // Static validation is expensive, so it runs at most once per identity — but
