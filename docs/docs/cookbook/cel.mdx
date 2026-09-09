@@ -43,8 +43,9 @@ target.signing_time >= timestamp('2025-05-31T00:00:00Z')
 This allows executions only when the binary was securely signed within a sliding
 window — here, the last 90 days — and blocks anything older. Unlike a fixed
 `timestamp(...)`, the window moves forward automatically each day, so the rule
-never needs to be re-pushed. `today()` is the start of the current UTC day and
-`days(n)` is `n`×24h (the standard `duration()` only parses units up to hours).
+never needs to be re-pushed. `today()` is the start of the current day in the
+host's time zone (before Santa 2026.8, the current UTC day) and `days(n)` is
+`n`×24h (the standard `duration()` only parses units up to hours).
 This requires [Workshop](https://northpole.security/), and because `today()`
 changes daily the result is not cached.
 
@@ -62,6 +63,218 @@ is blocked:
       secure_signing_time: "2020-01-01T00:00:00Z"
     args:
       - "--version"
+    envs:
+      HOME: "/Users/admin"
+    euid: 501
+    cwd: "/Applications"
+  `}
+/>
+
+## Allow an app only during working hours <AddedBadge added={"2026.8"} /> {#working-hours}
+
+Attach this to a Signing ID or Team ID rule for the application. It allows the
+app from 09:00 to 17:00, Monday through Friday, on each host's own clock, and
+blocks it at any other time. See [Time Based Rules](/features/time-based-rules)
+for the other window forms and for what happens at the edges of a window.
+Requires [Workshop](https://northpole.security/) 2026.8 or later and Santa
+2026.8 or later, and because the window is checked at every execution the result
+is not cached.
+
+```clike
+policy_for_range(weekdays(), "09:00", "17:00", ALLOWLIST, BLOCKLIST)
+```
+
+The example below evaluates the rule at 10:30 on a Monday, so the execution is
+allowed. Change `now` to an evening or a weekend to see the block:
+
+<PlaygroundLink
+  expression={`policy_for_range(weekdays(), "09:00", "17:00", ALLOWLIST, BLOCKLIST)`}
+  context={`
+    # Playground only: the host's clock. Its UTC offset is the host's time zone.
+    now: "2026-09-14T10:30:00-04:00"
+    target:
+      signing_id: "EQHXZ8M8AV:com.example.app"
+    args:
+      - "--flag"
+    envs:
+      HOME: "/Users/admin"
+    euid: 501
+    cwd: "/Applications"
+  `}
+/>
+
+## Working hours with Touch ID outside them <AddedBadge added={"2026.8"} /> {#working-hours-touchid}
+
+Out-of-hours use stays possible with a person at the keyboard. The cooldown
+means one approval covers the next hour. Requires
+[Workshop](https://northpole.security/) 2026.8 or later and Santa 2026.8 or
+later.
+
+```clike
+policy_for_range(weekdays(), "08:00", "18:00", ALLOWLIST, require_touchid_with_cooldown_minutes(60))
+```
+
+The example below evaluates the rule at 21:15 on a Monday, so Touch ID is
+required:
+
+<PlaygroundLink
+  expression={`policy_for_range(weekdays(), "08:00", "18:00", ALLOWLIST, require_touchid_with_cooldown_minutes(60))`}
+  context={`
+    # Playground only: the host's clock. Its UTC offset is the host's time zone.
+    now: "2026-09-14T21:15:00-04:00"
+    target:
+      signing_id: "EQHXZ8M8AV:com.example.app"
+    args:
+      - "--flag"
+    envs:
+      HOME: "/Users/admin"
+    euid: 501
+    cwd: "/Applications"
+  `}
+/>
+
+## Audit out-of-hours use before enforcing <AddedBadge added={"2026.8"} /> {#audit-before-enforcing}
+
+Both policy slots allow the process to run. Out-of-hours executions arrive as
+audit matches, which is the list of users a blocking version of this rule would
+have stopped. Swap `AUDIT` for `BLOCKLIST` when that list looks right. Requires
+[Workshop](https://northpole.security/) 2026.8 or later and Santa 2026.8 or
+later.
+
+```clike
+policy_for_range(weekdays(), "09:00", "17:00", ALLOWLIST, AUDIT)
+```
+
+The example below evaluates the rule on a Saturday afternoon, so the execution
+is allowed and flagged for audit:
+
+<PlaygroundLink
+  expression={`policy_for_range(weekdays(), "09:00", "17:00", ALLOWLIST, AUDIT)`}
+  context={`
+    # Playground only: the host's clock. Its UTC offset is the host's time zone.
+    now: "2026-09-12T14:00:00-04:00"
+    target:
+      signing_id: "EQHXZ8M8AV:com.example.app"
+    args:
+      - "--flag"
+    envs:
+      HOME: "/Users/admin"
+    euid: 501
+    cwd: "/Applications"
+  `}
+/>
+
+## One maintenance window for the whole fleet <AddedBadge added={"2026.8"} /> {#fleet-maintenance-window}
+
+With a named time zone every host reads the same calendar, so this window is
+the same four hours everywhere regardless of each host's own zone. The zone can
+be `"UTC"`, an IANA name such as `"America/New_York"`, or a fixed offset such as
+`"+05:30"`. Requires [Workshop](https://northpole.security/) 2026.8 or later
+and Santa 2026.8 or later.
+
+```clike
+policy_for_range([0, 1, 2, 3, 4, 5, 6], "01:00", "05:00", "UTC", ALLOWLIST, BLOCKLIST)
+```
+
+The example below runs on a host in New York at 23:30 local time, which is
+03:30 UTC, so the execution is allowed:
+
+<PlaygroundLink
+  expression={`policy_for_range([0, 1, 2, 3, 4, 5, 6], "01:00", "05:00", "UTC", ALLOWLIST, BLOCKLIST)`}
+  context={`
+    # Playground only: the host's clock. Its UTC offset is the host's time zone.
+    now: "2026-09-14T23:30:00-04:00"
+    target:
+      signing_id: "EQHXZ8M8AV:com.example.app"
+    args:
+      - "--flag"
+    envs:
+      HOME: "/Users/admin"
+    euid: 501
+    cwd: "/Applications"
+  `}
+/>
+
+## Quit an app when the shift ends <AddedBadge added={"2026.8"} /> {#quit-at-end-of-shift}
+
+Without `kill_on_expiry()` a window governs new executions only, and a process
+started inside the window keeps running after it closes. Wrapping the in-range
+policy records every execution the rule allows during the window and quits
+whatever is still running at 17:00, after warning the user 48 minutes earlier.
+See [Quitting Processes When the Window
+Closes](/features/time-based-rules#kill-on-expiry) for what Santa records and
+how the quit is delivered. Requires [Workshop](https://northpole.security/)
+2026.8 or later and Santa 2026.8 or later.
+
+```clike
+policy_for_range(weekdays(), "09:00", "17:00", kill_on_expiry(ALLOWLIST), BLOCKLIST)
+```
+
+The example below evaluates the rule at 15:45 on a Monday. The execution is
+allowed, and the playground shows the quit that is recorded for 17:00:
+
+<PlaygroundLink
+  expression={`policy_for_range(weekdays(), "09:00", "17:00", kill_on_expiry(ALLOWLIST), BLOCKLIST)`}
+  context={`
+    # Playground only: the host's clock. Its UTC offset is the host's time zone.
+    now: "2026-09-14T15:45:00-04:00"
+    target:
+      signing_id: "EQHXZ8M8AV:com.example.app"
+    args:
+      - "--flag"
+    envs:
+      HOME: "/Users/admin"
+    euid: 501
+    cwd: "/Applications"
+  `}
+/>
+
+## Timed access counted from launch <AddedBadge added={"2026.8"} /> {#timed-access}
+
+The duration form opens a window at the moment of the execution, so it is
+always in range and exists only to set an expiry, which is why
+`kill_on_expiry()` is required with it. Here the user is asked for Touch ID
+first, and the process is quit 30 minutes after it started. A second launch
+inside those 30 minutes shares the first one's deadline. Requires
+[Workshop](https://northpole.security/) 2026.8 or later and Santa 2026.8 or
+later.
+
+```clike
+policy_for_range(duration("30m"), kill_on_expiry(require_touchid_with_cooldown_minutes(30)))
+```
+
+<PlaygroundLink
+  expression={`policy_for_range(duration("30m"), kill_on_expiry(require_touchid_with_cooldown_minutes(30)))`}
+  context={`
+    # Playground only: the host's clock. Its UTC offset is the host's time zone.
+    now: "2026-09-14T10:00:00-04:00"
+    target:
+      signing_id: "EQHXZ8M8AV:com.example.app"
+    args:
+      - "--flag"
+    envs:
+      HOME: "/Users/admin"
+    euid: 501
+    cwd: "/Applications"
+  `}
+/>
+
+To time only some launches, put the call in a branch of a ternary. Ordinary
+launches are allowed at any hour and only launches with `--beta` are timed:
+
+```clike
+"--beta" in args ? policy_for_range(duration("30m"), kill_on_expiry(ALLOWLIST)) : ALLOWLIST
+```
+
+<PlaygroundLink
+  expression={`"--beta" in args ? policy_for_range(duration("30m"), kill_on_expiry(ALLOWLIST)) : ALLOWLIST`}
+  context={`
+    # Playground only: the host's clock. Its UTC offset is the host's time zone.
+    now: "2026-09-14T10:00:00-04:00"
+    target:
+      signing_id: "EQHXZ8M8AV:com.example.app"
+    args:
+      - "--beta"
     envs:
       HOME: "/Users/admin"
     euid: 501

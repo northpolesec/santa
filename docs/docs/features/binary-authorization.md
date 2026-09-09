@@ -371,7 +371,9 @@ Each entry in `ancestors` has the following fields:
 Fields accessed from `target.*` are **cacheable** — their result is cached so
 subsequent executions are faster. All other fields (`path`, `args`, `envs`,
 `euid`, `cwd`, `ancestors`) are **not cacheable** and may impact performance
-if used in rules for frequently-executed binaries.
+if used in rules for frequently-executed binaries. Expressions that call
+`today()`, `now()` or `policy_for_range()` are also **not cacheable**, since
+their result depends on when the execution happens.
 
 :::
 
@@ -381,8 +383,13 @@ following helper functions are available. They require [Workshop](https://northp
 
 | Function | Returns | Description |
 | -------- | ------- | ----------- |
-| `today()` | `timestamp` | The start of the current UTC day (`00:00:00Z`). Combine with duration arithmetic to compare against a sliding window, e.g. `target.secure_signing_time > today() - days(90)`. Any expression using `today()` is **not cacheable**, as its value changes each day. |
+| `today()` | `timestamp` | The start of the current day in the host's local time zone. Combine with duration arithmetic to compare against a sliding window, e.g. `target.secure_signing_time > today() - days(90)`. Any expression using `today()` is **not cacheable**, as its value changes each day. Before Santa 2026.8 this was the start of the current UTC day. |
+| `today(tz)` | `timestamp` | The start of the current day in the named time zone, for rules whose calendar must be the same fleet-wide. `tz` is `"local"`, an IANA name such as `"America/New_York"` or `"UTC"`, or a fixed `"+05:30"` offset. Not cacheable. Requires Workshop and Santa 2026.8+ |
 | `days(n)` | `duration` | A duration of `n` days (`n`×24h). Convenience for day-length windows, since the standard `duration()` only parses units up to hours (`days(90)` is equivalent to `duration('2160h')`). |
+| `now()` | `timestamp` | The current instant, with no truncation. Any expression using `now()` is **not cacheable**. Requires Workshop and Santa 2026.8+ |
+| `weekdays()` | `list<int>` | The constant `[1, 2, 3, 4, 5]`, Monday through Friday, in the `0` (Sunday) through `6` (Saturday) numbering used by `policy_for_range()` and `getDayOfWeek()`. Requires Workshop and Santa 2026.8+ |
+| `policy_for_range(...)` | policy | Returns one policy while a time window is open and another while it is closed. Four forms: a weekly `HH:MM` window on the host's clock, the same window in a named time zone, a fixed span between two timestamps, or a duration counted from the execution. Never cacheable. See [Time Based Rules](/features/time-based-rules). Requires Workshop and Santa 2026.8+ |
+| `kill_on_expiry(policy)` | policy | Wraps the in-range policy of `policy_for_range()` so the processes the rule allowed are quit when the window closes. Accepts only policies that let a process start. See [Time Based Rules](/features/time-based-rules#kill-on-expiry). Requires Workshop and Santa 2026.8+ |
 
 Some examples of valid CEL expressions:
 
@@ -395,6 +402,11 @@ target.signing_time >= timestamp('2025-05-31T00:00:00Z')
 // automatically each day. Requires Workshop.
 // This expression will NOT be cacheable.
 target.secure_signing_time > today() - days(90)
+
+// Only allow the app from 09:00 to 17:00, Monday through Friday, on the host's
+// own clock, and block it at any other time. Requires Workshop and Santa 2026.8+.
+// See /features/time-based-rules. This expression will NOT be cacheable.
+policy_for_range(weekdays(), '09:00', '17:00', ALLOWLIST, BLOCKLIST)
 
 // Only allow Chrome from this team, block other apps.
 // Useful when attached to a TEAMID rule to allow a specific app.

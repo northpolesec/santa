@@ -239,13 +239,39 @@ export default function CELPlayground() {
                 <span className="text-xs text-muted-foreground">
                   {result.cacheable
                     ? "(expression only uses static target fields)"
-                    : "(expression references dynamic fields: args, envs, euid, or cwd)"}
+                    : "(expression depends on the execution context or the time: args, envs, euid, cwd, ancestors, today(), now() or policy_for_range())"}
                 </span>
               </div>
+              {result.evaluatedAt && (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-foreground">
+                    Evaluated at:
+                  </span>
+                  <code className="px-2 py-0.5 rounded bg-accent text-accent-foreground text-sm font-mono">
+                    {result.evaluatedAt.toISOString()}
+                  </code>
+                  <span className="text-xs text-muted-foreground">
+                    (pinned by the now key in the context)
+                  </span>
+                </div>
+              )}
+              {result.pendingKill && (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-foreground">
+                    Quits at:
+                  </span>
+                  <code className="px-2 py-0.5 rounded bg-accent text-accent-foreground text-sm font-mono">
+                    {result.pendingKill.deadline.toISOString()}
+                  </code>
+                  <span className="text-xs text-muted-foreground">
+                    (user warned at {result.pendingKill.notifyAt.toISOString()})
+                  </span>
+                </div>
+              )}
               {result.isV2 && (
                 <div className="mt-1 rounded-md border border-border bg-accent p-3 text-sm text-accent-foreground">
-                  This expression uses CELv2 features which are only available
-                  to Workshop customers.
+                  This expression uses features that are only available to
+                  Workshop customers.
                 </div>
               )}
             </div>
