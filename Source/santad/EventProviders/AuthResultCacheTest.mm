@@ -361,6 +361,7 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
       {FlushCacheReason::kEntitlementsPrefixFilterChanged, @"EntitlementsPrefixFilterChanged"},
       {FlushCacheReason::kEntitlementsTeamIDFilterChanged, @"EntitlementsTeamIDFilterChanged"},
       {FlushCacheReason::kCELFallbackRulesChanged, @"CELFallbackRulesChanged"},
+      {FlushCacheReason::kTransitiveRulesChanged, @"TransitiveRulesChanged"},
   };
 
   for (const auto& kv : reasonToString) {
@@ -368,7 +369,7 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
   }
 
   XCTAssertThrows(FlushCacheReasonToString(
-      (FlushCacheReason)(static_cast<int>(FlushCacheReason::kCELFallbackRulesChanged) + 1)));
+      (FlushCacheReason)(static_cast<int>(FlushCacheReason::kTransitiveRulesChanged) + 1)));
 }
 
 @end

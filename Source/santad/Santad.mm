@@ -492,6 +492,19 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                  }],
     [[SNTKVOManager alloc]
         initWithObject:configurator
+              selector:@selector(enableTransitiveRules)
+                  type:[NSNumber class]
+              callback:^(NSNumber* oldValue, NSNumber* newValue) {
+                if ([oldValue isEqual:newValue]) return;
+
+                // Compiler authorizations are cached, so without a flush an
+                // already-authorized compiler keeps being marked as one.
+                LOGI(@"EnableTransitiveRules changed: %@. Flushing caches.", newValue);
+                auth_result_cache->FlushCache(FlushCacheMode::kAllCaches,
+                                              FlushCacheReason::kTransitiveRulesChanged);
+              }],
+    [[SNTKVOManager alloc]
+        initWithObject:configurator
               selector:@selector(staticRules)
                   type:[NSArray class]
               callback:^(NSArray* oldValue, NSArray* newValue) {
