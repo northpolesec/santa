@@ -376,9 +376,9 @@ export const celWorkshopFunctions: CELCompletionItem[] = [
   {
     label: "today",
     kind: "function",
-    detail: "today() -> timestamp",
+    detail: "today([tz]) -> timestamp",
     documentation:
-      "Returns the start of the current UTC day (00:00:00Z). Combine with duration arithmetic to compare against a sliding window, e.g. target.secure_signing_time > today() - days(90). Any expression using today() is not cacheable.",
+      'Returns the start of the current day in the host\'s local time zone, or in the named zone: "local", an IANA name such as "America/New_York", or a [+-]HH:MM offset. Combine with duration arithmetic to compare against a sliding window, e.g. target.secure_signing_time > today() - days(90). Any expression using today() is not cacheable. Requires Workshop; the zone argument requires Santa 2026.8+.',
     insertText: "today()",
     v2Only: true,
   },
@@ -389,6 +389,46 @@ export const celWorkshopFunctions: CELCompletionItem[] = [
     documentation:
       "Returns a duration of n*24h. Convenience for day-length windows, since the built-in duration() only parses units up to hours (e.g. days(90) == duration('2160h')).",
     insertText: "days(${1:n})",
+    insertTextRules: "insertAsSnippet",
+    v2Only: true,
+  },
+  {
+    label: "now",
+    kind: "function",
+    detail: "now() -> timestamp",
+    documentation:
+      "Returns the current instant, with no truncation. Any expression using now() is not cacheable. Requires Workshop and Santa 2026.8+.",
+    insertText: "now()",
+    v2Only: true,
+  },
+  {
+    label: "weekdays",
+    kind: "function",
+    detail: "weekdays() -> list<int>",
+    documentation:
+      "Returns [1, 2, 3, 4, 5], Monday through Friday, in the 0 (Sunday) through 6 (Saturday) numbering used by policy_for_range() and getDayOfWeek(). Requires Workshop and Santa 2026.8+.",
+    insertText: "weekdays()",
+    v2Only: true,
+  },
+  {
+    label: "policy_for_range",
+    kind: "function",
+    detail:
+      "policy_for_range(days, start, end[, tz], policy, out_of_range_policy) -> policy",
+    documentation:
+      'Returns policy while a time window is open and out_of_range_policy while it is closed. Forms: policy_for_range(days, "HH:MM", "HH:MM", policy, out_of_range_policy) for a weekly window on the host\'s clock; the same with a tz argument before the policies; policy_for_range(timestamp, timestamp, policy, out_of_range_policy) for a fixed span; policy_for_range(duration, kill_on_expiry(policy)) for a window counted from the execution. Never cacheable. Requires Workshop and Santa 2026.8+.',
+    insertText:
+      'policy_for_range(${1:weekdays()}, "${2:09:00}", "${3:17:00}", ${4:ALLOWLIST}, ${5:BLOCKLIST})',
+    insertTextRules: "insertAsSnippet",
+    v2Only: true,
+  },
+  {
+    label: "kill_on_expiry",
+    kind: "function",
+    detail: "kill_on_expiry(policy) -> policy",
+    documentation:
+      "Wraps the in-range policy of policy_for_range() so the processes the rule allowed are quit when the window closes. Accepts only policies that let a process start: ALLOWLIST, AUDIT, SEATBELT, REQUIRE_TOUCHID, REQUIRE_TOUCHID_ONLY and the Touch ID cooldown helpers. Requires Workshop and Santa 2026.8+.",
+    insertText: "kill_on_expiry(${1:ALLOWLIST})",
     insertTextRules: "insertAsSnippet",
     v2Only: true,
   },
@@ -550,6 +590,10 @@ export const celLanguageDefinition = {
     "require_touchid_only_with_cooldown_minutes",
     "today",
     "days",
+    "now",
+    "weekdays",
+    "policy_for_range",
+    "kill_on_expiry",
   ],
 
   // Operators (CEL-specific, no assignment operators)
