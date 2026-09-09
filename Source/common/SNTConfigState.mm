@@ -23,6 +23,7 @@
   self = [super init];
   if (self) {
     _clientMode = config.clientMode;
+    _inTemporaryMonitorMode = config.inTemporaryMonitorMode;
     _enableNotificationSilences = config.enableNotificationSilences;
     _eventDetailText = config.eventDetailText;
     _fileAccessEventDetailURL = config.fileAccessEventDetailURL;
@@ -37,6 +38,7 @@
 
 - (void)encodeWithCoder:(NSCoder*)coder {
   ENCODE_BOXABLE(coder, clientMode);
+  ENCODE_BOXABLE(coder, inTemporaryMonitorMode);
   ENCODE_BOXABLE(coder, enableNotificationSilences);
   ENCODE(coder, eventDetailText);
   ENCODE(coder, fileAccessEventDetailURL);
@@ -47,6 +49,7 @@
   self = [super init];
   if (self) {
     DECODE_SELECTOR(decoder, clientMode, NSNumber, integerValue);
+    DECODE_SELECTOR(decoder, inTemporaryMonitorMode, NSNumber, boolValue);
     DECODE_SELECTOR(decoder, enableNotificationSilences, NSNumber, boolValue);
     DECODE(decoder, eventDetailText, NSString);
     DECODE(decoder, fileAccessEventDetailURL, NSString);

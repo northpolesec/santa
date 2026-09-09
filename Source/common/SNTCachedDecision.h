@@ -40,6 +40,7 @@
 @property SantaVnode vnodeId;
 @property SNTEventState decision;
 @property SNTClientMode decisionClientMode;
+@property BOOL decisionTemporaryMonitorMode;
 @property NSString* decisionExtra;
 @property NSString* sha256;
 
