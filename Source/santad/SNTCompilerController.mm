@@ -24,7 +24,6 @@
 
 #import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTCommonEnums.h"
-#import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTFileInfo.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTRule.h"
@@ -111,18 +110,6 @@ static constexpr std::string_view kIgnoredCompilerProcessPathPrefix = "/dev/";
   SNTFileInfo* targetFile;
   NSString* targetPath;
   NSError* error;
-
-  // This is the only place transitive rules are created, so it is the only place
-  // that has to honor the config being turned off. Nothing else re-checks: a
-  // process marked as a compiler stays marked until it exits, and the
-  // AuthResultCache keeps handing back SNTActionRespondAllowCompiler for
-  // already-authorized compilers, so both would keep feeding this method after
-  // EnableTransitiveRules flipped to false. EXIT still runs so compiler marks
-  // are cleared rather than left dangling.
-  if (esMsg->event_type != ES_EVENT_TYPE_NOTIFY_EXIT &&
-      ![[SNTConfigurator configurator] enableTransitiveRules]) {
-    return NO;
-  }
 
   switch (esMsg->event_type) {
     case ES_EVENT_TYPE_NOTIFY_CLOSE:
