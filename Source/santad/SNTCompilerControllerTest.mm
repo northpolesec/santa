@@ -25,6 +25,7 @@
 #include <memory>
 
 #import "Source/common/SNTCachedDecision.h"
+#import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTFileInfo.h"
 #include "Source/common/TestUtils.h"
 #include "Source/common/es/Message.h"
@@ -47,6 +48,7 @@ static const pid_t PID_MAX = 99999;
 @end
 
 @interface SNTCompilerControllerTest : XCTestCase
+@property id mockConfigurator;
 @property id mockDecisionCache;
 @property audit_token_t tok1;
 @property audit_token_t tok2;
@@ -60,6 +62,10 @@ static const pid_t PID_MAX = 99999;
   self.mockDecisionCache = OCMClassMock([SNTDecisionCache class]);
   OCMStub([self.mockDecisionCache sharedCache]).andReturn(self.mockDecisionCache);
 
+  self.mockConfigurator = OCMClassMock([SNTConfigurator class]);
+  OCMStub([self.mockConfigurator configurator]).andReturn(self.mockConfigurator);
+  OCMStub([self.mockConfigurator enableTransitiveRules]).andReturn(YES);
+
   self.tok1 = MakeAuditToken(12, 11);
   self.tok2 = MakeAuditToken(34, 22);
   self.tokNegativePid = MakeAuditToken(-1, 33);
@@ -67,6 +73,7 @@ static const pid_t PID_MAX = 99999;
 }
 
 - (void)tearDown {
+  [self.mockConfigurator stopMocking];
   [self.mockDecisionCache stopMocking];
 }
 
@@ -513,6 +520,53 @@ static const pid_t PID_MAX = 99999;
     XCTAssertTrue(OCMVerifyAll(mockCompilerController), "Unable to verify all expectations");
     [mockCompilerController stopMocking];
     [mockFileInfo stopMocking];
+  }
+}
+
+// A process stays marked as a compiler until it exits, and the AuthResultCache
+// keeps replaying SNTActionRespondAllowCompiler for compilers it already
+// authorized. Both keep feeding handleEvent: after EnableTransitiveRules is
+// turned off, so handleEvent: must refuse to create rules itself.
+- (void)testHandleEventDoesNothingWhenTransitiveRulesDisabled {
+  [self.mockConfigurator stopMocking];
+  self.mockConfigurator = OCMClassMock([SNTConfigurator class]);
+  OCMStub([self.mockConfigurator configurator]).andReturn(self.mockConfigurator);
+  OCMStub([self.mockConfigurator enableTransitiveRules]).andReturn(NO);
+
+  es_file_t file = MakeESFile("foo");
+  es_file_t normalFile = MakeESFile("bar");
+  audit_token_t compilerTok = MakeAuditToken(12, 34);
+  es_process_t compilerProc = MakeESProcess(&file, compilerTok, {});
+  es_message_t esMsg;
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+
+  SNTCompilerController* cc = [[SNTCompilerController alloc] init];
+  [cc setProcess:compilerTok isCompiler:true];
+
+  for (es_event_type_t eventType :
+       {ES_EVENT_TYPE_NOTIFY_CLOSE, ES_EVENT_TYPE_NOTIFY_RENAME, ES_EVENT_TYPE_NOTIFY_CLONE}) {
+    esMsg = MakeESMessage(eventType, &compilerProc);
+    esMsg.event.close.target = &normalFile;
+    Message msg(mockESApi, &esMsg);
+
+    id mockCompilerController = OCMPartialMock(cc);
+    OCMReject([mockCompilerController createTransitiveRule:msg target:OCMOCK_ANY logger:nullptr])
+        .ignoringNonObjectArgs();
+
+    XCTAssertFalse([cc handleEvent:msg withLogger:nullptr]);
+
+    XCTAssertTrue(OCMVerifyAll(mockCompilerController), "Unable to verify all expectations");
+    [mockCompilerController stopMocking];
+  }
+
+  // EXIT is still processed so compiler marks don't dangle.
+  {
+    esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_EXIT, &compilerProc);
+    Message msg(mockESApi, &esMsg);
+    XCTAssertTrue([cc handleEvent:msg withLogger:nullptr]);
+    XCTAssertFalse([cc isCompiler:compilerTok]);
   }
 }
 

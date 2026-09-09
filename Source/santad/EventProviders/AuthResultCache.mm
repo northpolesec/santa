@@ -36,6 +36,7 @@ static NSString* const kFlushCacheReasonEntitlementsPrefixFilterChanged =
 static NSString* const kFlushCacheReasonEntitlementsTeamIDFilterChanged =
     @"EntitlementsTeamIDFilterChanged";
 static NSString* const kFlushCacheReasonCELFallbackRulesChanged = @"CELFallbackRulesChanged";
+static NSString* const kFlushCacheReasonTransitiveRulesChanged = @"TransitiveRulesChanged";
 
 namespace santa {
 
@@ -53,6 +54,7 @@ NSString* const FlushCacheReasonToString(FlushCacheReason reason) {
       return kFlushCacheReasonEntitlementsTeamIDFilterChanged;
     case FlushCacheReason::kCELFallbackRulesChanged:
       return kFlushCacheReasonCELFallbackRulesChanged;
+    case FlushCacheReason::kTransitiveRulesChanged: return kFlushCacheReasonTransitiveRulesChanged;
     default:
       [NSException raise:@"Invalid reason"
                   format:@"Unknown reason value: %d", static_cast<int>(reason)];
