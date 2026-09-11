@@ -9,6 +9,15 @@
 # //:release genrule to collect. Without it, releases silently ship with only
 # Santa.app's dSYM -- the daemon and services lose their symbols.
 build --define=apple.propagate_embedded_extra_outputs=yes
+
+# Bazel 9 removed the native cc_* and py_* rules from BUILD/bzl globals. Our
+# pinned hedron_compile_commands fork still uses cc_binary and native.py_binary
+# unqualified, and it is unmaintained, so re-enable the autoload for those two
+# rules. This only affects external repos:
+# --incompatible_disable_autoloads_in_main_repo stays on by default, so our own
+# BUILD files still have to load every rule explicitly.
+common --incompatible_autoload_externally=+cc_binary,+py_binary
+
 build --copt=-Werror
 build --copt=-Wall
 build --copt=-Wformat-security
@@ -40,16 +49,14 @@ build --@rules_swift//swift:copt=-std=c++23
 build --per_file_copt=.*cel-cpp.*@-Wno-deprecated-declarations
 build --per_file_copt=.*cel-cpp.*@-Wno-nontrivial-memcall
 build --per_file_copt=.*cel-cpp.*@-Wno-nullability-completeness
-build --per_file_copt=.*cel-cpp.*@-Wno-unused-function
+build --per_file_copt=.*cel-cpp.*@-Wno-unused-const-variable
 build --per_file_copt=.*cel-cpp.*@-Wno-unused-result
 
-# protobuf v33.0 introduced a large number of warnings when building
-# the dependency about the use of newly deprecated functions.
-build --per_file_copt=external/protos\+.*@-Wno-deprecated-declarations
+# protobuf uses plenty of its own and abseil's deprecated APIs internally, which
+# is noise we can't act on. These are warnings only -- -Wno-error=deprecated-declarations
+# above already keeps them non-fatal -- so this is purely to keep the log readable.
+build --per_file_copt=external/protobuf.*@-Wno-deprecated-declarations
 build --host_per_file_copt=external/protobuf.*@-Wno-deprecated-declarations
-# protobuf v34 has an unused private field in descriptor.cc.
-build --per_file_copt=external/protobuf.*@-Wno-unused-private-field
-build --host_per_file_copt=external/protobuf.*@-Wno-unused-private-field
 
 # Many config options for sanitizers pulled from
 # https://github.com/protocolbuffers/protobuf/blob/main/.bazelrc
