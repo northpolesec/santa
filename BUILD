@@ -33,11 +33,17 @@ apple_bundle_version(
     visibility = ["//visibility:public"],
 )
 
+# The three SANTA_BUILD_TYPE settings are public rather than limited to
+# :santa_package_group (which is Bazel's default for config_setting anyway).
+# They are used as select() keys on attributes of rules_apple's symbolic macros,
+# e.g. macos_command_line_application's provisioning_profile, and visibility for
+# those keys is resolved against the macro's package, not ours.
+
 # Used to detect release builds
 config_setting(
     name = "release_build",
     values = {"define": "SANTA_BUILD_TYPE=release"},
-    visibility = [":santa_package_group"],
+    visibility = ["//visibility:public"],
 )
 
 # Adhoc signed - provisioning profiles are not used.
@@ -45,7 +51,7 @@ config_setting(
 config_setting(
     name = "adhoc_build",
     values = {"define": "SANTA_BUILD_TYPE=adhoc"},
-    visibility = [":santa_package_group"],
+    visibility = ["//visibility:public"],
 )
 
 # Production signed but has get-task-allow
@@ -53,7 +59,7 @@ config_setting(
 config_setting(
     name = "debugger_build",
     values = {"define": "SANTA_BUILD_TYPE=debugger"},
-    visibility = [":santa_package_group"],
+    visibility = ["//visibility:public"],
 )
 
 # Used to detect optimized builds

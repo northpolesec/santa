@@ -1,3 +1,5 @@
+load("@rules_cc//cc:objc_library.bzl", "objc_library")
+
 objc_library(
     name = "FMDB",
     srcs = glob(["src/fmdb/*.m"], exclude=["src/fmdb.m"]),
@@ -6,4 +8,3 @@ objc_library(
     sdk_dylibs = ["sqlite3"],
     visibility = ["//visibility:public"],
 )
-
