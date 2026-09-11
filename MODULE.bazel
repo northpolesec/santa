@@ -1,17 +1,17 @@
 module(name = "santa")
 
-bazel_dep(name = "abseil-cpp", version = "20260526.0")
+bazel_dep(name = "abseil-cpp", version = "20260817.0")
 bazel_dep(name = "apple_support", version = "2.8.2")
 bazel_dep(name = "cel-cpp", version = "0.16.1")
 bazel_dep(name = "googletest", version = "1.18.0.bcr.1")
-bazel_dep(name = "protobuf", version = "35.1")
+bazel_dep(name = "protobuf", version = "36.1.bcr.1")
 bazel_dep(name = "rules_apple", version = "5.0.0")
 bazel_dep(name = "rules_cc", version = "0.2.22")
 bazel_dep(name = "rules_shell", version = "0.8.0")
 bazel_dep(name = "rules_swift", version = "4.0.1")
 bazel_dep(name = "xxhash", version = "0.8.3.bcr.1")
 bazel_dep(name = "zstd", version = "1.5.7.bcr.1")
-bazel_dep(name = "boringssl", version = "0.20260803.0")
+bazel_dep(name = "boringssl", version = "0.20260813.0")
 
 # Not used directly. cel-cpp pulls in flatbuffers, which pins an aspect_bazel_lib
 # that is too old for Bazel 9. Raise both via MVS.
