@@ -60,6 +60,16 @@ bool TemporaryAdminMode::IsCurrentlyAdmin(uid_t uid) {
   return membership_->IsMember(uid);
 }
 
+std::optional<uid_t> TemporaryAdminMode::ActiveSessionTargetUID() {
+  // Exclusive rather than reader lock: IsStartedLocked is annotated
+  // ABSL_EXCLUSIVE_LOCKS_REQUIRED, and this is a cold path.
+  absl::MutexLock lock(lock_);
+  if (!IsStartedLocked() || target_uid_ == 0) {
+    return std::nullopt;
+  }
+  return target_uid_;
+}
+
 uint32_t TemporaryAdminMode::RequestMinutes(NSNumber* requested_duration, uid_t uid,
                                             NSString* username, NSError** err) {
   // Serialize the whole grant (pre-checks + auth + apply) against other grants so

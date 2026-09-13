@@ -29,13 +29,31 @@ typedef NS_ENUM(NSInteger, SNTTemporaryAdminPolicyType) {
 @property(readonly) NSNumber* defaultDurationMinutes;
 @property(readonly) BOOL requireJustification;
 
+/// Whether the sync server sent the allowed-admins wrapper. NO means the server
+/// does not implement admin-group enforcement, and Santa must fall back to the
+/// one-shot capture behavior rather than treating an empty list as "allow none".
+@property(readonly) BOOL enforcesAdminGroup;
+
+/// The accounts allowed to hold standing admin, lowercased and trimmed. nil
+/// exactly when enforcesAdminGroup is NO; an empty set means "allow none".
+@property(readonly) NSSet<NSString*>* allowedAdminUsernames;
+
 - (instancetype)initRevocation;
 - (instancetype)initOnDemandMinutes:(uint32_t)minutes
                     defaultDuration:(uint32_t)defaultDuration
                requireJustification:(BOOL)requireJustification;
+- (instancetype)initOnDemandMinutes:(uint32_t)minutes
+                    defaultDuration:(uint32_t)defaultDuration
+               requireJustification:(BOOL)requireJustification
+                      allowedAdmins:(NSArray<NSString*>*)allowedAdmins;
 - (instancetype)init NS_UNAVAILABLE;
 
 - (NSData*)serialize;
 + (instancetype)deserialize:(NSData*)data;
 - (uint32_t)getDurationMinutes:(NSNumber*)requestedDuration;
+
+/// The canonical form used for every allowlist comparison: trimmed, canonically
+/// precomposed and lowercased. Callers matching a directory username against
+/// `allowedAdminUsernames` MUST put it through this first.
++ (NSString*)normalizedUsername:(NSString*)name;
 @end
