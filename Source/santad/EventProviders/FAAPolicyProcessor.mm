@@ -178,47 +178,67 @@ NSString* FAAPolicyProcessor::GetCertificateHash(const es_file_t* es_file) {
 
   // 2. Decision cache is canonical. Prime cert_hash_cache_ on hit so the
   //    next event for this vnode goes straight to step 1 above.
+  //    A decision from an unconfirmed read carries the certificate of the file
+  //    that was read, not of the one the event named, and the entry primed here
+  //    is terminal for the vnode's lifetime. Fall through to the steps below,
+  //    which resolve the path as it is now.
   SNTCachedDecision* cd = [decision_cache_ cachedDecisionForFile:es_file->stat];
-  if (cd.certSHA256.length) {
+  if (cd.certSHA256.length && !cd.identityMismatched) {
     cert_hash_cache_.set(vnodeID, cd.certSHA256);
     return cd.certSHA256;
   }
 
   // 3. Rehydrate (subject to size cap). Populates SNTDecisionCache so the
   //    log-path lookup can hit without redoing the work.
-  NSError* err;
-  SNTFileInfo* fi = [[SNTFileInfo alloc] initWithEndpointSecurityFile:es_file error:&err];
-  if (fi) {
-    if (fi.fileSize <= kMaxSyncRehydrateBytes) {
-      SNTCachedDecision* rehydrated = [decision_cache_ rehydrateAndCacheDecisionForFileInfo:fi];
-      if (rehydrated.certSHA256.length) {
-        cert_hash_cache_.set(vnodeID, rehydrated.certSHA256);
-        return rehydrated.certSHA256;
-      }
-      if (rehydrated) {
-        // Rehydrate succeeded but produced no cert info — the binary is
-        // unsigned (or has broken codesigning). A fresh MOLCodesignChecker
-        // on the same file would return the same empty answer, so short-
-        // circuit with the terminal sentinel.
-        cert_hash_cache_.set(vnodeID, kBadCertHash);
-        return kBadCertHash;
+  //    Only when nothing is cached: the insert is first-writer-wins, so against
+  //    an existing entry this hands that entry back instead of what it built,
+  //    defeating both the sentinel below and step 2's check. Step 4 handles it.
+  if (!cd) {
+    NSError* err;
+    SNTFileInfo* fi = [[SNTFileInfo alloc] initWithEndpointSecurityFile:es_file error:&err];
+    if (fi && fi.identityVerification == SNTFileInfoIdentityMismatch) {
+      // Skip the rehydrate: it writes a full decision keyed on this vnode into
+      // SNTDecisionCache, which readers on other paths consume as this process's
+      // identity.
+      //
+      // Fall through to the fallback below rather than returning no answer.
+      // This value is consulted when matching policy, where a nil hash is not
+      // a neutral answer. The fallback is the same answer this function
+      // already gives whenever no SNTFileInfo is available.
+      LOGD(@"FAA GetCertificateHash: identity not confirmed for %s", es_file->path.data);
+    } else if (fi) {
+      if (fi.fileSize <= kMaxSyncRehydrateBytes) {
+        SNTCachedDecision* rehydrated = [decision_cache_ rehydrateAndCacheDecisionForFileInfo:fi];
+        if (rehydrated.certSHA256.length) {
+          cert_hash_cache_.set(vnodeID, rehydrated.certSHA256);
+          return rehydrated.certSHA256;
+        }
+        if (rehydrated) {
+          // Rehydrate produced no cert info — the binary is unsigned (or has
+          // broken codesigning). A fresh MOLCodesignChecker would return the
+          // same empty answer, so short-circuit with the terminal sentinel.
+          // Sound only because nothing was cached above, so this is the
+          // decision just built from the file.
+          cert_hash_cache_.set(vnodeID, kBadCertHash);
+          return kBadCertHash;
+        }
+      } else {
+        // File is too large to hash synchronously; kick off async rehydrate
+        // to warm SNTDecisionCache for future events. We still need the cert
+        // hash right now, so fall through to step 4 for a MOLCodesignChecker
+        // lookup on this thread.
+        [decision_cache_ asyncRehydrateAndCacheDecisionForFileInfo:fi];
       }
     } else {
-      // File is too large to hash synchronously; kick off async rehydrate
-      // to warm SNTDecisionCache for future events. We still need the cert
-      // hash right now, so fall through to step 4 for a MOLCodesignChecker
-      // lookup on this thread.
-      [decision_cache_ asyncRehydrateAndCacheDecisionForFileInfo:fi];
+      LOGD(@"FAA GetCertificateHash: SNTFileInfo init failed for %s: %@", es_file->path.data,
+           err.localizedDescription);
     }
-  } else {
-    LOGD(@"FAA GetCertificateHash: SNTFileInfo init failed for %s: %@", es_file->path.data,
-         err.localizedDescription);
   }
 
-  // 4. Fallback: fresh codesign. Reached when: file is too big to sync-rehydrate
-  //    (async path), or SNTFileInfo init failed (bad path / non-regular file).
-  //    The "rehydrate produced no cert info" case is handled above to avoid a
-  //    redundant codesign trip.
+  // 4. Fallback: fresh codesign. Reached when a decision is cached but step 2
+  //    declined it, the identity was not confirmed, the file is too big to
+  //    sync-rehydrate, or SNTFileInfo init failed. The "rehydrate produced no
+  //    cert info" case is handled above to avoid a redundant codesign trip.
   MOLCodesignChecker* csInfo =
       [[MOLCodesignChecker alloc] initWithBinaryPath:@(es_file->path.data)];
   NSString* result = csInfo.leafCertificate.SHA256;
@@ -585,11 +605,19 @@ FAAPolicyProcessor::DecisionAndOptions FAAPolicyProcessor::ProcessTargetAndPolic
     LogTelemetry(*policy, msg, target_policy_pair.first, decision);
 
     SNTCachedDecision* cd = GetCachedDecision(msg->process->executable->stat);
-    if (unlikely(!cd.sha256)) {
+    // Only when nothing is cached: first-writer-wins means a rehydrate cannot add
+    // a hash to an existing entry, and some decisions carry none by design.
+    if (unlikely(!cd)) {
       NSError* err;
       SNTFileInfo* fi = [[SNTFileInfo alloc] initWithEndpointSecurityFile:msg->process->executable
                                                                     error:&err];
-      if (fi) {
+      if (fi && fi.identityVerification == SNTFileInfoIdentityMismatch) {
+        // A decision rehydrated from this read would be written to
+        // SNTDecisionCache keyed on this process's vnode, where readers that
+        // treat a cached decision as an input would consume it as this
+        // process's identity.
+        LOGD(@"FAA rehydrate: identity not confirmed for %s", msg->process->executable->path.data);
+      } else if (fi) {
         if (fi.fileSize <= kMaxSyncRehydrateBytes) {
           SNTCachedDecision* rehydrated = [decision_cache_ rehydrateAndCacheDecisionForFileInfo:fi];
           if (rehydrated) cd = rehydrated;

@@ -14,13 +14,35 @@
 /// limitations under the License.
 
 #import <XCTest/XCTest.h>
+#include <fcntl.h>
 #include <libkern/OSByteOrder.h>
 #include <mach-o/fat.h>
 #include <mach-o/loader.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
+#import "Source/common/SNTError.h"
 #import "Source/common/SNTFileInfo.h"
+#include "Source/common/SystemResources.h"
 
 static const uint32_t kFatTestSliceSize = 8192;
+
+///
+///  Builds an es_file_t for `path` whose stat is `sb`. The struct borrows the
+///  UTF-8 buffer, which -UTF8String only guarantees until the enclosing
+///  autorelease pool drains, so the result must be used within the pool it was
+///  built in. Every caller does, by keeping both inside one test.
+///
+static es_file_t MakeESFile(NSString* path, const struct stat* sb) {
+  es_file_t file = {};
+  const char* pathBytes = path.UTF8String;
+  file.path.data = pathBytes;
+  file.path.length = strlen(pathBytes);
+  file.path_truncated = false;
+  file.stat = *sb;
+  return file;
+}
 
 @interface SNTFileInfoTest : XCTestCase
 @property NSString* scratchDirPath;
@@ -33,6 +55,14 @@ static const uint32_t kFatTestSliceSize = 8192;
     [[NSFileManager defaultManager] removeItemAtPath:self.scratchDirPath error:NULL];
     self.scratchDirPath = nil;
   }
+  // The overrides are behind #ifdef DEBUG so they cannot ship, and DEBUG follows
+  // bazel's compilation mode (set under fastbuild, unset under -c opt). Tests
+  // needing them skip rather than compile away, so a non-debug build reports the
+  // gap instead of silently running a smaller suite.
+#ifdef DEBUG
+  SetBootVolumeGroupDevForTesting(std::nullopt);
+  SetBootVolumeGroupDevUnavailableForTesting(false);
+#endif
   [super tearDown];
 }
 
@@ -307,6 +337,77 @@ static const uint32_t kFatTestSliceSize = 8192;
   XCTAssertNotNil(sut);
   XCTAssertTrue(sut.isMachO);
   XCTAssertTrue(sut.isFat);
+}
+
+///  Writes a universal binary declaring |archCount| architecture records. The
+///  record at |realIndex| points at a genuine x86_64 slice; the rest are padding
+///  records with distinct cputype/cpusubtype tuples and zero size. The real slice
+///  is written via seek so the file stays sparse.
+- (NSString*)writeFatFixtureWithArchCount:(uint32_t)archCount realIndex:(uint32_t)realIndex {
+  NSString* path = [NSTemporaryDirectory()
+      stringByAppendingPathComponent:[NSString stringWithFormat:@"SNTFileInfoFatMany-%@",
+                                                                NSUUID.UUID.UUIDString]];
+
+  const uint32_t kHeaderSize = sizeof(struct fat_header) + sizeof(struct fat_arch) * archCount;
+  // Place the real slice on a page boundary past the arch table.
+  const uint32_t kSliceOffset = (kHeaderSize + 0xFFF) & ~0xFFFu;
+
+  struct fat_header fh = {
+      .magic = OSSwapHostToBigInt32(FAT_MAGIC),
+      .nfat_arch = OSSwapHostToBigInt32(archCount),
+  };
+  NSMutableData* contents = [NSMutableData dataWithBytes:&fh length:sizeof(fh)];
+  for (uint32_t i = 0; i < archCount; ++i) {
+    struct fat_arch fa = {0};
+    if (i == realIndex) {
+      fa.cputype = (cpu_type_t)OSSwapHostToBigInt32((uint32_t)CPU_TYPE_X86_64);
+      fa.cpusubtype = (cpu_subtype_t)OSSwapHostToBigInt32((uint32_t)CPU_SUBTYPE_X86_64_ALL);
+      fa.offset = OSSwapHostToBigInt32(kSliceOffset);
+      fa.size = OSSwapHostToBigInt32(kFatTestSliceSize);
+      fa.align = OSSwapHostToBigInt32(12);
+    } else {
+      // Distinct, deliberately non-real tuple; zero size so it claims no bytes.
+      fa.cputype = (cpu_type_t)OSSwapHostToBigInt32(0x02000000u | i);
+      fa.cpusubtype = (cpu_subtype_t)OSSwapHostToBigInt32(i);
+      fa.offset = OSSwapHostToBigInt32(kHeaderSize);
+      fa.size = 0;
+    }
+    [contents appendBytes:&fa length:sizeof(fa)];
+  }
+  XCTAssertTrue([[NSFileManager defaultManager] createFileAtPath:path
+                                                        contents:contents
+                                                      attributes:nil]);
+  [self addTeardownBlock:^{
+    [[NSFileManager defaultManager] removeItemAtPath:path error:nil];
+  }];
+
+  NSMutableData* slice = [NSMutableData dataWithLength:kFatTestSliceSize];
+  struct mach_header_64* mh = (struct mach_header_64*)slice.mutableBytes;
+  mh->magic = MH_MAGIC_64;
+  mh->cputype = CPU_TYPE_X86_64;
+  mh->cpusubtype = CPU_SUBTYPE_X86_64_ALL;
+  mh->filetype = MH_EXECUTE;
+
+  NSFileHandle* handle = [NSFileHandle fileHandleForWritingAtPath:path];
+  XCTAssertNotNil(handle);
+  [handle seekToFileOffset:kSliceOffset];
+  [handle writeData:slice];
+  [handle closeFile];
+
+  return path;
+}
+
+- (void)testFatManyArchesIsRecognized {
+  // A universal binary may carry many architecture records; the kernel parses as
+  // many as fit in a page. Santa should recognize the same binaries, so a
+  // large-but-valid count is still parsed. The real slice is placed last to
+  // exercise the full table.
+  const uint32_t kArchCount = 100;
+  NSString* path = [self writeFatFixtureWithArchCount:kArchCount realIndex:kArchCount - 1];
+  SNTFileInfo* sut = [[SNTFileInfo alloc] initWithPath:path];
+  XCTAssertNotNil(sut);
+  XCTAssertTrue(sut.isMachO, @"a universal binary with 100 arch records must be recognized");
+  XCTAssertTrue([sut.architectures containsObject:@"x86_64"]);
 }
 
 #pragma mark Thin Mach-O identification
@@ -740,6 +841,388 @@ static const uint32_t kFatTestSliceSize = 8192;
     XCTAssertNotNil(sut);
     XCTAssertEqualObjects([sut codesignStatus], @"Yes, platform binary");
   }
+}
+
+#pragma mark Identity verification
+
+- (NSString*)writeScratchFileNamed:(NSString*)name bytes:(size_t)bytes {
+  NSString* path = [[self scratchDir] stringByAppendingPathComponent:name];
+  NSMutableData* data = [NSMutableData dataWithLength:bytes];
+  memset(data.mutableBytes, 'A', bytes);
+  XCTAssertTrue([data writeToFile:path atomically:YES]);
+  return path;
+}
+
+- (void)testIdentityVerifiedWhenStatMatches {
+  NSString* path = [self writeScratchFileNamed:@"match" bytes:4096];
+  struct stat sb;
+  XCTAssertEqual(stat(path.UTF8String, &sb), 0);
+
+  es_file_t file = MakeESFile(path, &sb);
+  NSError* err;
+  SNTFileInfo* fi = [[SNTFileInfo alloc] initWithEndpointSecurityFile:&file error:&err];
+
+  XCTAssertNotNil(fi);
+  XCTAssertEqual(fi.identityVerification, SNTFileInfoIdentityVerified);
+  XCTAssertEqual(fi.fileSize, 4096);
+}
+
+- (void)testIdentityMismatchOnInode {
+  NSString* path = [self writeScratchFileNamed:@"inode" bytes:4096];
+  struct stat sb;
+  XCTAssertEqual(stat(path.UTF8String, &sb), 0);
+  sb.st_ino += 1;
+
+  es_file_t file = MakeESFile(path, &sb);
+  SNTFileInfo* fi = [[SNTFileInfo alloc] initWithEndpointSecurityFile:&file error:NULL];
+
+  XCTAssertNotNil(fi);
+  XCTAssertEqual(fi.identityVerification, SNTFileInfoIdentityMismatch);
+}
+
+- (void)testIdentityMismatchOnDevice {
+  NSString* path = [self writeScratchFileNamed:@"dev" bytes:4096];
+  struct stat sb;
+  XCTAssertEqual(stat(path.UTF8String, &sb), 0);
+  sb.st_dev += 1;
+
+  es_file_t file = MakeESFile(path, &sb);
+  SNTFileInfo* fi = [[SNTFileInfo alloc] initWithEndpointSecurityFile:&file error:NULL];
+
+  XCTAssertNotNil(fi);
+  XCTAssertEqual(fi.identityVerification, SNTFileInfoIdentityMismatch);
+}
+
+- (void)testIdentityMismatchOnSize {
+  NSString* path = [self writeScratchFileNamed:@"size" bytes:4096];
+  struct stat sb;
+  XCTAssertEqual(stat(path.UTF8String, &sb), 0);
+  sb.st_size += 1;
+
+  es_file_t file = MakeESFile(path, &sb);
+  SNTFileInfo* fi = [[SNTFileInfo alloc] initWithEndpointSecurityFile:&file error:NULL];
+
+  XCTAssertNotNil(fi);
+  XCTAssertEqual(fi.identityVerification, SNTFileInfoIdentityMismatch);
+}
+
+- (void)testModificationTimeIsNotCompared {
+  // Deliberate: mtime is caller-settable, so it is not part of the comparison.
+  NSString* path = [self writeScratchFileNamed:@"mtime" bytes:4096];
+  struct stat sb;
+  XCTAssertEqual(stat(path.UTF8String, &sb), 0);
+  sb.st_mtimespec.tv_sec -= 3600;
+  sb.st_mtimespec.tv_nsec = 12345;
+
+  es_file_t file = MakeESFile(path, &sb);
+  SNTFileInfo* fi = [[SNTFileInfo alloc] initWithEndpointSecurityFile:&file error:NULL];
+
+  XCTAssertNotNil(fi);
+  XCTAssertEqual(fi.identityVerification, SNTFileInfoIdentityVerified);
+}
+
+///
+///  The two tests below fail against the pre-change implementation. They pin
+///  that content-derived values are read through the descriptor rather than
+///  from caller-supplied metadata.
+///
+- (void)testHashIsCorrectWhenSuppliedSizeIsTooSmall {
+  NSString* path = [self writeScratchFileNamed:@"toosmall" bytes:8192];
+  struct stat sb;
+  XCTAssertEqual(stat(path.UTF8String, &sb), 0);
+  NSString* expected = [[SNTFileInfo alloc] initWithPath:path].SHA256;
+  XCTAssertNotNil(expected);
+  sb.st_size = 4096;
+
+  es_file_t file = MakeESFile(path, &sb);
+  SNTFileInfo* fi = [[SNTFileInfo alloc] initWithEndpointSecurityFile:&file error:NULL];
+
+  XCTAssertNotNil(fi);
+  XCTAssertEqual(fi.identityVerification, SNTFileInfoIdentityMismatch);
+  XCTAssertEqual(fi.fileSize, 8192);
+  XCTAssertEqualObjects(fi.SHA256, expected);
+}
+
+- (void)testHashIsCorrectWhenSuppliedSizeIsTooLarge {
+  NSString* path = [self writeScratchFileNamed:@"toolarge" bytes:4096];
+  struct stat sb;
+  XCTAssertEqual(stat(path.UTF8String, &sb), 0);
+  NSString* expected = [[SNTFileInfo alloc] initWithPath:path].SHA256;
+  XCTAssertNotNil(expected);
+  sb.st_size = 1 << 20;
+
+  es_file_t file = MakeESFile(path, &sb);
+  SNTFileInfo* fi = [[SNTFileInfo alloc] initWithEndpointSecurityFile:&file error:NULL];
+
+  XCTAssertNotNil(fi);
+  XCTAssertEqual(fi.identityVerification, SNTFileInfoIdentityMismatch);
+  XCTAssertEqual(fi.fileSize, 4096);
+  XCTAssertNotNil(fi.SHA256);
+  XCTAssertEqualObjects(fi.SHA256, expected);
+}
+
+- (void)testZeroLengthFileStillReportsMismatchThroughTheError {
+  // A mismatch that also hits a nil-returning condition must not look like an
+  // ordinary read failure to the caller.
+  NSString* path = [self writeScratchFileNamed:@"empty" bytes:0];
+  struct stat sb;
+  XCTAssertEqual(stat(path.UTF8String, &sb), 0);
+  sb.st_ino += 1;
+  sb.st_size = 4096;
+
+  es_file_t file = MakeESFile(path, &sb);
+  NSError* err;
+  SNTFileInfo* fi = [[SNTFileInfo alloc] initWithEndpointSecurityFile:&file error:&err];
+
+  XCTAssertNil(fi);
+  XCTAssertEqual(err.code, SNTErrorCodeIdentityMismatch);
+}
+
+- (void)testZeroLengthFileWithoutMismatchReturnsNilWithoutIdentityError {
+  NSString* path = [self writeScratchFileNamed:@"empty-ok" bytes:0];
+  struct stat sb;
+  XCTAssertEqual(stat(path.UTF8String, &sb), 0);
+
+  es_file_t file = MakeESFile(path, &sb);
+  NSError* err;
+  SNTFileInfo* fi = [[SNTFileInfo alloc] initWithEndpointSecurityFile:&file error:&err];
+
+  XCTAssertNil(fi);
+  // Not XCTAssertNotEqual against the mismatch code: this path returns nil
+  // without populating the error at all, so `err` is nil and `err.code` is 0,
+  // which no comparison against a nonzero code can ever fail.
+  XCTAssertNil(err);
+}
+
+- (void)testResolvedPathInitializerReportsVerified {
+  NSString* path = [self writeScratchFileNamed:@"selfstat" bytes:2048];
+  NSError* err;
+  SNTFileInfo* fi = [[SNTFileInfo alloc] initWithResolvedPath:path error:&err];
+
+  XCTAssertNotNil(fi);
+  XCTAssertEqual(fi.identityVerification, SNTFileInfoIdentityVerified);
+  XCTAssertEqual(fi.fileSize, 2048);
+}
+
+// devfs synthesizes st_dev for an fdesc node, so a stat taken from a /dev/fd/N
+// path disagrees with the file it opens on that field alone and the comparison
+// cannot succeed. Callers that hold the descriptor supply its stat instead;
+// SNTCommandSandbox is the one in tree. Both halves are asserted here so that if
+// devfs ever reports the real device, the first assertion identifies the cause
+// rather than the second silently going vacuous.
+- (void)testFileDescriptorPathNeedsTheDescriptorsOwnStat {
+  NSString* path = [self writeScratchFileNamed:@"fdpath" bytes:2048];
+  int fd = open(path.UTF8String, O_RDONLY | O_CLOEXEC);
+  XCTAssertGreaterThanOrEqual(fd, 0);
+
+  struct stat fdStat;
+  XCTAssertEqual(fstat(fd, &fdStat), 0);
+
+  NSString* fdPath = [NSString stringWithFormat:@"/dev/fd/%d", fd];
+
+  // Precondition for everything below: devfs reports a device that is not the
+  // one the descriptor is on, while passing the inode and size through.
+  struct stat pathStat;
+  XCTAssertEqual(lstat(fdPath.UTF8String, &pathStat), 0);
+  XCTAssertNotEqual(pathStat.st_dev, fdStat.st_dev);
+  XCTAssertEqual(pathStat.st_ino, fdStat.st_ino);
+  XCTAssertEqual(pathStat.st_size, fdStat.st_size);
+
+  // Taking the stat from the path cannot confirm the identity.
+  SNTFileInfo* viaPath = [[SNTFileInfo alloc] initWithResolvedPath:fdPath error:NULL];
+  XCTAssertNotNil(viaPath);
+  XCTAssertEqual(viaPath.identityVerification, SNTFileInfoIdentityMismatch);
+
+  // Supplying the descriptor's own stat does, and yields a usable vnode.
+  NSError* err;
+  SNTFileInfo* viaFd = [[SNTFileInfo alloc] initWithResolvedPath:fdPath stat:&fdStat error:&err];
+  XCTAssertNotNil(viaFd);
+  XCTAssertNil(err);
+  XCTAssertEqual(viaFd.identityVerification, SNTFileInfoIdentityVerified);
+  XCTAssertEqual(viaFd.fileSize, 2048);
+  XCTAssertEqual(viaFd.vnode.fsid, (uint64_t)fdStat.st_dev);
+  XCTAssertEqual(viaFd.vnode.fileid, (uint64_t)fdStat.st_ino);
+
+  // Content read through fdPath is the pinned file's.
+  SNTFileInfo* viaRealPath = [[SNTFileInfo alloc] initWithResolvedPath:path error:NULL];
+  XCTAssertEqualObjects(viaFd.SHA256, viaRealPath.SHA256);
+
+  close(fd);
+}
+
+- (void)testDirectoryIsRejected {
+  NSError* err;
+  SNTFileInfo* fi = [[SNTFileInfo alloc] initWithResolvedPath:[self scratchDir] error:&err];
+
+  XCTAssertNil(fi);
+  XCTAssertEqual(err.code, SNTErrorCodeNonRegularFile);
+}
+
+- (void)testSymlinkIsStillRejected {
+  // Contract guard. -initWithResolvedPath:error: keeps its lstat, so a symlink
+  // is rejected before the file is opened. The assertions below are that
+  // rejection, so if this starts failing, the sibling initializer was
+  // restructured.
+  NSString* target = [self writeScratchFileNamed:@"symlink-target" bytes:1024];
+  NSString* link = [[self scratchDir] stringByAppendingPathComponent:@"link"];
+  XCTAssertTrue([[NSFileManager defaultManager] createSymbolicLinkAtPath:link
+                                                     withDestinationPath:target
+                                                                   error:NULL]);
+  NSError* err;
+  SNTFileInfo* fi = [[SNTFileInfo alloc] initWithResolvedPath:link error:&err];
+
+  XCTAssertNil(fi);
+  XCTAssertEqual(err.code, SNTErrorCodeNonRegularFile);
+}
+
+// The gate before the open reads the caller's stat, so a path that no longer
+// matches it is opened anyway; only the re-check after the open can reject it.
+//
+// A directory rather than a FIFO, deliberately: a FIFO's zero size reaches the
+// same error through the zero-size path, so that test would still pass with the
+// re-check deleted.
+- (void)testNonRegularFileBehindARegularFileStatIsRejectedAfterTheOpen {
+  NSString* path = [[self scratchDir] stringByAppendingPathComponent:@"dir"];
+  XCTAssertTrue([[NSFileManager defaultManager] createDirectoryAtPath:path
+                                          withIntermediateDirectories:NO
+                                                           attributes:nil
+                                                                error:NULL]);
+
+  struct stat actual;
+  XCTAssertEqual(lstat(path.UTF8String, &actual), 0);
+
+  struct stat supplied = actual;
+  supplied.st_mode = (actual.st_mode & ~S_IFMT) | S_IFREG;
+  // Must differ, or the identity comparison passes.
+  supplied.st_size = actual.st_size + 4096;
+
+  // Preconditions: really a directory, the supplied stat really claims regular,
+  // and a nonzero size so the rejection cannot come from the zero-size path.
+  XCTAssertEqual((mode_t)(S_IFMT & actual.st_mode), (mode_t)S_IFDIR);
+  XCTAssertEqual((mode_t)(S_IFMT & supplied.st_mode), (mode_t)S_IFREG);
+  XCTAssertNotEqual(actual.st_size, 0);
+
+  NSError* err;
+  SNTFileInfo* fi = [[SNTFileInfo alloc] initWithResolvedPath:path stat:&supplied error:&err];
+
+  XCTAssertNil(fi);
+  XCTAssertEqual(err.code, SNTErrorCodeIdentityMismatch);
+}
+
+// Covers O_NONBLOCK on that open. Nothing opens the write end, so without the
+// flag this hangs rather than fails -- a timed-out target is the only signal.
+//
+// A FIFO's zero size means the rejection could come from either branch, so this
+// asserts only that the outcome is sane. The test above covers the branch.
+- (void)testNonRegularFileBehindARegularFileStatDoesNotBlockTheOpen {
+  NSString* path = [[self scratchDir] stringByAppendingPathComponent:@"fifo"];
+  XCTAssertEqual(mkfifo(path.UTF8String, 0644), 0);
+
+  struct stat actual;
+  XCTAssertEqual(lstat(path.UTF8String, &actual), 0);
+
+  struct stat supplied = actual;
+  supplied.st_mode = (actual.st_mode & ~S_IFMT) | S_IFREG;
+  supplied.st_size = 4096;
+
+  // Preconditions: really a FIFO, the supplied stat really claims regular.
+  XCTAssertEqual((mode_t)(S_IFMT & actual.st_mode), (mode_t)S_IFIFO);
+  XCTAssertEqual((mode_t)(S_IFMT & supplied.st_mode), (mode_t)S_IFREG);
+
+  NSError* err;
+  SNTFileInfo* fi = [[SNTFileInfo alloc] initWithResolvedPath:path stat:&supplied error:&err];
+
+  XCTAssertNil(fi);
+  XCTAssertEqual(err.code, SNTErrorCodeIdentityMismatch);
+}
+
+- (void)testSystemBinaryTakesTheTrustedPath {
+  // Precondition: /bin/ls is SIP-protected.
+  struct stat sb;
+  XCTAssertEqual(stat("/bin/ls", &sb), 0);
+  XCTAssertNotEqual(sb.st_flags & SF_RESTRICTED, 0u, @"/bin/ls is expected to be SIP-protected");
+
+  NSString* path = @"/bin/ls";
+  es_file_t file = MakeESFile(path, &sb);
+  SNTFileInfo* fi = [[SNTFileInfo alloc] initWithEndpointSecurityFile:&file error:NULL];
+
+  XCTAssertNotNil(fi);
+  XCTAssertEqual(fi.identityVerification, SNTFileInfoIdentityTrustedUnverified);
+}
+
+- (void)testTrustedPathRequiresTheBootVolumeGroup {
+#ifndef DEBUG
+  XCTSkip(@"the boot volume group overrides are DEBUG-only and are not built with -c opt");
+#else
+  struct stat sb;
+  XCTAssertEqual(stat("/bin/ls", &sb), 0);
+  // Verified is also what a file that never qualified reports, so without this
+  // the test would pass without exercising the device conjunct.
+  XCTAssertNotEqual(sb.st_flags & SF_RESTRICTED, 0u, @"/bin/ls is expected to be SIP-protected");
+  SetBootVolumeGroupDevForTesting(std::make_optional<dev_t>(sb.st_dev + 1));
+
+  NSString* path = @"/bin/ls";
+  es_file_t file = MakeESFile(path, &sb);
+  SNTFileInfo* fi = [[SNTFileInfo alloc] initWithEndpointSecurityFile:&file error:NULL];
+
+  XCTAssertNotNil(fi);
+  XCTAssertEqual(fi.identityVerification, SNTFileInfoIdentityVerified);
+
+  SetBootVolumeGroupDevForTesting(std::nullopt);
+#endif
+}
+
+- (void)testTrustedPathDisabledWhenBootVolumeUnknown {
+#ifndef DEBUG
+  XCTSkip(@"the boot volume group overrides are DEBUG-only and are not built with -c opt");
+#else
+  // An undetermined boot device must fail toward performing the comparison.
+  struct stat sb;
+  XCTAssertEqual(stat("/bin/ls", &sb), 0);
+  // As above: must qualify on every other count, or the assertion below holds
+  // for an unrelated reason.
+  XCTAssertNotEqual(sb.st_flags & SF_RESTRICTED, 0u, @"/bin/ls is expected to be SIP-protected");
+  SetBootVolumeGroupDevUnavailableForTesting(true);
+
+  NSString* path = @"/bin/ls";
+  es_file_t file = MakeESFile(path, &sb);
+  SNTFileInfo* fi = [[SNTFileInfo alloc] initWithEndpointSecurityFile:&file error:NULL];
+
+  XCTAssertNotNil(fi);
+  XCTAssertEqual(fi.identityVerification, SNTFileInfoIdentityVerified);
+
+  SetBootVolumeGroupDevUnavailableForTesting(false);
+#endif
+}
+
+- (void)testUnprotectedFileDoesNotTakeTheTrustedPath {
+  NSString* path = [self writeScratchFileNamed:@"unprotected" bytes:1024];
+  struct stat sb;
+  XCTAssertEqual(stat(path.UTF8String, &sb), 0);
+  XCTAssertEqual(sb.st_flags & SF_RESTRICTED, 0u);
+
+  es_file_t file = MakeESFile(path, &sb);
+  SNTFileInfo* fi = [[SNTFileInfo alloc] initWithEndpointSecurityFile:&file error:NULL];
+
+  XCTAssertNotNil(fi);
+  XCTAssertEqual(fi.identityVerification, SNTFileInfoIdentityVerified);
+}
+
+- (void)testTrustedPathKeepsTheSuppliedSize {
+  // The fast path performs no fstat, so the supplied size is used as-is.
+  struct stat sb;
+  XCTAssertEqual(stat("/bin/ls", &sb), 0);
+  XCTAssertNotEqual(sb.st_flags & SF_RESTRICTED, 0u);
+  off_t realSize = sb.st_size;
+  sb.st_size = realSize + 4096;
+
+  NSString* path = @"/bin/ls";
+  es_file_t file = MakeESFile(path, &sb);
+  SNTFileInfo* fi = [[SNTFileInfo alloc] initWithEndpointSecurityFile:&file error:NULL];
+
+  XCTAssertNotNil(fi);
+  XCTAssertEqual(fi.identityVerification, SNTFileInfoIdentityTrustedUnverified);
+  XCTAssertEqual(fi.fileSize, (NSUInteger)(realSize + 4096));
 }
 
 @end

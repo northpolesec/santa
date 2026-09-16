@@ -217,6 +217,11 @@ static id EncodedValueOrNull(id value) {
       reason = NSLocalizedString(@"No matching rule",
                                  @"Block reason when no rule matched in lockdown mode");
       break;
+    case SNTEventStateBlockBinaryMismatch:
+      reason = NSLocalizedString(@"Executable changed during launch",
+                                 @"Block reason when the executable on disk no longer "
+                                 @"matches the file the decision was evaluated against");
+      break;
     default:
       reason = NSLocalizedString(@"Unknown", @"Block reason when decision state is unrecognized");
       break;

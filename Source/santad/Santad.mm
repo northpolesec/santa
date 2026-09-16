@@ -117,7 +117,7 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
             return auth_result_cache->CacheCounts();
           }
           checkCacheBlock:^SNTAction(SantaVnode vnode) {
-            return auth_result_cache->CheckCache(vnode).action;
+            return auth_result_cache->CheckCacheForVnode(vnode).action;
           }
           metricsExportBlock:^(void (^reply)(BOOL)) {
             if (auto m = weak_metrics.lock()) {
@@ -178,7 +178,6 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                                 enricher:enricher
                                       compilerController:compiler_controller
                                loginWindowSessionHandler:lw_session_handler
-                                         authResultCache:auth_result_cache
                                               prefixTree:prefix_tree
                                              processTree:process_tree];
 

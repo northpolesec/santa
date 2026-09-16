@@ -31,11 +31,13 @@
 #import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
+#import "Source/common/SNTError.h"
 #import "Source/common/SNTFileInfo.h"
 #import "Source/common/SNTMetricSet.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTRuleIdentifiers.h"
 #import "Source/common/SNTSandboxExecRequest.h"
+#import "Source/common/SNTStoredExecutionEvent.h"
 #include "Source/common/SantaVnode.h"
 #include "Source/common/TestUtils.h"
 #include "Source/common/es/Message.h"
@@ -83,6 +85,11 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
                                                       fsIno:ino
                                                resolvedPath:nil];
 }
+
+@interface SNTExecutionController (Testing)
+- (void)createRuleForStandaloneModeEvent:(SNTStoredExecutionEvent*)se
+                      identityMismatched:(BOOL)identityMismatched;
+@end
 
 @interface SNTRule ()
 // Making these properties readwrite makes some tests much easier to write.
@@ -168,7 +175,7 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
                    expected:(NSNumber*)expectedValue {
   SNTMetricSet* metricSet = [SNTMetricSet sharedInstance];
   NSDictionary* eventCounter = [metricSet export][@"metrics"][@"/santa/events"];
-  BOOL foundField;
+  BOOL foundField = NO;
   for (NSDictionary* fieldValue in eventCounter[@"fields"][@"action_response"]) {
     if (![expectedFieldValueName isEqualToString:fieldValue[@"value"]]) continue;
     XCTAssertEqualObjects(expectedValue, fieldValue[@"data"],
@@ -300,10 +307,15 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
 // decision for the instigator (forcing the (dev, ino) fallback), or a SHA-256 to
 // simulate a cached hash for the instigator's image.
 - (void)stubInstigatorSHA256:(NSString*)sha256 {
+  [self stubInstigatorSHA256:sha256 identityMismatched:NO];
+}
+
+- (void)stubInstigatorSHA256:(NSString*)sha256 identityMismatched:(BOOL)identityMismatched {
   SNTCachedDecision* dec = nil;
   if (sha256.length) {
     dec = [[SNTCachedDecision alloc] init];
     dec.sha256 = sha256;
+    dec.identityMismatched = identityMismatched;
   }
   OCMStub([self.mockDecisionCache cachedDecisionForVnode:SantaVnode{}])
       .ignoringNonObjectArgs()
@@ -902,27 +914,53 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   [self checkMetricCounters:kDenyNoFileInfo expected:@1];
 }
 
-- (void)testMissingShasum {
+- (void)testMissingShasumUsesClientModeDefault {
+  // No SHA-256 is stubbed; the decision must still complete via the client
+  // mode default.
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockConfigurator clientMode]).andReturn(SNTClientModeMonitor);
+
   [self validateExecEvent:SNTActionRespondAllow];
-  [self checkMetricCounters:kAllowScope expected:@1];
+  [self checkMetricCounters:kAllowUnknown expected:@1];
 }
 
-- (void)testOutOfScope {
+- (void)testUnparseableBlockedInLockdownByDefault {
   OCMStub([self.mockFileInfo isMachO]).andReturn(NO);
   OCMStub([self.mockConfigurator clientMode]).andReturn(SNTClientModeLockdown);
-
-  [self validateExecEvent:SNTActionRespondAllow];
-  [self checkMetricCounters:kAllowScope expected:@1];
-}
-
-- (void)testPageZero {
-  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
-  OCMStub([self.mockFileInfo isMissingPageZero]).andReturn(YES);
   OCMExpect([self.mockEventDatabase addStoredEvent:OCMOCK_ANY]);
 
   [self validateExecEvent:SNTActionRespondDeny];
   OCMVerifyAllWithDelay(self.mockEventDatabase, 1);
   [self checkMetricCounters:kBlockUnknown expected:@1];
+}
+
+- (void)testPageZero {
+  OCMStub([self.mockConfigurator enablePageZeroProtection]).andReturn(YES);
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo isMissingPageZero]).andReturn(YES);
+  OCMExpect([self.mockEventDatabase addStoredEvent:OCMOCK_ANY]);
+
+  [self validateExecEvent:SNTActionRespondDeny
+             messageSetup:^(es_message_t* msg) {
+               msg->event.exec.image_cputype = CPU_TYPE_X86;
+             }];
+  OCMVerifyAllWithDelay(self.mockEventDatabase, 1);
+  [self checkMetricCounters:kBlockScope expected:@1];
+}
+
+- (void)testPageZeroNotEnforcedForNonI386Image {
+  OCMStub([self.mockConfigurator enablePageZeroProtection]).andReturn(YES);
+  OCMStub([self.mockConfigurator clientMode]).andReturn(SNTClientModeMonitor);
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo isMissingPageZero]).andReturn(YES);
+
+  // Same file, but a 64-bit image executed. The kernel enforces __PAGEZERO for
+  // those itself, so the file's i386 slice must not block this execution.
+  [self validateExecEvent:SNTActionRespondAllow
+             messageSetup:^(es_message_t* msg) {
+               msg->event.exec.image_cputype = CPU_TYPE_X86_64;
+             }];
+  [self checkMetricCounters:kAllowUnknown expected:@1];
 }
 
 - (void)testAllEventUpload {
@@ -2216,6 +2254,912 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
                msg->event.exec.target->executable->stat.st_dev = 17;
                msg->event.exec.target->executable->stat.st_ino = 42;
              }];
+}
+
+#pragma mark Executable identity verification
+
+// Like validateExecEvent:messageSetup: but returns the decision the controller
+// posted, so tests can assert on its fields.
+- (SNTCachedDecision*)postedDecisionForExecEvent:(SNTAction)wantAction
+                                  cachedDecision:(SNTCachedDecision*)cachedDecision
+                                    messageSetup:(void (^)(es_message_t*))messageSetupBlock {
+  __block SNTCachedDecision* posted = nil;
+  __block BOOL didPost = NO;
+
+  es_file_t file = MakeESFile("foo");
+  es_process_t proc = MakeESProcess(&file);
+  es_file_t fileExec = MakeESFile("bar", {
+                                             .st_dev = 12,
+                                             .st_ino = 34,
+                                         });
+  es_process_t procExec = MakeESProcess(&fileExec);
+  procExec.is_platform_binary = false;
+  procExec.codesigning_flags = CS_SIGNED | CS_VALID;
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_EXEC, &proc);
+  esMsg.event.exec.target = &procExec;
+
+  if (messageSetupBlock) {
+    messageSetupBlock(&esMsg);
+  }
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+  EXPECT_CALL(*mockESApi, ExecArgs).WillRepeatedly(testing::Return(std::vector<std::string>{}));
+
+  {
+    Message msg(mockESApi, &esMsg);
+    [self.sut validateExecEvent:msg
+                 cachedDecision:cachedDecision
+                     postAction:^bool(SNTAction gotAction, SNTCachedDecision* cd) {
+                       XCTAssertEqual(gotAction, wantAction);
+                       posted = cd;
+                       didPost = YES;
+                       return true;
+                     }];
+  }
+
+  // The action comparison above lives inside the block, so a controller that
+  // returns without posting would run none of it. Assert the block ran rather
+  // than that it produced a decision: a posted nil is legitimate, as the
+  // fail-closed path with no file info shows.
+  XCTAssertTrue(didPost, @"the controller returned without posting an action");
+
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+  return posted;
+}
+
+// Reports the file read for the target as not confirmed to be the file the
+// event described.
+- (void)stubUnconfirmedIdentity {
+  OCMStub([self.mockFileInfo identityVerification]).andReturn(SNTFileInfoIdentityMismatch);
+}
+
+// The on-disk signature reports the same signing identifier the kernel did, so
+// only the other conjuncts of the vendor comparison are under test.
+- (void)stubMatchingOnDiskSigningID {
+  OCMStub([self.mockCodesignChecker signingID]).andReturn(@(kExampleSigningID));
+}
+
+- (void)testUnconfirmedIdentityWithMatchingVendorIsAllowedWithoutCaching {
+  [self stubUnconfirmedIdentity];
+  [self stubMatchingOnDiskSigningID];
+  OCMStub([self.mockCodesignChecker teamID]).andReturn(@(kExampleTeamID));
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateAllow;
+  rule.type = SNTRuleTypeTeamID;
+  [self stubRule:rule
+      forIdentifiers:{.signingID = @"myteamid:example.signing.id", .teamID = @(kExampleTeamID)}];
+
+  SNTCachedDecision* cd = [self
+      postedDecisionForExecEvent:SNTActionRespondAllowNoCache
+                  cachedDecision:nil
+                    messageSetup:^(es_message_t* msg) {
+                      msg->event.exec.target->team_id = MakeESStringToken(kExampleTeamID);
+                      msg->event.exec.target->signing_id = MakeESStringToken(kExampleSigningID);
+                    }];
+
+  XCTAssertNotNil(cd);
+  XCTAssertTrue(cd.identityMismatched);
+  XCTAssertFalse(cd.cacheable);
+  XCTAssertNotNil(cd.decisionExtra);
+}
+
+- (void)testUnconfirmedIdentityWithNoTeamIDIsDenied {
+  // CS_SIGNED and CS_VALID but no signing identifier on either side. Equality
+  // alone would treat "absent on both sides" as a match; what denies here is
+  // the requirement that both be non-empty.
+  [self stubUnconfirmedIdentity];
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateAllow;
+  rule.type = SNTRuleTypeBinary;
+  [self stubRule:rule forIdentifiers:{.binarySHA256 = @"a"}];
+
+  SNTCachedDecision* cd = [self postedDecisionForExecEvent:SNTActionRespondDenyOnce
+                                            cachedDecision:nil
+                                              messageSetup:^(es_message_t* msg) {
+                                                msg->event.exec.target->codesigning_flags =
+                                                    CS_SIGNED | CS_VALID;
+                                              }];
+
+  XCTAssertNotNil(cd);
+  XCTAssertEqual(cd.decision, SNTEventStateBlockBinaryMismatch);
+  XCTAssertTrue(cd.identityMismatched);
+  XCTAssertFalse(cd.cacheable);
+  OCMVerify([self.mockDecisionCache cacheDecision:cd]);
+  [self checkMetricCounters:kBlockBinaryMismatch expected:@1];
+}
+
+- (void)testUnconfirmedIdentityWithTeamIDOnKernelSideOnlyIsDenied {
+  [self stubUnconfirmedIdentity];
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateAllow;
+  rule.type = SNTRuleTypeBinary;
+  [self stubRule:rule forIdentifiers:{.binarySHA256 = @"a"}];
+
+  [self postedDecisionForExecEvent:SNTActionRespondDenyOnce
+                    cachedDecision:nil
+                      messageSetup:^(es_message_t* msg) {
+                        msg->event.exec.target->team_id = MakeESStringToken(kExampleTeamID);
+                      }];
+}
+
+- (void)testUnconfirmedIdentityWithTeamIDOnDiskSideOnlyIsDenied {
+  [self stubUnconfirmedIdentity];
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
+  OCMStub([self.mockCodesignChecker teamID]).andReturn(@(kExampleTeamID));
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateAllow;
+  rule.type = SNTRuleTypeBinary;
+  [self stubRule:rule forIdentifiers:{.binarySHA256 = @"a"}];
+
+  [self postedDecisionForExecEvent:SNTActionRespondDenyOnce cachedDecision:nil messageSetup:nil];
+}
+
+- (void)testUnconfirmedIdentityWithDifferentTeamIDsIsDenied {
+  [self stubUnconfirmedIdentity];
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
+  OCMStub([self.mockCodesignChecker teamID]).andReturn(@"BBBBBBBBBB");
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateAllow;
+  rule.type = SNTRuleTypeBinary;
+  [self stubRule:rule forIdentifiers:{.binarySHA256 = @"a"}];
+
+  [self postedDecisionForExecEvent:SNTActionRespondDenyOnce
+                    cachedDecision:nil
+                      messageSetup:^(es_message_t* msg) {
+                        msg->event.exec.target->team_id = MakeESStringToken("AAAAAAAAAA");
+                      }];
+}
+
+- (void)testUnconfirmedIdentityWhenUnsignedIsDenied {
+  [self stubUnconfirmedIdentity];
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
+  OCMStub([self.mockCodesignChecker teamID]).andReturn(@(kExampleTeamID));
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateAllow;
+  rule.type = SNTRuleTypeBinary;
+  [self stubRule:rule forIdentifiers:{.binarySHA256 = @"a"}];
+
+  [self postedDecisionForExecEvent:SNTActionRespondDenyOnce
+                    cachedDecision:nil
+                      messageSetup:^(es_message_t* msg) {
+                        msg->event.exec.target->codesigning_flags = 0;
+                        msg->event.exec.target->team_id = MakeESStringToken(kExampleTeamID);
+                      }];
+}
+
+- (void)testUnconfirmedIdentityOnPlatformBinaryIsAllowed {
+  [self stubUnconfirmedIdentity];
+  [self stubMatchingOnDiskSigningID];
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
+  OCMStub([self.mockCodesignChecker platformBinary]).andReturn(YES);
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateAllow;
+  rule.type = SNTRuleTypeBinary;
+  [self stubRule:rule
+      forIdentifiers:{.binarySHA256 = @"a", .signingID = @"platform:example.signing.id"}];
+
+  SNTCachedDecision* cd = [self postedDecisionForExecEvent:SNTActionRespondAllowNoCache
+                                            cachedDecision:nil
+                                              messageSetup:^(es_message_t* msg) {
+                                                msg->event.exec.target->is_platform_binary = true;
+                                                msg->event.exec.target->signing_id =
+                                                    MakeESStringToken(kExampleSigningID);
+                                              }];
+
+  XCTAssertTrue(cd.identityMismatched);
+}
+
+- (void)testUnconfirmedIdentityIsDeniedInMonitorMode {
+  // Denied regardless of client mode: a tampering condition, which Santa
+  // already treats as mode-independent.
+  OCMStub([self.mockConfigurator clientMode]).andReturn(SNTClientModeMonitor);
+  [self stubUnconfirmedIdentity];
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
+
+  SNTCachedDecision* cd = [self postedDecisionForExecEvent:SNTActionRespondDenyOnce
+                                            cachedDecision:nil
+                                              messageSetup:^(es_message_t* msg) {
+                                                msg->event.exec.target->codesigning_flags =
+                                                    CS_SIGNED | CS_VALID;
+                                              }];
+
+  XCTAssertEqual(cd.decision, SNTEventStateBlockBinaryMismatch);
+}
+
+- (void)testUnconfirmedIdentityDropsCompilerStatus {
+  // Compiler status cannot follow from evaluating a different file.
+  OCMStub([self.mockConfigurator enableTransitiveRules]).andReturn(YES);
+  [self stubUnconfirmedIdentity];
+  [self stubMatchingOnDiskSigningID];
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
+  OCMStub([self.mockCodesignChecker teamID]).andReturn(@(kExampleTeamID));
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateAllowCompiler;
+  rule.type = SNTRuleTypeBinary;
+  [self stubRule:rule
+      forIdentifiers:{.binarySHA256 = @"a",
+                      .signingID = @"myteamid:example.signing.id",
+                      .teamID = @(kExampleTeamID)}];
+
+  SNTCachedDecision* cd = [self
+      postedDecisionForExecEvent:SNTActionRespondAllowNoCache
+                  cachedDecision:nil
+                    messageSetup:^(es_message_t* msg) {
+                      msg->event.exec.target->team_id = MakeESStringToken(kExampleTeamID);
+                      msg->event.exec.target->signing_id = MakeESStringToken(kExampleSigningID);
+                    }];
+
+  XCTAssertEqual(cd.decision, SNTEventStateAllowBinary);
+}
+
+// The mapping that drops compiler status is per rule type, so the binary case
+// above does not establish the other two.
+- (void)testUnconfirmedIdentityDropsCompilerStatusForASigningIDRule {
+  OCMStub([self.mockConfigurator enableTransitiveRules]).andReturn(YES);
+  [self stubUnconfirmedIdentity];
+  [self stubMatchingOnDiskSigningID];
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
+  OCMStub([self.mockCodesignChecker teamID]).andReturn(@(kExampleTeamID));
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateAllowCompiler;
+  rule.type = SNTRuleTypeSigningID;
+  [self stubRule:rule
+      forIdentifiers:{.binarySHA256 = @"a",
+                      .signingID = @"myteamid:example.signing.id",
+                      .teamID = @(kExampleTeamID)}];
+
+  SNTCachedDecision* cd = [self
+      postedDecisionForExecEvent:SNTActionRespondAllowNoCache
+                  cachedDecision:nil
+                    messageSetup:^(es_message_t* msg) {
+                      msg->event.exec.target->team_id = MakeESStringToken(kExampleTeamID);
+                      msg->event.exec.target->signing_id = MakeESStringToken(kExampleSigningID);
+                    }];
+
+  XCTAssertEqual(cd.decision, SNTEventStateAllowSigningID);
+}
+
+- (void)testUnconfirmedIdentityDropsCompilerStatusForACDHashRule {
+  OCMStub([self.mockConfigurator enableTransitiveRules]).andReturn(YES);
+  [self stubUnconfirmedIdentity];
+  [self stubMatchingOnDiskSigningID];
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
+  OCMStub([self.mockCodesignChecker teamID]).andReturn(@(kExampleTeamID));
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateAllowCompiler;
+  rule.type = SNTRuleTypeCDHash;
+  [self stubRule:rule
+      forIdentifiers:{.cdhash = @"aa00000000000000000000000000000000000000",
+                      .binarySHA256 = @"a",
+                      .signingID = @"myteamid:example.signing.id",
+                      .teamID = @(kExampleTeamID)}];
+
+  SNTCachedDecision* cd = [self
+      postedDecisionForExecEvent:SNTActionRespondAllowNoCache
+                  cachedDecision:nil
+                    messageSetup:^(es_message_t* msg) {
+                      msg->event.exec.target->cdhash[0] = 0xaa;
+                      msg->event.exec.target->codesigning_flags =
+                          CS_SIGNED | CS_VALID | CS_KILL | CS_HARD;
+                      msg->event.exec.target->team_id = MakeESStringToken(kExampleTeamID);
+                      msg->event.exec.target->signing_id = MakeESStringToken(kExampleSigningID);
+                    }];
+
+  XCTAssertEqual(cd.decision, SNTEventStateAllowCDHash);
+}
+
+// The gate's note is appended to whatever the evaluation already said. No rule
+// is stubbed, so evaluation falls through to the platform branch, which sets a
+// note of its own first. The tests above reach the gate through a rule match,
+// which returns before it.
+- (void)testUnconfirmedIdentityAppendsToAnExistingDecisionNote {
+  [self stubUnconfirmedIdentity];
+  [self stubMatchingOnDiskSigningID];
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
+  OCMStub([self.mockCodesignChecker platformBinary]).andReturn(YES);
+
+  SNTCachedDecision* cd = [self postedDecisionForExecEvent:SNTActionRespondAllowNoCache
+                                            cachedDecision:nil
+                                              messageSetup:^(es_message_t* msg) {
+                                                msg->event.exec.target->is_platform_binary = true;
+                                                msg->event.exec.target->signing_id =
+                                                    MakeESStringToken(kExampleSigningID);
+                                              }];
+
+  // Pins the setup: without this the note below could be the gate's own, set on
+  // a nil value, which is what every other test in this group exercises.
+  XCTAssertEqual(cd.decision, SNTEventStateAllowPlatform);
+  XCTAssertEqualObjects(cd.decisionExtra,
+                        @"Platform Binary; Executable identity confirmed by signing vendor only");
+}
+
+- (void)testUnconfirmedIdentityIgnoresExistingDecision {
+  // The cached identity describes a different file. Honored, the rule lookup
+  // would use its team ID and find nothing.
+  [self stubUnconfirmedIdentity];
+  [self stubMatchingOnDiskSigningID];
+  OCMStub([self.mockCodesignChecker teamID]).andReturn(@(kExampleTeamID));
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateAllow;
+  rule.type = SNTRuleTypeTeamID;
+  [self stubRule:rule
+      forIdentifiers:{.signingID = @"myteamid:example.signing.id", .teamID = @(kExampleTeamID)}];
+
+  SNTCachedDecision* existing = [[SNTCachedDecision alloc] init];
+  existing.teamID = @"OTHERTEAMS";
+  existing.signingID = @"OTHERTEAMS:other.signing.id";
+
+  [self postedDecisionForExecEvent:SNTActionRespondAllowNoCache
+                    cachedDecision:existing
+                      messageSetup:^(es_message_t* msg) {
+                        msg->event.exec.target->team_id = MakeESStringToken(kExampleTeamID);
+                        msg->event.exec.target->signing_id = MakeESStringToken(kExampleSigningID);
+                      }];
+}
+
+- (void)testNilFileInfoFromAnIdentityMismatchIsDeniedRegardlessOfFailClosed {
+  // The initializer can return nil after determining a mismatch. Without a
+  // distinct error code the caller cannot tell that from an ordinary read
+  // failure, which takes a different path.
+  OCMStub([self.mockConfigurator failClosed]).andReturn(NO);
+
+  // Replace the shared SNTFileInfo mock: OCMock applies the first matching
+  // stub, so the one installed in -setUp would otherwise win.
+  [self.mockFileInfo stopMocking];
+  self.mockFileInfo = OCMClassMock([SNTFileInfo class]);
+  OCMStub([self.mockFileInfo alloc]).andReturn(self.mockFileInfo);
+  NSError* mismatchError = [NSError errorWithDomain:@"com.northpolesec.santa.common"
+                                               code:SNTErrorCodeIdentityMismatch
+                                           userInfo:nil];
+  OCMStub([self.mockFileInfo initWithEndpointSecurityFile:NULL error:[OCMArg setTo:mismatchError]])
+      .ignoringNonObjectArgs()
+      .andReturn(nil);
+
+  SNTCachedDecision* cd = [self postedDecisionForExecEvent:SNTActionRespondDenyOnce
+                                            cachedDecision:nil
+                                              messageSetup:nil];
+
+  XCTAssertNotNil(cd);
+  XCTAssertEqual(cd.decision, SNTEventStateBlockBinaryMismatch);
+  XCTAssertTrue(cd.identityMismatched);
+}
+
+- (void)testSeatbeltRequiredWithUnconfirmedIdentityIsDenied {
+  // The fallback comparison is derived from the file that was read, so this is
+  // the case the guard exists for: the expectation matches and the exec would
+  // otherwise be authorized.
+  [self stubUnconfirmedIdentity];
+  [self stubMatchingOnDiskSigningID];
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"cafebabe");
+  OCMStub([self.mockCodesignChecker teamID]).andReturn(@(kExampleTeamID));
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateSeatbelt;
+  rule.type = SNTRuleTypeBinary;
+  [self stubRule:rule
+      forIdentifiers:{.binarySHA256 = @"cafebabe",
+                      .signingID = @"myteamid:example.signing.id",
+                      .teamID = @(kExampleTeamID)}];
+
+  SNTCachedDecision* cd = [self
+      postedDecisionForExecEvent:SNTActionRespondDenyOnce
+                  cachedDecision:nil
+                    messageSetup:^(es_message_t* msg) {
+                      msg->process->audit_token = santa::MakeStubAuditToken(701, 1);
+                      msg->event.exec.target->codesigning_flags = CS_SIGNED | CS_VALID;
+                      msg->event.exec.target->team_id = MakeESStringToken(kExampleTeamID);
+                      msg->event.exec.target->signing_id = MakeESStringToken(kExampleSigningID);
+                      msg->event.exec.target->executable->stat.st_dev = 17;
+                      msg->event.exec.target->executable->stat.st_ino = 42;
+
+                      const uint8_t cdhash[20] = {0};
+                      _sandboxExpectations->Register(
+                          msg->process->audit_token,
+                          MakeSandboxRequest(17, 42, cdhash, @"cafebabe"));
+                    }];
+
+  XCTAssertEqual(cd.decision, SNTEventStateBlockBinaryMismatch);
+  XCTAssertFalse(cd.cacheable);
+}
+
+// Registers a seatbelt expectation for (500, 1) and authorizes it, which records
+// (501, 1) as a sandboxed seatbelt process. That process is the instigator in
+// the self-exec tests below.
+- (void)authorizeSandboxedSeatbeltProcess {
+  [self validateExecEvent:SNTActionRespondAllowNoCache
+             messageSetup:^(es_message_t* msg) {
+               msg->process->audit_token = santa::MakeStubAuditToken(500, 1);
+               msg->event.exec.target->audit_token = santa::MakeStubAuditToken(501, 1);
+               msg->event.exec.target->codesigning_flags = CS_SIGNED | CS_VALID;
+               msg->event.exec.target->executable->stat.st_dev = 17;
+               msg->event.exec.target->executable->stat.st_ino = 42;
+
+               const uint8_t cdhash[20] = {0};
+               _sandboxExpectations->Register(msg->process->audit_token,
+                                              MakeSandboxRequest(17, 42, cdhash, @"cafebabe"));
+             }];
+}
+
+- (void)testInstigatorHashIsIgnoredWhenItsIdentityWasUnconfirmed {
+  // The recorded hash describes a different file, so it is unusable. SameBinary
+  // then falls back to the kernel-reported identity, which both share here.
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"cafebabe");
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateSeatbelt;
+  rule.type = SNTRuleTypeBinary;
+  [self stubRule:rule forIdentifiers:{.binarySHA256 = @"cafebabe"}];
+  [self stubInstigatorSHA256:@"deadbeef" identityMismatched:YES];
+
+  [self authorizeSandboxedSeatbeltProcess];
+
+  [self validateExecEvent:SNTActionRespondAllowNoCache
+             messageSetup:^(es_message_t* msg) {
+               msg->process->audit_token = santa::MakeStubAuditToken(501, 1);
+               msg->process->codesigning_flags = CS_SIGNED | CS_VALID;
+               msg->process->executable->stat.st_dev = 17;
+               msg->process->executable->stat.st_ino = 42;
+               msg->event.exec.target->codesigning_flags = CS_SIGNED | CS_VALID;
+               msg->event.exec.target->executable->stat.st_dev = 17;
+               msg->event.exec.target->executable->stat.st_ino = 42;
+             }];
+}
+
+- (void)testInstigatorHashIsUsedWhenItsIdentityWasConfirmed {
+  // Same shape, but the recorded hash is usable and disagrees with the target,
+  // so the relaxation must not apply.
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"cafebabe");
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateSeatbelt;
+  rule.type = SNTRuleTypeBinary;
+  [self stubRule:rule forIdentifiers:{.binarySHA256 = @"cafebabe"}];
+  [self stubInstigatorSHA256:@"deadbeef" identityMismatched:NO];
+
+  [self authorizeSandboxedSeatbeltProcess];
+
+  [self validateExecEvent:SNTActionRespondDeny
+             messageSetup:^(es_message_t* msg) {
+               msg->process->audit_token = santa::MakeStubAuditToken(501, 1);
+               msg->process->codesigning_flags = CS_SIGNED | CS_VALID;
+               msg->process->executable->stat.st_dev = 17;
+               msg->process->executable->stat.st_ino = 42;
+               msg->event.exec.target->codesigning_flags = CS_SIGNED | CS_VALID;
+               msg->event.exec.target->executable->stat.st_dev = 17;
+               msg->event.exec.target->executable->stat.st_ino = 42;
+             }];
+}
+
+- (void)testUnconfirmedIdentityIsNotReusedByALaterExecution {
+  // A decision whose identity was never confirmed must not be handed to a later
+  // execution as pre-computed identity: the restrictions that applied to the
+  // evaluation those values came from do not travel with them.
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
+  OCMStub([self.mockCodesignChecker teamID]).andReturn(@(kExampleTeamID));
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateAllow;
+  rule.type = SNTRuleTypeTeamID;
+  [self stubRule:rule
+      forIdentifiers:{.binarySHA256 = @"a",
+                      .signingID = @"myteamid:example.signing.id",
+                      .teamID = @(kExampleTeamID)}];
+
+  SNTCachedDecision* poisoned = [[SNTCachedDecision alloc] init];
+  poisoned.identityMismatched = YES;
+  poisoned.sha256 = @"unconfirmed-hash";
+  poisoned.teamID = @"OTHERTEAMS";
+  poisoned.signingID = @"OTHERTEAMS:other.signing.id";
+
+  // This execution is itself fine, so the drift gate never fires; the guard has
+  // to key off the incoming decision rather than this execution's state.
+  [self postedDecisionForExecEvent:SNTActionRespondAllow
+                    cachedDecision:poisoned
+                      messageSetup:^(es_message_t* msg) {
+                        msg->event.exec.target->team_id = MakeESStringToken(kExampleTeamID);
+                        msg->event.exec.target->signing_id = MakeESStringToken(kExampleSigningID);
+                      }];
+}
+
+- (void)testUnconfirmedIdentityDenialIsReported {
+  // A denial that returns early must still produce the stored event that feeds
+  // the console and the sync server.
+  [self stubUnconfirmedIdentity];
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
+
+  __block SNTStoredExecutionEvent* reported = nil;
+  OCMExpect([self.mockEventDatabase
+      addStoredEvent:[OCMArg checkWithBlock:^BOOL(SNTStoredExecutionEvent* se) {
+        reported = se;
+        return YES;
+      }]]);
+
+  [self postedDecisionForExecEvent:SNTActionRespondDenyOnce
+                    cachedDecision:nil
+                      messageSetup:^(es_message_t* msg) {
+                        msg->event.exec.target->codesigning_flags = CS_SIGNED | CS_VALID;
+                      }];
+
+  OCMVerifyAllWithDelay(self.mockEventDatabase, 1);
+  XCTAssertNotNil(reported);
+  XCTAssertEqual(reported.decision, SNTEventStateBlockBinaryMismatch);
+}
+
+- (void)testNilFileInfoDenialIsReportedWithAPath {
+  // Same, for the denial that has no SNTFileInfo to describe the file with.
+  OCMStub([self.mockConfigurator failClosed]).andReturn(NO);
+
+  [self.mockFileInfo stopMocking];
+  self.mockFileInfo = OCMClassMock([SNTFileInfo class]);
+  OCMStub([self.mockFileInfo alloc]).andReturn(self.mockFileInfo);
+  NSError* mismatchError = [NSError errorWithDomain:@"com.northpolesec.santa.common"
+                                               code:SNTErrorCodeIdentityMismatch
+                                           userInfo:nil];
+  OCMStub([self.mockFileInfo initWithEndpointSecurityFile:NULL error:[OCMArg setTo:mismatchError]])
+      .ignoringNonObjectArgs()
+      .andReturn(nil);
+
+  __block SNTStoredExecutionEvent* reported = nil;
+  OCMExpect([self.mockEventDatabase
+      addStoredEvent:[OCMArg checkWithBlock:^BOOL(SNTStoredExecutionEvent* se) {
+        reported = se;
+        return YES;
+      }]]);
+
+  [self postedDecisionForExecEvent:SNTActionRespondDenyOnce cachedDecision:nil messageSetup:nil];
+
+  OCMVerifyAllWithDelay(self.mockEventDatabase, 1);
+  XCTAssertNotNil(reported);
+  XCTAssertEqual(reported.decision, SNTEventStateBlockBinaryMismatch);
+  // No SNTFileInfo existed, so the path has to come from the event itself.
+  XCTAssertEqualObjects(reported.filePath, @"bar");
+}
+
+- (void)testNilFileInfoDenialReportsTheKernelReportedIdentity {
+  // No hash: the file could not be read, which is the condition being reported.
+  // The kernel-supplied team and signing ID identify the binary instead.
+  OCMStub([self.mockConfigurator failClosed]).andReturn(NO);
+
+  // setUp installs a catch-all initWithEndpointSecurityFile: stub and OCMock
+  // applies the first match, so the mock has to be rebuilt to return nil here.
+  [self.mockFileInfo stopMocking];
+  self.mockFileInfo = OCMClassMock([SNTFileInfo class]);
+  OCMStub([self.mockFileInfo alloc]).andReturn(self.mockFileInfo);
+  NSError* mismatchError = [NSError errorWithDomain:@"com.northpolesec.santa.common"
+                                               code:SNTErrorCodeIdentityMismatch
+                                           userInfo:nil];
+  OCMStub([self.mockFileInfo initWithEndpointSecurityFile:NULL error:[OCMArg setTo:mismatchError]])
+      .ignoringNonObjectArgs()
+      .andReturn(nil);
+
+  __block SNTStoredExecutionEvent* reported = nil;
+  OCMExpect([self.mockEventDatabase
+      addStoredEvent:[OCMArg checkWithBlock:^BOOL(SNTStoredExecutionEvent* se) {
+        reported = se;
+        return YES;
+      }]]);
+
+  // Load-bearing: the default event's tokens are empty and map to nil, so the
+  // assertions below would hold vacuously.
+  SNTCachedDecision* cd = [self
+      postedDecisionForExecEvent:SNTActionRespondDenyOnce
+                  cachedDecision:nil
+                    messageSetup:^(es_message_t* msg) {
+                      msg->event.exec.target->team_id = MakeESStringToken(kExampleTeamID);
+                      msg->event.exec.target->signing_id = MakeESStringToken(kExampleSigningID);
+                    }];
+
+  // On the decision, which is what the NOTIFY_EXEC telemetry recovers by vnode.
+  XCTAssertEqualObjects(cd.teamID, @(kExampleTeamID));
+  XCTAssertEqualObjects(cd.signingID, @(kExampleSigningID));
+  XCTAssertNil(cd.sha256);
+
+  // And on the stored event, which is what reaches the console and the sync
+  // server.
+  OCMVerifyAllWithDelay(self.mockEventDatabase, 1);
+  XCTAssertNotNil(reported);
+  XCTAssertEqualObjects(reported.teamID, @(kExampleTeamID));
+  XCTAssertEqualObjects(reported.signingID, @(kExampleSigningID));
+}
+
+- (void)testSeatbeltDenialForUnconfirmedIdentityIsReported {
+  [self stubUnconfirmedIdentity];
+  [self stubMatchingOnDiskSigningID];
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"cafebabe");
+  OCMStub([self.mockCodesignChecker teamID]).andReturn(@(kExampleTeamID));
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateSeatbelt;
+  rule.type = SNTRuleTypeBinary;
+  [self stubRule:rule
+      forIdentifiers:{.binarySHA256 = @"cafebabe",
+                      .signingID = @"myteamid:example.signing.id",
+                      .teamID = @(kExampleTeamID)}];
+
+  OCMExpect([self.mockEventDatabase addStoredEvent:OCMOCK_ANY]);
+
+  [self postedDecisionForExecEvent:SNTActionRespondDenyOnce
+                    cachedDecision:nil
+                      messageSetup:^(es_message_t* msg) {
+                        msg->process->audit_token = santa::MakeStubAuditToken(702, 1);
+                        msg->event.exec.target->codesigning_flags = CS_SIGNED | CS_VALID;
+                        msg->event.exec.target->team_id = MakeESStringToken(kExampleTeamID);
+                        msg->event.exec.target->signing_id = MakeESStringToken(kExampleSigningID);
+                        msg->event.exec.target->executable->stat.st_dev = 17;
+                        msg->event.exec.target->executable->stat.st_ino = 42;
+
+                        const uint8_t cdhash[20] = {0};
+                        _sandboxExpectations->Register(
+                            msg->process->audit_token,
+                            MakeSandboxRequest(17, 42, cdhash, @"cafebabe"));
+                      }];
+
+  OCMVerifyAllWithDelay(self.mockEventDatabase, 1);
+}
+
+#pragma mark Early-denial ordering
+
+// Runs an execution that must take one of the early-denial paths and returns the
+// steps it took, in order: `cache` is the decision being stored where NOTIFY_EXEC
+// telemetry can recover it by vnode, `respond` is the reply to Endpoint Security.
+// The reporting that follows is checked with the event counter, the only part of
+// it that is synchronous in this fixture.
+- (NSArray<NSString*>*)earlyDenialStepsWithMessageSetup:(void (^)(es_message_t*))messageSetupBlock {
+  NSMutableArray<NSString*>* steps = [NSMutableArray array];
+
+  // setUp answers cacheDecision: with a stub and OCMock applies the first
+  // matching stub, so the mock is rebuilt here to observe the call instead.
+  self.mockDecisionCache = OCMStrictClassMock([SNTDecisionCache class]);
+  OCMStub([self.mockDecisionCache sharedCache]).andReturn(self.mockDecisionCache);
+  OCMStub([self.mockDecisionCache cacheDecision:OCMOCK_ANY]).andDo(^(NSInvocation* invocation) {
+    [steps addObject:@"cache"];
+  });
+
+  es_file_t file = MakeESFile("foo");
+  es_process_t proc = MakeESProcess(&file);
+  es_file_t fileExec = MakeESFile("bar", {
+                                             .st_dev = 12,
+                                             .st_ino = 34,
+                                         });
+  es_process_t procExec = MakeESProcess(&fileExec);
+  procExec.is_platform_binary = false;
+  procExec.codesigning_flags = CS_SIGNED | CS_VALID;
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_EXEC, &proc);
+  esMsg.event.exec.target = &procExec;
+
+  if (messageSetupBlock) {
+    messageSetupBlock(&esMsg);
+  }
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+  EXPECT_CALL(*mockESApi, ExecArgs).WillRepeatedly(testing::Return(std::vector<std::string>{}));
+
+  {
+    Message msg(mockESApi, &esMsg);
+    [self.sut validateExecEvent:msg
+                 cachedDecision:nil
+                     postAction:^bool(SNTAction gotAction, SNTCachedDecision* cd) {
+                       XCTAssertEqual(gotAction, SNTActionRespondDenyOnce);
+                       // Reporting has not started: it must not precede the
+                       // response, because it is unbounded work.
+                       [self checkMetricCounters:kBlockBinaryMismatch expected:@0];
+                       [steps addObject:@"respond"];
+                       return true;
+                     }];
+  }
+
+  // And the reporting did run, after.
+  [self checkMetricCounters:kBlockBinaryMismatch expected:@1];
+
+  return steps;
+}
+
+- (void)testNilFileInfoDenialRespondsBeforeReporting {
+  OCMStub([self.mockConfigurator failClosed]).andReturn(NO);
+
+  // setUp installs a catch-all initWithEndpointSecurityFile: stub and OCMock
+  // applies the first match, so the mock has to be rebuilt to return nil here.
+  [self.mockFileInfo stopMocking];
+  self.mockFileInfo = OCMClassMock([SNTFileInfo class]);
+  OCMStub([self.mockFileInfo alloc]).andReturn(self.mockFileInfo);
+  NSError* mismatchError = [NSError errorWithDomain:@"com.northpolesec.santa.common"
+                                               code:SNTErrorCodeIdentityMismatch
+                                           userInfo:nil];
+  OCMStub([self.mockFileInfo initWithEndpointSecurityFile:NULL error:[OCMArg setTo:mismatchError]])
+      .ignoringNonObjectArgs()
+      .andReturn(nil);
+
+  XCTAssertEqualObjects([self earlyDenialStepsWithMessageSetup:nil], (@[ @"cache", @"respond" ]));
+}
+
+- (void)testUnconfirmedIdentityDenialRespondsBeforeReporting {
+  [self stubUnconfirmedIdentity];
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
+
+  XCTAssertEqualObjects([self earlyDenialStepsWithMessageSetup:^(es_message_t* msg) {
+                          msg->event.exec.target->codesigning_flags = CS_SIGNED | CS_VALID;
+                        }],
+                        (@[ @"cache", @"respond" ]));
+}
+
+- (void)testSeatbeltDenialForUnconfirmedIdentityRespondsBeforeReporting {
+  [self stubUnconfirmedIdentity];
+  [self stubMatchingOnDiskSigningID];
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"cafebabe");
+  OCMStub([self.mockCodesignChecker teamID]).andReturn(@(kExampleTeamID));
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateSeatbelt;
+  rule.type = SNTRuleTypeBinary;
+  [self stubRule:rule
+      forIdentifiers:{.binarySHA256 = @"cafebabe",
+                      .signingID = @"myteamid:example.signing.id",
+                      .teamID = @(kExampleTeamID)}];
+
+  XCTAssertEqualObjects([self earlyDenialStepsWithMessageSetup:^(es_message_t* msg) {
+                          msg->process->audit_token = santa::MakeStubAuditToken(703, 1);
+                          msg->event.exec.target->codesigning_flags = CS_SIGNED | CS_VALID;
+                          msg->event.exec.target->team_id = MakeESStringToken(kExampleTeamID);
+                          msg->event.exec.target->signing_id = MakeESStringToken(kExampleSigningID);
+                          msg->event.exec.target->executable->stat.st_dev = 17;
+                          msg->event.exec.target->executable->stat.st_ino = 42;
+
+                          const uint8_t cdhash[20] = {0};
+                          _sandboxExpectations->Register(
+                              msg->process->audit_token,
+                              MakeSandboxRequest(17, 42, cdhash, @"cafebabe"));
+                        }],
+                        (@[ @"cache", @"respond" ]));
+}
+
+#pragma mark Standalone-mode rule creation
+
+- (SNTStoredExecutionEvent*)standaloneEventWithSigningID:(NSString*)signingID {
+  SNTStoredExecutionEvent* se = [[SNTStoredExecutionEvent alloc] init];
+  se.filePath = @"/tmp/example";
+  se.fileSHA256 = @"6896d9ea3f73a4434f5832bc65714e7d066f177373f36f34dc8a6f735daa41b1";
+  se.signingID = signingID;
+  se.signingStatus = signingID ? SNTSigningStatusProduction : SNTSigningStatusUnsigned;
+  return se;
+}
+
+- (void)testStandaloneRuleStillUsesSigningIDWhenIdentityIsUnconfirmed {
+  // The signing ID is reported by the kernel for the image it loaded, so it
+  // names the right file no matter what was read from disk. Gating it would
+  // lose nothing but the user's approval.
+  __block SNTRule* written = nil;
+  OCMExpect([self.mockRuleDatabase
+                addExecutionRules:[OCMArg checkWithBlock:^BOOL(NSArray<SNTRule*>* rules) {
+                  written = rules.firstObject;
+                  return YES;
+                }]
+                      ruleCleanup:SNTRuleCleanupNone
+                           errors:[OCMArg anyObjectRef]])
+      .andReturn(YES);
+
+  [self.sut createRuleForStandaloneModeEvent:[self standaloneEventWithSigningID:@"ABCDEFGHIJ:app"]
+                          identityMismatched:YES];
+
+  XCTAssertTrue(OCMVerifyAll(self.mockRuleDatabase));
+  XCTAssertEqual(written.type, SNTRuleTypeSigningID);
+  XCTAssertEqualObjects(written.identifier, @"ABCDEFGHIJ:app");
+}
+
+- (void)testStandaloneRuleIsNotCreatedFromAnUnconfirmedHash {
+  // A content hash names whatever was read. With no signing ID to fall back on
+  // there is nothing safe to write, so no rule is created at all.
+  OCMReject([self.mockRuleDatabase addExecutionRules:OCMOCK_ANY
+                                         ruleCleanup:SNTRuleCleanupNone
+                                              errors:[OCMArg anyObjectRef]]);
+
+  [self.sut createRuleForStandaloneModeEvent:[self standaloneEventWithSigningID:nil]
+                          identityMismatched:YES];
+}
+
+- (void)testStandaloneRuleIsCreatedFromAConfirmedHash {
+  // Regression guard: the hash branch must still work normally.
+  __block SNTRule* written = nil;
+  OCMExpect([self.mockRuleDatabase
+                addExecutionRules:[OCMArg checkWithBlock:^BOOL(NSArray<SNTRule*>* rules) {
+                  written = rules.firstObject;
+                  return YES;
+                }]
+                      ruleCleanup:SNTRuleCleanupNone
+                           errors:[OCMArg anyObjectRef]])
+      .andReturn(YES);
+
+  [self.sut createRuleForStandaloneModeEvent:[self standaloneEventWithSigningID:nil]
+                          identityMismatched:NO];
+
+  XCTAssertTrue(OCMVerifyAll(self.mockRuleDatabase));
+  XCTAssertEqual(written.type, SNTRuleTypeBinary);
+  XCTAssertEqualObjects(written.identifier,
+                        @"6896d9ea3f73a4434f5832bc65714e7d066f177373f36f34dc8a6f735daa41b1");
+}
+
+- (void)testUnconfirmedIdentityWithDifferentSigningIDsIsDenied {
+  // Same vendor is not enough. Without this, any binary from a vendor could
+  // stand in for any other binary from that vendor, which erases the
+  // distinction SigningID, CDHash and Binary rules exist to express.
+  [self stubUnconfirmedIdentity];
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
+  OCMStub([self.mockCodesignChecker teamID]).andReturn(@(kExampleTeamID));
+  OCMStub([self.mockCodesignChecker signingID]).andReturn(@"some.other.product");
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateAllow;
+  rule.type = SNTRuleTypeBinary;
+  [self stubRule:rule forIdentifiers:{.binarySHA256 = @"a"}];
+
+  [self postedDecisionForExecEvent:SNTActionRespondDenyOnce
+                    cachedDecision:nil
+                      messageSetup:^(es_message_t* msg) {
+                        msg->event.exec.target->team_id = MakeESStringToken(kExampleTeamID);
+                        msg->event.exec.target->signing_id = MakeESStringToken(kExampleSigningID);
+                      }];
+}
+
+- (void)testUnconfirmedIdentityWithSigningIDOnKernelSideOnlyIsDenied {
+  [self stubUnconfirmedIdentity];
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
+  OCMStub([self.mockCodesignChecker teamID]).andReturn(@(kExampleTeamID));
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateAllow;
+  rule.type = SNTRuleTypeBinary;
+  [self stubRule:rule forIdentifiers:{.binarySHA256 = @"a"}];
+
+  [self postedDecisionForExecEvent:SNTActionRespondDenyOnce
+                    cachedDecision:nil
+                      messageSetup:^(es_message_t* msg) {
+                        msg->event.exec.target->team_id = MakeESStringToken(kExampleTeamID);
+                        msg->event.exec.target->signing_id = MakeESStringToken(kExampleSigningID);
+                      }];
+}
+
+- (void)testUnconfirmedIdentityOnPlatformBinaryWithDifferentSigningIDsIsDenied {
+  // The platform arm is reached by system code carrying no team identifier.
+  // Cryptex-resident binaries are system protected but sit on a device other
+  // than the boot volume group, so they are compared here rather than being
+  // accepted without comparison.
+  [self stubUnconfirmedIdentity];
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
+  OCMStub([self.mockCodesignChecker platformBinary]).andReturn(YES);
+  OCMStub([self.mockCodesignChecker signingID]).andReturn(@"com.apple.something.else");
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateAllow;
+  rule.type = SNTRuleTypeBinary;
+  [self stubRule:rule forIdentifiers:{.binarySHA256 = @"a"}];
+
+  [self postedDecisionForExecEvent:SNTActionRespondDenyOnce
+                    cachedDecision:nil
+                      messageSetup:^(es_message_t* msg) {
+                        msg->event.exec.target->is_platform_binary = true;
+                        msg->event.exec.target->signing_id = MakeESStringToken(kExampleSigningID);
+                      }];
 }
 
 @end

@@ -964,7 +964,9 @@ mount flags that are a superset of \`RemovableMediaRemountFlags\` or \`Encrypted
     {
       key: "EnablePageZeroProtection",
       description: `If true, 32-bit binaries that are missing the \`__PAGEZERO\` segment will be blocked even in
-        \`MONITOR\` mode, **unless** the binary is allowed by an explicit rule.`,
+        \`MONITOR\` mode, **unless** the binary is allowed by an explicit rule. This only applies to 32-bit
+        executions, which are the only ones the kernel exempts from its own \`__PAGEZERO\` enforcement; for any
+        other image the kernel requires a valid \`__PAGEZERO\` at load time, so the setting has no effect.`,
       type: "bool",
       defaultValue: true,
     },

@@ -178,9 +178,11 @@
 @property(nullable, readonly, nonatomic) NSArray* fileChangesPrefixFilters;
 
 ///
-///  Enable __PAGEZERO protection, defaults to YES
-///  If this flag is set to NO, 32-bit binaries that are missing
-///  the __PAGEZERO segment will not be blocked.
+///  Enable __PAGEZERO protection, defaults to YES.
+///  This only has an effect on 32-bit (i386) executions, which are the only
+///  ones the kernel exempts from its own __PAGEZERO enforcement. For every
+///  other image the kernel requires a valid __PAGEZERO at load time, so this
+///  flag has no effect there.
 ///
 @property(readonly, nonatomic) BOOL enablePageZeroProtection;
 

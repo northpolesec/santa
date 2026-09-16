@@ -56,6 +56,14 @@ objc_library(
     ],
 )
 
+santa_unit_test(
+    name = "SystemResourcesTest",
+    srcs = ["SystemResourcesTest.mm"],
+    deps = [
+        ":SystemResources",
+    ],
+)
+
 objc_library(
     name = "Pinning",
     srcs = ["Pinning.mm"],
@@ -723,6 +731,7 @@ objc_library(
         ":SNTError",
         ":SNTLogging",
         ":SantaVnode",
+        ":SystemResources",
         "@FMDB",
     ],
 )
@@ -1326,7 +1335,11 @@ santa_unit_test(
         "testdata/BundleExample.app/**",
         "testdata/DirectoryBundle/**",
     ]),
-    deps = [":SNTFileInfo"],
+    deps = [
+        ":SNTError",
+        ":SNTFileInfo",
+        ":SystemResources",
+    ],
 )
 
 santa_unit_test(
@@ -1434,6 +1447,7 @@ test_suite(
         ":ScopedFileTest",
         ":ScopedIOObjectRefTest",
         ":ScopedMachPortTest",
+        ":SystemResourcesTest",
         ":TelemetryEventMapTest",
         "//Source/common/cel:ArenaGrowthTest",
         "//Source/common/cel:CELPlanCacheTest",

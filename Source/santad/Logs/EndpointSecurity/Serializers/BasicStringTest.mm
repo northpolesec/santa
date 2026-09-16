@@ -1439,6 +1439,7 @@ std::string BasicStringSerializeMessage(es_message_t* esMsg) {
       {SNTEventStateBlockTeamID, "DENY"},
       {SNTEventStateBlockLongPath, "DENY"},
       {SNTEventStateBlockCELFallback, "DENY"},
+      {SNTEventStateBlockBinaryMismatch, "DENY"},
       {SNTEventStateAllowUnknown, "ALLOW"},
       {SNTEventStateAllowBinary, "ALLOW"},
       {SNTEventStateAllowCertificate, "ALLOW"},
@@ -1475,6 +1476,7 @@ std::string BasicStringSerializeMessage(es_message_t* esMsg) {
       case SNTEventStateBlockSigningID: want = "SIGNINGID"; break;
       case SNTEventStateBlockCDHash: want = "CDHASH"; break;
       case SNTEventStateBlockCELFallback: want = "CEL_FALLBACK"; break;
+      case SNTEventStateBlockBinaryMismatch: want = "BINARY_MISMATCH"; break;
       case SNTEventStateAllowUnknown: want = "UNKNOWN"; break;
       case SNTEventStateAllowBinary: want = "BINARY"; break;
       case SNTEventStateAllowCertificate: want = "CERT"; break;

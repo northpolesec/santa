@@ -555,6 +555,7 @@ void SerializeAndCheckNonESEvents(
       {SNTEventStateBlockTeamID, ::pbv1::Execution::DECISION_DENY},
       {SNTEventStateBlockLongPath, ::pbv1::Execution::DECISION_DENY},
       {SNTEventStateBlockCELFallback, ::pbv1::Execution::DECISION_DENY},
+      {SNTEventStateBlockBinaryMismatch, ::pbv1::Execution::DECISION_DENY},
       {SNTEventStateAllowUnknown, ::pbv1::Execution::DECISION_ALLOW},
       {SNTEventStateAllowBinary, ::pbv1::Execution::DECISION_ALLOW},
       {SNTEventStateAllowCertificate, ::pbv1::Execution::DECISION_ALLOW},
@@ -591,6 +592,9 @@ void SerializeAndCheckNonESEvents(
       case SNTEventStateBlockSigningID: want = ::pbv1::Execution::REASON_SIGNING_ID; break;
       case SNTEventStateBlockCDHash: want = ::pbv1::Execution::REASON_CDHASH; break;
       case SNTEventStateBlockCELFallback: want = ::pbv1::Execution::REASON_CEL_FALLBACK; break;
+      case SNTEventStateBlockBinaryMismatch:
+        want = ::pbv1::Execution::REASON_BINARY_MISMATCH;
+        break;
       case SNTEventStateAllowUnknown: want = ::pbv1::Execution::REASON_UNKNOWN; break;
       case SNTEventStateAllowBinary: want = ::pbv1::Execution::REASON_BINARY; break;
       case SNTEventStateAllowCertificate: want = ::pbv1::Execution::REASON_CERT; break;

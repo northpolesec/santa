@@ -516,4 +516,85 @@ static const pid_t PID_MAX = 99999;
   }
 }
 
+- (void)testTransitiveRuleIsNotCreatedWhenIdentityIsUnconfirmed {
+  // A transitive rule names a file by content hash, so it must not be written
+  // from an unconfirmed read.
+  es_file_t file = MakeESFile("foo");
+  es_file_t normalFile = MakeESFile("bar");
+  audit_token_t compilerTok = MakeAuditToken(12, 34);
+  es_process_t compilerProc = MakeESProcess(&file, compilerTok, {});
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+
+  SNTCompilerController* cc = [[SNTCompilerController alloc] init];
+  [cc setProcess:compilerTok isCompiler:true];
+
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_CLOSE, &compilerProc);
+  esMsg.event.close.target = &normalFile;
+  Message msg(mockESApi, &esMsg);
+
+  id mockCompilerController = OCMPartialMock(cc);
+  id mockFileInfo = OCMClassMock([SNTFileInfo class]);
+  OCMStub([mockFileInfo alloc]).andReturn(mockFileInfo);
+  OCMStub([mockFileInfo initWithEndpointSecurityFile:&normalFile error:[OCMArg anyObjectRef]])
+      .ignoringNonObjectArgs()
+      .andReturn(mockFileInfo);
+  OCMStub([mockFileInfo identityVerification]).andReturn(SNTFileInfoIdentityMismatch);
+
+  OCMReject([mockCompilerController createTransitiveRule:msg target:OCMOCK_ANY logger:nullptr])
+      .ignoringNonObjectArgs();
+
+  XCTAssertFalse([cc handleEvent:msg withLogger:nullptr]);
+
+  XCTAssertTrue(OCMVerifyAll(mockCompilerController), "Unable to verify all expectations");
+  [mockCompilerController stopMocking];
+  [mockFileInfo stopMocking];
+}
+
+- (void)testRenameDoesNotFallBackToDestinationOnUnconfirmedIdentity {
+  // The destination fallback fires only when the source cannot be read at all,
+  // so a source that resolves but is unconfirmed must stop here rather than
+  // falling back to the destination path.
+  //
+  // What is asserted is that a resolvable but unconfirmed source creates no
+  // transitive rule. That the fallback is not entered follows from its own
+  // `if (!targetFile)` guard, which this test cannot exercise.
+  es_file_t file = MakeESFile("foo");
+  es_file_t normalFile = MakeESFile("bar");
+  es_file_t destDir = MakeESFile("/dest/dir");
+  audit_token_t compilerTok = MakeAuditToken(12, 34);
+  es_process_t compilerProc = MakeESProcess(&file, compilerTok, {});
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+
+  SNTCompilerController* cc = [[SNTCompilerController alloc] init];
+  [cc setProcess:compilerTok isCompiler:true];
+
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_RENAME, &compilerProc);
+  esMsg.event.rename.source = &normalFile;
+  esMsg.event.rename.destination_type = ES_DESTINATION_TYPE_NEW_PATH;
+  esMsg.event.rename.destination.new_path.dir = &destDir;
+  esMsg.event.rename.destination.new_path.filename = MakeESStringToken("newname");
+  Message msg(mockESApi, &esMsg);
+
+  id mockCompilerController = OCMPartialMock(cc);
+  id mockFileInfo = OCMClassMock([SNTFileInfo class]);
+  OCMStub([mockFileInfo alloc]).andReturn(mockFileInfo);
+  OCMStub([mockFileInfo initWithEndpointSecurityFile:&normalFile error:[OCMArg anyObjectRef]])
+      .ignoringNonObjectArgs()
+      .andReturn(mockFileInfo);
+  OCMStub([mockFileInfo identityVerification]).andReturn(SNTFileInfoIdentityMismatch);
+
+  OCMReject([mockCompilerController createTransitiveRule:msg target:OCMOCK_ANY logger:nullptr])
+      .ignoringNonObjectArgs();
+
+  XCTAssertFalse([cc handleEvent:msg withLogger:nullptr]);
+
+  XCTAssertTrue(OCMVerifyAll(mockCompilerController), "Unable to verify all expectations");
+  [mockCompilerController stopMocking];
+  [mockFileInfo stopMocking];
+}
+
 @end

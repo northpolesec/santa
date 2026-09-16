@@ -18,6 +18,7 @@
 #import <XCTest/XCTest.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include <mach/machine.h>
 
 #include <map>
 #include <memory>
@@ -25,6 +26,7 @@
 
 #import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTCommonEnums.h"
+#include "Source/common/SantaVnode.h"
 #include "Source/common/TestUtils.h"
 #include "Source/common/es/Client.h"
 #include "Source/common/es/Message.h"
@@ -45,8 +47,9 @@ class MockAuthResultCache : public AuthResultCache {
   using AuthResultCache::AuthResultCache;
 
   MOCK_METHOD(bool, AddToCache,
-              (const es_file_t* es_file, SNTAction decision, SNTCachedDecision* cd));
-  MOCK_METHOD(santa::CachedAuthResult, CheckCache, (const es_file_t* es_file));
+              (const santa::ExecTarget& target, SNTAction decision, SNTCachedDecision* cd));
+  MOCK_METHOD(santa::CachedAuthResult, CheckCache, (const santa::ExecTarget& target));
+  MOCK_METHOD(void, RemoveFromCache, (const santa::ExecTarget& target));
 };
 
 @interface SNTEndpointSecurityAuthorizer (Testing)
@@ -326,6 +329,8 @@ class MockAuthResultCache : public AuthResultCache {
   es_process_t execProc = MakeESProcess(&execFile, MakeAuditToken(12, 23), MakeAuditToken(34, 45));
   es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_EXEC, &proc, ActionType::Auth);
   esMsg.event.exec.target = &execProc;
+  esMsg.event.exec.image_cputype = CPU_TYPE_ARM64;
+  esMsg.event.exec.image_cpusubtype = CPU_SUBTYPE_ARM64E;
 
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   mockESApi->SetExpectationsESNewClient();
@@ -412,24 +417,34 @@ class MockAuthResultCache : public AuthResultCache {
   es_process_t execProc = MakeESProcess(&execFile, MakeAuditToken(12, 23), MakeAuditToken(34, 45));
   es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_EXEC, &proc, ActionType::Auth);
   esMsg.event.exec.target = &execProc;
+  esMsg.event.exec.image_cputype = CPU_TYPE_ARM64;
+  esMsg.event.exec.image_cpusubtype = CPU_SUBTYPE_ARM64E;
 
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   mockESApi->SetExpectationsESNewClient();
   mockESApi->SetExpectationsRetainReleaseMessage();
 
+  // The cache is keyed by the executable's vnode plus the slice that was
+  // actually selected for execution.
+  santa::AuthResultKey expectedKey{SantaVnode::VnodeForFile(&execFile), CPU_TYPE_ARM64,
+                                   CPU_SUBTYPE_ARM64E};
+  auto hasExpectedKey = testing::Field(&santa::ExecTarget::key, expectedKey);
+
   auto mockAuthCache = std::make_shared<MockAuthResultCache>(nullptr, nil);
-  EXPECT_CALL(*mockAuthCache, AddToCache(&execFile, SNTActionRespondAllowCompiler, testing::_))
+  EXPECT_CALL(*mockAuthCache, AddToCache(hasExpectedKey, SNTActionRespondAllowCompiler, testing::_))
       .WillOnce(testing::Return(true));
-  EXPECT_CALL(*mockAuthCache, AddToCache(&execFile, SNTActionRespondAllow, testing::_))
+  EXPECT_CALL(*mockAuthCache, AddToCache(hasExpectedKey, SNTActionRespondAllow, testing::_))
       .WillOnce(testing::Return(true));
-  EXPECT_CALL(*mockAuthCache, AddToCache(&execFile, SNTActionRespondDeny, testing::_))
+  EXPECT_CALL(*mockAuthCache, AddToCache(hasExpectedKey, SNTActionRespondDeny, testing::_))
       .WillOnce(testing::Return(true));
-  EXPECT_CALL(*mockAuthCache, AddToCache(&execFile, SNTActionRespondHold, testing::_))
+  EXPECT_CALL(*mockAuthCache, AddToCache(hasExpectedKey, SNTActionRespondDenyOnce, testing::_))
       .WillOnce(testing::Return(true));
-  EXPECT_CALL(*mockAuthCache, AddToCache(&execFile, SNTActionRespondAllowNoCache, testing::_))
+  EXPECT_CALL(*mockAuthCache, AddToCache(hasExpectedKey, SNTActionRespondHold, testing::_))
+      .WillOnce(testing::Return(true));
+  EXPECT_CALL(*mockAuthCache, AddToCache(hasExpectedKey, SNTActionRespondAllowNoCache, testing::_))
       .WillOnce(testing::Return(true));
   EXPECT_CALL(*mockAuthCache,
-              AddToCache(&execFile, SNTActionRespondAllowCompilerNoCache, testing::_))
+              AddToCache(hasExpectedKey, SNTActionRespondAllowCompilerNoCache, testing::_))
       .WillOnce(testing::Return(true));
 
   id mockCompilerController = OCMStrictClassMock([SNTCompilerController class]);
@@ -458,6 +473,7 @@ class MockAuthResultCache : public AuthResultCache {
         {SNTActionRespondAllowCompilerNoCache, ES_AUTH_RESULT_ALLOW},
         {SNTActionRespondAllow, ES_AUTH_RESULT_ALLOW},
         {SNTActionRespondDeny, ES_AUTH_RESULT_DENY},
+        {SNTActionRespondDenyOnce, ES_AUTH_RESULT_DENY},
         {SNTActionRespondHold, ES_AUTH_RESULT_ALLOW},
         {SNTActionRespondAllowNoCache, ES_AUTH_RESULT_ALLOW},
     };

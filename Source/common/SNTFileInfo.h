@@ -21,6 +21,26 @@
 @class MOLCodesignChecker;
 
 ///
+///  Whether the stat an instance was constructed with still describes the file
+///  the instance reads through.
+///
+typedef NS_ENUM(NSInteger, SNTFileInfoIdentityVerification) {
+  ///  The stat describes the opened file. Either it was read from this
+  ///  instance's own descriptor, or a caller-supplied stat was compared against
+  ///  it and agreed.
+  SNTFileInfoIdentityVerified,
+
+  ///  A caller-supplied stat was accepted without comparison because the file
+  ///  it described cannot be replaced at that path while the system protections
+  ///  it is subject to are in force.
+  SNTFileInfoIdentityTrustedUnverified,
+
+  ///  A caller-supplied stat does not describe the opened file, so no value this
+  ///  instance derives from the file describes the one the caller asked about.
+  SNTFileInfoIdentityMismatch,
+};
+
+///
 ///  Represents a binary on disk, providing access to details about that binary
 ///  such as the SHA-1, SHA-256, Info.plist and the Mach-O data.
 ///
@@ -38,6 +58,9 @@
 
 ///
 ///  Convenience initializer.
+///
+///  The supplied stat is validated against the file actually opened. Callers must
+///  consult `identityVerification` before acting on any content-derived value.
 ///
 ///  @param esFile Pointer to an es_file_t provided by the EndpointSecurity framework.
 ///      Assumes that the path is a resolved path.
@@ -64,12 +87,41 @@
 - (instancetype)initWithResolvedPath:(NSString*)path error:(NSError**)error;
 
 ///
+///  Initializer for an already resolved path whose stat the caller already holds.
+///
+///  The supplied stat is validated against the file actually opened. Callers must
+///  consult `identityVerification` before acting on any content-derived value.
+///
+///  Use this in preference to `initWithResolvedPath:error:` only when the stat
+///  is more authoritative than one taken from the path would be — for example
+///  when it was read from a descriptor the caller is holding open, and the path
+///  merely names that descriptor.
+///
+///  @param path The path of the file this instance is to represent. The path will
+///      not be converted and will be used as is. If the path is not a regular file this method will
+///      return nil and fill in an error.
+///  @param fileStat The stat describing the file the caller means. Must not be NULL.
+///  @param error If an error occurred and nil is returned, this will be a pointer to an NSError
+///      describing the problem.
+///
+- (instancetype)initWithResolvedPath:(NSString*)path
+                                stat:(const struct stat*)fileStat
+                               error:(NSError**)error;
+
+///
 ///  @return Path of this file. Always a regular file, and expected to be absolute and resolved:
 ///      the initializers either standardize the path or document that they take one already
 ///      resolved. bundlePath is derived from this, so an unresolved path here yields an
 ///      unresolved bundle path.
 ///
 - (NSString*)path;
+
+///
+///  @return Whether the stat backing this instance describes the opened file.
+///      Callers constructing from an `es_file_t` must consult this before acting
+///      on any value this class derives from the file.
+///
+@property(readonly) SNTFileInfoIdentityVerification identityVerification;
 
 ///
 ///  Hash this file with SHA-1 and SHA-256 simultaneously.

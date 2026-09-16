@@ -292,6 +292,7 @@ typename santa::ProtoTraits<IsV2>::EventT* MessageForExecutionEvent(
     case SNTEventStateBlockSigningID: e->set_decision(Traits::BLOCK_SIGNINGID); break;
     case SNTEventStateBlockCDHash: e->set_decision(Traits::BLOCK_CDHASH); break;
     case SNTEventStateBlockCELFallback: e->set_decision(Traits::BLOCK_CEL_FALLBACK); break;
+    case SNTEventStateBlockBinaryMismatch: e->set_decision(Traits::BLOCK_BINARY_MISMATCH); break;
     case SNTEventStateAllowCELFallback: e->set_decision(Traits::ALLOW_CEL_FALLBACK); break;
     case SNTEventStateAllowPlatform: e->set_decision(Traits::ALLOW_PLATFORM); break;
     case SNTEventStateAllowTransitive: return nullptr;

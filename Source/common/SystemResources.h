@@ -20,6 +20,7 @@
 #include <mach/mach_time.h>
 #include <sys/cdefs.h>
 #include <sys/proc_info.h>
+#include <sys/types.h>
 #include <time.h>
 
 #include <optional>
@@ -51,5 +52,33 @@ std::optional<SantaTaskInfo> GetTaskInfo();
 
 // Get a list of all current pids
 std::optional<std::vector<pid_t>> GetPidList();
+
+// Get the st_dev shared by the volumes of the boot volume group.
+//
+// The system and data volumes of an APFS volume group are presented as a single
+// device, so this identifies "the volumes this machine booted from" rather than
+// any single volume. It also differs from the f_fsid statfs reports for the
+// same file, so the two are not interchangeable.
+//
+// Resolved once per process. Returns std::nullopt if it could not be
+// determined.
+std::optional<dev_t> GetBootVolumeGroupDev();
+
+// Debug builds only. GetBootVolumeGroupDev feeds the check that decides whether
+// a caller-supplied stat may be accepted without comparison, so an override
+// that relaxes it must not be reachable in a shipping binary. The storage
+// backing them is compiled out with them.
+#ifdef DEBUG
+
+// Override the value returned by GetBootVolumeGroupDev. Pass std::nullopt to
+// restore normal resolution. Tests only.
+void SetBootVolumeGroupDevForTesting(std::optional<dev_t> dev);
+
+// Force GetBootVolumeGroupDev to report the device as undetermined, which
+// SetBootVolumeGroupDevForTesting(std::nullopt) cannot express -- it restores
+// normal resolution. Takes precedence over any value override. Tests only.
+void SetBootVolumeGroupDevUnavailableForTesting(bool unavailable);
+
+#endif  // DEBUG
 
 #endif  // SANTA_COMMON_SYSTEMRESOURCES_H

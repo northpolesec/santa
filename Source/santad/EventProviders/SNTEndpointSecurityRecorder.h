@@ -20,7 +20,6 @@
 #include "Source/common/es/Enricher.h"
 #import "Source/common/es/SNTEndpointSecurityEventHandler.h"
 #include "Source/common/processtree/process_tree.h"
-#import "Source/santad/EventProviders/AuthResultCache.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityTreeAwareClient.h"
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
 #import "Source/santad/SNTCompilerController.h"
@@ -38,7 +37,6 @@
                      enricher:(std::shared_ptr<santa::Enricher>)enricher
            compilerController:(SNTCompilerController*)compilerController
     loginWindowSessionHandler:(id<SNTLoginWindowSessionHandler>)loginWindowSessionHandler
-              authResultCache:(std::shared_ptr<santa::AuthResultCache>)authResultCache
                    prefixTree:(std::shared_ptr<santa::PrefixTree<santa::Unit>>)prefixTree
                   processTree:
                       (std::shared_ptr<santa::santad::process_tree::ProcessTree>)processTree;

@@ -207,6 +207,48 @@ SNTCachedDecision* MakeCachedDecision(struct stat sb, SNTEventState decision) {
   [[NSFileManager defaultManager] removeItemAtPath:tmpPath error:nil];
 }
 
+// A decision built from a read whose identity was not confirmed would be keyed
+// on the vnode the caller asked about while every value in it described a
+// different file. buildDecisionForFileInfo: refuses to build one, so no
+// rehydrate path can insert one and no reader of the cache has to test for it.
+- (void)testRehydrateRefusesUnconfirmedIdentity {
+  NSString* tmpPath = [NSTemporaryDirectory()
+      stringByAppendingPathComponent:[NSString stringWithFormat:@"snt415-unconfirmed-%@",
+                                                                [[NSUUID UUID] UUIDString]]];
+  NSData* contents = [@"identity not confirmed" dataUsingEncoding:NSUTF8StringEncoding];
+  XCTAssertTrue([contents writeToFile:tmpPath atomically:YES]);
+  [self addTeardownBlock:^{
+    [[NSFileManager defaultManager] removeItemAtPath:tmpPath error:nil];
+  }];
+
+  SNTFileInfo* fi = [[SNTFileInfo alloc] initWithPath:tmpPath];
+  XCTAssertNotNil(fi);
+  // Without this the test could go vacuous rather than red: the fixture must be
+  // a file the cache would otherwise happily build a decision for, so that the
+  // stub below is the only reason it declines.
+  XCTAssertEqual(fi.identityVerification, SNTFileInfoIdentityVerified);
+
+  id fiMock = OCMPartialMock(fi);
+  [self addTeardownBlock:^{
+    [fiMock stopMocking];
+  }];
+  OCMStub([fiMock identityVerification]).andReturn(SNTFileInfoIdentityMismatch);
+  // Declining costs no whole-file read: the check precedes the hash.
+  OCMReject([fiMock SHA256]);
+
+  SNTDecisionCache* dc = [SNTDecisionCache sharedCache];
+  [dc forgetCachedDecisionForVnode:fi.vnode];
+
+  XCTAssertNil([dc rehydrateAndCacheDecisionForFileInfo:fi]);
+  XCTAssertNil([dc cachedDecisionForVnode:fi.vnode]);
+
+  // Same for the background path, which is what the size-capped callers use.
+  [dc asyncRehydrateAndCacheDecisionForFileInfo:fi];
+  [dc waitForCachePopulateQueueForTesting];
+  XCTAssertNil([dc cachedDecisionForVnode:fi.vnode]);
+  XCTAssertEqual([dc pendingRehydrateCountForTesting], 0u);
+}
+
 // Exercises buildDecisionForFileInfo:'s codesign-success branch using a real
 // Apple-signed binary. The temp-file fixtures used by the other tests are
 // unsigned, so this is the only place we verify certSHA256 / cdhash /

@@ -123,11 +123,12 @@ using santa::Message;
   }
 
   const es_process_t* targetProc = msg->event.exec.target;
+  santa::ExecTarget target = santa::ExecTarget::ForExecEvent(&(*msg));
 
   SNTCachedDecision* cd = nil;
 
   while (true) {
-    santa::CachedAuthResult cacheEntry = self->_authResultCache->CheckCache(targetProc->executable);
+    santa::CachedAuthResult cacheEntry = self->_authResultCache->CheckCache(target);
     SNTAction returnAction = cacheEntry.action;
     if (RESPONSE_VALID(returnAction)) {
       es_auth_result_t authResult = ES_AUTH_RESULT_DENY;
@@ -150,7 +151,7 @@ using santa::Message;
       // Cache hit — we have pre-computed identity data but need to re-evaluate policy.
       cd = cacheEntry.cached_decision;
       // Remove the entry so we can transition through RequestBinary for re-evaluation.
-      self->_authResultCache->RemoveFromCache(targetProc->executable);
+      self->_authResultCache->RemoveFromCache(target);
       break;
     } else if (returnAction == SNTActionRespondHold) {
       _ttyWriter->Write(
@@ -178,7 +179,7 @@ using santa::Message;
     }
   }
 
-  self->_authResultCache->AddToCache(targetProc->executable, SNTActionRequestBinary);
+  self->_authResultCache->AddToCache(target, SNTActionRequestBinary);
 
   [self.execController validateExecEvent:msg
                           cachedDecision:cd
@@ -260,7 +261,18 @@ using santa::Message;
       authResult = ES_AUTH_RESULT_ALLOW;
       break;
     case SNTActionRespondAllow: authResult = ES_AUTH_RESULT_ALLOW; break;
-    case SNTActionRespondDeny: authResult = ES_AUTH_RESULT_DENY; break;
+    case SNTActionRespondDeny: OS_FALLTHROUGH;
+    case SNTActionRespondDenyOnce:
+      // Stated here rather than relied upon: -respondToMessage:withAuthResult:
+      // forcePreventCache: already refuses to cache anything but an ALLOW, so
+      // this is not what stops a denial reaching the ES framework cache. Set it
+      // so the intent is local to the case and survives that method changing.
+      // The local AuthResultCache is keyed on the action above and is
+      // unaffected -- SNTActionRespondDeny is still held for the deny cache
+      // interval, and SNTActionRespondDenyOnce still stores no entry at all.
+      cacheable = false;
+      authResult = ES_AUTH_RESULT_DENY;
+      break;
 
     // Not setting `authResult` intentionally as no ES response takes place
     case SNTActionHoldAllowed: OS_FALLTHROUGH;
@@ -272,7 +284,7 @@ using santa::Message;
       [NSException raise:@"Invalid post action" format:@"Invalid post action: %ld", action];
   }
 
-  self->_authResultCache->AddToCache(esMsg->event.exec.target->executable, action, cd);
+  self->_authResultCache->AddToCache(santa::ExecTarget::ForExecEvent(&(*esMsg)), action, cd);
 
   if (action != SNTActionHoldAllowed && action != SNTActionHoldDenied) {
     return [self respondToMessage:esMsg withAuthResult:authResult forcePreventCache:!cacheable];

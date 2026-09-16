@@ -77,6 +77,12 @@
 
 @property int64_t ruleId;
 
+/// YES when the identity fields on this decision were derived from a file that
+/// could not be confirmed to be the one the event described. Readers that use a
+/// cached decision as an input to a later decision, rather than as a record of
+/// a past one, must not trust the identity fields when this is set.
+@property BOOL identityMismatched;
+
 @property BOOL cacheable;
 @property BOOL holdAndAsk;
 @property BOOL silentTouchID;

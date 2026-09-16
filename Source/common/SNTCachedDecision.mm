@@ -52,6 +52,7 @@
     _secureSigningTime = previous.secureSigningTime;
     _signingTime = previous.signingTime;
     _codesignValidationStatus = previous.codesignValidationStatus;
+    _identityMismatched = previous.identityMismatched;
   }
   return self;
 }
@@ -89,6 +90,7 @@
   copy.staticRule = _staticRule;
   copy.ruleId = _ruleId;
   copy.cacheable = _cacheable;
+  copy.identityMismatched = _identityMismatched;
   copy.holdAndAsk = _holdAndAsk;
   copy.silentTouchID = _silentTouchID;
   copy.touchIDCooldownMinutes = _touchIDCooldownMinutes;

@@ -29,10 +29,8 @@
 #include "Source/common/es/EnrichedTypes.h"
 #include "Source/common/es/Message.h"
 #include "Source/common/processtree/process_tree.h"
-#include "Source/santad/EventProviders/AuthResultCache.h"
 #import "Source/santad/SNTDecisionCache.h"
 
-using santa::AuthResultCache;
 using santa::EndpointSecurityAPI;
 using santa::EnrichedMessage;
 using santa::Enricher;
@@ -63,7 +61,6 @@ es_file_t* GetTargetFileForPrefixTree(const es_message_t* msg) {
 @end
 
 @implementation SNTEndpointSecurityRecorder {
-  std::shared_ptr<AuthResultCache> _authResultCache;
   std::shared_ptr<Enricher> _enricher;
   std::shared_ptr<Logger> _logger;
   std::shared_ptr<PrefixTree<Unit>> _prefixTree;
@@ -75,7 +72,6 @@ es_file_t* GetTargetFileForPrefixTree(const es_message_t* msg) {
                      enricher:(std::shared_ptr<Enricher>)enricher
            compilerController:(SNTCompilerController*)compilerController
     loginWindowSessionHandler:(id<SNTLoginWindowSessionHandler>)loginWindowSessionHandler
-              authResultCache:(std::shared_ptr<AuthResultCache>)authResultCache
                    prefixTree:(std::shared_ptr<PrefixTree<Unit>>)prefixTree
                   processTree:(std::shared_ptr<ProcessTree>)processTree {
   self = [super initWithESAPI:std::move(esApi)
@@ -87,7 +83,6 @@ es_file_t* GetTargetFileForPrefixTree(const es_message_t* msg) {
     _logger = logger;
     _compilerController = compilerController;
     _loginWindowSessionHandler = loginWindowSessionHandler;
-    _authResultCache = authResultCache;
     _prefixTree = prefixTree;
     _configurator = [SNTConfigurator configurator];
 
@@ -116,8 +111,6 @@ es_file_t* GetTargetFileForPrefixTree(const es_message_t* msg) {
         // these events in the first place but no such mechanism currently exists.
         return;
       }
-
-      self->_authResultCache->RemoveFromCache(esMsg->event.close.target);
 
       break;
     }
