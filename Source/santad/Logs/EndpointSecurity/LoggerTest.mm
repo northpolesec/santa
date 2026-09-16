@@ -94,14 +94,15 @@ using santa::LoggerPeer;
 
 class MockSerializer : public Empty {
  public:
-  MOCK_METHOD(std::vector<uint8_t>, SerializeMessage, (const EnrichedClose& msg));
+  MOCK_METHOD(std::vector<uint8_t>, SerializeMessage, (const EnrichedClose& msg), (override));
 
   MOCK_METHOD(std::vector<uint8_t>, SerializeAllowlist,
-              (const Message&, const std::string_view, const std::string_view));
+              (const Message&, const std::string_view, const std::string_view), (override));
 
-  MOCK_METHOD(std::vector<uint8_t>, SerializeBundleHashingEvent, (SNTStoredExecutionEvent*));
-  MOCK_METHOD(std::vector<uint8_t>, SerializeDiskAppeared, (NSDictionary*, bool));
-  MOCK_METHOD(std::vector<uint8_t>, SerializeDiskDisappeared, (NSDictionary*));
+  MOCK_METHOD(std::vector<uint8_t>, SerializeBundleHashingEvent, (SNTStoredExecutionEvent*),
+              (override));
+  MOCK_METHOD(std::vector<uint8_t>, SerializeDiskAppeared, (NSDictionary*, bool), (override));
+  MOCK_METHOD(std::vector<uint8_t>, SerializeDiskDisappeared, (NSDictionary*), (override));
 
   MOCK_METHOD(std::vector<uint8_t>, SerializeFileAccess,
               (const std::string& policy_version, const std::string& policy_name,

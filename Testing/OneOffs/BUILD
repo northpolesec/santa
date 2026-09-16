@@ -1,6 +1,6 @@
-load("@rules_apple//apple:macos.bzl", "macos_command_line_application")
+load("@rules_apple//apple:macos.bzl", "macos_build_test", "macos_command_line_application")
 load("@rules_cc//cc:defs.bzl", "objc_library")
-load("//:helper.bzl", "SANTA_MINIMUM_OS_VERSION", "santa_unit_test")
+load("//:helper.bzl", "SANTA_MINIMUM_OS_VERSION")
 
 package(
     default_visibility = ["//:santa_package_group"],
@@ -39,9 +39,14 @@ objc_library(
     ],
 )
 
-santa_unit_test(
+# These libraries have no tests of their own; this only checks that they still
+# build. macos_build_test is used rather than an empty santa_unit_test because
+# rules_apple's macOS test runner fails on an .xctest bundle that contains no
+# XCTestCase classes.
+macos_build_test(
     name = "OneOffBuildAll",
-    deps = [
+    minimum_os_version = SANTA_MINIMUM_OS_VERSION,
+    targets = [
         ":RuleQueryBench",
         ":SNTFileAccessRuleArchiveGenerator",
         ":SNTStoredEventArchiveGenerator",

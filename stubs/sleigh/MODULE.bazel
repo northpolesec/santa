@@ -5,9 +5,9 @@ module(
     version = "1.0.0",
 )
 
-bazel_dep(name = "apple_support", version = "1.24.5")
-bazel_dep(name = "rules_apple", version = "4.3.2")
-bazel_dep(name = "rules_cc", version = "0.2.14")
+bazel_dep(name = "apple_support", version = "2.8.2")
+bazel_dep(name = "rules_apple", version = "5.0.0")
+bazel_dep(name = "rules_cc", version = "0.2.22")
 bazel_dep(name = "profiles", version = "1.0.0")
 local_path_override(
     module_name = "profiles",
