@@ -917,15 +917,17 @@ class MockAuthResultCache : public AuthResultCache {
     XCTestExpectation* expectation =
         [self expectationWithDescription:@"Wait for networkMountCallback to trigger"];
 
-    // Use a string with spaces so NSURL returns nil even after scheme normalization
+    // A mntfromname with no host component: "smbfs:///exports/data" parses, but its authority is
+    // empty, so NSURL.host is nil under both the pre-macOS 27 URL parser and the one that
+    // replaced it.
     [self triggerTestNetworkMountEvent:ES_EVENT_TYPE_AUTH_MOUNT
-        mountFromURL:@"not a valid host"
+        mountFromURL:@"/exports/data"
         fsTypeName:@"smbfs"
         expectedAuthResult:ES_AUTH_RESULT_DENY
         deviceManagerSetup:^(SNTEndpointSecurityDeviceManager* dm) {
         }
         networkMountCallback:^(SNTStoredNetworkMountEvent* event) {
-          XCTAssertEqualObjects(event.mountFromName, @"not a valid host");
+          XCTAssertEqualObjects(event.mountFromName, @"/exports/data");
           [expectation fulfill];
         }];
 
@@ -941,9 +943,11 @@ class MockAuthResultCache : public AuthResultCache {
     OCMStub([self.mockConfigurator failClosed]).andReturn(NO);
     OCMStub([self.mockConfigurator allowedNetworkMountHosts]).andReturn(@[]);
 
-    // Use a string with spaces so NSURL returns nil even after scheme normalization
+    // A mntfromname with no host component: "smbfs:///exports/data" parses, but its authority is
+    // empty, so NSURL.host is nil under both the pre-macOS 27 URL parser and the one that
+    // replaced it.
     [self triggerTestNetworkMountEvent:ES_EVENT_TYPE_AUTH_MOUNT
-        mountFromURL:@"not a valid host"
+        mountFromURL:@"/exports/data"
         fsTypeName:@"smbfs"
         expectedAuthResult:ES_AUTH_RESULT_ALLOW
         deviceManagerSetup:^(SNTEndpointSecurityDeviceManager* dm) {

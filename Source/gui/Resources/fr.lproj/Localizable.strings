@@ -345,3 +345,6 @@
 
 /* Timed rule kill reason: bare Certificate rule type name */
 "Certificate" = "Certificat";
+
+/* Block reason when the executable on disk no longer matches the file the decision was evaluated against */
+"Executable changed during launch" = "Exécutable modifié pendant le lancement";
