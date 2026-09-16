@@ -149,8 +149,16 @@ static es_file_t MakeESFile(NSString* path, const struct stat* sb) {
   sut = [[SNTFileInfo alloc] initWithPath:@"../../../../../../../../../../../../../../../bin/ls"];
   XCTAssertEqualObjects(sut.path, @"/bin/ls");
 
-  sut = [[SNTFileInfo alloc] initWithPath:@"/usr/sbin/DirectoryService"];
-  XCTAssertEqualObjects(sut.path, @"/usr/libexec/dspluginhelperd");
+  // A symlink resolves to its target. The link is created here rather than borrowed from the
+  // system: this used /usr/sbin/DirectoryService, which macOS 27 removed.
+  NSString* target = [[self scratchDir] stringByAppendingPathComponent:@"target"];
+  [self writeExecutableAtPath:target];
+  NSString* link = [[self scratchDir] stringByAppendingPathComponent:@"pathstd-link"];
+  XCTAssertTrue([[NSFileManager defaultManager] createSymbolicLinkAtPath:link
+                                                     withDestinationPath:target
+                                                                   error:NULL]);
+  sut = [[SNTFileInfo alloc] initWithPath:link];
+  XCTAssertEqualObjects(sut.path, [target stringByResolvingSymlinksInPath]);
 }
 
 - (void)testResolvedPathStatFailure {
