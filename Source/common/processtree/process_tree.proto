@@ -24,4 +24,7 @@ message Annotations {
   }
 
   Originator originator = 1;
+
+  // Names of the annotations added by CEL rules via add_annotation(), sorted.
+  repeated string cel = 2;
 }

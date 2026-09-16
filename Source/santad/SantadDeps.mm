@@ -148,6 +148,9 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator* configurator,
   std::shared_ptr<santa::santad::process_tree::ProcessTree> process_tree;
   std::vector<std::unique_ptr<santa::santad::process_tree::Annotator>> annotators;
 
+  // CELAnnotator is deliberately absent: it inherits via Annotator::Propagate,
+  // which the tree drives from the annotation already on the ancestor, so it
+  // needs no entry here.
   for (NSString* annotation in [configurator enabledProcessAnnotations]) {
     if ([[annotation lowercaseString] isEqualToString:@"originator"]) {
       annotators.emplace_back(std::make_unique<santa::santad::process_tree::OriginatorAnnotator>());
