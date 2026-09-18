@@ -24,7 +24,7 @@ def _non_module_deps_impl(_module_ctx):
     git_repository(
         name = "nats_c",
         remote = "https://github.com/nats-io/nats.c.git",
-        tag = "v3.12.0",
+        commit = "aed20fe4227a99c6ae3dc97fc35469cc24f081e7",  # tag = v3.12.0
         build_file = Label("//deps:BUILD.nats"),
         patches = [Label("//deps/patches/nats_c:0001-natssock-read-no-progress-bound.patch")],
         patch_args = ["-p1"],
