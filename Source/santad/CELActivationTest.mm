@@ -32,12 +32,14 @@
 #include "Source/common/es/Message.h"
 #include "Source/common/es/MockEndpointSecurityAPI.h"
 #include "Source/common/processtree/SNTEndpointSecurityAdapter.h"
+#include "Source/common/processtree/annotations/cel.h"
 #include "Source/common/processtree/process.h"
 #include "Source/common/processtree/process_tree_test_helpers.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
 
 using santa::Message;
+using santa::santad::process_tree::CELAnnotator;
 using santa::santad::process_tree::CodeSigningInfo;
 using santa::santad::process_tree::Cred;
 using santa::santad::process_tree::Pid;
@@ -199,6 +201,91 @@ std::string MakeRawCDHash() {
                                                       *activation);
   XCTAssertTrue(result.ok());
   XCTAssertEqual(result.value().value, santa::cel::CELProtoTraits<true>::ReturnValue::ALLOWLIST);
+}
+
+// add_annotation() and has_annotation() end to end against a real process tree:
+// a rule on the tool stamps the annotation, and a fallback on a descendant's
+// exec sees it. This is the ancestor-walk replacement the functions exist for.
+- (void)testAnnotationsAcrossTheProcessTree {
+  using ReturnValue = santa::cel::CELProtoTraits<true>::ReturnValue;
+
+  // No registered annotators: CEL annotations inherit through
+  // Annotator::Propagate, under the tree's write lock.
+  auto tree = std::make_shared<ProcessTreeTestPeer>(
+      std::vector<std::unique_ptr<santa::santad::process_tree::Annotator>>{});
+  auto init = tree->InsertInit();
+
+  const Cred cred = {.uid = 0, .gid = 0};
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+
+  // An AUTH_EXEC activation for the process at `target`, which is what the
+  // annotation hooks resolve against.
+  auto evaluate = [&](Pid target, santa::cel::Evaluator<true>* evaluator, absl::string_view expr) {
+    es_file_t procFile = MakeESFile("/bin/parent");
+    es_process_t proc = MakeESProcess(&procFile, MakeAuditToken(1, 1), MakeAuditToken(1, 1));
+    es_file_t targetFile = MakeESFile("/bin/target");
+    es_process_t targetProc = MakeESProcess(
+        &targetFile, MakeAuditToken(target.pid, (int)target.pidversion), MakeAuditToken(1, 1));
+    es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_EXEC, &proc);
+    esMsg.event.exec.target = &targetProc;
+
+    Message msg(mockESApi, &esMsg);
+    ActivationCallbackBlock block = santa::CreateCELActivationBlock(
+        msg, /*signingID=*/nil, /*teamID=*/nil, /*isPlatformBinary=*/NO, /*signingTime=*/nil,
+        /*secureSigningTime=*/nil, /*entitlements=*/nil, tree);
+    std::unique_ptr<::google::api::expr::runtime::BaseActivation> base = block(/*useV2=*/true);
+    return evaluator->CompileAndEvaluate(expr,
+                                         *static_cast<santa::cel::Activation<true>*>(base.get()));
+  };
+
+  auto ruleEvaluator = santa::cel::Evaluator<true>::Create();
+  XCTAssertTrue(ruleEvaluator.ok());
+  auto fallbackEvaluator = santa::cel::Evaluator<true>::Create(/*allowUnspecified=*/true);
+  XCTAssertTrue(fallbackEvaluator.ok());
+
+  // The tool: init forks to 20.1, which execs to 20.2.
+  Pid toolPid = {.pid = 20, .pidversion = 2};
+  tree->HandleFork(1, init, (Pid){.pid = 20, .pidversion = 1});
+  tree->HandleExec(2, **tree->Get((Pid){.pid = 20, .pidversion = 1}), toolPid,
+                   (Program){.executable = "/bin/tool", .arguments = {}}, cred);
+
+  {
+    auto result = evaluate(toolPid, ruleEvaluator.value().get(),
+                           "add_annotation('BAZEL-CALL', FORK_AND_EXEC, ALLOWLIST)");
+    XCTAssertTrue(result.ok());
+    XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
+    // Otherwise the next exec of the same binary would skip the stamp entirely.
+    XCTAssertFalse(result.value().cacheable);
+  }
+
+  auto annotation = tree->GetAnnotation<CELAnnotator>(**tree->Get(toolPid));
+  XCTAssertTrue(annotation.has_value());
+  XCTAssertTrue((*annotation)->Has("BAZEL-CALL"));
+
+  // A descendant: the tool forks to 30.1, which execs to 30.2.
+  Pid childPid = {.pid = 30, .pidversion = 2};
+  tree->HandleFork(3, *tree->Get(toolPid), (Pid){.pid = 30, .pidversion = 1});
+  tree->HandleExec(4, **tree->Get((Pid){.pid = 30, .pidversion = 1}), childPid,
+                   (Program){.executable = "/bin/child", .arguments = {}}, cred);
+
+  {
+    auto result = evaluate(childPid, fallbackEvaluator.value().get(),
+                           "has_annotation('BAZEL-CALL') ? ALLOWLIST_COMPILER : UNSPECIFIED");
+    XCTAssertTrue(result.ok());
+    XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST_COMPILER);
+    XCTAssertFalse(result.value().cacheable);
+  }
+
+  // An unrelated process gets no decision from the same fallback.
+  Pid strangerPid = {.pid = 40, .pidversion = 1};
+  tree->HandleFork(5, init, strangerPid);
+  {
+    auto result = evaluate(strangerPid, fallbackEvaluator.value().get(),
+                           "has_annotation('BAZEL-CALL') ? ALLOWLIST_COMPILER : UNSPECIFIED");
+    XCTAssertTrue(result.ok());
+    XCTAssertEqual(result.value().value, ReturnValue::UNSPECIFIED);
+  }
 }
 
 @end

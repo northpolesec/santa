@@ -103,8 +103,9 @@ cel_runtime::CelValue CreateCELValue(const std::map<K, V>& v, google::protobuf::
 // once per lazy call site per evaluation, so on every exec: building descriptors
 // only to discard them would allocate for nothing.
 //
-// `make` builds one implementation: the two overload sets need different
-// constructor arguments.
+// `make` builds one implementation: the overload sets need different
+// constructor arguments (the annotation functions also take process-tree
+// hooks).
 template <typename FunctionT, typename MakeFn>
 std::vector<const cel_runtime::CelFunction*> LazyOverloads(
     std::vector<std::unique_ptr<FunctionT>>& fns,
@@ -173,6 +174,13 @@ std::optional<cel_runtime::CelValue> Activation<IsV2>::FindValue(
     if (fdTypeValue != nullptr) {
       return CELValue(fdTypeValue->number(), arena);
     }
+
+    // Handle the add_annotation() propagation values.
+    for (const auto& [propagationName, propagation] : kAnnotationPropagationNames) {
+      if (name == propagationName) {
+        return CELValue(static_cast<int64_t>(propagation), arena);
+      }
+    }
   }
 
   // Handle the fields from the CELContext message.
@@ -220,7 +228,8 @@ std::optional<cel_runtime::CelValue> Activation<IsV2>::FindValue(
 template <bool IsV2>
 std::vector<const cel_runtime::CelFunction*> Activation<IsV2>::FindFunctionOverloads(
     absl::string_view name) const {
-  // The relative-time functions and policy_for_range() are CELv2 only.
+  // The relative-time, policy_for_range() and annotation functions are CELv2
+  // only.
   if constexpr (IsV2) {
     if (name == "today") {
       return LazyOverloads(
@@ -239,6 +248,20 @@ std::vector<const cel_runtime::CelFunction*> Activation<IsV2>::FindFunctionOverl
                            [this](cel_runtime::CelFunctionDescriptor descriptor) {
                              return std::make_unique<PolicyForRangeFunction>(
                                  std::move(descriptor), &usedRelativeTime_, &pendingKill_, now_);
+                           });
+    }
+    if (name == "has_annotation") {
+      return LazyOverloads(hasAnnotationFns_, HasAnnotationDescriptors,
+                           [this](cel_runtime::CelFunctionDescriptor descriptor) {
+                             return std::make_unique<HasAnnotationFunction>(
+                                 std::move(descriptor), &usedAnnotations_, annotations_);
+                           });
+    }
+    if (name == "add_annotation") {
+      return LazyOverloads(addAnnotationFns_, AddAnnotationDescriptors,
+                           [this](cel_runtime::CelFunctionDescriptor descriptor) {
+                             return std::make_unique<AddAnnotationFunction>(
+                                 std::move(descriptor), &usedAnnotations_, annotations_);
                            });
     }
   }
@@ -276,6 +299,11 @@ std::vector<std::pair<absl::string_view, ::cel::Type>> Activation<IsV2>::GetVari
       auto value = fdTypeDescriptor->value(i);
       v.push_back({value->name(), ::cel::IntType()});
     }
+
+    // ...and the add_annotation() propagation values, e.g. FORK_AND_EXEC.
+    for (const auto& [propagationName, _] : kAnnotationPropagationNames) {
+      v.push_back({propagationName, ::cel::IntType()});
+    }
   }
 
   // Now add all the fields from the CELContext message.
@@ -310,6 +338,12 @@ bool Activation<IsV2>::IsResultCacheable() const {
   // immediately for now(), at the window edge for policy_for_range(). Don't cache
   // expressions that use them.
   if (usedRelativeTime_) {
+    return false;
+  }
+
+  // add_annotation() writes to the process tree and has_annotation() reads it,
+  // so the answer is per-process and re-running the expression is the point.
+  if (usedAnnotations_) {
     return false;
   }
 

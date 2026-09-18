@@ -20,6 +20,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -27,11 +28,58 @@
 #import "Source/common/SigningIDHelpers.h"
 #include "Source/common/String.h"
 #include "Source/common/cel/Activation.h"
+#include "Source/common/cel/AnnotationFunction.h"
 #include "Source/common/cel/CELProtoTraits.h"
 #include "Source/common/es/EndpointSecurityAPI.h"
+#include "Source/common/processtree/annotations/cel.h"
 #include "Source/common/processtree/process_tree_macos.h"
 
 namespace {
+
+using santa::santad::process_tree::CELAnnotator;
+using santa::santad::process_tree::ProcessTree;
+
+CELAnnotator::Entry EntryFor(santa::cel::AnnotationPropagation propagation) {
+  using P = santa::cel::AnnotationPropagation;
+  return {
+      .fork = propagation == P::kForkOnly || propagation == P::kForkAndExec,
+      .exec = propagation == P::kExecOnly || propagation == P::kForkAndExec,
+  };
+}
+
+// Annotations are read from and written to the process being executed: at
+// AUTH_EXEC the tree has already applied the exec, so the target carries
+// whatever its parent propagated to it.
+//
+// The target is resolved inside each hook, not here. An activation is built for
+// every CEL evaluation, but the hooks only run for a rule that actually calls
+// an annotation function, and every other field of the message is read lazily
+// for the same reason (an activation is legitimately built for a message whose
+// exec fields are never touched). PidFromAuditToken is a couple of field reads;
+// the cost worth avoiding is the tree lock, and addressing the tree by pid
+// already keeps each hook to a single acquisition of it on the auth path.
+santa::cel::AnnotationHooks AnnotationHooksFor(std::shared_ptr<ProcessTree> processTree,
+                                               const santa::Message& esMsg) {
+  if (!processTree) return {};
+
+  return {
+      .has =
+          [processTree, esMsg](const std::string& name) {
+            auto annotation = processTree->GetAnnotation<CELAnnotator>(
+                santa::santad::process_tree::PidFromAuditToken(
+                    esMsg->event.exec.target->audit_token));
+            return annotation && *annotation && (*annotation)->Has(name);
+          },
+      .add =
+          [processTree, esMsg](const std::string& name,
+                               santa::cel::AnnotationPropagation propagation) {
+            AddCELAnnotation(*processTree,
+                             santa::santad::process_tree::PidFromAuditToken(
+                                 esMsg->event.exec.target->audit_token),
+                             name, EntryFor(propagation));
+          },
+  };
+}
 
 template <bool IsV2>
 std::vector<typename santa::cel::CELProtoTraits<IsV2>::AncestorT> Ancestors(
@@ -147,7 +195,13 @@ ActivationCallbackBlock CreateCELActivationBlock(
         f->set_team_id(santa::NSStringToUTF8String(teamID));
       }
 
+      // add_annotation() and has_annotation() are CELv2 only, so a V1
+      // activation gets empty hooks rather than two closures nothing can call.
+      santa::cel::AnnotationHooks annotationHooks;
+
       if constexpr (IsV2) {
+        annotationHooks = AnnotationHooksFor(processTree, esMsg);
+
         if (entitlementsDict) {
           auto* entitlements = f->mutable_entitlements();
           [entitlementsDict
@@ -213,7 +267,7 @@ ActivationCallbackBlock CreateCELActivationBlock(
               return {};
             }
           },
-          now);
+          now, std::move(annotationHooks));
     };
 
     if (useV2) {

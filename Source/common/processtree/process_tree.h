@@ -109,13 +109,39 @@ class ProcessTree {
   // processing the event that retained them.
   void ReleaseProcess(const PidList& pids);
 
-  // Annotate the given process with an Annotator (state).
+  // Annotate the given process with an Annotator (state). If an annotation of
+  // the same type is already set on the process, it is left untouched; use
+  // UpdateAnnotation to replace one.
   void AnnotateProcess(const Process& p, std::shared_ptr<const Annotator> a);
+
+  // Replace the annotation of type T on the given process with the result of
+  // `update`, which is passed the annotation currently set (nullptr if there is
+  // none). Returning nullptr leaves the existing annotation in place.
+  //
+  // The read and the write are one critical section, so concurrent
+  // read-modify-writes of the same annotation cannot lose an update. `update`
+  // therefore runs with the write lock held. It is handed only the current
+  // annotation, never the tree, so it cannot re-enter and self-deadlock on the
+  // (non-recursive) mutex; keep it that way, and keep it short.
+  //
+  // Takes a pid rather than a handle so resolving the process and updating it
+  // are one acquisition.
+  template <typename T>
+  void UpdateAnnotation(
+      struct Pid p,
+      const std::function<std::shared_ptr<const T>(const T*)>& update);
 
   // Get the given annotation on the given process if it exists, or nullopt if
   // the annotation is not set.
   template <typename T>
   std::optional<std::shared_ptr<const T>> GetAnnotation(const Process& p) const;
+
+  // As above, for a process named by pid. Resolving the process and reading its
+  // annotation share one acquisition, which is what the CEL has_annotation()
+  // path wants: it starts from an audit token, not a handle, and runs once per
+  // exec of an annotated subtree.
+  template <typename T>
+  std::optional<std::shared_ptr<const T>> GetAnnotation(struct Pid p) const;
 
   // Get the fully merged proto form of all annotations on the given process.
   std::optional<::santa::pb::v1::process_tree::Annotations> ExportAnnotations(
@@ -169,6 +195,15 @@ class ProcessTree {
   // propagation runs outside the lock and is NOT part of this atomicity
   // guarantee (see HandleFork/HandleExec).
   bool StepLocked(const struct EventKey& key)
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mtx_);
+
+  // Copy the annotations on `from` that survive this transition onto `to`,
+  // asking each one via Annotator::Propagate. Runs inside the same critical
+  // section that publishes `to`, so a client that skipped this event as a
+  // duplicate can never observe the new process without its inherited
+  // annotations. See Annotator::Propagate.
+  void PropagateAnnotationsLocked(const Process& from, Process& to,
+                                  bool across_exec)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(mtx_);
 
   // Reap deferred removals whose grace has elapsed. Caller must hold mtx_.
@@ -235,14 +270,56 @@ class ProcessTree {
   std::function<void()> on_release_collected_for_test_;
 };
 
+// Annotations are read from the ES auth path (CEL) while the annotators write
+// them from the ingest path, so both sides take mtx_. It guards every process's
+// annotation map, not just map_ itself.
 template <typename T>
 std::optional<std::shared_ptr<const T>> ProcessTree::GetAnnotation(
     const Process& p) const {
+  absl::ReaderMutexLock lock(mtx_);
   auto it = p.annotations_.find(std::type_index(typeid(T)));
   if (it == p.annotations_.end()) {
     return std::nullopt;
   }
   return std::dynamic_pointer_cast<const T>(it->second);
+}
+
+template <typename T>
+std::optional<std::shared_ptr<const T>> ProcessTree::GetAnnotation(
+    const struct Pid p) const {
+  absl::ReaderMutexLock lock(mtx_);
+  auto proc = map_.find(p);
+  if (proc == map_.end()) {
+    return std::nullopt;
+  }
+  const auto& annotations = proc->second->annotations_;
+  auto it = annotations.find(std::type_index(typeid(T)));
+  if (it == annotations.end()) {
+    return std::nullopt;
+  }
+  return std::dynamic_pointer_cast<const T>(it->second);
+}
+
+template <typename T>
+void ProcessTree::UpdateAnnotation(
+    const struct Pid p,
+    const std::function<std::shared_ptr<const T>(const T*)>& update) {
+  absl::MutexLock lock(mtx_);
+  auto it = map_.find(p);
+  if (it == map_.end()) {
+    return;
+  }
+
+  auto& annotations = it->second->annotations_;
+  const std::type_index key(typeid(T));
+  const T* current = nullptr;
+  if (auto found = annotations.find(key); found != annotations.end()) {
+    current = dynamic_cast<const T*>(found->second.get());
+  }
+
+  if (std::shared_ptr<const T> next = update(current); next != nullptr) {
+    annotations.insert_or_assign(key, std::move(next));
+  }
 }
 
 // Create a new tree, ensuring the provided annotations are valid and that

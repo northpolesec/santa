@@ -273,6 +273,67 @@ using namespace santa::santad::process_tree;
   XCTAssertTrue(annotation.has_value());
 }
 
+- (void)testUpdateAnnotation {
+  auto proc = self.initProc;
+  auto first = std::make_shared<TestAnnotator>();
+  auto second = std::make_shared<TestAnnotator>();
+
+  self.tree->AnnotateProcess(*proc, first);
+  XCTAssertEqual(*self.tree->GetAnnotation<TestAnnotator>(*proc), first);
+
+  // AnnotateProcess is first-wins...
+  self.tree->AnnotateProcess(*proc, second);
+  XCTAssertEqual(*self.tree->GetAnnotation<TestAnnotator>(*proc), first);
+
+  // ...while UpdateAnnotation sees the current value and replaces it.
+  const TestAnnotator* seen = nullptr;
+  self.tree->UpdateAnnotation<TestAnnotator>(
+      proc->pid_, [&](const TestAnnotator* current) -> std::shared_ptr<const TestAnnotator> {
+        seen = current;
+        return second;
+      });
+  XCTAssertEqual(seen, first.get());
+  XCTAssertEqual(*self.tree->GetAnnotation<TestAnnotator>(*proc), second);
+
+  // Returning nullptr leaves the existing annotation in place.
+  self.tree->UpdateAnnotation<TestAnnotator>(
+      proc->pid_,
+      [](const TestAnnotator*) -> std::shared_ptr<const TestAnnotator> { return nullptr; });
+  XCTAssertEqual(*self.tree->GetAnnotation<TestAnnotator>(*proc), second);
+
+  // The by-pid lookup resolves the process and reads its annotation in one
+  // acquisition; it must agree with the by-handle overload.
+  XCTAssertEqual(*self.tree->GetAnnotation<TestAnnotator>(proc->pid_), second);
+  XCTAssertFalse(
+      self.tree->GetAnnotation<TestAnnotator>((struct Pid){.pid = 999, .pidversion = 999})
+          .has_value());
+}
+
+- (void)testCreateTreeRejectsDuplicateAnnotatorClasses {
+  std::vector<std::unique_ptr<Annotator>> annotators;
+  annotators.emplace_back(std::make_unique<TestAnnotator>());
+  annotators.emplace_back(std::make_unique<TestAnnotator>());
+
+  auto tree = CreateTree(std::move(annotators));
+  XCTAssertFalse(tree.ok());
+  XCTAssertEqual(tree.status().code(), absl::StatusCode::kInvalidArgument);
+}
+
+- (void)testCreateTreeAcceptsDistinctAnnotatorClasses {
+  std::vector<std::unique_ptr<Annotator>> annotators;
+  annotators.emplace_back(std::make_unique<TestAnnotator>());
+  annotators.emplace_back(std::make_unique<ExecCountingAnnotator>(std::make_shared<int>(0)));
+
+  // Regression: the duplicate check used to run typeid on the unique_ptr, which
+  // is the same static type for every element, so any two annotators collided.
+  auto tree = CreateTree(std::move(annotators));
+  if (!tree.ok()) {
+    // Backfill can fail for reasons unrelated to the check; what must not
+    // happen is being rejected as duplicates.
+    XCTAssertNotEqual(tree.status().code(), absl::StatusCode::kInvalidArgument);
+  }
+}
+
 - (void)testCleanup {
   // Removal is time-based: an exited process is retained until removal_grace_ticks
   // have elapsed past its exit (measured by the newest timestamp seen), so a

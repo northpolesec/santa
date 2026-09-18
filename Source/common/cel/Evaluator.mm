@@ -31,6 +31,7 @@
 #include "parser/parser.h"
 
 #include "Source/common/cel/Activation.h"
+#include "Source/common/cel/AnnotationFunction.h"
 #include "Source/common/cel/PolicyForRangeFunction.h"
 #include "Source/common/cel/RelativeTimeFunction.h"
 #include "Source/common/cel/TouchIDFunction.h"
@@ -69,6 +70,11 @@ static absl::StatusOr<std::unique_ptr<::cel::Compiler>> CreateCompiler(
       return result;
     }
     if (auto result = santa::cel::AddRelativeTimeCompilerLibrary(*builder); !result.ok()) {
+      return result;
+    }
+    // Declared for rules and fallbacks alike: a fallback testing an annotation
+    // a rule stamped is the main reason these exist.
+    if (auto result = santa::cel::AddAnnotationCompilerLibrary(*builder); !result.ok()) {
       return result;
     }
     // policy_for_range() is declared for rules only: a fallback expression has
@@ -167,6 +173,10 @@ absl::StatusOr<std::unique_ptr<::cel_runtime::CelExpression>> Evaluator<IsV2>::C
       return result;
     }
     if (auto result = santa::cel::RegisterRelativeTimeFunctions(builder->GetRegistry(), options);
+        !result.ok()) {
+      return result;
+    }
+    if (auto result = santa::cel::RegisterAnnotationFunctions(builder->GetRegistry(), options);
         !result.ok()) {
       return result;
     }

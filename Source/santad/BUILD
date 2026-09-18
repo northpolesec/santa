@@ -549,6 +549,7 @@ objc_library(
         "//Source/common/es:EndpointSecurityMessage",
         "//Source/common/processtree:process",
         "//Source/common/processtree:process_tree",
+        "//Source/common/processtree/annotations:cel",
         "@abseil-cpp//absl/time",
     ],
 )
@@ -570,6 +571,7 @@ santa_unit_test(
         "//Source/common/processtree:process",
         "//Source/common/processtree:process_tree",
         "//Source/common/processtree:process_tree_test_helpers",
+        "//Source/common/processtree/annotations:cel",
         "@abseil-cpp//absl/time",
         "@googletest//:gtest",
     ],
@@ -2256,6 +2258,7 @@ test_suite(
         "//Source/common/es:EndpointSecurityMessageTest",
         "//Source/common/es:SNTEndpointSecurityClientTest",
         "//Source/common/processtree:process_tree_test",
+        "//Source/common/processtree/annotations:cel_test",
         "//Source/common/processtree/annotations:originator_test",
         "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:StreamBatchersTest",
         "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:fsspool_test",
