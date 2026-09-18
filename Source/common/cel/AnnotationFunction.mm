@@ -135,6 +135,20 @@ absl::Status AddAnnotationFunction::Evaluate(absl::Span<const cel_runtime::CelVa
     return absl::InvalidArgumentError("add_annotation() expects 2 or 3 arguments");
   }
 
+  // The declared parameter is santa.cel.Result, but CEL lets a dyn expression
+  // satisfy it, and any message is kStruct at runtime, so
+  // add_annotation('X', [target, ALLOWLIST][0]) both type-checks and dispatches
+  // here with an ExecutableFile as the policy. Evaluator rejects that, but only
+  // after this function has returned, and with fail-closed off the failed
+  // evaluation falls through to the fallback expressions -- where
+  // has_annotation('X') would see a stamp left behind by an expression that
+  // errored. Check before touching the tree.
+  const cel_runtime::CelValue& policy = args.back();
+  if (!policy.IsMessage() || policy.MessageOrDie() == nullptr ||
+      policy.MessageOrDie()->GetDescriptor()->full_name() != "santa.cel.Result") {
+    return absl::InvalidArgumentError("add_annotation() policy argument must be a return value");
+  }
+
   // Annotating is a side effect on the process tree. A cached decision skips
   // evaluation on the next exec, which would silently stop stamping.
   *used_sink_ = true;
@@ -182,7 +196,7 @@ absl::Status AddAnnotationFunction::Evaluate(absl::Span<const cel_runtime::CelVa
   }
 
   // Pass the policy through untouched so a composite policy keeps its fields.
-  *result = args.back();
+  *result = policy;
   return absl::OkStatus();
 }
 

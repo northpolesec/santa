@@ -2268,6 +2268,36 @@ class ScopedHostZone {
   }
 }
 
+// CEL lets a dyn expression satisfy the declared Result parameter, so a policy
+// argument that is some other message still type-checks and still dispatches
+// here. It must be rejected before anything is stamped: Evaluator only rejects
+// it afterwards, and with fail-closed off the failed evaluation falls through
+// to the fallbacks, where has_annotation() would see the stray annotation.
+- (void)testAddAnnotationRejectsANonPolicyArgument {
+  auto sut = santa::cel::Evaluator<true>::Create();
+  XCTAssertTrue(sut.ok());
+
+  FakeAnnotations annotations;
+  auto evaluate = [&](absl::string_view expr) {
+    auto activation = MakeActivation<true>(absl::Now, annotations.Hooks());
+    return sut.value()->CompileAndEvaluate(expr, *activation);
+  };
+
+  // `target` is an ExecutableFile, not a Result, but the list literal erases
+  // that to dyn and both messages are kStruct at runtime.
+  XCTAssertFalse(evaluate("add_annotation('X', [target, ALLOWLIST][0])").ok());
+  XCTAssertTrue(annotations.added.empty());
+
+  XCTAssertFalse(
+      evaluate("add_annotation(['X', 'Y'], FORK_AND_EXEC, [target, ALLOWLIST][0])").ok());
+  XCTAssertTrue(annotations.added.empty());
+
+  // The well-typed form still works.
+  auto ok = evaluate("add_annotation('X', ALLOWLIST)");
+  XCTAssertTrue(ok.ok());
+  XCTAssertEqual(annotations.added.size(), 1u);
+}
+
 - (void)testAddAnnotationOnlyRunsOnTheTakenBranch {
   using ReturnValue = santa::cel::CELProtoTraits<true>::ReturnValue;
 
