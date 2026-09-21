@@ -202,6 +202,24 @@ template <bool IsV2>
 absl::StatusOr<typename Evaluator<IsV2>::EvaluationResultT> Evaluator<IsV2>::Evaluate(
     const ::cel_runtime::CelExpression* expression_plan, const ActivationT& activation,
     google::protobuf::Arena* arena) {
+  absl::StatusOr<EvaluationResultT> result = EvaluateChecked(expression_plan, activation, arena);
+
+  // add_annotation() stages its writes rather than applying them as it runs.
+  // Apply them only now, and only if the expression as a whole produced a
+  // result: CEL evaluates call arguments eagerly, so an add_annotation() can
+  // succeed inside an expression that then fails, and with fail-closed off the
+  // failed evaluation falls through to the fallbacks -- which would read an
+  // annotation no successful rule ever asked for.
+  if constexpr (IsV2) {
+    activation.FlushStagedAnnotations(result.ok());
+  }
+  return result;
+}
+
+template <bool IsV2>
+absl::StatusOr<typename Evaluator<IsV2>::EvaluationResultT> Evaluator<IsV2>::EvaluateChecked(
+    const ::cel_runtime::CelExpression* expression_plan, const ActivationT& activation,
+    google::protobuf::Arena* arena) {
   // The kill sink is per-evaluation: a reused activation must not return an
   // earlier evaluation's kill, and RecordPendingKill() keeps the earliest
   // deadline, so a stale one would even win over this evaluation's. Cacheability

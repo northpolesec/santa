@@ -113,6 +113,21 @@ struct AnnotationHooks {
       add;
 };
 
+// Annotations an evaluation has asked for but not yet applied. add_annotation()
+// appends here instead of writing straight through, and the Activation applies
+// the list only once the whole expression has produced a usable result (see
+// Activation::FlushStagedAnnotations). Without that, an expression that fails
+// *after* a successful add_annotation -- CEL evaluates call arguments eagerly,
+// so the inner call of add_annotation('A', 99, add_annotation('B', ALLOWLIST))
+// completes before the outer one rejects 99 -- would leave the annotation
+// behind, and with fail-closed off the fallbacks would then read it.
+//
+// Consequence worth knowing: has_annotation() reports the process as it was
+// when evaluation began, and does not observe an add_annotation() made by the
+// same expression.
+using StagedAnnotations =
+    std::vector<std::pair<std::string, AnnotationPropagation>>;
+
 // Descriptors for has_annotation() and the add_annotation() overloads. Both are
 // returned as vectors because the Activation vends whole overload sets.
 std::vector<::google::api::expr::runtime::CelFunctionDescriptor>
@@ -149,10 +164,10 @@ class AddAnnotationFunction : public ::google::api::expr::runtime::CelFunction {
  public:
   AddAnnotationFunction(
       ::google::api::expr::runtime::CelFunctionDescriptor descriptor,
-      bool* used_sink, AnnotationHooks hooks)
+      bool* used_sink, StagedAnnotations* staged)
       : ::google::api::expr::runtime::CelFunction(std::move(descriptor)),
         used_sink_(used_sink),
-        hooks_(hooks) {}
+        staged_(staged) {}
 
   absl::Status Evaluate(
       absl::Span<const ::google::api::expr::runtime::CelValue> args,
@@ -161,7 +176,7 @@ class AddAnnotationFunction : public ::google::api::expr::runtime::CelFunction {
 
  private:
   bool* used_sink_;
-  AnnotationHooks hooks_;
+  StagedAnnotations* staged_;
 };
 
 // Register the add_annotation() and has_annotation() decls with the type

@@ -261,7 +261,7 @@ std::vector<const cel_runtime::CelFunction*> Activation<IsV2>::FindFunctionOverl
       return LazyOverloads(addAnnotationFns_, AddAnnotationDescriptors,
                            [this](cel_runtime::CelFunctionDescriptor descriptor) {
                              return std::make_unique<AddAnnotationFunction>(
-                                 std::move(descriptor), &usedAnnotations_, annotations_);
+                                 std::move(descriptor), &usedAnnotations_, &stagedAnnotations_);
                            });
     }
   }
@@ -328,6 +328,16 @@ std::vector<std::pair<absl::string_view, ::cel::Type>> Activation<IsV2>::GetVari
   }
 
   return v;
+}
+
+template <bool IsV2>
+void Activation<IsV2>::FlushStagedAnnotations(bool commit) const {
+  if (commit && annotations_.add) {
+    for (const auto& [name, propagation] : stagedAnnotations_) {
+      annotations_.add(name, propagation);
+    }
+  }
+  stagedAnnotations_.clear();
 }
 
 template <bool IsV2>

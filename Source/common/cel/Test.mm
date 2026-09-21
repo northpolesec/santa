@@ -2298,6 +2298,116 @@ class ScopedHostZone {
   XCTAssertEqual(annotations.added.size(), 1u);
 }
 
+// CEL evaluates call arguments eagerly, so an add_annotation() can finish
+// inside an expression that then fails. Nothing may be stamped in that case:
+// with fail-closed off the failed evaluation falls through to the fallbacks,
+// which would otherwise read an annotation no successful rule asked for.
+- (void)testAddAnnotationIsNotAppliedWhenTheExpressionFails {
+  auto sut = santa::cel::Evaluator<true>::Create();
+  XCTAssertTrue(sut.ok());
+
+  FakeAnnotations annotations;
+  auto evaluate = [&](absl::string_view expr) {
+    auto activation = MakeActivation<true>(absl::Now, annotations.Hooks());
+    return sut.value()->CompileAndEvaluate(expr, *activation);
+  };
+
+  // The inner call succeeds and the outer one rejects propagation 99.
+  XCTAssertFalse(
+      evaluate("add_annotation('OUTER', 99, add_annotation('TRUSTED', ALLOWLIST))").ok());
+  XCTAssertTrue(annotations.added.empty());
+
+  // Any later failure does it too, not just a bad propagation.
+  XCTAssertFalse(evaluate("add_annotation('X', ALLOWLIST) == ALLOWLIST ? [1][5] : ALLOWLIST").ok());
+  XCTAssertTrue(annotations.added.empty());
+
+  // A nested pair that does succeed applies both.
+  auto ok = evaluate("add_annotation('OUTER', add_annotation('INNER', ALLOWLIST))");
+  XCTAssertTrue(ok.ok());
+  XCTAssertEqual(annotations.added.size(), 2u);
+}
+
+// One Activation is reused for every rule in a fallback batch, so a failed
+// rule's staging must not ride along and apply with a later rule that succeeds.
+- (void)testFailedEvaluationDoesNotLeakStagingIntoTheNextOne {
+  auto sut = santa::cel::Evaluator<true>::Create();
+  XCTAssertTrue(sut.ok());
+
+  FakeAnnotations annotations;
+  auto activation = MakeActivation<true>(absl::Now, annotations.Hooks());
+
+  XCTAssertFalse(
+      sut.value()
+          ->CompileAndEvaluate("add_annotation('LEAKED', 99, add_annotation('ALSO', ALLOWLIST))",
+                               *activation)
+          .ok());
+  XCTAssertTrue(annotations.added.empty());
+
+  auto second = sut.value()->CompileAndEvaluate("add_annotation('WANTED', ALLOWLIST)", *activation);
+  XCTAssertTrue(second.ok());
+  XCTAssertEqual(annotations.added.size(), 1u);
+  XCTAssertEqual(annotations.added[0].first, "WANTED");
+}
+
+// add_annotation() has to be one of the values the rule can return. Eager
+// argument evaluation means one tucked into a policy_for_range() slot would
+// stamp even when that slot is not the one selected.
+- (void)testAddAnnotationMustBeOnTheResultPath {
+  auto sut = santa::cel::Evaluator<true>::Create();
+  XCTAssertTrue(sut.ok());
+
+  FakeAnnotations annotations;
+  auto evaluate = [&](absl::string_view expr) {
+    auto activation = MakeActivation<true>(absl::Now, annotations.Hooks());
+    return sut.value()->CompileAndEvaluate(expr, *activation);
+  };
+
+  // Rejected: an unselected argument of a timed policy.
+  XCTAssertFalse(evaluate("policy_for_range(now() + duration('1h'), now() + duration('2h'), "
+                          "add_annotation('TRUSTED', ALLOWLIST), BLOCKLIST)")
+                     .ok());
+  XCTAssertTrue(annotations.added.empty());
+
+  // Rejected: evaluated for a comparison, not returned.
+  XCTAssertFalse(evaluate("add_annotation('X', ALLOWLIST) == ALLOWLIST").ok());
+
+  // Accepted: a ternary branch, and wrapping the returned policy.
+  XCTAssertTrue(evaluate("euid == 0 ? add_annotation('X', ALLOWLIST) : BLOCKLIST").ok());
+  XCTAssertTrue(evaluate("add_annotation('X', policy_for_range(now() - duration('1h'), "
+                         "now() + duration('1h'), ALLOWLIST, BLOCKLIST))")
+                    .ok());
+}
+
+// add_annotation() is transparent, so wrapping a timed-kill rule in one still
+// produces the rule's result and must stay valid.
+- (void)testAnnotationWrapperDoesNotBreakKillOnExpiry {
+  auto sut = santa::cel::Evaluator<true>::Create();
+  XCTAssertTrue(sut.ok());
+
+  FakeAnnotations annotations;
+  auto evaluate = [&](absl::string_view expr) {
+    auto activation = MakeActivation<true>(absl::Now, annotations.Hooks());
+    return sut.value()->CompileAndEvaluate(expr, *activation);
+  };
+
+  auto bare = evaluate("policy_for_range(duration('60s'), kill_on_expiry(ALLOWLIST))");
+  XCTAssertTrue(bare.ok());
+
+  auto wrapped = evaluate("add_annotation('TRUSTED', policy_for_range(duration('60s'), "
+                          "kill_on_expiry(ALLOWLIST)))");
+  if (!wrapped.ok()) {
+    XCTFail(@"wrapping a timed-kill rule should stay valid: %s",
+            std::string(wrapped.status().message()).c_str());
+  } else {
+    XCTAssertEqual(wrapped.value().value, bare.value().value);
+  }
+
+  // Still rejected where the kill would not be the rule's decision.
+  XCTAssertFalse(evaluate("has_annotation(string(policy_for_range(duration('60s'), "
+                          "kill_on_expiry(ALLOWLIST))))")
+                     .ok());
+}
+
 - (void)testAddAnnotationOnlyRunsOnTheTakenBranch {
   using ReturnValue = santa::cel::CELProtoTraits<true>::ReturnValue;
 

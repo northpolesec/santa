@@ -19,6 +19,7 @@
 #include <utility>
 #include <vector>
 
+#include "Source/common/cel/ResultPath.h"
 #include "Source/common/cel/result.pb.h"
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
@@ -74,6 +75,30 @@ absl::Status RegisterAnnotationDecls(::cel::TypeCheckerBuilder& builder) {
 
   CEL_RETURN_IF_ERROR(builder.AddFunction(std::move(addDecl)));
   return builder.AddFunction(std::move(hasDecl));
+}
+
+// Runs after type checking. add_annotation() writes to the process tree, and
+// CEL evaluates call arguments eagerly, so one placed anywhere but the result
+// path stamps an annotation for a policy the rule may never return --
+// policy_for_range(start, end, add_annotation('X', ALLOWLIST), BLOCKLIST)
+// stamps X even with the window shut. Reject that at compile time, the way
+// kill_on_expiry() is placed-checked, rather than let a rule grant privileges
+// through a descendant that reads the stray annotation.
+bool ValidateAnnotationPlacement(::cel::ValidationContext& context) {
+  bool valid = true;
+  for (const ::cel::NavigableAstNode& node : context.navigable_ast().Root().DescendantsPreorder()) {
+    const ::cel::Expr& expr = *node.expr();
+    if (!expr.has_call_expr() || expr.call_expr().function() != "add_annotation") {
+      continue;
+    }
+    if (!IsOnResultPath(node)) {
+      context.ReportErrorAt(expr.id(),
+                            "add_annotation() must produce the rule's result: put it on a ternary "
+                            "branch or around the policy the rule returns");
+      valid = false;
+    }
+  }
+  return valid;
 }
 
 }  // namespace
@@ -189,10 +214,11 @@ absl::Status AddAnnotationFunction::Evaluate(absl::Span<const cel_runtime::CelVa
     names.emplace_back(args[0].StringOrDie().value());
   }
 
-  if (hooks_.add) {
-    for (const std::string& name : names) {
-      hooks_.add(name, propagation);
-    }
+  // Staged, not applied: the enclosing expression may still fail, and CEL has
+  // already evaluated this call eagerly as somebody else's argument. The
+  // Activation applies the list only if evaluation produces a result.
+  for (std::string& name : names) {
+    staged_->emplace_back(std::move(name), propagation);
   }
 
   // Pass the policy through untouched so a composite policy keeps its fields.
@@ -201,6 +227,8 @@ absl::Status AddAnnotationFunction::Evaluate(absl::Span<const cel_runtime::CelVa
 }
 
 absl::Status AddAnnotationCompilerLibrary(::cel::CompilerBuilder& builder) {
+  builder.GetValidator().AddValidation(
+      ::cel::Validation(&ValidateAnnotationPlacement, "add_annotation_placement"));
   return builder.AddLibrary(
       ::cel::CompilerLibrary::FromCheckerLibrary({"annotations", &RegisterAnnotationDecls}));
 }

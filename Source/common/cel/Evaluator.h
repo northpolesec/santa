@@ -106,6 +106,14 @@ class Evaluator {
       ::google::api::expr::runtime::CelExpression const* expression_plan,
       const ActivationT& activation, google::protobuf::Arena* arena);
 
+ private:
+  // The body of Evaluate. Kept separate so Evaluate can resolve the
+  // annotations the expression staged once it knows whether it succeeded.
+  static absl::StatusOr<EvaluationResultT> EvaluateChecked(
+      const ::google::api::expr::runtime::CelExpression* expression_plan,
+      const ActivationT& activation, google::protobuf::Arena* arena);
+
+ public:
   // Compile and evaluate a CEL expression in a single call. Uses a
   // stack-local arena internally so no allocations persist after return.
   absl::StatusOr<EvaluationResultT> CompileAndEvaluate(

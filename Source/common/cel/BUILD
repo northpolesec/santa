@@ -30,6 +30,7 @@ objc_library(
         "Evaluator.mm",
         "PolicyForRangeFunction.mm",
         "RelativeTimeFunction.mm",
+        "ResultPath.mm",
         "TouchIDFunction.mm",
     ],
     hdrs = [
@@ -40,6 +41,7 @@ objc_library(
         "Evaluator.h",
         "PolicyForRangeFunction.h",
         "RelativeTimeFunction.h",
+        "ResultPath.h",
         "TouchIDFunction.h",
     ],
     deps = [

@@ -95,6 +95,13 @@ class Activation : public ::google::api::expr::runtime::BaseActivation {
   static std::vector<std::pair<absl::string_view, ::cel::Type>> GetVariables(
       google::protobuf::Arena* arena, bool includeUnspecified);
 
+  // Apply the annotations add_annotation() asked for, or drop them. Called by
+  // Evaluator::Evaluate with commit=true only when the expression produced a
+  // result. Always clears: one Activation is reused across every rule in a
+  // fallback batch, so a failed rule's staging must not ride along and commit
+  // with whichever later rule succeeds.
+  void FlushStagedAnnotations(bool commit) const;
+
   template <bool V2>
   friend class Evaluator;
 
@@ -132,6 +139,7 @@ class Activation : public ::google::api::expr::runtime::BaseActivation {
   mutable std::vector<std::unique_ptr<TodayFunction>> todayFns_;
   mutable std::unique_ptr<NowFunction> nowFn_;
   mutable std::vector<std::unique_ptr<PolicyForRangeFunction>> policyForRangeFns_;
+  mutable StagedAnnotations stagedAnnotations_;
   mutable std::vector<std::unique_ptr<HasAnnotationFunction>> hasAnnotationFns_;
   mutable std::vector<std::unique_ptr<AddAnnotationFunction>> addAnnotationFns_;
 
