@@ -334,6 +334,42 @@ using namespace santa::santad::process_tree;
   }
 }
 
+// RetainProcess can only bump a pid that is in the tree, so a ProcessToken must
+// remember what it retained rather than what it asked for. Otherwise a pid that
+// was absent at retain time and inserted by another client before the token
+// dies gets a decrement that pairs with no increment -- enough to erase a
+// process a different, still-live token is holding.
+- (void)testTokenDoesNotReleaseWhatItNeverRetained {
+  // grace=1 so one later event is enough to drain.
+  std::vector<std::unique_ptr<Annotator>> annotators{};
+  auto tree = std::make_shared<ProcessTreeTestPeer>(std::move(annotators), 1);
+  auto init = tree->InsertInit();
+  const struct Pid p = {.pid = 2, .pidversion = 2};
+  const struct Pid other = {.pid = 3, .pidversion = 3};
+
+  // Token A asks for P before P exists.
+  auto tokenA = std::make_unique<ProcessToken>(tree, PidList{p});
+
+  // Another ingestion thread inserts P, and token B legitimately retains it.
+  tree->HandleFork(10, init, p);
+  XCTAssertTrue(tree->Get(p).has_value());
+  auto tokenB = std::make_unique<ProcessToken>(tree, PidList{p});
+
+  // P exits. B holds it, so it is tombstoned rather than erased.
+  tree->HandleExit(11, **tree->Get(p));
+  tree->HandleFork(100, init, other);  // advances latest_ts_ so DrainRemovals runs
+  XCTAssertTrue(tree->Get(p).has_value());
+
+  // A goes away. It never retained P, so this must not touch P's count.
+  tokenA.reset();
+  XCTAssertTrue(tree->Get(p).has_value(),
+                @"token A released a process it never retained, erasing it under token B");
+
+  // B is the only real holder, so its release is what reaps P.
+  tokenB.reset();
+  XCTAssertFalse(tree->Get(p).has_value());
+}
+
 - (void)testCleanup {
   // Removal is time-based: an exited process is retained until removal_grace_ticks
   // have elapsed past its exit (measured by the newest timestamp seen), so a
@@ -387,7 +423,7 @@ using namespace santa::santad::process_tree;
     auto child = tree->Get(child_pid);
     XCTAssertTrue(child.has_value());
     PidList pids = {(*child)->pid_};
-    tree->RetainProcess(pids);
+    (void)tree->RetainProcess(pids);
   }
 
   // Even stepping well past the grace, the retained child stays reachable
@@ -437,7 +473,7 @@ using namespace santa::santad::process_tree;
     auto child = tree->Get(child_pid);
     XCTAssertTrue(child.has_value());
     PidList pids = {(*child)->pid_};
-    tree->RetainProcess(pids);
+    (void)tree->RetainProcess(pids);
   }
 
   struct Pid churn_pid = {.pid = 100, .pidversion = 100};
@@ -453,7 +489,7 @@ using namespace santa::santad::process_tree;
   int fired = 0;
   tree->SetOnReleaseCollectedForTest([&] {
     fired++;
-    tree->RetainProcess(pids);
+    (void)tree->RetainProcess(pids);
   });
   tree->ReleaseProcess(pids);
   XCTAssertEqual(fired, 1);
@@ -487,7 +523,7 @@ using namespace santa::santad::process_tree;
     auto child = tree->Get(child_pid);
     XCTAssertTrue(child.has_value());
     PidList pids = {(*child)->pid_};
-    tree->RetainProcess(pids);
+    (void)tree->RetainProcess(pids);
   }
 
   struct Pid churn_pid = {.pid = 100, .pidversion = 100};
@@ -504,7 +540,7 @@ using namespace santa::santad::process_tree;
   tree->SetOnReleaseCollectedForTest([&] {
     // The nested ReleaseProcess re-enters this seam; only act on the first fire.
     if (++fired > 1) return;
-    tree->RetainProcess(pids);
+    (void)tree->RetainProcess(pids);
     tree->ReleaseProcess(pids);
   });
   tree->ReleaseProcess(pids);
@@ -534,7 +570,7 @@ using namespace santa::santad::process_tree;
     auto child = tree->Get(child_pid);
     XCTAssertTrue(child.has_value());
     PidList pids = {(*child)->pid_};
-    tree->RetainProcess(pids);
+    (void)tree->RetainProcess(pids);
   }
 
   struct Pid churn_pid = {.pid = 100, .pidversion = 100};
@@ -551,7 +587,7 @@ using namespace santa::santad::process_tree;
   tree->SetOnReleaseCollectedForTest([&] {
     // The nested ReleaseProcess re-enters this seam; only act on the first fire.
     if (++fired > 1) return;
-    tree->RetainProcess(pids);
+    (void)tree->RetainProcess(pids);
     tree->ReleaseProcess(pids);
     tree->HandleFork(event_id++, init, child_pid);
   });

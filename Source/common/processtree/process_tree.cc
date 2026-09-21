@@ -237,17 +237,20 @@ void ProcessTree::DrainRemovals() {
   }
 }
 
-void ProcessTree::RetainProcess(const PidList& pids) {
+PidList ProcessTree::RetainProcess(const PidList& pids) {
   // Reader lock suffices: we only need the map to be stable for lookup.
   // relaxed is safe because the increment has no dependent memory operations —
   // we are only bumping a counter.
+  PidList retained;
   absl::ReaderMutexLock lock(mtx_);
   for (const struct Pid& p : pids) {
     auto proc = GetLocked(p);
     if (proc) {
       (*proc)->refcnt_.fetch_add(1, std::memory_order_relaxed);
+      retained.push_back(p);
     }
   }
+  return retained;
 }
 
 void ProcessTree::ReleaseProcess(const PidList& pids) {
@@ -448,9 +451,13 @@ Tokens
 */
 
 ProcessToken::ProcessToken(std::shared_ptr<ProcessTree> tree, PidList pids)
-    : state_(std::make_shared<State>(std::move(tree), std::move(pids))) {
+    : state_(std::make_shared<State>(std::move(tree), PidList{})) {
   if (state_->tree) {
-    state_->tree->RetainProcess(state_->pids);
+    // Remember what was retained, not what was asked for. A pid missing now can
+    // be inserted by another client before this token dies, and releasing it
+    // then would decrement a count this token never incremented -- enough to
+    // erase a process a different, valid token is still holding.
+    state_->pids = state_->tree->RetainProcess(pids);
   }
 }
 

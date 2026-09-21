@@ -103,10 +103,16 @@ class ProcessTree {
   // event which would remove the Process (e.g. exit), however in cases where
   // async processing occurs, the Process may need to be accessed after the
   // exit.
-  void RetainProcess(const PidList& pids);
+  //
+  // Returns the subset actually retained. A pid absent from the tree cannot be
+  // retained, and the caller must not release it later: another client may
+  // insert that pid in the meantime, and the release would then decrement a
+  // count this caller never incremented. Pass this return value to
+  // ReleaseProcess, not the request (see ProcessToken).
+  [[nodiscard]] PidList RetainProcess(const PidList& pids);
 
-  // Release previously retained processes, signaling that the client is done
-  // processing the event that retained them.
+  // Release processes previously retained. `pids` must be what RetainProcess
+  // returned, so that every decrement pairs with an increment this caller made.
   void ReleaseProcess(const PidList& pids);
 
   // Annotate the given process with an Annotator (state). If an annotation of
