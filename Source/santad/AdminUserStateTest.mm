@@ -108,6 +108,13 @@ static SNTTemporaryAdminPolicy* OnDemandPolicy() {
                                          requireJustification:NO];
 }
 
+static SNTTemporaryAdminPolicy* EnforcingPolicy(NSArray<NSString*>* allowed) {
+  return [[SNTTemporaryAdminPolicy alloc] initOnDemandMinutes:60
+                                              defaultDuration:5
+                                         requireJustification:NO
+                                                allowedAdmins:allowed];
+}
+
 static SNTTemporaryAdminPolicy* RevokePolicy() {
   return [[SNTTemporaryAdminPolicy alloc] initRevocation];
 }
@@ -125,6 +132,8 @@ static SNTTemporaryAdminPolicy* RevokePolicy() {
 @property(copy) NSDictionary* tamSessionState;
 // Number of times the injected revoke-TAM block was called.
 @property NSInteger revokeTAMCalls;
+// Boxed uid the injected active-TAM block reports, or nil for "no session".
+@property(copy) NSNumber* activeTAMUID;
 @end
 
 @implementation AdminUserStateTest
@@ -164,7 +173,9 @@ static SNTTemporaryAdminPolicy* RevokePolicy() {
   auto fakeOwned = std::make_unique<FakeAdminGroupMembership>();
   *fakeOut = fakeOwned.get();
   return std::make_unique<AdminUserState>((SNTConfigurator*)self.mockConfigurator,
-                                          std::move(fakeOwned), revokeTAM);
+                                          std::move(fakeOwned), revokeTAM, ^NSNumber*(void) {
+                                            return self.activeTAMUID;
+                                          });
 }
 
 - (std::unique_ptr<AdminUserState>)makeStateWithFake:(FakeAdminGroupMembership**)fakeOut {
@@ -629,6 +640,368 @@ static SNTTemporaryAdminPolicy* RevokePolicy() {
   state->HandlePolicy(nil);
   XCTAssertFalse(fake->IsMember(504));
   XCTAssertEqualObjects(self.storedRecord, (@[ @{@"Username" : @"gone", @"UID" : @504} ]));
+}
+
+#pragma mark Sweep
+
+- (void)testSweepDemotesUnlistedAndSparesListed {
+  FakeAdminGroupMembership* fake = nullptr;
+  auto state = [self makeStateWithFake:&fake];
+  fake->members_ = {0, 200, 501, 503};
+  fake->names_ = {{0, @"root"}, {200, @"_swupdate"}, {501, @"jane"}, {503, @"kandji_admin"}};
+
+  state->HandlePolicy(EnforcingPolicy(@[ @"Kandji_Admin" ]));
+
+  XCTAssertFalse(fake->IsMember(501));  // unlisted -> demoted
+  XCTAssertTrue(fake->IsMember(503));   // listed (case-insensitively) -> untouched
+  XCTAssertTrue(fake->IsMember(0));     // system accounts never touched
+  XCTAssertTrue(fake->IsMember(200));
+  NSArray* expected = @[ @{@"Username" : @"jane", @"UID" : @501, @"Local" : @YES} ];
+  XCTAssertEqualObjects(self.storedRecord, expected);
+}
+
+- (void)testSweepDemotesAdminsThatAppearLater {
+  FakeAdminGroupMembership* fake = nullptr;
+  auto state = [self makeStateWithFake:&fake];
+  fake->members_ = {501};
+  fake->names_ = {{501, @"jane"}};
+  state->HandlePolicy(EnforcingPolicy(@[]));
+  XCTAssertFalse(fake->IsMember(501));
+
+  // An account promoted by another tool after the policy turned on is demoted
+  // at the next sweep. This is the behavior the one-shot capture cannot do.
+  fake->members_.insert(504);
+  fake->names_[504] = @"bob";
+  state->HandlePolicy(EnforcingPolicy(@[]));
+
+  XCTAssertFalse(fake->IsMember(504));
+  XCTAssertEqual(self.storedRecord.count, 2u);
+}
+
+- (void)testSweepSkipsActiveTAMTarget {
+  FakeAdminGroupMembership* fake = nullptr;
+  auto state = [self makeStateWithFake:&fake];
+  fake->members_ = {501, 502};
+  fake->names_ = {{501, @"jane"}, {502, @"mallory"}};
+  self.activeTAMUID = @501;
+
+  state->HandlePolicy(EnforcingPolicy(@[]));
+
+  XCTAssertTrue(fake->IsMember(501));   // legitimately elevated -> left alone
+  XCTAssertFalse(fake->IsMember(502));  // a second admin is still demoted
+  NSArray* expected = @[ @{@"Username" : @"mallory", @"UID" : @502, @"Local" : @YES} ];
+  XCTAssertEqualObjects(self.storedRecord, expected);
+}
+
+- (void)testSweepDemotesTAMResidueWithoutRecordingIt {
+  // A failed teardown left uid 501 in the admin group with Deadline:0. It is
+  // not an active session, so the sweep demotes it — but recording it would
+  // make the revoke restore promote a temporary admin permanently.
+  FakeAdminGroupMembership* fake = nullptr;
+  auto state = [self makeStateWithFake:&fake];
+  self.tamSessionState = @{@"TargetUID" : @501};
+  self.activeTAMUID = nil;
+  fake->members_ = {501};
+  fake->names_ = {{501, @"jane"}};
+
+  state->HandlePolicy(EnforcingPolicy(@[]));
+  XCTAssertFalse(fake->IsMember(501));
+  XCTAssertEqual(self.storedRecord.count, 0u);
+
+  state->HandlePolicy(RevokePolicy());
+  XCTAssertFalse(fake->IsMember(501));  // never promoted
+}
+
+- (void)testSweepWithNothingToDemoteStillWritesTheRecord {
+  FakeAdminGroupMembership* fake = nullptr;
+  auto state = [self makeStateWithFake:&fake];
+  fake->members_ = {503};
+  fake->names_ = {{503, @"kandji_admin"}};
+
+  state->HandlePolicy(EnforcingPolicy(@[ @"kandji_admin" ]));
+
+  // An empty record marks the machine as managed. Without it, a later policy
+  // that omits the wrapper would fall into the one-shot capture branch and
+  // demote the allowed account.
+  XCTAssertNotNil(self.storedRecord);
+  XCTAssertEqual(self.storedRecord.count, 0u);
+
+  SNTTemporaryAdminPolicy* nonEnforcing = OnDemandPolicy();
+  state->HandlePolicy(nonEnforcing);
+  XCTAssertTrue(fake->IsMember(503));
+}
+
+- (void)testSweepEnumerationFailureDemotesNobody {
+  FakeAdminGroupMembership* fake = nullptr;
+  auto state = [self makeStateWithFake:&fake];
+  fake->members_ = {501};
+  fake->names_ = {{501, @"jane"}};
+  fake->fail_list_ = true;
+
+  state->HandlePolicy(EnforcingPolicy(@[]));
+
+  XCTAssertTrue(fake->IsMember(501));
+  XCTAssertNil(self.storedRecord);
+}
+
+- (void)testSweepPersistFailureDemotesNobody {
+  FakeAdminGroupMembership* fake = nullptr;
+  auto state = [self makeStateWithFake:&fake];
+  fake->members_ = {501};
+  fake->names_ = {{501, @"jane"}};
+  self.persistFails = YES;
+
+  state->HandlePolicy(EnforcingPolicy(@[]));
+
+  XCTAssertTrue(fake->IsMember(501));
+  XCTAssertNil(self.storedRecord);
+}
+
+- (void)testSweepRetriesAFailedDemotionWithoutDuplicatingTheEntry {
+  FakeAdminGroupMembership* fake = nullptr;
+  auto state = [self makeStateWithFake:&fake];
+  fake->members_ = {501};
+  fake->names_ = {{501, @"jane"}};
+  fake->fail_remove_uids_ = {501};
+
+  state->HandlePolicy(EnforcingPolicy(@[]));
+  XCTAssertTrue(fake->IsMember(501));
+  XCTAssertEqual(self.storedRecord.count, 1u);
+
+  // Under continuous enforcement, retrying is correct — unlike the one-shot
+  // capture path, where a retry would fight other user-management software.
+  fake->fail_remove_uids_.clear();
+  state->HandlePolicy(EnforcingPolicy(@[]));
+  XCTAssertFalse(fake->IsMember(501));
+  XCTAssertEqual(self.storedRecord.count, 1u);
+}
+
+- (void)testRepeatedDemoteFailureStillRetriesEverySweep {
+  FakeAdminGroupMembership* fake = nullptr;
+  auto state = [self makeStateWithFake:&fake];
+  fake->members_ = {501};
+  fake->names_ = {{501, @"jane"}};
+  fake->fail_remove_uids_ = {501};
+
+  // Three sweeps: the demotion must be attempted each time even though the
+  // log line is only written once.
+  for (int i = 0; i < 3; i++) {
+    state->HandlePolicy(EnforcingPolicy(@[]));
+  }
+  XCTAssertTrue(fake->IsMember(501));
+  XCTAssertEqual(self.storedRecord.count, 1u);
+
+  // Once the failure clears, the retry succeeds and the uid is forgotten, so a
+  // later failure would log again.
+  fake->fail_remove_uids_.clear();
+  state->HandlePolicy(EnforcingPolicy(@[]));
+  XCTAssertFalse(fake->IsMember(501));
+}
+
+- (void)testNonEnforcingPolicyKeepsOneShotBehavior {
+  FakeAdminGroupMembership* fake = nullptr;
+  auto state = [self makeStateWithFake:&fake];
+  fake->members_ = {501};
+  fake->names_ = {{501, @"jane"}};
+
+  state->HandlePolicy(OnDemandPolicy());
+  XCTAssertFalse(fake->IsMember(501));
+
+  // One-shot: a later admin is NOT demoted when the server does not enforce.
+  fake->members_.insert(504);
+  fake->names_[504] = @"bob";
+  state->HandlePolicy(OnDemandPolicy());
+  XCTAssertTrue(fake->IsMember(504));
+}
+
+- (void)testEnforcingPolicyRevokeRestoresEveryoneRecorded {
+  FakeAdminGroupMembership* fake = nullptr;
+  auto state = [self makeStateWithFake:&fake];
+  fake->members_ = {501};
+  fake->names_ = {{501, @"jane"}};
+  state->HandlePolicy(EnforcingPolicy(@[]));
+
+  fake->members_.insert(504);
+  fake->names_[504] = @"bob";
+  state->HandlePolicy(EnforcingPolicy(@[]));
+
+  state->HandlePolicy(RevokePolicy());
+
+  XCTAssertTrue(fake->IsMember(501));
+  XCTAssertTrue(fake->IsMember(504));  // demoted mid-window, still restored
+  XCTAssertNil(self.storedRecord);
+}
+
+- (void)testAddingANameRestoresThatAccountOnly {
+  FakeAdminGroupMembership* fake = nullptr;
+  auto state = [self makeStateWithFake:&fake];
+  fake->members_ = {501, 503};
+  fake->names_ = {{501, @"jane"}, {503, @"kandji_admin"}};
+
+  state->HandlePolicy(EnforcingPolicy(@[]));
+  XCTAssertFalse(fake->IsMember(501));
+  XCTAssertFalse(fake->IsMember(503));
+
+  state->HandlePolicy(EnforcingPolicy(@[ @"kandji_admin" ]));
+
+  XCTAssertTrue(fake->IsMember(503));   // restored
+  XCTAssertFalse(fake->IsMember(501));  // untouched
+  NSArray* expected = @[ @{@"Username" : @"jane", @"UID" : @501, @"Local" : @YES} ];
+  XCTAssertEqualObjects(self.storedRecord, expected);
+}
+
+- (void)testRemovingANameDemotesItAgain {
+  FakeAdminGroupMembership* fake = nullptr;
+  auto state = [self makeStateWithFake:&fake];
+  fake->members_ = {503};
+  fake->names_ = {{503, @"kandji_admin"}};
+
+  state->HandlePolicy(EnforcingPolicy(@[ @"kandji_admin" ]));
+  XCTAssertTrue(fake->IsMember(503));
+
+  state->HandlePolicy(EnforcingPolicy(@[]));
+
+  XCTAssertFalse(fake->IsMember(503));
+  XCTAssertEqual(self.storedRecord.count, 1u);
+}
+
+- (void)testListingAnAccountSantaNeverDemotedPromotesNobody {
+  FakeAdminGroupMembership* fake = nullptr;
+  auto state = [self makeStateWithFake:&fake];
+  fake->members_ = {501};
+  fake->names_ = {{501, @"jane"}, {504, @"bob"}};  // bob exists but is not admin
+
+  state->HandlePolicy(EnforcingPolicy(@[ @"bob" ]));
+
+  // bob was never in the record, so the restore pass cannot see him. The list
+  // only ever moves people Santa itself demoted.
+  XCTAssertFalse(fake->IsMember(504));
+  XCTAssertFalse(fake->IsMember(501));
+}
+
+- (void)testRestorePassRefusesAReusedUID {
+  FakeAdminGroupMembership* fake = nullptr;
+  auto state = [self makeStateWithFake:&fake];
+  fake->members_ = {503};
+  fake->names_ = {{503, @"kandji_admin"}};
+  state->HandlePolicy(EnforcingPolicy(@[]));
+  XCTAssertFalse(fake->IsMember(503));
+
+  // kandji_admin is deleted and uid 503 is reallocated to a different account.
+  fake->names_[503] = @"contractor";
+
+  state->HandlePolicy(EnforcingPolicy(@[ @"kandji_admin" ]));
+
+  // Never hand admin to whoever holds the uid now; drop the stale entry.
+  XCTAssertFalse(fake->IsMember(503));
+  XCTAssertEqual(self.storedRecord.count, 0u);
+}
+
+- (void)testRestorePassRetriesAFailedPromote {
+  FakeAdminGroupMembership* fake = nullptr;
+  auto state = [self makeStateWithFake:&fake];
+  fake->members_ = {503};
+  fake->names_ = {{503, @"kandji_admin"}};
+  state->HandlePolicy(EnforcingPolicy(@[]));
+
+  fake->fail_add_uids_ = {503};
+  state->HandlePolicy(EnforcingPolicy(@[ @"kandji_admin" ]));
+  XCTAssertFalse(fake->IsMember(503));
+  XCTAssertEqual(self.storedRecord.count, 1u);  // entry kept for the retry
+
+  fake->fail_add_uids_.clear();
+  state->HandlePolicy(EnforcingPolicy(@[ @"kandji_admin" ]));
+  XCTAssertTrue(fake->IsMember(503));
+  XCTAssertEqual(self.storedRecord.count, 0u);
+}
+
+- (void)testRestorePassKeepsANonDictionaryRecordEntry {
+  // Only possible via on-disk tampering or corruption: an array element that
+  // isn't a dictionary at all. It must not crash the sweep, and since it can
+  // never be resolved, it is kept rather than promoted or silently dropped.
+  FakeAdminGroupMembership* fake = nullptr;
+  auto state = [self makeStateWithFake:&fake];
+  NSArray* garbage = @[ @"not-a-dictionary" ];
+  self.storedRecord = (NSArray<NSDictionary*>*)garbage;
+
+  state->HandlePolicy(EnforcingPolicy(@[ @"whatever" ]));
+
+  XCTAssertEqualObjects(self.storedRecord, garbage);
+}
+
+- (void)testRestorePassRetriesAnUnresolvableDirectoryAccount {
+  FakeAdminGroupMembership* fake = nullptr;
+  auto state = [self makeStateWithFake:&fake];
+  fake->members_ = {503};
+  fake->names_ = {{503, @"adadmin"}};
+  fake->network_uids_ = {503};  // a directory account, not local
+  state->HandlePolicy(EnforcingPolicy(@[]));
+  XCTAssertFalse(fake->IsMember(503));
+
+  // The directory is unreachable when adadmin is added to the allowlist.
+  fake->gone_uids_ = {503};
+  state->HandlePolicy(EnforcingPolicy(@[ @"adadmin" ]));
+
+  // Unresolvable may mean deleted OR merely unreachable; consuming the entry
+  // here would risk stranding a real admin, so it is retried instead.
+  XCTAssertFalse(fake->IsMember(503));
+  XCTAssertEqual(self.storedRecord.count, 1u);
+
+  // Back on the network: the next sync completes the restore.
+  fake->gone_uids_.clear();
+  state->HandlePolicy(EnforcingPolicy(@[ @"adadmin" ]));
+  XCTAssertTrue(fake->IsMember(503));
+  XCTAssertEqual(self.storedRecord.count, 0u);
+}
+
+- (void)testRestorePassDropsAnUnresolvableLocalAccount {
+  FakeAdminGroupMembership* fake = nullptr;
+  auto state = [self makeStateWithFake:&fake];
+  fake->members_ = {503};
+  fake->names_ = {{503, @"kandji_admin"}};
+  state->HandlePolicy(EnforcingPolicy(@[]));
+  XCTAssertFalse(fake->IsMember(503));
+
+  // kandji_admin's local account is deleted before it can be restored.
+  fake->gone_uids_ = {503};
+
+  state->HandlePolicy(EnforcingPolicy(@[ @"kandji_admin" ]));
+
+  // A deleted local identity is never coming back: terminal, so the entry is
+  // dropped rather than retried forever.
+  XCTAssertFalse(fake->IsMember(503));
+  XCTAssertEqual(self.storedRecord.count, 0u);
+}
+
+- (void)testRestorePassDefersToAnActiveTAMSession {
+  FakeAdminGroupMembership* fake = nullptr;
+  auto state = [self makeStateWithFake:&fake];
+  fake->members_ = {503};
+  fake->names_ = {{503, @"jane"}};
+  state->HandlePolicy(EnforcingPolicy(@[]));
+  XCTAssertFalse(fake->IsMember(503));
+
+  // jane elevates through TAM while ops adds her to the allowlist; a sync
+  // lands mid-session.
+  fake->members_.insert(503);
+  self.activeTAMUID = @503;
+  state->HandlePolicy(EnforcingPolicy(@[ @"jane" ]));
+
+  // The membership is TAM's, not a completed restore: treating AddMember's
+  // idempotent no-op as success would consume the entry, and TAM's later
+  // teardown would then demote an allowed user with nothing left to bring
+  // her back. The entry must survive for a later sweep.
+  XCTAssertTrue(fake->IsMember(503));
+  XCTAssertEqual(self.storedRecord.count, 1u);
+
+  // TAM's session ends and TAM demotes her, unrelated to this record.
+  fake->members_.erase(503);
+  self.activeTAMUID = nil;
+  state->HandlePolicy(EnforcingPolicy(@[ @"jane" ]));
+
+  // Now the restore pass actually runs and promotes her for real.
+  XCTAssertTrue(fake->IsMember(503));
+  XCTAssertEqual(self.storedRecord.count, 0u);
 }
 
 @end

@@ -1327,4 +1327,87 @@ static uint64_t MakeDeadline(uint64_t want) {
   XCTAssertEqualObjects(writes[1], [NSNull null]);
 }
 
+#pragma mark ActiveSessionTargetUID tests
+
+- (void)testActiveSessionTargetUIDIsEmptyWithNoSession {
+  [self stubPolicyAvailable];
+  auto fakeOwned = std::make_unique<FakeAdminGroupMembership>();
+  auto tam = santa::TemporaryAdminMode::Create((SNTConfigurator*)self.mockConfigurator,
+                                               (SNTNotificationQueue*)self.mockNotQueue,
+                                               std::move(fakeOwned),
+                                               ^(SNTStoredTemporaryAdminModeAuditEvent* e){
+                                               });
+
+  XCTAssertFalse(tam->ActiveSessionTargetUID().has_value());
+}
+
+- (void)testActiveSessionTargetUIDNamesTheElevatedUser {
+  [self stubPolicyAvailable];
+  [self stubAuthReply:YES reason:@"reason"];
+  auto fakeOwned = std::make_unique<FakeAdminGroupMembership>();
+  auto tam = santa::TemporaryAdminMode::Create((SNTConfigurator*)self.mockConfigurator,
+                                               (SNTNotificationQueue*)self.mockNotQueue,
+                                               std::move(fakeOwned),
+                                               ^(SNTStoredTemporaryAdminModeAuditEvent* e){
+                                               });
+
+  NSError* err = nil;
+  XCTAssertGreaterThan(tam->RequestMinutes(@5, 501, @"jane", &err), 0u);
+  XCTAssertTrue(tam->ActiveSessionTargetUID().has_value());
+  XCTAssertEqual(tam->ActiveSessionTargetUID().value(), (uid_t)501);
+}
+
+- (void)testActiveSessionTargetUIDIsEmptyAfterRevoke {
+  [self stubPolicyAvailable];
+  [self stubAuthReply:YES reason:@"reason"];
+  auto fakeOwned = std::make_unique<FakeAdminGroupMembership>();
+  auto tam = santa::TemporaryAdminMode::Create((SNTConfigurator*)self.mockConfigurator,
+                                               (SNTNotificationQueue*)self.mockNotQueue,
+                                               std::move(fakeOwned),
+                                               ^(SNTStoredTemporaryAdminModeAuditEvent* e){
+                                               });
+
+  NSError* err = nil;
+  XCTAssertGreaterThan(tam->RequestMinutes(@5, 501, @"jane", &err), 0u);
+  tam->Revoke(SNTTemporaryAdminModeLeaveReasonSyncServerChanged);
+  XCTAssertFalse(tam->ActiveSessionTargetUID().has_value());
+}
+
+// A revert that fails leaves a Deadline:0 residue naming the uid. That is not
+// an active session: the sweep must be free to demote that user. FakeAdminGroupMembership
+// has no per-uid removal-failure knob (only the blanket fail_remove_), which is enough
+// here since only uid 501 is ever removed in this test.
+- (void)testActiveSessionTargetUIDIsEmptyForTeardownResidue {
+  [self stubPolicyAvailable];
+  [self stubAuthReply:YES reason:@"reason"];
+  __block NSDictionary* lastPersisted = nil;
+  OCMStub([self.mockConfigurator persistTimedSessionState:[OCMArg any] forKey:@"TempAdmin"])
+      .andDo(^(NSInvocation* inv) {
+        __unsafe_unretained NSDictionary* s = nil;
+        [inv getArgument:&s atIndex:2];
+        lastPersisted = s;
+      });
+  auto fakeOwned = std::make_unique<FakeAdminGroupMembership>();
+  FakeAdminGroupMembership* fake = fakeOwned.get();
+  auto tam = santa::TemporaryAdminMode::Create((SNTConfigurator*)self.mockConfigurator,
+                                               (SNTNotificationQueue*)self.mockNotQueue,
+                                               std::move(fakeOwned),
+                                               ^(SNTStoredTemporaryAdminModeAuditEvent* e){
+                                               });
+
+  NSError* err = nil;
+  XCTAssertGreaterThan(tam->RequestMinutes(@5, 501, @"jane", &err), 0u);
+  fake->fail_remove_ = true;  // the demotion cannot be committed
+  tam->Revoke(SNTTemporaryAdminModeLeaveReasonSyncServerChanged);
+
+  XCTAssertFalse(tam->ActiveSessionTargetUID().has_value());
+  // The residue is real, not just an accessor artifact: the user is still in
+  // the admin group (the demotion never committed) and a Deadline:0 record
+  // naming them was persisted for retry -- exactly the state the sweep needs
+  // to be free to demote them.
+  XCTAssertTrue(fake->IsMember(501));  // still elevated: the demotion never committed
+  XCTAssertEqualObjects(lastPersisted[kTimedSessionDeadlineKey], @0);
+  XCTAssertEqualObjects(lastPersisted[@"TargetUID"], @501);
+}
+
 @end

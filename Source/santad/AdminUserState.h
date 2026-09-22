@@ -16,6 +16,7 @@
 #define SANTA_SANTAD_ADMINUSERSTATE_H
 
 #include <memory>
+#include <set>
 
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTKVOManager.h"
@@ -44,8 +45,13 @@ class AdminUserState {
 
   // `revoke_tam` must synchronously revoke any active Temporary Admin Mode
   // session; HandleSyncServerChange calls it before restoring (see there).
+  //
+  // `active_tam_uid` returns the uid of the live TAM session boxed, or nil when
+  // none is active. The sweep uses it to avoid demoting a user who is
+  // legitimately elevated. It is a block rather than a TemporaryAdminMode
+  // reference so this class stays testable without one.
   AdminUserState(SNTConfigurator* configurator, std::unique_ptr<AdminGroupMembership> membership,
-                 void (^revoke_tam)(void));
+                 void (^revoke_tam)(void), NSNumber* (^active_tam_uid)(void));
 
   // Reconciles local admin users against `policy`. Called after each sync
   // batch commits, after TemporaryAdminMode::NewPolicyReceived, so on a revoke
@@ -70,12 +76,18 @@ class AdminUserState {
  private:
   void CaptureAndDemoteLocked() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
   void RestoreAndClearLocked() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
+  void SweepLocked(NSSet<NSString*>* allowed) ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   SNTConfigurator* configurator_;
   std::unique_ptr<AdminGroupMembership> membership_;
   void (^revoke_tam_)(void);
+  NSNumber* (^active_tam_uid_)(void);
   NSArray<SNTKVOManager*>* kvo_;
   absl::Mutex lock_;
+  // uids whose demotion failed and has already been logged in this enforcing
+  // window. Bounds log volume when another tool keeps re-promoting a user; it
+  // never suppresses the retry itself.
+  std::set<uid_t> demote_failures_logged_ ABSL_GUARDED_BY(lock_);
 };
 
 }  // namespace santa

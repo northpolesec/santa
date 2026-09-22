@@ -97,4 +97,101 @@
   XCTAssertNil([SNTTemporaryAdminPolicy deserialize:nil]);
 }
 
+- (void)testAllowlistAbsentMeansNoEnforcement {
+  SNTTemporaryAdminPolicy* p = [[SNTTemporaryAdminPolicy alloc] initOnDemandMinutes:60
+                                                                    defaultDuration:5
+                                                               requireJustification:NO
+                                                                      allowedAdmins:nil];
+  XCTAssertFalse(p.enforcesAdminGroup);
+  XCTAssertNil(p.allowedAdminUsernames);
+}
+
+- (void)testEmptyAllowlistEnforcesWithNobodyAllowed {
+  SNTTemporaryAdminPolicy* p = [[SNTTemporaryAdminPolicy alloc] initOnDemandMinutes:60
+                                                                    defaultDuration:5
+                                                               requireJustification:NO
+                                                                      allowedAdmins:@[]];
+  XCTAssertTrue(p.enforcesAdminGroup);
+  XCTAssertNotNil(p.allowedAdminUsernames);
+  XCTAssertEqual(p.allowedAdminUsernames.count, 0u);
+}
+
+- (void)testAllowlistIsNormalized {
+  SNTTemporaryAdminPolicy* p = [[SNTTemporaryAdminPolicy alloc]
+       initOnDemandMinutes:60
+           defaultDuration:5
+      requireJustification:NO
+             allowedAdmins:@[ @"  Kandji_Admin ", @"ladmin", @"", @"   ", @"uid:503", @"LADMIN" ]];
+  NSSet* want = [NSSet setWithObjects:@"kandji_admin", @"ladmin", nil];
+  XCTAssertEqualObjects(p.allowedAdminUsernames, want);
+}
+
+- (void)testAllowlistSurvivesSerialization {
+  SNTTemporaryAdminPolicy* p =
+      [[SNTTemporaryAdminPolicy alloc] initOnDemandMinutes:60
+                                           defaultDuration:5
+                                      requireJustification:NO
+                                             allowedAdmins:@[ @"kandji_admin" ]];
+  SNTTemporaryAdminPolicy* got = [SNTTemporaryAdminPolicy deserialize:[p serialize]];
+  XCTAssertTrue(got.enforcesAdminGroup);
+  XCTAssertEqualObjects(got.allowedAdminUsernames, [NSSet setWithObject:@"kandji_admin"]);
+}
+
+- (void)testNonEnforcingPolicySurvivesSerialization {
+  SNTTemporaryAdminPolicy* p = [[SNTTemporaryAdminPolicy alloc] initOnDemandMinutes:60
+                                                                    defaultDuration:5
+                                                               requireJustification:NO];
+  SNTTemporaryAdminPolicy* got = [SNTTemporaryAdminPolicy deserialize:[p serialize]];
+  XCTAssertFalse(got.enforcesAdminGroup);
+  XCTAssertNil(got.allowedAdminUsernames);
+}
+
+- (void)testRevocationPolicyDoesNotEnforce {
+  SNTTemporaryAdminPolicy* p = [[SNTTemporaryAdminPolicy alloc] initRevocation];
+  XCTAssertFalse(p.enforcesAdminGroup);
+  XCTAssertNil(p.allowedAdminUsernames);
+}
+
+- (void)testOldArchiveWithNeitherKeyDecodesToNonEnforcing {
+  // Simulates an archive written by a build that predates
+  // enforcesAdminGroup/allowedAdminUsernames: only the four original keys are
+  // present. Landing on "enforcing, nobody allowed" here instead of "not
+  // enforcing" would demote every admin in the fleet the first time an old
+  // cached policy is read by a new build.
+  NSKeyedArchiver* archiver = [[NSKeyedArchiver alloc] initRequiringSecureCoding:YES];
+  [archiver encodeObject:@(SNTTemporaryAdminPolicyTypeOnDemand) forKey:@"type"];
+  [archiver encodeObject:@60 forKey:@"maxMinutes"];
+  [archiver encodeObject:@5 forKey:@"defaultDurationMinutes"];
+  [archiver encodeObject:@NO forKey:@"requireJustification"];
+  [archiver finishEncoding];
+
+  NSError* error;
+  NSKeyedUnarchiver* unarchiver =
+      [[NSKeyedUnarchiver alloc] initForReadingFromData:archiver.encodedData error:&error];
+  XCTAssertNil(error);
+  unarchiver.requiresSecureCoding = YES;
+  SNTTemporaryAdminPolicy* got = [[SNTTemporaryAdminPolicy alloc] initWithCoder:unarchiver];
+  [unarchiver finishDecoding];
+
+  XCTAssertFalse(got.enforcesAdminGroup);
+  XCTAssertNil(got.allowedAdminUsernames);
+}
+
+- (void)testAllowlistMatchesAcrossUnicodeCompositions {
+  // "josé" written with a combining acute (NFD), as a directory may report it.
+  NSString* decomposed = @"josé";
+  // The same name precomposed (NFC), as a browser form typically submits it.
+  NSString* composed = @"josé";
+  XCTAssertNotEqualObjects(decomposed, composed);  // different bytes, same name
+
+  SNTTemporaryAdminPolicy* p = [[SNTTemporaryAdminPolicy alloc] initOnDemandMinutes:60
+                                                                    defaultDuration:5
+                                                               requireJustification:NO
+                                                                      allowedAdmins:@[ composed ]];
+  // Both forms must land on the same key, or the account is demoted anyway with
+  // nothing logged and nothing visible in the UI.
+  XCTAssertTrue([p.allowedAdminUsernames
+      containsObject:[SNTTemporaryAdminPolicy normalizedUsername:decomposed]]);
+}
+
 @end

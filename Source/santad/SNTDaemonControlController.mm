@@ -203,8 +203,13 @@ static NSString* TAMUsernameForUID(uid_t uid) {
     // sync-server-change path; see AdminUserState::HandleSyncServerChange.
     std::shared_ptr<santa::TemporaryAdminMode> tam = _temporaryAdminMode;
     _adminUserState = std::make_unique<santa::AdminUserState>(
-        [SNTConfigurator configurator], santa::CreateAdminGroupMembership(), ^{
+        [SNTConfigurator configurator], santa::CreateAdminGroupMembership(),
+        ^{
           tam->Revoke(SNTTemporaryAdminModeLeaveReasonSyncServerChanged);
+        },
+        ^NSNumber*(void) {
+          std::optional<uid_t> uid = tam->ActiveSessionTargetUID();
+          return uid.has_value() ? @(uid.value()) : nil;
         });
   }
   return self;
@@ -1466,6 +1471,13 @@ static BOOL CloneBundleTree(NSString* src, NSString* dst) {
   audit_token_t peer = [MOLXPCConnection currentPeerAuditToken];
   uid_t uid = audit_token_to_euid(peer);
   reply(_temporaryAdminMode->Available(), _temporaryAdminMode->IsCurrentlyAdmin(uid));
+}
+
+- (void)temporaryAdminAllowlist:(void (^)(BOOL, NSArray<NSString*>*))reply {
+  SNTTemporaryAdminPolicy* policy = [SNTConfigurator configurator].temporaryAdminPolicy;
+  NSArray<NSString*>* names =
+      [policy.allowedAdminUsernames.allObjects sortedArrayUsingSelector:@selector(compare:)] ?: @[];
+  reply(policy.enforcesAdminGroup, names);
 }
 
 - (void)temporaryAdminModeSessionResignedActive:(void (^)(NSError*))reply {
