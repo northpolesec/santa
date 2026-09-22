@@ -155,10 +155,13 @@ objc_library(
         "//Source/common:SNTLogging",
         "//Source/common:SNTRule",
         "//Source/common:SNTRuleIdentifiers",
+        "//Source/common:SNTRuleTimeWindow",
         "//Source/common:SNTStoredExecutionEvent",
         "//Source/common:SNTXPCBundleServiceInterface",
         "//Source/common:SNTXPCControlInterface",
         "//Source/common:SigningIDHelpers",
+        "@abseil-cpp//absl/time",
+        "@cel-cpp//parser",
     ],
 )
 
