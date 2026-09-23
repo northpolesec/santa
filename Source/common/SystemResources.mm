@@ -20,8 +20,10 @@
 #include <libproc.h>
 #include <mach/kern_return.h>
 #include <string.h>
+#include <sys/resource.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <algorithm>
 #include <optional>
 #include <vector>
 
@@ -80,6 +82,28 @@ std::optional<SantaTaskInfo> GetTaskInfo() {
       .resident_size = pti.pti_resident_size,
       .total_user_nanos = MachTimeToNanos(pti.pti_total_user),
       .total_system_nanos = MachTimeToNanos(pti.pti_total_system),
+  };
+}
+
+std::optional<SantaMemoryFootprint> GetMemoryFootprint() {
+  struct rusage_info_v4 ri;
+
+  // V4 is the earliest flavor carrying ri_lifetime_max_phys_footprint. Ask for
+  // it by number rather than RUSAGE_INFO_CURRENT so a newer SDK doesn't silently
+  // start requesting fields nothing here reads.
+  if (proc_pid_rusage(getpid(), RUSAGE_INFO_V4, (rusage_info_t*)&ri) != 0) {
+    LOGW(@"Unable to get process memory footprint");
+    return std::nullopt;
+  }
+
+  // The kernel fills these fields one at a time, reading the lifetime maximum
+  // before the current footprint, so an allocation racing the call can yield a
+  // current value above the reported peak. Clamp rather than export a peak that
+  // is below the current value.
+  return SantaMemoryFootprint{
+      .phys_footprint = ri.ri_phys_footprint,
+      .lifetime_max_phys_footprint =
+          std::max(ri.ri_lifetime_max_phys_footprint, ri.ri_phys_footprint),
   };
 }
 

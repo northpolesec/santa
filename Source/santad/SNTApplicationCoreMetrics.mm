@@ -91,6 +91,14 @@ static void RegisterMemoryAndCPUMetrics(SNTMetricSet* metricSet) {
       [metricSet int64GaugeWithName:@"/proc/memory/resident_size"
                          fieldNames:@[]
                            helpText:@"The resident set size of this process"];
+  SNTMetricInt64Gauge* footprint =
+      [metricSet int64GaugeWithName:@"/proc/memory/phys_footprint"
+                         fieldNames:@[]
+                           helpText:@"The physical memory footprint of this process"];
+  SNTMetricInt64Gauge* maxFootprint = [metricSet
+      int64GaugeWithName:@"/proc/memory/lifetime_max_phys_footprint"
+              fieldNames:@[]
+                helpText:@"The peak physical memory footprint of this process since launch"];
 
   SNTMetricDoubleGauge* cpuUsage =
       [metricSet doubleGaugeWithName:@"/proc/cpu_usage"
@@ -98,6 +106,14 @@ static void RegisterMemoryAndCPUMetrics(SNTMetricSet* metricSet) {
                             helpText:@"CPU time consumed by this process, in seconds"];
 
   [metricSet registerCallback:^(void) {
+    // Reported before the GetTaskInfo() guard below so one call failing doesn't
+    // blank out the other's metrics.
+    std::optional<SantaMemoryFootprint> footprintInfo = GetMemoryFootprint();
+    if (footprintInfo.has_value()) {
+      [footprint set:footprintInfo->phys_footprint forFieldValues:@[]];
+      [maxFootprint set:footprintInfo->lifetime_max_phys_footprint forFieldValues:@[]];
+    }
+
     std::optional<SantaTaskInfo> tinfo = GetTaskInfo();
     if (!tinfo.has_value()) {
       return;

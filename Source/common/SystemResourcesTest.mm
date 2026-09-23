@@ -37,6 +37,18 @@
   [super tearDown];
 }
 
+- (void)testMemoryFootprint {
+  std::optional<SantaMemoryFootprint> footprint = GetMemoryFootprint();
+  XCTAssertTrue(footprint.has_value());
+  XCTAssertGreaterThan(footprint->phys_footprint, 0);
+
+  // GetMemoryFootprint() clamps the peak to the current value, so this holds by
+  // construction rather than by luck. It is asserted to pin that clamp down: the
+  // kernel fills the two fields non-atomically and can report a peak below the
+  // current footprint, which is exactly what callers must never see.
+  XCTAssertGreaterThanOrEqual(footprint->lifetime_max_phys_footprint, footprint->phys_footprint);
+}
+
 - (void)testBootVolumeGroupDevMatchesRootDirectory {
   struct stat rootStat;
   XCTAssertEqual(stat("/", &rootStat), 0);
