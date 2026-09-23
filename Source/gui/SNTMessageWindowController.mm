@@ -75,6 +75,10 @@
   }
 }
 
+// Most message types have nothing to answer.
+- (void)replyNo {
+}
+
 - (NSString*)messageHash {
   [self doesNotRecognizeSelector:_cmd];
   return nil;

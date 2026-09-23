@@ -16,6 +16,7 @@
 #import <OCMock/OCMock.h>
 #import <XCTest/XCTest.h>
 
+#import "Source/gui/SNTBinaryMessageWindowController.h"
 #import "Source/gui/SNTMessageWindowController.h"
 #import "Source/gui/SNTNetworkFlowMessageWindowController.h"
 #import "Source/gui/SNTNotificationManager.h"
@@ -23,15 +24,15 @@
 #import "Source/gui/SNTTimedRuleKillMessageWindowController.h"
 
 #import "Source/common/SNTConfigBundle.h"
+#import "Source/common/SNTConfigState.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
 #import "Source/common/SNTStoredNetworkFlowEvent.h"
 #import "Source/common/SNTTimedRuleKillDetails.h"
 
-@class SNTBinaryMessageWindowController;
-
 @interface SNTNotificationManager (Testing)
 @property(readonly) NSMutableArray* pendingNotifications;
+- (void)updateSilenceDate:(NSDate*)date forHash:(NSString*)hash;
 - (void)hashBundleBinariesForEvent:(SNTStoredEvent*)event
                     withController:(SNTBinaryMessageWindowController*)controller;
 - (void)queueMessage:(SNTMessageWindowController*)pendingMsg enableSilences:(BOOL)enableSilences;
@@ -354,6 +355,131 @@ static SNTTimedRuleKillDetails* TimedRuleKillDetails(NSString* application, NSDa
           record();
         });
       }];
+}
+
+#pragma mark Notification silences
+
+static NSString* const kSHA = @"the-sha256";
+static NSString* const kSilenceHash = @"binary:the-sha256";
+
+static SNTStoredExecutionEvent* BlockedEvent(BOOL holdAndAsk) {
+  SNTStoredExecutionEvent* event = [[SNTStoredExecutionEvent alloc] init];
+  event.fileSHA256 = kSHA;
+  event.holdAndAsk = holdAndAsk;
+  return event;
+}
+
+static SNTBinaryMessageWindowController* BlockController(BOOL holdAndAsk, void (^reply)(BOOL)) {
+  return [[SNTBinaryMessageWindowController alloc] initWithEvent:BlockedEvent(holdAndAsk)
+                                                       customMsg:nil
+                                                       customURL:nil
+                                           eventDetailButtonText:nil
+                                                     configState:nil
+                                                           reply:reply];
+}
+
+// A notification dropped instead of shown still owes the daemon an answer.
+- (void)testEveryDropPathAnswersTheReplyBlockOnce {
+  for (NSString* reason in @[ @"silent mode", @"user silence", @"already queued" ]) {
+    [self mockSilentMode:[reason isEqual:@"silent mode"]];
+    BOOL enableSilences = [reason isEqual:@"user silence"];
+
+    SNTNotificationManager* mgr = [[SNTNotificationManager alloc] init];
+    id mgrMock = OCMPartialMock(mgr);
+    // Nothing here needs a dialog on screen; the "already queued" row makes one.
+    OCMStub([mgrMock showQueuedWindow]).andDo(nil);
+
+    if (enableSilences) {
+      [mgr updateSilenceDate:[NSDate dateWithTimeIntervalSinceNow:600] forHash:kSilenceHash];
+    }
+    if ([reason isEqual:@"already queued"]) {
+      [mgr queueMessage:BlockController(NO, nil) enableSilences:NO];
+    }
+
+    NSMutableArray* answers = [NSMutableArray array];
+    XCTestExpectation* replied = [self expectationWithDescription:reason];
+    [mgr queueMessage:BlockController(NO,
+                                      ^(BOOL authenticated) {
+                                        [answers addObject:@(authenticated)];
+                                        [replied fulfill];
+                                      })
+        enableSilences:enableSilences];
+
+    [self waitForExpectationsWithTimeout:5.0 handler:nil];
+    // Exactly once, not just at least once: -replyNo clears the block after calling it.
+    XCTAssertEqualObjects(answers, @[ @NO ], @"%@", reason);
+
+    [mgr updateSilenceDate:nil forHash:kSilenceHash];
+    [mgrMock stopMocking];
+    [self.mockConfigurator stopMocking];
+    self.mockConfigurator = nil;
+  }
+}
+
+// Message types with no reply to give still go through -replyNo on every drop path.
+- (void)testDroppingAMessageWithNoReplyIsHarmless {
+  [self mockSilentMode:YES];
+  SNTNotificationManager* mgr = [[SNTNotificationManager alloc] init];
+
+  [mgr queueMessage:[[DedupeHashPassthroughController alloc] init] enableSilences:NO];
+
+  XCTestExpectation* drained = [self expectationWithDescription:@"main queue drained"];
+  dispatch_async(dispatch_get_main_queue(), ^{
+    [drained fulfill];
+  });
+  [self waitForExpectationsWithTimeout:5.0 handler:nil];
+  XCTAssertEqual(mgr.pendingNotifications.count, 0u);
+}
+
+// A held execution has no silence key, so nothing can silence it. An ordinary block
+// keeps one.
+- (void)testHeldExecutionHasNoSilenceKey {
+  XCTAssertNil([BlockController(YES, nil) messageHash]);
+  XCTAssertEqualObjects([BlockController(NO, nil) messageHash], kSilenceHash);
+}
+
+// A held execution is a question, not a notice: the process is stopped until the
+// user answers it, so a silence set from an earlier block dialog for the same
+// binary must not swallow it. An ordinary block still honors that silence.
+- (void)testHeldExecutionIgnoresUserSilences {
+  for (NSNumber* holdAndAsk in @[ @YES, @NO ]) {
+    [self mockSilentMode:NO];
+
+    SNTNotificationManager* mgr = [[SNTNotificationManager alloc] init];
+    id mgrMock = OCMPartialMock(mgr);
+    // Nothing here needs a dialog on screen, and a held event would build one.
+    OCMStub([mgrMock showQueuedWindow]).andDo(nil);
+    [mgr updateSilenceDate:[NSDate dateWithTimeIntervalSinceNow:600] forHash:kSilenceHash];
+
+    SNTConfigState* configState = [[SNTConfigState alloc] initWithConfig:nil];
+    [configState setValue:@YES forKey:@"enableNotificationSilences"];
+
+    NSMutableArray* answers = [NSMutableArray array];
+    [mgr postBlockNotification:BlockedEvent(holdAndAsk.boolValue)
+             withCustomMessage:nil
+                     customURL:nil
+         eventDetailButtonText:nil
+                   configState:configState
+                      andReply:^(BOOL authenticated) {
+                        [answers addObject:@(authenticated)];
+                      }];
+
+    // A held event is queued rather than dropped, so there is no reply to wait
+    // for: drain the main queue the decision was posted to instead.
+    XCTestExpectation* drained = [self expectationWithDescription:@"main queue drained"];
+    dispatch_async(dispatch_get_main_queue(), ^{
+      [drained fulfill];
+    });
+    [self waitForExpectationsWithTimeout:5.0 handler:nil];
+
+    XCTAssertEqual(mgr.pendingNotifications.count, holdAndAsk.boolValue ? 1u : 0u);
+    XCTAssertEqualObjects(answers, holdAndAsk.boolValue ? @[] : @[ @NO ]);
+
+    [mgr updateSilenceDate:nil forHash:kSilenceHash];
+    [mgrMock stopMocking];
+    [self.mockConfigurator stopMocking];
+    self.mockConfigurator = nil;
+  }
 }
 
 #pragma mark Timed rule kill warning

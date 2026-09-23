@@ -504,8 +504,10 @@ santa_unit_test(
         "Cocoa",
     ],
     deps = [
+        ":SNTBinaryMessageWindowController",
         ":SNTNotificationManager",
         "//Source/common:SNTConfigBundle",
+        "//Source/common:SNTConfigState",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTStoredExecutionEvent",
         "//Source/common:SNTStoredNetworkFlowEvent",
