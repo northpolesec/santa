@@ -63,8 +63,8 @@
   certificate matching this common name and use that for authentication.
 
   @note Case sensitive
-  @note If multiple matching certificates are found, the most recently issued one whose private
-  key can be used is chosen.
+  @note If multiple matching certificates are found, the one with the latest valid-from date
+  whose private key can be used is chosen.
   @note If this property is not set and neither is |clientCertIssuerCn|, the allowed issuers
   provided by the server will be used to find a matching certificate.
 */
@@ -75,8 +75,8 @@
   certificate issued by an issuer with this name and use that for authentication.
 
   @note Case sensitive
-  @note If multiple matching certificates are found, the most recently issued one whose private
-        key can be used is chosen.
+  @note If multiple matching certificates are found, the one with the latest valid-from date
+        whose private key can be used is chosen.
   @note If this property is not set and neither is |clientCertCommonName|, the allowed issuers
         provided by the server will be used to find a matching certificate.
 */

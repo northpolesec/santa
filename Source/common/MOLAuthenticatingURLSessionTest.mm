@@ -72,9 +72,11 @@
   // The key can't be read at all.
   XCTAssertFalse([s privateKeyUsableWithCopyStatus:errSecItemNotFound signError:nil]);
 
-  // The key exists but its ACL doesn't allow us to use it.
+  // The key exists but we're not allowed to use it.
   XCTAssertFalse([s privateKeyUsableWithCopyStatus:errSecSuccess
                                          signError:secError(errSecInteractionNotAllowed)]);
+  XCTAssertFalse([s privateKeyUsableWithCopyStatus:errSecSuccess
+                                         signError:secError(errSecAuthFailed)]);
 
   // Failures that mean the check itself couldn't be performed fail open.
   XCTAssertTrue([s privateKeyUsableWithCopyStatus:errSecSuccess signError:secError(errSecParam)]);

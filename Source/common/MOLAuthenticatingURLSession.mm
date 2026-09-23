@@ -457,7 +457,8 @@ using ScopedSecTrustRef = santa::ScopedCFTypeRef<SecTrustRef>;
   switch (signError.code) {
     case errSecSuccess: return YES;
     case errSecInteractionNotAllowed:
-      [self log:@"[Client Trust] Private key is inaccessible"];
+    case errSecAuthFailed:
+      [self log:@"[Client Trust] Private key is inaccessible: %d", (int)signError.code];
       return NO;
     case errSecParam:
       [self log:@"[Client Trust] Neither kSecKeyAlgorithmRSASignatureRaw nor "
