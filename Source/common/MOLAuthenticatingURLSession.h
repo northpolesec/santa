@@ -62,8 +62,9 @@
   If set and client certificate authentication is needed, will search the keychain for a
   certificate matching this common name and use that for authentication.
 
-  @note Not case sensitive
-  @note If multiple matching certificates are found, the first one is used.
+  @note Case sensitive
+  @note If multiple matching certificates are found, the most recently issued one whose private
+  key can be used is chosen.
   @note If this property is not set and neither is |clientCertIssuerCn|, the allowed issuers
   provided by the server will be used to find a matching certificate.
 */
@@ -73,8 +74,9 @@
   If set and client certificate authentication is needed, will search the keychain for a
   certificate issued by an issuer with this name and use that for authentication.
 
-  @note Not case sensitive
-  @note If multiple matching certificates are found, the first one is used.
+  @note Case sensitive
+  @note If multiple matching certificates are found, the most recently issued one whose private
+        key can be used is chosen.
   @note If this property is not set and neither is |clientCertCommonName|, the allowed issuers
         provided by the server will be used to find a matching certificate.
 */

@@ -25,6 +25,7 @@
                               issuerCountryName:(NSString*)issuerCountryName
                                   issuerOrgName:(NSString*)issuerOrgName
                                   issuerOrgUnit:(NSString*)issuerOrgUnit;
+- (BOOL)privateKeyUsableWithCopyStatus:(OSStatus)copyStatus signError:(NSError*)signError;
 @end
 
 @interface MOLAuthenticatingURLSessionTest : XCTestCase
@@ -56,6 +57,29 @@
 
   NSArray* want = @[ c3, c1 ];
   XCTAssertEqualObjects(got, want, @"");
+}
+
+- (void)testPrivateKeyUsableClassification {
+  MOLAuthenticatingURLSession* s = [[MOLAuthenticatingURLSession alloc] init];
+
+  NSError* (^secError)(OSStatus) = ^NSError*(OSStatus code) {
+    return [NSError errorWithDomain:NSOSStatusErrorDomain code:code userInfo:nil];
+  };
+
+  // The key can be read and signing works.
+  XCTAssertTrue([s privateKeyUsableWithCopyStatus:errSecSuccess signError:nil]);
+
+  // The key can't be read at all.
+  XCTAssertFalse([s privateKeyUsableWithCopyStatus:errSecItemNotFound signError:nil]);
+
+  // The key exists but its ACL doesn't allow us to use it.
+  XCTAssertFalse([s privateKeyUsableWithCopyStatus:errSecSuccess
+                                         signError:secError(errSecInteractionNotAllowed)]);
+
+  // Failures that mean the check itself couldn't be performed fail open.
+  XCTAssertTrue([s privateKeyUsableWithCopyStatus:errSecSuccess signError:secError(errSecParam)]);
+  XCTAssertTrue([s privateKeyUsableWithCopyStatus:errSecSuccess
+                                        signError:secError(errSecUnimplemented)]);
 }
 
 @end
