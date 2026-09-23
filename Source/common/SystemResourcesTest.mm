@@ -24,6 +24,14 @@
 
 @implementation SystemResourcesTest
 
+- (void)setUp {
+  [super setUp];
+  // Several tests here assert an optional has a value and dereference it on the
+  // next line. continueAfterFailure defaults to YES, which would run that
+  // dereference on an empty optional. Stop at the failing assertion instead.
+  self.continueAfterFailure = NO;
+}
+
 - (void)tearDown {
   // The overrides below are declared behind #ifdef DEBUG so they cannot ship, and
   // DEBUG follows bazel's compilation mode: set under fastbuild, unset under
