@@ -24,6 +24,7 @@
 #include <vector>
 
 #include "Source/common/Memoizer.h"
+#include "Source/common/cel/AnnotationFunction.h"
 #include "Source/common/cel/CELProtoTraits.h"
 #include "Source/common/cel/PolicyForRangeFunction.h"
 #include "Source/common/cel/RelativeTimeFunction.h"
@@ -61,7 +62,8 @@ class Activation : public ::google::api::expr::runtime::BaseActivation {
   Activation(std::unique_ptr<ExecutableFileT> file, std::vector<std::string> (^args)(),
              std::map<std::string, std::string> (^envs)(), uid_t (^euid)(), std::string (^cwd)(),
              std::string (^path)(), std::vector<AncestorT> (^ancestors)(),
-             std::vector<FileDescriptorT> (^fds)(), std::function<absl::Time()> now = absl::Now)
+             std::vector<FileDescriptorT> (^fds)(), std::function<absl::Time()> now = absl::Now,
+             AnnotationHooks annotations = {})
       : file_(std::move(file)),
         args_(args),
         envs_(envs),
@@ -70,16 +72,19 @@ class Activation : public ::google::api::expr::runtime::BaseActivation {
         path_(path),
         ancestors_(ancestors),
         fds_(fds),
-        now_(std::move(now)) {};
+        now_(std::move(now)),
+        annotations_(annotations) {};
   ~Activation() = default;
 
   std::optional<::google::api::expr::runtime::CelValue> FindValue(
       absl::string_view name, google::protobuf::Arena* arena) const override;
 
-  // Vends the lazy today(), now() and policy_for_range() functions for CELv2.
-  // Resolving them here (rather than registering eager functions) keeps them out
-  // of constant folding and lets them flag the evaluation as non-cacheable, and
-  // record a pending kill, on this activation as a side effect.
+  // Vends the lazy today(), now(), policy_for_range(), add_annotation() and
+  // has_annotation() functions for CELv2. Resolving them here (rather than
+  // registering eager functions) keeps them out of constant folding, lets them
+  // flag the evaluation as non-cacheable (and record a pending kill) on this
+  // activation as a side effect, and is how the annotation functions reach the
+  // process tree.
   std::vector<const ::google::api::expr::runtime::CelFunction*> FindFunctionOverloads(
       absl::string_view name) const override;
 
@@ -89,6 +94,13 @@ class Activation : public ::google::api::expr::runtime::BaseActivation {
   // UNSPECIFIED then fails to compile.
   static std::vector<std::pair<absl::string_view, ::cel::Type>> GetVariables(
       google::protobuf::Arena* arena, bool includeUnspecified);
+
+  // Apply the annotations add_annotation() asked for, or drop them. Called by
+  // Evaluator::Evaluate with commit=true only when the expression produced a
+  // result. Always clears: one Activation is reused across every rule in a
+  // fallback batch, so a failed rule's staging must not ride along and commit
+  // with whichever later rule succeeds.
+  void FlushStagedAnnotations(bool commit) const;
 
   template <bool V2>
   friend class Evaluator;
@@ -106,6 +118,9 @@ class Activation : public ::google::api::expr::runtime::BaseActivation {
   // a time window, now() and policy_for_range(), and not to today(), which is
   // calendar truth from the system clock.
   std::function<absl::Time()> now_;
+  // Only ever read for V2: the annotation functions are not declared, not
+  // registered and not vended for V1, so a V1 activation leaves this empty.
+  AnnotationHooks annotations_;
 
   // Set during evaluation when a relative-time function (today(), now(),
   // policy_for_range()) is used, which makes the result non-cacheable. Mutable
@@ -115,11 +130,18 @@ class Activation : public ::google::api::expr::runtime::BaseActivation {
   // kill_on_expiry() policy. The earlier deadline wins if it is set more than
   // once.
   mutable std::optional<PendingKill> pendingKill_;
+  // Set during evaluation when add_annotation() or has_annotation() is used.
+  // Also makes the result non-cacheable: the answer is per-process, and a
+  // cached decision would skip add_annotation()'s write on the next exec.
+  mutable bool usedAnnotations_ = false;
   // Lazily-created implementations of the lazy functions, vended via
   // FindFunctionOverloads.
   mutable std::vector<std::unique_ptr<TodayFunction>> todayFns_;
   mutable std::unique_ptr<NowFunction> nowFn_;
   mutable std::vector<std::unique_ptr<PolicyForRangeFunction>> policyForRangeFns_;
+  mutable StagedAnnotations stagedAnnotations_;
+  mutable std::vector<std::unique_ptr<HasAnnotationFunction>> hasAnnotationFns_;
+  mutable std::vector<std::unique_ptr<AddAnnotationFunction>> addAnnotationFns_;
 
   bool IsResultCacheable() const;
 

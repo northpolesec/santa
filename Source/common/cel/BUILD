@@ -26,18 +26,22 @@ objc_library(
     name = "CEL",
     srcs = [
         "Activation.mm",
+        "AnnotationFunction.mm",
         "Evaluator.mm",
         "PolicyForRangeFunction.mm",
         "RelativeTimeFunction.mm",
+        "ResultPath.mm",
         "TouchIDFunction.mm",
     ],
     hdrs = [
         "Activation.h",
+        "AnnotationFunction.h",
         "CELPlanCache.h",
         "CELProtoTraits.h",
         "Evaluator.h",
         "PolicyForRangeFunction.h",
         "RelativeTimeFunction.h",
+        "ResultPath.h",
         "TouchIDFunction.h",
     ],
     deps = [

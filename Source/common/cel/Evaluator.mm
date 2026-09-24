@@ -31,6 +31,7 @@
 #include "parser/parser.h"
 
 #include "Source/common/cel/Activation.h"
+#include "Source/common/cel/AnnotationFunction.h"
 #include "Source/common/cel/PolicyForRangeFunction.h"
 #include "Source/common/cel/RelativeTimeFunction.h"
 #include "Source/common/cel/TouchIDFunction.h"
@@ -69,6 +70,11 @@ static absl::StatusOr<std::unique_ptr<::cel::Compiler>> CreateCompiler(
       return result;
     }
     if (auto result = santa::cel::AddRelativeTimeCompilerLibrary(*builder); !result.ok()) {
+      return result;
+    }
+    // Declared for rules and fallbacks alike: a fallback testing an annotation
+    // a rule stamped is the main reason these exist.
+    if (auto result = santa::cel::AddAnnotationCompilerLibrary(*builder); !result.ok()) {
       return result;
     }
     // policy_for_range() is declared for rules only: a fallback expression has
@@ -170,6 +176,10 @@ absl::StatusOr<std::unique_ptr<::cel_runtime::CelExpression>> Evaluator<IsV2>::C
         !result.ok()) {
       return result;
     }
+    if (auto result = santa::cel::RegisterAnnotationFunctions(builder->GetRegistry(), options);
+        !result.ok()) {
+      return result;
+    }
     // Matches the declarations above: only an evaluator for rules has
     // policy_for_range() and kill_on_expiry().
     if (!allowUnspecified_) {
@@ -190,6 +200,24 @@ absl::StatusOr<std::unique_ptr<::cel_runtime::CelExpression>> Evaluator<IsV2>::C
 
 template <bool IsV2>
 absl::StatusOr<typename Evaluator<IsV2>::EvaluationResultT> Evaluator<IsV2>::Evaluate(
+    const ::cel_runtime::CelExpression* expression_plan, const ActivationT& activation,
+    google::protobuf::Arena* arena) {
+  absl::StatusOr<EvaluationResultT> result = EvaluateChecked(expression_plan, activation, arena);
+
+  // add_annotation() stages its writes rather than applying them as it runs.
+  // Apply them only now, and only if the expression as a whole produced a
+  // result: CEL evaluates call arguments eagerly, so an add_annotation() can
+  // succeed inside an expression that then fails, and with fail-closed off the
+  // failed evaluation falls through to the fallbacks -- which would read an
+  // annotation no successful rule ever asked for.
+  if constexpr (IsV2) {
+    activation.FlushStagedAnnotations(result.ok());
+  }
+  return result;
+}
+
+template <bool IsV2>
+absl::StatusOr<typename Evaluator<IsV2>::EvaluationResultT> Evaluator<IsV2>::EvaluateChecked(
     const ::cel_runtime::CelExpression* expression_plan, const ActivationT& activation,
     google::protobuf::Arena* arena) {
   // The kill sink is per-evaluation: a reused activation must not return an

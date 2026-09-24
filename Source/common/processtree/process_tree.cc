@@ -64,6 +64,11 @@ void ProcessTree::BackfillInsertChildren(
       parent);
   {
     absl::MutexLock lock(mtx_);
+    if (parent) {
+      // Nothing is annotated during backfill (the tree is brand new and no rule
+      // has run yet), but keep the invariant in one place rather than three.
+      PropagateAnnotationsLocked(*parent, *proc, /*across_exec=*/false);
+    }
     map_.emplace(backfilled_proc.pid, proc);
   }
 
@@ -105,13 +110,17 @@ void ProcessTree::HandleFork(uint64_t timestamp,
     if (on_event_claimed_for_test_) {
       on_event_claimed_for_test_();
     }
+    // Inside the same hold as the insert, deliberately: a client that skips
+    // this event as a duplicate must never see the child without the
+    // annotations it inherits. See Annotator::Propagate.
+    PropagateAnnotationsLocked(*parent, *child, /*across_exec=*/false);
     map_.emplace(new_pid, child);
     // Reap AFTER applying, so a late event can never reap the actor it needs.
     DrainRemovals();
   }
-  // Annotators run outside the lock (they re-enter the tree). Annotation
-  // propagation is therefore NOT atomic with the structural insert above; that
-  // is intentional and does not affect CEL ancestry (see StepLocked).
+  // Registered annotators run outside the lock (they re-enter the tree), so
+  // what they add is NOT atomic with the structural insert above. That is why
+  // anything an authorization decision reads inherits via Propagate() instead.
   for (const auto& annotator : annotators_) {
     annotator->AnnotateFork(*this, *parent, *child);
   }
@@ -140,6 +149,7 @@ void ProcessTree::HandleExec(uint64_t timestamp, const Process& p,
       return;
     }
     remove_at_.push({timestamp, p.pid_});
+    PropagateAnnotationsLocked(p, *new_proc, /*across_exec=*/true);
     map_.emplace(new_proc->pid_, new_proc);
     DrainRemovals();
   }
@@ -227,17 +237,20 @@ void ProcessTree::DrainRemovals() {
   }
 }
 
-void ProcessTree::RetainProcess(const PidList& pids) {
+PidList ProcessTree::RetainProcess(const PidList& pids) {
   // Reader lock suffices: we only need the map to be stable for lookup.
   // relaxed is safe because the increment has no dependent memory operations —
   // we are only bumping a counter.
+  PidList retained;
   absl::ReaderMutexLock lock(mtx_);
   for (const struct Pid& p : pids) {
     auto proc = GetLocked(p);
     if (proc) {
       (*proc)->refcnt_.fetch_add(1, std::memory_order_relaxed);
+      retained.push_back(p);
     }
   }
+  return retained;
 }
 
 void ProcessTree::ReleaseProcess(const PidList& pids) {
@@ -282,21 +295,58 @@ Annotation get/set
 ---
 */
 
+void ProcessTree::PropagateAnnotationsLocked(const Process& from, Process& to,
+                                             bool across_exec) {
+  if (from.annotations_.empty()) {
+    return;
+  }
+
+  for (const auto& [key, annotation] : from.annotations_) {
+    if (annotation->PropagatesWholly(across_exec)) {
+      // Share the ancestor's object. The descendant inherits it unchanged, and
+      // annotations are immutable, so copying it would allocate inside this
+      // critical section to produce something equal. See
+      // Annotator::PropagatesWholly.
+      to.annotations_.insert_or_assign(key, annotation);
+    } else if (auto next = annotation->Propagate(across_exec)) {
+      to.annotations_.insert_or_assign(key, std::move(next));
+    }
+  }
+}
+
 void ProcessTree::AnnotateProcess(const Process& p,
                                   std::shared_ptr<const Annotator> a) {
   absl::MutexLock lock(mtx_);
+  auto it = map_.find(p.pid_);
+  if (it == map_.end()) {
+    return;
+  }
   const Annotator& x = *a;
-  map_[p.pid_]->annotations_.emplace(std::type_index(typeid(x)), std::move(a));
+  it->second->annotations_.emplace(std::type_index(typeid(x)), std::move(a));
 }
 
 std::optional<::santa::pb::v1::process_tree::Annotations>
 ProcessTree::ExportAnnotations(const Pid p) {
-  auto proc = Get(p);
-  if (!proc || (*proc)->annotations_.empty()) {
-    return std::nullopt;
+  // Copy the handles out under the lock, then build the proto after releasing
+  // it. Proto() is virtual, allocates, and runs once per process per logged
+  // event; leaving it inside the critical section would block fork/exec ingest
+  // on telemetry serialization.
+  absl::InlinedVector<std::shared_ptr<const Annotator>, 2> annotations;
+  {
+    absl::ReaderMutexLock lock(mtx_);
+    auto proc = GetLocked(p);
+    // Already under the lock, so read the map directly rather than the flag.
+    if (!proc || (*proc)->annotations_.empty()) {
+      return std::nullopt;
+    }
+    annotations.reserve((*proc)->annotations_.size());
+    for (const auto& [_, annotation] : (*proc)->annotations_) {
+      annotations.push_back(annotation);
+    }
   }
+
   ::santa::pb::v1::process_tree::Annotations a;
-  for (const auto& [_, annotation] : (*proc)->annotations_) {
+  for (const auto& annotation : annotations) {
     if (auto x = annotation->Proto(); x) a.MergeFrom(*x);
   }
   return a;
@@ -378,11 +428,13 @@ absl::StatusOr<std::shared_ptr<ProcessTree>> CreateTree(
     std::vector<std::unique_ptr<Annotator>> annotations) {
   absl::flat_hash_set<std::type_index> seen;
   for (const auto& annotator : annotations) {
-    if (seen.count(std::type_index(typeid(annotator)))) {
+    // Dereference: typeid on the unique_ptr itself is the same static type for
+    // every element, so every pair of annotators would collide.
+    const Annotator& x = *annotator;
+    if (!seen.emplace(std::type_index(typeid(x))).second) {
       return absl::InvalidArgumentError(
           "Multiple annotators of the same class");
     }
-    seen.emplace(std::type_index(typeid(annotator)));
   }
 
   auto tree = std::make_shared<ProcessTree>(std::move(annotations));
@@ -399,9 +451,13 @@ Tokens
 */
 
 ProcessToken::ProcessToken(std::shared_ptr<ProcessTree> tree, PidList pids)
-    : state_(std::make_shared<State>(std::move(tree), std::move(pids))) {
+    : state_(std::make_shared<State>(std::move(tree), PidList{})) {
   if (state_->tree) {
-    state_->tree->RetainProcess(state_->pids);
+    // Remember what was retained, not what was asked for. A pid missing now can
+    // be inserted by another client before this token dies, and releasing it
+    // then would decrement a count this token never incremented -- enough to
+    // erase a process a different, valid token is still holding.
+    state_->pids = state_->tree->RetainProcess(pids);
   }
 }
 

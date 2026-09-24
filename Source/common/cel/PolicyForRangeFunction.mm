@@ -14,6 +14,8 @@
 
 #include "Source/common/cel/PolicyForRangeFunction.h"
 
+#include "Source/common/cel/ResultPath.h"
+
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -323,14 +325,13 @@ bool ValidatePlacement(::cel::ValidationContext& context, const ::cel::Navigable
         "kill_on_expiry() may only be used as the in-range policy of policy_for_range()");
     return false;
   }
-  for (const ::cel::NavigableAstNode* node = range; node->parent() != nullptr;
-       node = node->parent()) {
-    if (!IsCall(*node->parent()->expr(), "_?_:_") || node->child_index() == 0) {
-      context.ReportErrorAt(
-          range->expr()->id(),
-          "a policy_for_range() using kill_on_expiry() must produce the rule's result");
-      return false;
-    }
+  // Ternary branches and add_annotation()'s policy slot both hand the value
+  // straight back, so either keeps the kill attached to the rule's decision.
+  if (!IsOnResultPath(*range)) {
+    context.ReportErrorAt(
+        range->expr()->id(),
+        "a policy_for_range() using kill_on_expiry() must produce the rule's result");
+    return false;
   }
   return true;
 }

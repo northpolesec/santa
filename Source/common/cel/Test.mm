@@ -27,6 +27,7 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -50,7 +51,7 @@ namespace {
 // case that isn't about the clock wants.
 template <bool IsV2>
 std::unique_ptr<santa::cel::Activation<IsV2>> MakeActivation(
-    std::function<absl::Time()> now = absl::Now) {
+    std::function<absl::Time()> now = absl::Now, santa::cel::AnnotationHooks annotations = {}) {
   using ExecutableFileT = typename santa::cel::CELProtoTraits<IsV2>::ExecutableFileT;
   using AncestorT = typename santa::cel::CELProtoTraits<IsV2>::AncestorT;
   using FileDescriptorT = typename santa::cel::CELProtoTraits<IsV2>::FileDescriptorT;
@@ -78,8 +79,26 @@ std::unique_ptr<santa::cel::Activation<IsV2>> MakeActivation(
       ^std::vector<FileDescriptorT>() {
         return {};
       },
-      std::move(now));
+      std::move(now), std::move(annotations));
 }
+
+// Stands in for the process tree: answers has_annotation() from a set and
+// records what add_annotation() stamped.
+struct FakeAnnotations {
+  std::set<std::string> present;
+  std::vector<std::pair<std::string, santa::cel::AnnotationPropagation>> added;
+
+  santa::cel::AnnotationHooks Hooks() {
+    return {
+        .has = [this](const std::string& name) { return present.count(name) > 0; },
+        .add =
+            [this](const std::string& name, santa::cel::AnnotationPropagation propagation) {
+              added.push_back({name, propagation});
+              present.insert(name);
+            },
+    };
+  }
+};
 
 constexpr int kMinutesPerDay = 24 * 60;
 
@@ -2039,6 +2058,441 @@ class ScopedHostZone {
           ->CompileAndEvaluate("policy_for_range(duration('30m'), kill_on_expiry(ALLOWLIST))",
                                *activation)
           .ok());
+}
+
+- (void)testHasAnnotation {
+  using ReturnValue = santa::cel::CELProtoTraits<true>::ReturnValue;
+
+  auto sut = santa::cel::Evaluator<true>::Create();
+  XCTAssertTrue(sut.ok());
+
+  FakeAnnotations annotations;
+  auto evaluate = [&](absl::string_view expr) {
+    auto activation = MakeActivation<true>(absl::Now, annotations.Hooks());
+    return sut.value()->CompileAndEvaluate(expr, *activation);
+  };
+
+  {
+    auto result = evaluate("has_annotation('BAZEL-CALL') ? ALLOWLIST_COMPILER : BLOCKLIST");
+    if (!result.ok()) {
+      XCTFail(@"Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::BLOCKLIST);
+      // Annotations are per-process, so the answer must never be cached.
+      XCTAssertFalse(result.value().cacheable);
+    }
+  }
+
+  annotations.present.insert("BAZEL-CALL");
+
+  {
+    auto result = evaluate("has_annotation('BAZEL-CALL') ? ALLOWLIST_COMPILER : BLOCKLIST");
+    if (!result.ok()) {
+      XCTFail(@"Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST_COMPILER);
+      XCTAssertFalse(result.value().cacheable);
+    }
+  }
+}
+
+- (void)testAddAnnotation {
+  using ReturnValue = santa::cel::CELProtoTraits<true>::ReturnValue;
+  using Propagation = santa::cel::AnnotationPropagation;
+
+  auto sut = santa::cel::Evaluator<true>::Create();
+  XCTAssertTrue(sut.ok());
+
+  FakeAnnotations annotations;
+  auto evaluate = [&](absl::string_view expr) {
+    auto activation = MakeActivation<true>(absl::Now, annotations.Hooks());
+    return sut.value()->CompileAndEvaluate(expr, *activation);
+  };
+
+  {
+    // The policy argument comes back untouched, and the annotation is recorded
+    // with the propagation asked for.
+    auto result = evaluate("add_annotation('BAZEL-CALL', FORK_AND_EXEC, ALLOWLIST_COMPILER)");
+    if (!result.ok()) {
+      XCTFail(@"Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST_COMPILER);
+      XCTAssertFalse(result.value().cacheable);
+    }
+    XCTAssertEqual(annotations.added.size(), 1u);
+    XCTAssertEqual(annotations.added[0].first, "BAZEL-CALL");
+    XCTAssertTrue(annotations.added[0].second == Propagation::kForkAndExec);
+  }
+
+  annotations.added.clear();
+
+  {
+    // Every propagation name resolves.
+    for (const auto& [name, propagation] : santa::cel::kAnnotationPropagationNames) {
+      annotations.added.clear();
+      auto result = evaluate(absl::StrCat("add_annotation('MARK', ", name, ", ALLOWLIST)"));
+      if (!result.ok()) {
+        XCTFail(@"Failed to evaluate %s: %s", std::string(name).c_str(),
+                result.status().message().data());
+        continue;
+      }
+      XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
+      XCTAssertEqual(annotations.added.size(), 1u);
+      XCTAssertTrue(annotations.added[0].second == propagation);
+    }
+  }
+
+  {
+    // A composite policy keeps its fields on the way through.
+    auto result = evaluate("add_annotation('MARK', require_touchid_with_cooldown_minutes(30))");
+    if (!result.ok()) {
+      XCTFail(@"Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::REQUIRE_TOUCHID);
+      XCTAssertTrue(result.value().touchIDCooldownMinutes.has_value());
+      XCTAssertEqual(*result.value().touchIDCooldownMinutes, 30u);
+    }
+  }
+
+  {
+    // A propagation value that is not one of the names is an error, not a
+    // silently-dropped annotation.
+    XCTAssertFalse(evaluate("add_annotation('MARK', 99, ALLOWLIST)").ok());
+  }
+}
+
+- (void)testAddAnnotationDefaultPropagation {
+  using ReturnValue = santa::cel::CELProtoTraits<true>::ReturnValue;
+  using Propagation = santa::cel::AnnotationPropagation;
+
+  auto sut = santa::cel::Evaluator<true>::Create();
+  XCTAssertTrue(sut.ok());
+
+  FakeAnnotations annotations;
+  auto activation = MakeActivation<true>(absl::Now, annotations.Hooks());
+  auto result =
+      sut.value()->CompileAndEvaluate("add_annotation('BAZEL-CALL', ALLOWLIST)", *activation);
+  if (!result.ok()) {
+    XCTFail(@"Failed to evaluate: %s", result.status().message().data());
+    return;
+  }
+  XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
+  XCTAssertEqual(annotations.added.size(), 1u);
+  XCTAssertTrue(annotations.added[0].second == Propagation::kForkAndExec);
+}
+
+- (void)testAddAnnotationList {
+  using ReturnValue = santa::cel::CELProtoTraits<true>::ReturnValue;
+  using Propagation = santa::cel::AnnotationPropagation;
+
+  auto sut = santa::cel::Evaluator<true>::Create();
+  XCTAssertTrue(sut.ok());
+
+  FakeAnnotations annotations;
+  auto evaluate = [&](absl::string_view expr) {
+    auto activation = MakeActivation<true>(absl::Now, annotations.Hooks());
+    return sut.value()->CompileAndEvaluate(expr, *activation);
+  };
+
+  {
+    // Every name in the list is stamped, all with the given propagation, and
+    // the policy still comes back untouched.
+    auto result = evaluate("add_annotation(['A', 'B', 'C'], EXEC_ONLY, ALLOWLIST_COMPILER)");
+    if (!result.ok()) {
+      XCTFail(@"Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST_COMPILER);
+      XCTAssertFalse(result.value().cacheable);
+    }
+    XCTAssertEqual(annotations.added.size(), 3u);
+    XCTAssertEqual(annotations.added[0].first, "A");
+    XCTAssertEqual(annotations.added[1].first, "B");
+    XCTAssertEqual(annotations.added[2].first, "C");
+    for (const auto& [_, propagation] : annotations.added) {
+      XCTAssertTrue(propagation == Propagation::kExecOnly);
+    }
+  }
+
+  annotations.added.clear();
+
+  {
+    // The two-argument list form defaults to FORK_AND_EXEC, like the scalar one.
+    auto result = evaluate("add_annotation(['D', 'E'], ALLOWLIST)");
+    if (!result.ok()) {
+      XCTFail(@"Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
+    }
+    XCTAssertEqual(annotations.added.size(), 2u);
+    for (const auto& [_, propagation] : annotations.added) {
+      XCTAssertTrue(propagation == Propagation::kForkAndExec);
+    }
+  }
+
+  annotations.added.clear();
+
+  {
+    // An empty list stamps nothing and still returns the policy.
+    auto result = evaluate("add_annotation([], ALLOWLIST)");
+    if (!result.ok()) {
+      XCTFail(@"Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
+    }
+    XCTAssertTrue(annotations.added.empty());
+  }
+
+  annotations.added.clear();
+
+  {
+    // A heterogeneous list still type-checks, because CEL infers list(dyn) and
+    // that satisfies the list(string) parameter. So the runtime element check is
+    // what rejects it, and it has to reject the whole call: 'A' precedes the
+    // offending element but must not be left stamped.
+    XCTAssertFalse(evaluate("add_annotation(['A', 2], ALLOWLIST)").ok());
+    XCTAssertTrue(annotations.added.empty());
+  }
+
+  {
+    // Both shapes resolve in one expression.
+    annotations.added.clear();
+    auto result = evaluate("has_annotation('X') ? add_annotation('solo', ALLOWLIST) "
+                           ": add_annotation(['F', 'G'], NONE, BLOCKLIST)");
+    if (!result.ok()) {
+      XCTFail(@"Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::BLOCKLIST);
+    }
+    XCTAssertEqual(annotations.added.size(), 2u);
+    XCTAssertEqual(annotations.added[0].first, "F");
+  }
+}
+
+// CEL lets a dyn expression satisfy the declared Result parameter, so a policy
+// argument that is some other message still type-checks and still dispatches
+// here. It must be rejected before anything is stamped: Evaluator only rejects
+// it afterwards, and with fail-closed off the failed evaluation falls through
+// to the fallbacks, where has_annotation() would see the stray annotation.
+- (void)testAddAnnotationRejectsANonPolicyArgument {
+  auto sut = santa::cel::Evaluator<true>::Create();
+  XCTAssertTrue(sut.ok());
+
+  FakeAnnotations annotations;
+  auto evaluate = [&](absl::string_view expr) {
+    auto activation = MakeActivation<true>(absl::Now, annotations.Hooks());
+    return sut.value()->CompileAndEvaluate(expr, *activation);
+  };
+
+  // `target` is an ExecutableFile, not a Result, but the list literal erases
+  // that to dyn and both messages are kStruct at runtime.
+  XCTAssertFalse(evaluate("add_annotation('X', [target, ALLOWLIST][0])").ok());
+  XCTAssertTrue(annotations.added.empty());
+
+  XCTAssertFalse(
+      evaluate("add_annotation(['X', 'Y'], FORK_AND_EXEC, [target, ALLOWLIST][0])").ok());
+  XCTAssertTrue(annotations.added.empty());
+
+  // The well-typed form still works.
+  auto ok = evaluate("add_annotation('X', ALLOWLIST)");
+  XCTAssertTrue(ok.ok());
+  XCTAssertEqual(annotations.added.size(), 1u);
+}
+
+// CEL evaluates call arguments eagerly, so an add_annotation() can finish
+// inside an expression that then fails. Nothing may be stamped in that case:
+// with fail-closed off the failed evaluation falls through to the fallbacks,
+// which would otherwise read an annotation no successful rule asked for.
+- (void)testAddAnnotationIsNotAppliedWhenTheExpressionFails {
+  auto sut = santa::cel::Evaluator<true>::Create();
+  XCTAssertTrue(sut.ok());
+
+  FakeAnnotations annotations;
+  auto evaluate = [&](absl::string_view expr) {
+    auto activation = MakeActivation<true>(absl::Now, annotations.Hooks());
+    return sut.value()->CompileAndEvaluate(expr, *activation);
+  };
+
+  // The inner call succeeds and the outer one rejects propagation 99.
+  XCTAssertFalse(
+      evaluate("add_annotation('OUTER', 99, add_annotation('TRUSTED', ALLOWLIST))").ok());
+  XCTAssertTrue(annotations.added.empty());
+
+  // Any later failure does it too, not just a bad propagation.
+  XCTAssertFalse(evaluate("add_annotation('X', ALLOWLIST) == ALLOWLIST ? [1][5] : ALLOWLIST").ok());
+  XCTAssertTrue(annotations.added.empty());
+
+  // A nested pair that does succeed applies both.
+  auto ok = evaluate("add_annotation('OUTER', add_annotation('INNER', ALLOWLIST))");
+  XCTAssertTrue(ok.ok());
+  XCTAssertEqual(annotations.added.size(), 2u);
+}
+
+// One Activation is reused for every rule in a fallback batch, so a failed
+// rule's staging must not ride along and apply with a later rule that succeeds.
+- (void)testFailedEvaluationDoesNotLeakStagingIntoTheNextOne {
+  auto sut = santa::cel::Evaluator<true>::Create();
+  XCTAssertTrue(sut.ok());
+
+  FakeAnnotations annotations;
+  auto activation = MakeActivation<true>(absl::Now, annotations.Hooks());
+
+  XCTAssertFalse(
+      sut.value()
+          ->CompileAndEvaluate("add_annotation('LEAKED', 99, add_annotation('ALSO', ALLOWLIST))",
+                               *activation)
+          .ok());
+  XCTAssertTrue(annotations.added.empty());
+
+  auto second = sut.value()->CompileAndEvaluate("add_annotation('WANTED', ALLOWLIST)", *activation);
+  XCTAssertTrue(second.ok());
+  XCTAssertEqual(annotations.added.size(), 1u);
+  XCTAssertEqual(annotations.added[0].first, "WANTED");
+}
+
+// add_annotation() has to be one of the values the rule can return. Eager
+// argument evaluation means one tucked into a policy_for_range() slot would
+// stamp even when that slot is not the one selected.
+- (void)testAddAnnotationMustBeOnTheResultPath {
+  auto sut = santa::cel::Evaluator<true>::Create();
+  XCTAssertTrue(sut.ok());
+
+  FakeAnnotations annotations;
+  auto evaluate = [&](absl::string_view expr) {
+    auto activation = MakeActivation<true>(absl::Now, annotations.Hooks());
+    return sut.value()->CompileAndEvaluate(expr, *activation);
+  };
+
+  // Rejected: an unselected argument of a timed policy.
+  XCTAssertFalse(evaluate("policy_for_range(now() + duration('1h'), now() + duration('2h'), "
+                          "add_annotation('TRUSTED', ALLOWLIST), BLOCKLIST)")
+                     .ok());
+  XCTAssertTrue(annotations.added.empty());
+
+  // Rejected: evaluated for a comparison, not returned.
+  XCTAssertFalse(evaluate("add_annotation('X', ALLOWLIST) == ALLOWLIST").ok());
+
+  // Accepted: a ternary branch, and wrapping the returned policy.
+  XCTAssertTrue(evaluate("euid == 0 ? add_annotation('X', ALLOWLIST) : BLOCKLIST").ok());
+  XCTAssertTrue(evaluate("add_annotation('X', policy_for_range(now() - duration('1h'), "
+                         "now() + duration('1h'), ALLOWLIST, BLOCKLIST))")
+                    .ok());
+}
+
+// add_annotation() is transparent, so wrapping a timed-kill rule in one still
+// produces the rule's result and must stay valid.
+- (void)testAnnotationWrapperDoesNotBreakKillOnExpiry {
+  auto sut = santa::cel::Evaluator<true>::Create();
+  XCTAssertTrue(sut.ok());
+
+  FakeAnnotations annotations;
+  auto evaluate = [&](absl::string_view expr) {
+    auto activation = MakeActivation<true>(absl::Now, annotations.Hooks());
+    return sut.value()->CompileAndEvaluate(expr, *activation);
+  };
+
+  auto bare = evaluate("policy_for_range(duration('60s'), kill_on_expiry(ALLOWLIST))");
+  XCTAssertTrue(bare.ok());
+
+  auto wrapped = evaluate("add_annotation('TRUSTED', policy_for_range(duration('60s'), "
+                          "kill_on_expiry(ALLOWLIST)))");
+  if (!wrapped.ok()) {
+    XCTFail(@"wrapping a timed-kill rule should stay valid: %s",
+            std::string(wrapped.status().message()).c_str());
+  } else {
+    XCTAssertEqual(wrapped.value().value, bare.value().value);
+  }
+
+  // Still rejected where the kill would not be the rule's decision.
+  XCTAssertFalse(evaluate("has_annotation(string(policy_for_range(duration('60s'), "
+                          "kill_on_expiry(ALLOWLIST))))")
+                     .ok());
+}
+
+- (void)testAddAnnotationOnlyRunsOnTheTakenBranch {
+  using ReturnValue = santa::cel::CELProtoTraits<true>::ReturnValue;
+
+  auto sut = santa::cel::Evaluator<true>::Create();
+  XCTAssertTrue(sut.ok());
+
+  FakeAnnotations annotations;
+  auto activation = MakeActivation<true>(absl::Now, annotations.Hooks());
+  auto result = sut.value()->CompileAndEvaluate(
+      "euid == 1234 ? add_annotation('MARK', FORK_AND_EXEC, ALLOWLIST) : BLOCKLIST", *activation);
+  if (!result.ok()) {
+    XCTFail(@"Failed to evaluate: %s", result.status().message().data());
+    return;
+  }
+  XCTAssertEqual(result.value().value, ReturnValue::BLOCKLIST);
+  XCTAssertTrue(annotations.added.empty());
+}
+
+- (void)testAnnotationsWithoutHooks {
+  using ReturnValue = santa::cel::CELProtoTraits<true>::ReturnValue;
+
+  auto sut = santa::cel::Evaluator<true>::Create();
+  XCTAssertTrue(sut.ok());
+
+  // No process tree (santactl, tests): has_annotation() is false and
+  // add_annotation() still passes its policy through.
+  {
+    auto activation = MakeActivation<true>();
+    auto result = sut.value()->CompileAndEvaluate("has_annotation('MARK') ? ALLOWLIST : BLOCKLIST",
+                                                  *activation);
+    XCTAssertTrue(result.ok());
+    XCTAssertEqual(result.value().value, ReturnValue::BLOCKLIST);
+  }
+  {
+    auto activation = MakeActivation<true>();
+    auto result = sut.value()->CompileAndEvaluate(
+        "add_annotation('MARK', FORK_AND_EXEC, ALLOWLIST)", *activation);
+    XCTAssertTrue(result.ok());
+    XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
+  }
+}
+
+- (void)testAnnotationsAvailableInFallback {
+  using ReturnValue = santa::cel::CELProtoTraits<true>::ReturnValue;
+
+  // A fallback expression is the main consumer of has_annotation(), so it is
+  // declared for the allowUnspecified evaluator too (unlike policy_for_range).
+  auto sut = santa::cel::Evaluator<true>::Create(/*allowUnspecified=*/true);
+  XCTAssertTrue(sut.ok());
+
+  FakeAnnotations annotations;
+  annotations.present.insert("BAZEL-CALL");
+  auto activation = MakeActivation<true>(absl::Now, annotations.Hooks());
+
+  auto result = sut.value()->CompileAndEvaluate(
+      "has_annotation('BAZEL-CALL') ? ALLOWLIST_COMPILER : UNSPECIFIED", *activation);
+  if (!result.ok()) {
+    XCTFail(@"Failed to evaluate: %s", result.status().message().data());
+    return;
+  }
+  XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST_COMPILER);
+  XCTAssertFalse(result.value().cacheable);
+}
+
+// Annotations are CELv2 only: neither function, and neither of the propagation
+// identifiers, exists for V1.
+- (void)testAnnotationsNotAvailableInV1 {
+  auto sut = santa::cel::Evaluator<false>::Create();
+  XCTAssertTrue(sut.ok());
+
+  std::vector<std::string> exprs = {
+      "has_annotation('MARK')",
+      "add_annotation('MARK', ALLOWLIST)",
+      "add_annotation('MARK', FORK_AND_EXEC, ALLOWLIST)",
+  };
+  for (const auto& [name, _] : santa::cel::kAnnotationPropagationNames) {
+    // A bare propagation identifier is not a V1 variable either.
+    exprs.push_back(absl::StrCat(name, " == 0 ? ALLOWLIST : BLOCKLIST"));
+  }
+
+  for (const auto& expr : exprs) {
+    auto activation = MakeActivation<false>();
+    XCTAssertFalse(sut.value()->CompileAndEvaluate(expr, *activation).ok(),
+                   @"%s unexpectedly compiled under CELv1", expr.c_str());
+  }
 }
 
 @end
