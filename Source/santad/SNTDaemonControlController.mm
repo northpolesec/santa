@@ -691,6 +691,10 @@ static NSString* TAMUsernameForUID(uid_t uid) {
       [configurator setSyncServerClientMode:m];
     }];
 
+    [result executableIntegrityPolicy:^(SNTExecutableIntegrityPolicy p) {
+      [configurator setSyncServerExecutableIntegrityPolicy:p];
+    }];
+
     [result syncType:^(SNTSyncType val) {
       [configurator setSyncTypeRequired:val];
     }];

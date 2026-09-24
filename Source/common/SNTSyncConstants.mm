@@ -107,6 +107,7 @@ NSString* const kCertValidUntil = @"valid_until";
 NSString* const kTeamID = @"team_id";
 NSString* const kSigningID = @"signing_id";
 NSString* const kCDHash = @"cdhash";
+NSString* const kIdentityUnverified = @"identity_unverified";
 NSString* const kQuarantineDataURL = @"quarantine_data_url";
 NSString* const kQuarantineRefererURL = @"quarantine_referer_url";
 NSString* const kQuarantineTimestamp = @"quarantine_timestamp";

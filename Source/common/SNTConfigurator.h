@@ -51,6 +51,17 @@
 - (void)setSyncServerClientMode:(SNTClientMode)newMode;
 
 ///
+///  The policy applied when the file backing an execution cannot be confirmed to be the image the
+///  kernel loaded. Defaults to BlockChanged. Never returns Unknown.
+///
+@property(readonly, nonatomic) SNTExecutableIntegrityPolicy executableIntegrityPolicy;
+
+///
+///  Set the ExecutableIntegrityPolicy as received from a sync server.
+///
+- (void)setSyncServerExecutableIntegrityPolicy:(SNTExecutableIntegrityPolicy)policy;
+
+///
 ///  Enable Fail Close mode. Defaults to NO.
 ///  This controls Santa's behavior when a failure occurs, such as an
 ///  inability to read a file and as a default response when deadlines

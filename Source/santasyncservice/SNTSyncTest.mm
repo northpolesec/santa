@@ -534,6 +534,79 @@
                  SNTNetworkFlowDefaultActionDeny);
 }
 
+- (void)testPreflightExecutableIntegrityPolicy {
+  // executable_integrity_policy is a sync v2-only field.
+  if (!self.syncState.isSyncV2) return;
+
+  [self setupDefaultDaemonConnResponses];
+  SNTSyncPreflight* sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
+
+  NSData* respData =
+      [@"{\"client_mode\": \"LOCKDOWN\", \"batch_size\": 100, "
+       @"\"executable_integrity_policy\": \"REPORT\"}" dataUsingEncoding:NSUTF8StringEncoding];
+
+  [self stubRequestBody:respData response:nil error:nil validateBlock:nil];
+
+  XCTAssertTrue([sut sync]);
+  XCTAssertEqual(self.syncState.executableIntegrityPolicy, SNTExecutableIntegrityPolicyReport);
+}
+
+- (void)testPreflightExecutableIntegrityPolicyAbsent {
+  [self setupDefaultDaemonConnResponses];
+  SNTSyncPreflight* sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
+
+  NSData* respData = [@"{\"client_mode\": \"LOCKDOWN\", \"batch_size\": 100}"
+      dataUsingEncoding:NSUTF8StringEncoding];
+
+  [self stubRequestBody:respData response:nil error:nil validateBlock:nil];
+
+  XCTAssertTrue([sut sync]);
+  XCTAssertEqual(self.syncState.clientMode, SNTClientModeLockdown);
+  XCTAssertEqual(self.syncState.executableIntegrityPolicy, SNTExecutableIntegrityPolicyUnknown);
+}
+
+- (void)testPreflightExecutableIntegrityPolicyUnspecifiedOrUnknownValueLeavesSyncStateUnset {
+  if (!self.syncState.isSyncV2) return;
+
+  for (NSString* value in @[ @"\"EXECUTABLE_INTEGRITY_POLICY_UNSPECIFIED\"", @"99" ]) {
+    [self setupDefaultDaemonConnResponses];
+    // Non-default seed: catches an arm that writes Unknown back.
+    self.syncState.executableIntegrityPolicy = SNTExecutableIntegrityPolicyReport;
+    SNTSyncPreflight* sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
+
+    NSData* respData =
+        [[NSString stringWithFormat:@"{\"client_mode\": \"LOCKDOWN\", \"batch_size\": 100, "
+                                    @"\"executable_integrity_policy\": %@}",
+                                    value] dataUsingEncoding:NSUTF8StringEncoding];
+
+    [self stubRequestBody:respData response:nil error:nil validateBlock:nil];
+
+    XCTAssertTrue([sut sync]);
+    XCTAssertEqual(self.syncState.clientMode, SNTClientModeLockdown);
+    XCTAssertEqual(self.syncState.executableIntegrityPolicy, SNTExecutableIntegrityPolicyReport,
+                   @"executable_integrity_policy: %@", value);
+  }
+}
+
+- (void)testPreflightExecutableIntegrityPolicyNeverSetBySyncV1 {
+  if (self.syncState.isSyncV2) return;
+
+  [self setupDefaultDaemonConnResponses];
+  SNTSyncPreflight* sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
+
+  NSData* respData =
+      [@"{\"client_mode\": \"LOCKDOWN\", \"batch_size\": 100, "
+       @"\"executable_integrity_policy\": \"REPORT\"}" dataUsingEncoding:NSUTF8StringEncoding];
+
+  [self stubRequestBody:respData response:nil error:nil validateBlock:nil];
+
+  XCTAssertTrue([sut sync]);
+  // Proof the v1 path actually ran and applied the rest of the response.
+  XCTAssertEqual(self.syncState.clientMode, SNTClientModeLockdown);
+  XCTAssertEqual(self.syncState.eventBatchSize, 100);
+  XCTAssertEqual(self.syncState.executableIntegrityPolicy, SNTExecutableIntegrityPolicyUnknown);
+}
+
 - (void)testReschedulePreflightFail {
   // Have SNTSyncPreflight return mock obejcts
   id mockPreflight = OCMClassMock([SNTSyncPreflight class]);
@@ -2137,6 +2210,76 @@
             } else {
               XCTAssertNil(faaEvt[@"ruleId"]);
             }
+
+            return YES;
+          }];
+
+  XCTAssertTrue([sut sync]);
+}
+
+- (void)testEventUploadIdentityUnverified {
+  SNTSyncEventUpload* sut = [[SNTSyncEventUpload alloc] initWithState:self.syncState];
+  self.syncState.eventBatchSize = 50;
+
+  SNTStoredExecutionEvent* execEvent = [[SNTStoredExecutionEvent alloc] init];
+  execEvent.fileSHA256 = @"aabbccdd";
+  execEvent.filePath = @"/usr/bin/test";
+  execEvent.decision = SNTEventStateBlockBinary;
+  execEvent.occurrenceDate = [NSDate dateWithTimeIntervalSince1970:1700000000];
+  execEvent.pid = @(1234);
+  execEvent.ppid = @(1);
+  execEvent.identityUnverified = YES;
+
+  NSArray* events = @[ execEvent ];
+  OCMStub([self.daemonConnRop databaseEventsPending:([OCMArg invokeBlockWithArgs:events, nil])]);
+
+  [self stubRequestBody:nil
+               response:nil
+                  error:nil
+          validateBlock:^BOOL(NSURLRequest* req) {
+            NSDictionary* requestDict = [self dictFromRequest:req];
+            NSArray* execEvents = requestDict[kEvents];
+            XCTAssertEqual(execEvents.count, 1);
+            NSDictionary* event = execEvents[0];
+
+            // decision must stay the real rule outcome; the marker doesn't
+            // replace it.
+            XCTAssertEqualObjects(event[kDecision], @"BLOCK_BINARY");
+            XCTAssertEqualObjects(event[@"identity_unverified"], @YES);
+
+            return YES;
+          }];
+
+  XCTAssertTrue([sut sync]);
+}
+
+- (void)testEventUploadIdentityUnverifiedAbsentWhenFalse {
+  SNTSyncEventUpload* sut = [[SNTSyncEventUpload alloc] initWithState:self.syncState];
+  self.syncState.eventBatchSize = 50;
+
+  SNTStoredExecutionEvent* execEvent = [[SNTStoredExecutionEvent alloc] init];
+  execEvent.fileSHA256 = @"aabbccdd";
+  execEvent.filePath = @"/usr/bin/test";
+  execEvent.decision = SNTEventStateBlockBinary;
+  execEvent.occurrenceDate = [NSDate dateWithTimeIntervalSince1970:1700000000];
+  execEvent.pid = @(1234);
+  execEvent.ppid = @(1);
+  execEvent.identityUnverified = NO;
+
+  NSArray* events = @[ execEvent ];
+  OCMStub([self.daemonConnRop databaseEventsPending:([OCMArg invokeBlockWithArgs:events, nil])]);
+
+  [self stubRequestBody:nil
+               response:nil
+                  error:nil
+          validateBlock:^BOOL(NSURLRequest* req) {
+            NSDictionary* requestDict = [self dictFromRequest:req];
+            NSArray* execEvents = requestDict[kEvents];
+            XCTAssertEqual(execEvents.count, 1);
+            NSDictionary* event = execEvents[0];
+
+            XCTAssertEqualObjects(event[kDecision], @"BLOCK_BINARY");
+            XCTAssertNil(event[@"identity_unverified"]);
 
             return YES;
           }];

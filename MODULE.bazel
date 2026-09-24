@@ -21,7 +21,7 @@ bazel_dep(name = "flatbuffers", version = "25.12.19.bcr.1")
 bazel_dep(name = "protos", version = "1.0.1", repo_name = "northpolesec_protos")
 git_override(
     module_name = "protos",
-    commit = "68fc3caa33bbdf14a980229f50a25d80bfc72a33",
+    commit = "f1a1596457e661156afc2ca6337d56593d7def14",
     remote = "https://github.com/northpolesec/protos",
 )
 

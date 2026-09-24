@@ -27,6 +27,7 @@
 
 @interface SNTConfigBundle (ConfigBundleCreator)
 @property NSNumber* clientMode;
+@property NSNumber* executableIntegrityPolicy;
 @property NSNumber* syncType;
 @property NSString* allowlistRegex;
 @property NSString* blocklistRegex;
@@ -75,6 +76,7 @@
   XCTAssertEqualObjects(bundle.pushTokenChain, (@[ @"issuerToken", @"userToken" ]));
 
   XCTAssertNil(bundle.clientMode);
+  XCTAssertNil(bundle.executableIntegrityPolicy);
   XCTAssertNil(bundle.syncType);
   XCTAssertNil(bundle.allowlistRegex);
   XCTAssertNil(bundle.blocklistRegex);
@@ -113,6 +115,14 @@
   syncState.clientMode = SNTClientModeMonitor;
   bundle = PostflightConfigBundle(syncState);
   XCTAssertEqualObjects(bundle.clientMode, @(SNTClientModeMonitor));
+
+  syncState.executableIntegrityPolicy = SNTExecutableIntegrityPolicyUnknown;
+  bundle = PostflightConfigBundle(syncState);
+  XCTAssertNil(bundle.executableIntegrityPolicy);
+
+  syncState.executableIntegrityPolicy = SNTExecutableIntegrityPolicyReport;
+  bundle = PostflightConfigBundle(syncState);
+  XCTAssertEqualObjects(bundle.executableIntegrityPolicy, @(SNTExecutableIntegrityPolicyReport));
 
   syncState.syncType = SNTSyncTypeNormal;
   bundle = PostflightConfigBundle(syncState);

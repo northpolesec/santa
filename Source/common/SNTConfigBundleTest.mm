@@ -24,6 +24,7 @@
 
 @interface SNTConfigBundle (Testing)
 @property NSNumber* clientMode;
+@property NSNumber* executableIntegrityPolicy;
 @property NSNumber* syncType;
 @property NSString* allowlistRegex;
 @property NSString* blocklistRegex;
@@ -64,11 +65,12 @@
 
 - (void)testGettersWithValues {
   __block XCTestExpectation* exp = [self expectationWithDescription:@"Result Blocks"];
-  exp.expectedFulfillmentCount = 30;
+  exp.expectedFulfillmentCount = 31;
   NSDate* nowDate = [NSDate now];
 
   SNTConfigBundle* bundle = [[SNTConfigBundle alloc] init];
   bundle.clientMode = @(SNTClientModeLockdown);
+  bundle.executableIntegrityPolicy = @(SNTExecutableIntegrityPolicyReport);
   bundle.syncType = @(SNTSyncTypeNormal);
   bundle.allowlistRegex = @"allow";
   bundle.blocklistRegex = @"block";
@@ -105,6 +107,11 @@
 
   [bundle clientMode:^(SNTClientMode val) {
     XCTAssertEqual(val, SNTClientModeLockdown);
+    [exp fulfill];
+  }];
+
+  [bundle executableIntegrityPolicy:^(SNTExecutableIntegrityPolicy val) {
+    XCTAssertEqual(val, SNTExecutableIntegrityPolicyReport);
     [exp fulfill];
   }];
 
@@ -266,6 +273,10 @@
   SNTConfigBundle* bundle = [[SNTConfigBundle alloc] init];
 
   [bundle clientMode:^(SNTClientMode val) {
+    XCTFail(@"This shouldn't be called");
+  }];
+
+  [bundle executableIntegrityPolicy:^(SNTExecutableIntegrityPolicy val) {
     XCTFail(@"This shouldn't be called");
   }];
 
@@ -464,6 +475,48 @@
 
   __block BOOL unsetFired = NO;
   [unsetDecoded reconcileNetworkExtension:^(BOOL v) {
+    unsetFired = YES;
+  }];
+  XCTAssertFalse(unsetFired);
+}
+
+- (void)testExecutableIntegrityPolicyRoundTrips {
+  SNTConfigBundle* set = [[SNTConfigBundle alloc] init];
+  set.executableIntegrityPolicy = @(SNTExecutableIntegrityPolicyReport);
+
+  NSError* error = nil;
+  NSData* setData = [NSKeyedArchiver archivedDataWithRootObject:set
+                                          requiringSecureCoding:YES
+                                                          error:&error];
+  XCTAssertNil(error);
+  SNTConfigBundle* setDecoded = [NSKeyedUnarchiver unarchivedObjectOfClass:[SNTConfigBundle class]
+                                                                  fromData:setData
+                                                                     error:&error];
+  XCTAssertNil(error);
+
+  __block BOOL setFired = NO;
+  __block SNTExecutableIntegrityPolicy setValue = SNTExecutableIntegrityPolicyUnknown;
+  [setDecoded executableIntegrityPolicy:^(SNTExecutableIntegrityPolicy v) {
+    setFired = YES;
+    setValue = v;
+  }];
+  XCTAssertTrue(setFired);
+  XCTAssertEqual(setValue, SNTExecutableIntegrityPolicyReport);
+
+  // Unset: a bundle the server sent no policy in must not fire the block after
+  // a round-trip, or the daemon would clobber the profile value.
+  SNTConfigBundle* unset = [[SNTConfigBundle alloc] init];
+  NSData* unsetData = [NSKeyedArchiver archivedDataWithRootObject:unset
+                                            requiringSecureCoding:YES
+                                                            error:&error];
+  XCTAssertNil(error);
+  SNTConfigBundle* unsetDecoded = [NSKeyedUnarchiver unarchivedObjectOfClass:[SNTConfigBundle class]
+                                                                    fromData:unsetData
+                                                                       error:&error];
+  XCTAssertNil(error);
+
+  __block BOOL unsetFired = NO;
+  [unsetDecoded executableIntegrityPolicy:^(SNTExecutableIntegrityPolicy v) {
     unsetFired = YES;
   }];
   XCTAssertFalse(unsetFired);

@@ -24,6 +24,7 @@
 // Expose necessary setters for SNTConfigBundle properties related to Postflight
 @interface SNTConfigBundle (ConfigBundleCreator)
 @property NSNumber* clientMode;
+@property NSNumber* executableIntegrityPolicy;
 @property NSNumber* syncType;
 @property NSString* allowlistRegex;
 @property NSString* blocklistRegex;
@@ -72,6 +73,8 @@ SNTConfigBundle* PostflightConfigBundle(SNTSyncState* syncState) {
   SNTConfigBundle* bundle = [[SNTConfigBundle alloc] init];
 
   bundle.clientMode = syncState.clientMode ? @(syncState.clientMode) : nil;
+  bundle.executableIntegrityPolicy =
+      syncState.executableIntegrityPolicy ? @(syncState.executableIntegrityPolicy) : nil;
   bundle.syncType = syncState.syncType != SNTSyncTypeNormal ? @(SNTSyncTypeNormal) : nil;
   bundle.allowlistRegex = syncState.allowlistRegex;
   bundle.blocklistRegex = syncState.blocklistRegex;

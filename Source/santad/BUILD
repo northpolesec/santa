@@ -1281,6 +1281,7 @@ santa_unit_test(
         ":SandboxExpectations",
         "//Source/common:AuditUtilities",
         "//Source/common:MOLXPCConnection",
+        "//Source/common:SNTConfigBundle",
         "//Source/common:SNTError",
         "//Source/common:SNTNetworkFlowRule",
         "//Source/common:SNTRule",

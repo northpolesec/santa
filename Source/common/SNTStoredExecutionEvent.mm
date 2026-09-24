@@ -81,6 +81,8 @@
   ENCODE(coder, executingUser);
   ENCODE_BOXABLE(coder, decision);
   ENCODE_BOXABLE(coder, auditReturn);
+  ENCODE_BOXABLE(coder, identityUnverified);
+  ENCODE_BOXABLE(coder, identityVendorMatched);
   ENCODE_BOXABLE(coder, holdAndAsk);
   ENCODE_BOXABLE(coder, silentTouchID);
   ENCODE_BOXABLE(coder, seatbeltRequired);
@@ -130,6 +132,8 @@
     DECODE(decoder, executingUser, NSString);
     DECODE_SELECTOR(decoder, decision, NSNumber, unsignedLongLongValue);
     DECODE_SELECTOR(decoder, auditReturn, NSNumber, boolValue);
+    DECODE_SELECTOR(decoder, identityUnverified, NSNumber, boolValue);
+    DECODE_SELECTOR(decoder, identityVendorMatched, NSNumber, boolValue);
     DECODE_SELECTOR(decoder, holdAndAsk, NSNumber, boolValue);
     DECODE_SELECTOR(decoder, silentTouchID, NSNumber, boolValue);
     DECODE_SELECTOR(decoder, seatbeltRequired, NSNumber, boolValue);
@@ -187,16 +191,36 @@
   // (the events table is drained on upload) rather than one per execution --
   // which bounds table growth without needing a separate cap. The key is a pure
   // function of already-stored fields, so it is stable and thread-safe.
-  return self.auditReturn ? [self.fileSHA256 stringByAppendingString:@":audit"] : self.fileSHA256;
+  NSString* base = self.fileSHA256;
+  if (!base.length) {
+    // The file could not be read, so there is no content hash; key on what
+    // the kernel reported so the event still stores and dedups. Without this,
+    // the event table's validity check drops the event silently.
+    base = self.cdhash.length ? [NSString stringWithFormat:@"cdhash:%@", self.cdhash]
+                              : [NSString stringWithFormat:@"path:%@", self.filePath];
+  }
+  // Independent suffixes (an AUDIT match on an unverified read is possible), so each
+  // combination dedups separately.
+  if (self.auditReturn) {
+    base = [base stringByAppendingString:@":audit"];
+  }
+  if (self.identityUnverified) {
+    base = [base stringByAppendingString:@":mismatch"];
+  }
+  return base;
 }
 
 - (BOOL)unactionableEvent {
-  // Allow decisions are normally throttled as unactionable noise. Audit events
-  // are allow decisions too, but they are intentionally-collected telemetry, so
-  // they must not be suppressed by the storage backoff. Returning NO keeps them
-  // out of the backoff path entirely (see SNTEventTable -addStoredEvents:);
-  // they are instead deduped per sync cycle via -uniqueID's audit-specific key.
-  return !self.auditReturn && (self.decision & SNTEventStateAllow) != 0;
+  // Audit matches and unverified allows are deliberate telemetry, so they skip the storage
+  // backoff (-[SNTEventTable addStoredEvents:]) and rely on -uniqueID's per-cycle dedup. That
+  // needs a content hash: without one the key is unique per target, so hashless unverified
+  // allows stay backoff-eligible to bound event volume.
+  BOOL dedupableUnverified = self.identityUnverified && self.fileSHA256.length > 0;
+  return !self.auditReturn && !dedupableUnverified && (self.decision & SNTEventStateAllow) != 0;
+}
+
+- (BOOL)contentAttributesUnverified {
+  return self.identityUnverified && !self.identityVendorMatched;
 }
 
 @end

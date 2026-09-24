@@ -17,6 +17,7 @@
 #import <XCTest/XCTest.h>
 
 #import "Source/common/SNTCommonEnums.h"
+#import "Source/common/SNTConfigState.h"
 #import "Source/common/SNTConfigurator.h"
 
 typedef BOOL (^StateFileAccessAuthorizer)(void);
@@ -1010,6 +1011,76 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
   XCTAssertEqual(sut.clientModeIgnoringTemporaryMonitorMode, SNTClientModeMonitor);
 
   XCTAssertTrue([self.fileMgr removeItemAtPath:plistPath error:nil]);
+}
+
+#pragma mark - ExecutableIntegrityPolicy tests
+
+- (void)testExecutableIntegrityPolicy {
+  NSString* plistPath = [NSString stringWithFormat:@"%@/exec-integrity-policy.plist", self.testDir];
+  SNTConfigurator* cfg = [self configuratorWithEmptySyncStateAtPath:plistPath];
+
+  // Default
+  XCTAssertEqual(cfg.executableIntegrityPolicy, SNTExecutableIntegrityPolicyBlockChanged);
+
+  // Profile values, case-insensitive
+  cfg.configState[@"ExecutableIntegrityPolicy"] = @"BlockUnverified";
+  XCTAssertEqual(cfg.executableIntegrityPolicy, SNTExecutableIntegrityPolicyBlockUnverified);
+  cfg.configState[@"ExecutableIntegrityPolicy"] = @"report";
+  XCTAssertEqual(cfg.executableIntegrityPolicy, SNTExecutableIntegrityPolicyReport);
+  cfg.configState[@"ExecutableIntegrityPolicy"] = @"IGNORE";
+  XCTAssertEqual(cfg.executableIntegrityPolicy, SNTExecutableIntegrityPolicyIgnore);
+
+  // Invalid string fails closed to the default
+  cfg.configState[@"ExecutableIntegrityPolicy"] = @"AuditOnly";
+  XCTAssertEqual(cfg.executableIntegrityPolicy, SNTExecutableIntegrityPolicyBlockChanged);
+
+  // Sync state overrides the profile
+  cfg.configState[@"ExecutableIntegrityPolicy"] = @"BlockUnverified";
+  [cfg setSyncServerExecutableIntegrityPolicy:SNTExecutableIntegrityPolicyReport];
+  XCTAssertEqual(cfg.executableIntegrityPolicy, SNTExecutableIntegrityPolicyReport);
+
+  // The setter rejects an out-of-range value, so the earlier sync value stays
+  [cfg setSyncServerExecutableIntegrityPolicy:(SNTExecutableIntegrityPolicy)99];
+  XCTAssertEqual(cfg.executableIntegrityPolicy, SNTExecutableIntegrityPolicyReport);
+
+  // An out-of-range value already in sync state falls back to the profile
+  cfg.syncState[@"ExecutableIntegrityPolicy"] = @99;
+  XCTAssertEqual(cfg.executableIntegrityPolicy, SNTExecutableIntegrityPolicyBlockUnverified);
+
+  XCTAssertTrue([self.fileMgr removeItemAtPath:plistPath error:nil]);
+}
+
+// Fails if kExecutableIntegrityPolicyKey is missing from _syncServerKeyTypes as
+// NSNumber: the synced policy would silently reset on daemon restart.
+- (void)testExecutableIntegrityPolicySurvivesADiskRoundTrip {
+  NSString* plistPath =
+      [NSString stringWithFormat:@"%@/exec-integrity-policy-roundtrip.plist", self.testDir];
+  SNTConfigurator* writer = [self configuratorWithEmptySyncStateAtPath:plistPath];
+
+  [writer setSyncServerExecutableIntegrityPolicy:SNTExecutableIntegrityPolicyBlockUnverified];
+  XCTAssertEqual(writer.executableIntegrityPolicy, SNTExecutableIntegrityPolicyBlockUnverified);
+  XCTAssertTrue([self.fileMgr fileExistsAtPath:plistPath],
+                @"Sanity: the sync state must be written");
+
+  SNTConfigurator* restarted = [self configuratorWithEmptySyncStateAtPath:plistPath];
+  XCTAssertEqual(restarted.executableIntegrityPolicy, SNTExecutableIntegrityPolicyBlockUnverified,
+                 @"A synced ExecutableIntegrityPolicy must survive a daemon restart");
+
+  XCTAssertTrue([self.fileMgr removeItemAtPath:plistPath error:nil]);
+}
+
+- (void)testConfigStateCapturesExecutableIntegrityPolicy {
+  SNTConfigurator* cfg = [[SNTConfigurator alloc] init];
+
+  cfg.configState[@"ExecutableIntegrityPolicy"] = @"report";
+  SNTConfigState* cs = [[SNTConfigState alloc] initWithConfig:cfg];
+  XCTAssertEqual(cs.executableIntegrityPolicy, SNTExecutableIntegrityPolicyReport);
+
+  NSData* d = [NSKeyedArchiver archivedDataWithRootObject:cs requiringSecureCoding:YES error:nil];
+  SNTConfigState* cs2 = [NSKeyedUnarchiver unarchivedObjectOfClass:[SNTConfigState class]
+                                                          fromData:d
+                                                             error:nil];
+  XCTAssertEqual(cs2.executableIntegrityPolicy, SNTExecutableIntegrityPolicyReport);
 }
 
 @end

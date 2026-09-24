@@ -129,6 +129,19 @@ typedef NS_ENUM(NSInteger, SNTClientMode) {
   SNTClientModeStandalone = 3,
 };
 
+// Policy for an execution whose file cannot be confirmed as the image the kernel loaded
+// (the ExecutableIntegrityPolicy key), when the signing vendor does not match either.
+//
+// Values are pinned: they are persisted in the sync-state plist, encoded across XPC, and
+// equal to the sync v2 ExecutableIntegrityPolicy enum on the wire.
+typedef NS_ENUM(NSInteger, SNTExecutableIntegrityPolicy) {
+  SNTExecutableIntegrityPolicyUnknown = 0,
+  SNTExecutableIntegrityPolicyBlockChanged = 1,
+  SNTExecutableIntegrityPolicyBlockUnverified = 2,
+  SNTExecutableIntegrityPolicyReport = 3,
+  SNTExecutableIntegrityPolicyIgnore = 4,
+};
+
 typedef NS_ENUM(uint64_t, SNTEventState) {
   // Bits 0-15 bits store non-decision types
   SNTEventStateUnknown = 0,

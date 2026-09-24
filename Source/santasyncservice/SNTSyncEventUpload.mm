@@ -382,6 +382,10 @@ typename santa::ProtoTraits<IsV2>::EventT* MessageForExecutionEvent(
     }
   }
 
+  if (event.identityUnverified) {
+    e->set_identity_unverified(true);
+  }
+
   return e;
 }
 
