@@ -71,8 +71,6 @@ static SNTRemovableMediaAction ActionFromString(NSString* action) {
   return SNTRemovableMediaActionAllow;
 }
 
-// caseInsensitiveCompare, not lowercasing: this is the only key SNTConfigState parses on
-// every AUTH_EXEC.
 static SNTExecutableIntegrityPolicy ExecutableIntegrityPolicyFromString(NSString* policy) {
   if (!policy.length) return SNTExecutableIntegrityPolicyBlockChanged;
   if ([policy caseInsensitiveCompare:@"BlockChanged"] == NSOrderedSame) {
@@ -87,12 +85,7 @@ static SNTExecutableIntegrityPolicy ExecutableIntegrityPolicyFromString(NSString
   if ([policy caseInsensitiveCompare:@"Ignore"] == NSOrderedSame) {
     return SNTExecutableIntegrityPolicyIgnore;
   }
-  // Logged once rather than on every execution: an unrecognized value is a
-  // static misconfiguration, so the second line would say nothing new.
-  static dispatch_once_t onceToken;
-  dispatch_once(&onceToken, ^{
-    LOGW(@"Unrecognized ExecutableIntegrityPolicy value: %@, defaulting to BlockChanged", policy);
-  });
+  LOGW(@"Unrecognized ExecutableIntegrityPolicy value: %@, defaulting to BlockChanged", policy);
   return SNTExecutableIntegrityPolicyBlockChanged;
 }
 
@@ -1032,7 +1025,12 @@ static SNTConfigurator* sharedConfigurator = nil;
       return p;
     }
   }
-  return ExecutableIntegrityPolicyFromString(self.configState[kExecutableIntegrityPolicyKey]);
+  // readForcedConfig stores the parsed value; a string is still parsed so a directly
+  // assigned configState can never yield Unknown.
+  id profile = self.configState[kExecutableIntegrityPolicyKey];
+  return [profile isKindOfClass:[NSNumber class]]
+             ? (SNTExecutableIntegrityPolicy)[profile integerValue]
+             : ExecutableIntegrityPolicyFromString(profile);
 }
 
 - (void)setSyncServerExecutableIntegrityPolicy:(SNTExecutableIntegrityPolicy)policy {
@@ -2549,6 +2547,12 @@ static BOOL HoldsSyncedSettings(NSDictionary* syncState) {
   }
 
   [self applyOverrides:forcedConfig];
+
+  // Parsed once per profile load rather than on every AUTH_EXEC.
+  if (forcedConfig[kExecutableIntegrityPolicyKey]) {
+    forcedConfig[kExecutableIntegrityPolicyKey] =
+        @(ExecutableIntegrityPolicyFromString(forcedConfig[kExecutableIntegrityPolicyKey]));
+  }
 
   return forcedConfig;
 }

@@ -14,6 +14,7 @@
 /// limitations under the License.
 
 #import <Foundation/Foundation.h>
+#import <OCMock/OCMock.h>
 #import <XCTest/XCTest.h>
 
 #import "Source/common/SNTCommonEnums.h"
@@ -30,6 +31,8 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
 
 @property NSMutableDictionary* configState;
 @property NSMutableDictionary* syncState;
+- (NSMutableDictionary*)readForcedConfig;
+- (id)forcedConfigValueForKey:(NSString*)key;
 @end
 
 // Records the key paths for which KVO notifications are received.
@@ -1067,6 +1070,21 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
                  @"A synced ExecutableIntegrityPolicy must survive a daemon restart");
 
   XCTAssertTrue([self.fileMgr removeItemAtPath:plistPath error:nil]);
+}
+
+- (void)testExecutableIntegrityPolicyIsParsedWhenTheProfileLoads {
+  SNTConfigurator* cfg = [[SNTConfigurator alloc] init];
+  id partial = OCMPartialMock(cfg);
+  OCMStub([partial forcedConfigValueForKey:@"ExecutableIntegrityPolicy"]).andReturn(@"report");
+  OCMStub([partial forcedConfigValueForKey:[OCMArg any]]).andReturn(nil);
+
+  NSDictionary* forced = [partial readForcedConfig];
+  XCTAssertEqualObjects(forced[@"ExecutableIntegrityPolicy"],
+                        @(SNTExecutableIntegrityPolicyReport));
+
+  cfg.configState = [forced mutableCopy];
+  XCTAssertEqual(cfg.executableIntegrityPolicy, SNTExecutableIntegrityPolicyReport);
+  [partial stopMocking];
 }
 
 - (void)testConfigStateCapturesExecutableIntegrityPolicy {
