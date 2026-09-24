@@ -110,41 +110,41 @@ static NSString* const silencedNotificationsKey = @"SilencedNotifications";
   return NO;
 }
 
+- (BOOL)shouldQueueMessage:(SNTMessageWindowController*)pendingMsg
+            enableSilences:(BOOL)enableSilences {
+  if ([SNTConfigurator configurator].enableSilentMode) return NO;
+  if ([self notificationAlreadyQueued:pendingMsg]) return NO;
+  if (!enableSilences) return YES;
+
+  // See if this message has been user-silenced.
+  NSString* messageHash = [pendingMsg messageHash];
+  NSUserDefaults* ud = [NSUserDefaults standardUserDefaults];
+  NSDate* silenceDate = [ud objectForKey:silencedNotificationsKey][messageHash];
+  if ([silenceDate isKindOfClass:[NSDate class]]) {
+    switch ([silenceDate compare:[NSDate date]]) {
+      case NSOrderedDescending:
+        LOGI(@"Notification silence: dropping notification for %@", messageHash);
+        return NO;
+      case NSOrderedAscending:
+        LOGI(@"Notification silence: silence has expired, deleting");
+        [self updateSilenceDate:nil forHash:messageHash];
+        break;
+      default: break;
+    }
+  }
+
+  return YES;
+}
+
 - (void)queueMessage:(SNTMessageWindowController*)pendingMsg enableSilences:(BOOL)enableSilences {
   // Post a distributed notification, regardless of queue state.
   [self postDistributedNotification:pendingMsg];
 
-  // If GUI is in silent mode or if there's already a notification queued for
-  // this message, don't do anything else.
-  if ([SNTConfigurator configurator].enableSilentMode) return;
-
   dispatch_async(dispatch_get_main_queue(), ^{
-    if ([self notificationAlreadyQueued:pendingMsg]) {
-      // Make sure we clear the reply block so we don't leak memory.
-      if ([pendingMsg isKindOfClass:[SNTBinaryMessageWindowController class]]) {
-        SNTBinaryMessageWindowController* bmwc = (SNTBinaryMessageWindowController*)pendingMsg;
-        bmwc.replyBlock(NO);
-      }
+    // If a window is not shown, reply back to the daemon immediately.
+    if (![self shouldQueueMessage:pendingMsg enableSilences:enableSilences]) {
+      [pendingMsg replyNo];
       return;
-    }
-
-    // See if this message has been user-silenced.
-    if (enableSilences) {
-      NSString* messageHash = [pendingMsg messageHash];
-      NSUserDefaults* ud = [NSUserDefaults standardUserDefaults];
-      NSDate* silenceDate = [ud objectForKey:silencedNotificationsKey][messageHash];
-      if ([silenceDate isKindOfClass:[NSDate class]]) {
-        switch ([silenceDate compare:[NSDate date]]) {
-          case NSOrderedDescending:
-            LOGI(@"Notification silence: dropping notification for %@", messageHash);
-            return;
-          case NSOrderedAscending:
-            LOGI(@"Notification silence: silence has expired, deleting");
-            [self updateSilenceDate:nil forHash:messageHash];
-            break;
-          default: break;
-        }
-      }
     }
 
     pendingMsg.delegate = self;
@@ -449,6 +449,7 @@ static NSString* const silencedNotificationsKey = @"SilencedNotifications";
                      andReply:(void (^)(BOOL))replyBlock {
   if (!event) {
     LOGI(@"Error: Missing event object in message received from daemon!");
+    if (replyBlock) replyBlock(NO);
     return;
   }
 

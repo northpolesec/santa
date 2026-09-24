@@ -30,6 +30,10 @@
 /// notifications, and by default for collapsing notifications already queued.
 - (NSString*)messageHash;
 
+/// Answer the daemon's pending reply for this message with a denial and clear it, so it
+/// can fire only once. No-op for message types that carry no reply.
+- (void)replyNo;
+
 /// Key used to collapse a notification that is already queued or on-screen. Defaults to
 /// -messageHash; override when queue de-dup should be finer-grained than the silence key.
 - (NSString*)queueDedupeHash;

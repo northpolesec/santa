@@ -112,11 +112,23 @@
   [super showWindow:sender];
 }
 
+// A held execution has no silence key: the process is stopped until this dialog is
+// answered, so there is nothing to silence. santad's AuthResultCache holds one
+// SNTActionRespondHold per vnode, so there doesn't need to be deduping for these
+// notifications anyway.
 - (NSString*)messageHash {
+  if (self.event.holdAndAsk) return nil;
   // Don't return a bare "binary:" prefix when fileSHA256 is missing —
   // that would silence every hash-less event under one shared key.
   if (!self.event.fileSHA256.length) return nil;
   return [@"binary:" stringByAppendingString:self.event.fileSHA256];
+}
+
+- (void)replyNo {
+  if (_replyBlock) {
+    _replyBlock(NO);
+    _replyBlock = nil;
+  }
 }
 
 - (void)performSilentTouchIDAuthorization {
