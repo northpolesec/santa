@@ -36,7 +36,7 @@
 }
 
 - (void)testReasonDropsTheBundleNameAndWarnsForAnUnverifiedRead {
-  SNTStoredExecutionEvent* se = [self eventWithBundleName:@"Slack"];
+  SNTStoredExecutionEvent* se = [self eventWithBundleName:@"Other App"];
   se.identityUnverified = YES;
   se.identityVendorMatched = NO;
 
