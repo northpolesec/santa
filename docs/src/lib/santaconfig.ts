@@ -1067,13 +1067,17 @@ thousand static rules working correctly, but we don't recommend using StaticRule
     {
       key: "ClientAuthCertificateCN",
       description: `If set, this is the Common Name of a certificate in the System keychain to be used for sync
-        authentication. The corresponding private key must also be in the keychain`,
+        authentication. The corresponding private key must also be in the keychain.
+        Matching is case sensitive. If several certificates match, the one with the latest valid-from
+        date whose private key Santa can use is chosen`,
       type: "string",
     },
     {
       key: "ClientAuthCertificateIssuerCN",
       description: `If set, this is the Issuer Name of a certificate in the System keychain to be used for sync
-        authentication. The corresponding private key must also be in the keychain`,
+        authentication. The corresponding private key must also be in the keychain.
+        Matching is case sensitive. If several certificates match, the one with the latest valid-from
+        date whose private key Santa can use is chosen`,
       type: "string",
     },
     {

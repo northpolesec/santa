@@ -288,45 +288,10 @@ using ScopedSecTrustRef = santa::ScopedCFTypeRef<SecTrustRef>;
     // expiry) after the request completes.
     self.clientCertificate = clientCert;
 
-    // We have an identity but we don't know whether the private key is accessible to us, and if it
-    // isn't the framework will not give us any useful feedback. So, pull the private key from the
-    // identity and attempt to sign some random data with it. This is replicating what will happen
-    // during the mTLS handshake.
-    auto [status, scopedPrivateKey] = ScopedSecKeyRef::AssumeFrom(^OSStatus(SecKeyRef* out) {
-      return SecIdentityCopyPrivateKey(foundIdentity, out);
-    });
-    if (status != errSecSuccess) {
-      // This should never really happen if we've managed to find an identity.
-      [self log:@"[Client Trust] Failed to access private key, authentication will likely fail: %d",
-                status];
-    } else {
-      NSData* dataToSign = [@"test" dataUsingEncoding:NSUTF8StringEncoding];
-      auto [scopedDataRef, scopedErrorRef] = ScopedCFError::AssumeFrom([&](CFErrorRef* out) {
-        SecKeyAlgorithm algorithm = kSecKeyAlgorithmRSASignatureRaw;
-        if (!SecKeyIsAlgorithmSupported(scopedPrivateKey.Unsafe(), kSecKeyOperationTypeSign,
-                                        algorithm)) {
-          algorithm = kSecKeyAlgorithmECDSASignatureMessageX962SHA256;
-        }
-        return ScopedCFDataRef::Assume(SecKeyCreateSignature(scopedPrivateKey.Unsafe(), algorithm,
-                                                             (__bridge CFDataRef)dataToSign, out));
-      });
-
-      NSError* err = scopedErrorRef.BridgeRelease<NSError*>();
-      switch (err.code) {
-        case errSecInteractionNotAllowed:
-          [self log:@"[Client Trust] Private key is inaccessible, authentication will likely fail"];
-          break;
-        case errSecParam:
-          [self log:@"[Client Trust] Neither kSecKeyAlgorithmRSASignatureRaw nor "
-                    @"kSecKeyAlgorithmECDSASignatureMessageX962SHA256 are supported, unable to "
-                    @"verify key accessibility"];
-          break;
-        case errSecSuccess: break;
-        default:
-          [self log:@"[Client Trust] Failed to sign data with private key: %d", err.code];
-          break;
-      }
-    }
+    // Identities found in the keychain have already had their private key checked while searching
+    // for a match, but one loaded from a PKCS#12 file has not. There is no alternative identity to
+    // fall back to here, so the result is only logged.
+    if (self.clientCertFile) [self identityHasUsableKey:foundIdentity];
 
     NSArray* intermediates = [self locateIntermediatesForCertificate:clientCert inArray:allCerts];
 
@@ -415,26 +380,95 @@ using ScopedSecTrustRef = santa::ScopedCFTypeRef<SecTrustRef>;
     SecIdentityRef identityRef = NULL;
     OSStatus status = SecIdentityCreateWithCertificate(NULL, cert.certRef, &identityRef);
     if (status == errSecSuccess) {
-      return identityRef;
-    } else {
-      // Avoid infinite recursion from self-signed certs
-      if ((!cert.commonName || [cert.commonName isEqual:cert.issuerCommonName]) &&
-          (!cert.countryName || [cert.countryName isEqual:cert.issuerCountryName]) &&
-          (!cert.orgName || [cert.orgName isEqual:cert.issuerOrgName]) &&
-          (!cert.orgUnit || [cert.orgUnit isEqual:cert.issuerOrgUnit])) {
-        continue;
-      }
+      if ([self identityHasUsableKey:identityRef]) return identityRef;
 
-      // cert is an intermediate, recurse to find the leaf.
-      return [self identityByFilteringArray:array
-                                 commonName:nil
-                           issuerCommonName:cert.commonName
-                          issuerCountryName:cert.countryName
-                              issuerOrgName:cert.orgName
-                              issuerOrgUnit:cert.orgUnit];
+      // The identity exists but its private key can't be used for signing. Another certificate
+      // matching the same filters may have a key that can be, so keep looking.
+      [self log:@"[Client Trust] Skipping certificate with unusable private key: %@", cert];
+      CFRelease(identityRef);
+      continue;
     }
+
+    // Avoid infinite recursion from self-signed certs
+    if ((!cert.commonName || [cert.commonName isEqual:cert.issuerCommonName]) &&
+        (!cert.countryName || [cert.countryName isEqual:cert.issuerCountryName]) &&
+        (!cert.orgName || [cert.orgName isEqual:cert.issuerOrgName]) &&
+        (!cert.orgUnit || [cert.orgUnit isEqual:cert.issuerOrgUnit])) {
+      continue;
+    }
+
+    // cert is an intermediate, recurse to find the leaf. If that finds nothing, carry on with the
+    // remaining matches rather than abandoning the search.
+    SecIdentityRef leafIdentity = [self identityByFilteringArray:array
+                                                      commonName:nil
+                                                issuerCommonName:cert.commonName
+                                               issuerCountryName:cert.countryName
+                                                   issuerOrgName:cert.orgName
+                                                   issuerOrgUnit:cert.orgUnit];
+    if (leafIdentity) return leafIdentity;
   }
   return NULL;
+}
+
+/**
+  Returns whether the private key of the given identity can actually be used for signing.
+
+  Having an identity doesn't mean the private key is accessible to us, and if it isn't the
+  framework will not give us any useful feedback during the handshake. So, pull the private key
+  from the identity and attempt to sign some random data with it, replicating what will happen
+  during the mTLS handshake.
+ */
+- (BOOL)identityHasUsableKey:(SecIdentityRef)identity {
+  auto [status, scopedPrivateKey] = ScopedSecKeyRef::AssumeFrom(^OSStatus(SecKeyRef* out) {
+    return SecIdentityCopyPrivateKey(identity, out);
+  });
+  if (status != errSecSuccess) {
+    return [self privateKeyUsableWithCopyStatus:status signError:nil];
+  }
+
+  NSData* dataToSign = [@"test" dataUsingEncoding:NSUTF8StringEncoding];
+  auto [scopedDataRef, scopedErrorRef] = ScopedCFError::AssumeFrom([&](CFErrorRef* out) {
+    SecKeyAlgorithm algorithm = kSecKeyAlgorithmRSASignatureRaw;
+    if (!SecKeyIsAlgorithmSupported(scopedPrivateKey.Unsafe(), kSecKeyOperationTypeSign,
+                                    algorithm)) {
+      algorithm = kSecKeyAlgorithmECDSASignatureMessageX962SHA256;
+    }
+    return ScopedCFDataRef::Assume(SecKeyCreateSignature(scopedPrivateKey.Unsafe(), algorithm,
+                                                         (__bridge CFDataRef)dataToSign, out));
+  });
+
+  return [self privateKeyUsableWithCopyStatus:status
+                                    signError:scopedErrorRef.BridgeRelease<NSError*>()];
+}
+
+/**
+  Classifies the result of the key accessibility check performed by identityHasUsableKey:,
+  logging the reason whenever the key is not known to be good.
+
+  Fails open: if the check itself couldn't be performed, the key is treated as usable so that an
+  unexpected error doesn't stop us presenting a certificate that would have worked.
+ */
+- (BOOL)privateKeyUsableWithCopyStatus:(OSStatus)copyStatus signError:(NSError*)signError {
+  if (copyStatus != errSecSuccess) {
+    [self log:@"[Client Trust] Failed to access private key: %d", copyStatus];
+    return NO;
+  }
+
+  switch (signError.code) {
+    case errSecSuccess: return YES;
+    case errSecInteractionNotAllowed:
+    case errSecAuthFailed:
+      [self log:@"[Client Trust] Private key is inaccessible: %d", (int)signError.code];
+      return NO;
+    case errSecParam:
+      [self log:@"[Client Trust] Neither kSecKeyAlgorithmRSASignatureRaw nor "
+                @"kSecKeyAlgorithmECDSASignatureMessageX962SHA256 are supported, unable to "
+                @"verify key accessibility"];
+      return YES;
+    default:
+      [self log:@"[Client Trust] Failed to sign data with private key: %d", (int)signError.code];
+      return YES;
+  }
 }
 
 - (NSArray<MOLCertificate*>*)filterAndSortArray:(NSArray<MOLCertificate*>*)array
