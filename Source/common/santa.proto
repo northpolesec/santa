@@ -364,6 +364,16 @@ message Execution {
   // session rather than the configured client mode. The `mode` field still
   // reports the effective mode the decision was made under (MODE_MONITOR).
   optional bool temporary_monitor_mode = 20;
+
+  // True when Santa could not confirm that the file it evaluated for this
+  // event is the image the kernel actually loaded (see the
+  // ExecutableIntegrityPolicy configuration key). The `decision` field
+  // reports the real outcome of the evaluation; when this flag is set, that
+  // evaluation ran against the on-disk file, which may not be what executed,
+  // and the file hash (when present) is report-only. Also set when the
+  // on-disk file matched only by signing vendor, and when nothing was
+  // evaluable at all (decision UNKNOWN variants).
+  optional bool identity_unverified = 21;
 }
 
 // Information about a fork event

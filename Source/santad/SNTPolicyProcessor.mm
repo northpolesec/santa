@@ -32,7 +32,6 @@
 #import "Source/common/SNTKVOManager.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTRule.h"
-#import "Source/common/SigningIDHelpers.h"
 #include "Source/common/String.h"
 #include "Source/common/cel/CELPlanCache.h"
 #include "Source/common/cel/Evaluator.h"
@@ -47,7 +46,6 @@ static constexpr uint64_t kCELPlanCacheMaxSize = 128;
 enum class PlatformBinaryState {
   kRuntimeTrue = 0,
   kRuntimeFalse,
-  kStaticCheck,
 };
 
 struct CELEvaluationResult {
@@ -661,36 +659,12 @@ static void ApplySilentBlock(SNTCachedDecision* cd, SNTRuleState state) {
 }
 
 static void UpdateCachedDecisionSigningInfo(
-    SNTCachedDecision* cd, MOLCodesignChecker* csInfo, PlatformBinaryState platformBinaryState,
+    SNTCachedDecision* cd, MOLCodesignChecker* csInfo,
     NSDictionary* _Nullable (^entitlementsFilterCallback)(NSDictionary* _Nullable entitlements)) {
   cd.certSHA256 = csInfo.leafCertificate.SHA256;
   cd.certCommonName = csInfo.leafCertificate.commonName;
   cd.certChain = csInfo.certificates;
   cd.rawSigningID = csInfo.signingID;
-  // Check if we need to get teamID from code signing.
-  if (!cd.teamID) {
-    cd.teamID = csInfo.teamID;
-  }
-
-  // Check if we need to get signing ID from code signing.
-  if (!cd.signingID) {
-    cd.signingID = FormatSigningID(csInfo);
-  }
-
-  // Ensure that if no teamID exists but a signingID does exist, that the binary
-  // is a platform binary. If not, remove the signingID.
-  if (!cd.teamID && cd.signingID) {
-    switch (platformBinaryState) {
-      case PlatformBinaryState::kRuntimeTrue: break;
-      case PlatformBinaryState::kStaticCheck:
-        if (!csInfo.platformBinary) {
-          cd.signingID = nil;
-        }
-        break;
-      case PlatformBinaryState::kRuntimeFalse: OS_FALLTHROUGH;
-      default: cd.signingID = nil; break;
-    }
-  }
 
   NSDictionary* entitlements = csInfo.entitlements;
   cd.rawEntitlements = [entitlements sntDeepCopy];
@@ -799,7 +773,7 @@ static BOOL SignatureVerdictIsStable(SNTCachedDecision* cd) {
       ApplyCodesignValidationFailure(cd, csStatus);
     } else {
       cd.codesignValidationStatus = @(errSecSuccess);
-      UpdateCachedDecisionSigningInfo(cd, csInfo, platformBinaryState, entitlementsFilterCallback);
+      UpdateCachedDecisionSigningInfo(cd, csInfo, entitlementsFilterCallback);
     }
   }
 

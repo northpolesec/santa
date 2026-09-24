@@ -53,6 +53,7 @@
     _signingTime = previous.signingTime;
     _codesignValidationStatus = previous.codesignValidationStatus;
     _identityMismatched = previous.identityMismatched;
+    _identityVendorMatched = previous.identityVendorMatched;
   }
   return self;
 }
@@ -91,6 +92,7 @@
   copy.ruleId = _ruleId;
   copy.cacheable = _cacheable;
   copy.identityMismatched = _identityMismatched;
+  copy.identityVendorMatched = _identityVendorMatched;
   copy.holdAndAsk = _holdAndAsk;
   copy.silentTouchID = _silentTouchID;
   copy.touchIDCooldownMinutes = _touchIDCooldownMinutes;
