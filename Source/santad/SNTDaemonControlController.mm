@@ -131,6 +131,7 @@ static NSString* TAMUsernameForUID(uid_t uid) {
   std::unique_ptr<santa::AdminUserState> _adminUserState;
   std::shared_ptr<santa::SandboxExpectations> _sandboxExpectations;
   std::shared_ptr<santa::SNTBinaryUploadController> _binaryUploadController;
+  std::shared_ptr<santa::RecentBlocks> _recentBlocks;
 }
 
 - (instancetype)initWithNotificationQueue:(SNTNotificationQueue*)notQueue
@@ -146,11 +147,13 @@ static NSString* TAMUsernameForUID(uid_t uid) {
                           checkCacheBlock:(SNTAction (^)(SantaVnode))checkCacheBlock
                        metricsExportBlock:(void (^)(void (^reply)(BOOL)))metricsExportBlock
                    binaryUploadController:
-                       (std::shared_ptr<santa::SNTBinaryUploadController>)binaryUploadController {
+                       (std::shared_ptr<santa::SNTBinaryUploadController>)binaryUploadController
+                             recentBlocks:(std::shared_ptr<santa::RecentBlocks>)recentBlocks {
   self = [super init];
   if (self) {
     _logger = logger;
     _binaryUploadController = std::move(binaryUploadController);
+    _recentBlocks = std::move(recentBlocks);
     _watchItems = std::move(watchItems);
     _sandboxExpectations = std::move(sandboxExpectations);
     _notQueue = notQueue;
@@ -287,6 +290,21 @@ static NSString* TAMUsernameForUID(uid_t uid) {
 
 - (void)checkCacheForVnodeID:(SantaVnode)vnodeID withReply:(void (^)(SNTAction))reply {
   reply(self.checkCacheBlock(vnodeID));
+}
+
+#pragma mark Recent block ops
+
+- (void)recentBlocksSince:(NSDate*)since reply:(void (^)(NSArray<NSDictionary*>*))reply {
+  // Which binaries another user tried to run isn't theirs to see, so anyone but
+  // root gets only their own blocks. Without a connection to attribute the call
+  // to there is no uid to filter on, so nothing can safely be returned.
+  NSXPCConnection* connection = [NSXPCConnection currentConnection];
+  if (!connection) {
+    reply(@[]);
+    return;
+  }
+
+  reply(_recentBlocks->Since(since ?: [NSDate distantPast], connection.effectiveUserIdentifier));
 }
 
 #pragma mark Database ops

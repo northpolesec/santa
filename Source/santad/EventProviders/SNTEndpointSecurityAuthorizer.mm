@@ -19,19 +19,24 @@
 #include <os/base.h>
 #include <stdlib.h>
 
+#import "Source/common/AuditUtilities.h"
 #import "Source/common/BranchPrediction.h"
+#import "Source/common/SNTBlockMessage.h"
 #import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTLogging.h"
+#include "Source/common/String.h"
 #include "Source/common/es/ESMetricsObserver.h"
 #include "Source/common/es/EnrichedTypes.h"
 #include "Source/common/es/Message.h"
 #include "Source/santad/EventProviders/AuthResultCache.h"
+#include "Source/santad/RecentBlocks.h"
 
 using santa::AuthResultCache;
 using santa::EndpointSecurityAPI;
 using santa::EventDisposition;
 using santa::Message;
+using santa::RecentBlocks;
 
 @interface SNTEndpointSecurityAuthorizer ()
 @property SNTCompilerController* compilerController;
@@ -43,6 +48,7 @@ using santa::Message;
 @implementation SNTEndpointSecurityAuthorizer {
   std::shared_ptr<AuthResultCache> _authResultCache;
   std::shared_ptr<santa::TTYWriter> _ttyWriter;
+  std::shared_ptr<RecentBlocks> _recentBlocks;
 }
 
 - (instancetype)initWithESAPI:(std::shared_ptr<EndpointSecurityAPI>)esApi
@@ -51,8 +57,8 @@ using santa::Message;
            compilerController:(SNTCompilerController*)compilerController
               authResultCache:(std::shared_ptr<AuthResultCache>)authResultCache
                     ttyWriter:(std::shared_ptr<santa::TTYWriter>)ttyWriter
-                  processTree:
-                      (std::shared_ptr<santa::santad::process_tree::ProcessTree>)processTree {
+                  processTree:(std::shared_ptr<santa::santad::process_tree::ProcessTree>)processTree
+                 recentBlocks:(std::shared_ptr<RecentBlocks>)recentBlocks {
   self = [super initWithESAPI:std::move(esApi)
                       metrics:std::move(metrics)
                     processor:santa::Processor::kAuthorizer
@@ -62,6 +68,7 @@ using santa::Message;
     _compilerController = compilerController;
     _authResultCache = authResultCache;
     _ttyWriter = std::move(ttyWriter);
+    _recentBlocks = std::move(recentBlocks);
 
     _probes = [NSMutableArray array];
 
@@ -106,6 +113,28 @@ using santa::Message;
   }
 
   return [self respondToMessage:msg withAuthResult:result cacheable:cacheable];
+}
+
+// Record an execution this client is about to deny, so a caller that only saw
+// its process die with SIGKILL can ask santad whether Santa was the cause.
+//
+// ponytail: a denial served straight from the AuthResultCache deny cache is not
+// recorded. Those entries live only for the deny cache interval, so such a
+// denial always follows one that was recorded by at most that interval, which is
+// well inside the window any caller looks back over. Record there too if that
+// stops being true.
+- (void)recordBlockForMessage:(const Message&)esMsg
+                 withDecision:(SNTCachedDecision*)cd
+                       reason:(NSString*)reason {
+  const es_process_t* targetProc = esMsg->event.exec.target;
+
+  _recentBlocks->Record(santa::Pid(targetProc->audit_token),
+                        santa::Pid(targetProc->parent_audit_token),
+                        santa::RealUser(targetProc->audit_token),
+                        santa::StringTokenToNSString(targetProc->executable->path), cd.sha256,
+                        reason
+                            ?: [SNTBlockMessage blockReasonForDecision:cd.decision
+                                                      seatbeltRequired:cd.seatbeltRequired]);
 }
 
 - (void)processMessage:(Message)msg {
@@ -166,6 +195,9 @@ using santa::Message;
                                      @"---\n"
                                      @"\n",
                                      targetProc->executable->path.data]);
+      [self recordBlockForMessage:msg
+                     withDecision:cacheEntry.cached_decision
+                           reason:@"Another instance is pending user authorization"];
       [self respondToMessage:msg withAuthResult:ES_AUTH_RESULT_DENY cacheable:false];
       return;
     } else if (returnAction == SNTActionRequestBinary) {
@@ -272,11 +304,17 @@ using santa::Message;
       // interval, and SNTActionRespondDenyOnce still stores no entry at all.
       cacheable = false;
       authResult = ES_AUTH_RESULT_DENY;
+      [self recordBlockForMessage:esMsg withDecision:cd reason:nil];
       break;
 
     // Not setting `authResult` intentionally as no ES response takes place
-    case SNTActionHoldAllowed: OS_FALLTHROUGH;
-    case SNTActionHoldDenied: break;
+    case SNTActionHoldAllowed: break;
+    case SNTActionHoldDenied:
+      // Nothing authorized the held execution in time, so the exec controller
+      // has already killed the stopped process. No ES response follows, but it
+      // is as much a block as any other and is recorded as one.
+      [self recordBlockForMessage:esMsg withDecision:cd reason:nil];
+      break;
 
     default:
       // This is a programming error. Bail.

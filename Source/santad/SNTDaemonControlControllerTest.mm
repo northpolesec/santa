@@ -93,7 +93,8 @@ static NSString* const kBinarySHA256 =
       }
       metricsExportBlock:^(void (^)(BOOL)) {
       }
-      binaryUploadController:nullptr];
+      binaryUploadController:nullptr
+      recentBlocks:std::make_shared<santa::RecentBlocks>()];
 }
 
 - (void)tearDown {
@@ -417,6 +418,20 @@ static NSString* const kBinarySHA256 =
                  @"stuck with a departed sync server's rules");
 
   [cfg stopMocking];
+}
+
+// Every reply is filtered to the uid of the XPC connection the call arrived on.
+// Called with no connection at all there is no uid to filter by, so nothing can
+// safely be returned.
+- (void)testRecentBlocksReturnsNothingWithoutAnXPCConnection {
+  __block NSArray<NSDictionary*>* got = nil;
+  [self.sut recentBlocksSince:[NSDate distantPast]
+                        reply:^(NSArray<NSDictionary*>* blocks) {
+                          got = blocks;
+                        }];
+
+  XCTAssertNotNil(got);
+  XCTAssertEqual(got.count, (NSUInteger)0);
 }
 
 - (void)testManualRuleChangesAreAllowedWhenNothingElseManagesPolicy {

@@ -41,6 +41,17 @@ objc_library(
 )
 
 objc_library(
+    name = "SNTCommandBlocks",
+    srcs = ["Commands/SNTCommandBlocks.mm"],
+    deps = [
+        ":santactl_cmd",
+        "//Source/common:MOLXPCConnection",
+        "//Source/common:SNTLogging",
+        "//Source/common:SNTXPCControlInterface",
+    ],
+)
+
+objc_library(
     name = "SNTCommandInstall",
     srcs = ["Commands/SNTCommandInstall.mm"],
     deps = [
@@ -287,6 +298,7 @@ objc_library(
     ],
     deps = [
         ":SNTCommandAdminMode",
+        ":SNTCommandBlocks",
         ":SNTCommandCheckCache",
         ":SNTCommandCommand",
         ":SNTCommandDoctor",

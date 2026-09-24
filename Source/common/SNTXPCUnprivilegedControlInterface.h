@@ -51,6 +51,15 @@ struct RuleCounts {
 - (void)checkCacheForVnodeID:(SantaVnode)vnodeID withReply:(void (^)(SNTAction))reply;
 
 ///
+///  Recent block ops
+///
+///  The executions santad most recently denied, most recent last, as
+///  property-list dictionaries (see Source/santad/RecentBlocks.h for the keys).
+///  A non-root caller only sees blocks of executions it ran itself.
+///
+- (void)recentBlocksSince:(NSDate*)since reply:(void (^)(NSArray<NSDictionary*>*))reply;
+
+///
 ///  Database ops
 ///
 - (void)databaseRuleCounts:(void (^)(struct RuleCounts ruleCounts))reply;

@@ -48,6 +48,7 @@
 #import "Source/santad/EventProviders/SNTEndpointSecurityRecorder.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityTamperResistance.h"
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
+#import "Source/santad/RecentBlocks.h"
 #import "Source/santad/SNTBinaryUploadController.h"
 #import "Source/santad/SNTDaemonControlController.h"
 #import "Source/santad/SNTDatabaseController.h"
@@ -102,6 +103,12 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
       santa::SleighLauncher::Create(std::string(santa::SleighLauncher::kDefaultSleighPath)),
       /*timeout_seconds=*/6 * 60);
 
+  // The last few executions denied by this daemon, so santactl can tell a caller
+  // whose process was SIGKILLed that Santa was the reason. Shared between the
+  // authorizer, which records into it, and the control controller, which serves
+  // it to santactl.
+  auto recent_blocks = std::make_shared<santa::RecentBlocks>();
+
   SNTDaemonControlController* dc =
       [[SNTDaemonControlController alloc] initWithNotificationQueue:notifier_queue
           syncdQueue:syncd_queue
@@ -126,7 +133,8 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
               if (reply) reply(NO);
             }
           }
-          binaryUploadController:binary_upload_controller];
+          binaryUploadController:binary_upload_controller
+          recentBlocks:recent_blocks];
 
   // Watch for the sync server being removed or replaced, and restore any
   // recorded natural admins if that already happened while the daemon was not
@@ -188,7 +196,8 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                         compilerController:compiler_controller
                                            authResultCache:auth_result_cache
                                                  ttyWriter:tty_writer
-                                               processTree:process_tree];
+                                               processTree:process_tree
+                                              recentBlocks:recent_blocks];
 
   // While any client could be used, this implementation chooses to use the
   // authorizer client as it is most concerned with the state of ES caches.

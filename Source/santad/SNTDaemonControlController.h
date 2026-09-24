@@ -22,6 +22,7 @@
 #include "Source/common/faa/WatchItems.h"
 #include "Source/santad/EventProviders/AuthResultCache.h"
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
+#include "Source/santad/RecentBlocks.h"
 #include "Source/santad/SNTBinaryUploadController.h"
 #include "Source/santad/SandboxExpectations.h"
 
@@ -52,7 +53,8 @@ class TemporaryAdminMode;
                           checkCacheBlock:(SNTAction (^)(SantaVnode))checkCacheBlock
                        metricsExportBlock:(void (^)(void (^reply)(BOOL)))metricsExportBlock
                    binaryUploadController:
-                       (std::shared_ptr<santa::SNTBinaryUploadController>)binaryUploadController;
+                       (std::shared_ptr<santa::SNTBinaryUploadController>)binaryUploadController
+                             recentBlocks:(std::shared_ptr<santa::RecentBlocks>)recentBlocks;
 
 /// Install the network extension, optionally checking whether an upgrade is needed first.
 /// When force is YES, delegates to installNetworkExtension: as long as installation is authorized.

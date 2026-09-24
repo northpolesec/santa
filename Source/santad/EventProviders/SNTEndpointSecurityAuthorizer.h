@@ -21,6 +21,7 @@
 #include "Source/common/processtree/process_tree.h"
 #import "Source/santad/EventProviders/AuthResultCache.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityTreeAwareClient.h"
+#include "Source/santad/RecentBlocks.h"
 #import "Source/santad/SNTCompilerController.h"
 #import "Source/santad/SNTExecutionController.h"
 #include "Source/santad/TTYWriter.h"
@@ -44,8 +45,8 @@
            compilerController:(SNTCompilerController*)compilerController
               authResultCache:(std::shared_ptr<santa::AuthResultCache>)authResultCache
                     ttyWriter:(std::shared_ptr<santa::TTYWriter>)ttyWriter
-                  processTree:
-                      (std::shared_ptr<santa::santad::process_tree::ProcessTree>)processTree;
+                  processTree:(std::shared_ptr<santa::santad::process_tree::ProcessTree>)processTree
+                 recentBlocks:(std::shared_ptr<santa::RecentBlocks>)recentBlocks;
 
 - (void)registerAuthExecProbe:(id<SNTEndpointSecurityProbe>)watcher;
 

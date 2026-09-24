@@ -536,6 +536,24 @@ santa_unit_test(
 )
 
 objc_library(
+    name = "RecentBlocks",
+    srcs = ["RecentBlocks.mm"],
+    hdrs = ["RecentBlocks.h"],
+    deps = [
+        "//Source/common:RingBuffer",
+        "@abseil-cpp//absl/synchronization",
+    ],
+)
+
+santa_unit_test(
+    name = "RecentBlocksTest",
+    srcs = ["RecentBlocksTest.mm"],
+    deps = [
+        ":RecentBlocks",
+    ],
+)
+
+objc_library(
     name = "CELActivation",
     srcs = ["CELActivation.mm"],
     hdrs = ["CELActivation.h"],
@@ -706,14 +724,18 @@ objc_library(
     hdrs = ["EventProviders/SNTEndpointSecurityAuthorizer.h"],
     deps = [
         ":AuthResultCache",
+        ":RecentBlocks",
         ":SNTCompilerController",
         ":SNTEndpointSecurityTreeAwareClient",
         ":SNTExecutionController",
         ":TTYWriter",
+        "//Source/common:AuditUtilities",
         "//Source/common:BranchPrediction",
+        "//Source/common:SNTBlockMessage",
         "//Source/common:SNTCachedDecision",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTLogging",
+        "//Source/common:String",
         "//Source/common/es:ESMetricsObserver",
         "//Source/common/es:EndpointSecurityAPI",
         "//Source/common/es:EndpointSecurityEnrichedTypes",
@@ -1351,6 +1373,7 @@ objc_library(
         ":AuthResultCache",
         ":EndpointSecurityLogger",
         ":KillingMachine",
+        ":RecentBlocks",
         ":SNTBinaryUploadController",
         ":SNTDatabaseController",
         ":SNTEventTable",
@@ -1425,6 +1448,7 @@ objc_library(
         ":EndpointSecurityLogger",
         ":FAAPolicyProcessor",
         ":Metrics",
+        ":RecentBlocks",
         ":SNTBinaryUploadController",
         ":SNTCompilerController",
         ":SNTDaemonControlController",
@@ -2036,6 +2060,7 @@ santa_unit_test(
     deps = [
         ":AuthResultCache",
         ":Metrics",
+        ":RecentBlocks",
         ":SNTCompilerController",
         ":SNTEndpointSecurityAuthorizer",
         ":SNTExecutionController",
@@ -2225,6 +2250,7 @@ test_suite(
         ":KillingMachineTest",
         ":MetricsTest",
         ":RateLimiterTest",
+        ":RecentBlocksTest",
         ":SNTApplicationCoreMetricsTest",
         ":SNTBelievableClockTest",
         ":SNTBinaryUploadControllerTest",

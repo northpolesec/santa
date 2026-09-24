@@ -185,8 +185,14 @@ static id EncodedValueOrNull(id value) {
 }
 
 + (NSString*)blockReasonForEvent:(SNTStoredExecutionEvent*)event {
+  return [SNTBlockMessage blockReasonForDecision:event.decision
+                                seatbeltRequired:event.seatbeltRequired];
+}
+
++ (NSString*)blockReasonForDecision:(SNTEventState)decision
+                   seatbeltRequired:(BOOL)seatbeltRequired {
   NSString* reason;
-  switch (event.decision) {
+  switch (decision) {
     case SNTEventStateBlockBinary:
       reason = NSLocalizedString(@"Binary rule", @"Block reason for binary rule match");
       break;
@@ -227,7 +233,7 @@ static id EncodedValueOrNull(id value) {
       break;
   }
 
-  if (event.seatbeltRequired) {
+  if (seatbeltRequired) {
     reason = [reason
         stringByAppendingString:NSLocalizedString(
                                     @" (requires running under santactl sandbox)",

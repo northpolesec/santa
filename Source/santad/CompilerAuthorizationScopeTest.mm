@@ -184,7 +184,8 @@ static const std::vector<std::string> kBlockedArgs = {"clang", "--link"};
                                         compilerController:self.mockCompilerController
                                            authResultCache:_authResultCache
                                                  ttyWriter:santa::TTYWriter::Create(true)
-                                               processTree:nullptr];
+                                               processTree:nullptr
+                                              recentBlocks:std::make_shared<santa::RecentBlocks>()];
 }
 
 - (void)tearDown {

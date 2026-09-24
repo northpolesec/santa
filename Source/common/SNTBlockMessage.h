@@ -76,6 +76,12 @@ NS_ASSUME_NONNULL_BEGIN
 + (NSString*)blockReasonForEvent:(nullable SNTStoredExecutionEvent*)event;
 
 ///
+///  Returns the same human-readable block reason for a decision that has not been turned into a
+///  stored event, e.g. in the daemon's authorization path.
+///
++ (NSString*)blockReasonForDecision:(SNTEventState)decision seatbeltRequired:(BOOL)seatbeltRequired;
+
+///
 ///  Strip HTML from a string, replacing <br /> with newline.
 ///
 + (NSString*)stringFromHTML:(NSString*)html;

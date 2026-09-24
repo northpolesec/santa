@@ -34,6 +34,7 @@
 #include "Source/santad/EventProviders/AuthResultCache.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityAuthorizer.h"
 #include "Source/santad/Metrics.h"
+#include "Source/santad/RecentBlocks.h"
 #import "Source/santad/SNTCompilerController.h"
 #import "Source/santad/SNTExecutionController.h"
 #include "Source/santad/TTYWriter.h"
@@ -121,13 +122,15 @@ class MockAuthResultCache : public AuthResultCache {
 
   // Use the full initializer so the tree-aware base class is properly set up
   // (the inherited 3-arg initializer does not initialize tree-aware state).
-  id authClient = [[SNTEndpointSecurityAuthorizer alloc] initWithESAPI:mockESApi
-                                                               metrics:nullptr
-                                                        execController:nil
-                                                    compilerController:nil
-                                                       authResultCache:nullptr
-                                                             ttyWriter:nullptr
-                                                           processTree:nullptr];
+  id authClient =
+      [[SNTEndpointSecurityAuthorizer alloc] initWithESAPI:mockESApi
+                                                   metrics:nullptr
+                                            execController:nil
+                                        compilerController:nil
+                                           authResultCache:nullptr
+                                                 ttyWriter:nullptr
+                                               processTree:nullptr
+                                              recentBlocks:std::make_shared<santa::RecentBlocks>()];
 
   EXPECT_CALL(*mockESApi, ClearCache)
       .After(EXPECT_CALL(*mockESApi, Subscribe(testing::_, expectedEventSubs))
@@ -163,7 +166,8 @@ class MockAuthResultCache : public AuthResultCache {
                                         compilerController:nil
                                            authResultCache:nullptr
                                                  ttyWriter:nullptr
-                                               processTree:nullptr];
+                                               processTree:nullptr
+                                              recentBlocks:std::make_shared<santa::RecentBlocks>()];
 
   OCMExpect([self.mockExecController forgetSandboxedSeatbeltProc:proc.audit_token])
       .ignoringNonObjectArgs();
@@ -206,14 +210,15 @@ class MockAuthResultCache : public AuthResultCache {
     // mock object will think that it has been leaked.
     ::testing::Mock::AllowLeak(mockESApi.get());
 
-    SNTEndpointSecurityAuthorizer* authClient =
-        [[SNTEndpointSecurityAuthorizer alloc] initWithESAPI:mockESApi
-                                                     metrics:nullptr
-                                              execController:self.mockExecController
-                                          compilerController:nil
-                                             authResultCache:nullptr
-                                                   ttyWriter:nullptr
-                                                 processTree:nullptr];
+    SNTEndpointSecurityAuthorizer* authClient = [[SNTEndpointSecurityAuthorizer alloc]
+             initWithESAPI:mockESApi
+                   metrics:nullptr
+            execController:self.mockExecController
+        compilerController:nil
+           authResultCache:nullptr
+                 ttyWriter:nullptr
+               processTree:nullptr
+              recentBlocks:std::make_shared<santa::RecentBlocks>()];
 
     // Temporarily change the event type
     esMsg.event_type = ES_EVENT_TYPE_NOTIFY_EXEC;
@@ -232,14 +237,15 @@ class MockAuthResultCache : public AuthResultCache {
     mockESApi->SetExpectationsRetainReleaseMessage();
     ::testing::Mock::AllowLeak(mockESApi.get());
 
-    SNTEndpointSecurityAuthorizer* authClient =
-        [[SNTEndpointSecurityAuthorizer alloc] initWithESAPI:mockESApi
-                                                     metrics:nullptr
-                                              execController:self.mockExecController
-                                          compilerController:nil
-                                             authResultCache:nullptr
-                                                   ttyWriter:nullptr
-                                                 processTree:nullptr];
+    SNTEndpointSecurityAuthorizer* authClient = [[SNTEndpointSecurityAuthorizer alloc]
+             initWithESAPI:mockESApi
+                   metrics:nullptr
+            execController:self.mockExecController
+        compilerController:nil
+           authResultCache:nullptr
+                 ttyWriter:nullptr
+               processTree:nullptr
+              recentBlocks:std::make_shared<santa::RecentBlocks>()];
 
     id mockAuthClient = OCMPartialMock(authClient);
 
@@ -283,14 +289,15 @@ class MockAuthResultCache : public AuthResultCache {
     mockESApi->SetExpectationsRetainReleaseMessage();
     ::testing::Mock::AllowLeak(mockESApi.get());
 
-    SNTEndpointSecurityAuthorizer* authClient =
-        [[SNTEndpointSecurityAuthorizer alloc] initWithESAPI:mockESApi
-                                                     metrics:nullptr
-                                              execController:self.mockExecController
-                                          compilerController:nil
-                                             authResultCache:nullptr
-                                                   ttyWriter:nullptr
-                                                 processTree:nullptr];
+    SNTEndpointSecurityAuthorizer* authClient = [[SNTEndpointSecurityAuthorizer alloc]
+             initWithESAPI:mockESApi
+                   metrics:nullptr
+            execController:self.mockExecController
+        compilerController:nil
+           authResultCache:nullptr
+                 ttyWriter:nullptr
+               processTree:nullptr
+              recentBlocks:std::make_shared<santa::RecentBlocks>()];
 
     id mockAuthClient = OCMPartialMock(authClient);
 
@@ -359,7 +366,8 @@ class MockAuthResultCache : public AuthResultCache {
       compilerController:mockCompilerController
          authResultCache:mockAuthCache
                ttyWriter:santa::TTYWriter::Create(true)
-             processTree:nullptr];
+             processTree:nullptr
+            recentBlocks:std::make_shared<santa::RecentBlocks>()];
   id mockAuthClient = OCMPartialMock(authClient);
 
   // This block tests that processing is held up until an outstanding thread
@@ -453,6 +461,8 @@ class MockAuthResultCache : public AuthResultCache {
   OCMExpect([mockCompilerController setProcess:execProc.audit_token isCompiler:true]);
   OCMExpect([mockCompilerController setProcess:execProc.audit_token isCompiler:true]);
 
+  auto recentBlocks = std::make_shared<santa::RecentBlocks>();
+
   SNTEndpointSecurityAuthorizer* authClient =
       [[SNTEndpointSecurityAuthorizer alloc] initWithESAPI:mockESApi
                                                    metrics:nullptr
@@ -460,7 +470,8 @@ class MockAuthResultCache : public AuthResultCache {
                                         compilerController:mockCompilerController
                                            authResultCache:mockAuthCache
                                                  ttyWriter:nullptr
-                                               processTree:nullptr];
+                                               processTree:nullptr
+                                              recentBlocks:recentBlocks];
   id mockAuthClient = OCMPartialMock(authClient);
 
   {
@@ -498,6 +509,16 @@ class MockAuthResultCache : public AuthResultCache {
                                        kv.first != SNTActionRespondAllowCompiler &&
                                        kv.first != SNTActionRespondAllowNoCache &&
                                        kv.first != SNTActionRespondAllowCompilerNoCache));
+    }
+
+    // Only the two denying actions above should have been recorded, so a caller
+    // that sees its process killed can find out Santa was the cause.
+    NSArray<NSDictionary*>* blocks = recentBlocks->Since([NSDate distantPast], 0);
+    XCTAssertEqual(blocks.count, (NSUInteger)2);
+    for (NSDictionary* block in blocks) {
+      XCTAssertEqualObjects(block[santa::kRecentBlockPath], @"bar");
+      XCTAssertEqualObjects(block[santa::kRecentBlockPID], @(12));
+      XCTAssertEqualObjects(block[santa::kRecentBlockPPID], @(34));
     }
   }
 
