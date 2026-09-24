@@ -72,6 +72,7 @@ struct RuleCounts {
 - (void)watchItemsState:(void (^)(BOOL, uint64_t, NSString*,
                                   santa::WatchItems::DataSource dataSource, NSString*,
                                   NSTimeInterval))reply;
+- (void)overrideFileAccessAction:(void (^)(SNTOverrideFileAccessAction))reply;
 - (void)clientMode:(void (^)(SNTClientMode))reply;
 - (void)fullSyncLastSuccess:(void (^)(NSDate*))reply;
 - (void)ruleSyncLastSuccess:(void (^)(NSDate*))reply;

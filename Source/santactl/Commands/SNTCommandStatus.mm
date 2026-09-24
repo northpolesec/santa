@@ -252,6 +252,11 @@ REGISTER_COMMAND_NAME(@"status")
     }
   }];
 
+  __block SNTOverrideFileAccessAction overrideFileAccessAction = SNTOverrideFileAccessActionNone;
+  [rop overrideFileAccessAction:^(SNTOverrideFileAccessAction response) {
+    overrideFileAccessAction = response;
+  }];
+
   __block SNTRemovableMediaAction removableMediaAction = SNTRemovableMediaActionAllow;
   [rop removableMediaAction:^(SNTRemovableMediaAction response) {
     removableMediaAction = response;
@@ -382,6 +387,13 @@ REGISTER_COMMAND_NAME(@"status")
         }
       };
 
+  NSString* overrideFileAccessActionStr;
+  switch (overrideFileAccessAction) {
+    case SNTOverrideFileAccessActionAuditOnly: overrideFileAccessActionStr = @"AUDIT_ONLY"; break;
+    case SNTOverrideFileAccessActionDisable: overrideFileAccessActionStr = @"DISABLE"; break;
+    default: overrideFileAccessActionStr = @"NONE"; break;
+  }
+
   if ([arguments containsObject:@"--json"]) {
     NSMutableDictionary* stats = [@{
       @"daemon" : @{
@@ -477,6 +489,7 @@ REGISTER_COMMAND_NAME(@"status")
         @"data_source" : santa::WatchItems::DataSourceName(watchItemsDataSource),
         @"rule_count" : @(watchItemsRuleCount),
         @"last_policy_update" : watchItemsLastUpdateStr ?: @"null",
+        @"override_action" : overrideFileAccessActionStr,
       } mutableCopy];
 
       if (watchItemsPolicyVersion.length > 0) {
@@ -489,6 +502,7 @@ REGISTER_COMMAND_NAME(@"status")
     } else {
       stats[@"watch_items"] = @{
         @"enabled" : @(watchItemsEnabled),
+        @"override_action" : overrideFileAccessActionStr,
       };
     }
 
@@ -604,6 +618,9 @@ REGISTER_COMMAND_NAME(@"status")
 
     printf(">>> Watch Items\n");
     printf("  %-40s | %s\n", "Enabled", (watchItemsEnabled ? "Yes" : "No"));
+    if (overrideFileAccessAction != SNTOverrideFileAccessActionNone) {
+      printf("  %-40s | %s\n", "Override Action", overrideFileAccessActionStr.UTF8String);
+    }
     if (watchItemsEnabled) {
       printf("  %-40s | %s\n", "Data Source",
              santa::WatchItems::DataSourceName(watchItemsDataSource).UTF8String);
