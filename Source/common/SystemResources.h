@@ -33,6 +33,11 @@ struct SantaTaskInfo {
   uint64_t total_system_nanos;
 };
 
+struct SantaMemoryFootprint {
+  uint64_t phys_footprint;
+  uint64_t lifetime_max_phys_footprint;
+};
+
 // Convert mach absolute time to nanoseconds
 uint64_t MachTimeToNanos(uint64_t mach_time);
 
@@ -49,6 +54,16 @@ static inline uint64_t GetCurrentUptime() {
 
 // Get the result of proc_pidinfo with the PROC_PIDTASKINFO flavor
 std::optional<SantaTaskInfo> GetTaskInfo();
+
+// Get the result of proc_pid_rusage with the RUSAGE_INFO_V4 flavor.
+//
+// lifetime_max_phys_footprint is clamped to be at least phys_footprint. The
+// kernel does not fill the two fields atomically, so the raw values can show a
+// peak below the current footprint.
+//
+// Separate from GetTaskInfo(): no rusage_info flavor reports virtual size,
+// so a merged accessor would have to make both syscalls.
+std::optional<SantaMemoryFootprint> GetMemoryFootprint();
 
 // Get a list of all current pids
 std::optional<std::vector<pid_t>> GetPidList();

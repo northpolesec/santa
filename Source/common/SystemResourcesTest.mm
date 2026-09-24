@@ -24,6 +24,14 @@
 
 @implementation SystemResourcesTest
 
+- (void)setUp {
+  [super setUp];
+  // Several tests here assert an optional has a value and dereference it on the
+  // next line. continueAfterFailure defaults to YES, which would run that
+  // dereference on an empty optional. Stop at the failing assertion instead.
+  self.continueAfterFailure = NO;
+}
+
 - (void)tearDown {
   // The overrides below are declared behind #ifdef DEBUG so they cannot ship, and
   // DEBUG follows bazel's compilation mode: set under fastbuild, unset under
@@ -35,6 +43,18 @@
   SetBootVolumeGroupDevUnavailableForTesting(false);
 #endif
   [super tearDown];
+}
+
+- (void)testMemoryFootprint {
+  std::optional<SantaMemoryFootprint> footprint = GetMemoryFootprint();
+  XCTAssertTrue(footprint.has_value());
+  XCTAssertGreaterThan(footprint->phys_footprint, 0);
+
+  // GetMemoryFootprint() clamps the peak to the current value, so this holds by
+  // construction rather than by luck. It is asserted to pin that clamp down: the
+  // kernel fills the two fields non-atomically and can report a peak below the
+  // current footprint, which is exactly what callers must never see.
+  XCTAssertGreaterThanOrEqual(footprint->lifetime_max_phys_footprint, footprint->phys_footprint);
 }
 
 - (void)testBootVolumeGroupDevMatchesRootDirectory {

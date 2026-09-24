@@ -75,6 +75,18 @@
   metric[@"fields"][@""][0][@"data"] = @35634683904;
   mutableMetrics[@"metrics"][@"/proc/memory/virtual_size"] = metric;
 
+  // Fix up Memory (phys footprint)
+  metric = mutableMetrics[@"metrics"][@"/proc/memory/phys_footprint"];
+  XCTAssertFalse(CFNumberIsFloatType((__bridge CFNumberRef)metric[@"fields"][@""][0][@"data"]));
+  metric[@"fields"][@""][0][@"data"] = @24576000;
+  mutableMetrics[@"metrics"][@"/proc/memory/phys_footprint"] = metric;
+
+  // Fix up Memory (lifetime max phys footprint)
+  metric = mutableMetrics[@"metrics"][@"/proc/memory/lifetime_max_phys_footprint"];
+  XCTAssertFalse(CFNumberIsFloatType((__bridge CFNumberRef)metric[@"fields"][@""][0][@"data"]));
+  metric[@"fields"][@""][0][@"data"] = @26214400;
+  mutableMetrics[@"metrics"][@"/proc/memory/lifetime_max_phys_footprint"] = metric;
+
   return mutableMetrics;
 }
 
@@ -140,6 +152,30 @@
               @"value" : @"system"
             }
           ],
+        },
+      },
+      @"/proc/memory/lifetime_max_phys_footprint" : @{
+        @"description" : @"The peak physical memory footprint of this process since launch",
+        @"type" : @7,
+        @"fields" : @{
+          @"" : @[ @{
+            @"created" : fixedDate,
+            @"data" : @26214400,
+            @"last_updated" : fixedDate,
+            @"value" : @""
+          } ],
+        },
+      },
+      @"/proc/memory/phys_footprint" : @{
+        @"description" : @"The physical memory footprint of this process",
+        @"type" : @7,
+        @"fields" : @{
+          @"" : @[ @{
+            @"created" : fixedDate,
+            @"data" : @24576000,
+            @"last_updated" : fixedDate,
+            @"value" : @""
+          } ],
         },
       },
       @"/proc/memory/resident_size" : @{
