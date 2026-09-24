@@ -62,9 +62,17 @@ import santa_gui_SNTMessageView
 }
 
 func copyDetailsToClipboard(e: SNTStoredExecutionEvent?, customURL: String?) {
-  var s = "Santa blocked \((e?.fileBundleName?.isEmpty == false) ? e!.fileBundleName! : "an application")"
+  // A nil event suppresses: missing data must not be the permissive case.
+  let unverified = e?.contentAttributesUnverified ?? true
+  var s =
+    "Santa blocked \((!unverified && e?.fileBundleName?.isEmpty == false) ? e!.fileBundleName! : "an application")"
+  if unverified {
+    // The dialog says this; the pasted text has to say it too, or it reads as an ordinary block
+    // in whatever approval ticket it is pasted into.
+    s += "\nNote       : Santa could not verify this application's identity"
+  }
   s += "\nReason     : \(SNTBlockMessage.blockReason(for: e))"
-  if let publisher = e?.publisherInfo {
+  if !unverified, let publisher = e?.publisherInfo {
     s += "\nPublisher  : \(publisher)"
   }
   s += "\nUser       : \(e?.executingUser ?? "unknown")"
@@ -73,13 +81,15 @@ func copyDetailsToClipboard(e: SNTStoredExecutionEvent?, customURL: String?) {
   if let signingID = e?.signingID {
     s += "\nSigningID  : \(signingID)"
   }
-  if let bundleHash = e?.fileBundleHash {
+  if !unverified, let bundleHash = e?.fileBundleHash {
     s += "\nBundle Hash: \(bundleHash)"
   }
   if let cdhash = e?.cdhash {
     s += "\nCDHash     : \(cdhash)"
   }
-  s += "\nSHA-256    : \(e?.fileSHA256 ?? "unknown")"
+  if !unverified {
+    s += "\nSHA-256    : \(e?.fileSHA256 ?? "unknown")"
+  }
   s += "\nParent     : \(e?.parentName ?? "") (\(String(format: "%d", e?.ppid?.intValue ?? 0)))"
 
   let url = SNTBlockMessage.eventDetailURL(for: e, customURL: customURL as String?)
@@ -108,6 +118,8 @@ struct MoreDetailsView: View {
   }
 
   var body: some View {
+    let unverified = e?.contentAttributesUnverified ?? true
+
     HStack(spacing: 20.0) {
       VStack(spacing: 20.0) {
         addLabel {
@@ -132,7 +144,7 @@ struct MoreDetailsView: View {
           Divider()
         }
 
-        if let bundleHash = e?.fileBundleHash {
+        if let bundleHash = e?.fileBundleHash, !unverified {
           addLabel {
             Text("Bundle Hash").bold().font(Font.system(size: 12.0))
             Text(bundleHash).font(Font.system(size: 12.0).monospaced()).frame(width: 240)
@@ -149,15 +161,17 @@ struct MoreDetailsView: View {
           Divider()
         }
 
-        addLabel {
-          Text("SHA-256").bold().font(Font.system(size: 12.0))
-          // Fix the max width of this to 240px so that the SHA-256 splits across 2 lines evenly.
-          Text(e?.fileSHA256 ?? "unknown").font(Font.system(size: 12.0).monospaced()).frame(
-            width: 240
-          ).textSelection(.enabled)
-        }
+        if !unverified {
+          addLabel {
+            Text("SHA-256").bold().font(Font.system(size: 12.0))
+            // Fix the max width of this to 240px so that the SHA-256 splits across 2 lines evenly.
+            Text(e?.fileSHA256 ?? "unknown").font(Font.system(size: 12.0).monospaced()).frame(
+              width: 240
+            ).textSelection(.enabled)
+          }
 
-        Divider()
+          Divider()
+        }
 
         addLabel {
           Text("Parent").bold().font(Font.system(size: 12.0))
@@ -198,16 +212,26 @@ struct SNTBinaryMessageEventView: View {
   @State private var isShowingDetails = false
 
   var body: some View {
+    // Unverified: fall back to the path, which names the exec target regardless of content
+    // verification.
+    let unverified = e?.contentAttributesUnverified ?? true
+
     HStack(spacing: 20.0) {
       VStack(alignment: .trailing, spacing: 10.0) {
-        if e?.fileBundleName != "" {
+        if !unverified && e?.fileBundleName != "" {
           Text("Application").bold().font(Font.system(size: 12.0))
-        } else if e?.filePath != "" {
+        } else if let filePath = e?.filePath, !filePath.isEmpty {
           Text("Filename").bold().font(Font.system(size: 12.0))
         }
 
-        if e?.publisherInfo ?? "" != "" {
-          Text("Publisher").bold().font(Font.system(size: 12.0))
+        if !unverified {
+          if e?.publisherInfo ?? "" != "" {
+            Text("Publisher").bold().font(Font.system(size: 12.0))
+          }
+        } else if let signingID = e?.signingID, !signingID.isEmpty {
+          // Kernel-sourced. FormatSigningID is nil without a team ID or platform status
+          // (e.g. ad hoc), so no row.
+          Text("Signing ID").bold().font(Font.system(size: 12.0))
         }
 
         Text("User").bold().font(Font.system(size: 12.0))
@@ -216,14 +240,18 @@ struct SNTBinaryMessageEventView: View {
       Divider()
 
       VStack(alignment: .leading, spacing: 10.0) {
-        if let bundleName = e?.fileBundleName, !bundleName.isEmpty {
+        if !unverified, let bundleName = e?.fileBundleName, !bundleName.isEmpty {
           TextWithLimit(bundleName)
-        } else if let filePath = e?.filePath {
+        } else if let filePath = e?.filePath, !filePath.isEmpty {
           TextWithLimit((filePath as NSString).lastPathComponent)
         }
 
-        if let publisher = e?.publisherInfo {
-          TextWithLimit(publisher)
+        if !unverified {
+          if let publisher = e?.publisherInfo {
+            TextWithLimit(publisher)
+          }
+        } else if let signingID = e?.signingID, !signingID.isEmpty {
+          TextWithLimit(signingID)
         }
 
         TextWithLimit(e?.executingUser ?? "")

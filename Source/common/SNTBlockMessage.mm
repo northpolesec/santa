@@ -120,18 +120,35 @@ static id EncodedValueOrNull(id value) {
       @"The following application requires authorization before it can be used",
       @"The default message to show the user when a program requires TouchID/password");
 
+  NSString* message;
+  NSString* fallback;
   if (customMessage.length) {
-    return [self formatMessage:customMessage
-                  withFallback:event.decision == SNTEventStateBlockUnknown ? defaultBlockedMessage
-                                                                           : defaultBannedMessage];
+    message = customMessage;
+    fallback =
+        event.decision == SNTEventStateBlockUnknown ? defaultBlockedMessage : defaultBannedMessage;
   } else if (event.holdAndAsk) {
-    return [self formatMessage:customMessage withFallback:defaultStandaloneMessage];
+    message = customMessage;
+    fallback = defaultStandaloneMessage;
   } else if (event.decision == SNTEventStateBlockUnknown) {
-    return [self formatMessage:[[SNTConfigurator configurator] unknownBlockMessage]
-                  withFallback:defaultBlockedMessage];
+    message = [[SNTConfigurator configurator] unknownBlockMessage];
+    fallback = defaultBlockedMessage;
+  } else {
+    message = [[SNTConfigurator configurator] bannedBlockMessage];
+    fallback = defaultBannedMessage;
   }
-  return [self formatMessage:[[SNTConfigurator configurator] bannedBlockMessage]
-                withFallback:defaultBannedMessage];
+
+  // Said in the message so consent and allowlist requests are made knowing the identity is
+  // uncertain. Vendor-unmatched shape only: a vendor-matched read keeps the normal message.
+  if (event.contentAttributesUnverified) {
+    NSString* banner = NSLocalizedString(
+        @"<br /><br />This application's identity could not be verified",
+        @"Appended to the block/Standalone message when Santa could not confirm the executed "
+        @"file's identity against what the kernel loaded");
+    if (message.length) message = [message stringByAppendingString:banner];
+    fallback = [fallback stringByAppendingString:banner];
+  }
+
+  return [self formatMessage:message withFallback:fallback];
 }
 
 + (NSAttributedString*)attributedBlockMessageForFileAccessEvent:(SNTStoredFileAccessEvent*)event
@@ -312,14 +329,17 @@ static id EncodedValueOrNull(id value) {
 //
 + (NSDictionary*)eventDetailTemplateMappingForEvent:(SNTStoredExecutionEvent*)event {
   SNTConfigurator* config = [SNTConfigurator configurator];
+  // Content-derived tokens are blank for an unconfirmed read. Empty, not nil: nil leaves the
+  // literal token in the URL.
+  BOOL contentUnverified = event.contentAttributesUnverified;
+  NSString* bundleOrFileIdentifier =
+      contentUnverified ? @"" : (event.fileSHA256 ? event.fileBundleHash ?: event.fileSHA256 : nil);
   return @{
-    @"%file_sha%" :
-        EncodedValueOrNull(event.fileSHA256 ? event.fileBundleHash ?: event.fileSHA256 : nil),
-    @"%file_identifier%" : EncodedValueOrNull(event.fileSHA256),
-    @"%bundle_or_file_identifier%" :
-        EncodedValueOrNull(event.fileSHA256 ? event.fileBundleHash ?: event.fileSHA256 : nil),
+    @"%file_sha%" : EncodedValueOrNull(bundleOrFileIdentifier),
+    @"%file_identifier%" : EncodedValueOrNull(contentUnverified ? @"" : event.fileSHA256),
+    @"%bundle_or_file_identifier%" : EncodedValueOrNull(bundleOrFileIdentifier),
     @"%username%" : EncodedValueOrNull(event.executingUser),
-    @"%file_bundle_id%" : EncodedValueOrNull(event.fileBundleID),
+    @"%file_bundle_id%" : EncodedValueOrNull(contentUnverified ? @"" : event.fileBundleID),
     @"%team_id%" : EncodedValueOrNull(event.teamID),
     @"%signing_id%" : EncodedValueOrNull(event.signingID),
     @"%cdhash%" : EncodedValueOrNull(event.cdhash),

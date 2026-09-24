@@ -155,6 +155,67 @@ static SNTTimedRuleKillDetails* TimedRuleKillDetails(NSString* application, NSDa
                        deliverImmediately:YES]);
 }
 
+- (void)testPostBlockNotificationMarksAnUnverifiedIdentity {
+  SNTStoredExecutionEvent* ev = [[SNTStoredExecutionEvent alloc] init];
+  ev.fileSHA256 = @"the-sha256";
+  ev.filePath = @"/Applications/Safari.app/Contents/MacOS/Safari";
+  ev.decision = SNTEventStateBlockBinary;
+  ev.identityUnverified = YES;
+
+  SNTNotificationManager* sut = OCMPartialMock([[SNTNotificationManager alloc] init]);
+  OCMStub([sut hashBundleBinariesForEvent:OCMOCK_ANY withController:OCMOCK_ANY]).andDo(nil);
+
+  id dncMock = OCMClassMock([NSDistributedNotificationCenter class]);
+  OCMStub([dncMock defaultCenter]).andReturn(dncMock);
+
+  [sut postBlockNotification:ev
+           withCustomMessage:@""
+                   customURL:nil
+       eventDetailButtonText:nil
+                 configState:nil
+                    andReply:^(BOOL authenticated){
+                    }];
+
+  OCMVerify([dncMock postNotificationName:OCMOCK_ANY
+                                   object:OCMOCK_ANY
+                                 userInfo:[OCMArg checkWithBlock:^BOOL(NSDictionary* userInfo) {
+                                   XCTAssertEqualObjects(userInfo[@"identity_unverified"], @YES);
+                                   return YES;
+                                 }]
+                       deliverImmediately:YES]);
+}
+
+// An ordinary block sends NO rather than omitting the key, so it is
+// distinguishable from an older Santa.
+- (void)testPostBlockNotificationMarksAVerifiedIdentity {
+  SNTStoredExecutionEvent* ev = [[SNTStoredExecutionEvent alloc] init];
+  ev.fileSHA256 = @"the-sha256";
+  ev.filePath = @"/Applications/Safari.app/Contents/MacOS/Safari";
+  ev.decision = SNTEventStateBlockBinary;
+
+  SNTNotificationManager* sut = OCMPartialMock([[SNTNotificationManager alloc] init]);
+  OCMStub([sut hashBundleBinariesForEvent:OCMOCK_ANY withController:OCMOCK_ANY]).andDo(nil);
+
+  id dncMock = OCMClassMock([NSDistributedNotificationCenter class]);
+  OCMStub([dncMock defaultCenter]).andReturn(dncMock);
+
+  [sut postBlockNotification:ev
+           withCustomMessage:@""
+                   customURL:nil
+       eventDetailButtonText:nil
+                 configState:nil
+                    andReply:^(BOOL authenticated){
+                    }];
+
+  OCMVerify([dncMock postNotificationName:OCMOCK_ANY
+                                   object:OCMOCK_ANY
+                                 userInfo:[OCMArg checkWithBlock:^BOOL(NSDictionary* userInfo) {
+                                   XCTAssertEqualObjects(userInfo[@"identity_unverified"], @NO);
+                                   return YES;
+                                 }]
+                       deliverImmediately:YES]);
+}
+
 - (void)testPostNetworkFlowBlockNotificationQueuesAWindow {
   SNTNotificationManager* mgr = [[SNTNotificationManager alloc] init];
   id mgrMock = OCMPartialMock(mgr);

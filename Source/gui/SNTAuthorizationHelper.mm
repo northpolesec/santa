@@ -160,6 +160,23 @@ static const NSTimeInterval kAdminJustificationPromptTimeoutSeconds = 120;
   NSString* bundleName = event.fileBundleName ?: @"";
   NSString* filePath = event.filePath ?: @"";
 
+  // Silent TouchID shows no window, so this string is the user's only context:
+  // don't name the possibly-wrong on-disk bundle. The path names the exec
+  // target, so it is safe to show.
+  if (event.contentAttributesUnverified) {
+    if (filePath.length == 0) {
+      return NSLocalizedString(
+          @"authorize execution of an application whose identity could not be verified",
+          @"Authorize execution of an unidentifiable application with an unverifiable identity");
+    }
+    return
+        [NSString localizedStringWithFormat:
+                      NSLocalizedString(
+                          @"authorize execution of %@, whose identity could not be verified",
+                          @"Authorize execution of an application with an unverifiable identity"),
+                      filePath.lastPathComponent];
+  }
+
   if (bundleName.length > 0) {
     return
         [NSString localizedStringWithFormat:NSLocalizedString(

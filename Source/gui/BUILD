@@ -496,6 +496,34 @@ macos_application(
 )
 
 santa_unit_test(
+    name = "SNTAuthorizationHelperTest",
+    srcs = [
+        "SNTAuthorizationHelperTest.mm",
+    ],
+    sdk_frameworks = [
+        "Cocoa",
+    ],
+    deps = [
+        ":SNTAuthorizationHelper",
+        "//Source/common:SNTStoredExecutionEvent",
+    ],
+)
+
+santa_unit_test(
+    name = "SNTBinaryMessageWindowControllerTest",
+    srcs = [
+        "SNTBinaryMessageWindowControllerTest.mm",
+    ],
+    sdk_frameworks = [
+        "Cocoa",
+    ],
+    deps = [
+        ":SNTBinaryMessageWindowController",
+        "//Source/common:SNTStoredExecutionEvent",
+    ],
+)
+
+santa_unit_test(
     name = "SNTNotificationManagerTest",
     srcs = [
         "SNTNotificationManagerTest.mm",
@@ -535,6 +563,8 @@ santa_unit_test(
 test_suite(
     name = "unit_tests",
     tests = [
+        ":SNTAuthorizationHelperTest",
+        ":SNTBinaryMessageWindowControllerTest",
         ":SNTNotificationManagerTest",
         ":SNTSystemExtensionDelegateTest",
     ],

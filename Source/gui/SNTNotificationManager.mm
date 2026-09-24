@@ -187,9 +187,12 @@ static NSString* const silencedNotificationsKey = @"SilencedNotifications";
       kCertValidUntil : @([cert.validUntil timeIntervalSince1970]) ?: @0,
     }];
   }
+  // When kIdentityUnverified is set, the on-disk hash, bundle keys and signing
+  // chain may not match what ran.
   NSDictionary* userInfo = @{
     kFileSHA256 : wc.event.fileSHA256 ?: @"",
     kFilePath : wc.event.filePath ?: @"",
+    kIdentityUnverified : @(wc.event.identityUnverified),
     kFileBundleName : wc.event.fileBundleName ?: @"",
     kFileBundleID : wc.event.fileBundleID ?: @"",
     kFileBundleVersion : wc.event.fileBundleVersion ?: @"",
