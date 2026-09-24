@@ -23,6 +23,7 @@
 
 @interface SNTConfigBundle ()
 @property NSNumber* clientMode;
+@property NSNumber* executableIntegrityPolicy;
 @property NSNumber* syncType;
 @property NSString* allowlistRegex;
 @property NSString* blocklistRegex;
@@ -66,6 +67,7 @@
 
 - (void)encodeWithCoder:(NSCoder*)coder {
   ENCODE(coder, clientMode);
+  ENCODE(coder, executableIntegrityPolicy);
   ENCODE(coder, syncType);
   ENCODE(coder, allowlistRegex);
   ENCODE(coder, blocklistRegex);
@@ -105,6 +107,7 @@
   self = [super init];
   if (self) {
     DECODE(decoder, clientMode, NSNumber);
+    DECODE(decoder, executableIntegrityPolicy, NSNumber);
     DECODE(decoder, syncType, NSNumber);
     DECODE(decoder, allowlistRegex, NSString);
     DECODE(decoder, blocklistRegex, NSString);
@@ -145,6 +148,12 @@
 - (void)clientMode:(void (^)(SNTClientMode))block {
   if (self.clientMode) {
     block((SNTClientMode)[self.clientMode integerValue]);
+  }
+}
+
+- (void)executableIntegrityPolicy:(void (^)(SNTExecutableIntegrityPolicy))block {
+  if (self.executableIntegrityPolicy) {
+    block((SNTExecutableIntegrityPolicy)[self.executableIntegrityPolicy integerValue]);
   }
 }
 

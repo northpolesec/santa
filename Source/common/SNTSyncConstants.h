@@ -106,6 +106,7 @@ extern NSString* const kCertValidUntil;
 extern NSString* const kTeamID;
 extern NSString* const kSigningID;
 extern NSString* const kCDHash;
+extern NSString* const kIdentityUnverified;
 extern NSString* const kQuarantineDataURL;
 extern NSString* const kQuarantineRefererURL;
 extern NSString* const kQuarantineTimestamp;

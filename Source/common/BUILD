@@ -1389,6 +1389,7 @@ santa_unit_test(
     srcs = ["SNTConfiguratorTest.mm"],
     deps = [
         ":SNTCommonEnums",
+        ":SNTConfigState",
         ":SNTConfigurator",
         "@OCMock",
     ],

@@ -24,6 +24,7 @@
 
 #import "Source/common/AuditUtilities.h"
 #import "Source/common/MOLXPCConnection.h"
+#import "Source/common/SNTConfigBundle.h"
 #import "Source/common/SNTError.h"
 #import "Source/common/SNTNetworkFlowRule.h"
 #import "Source/common/SNTRule.h"
@@ -44,6 +45,13 @@ static NSString* const kBinarySHA256 =
 // unreachable-from-prod) "SEATBELT rule with empty policy" state.
 @interface SNTRule ()
 @property(readwrite) NSString* seatbeltPolicy;
+@end
+
+// Expose the bundle's private backing properties so tests can build a bundle
+// carrying exactly the fields under test.
+@interface SNTConfigBundle (Testing)
+@property NSNumber* clientMode;
+@property NSNumber* executableIntegrityPolicy;
 @end
 
 @interface SNTDaemonControlController (Testing)
@@ -428,6 +436,52 @@ static NSString* const kBinarySHA256 =
   XCTAssertFalse([self.sut shouldRejectManualRuleChangeAddingRules:YES]);
   XCTAssertFalse([self.sut shouldRejectManualRuleChangeAddingRules:NO]);
 
+  [cfg stopMocking];
+}
+
+- (id)mockConfiguratorForSyncSettings {
+  id cfg = OCMClassMock([SNTConfigurator class]);
+  OCMStub([cfg configurator]).andReturn(cfg);
+  OCMStub([cfg performSyncStateBatch:[OCMArg invokeBlock]]).andReturn(NO);
+  return cfg;
+}
+
+- (void)testUpdateSyncSettingsAppliesExecutableIntegrityPolicy {
+  id cfg = [self mockConfiguratorForSyncSettings];
+  OCMExpect([cfg setSyncServerExecutableIntegrityPolicy:SNTExecutableIntegrityPolicyReport]);
+
+  SNTConfigBundle* bundle = [[SNTConfigBundle alloc] init];
+  bundle.executableIntegrityPolicy = @(SNTExecutableIntegrityPolicyReport);
+
+  __block BOOL replied = NO;
+  [self.sut updateSyncSettings:bundle
+                         reply:^{
+                           replied = YES;
+                         }];
+
+  XCTAssertTrue(replied);
+  OCMVerifyAll(cfg);
+  [cfg stopMocking];
+}
+
+- (void)testUpdateSyncSettingsWithoutExecutableIntegrityPolicyLeavesItAlone {
+  id cfg = [self mockConfiguratorForSyncSettings];
+  OCMReject([cfg setSyncServerExecutableIntegrityPolicy:SNTExecutableIntegrityPolicyUnknown])
+      .ignoringNonObjectArgs();
+  // The bundle still carries another key, so the batch demonstrably ran.
+  OCMExpect([cfg setSyncServerClientMode:SNTClientModeLockdown]);
+
+  SNTConfigBundle* bundle = [[SNTConfigBundle alloc] init];
+  bundle.clientMode = @(SNTClientModeLockdown);
+
+  __block BOOL replied = NO;
+  [self.sut updateSyncSettings:bundle
+                         reply:^{
+                           replied = YES;
+                         }];
+
+  XCTAssertTrue(replied);
+  OCMVerifyAll(cfg);
   [cfg stopMocking];
 }
 

@@ -71,6 +71,24 @@ static SNTRemovableMediaAction ActionFromString(NSString* action) {
   return SNTRemovableMediaActionAllow;
 }
 
+static SNTExecutableIntegrityPolicy ExecutableIntegrityPolicyFromString(NSString* policy) {
+  if (!policy.length) return SNTExecutableIntegrityPolicyBlockChanged;
+  if ([policy caseInsensitiveCompare:@"BlockChanged"] == NSOrderedSame) {
+    return SNTExecutableIntegrityPolicyBlockChanged;
+  }
+  if ([policy caseInsensitiveCompare:@"BlockUnverified"] == NSOrderedSame) {
+    return SNTExecutableIntegrityPolicyBlockUnverified;
+  }
+  if ([policy caseInsensitiveCompare:@"Report"] == NSOrderedSame) {
+    return SNTExecutableIntegrityPolicyReport;
+  }
+  if ([policy caseInsensitiveCompare:@"Ignore"] == NSOrderedSame) {
+    return SNTExecutableIntegrityPolicyIgnore;
+  }
+  LOGW(@"Unrecognized ExecutableIntegrityPolicy value: %@, defaulting to BlockChanged", policy);
+  return SNTExecutableIntegrityPolicyBlockChanged;
+}
+
 @interface SNTConfigurator ()
 @property(readonly, nonatomic) NSUserDefaults* defaults;
 
@@ -243,6 +261,7 @@ static NSString* const kAllowedSantaCommandsKey = @"AllowedSantaCommands";
 
 // The keys managed by a sync server or mobileconfig.
 static NSString* const kClientModeKey = @"ClientMode";
+static NSString* const kExecutableIntegrityPolicyKey = @"ExecutableIntegrityPolicy";
 static NSString* const kBlockUSBMountKey = @"BlockUSBMount";
 static NSString* const kRemountUSBModeKey = @"RemountUSBMode";
 static NSString* const kRemovableMediaActionKey = @"RemovableMediaAction";
@@ -306,6 +325,7 @@ static NSString* const kPushTokenChainKey = @"PushTokenChain";
     Class dictionary = [NSDictionary class];
     _syncServerKeyTypes = @{
       kClientModeKey : number,
+      kExecutableIntegrityPolicyKey : number,
       kEnableTransitiveRulesKey : number,
       kEnableTransitiveRulesKeyDeprecated : number,
       kAllowedPathRegexKey : re,
@@ -345,6 +365,7 @@ static NSString* const kPushTokenChainKey = @"PushTokenChain";
     };
     _forcedConfigKeyTypes = @{
       kClientModeKey : number,
+      kExecutableIntegrityPolicyKey : string,
       kFailClosedKey : number,
       kEnableTransitiveRulesKey : number,
       kEnableTransitiveRulesKeyDeprecated : number,
@@ -555,6 +576,10 @@ static SNTConfigurator* sharedConfigurator = nil;
 + (NSSet*)keyPathsForValuesAffectingClientModeIgnoringTemporaryMonitorMode {
   // Deliberately excludes inTemporaryMonitorMode: this accessor reports the base
   // (policy) mode, which an active session must not affect.
+  return [self syncAndConfigStateSet];
+}
+
++ (NSSet*)keyPathsForValuesAffectingExecutableIntegrityPolicy {
   return [self syncAndConfigStateSet];
 }
 
@@ -989,6 +1014,29 @@ static SNTConfigurator* sharedConfigurator = nil;
   if (newMode == SNTClientModeMonitor || newMode == SNTClientModeLockdown ||
       newMode == SNTClientModeStandalone) {
     [self updateSyncStateForKey:kClientModeKey value:@(newMode)];
+  }
+}
+
+- (SNTExecutableIntegrityPolicy)executableIntegrityPolicy {
+  NSNumber* n = self.syncState[kExecutableIntegrityPolicyKey];
+  if (n) {
+    SNTExecutableIntegrityPolicy p = (SNTExecutableIntegrityPolicy)[n integerValue];
+    if (p > SNTExecutableIntegrityPolicyUnknown && p <= SNTExecutableIntegrityPolicyIgnore) {
+      return p;
+    }
+  }
+  // readForcedConfig stores the parsed value; a string is still parsed so a directly
+  // assigned configState can never yield Unknown.
+  id profile = self.configState[kExecutableIntegrityPolicyKey];
+  return [profile isKindOfClass:[NSNumber class]]
+             ? (SNTExecutableIntegrityPolicy)[profile integerValue]
+             : ExecutableIntegrityPolicyFromString(profile);
+}
+
+- (void)setSyncServerExecutableIntegrityPolicy:(SNTExecutableIntegrityPolicy)policy {
+  if (policy > SNTExecutableIntegrityPolicyUnknown &&
+      policy <= SNTExecutableIntegrityPolicyIgnore) {
+    [self updateSyncStateForKey:kExecutableIntegrityPolicyKey value:@(policy)];
   }
 }
 
@@ -2499,6 +2547,12 @@ static BOOL HoldsSyncedSettings(NSDictionary* syncState) {
   }
 
   [self applyOverrides:forcedConfig];
+
+  // Parsed once per profile load rather than on every AUTH_EXEC.
+  if (forcedConfig[kExecutableIntegrityPolicyKey]) {
+    forcedConfig[kExecutableIntegrityPolicyKey] =
+        @(ExecutableIntegrityPolicyFromString(forcedConfig[kExecutableIntegrityPolicyKey]));
+  }
 
   return forcedConfig;
 }

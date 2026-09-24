@@ -94,6 +94,28 @@
 /// is uploaded so audit matches can be distinguished on the sync server.
 @property BOOL auditReturn;
 
+/// YES when the identity fields on this event could not be confirmed to be
+/// the file the kernel loaded (mirrors SNTCachedDecision.identityMismatched).
+/// Independent of -decision: an unverified execution can still be allowed or
+/// blocked by rule evaluation.
+@property BOOL identityUnverified;
+
+/// YES when this event's identity could not be confirmed exactly but its
+/// signing vendor still matched the kernel-reported process (mirrors
+/// SNTCachedDecision.identityVendorMatched). Always implies
+/// identityUnverified. Local only -- there is no wire field for this; the
+/// uploaded identity_unverified marker deliberately covers both shapes.
+@property BOOL identityVendorMatched;
+
+/// YES for the vendor-unmatched unverified shape (identityUnverified with no vendor match): this
+/// event's content-derived attributes (fileSHA256, signingChain and its derived publisherInfo,
+/// bundle info) may describe a different file than the one that actually ran, so UI
+/// presentations must not display them. NO for the vendor-matched shape, whose vendor match
+/// verified the read against the kernel-reported vendor. The single definition of the GUI's
+/// reduced-detail gate -- the block/Standalone message banner (SNTBlockMessage) and the detail
+/// views (SNTBinaryMessageWindowView) read this rather than re-deriving it.
+@property(readonly) BOOL contentAttributesUnverified;
+
 /// The decision depends on the user approving execution.
 @property BOOL holdAndAsk;
 

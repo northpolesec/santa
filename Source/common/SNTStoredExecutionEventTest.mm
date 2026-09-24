@@ -70,4 +70,107 @@
   XCTAssertEqual(sut.signingStatus, SNTSigningStatusProduction);
 }
 
+- (void)testUniqueIDFallsBackWhenHashMissing {
+  SNTStoredExecutionEvent* se = [[SNTStoredExecutionEvent alloc] init];
+  se.decision = SNTEventStateBlockBinaryMismatch;
+  se.filePath = @"/tmp/gone";
+  se.cdhash = @"aabbccdd";
+  XCTAssertEqualObjects([se uniqueID], @"cdhash:aabbccdd");
+  se.cdhash = nil;
+  XCTAssertEqualObjects([se uniqueID], @"path:/tmp/gone");
+}
+
+- (void)testUniqueIDComposesAuditAndMismatchSuffixes {
+  // :mismatch keys on identityUnverified, not a decision value, so it cannot
+  // silently stop firing if a decision enum member is removed.
+  SNTStoredExecutionEvent* normal = [[SNTStoredExecutionEvent alloc] init];
+  normal.fileSHA256 = @"abc";
+  normal.decision = SNTEventStateAllowBinary;
+  XCTAssertEqualObjects([normal uniqueID], @"abc");
+
+  SNTStoredExecutionEvent* auditOnly = [[SNTStoredExecutionEvent alloc] init];
+  auditOnly.fileSHA256 = @"abc";
+  auditOnly.decision = SNTEventStateAllowBinary;
+  auditOnly.auditReturn = YES;
+  XCTAssertEqualObjects([auditOnly uniqueID], @"abc:audit");
+
+  SNTStoredExecutionEvent* mismatchOnly = [[SNTStoredExecutionEvent alloc] init];
+  mismatchOnly.fileSHA256 = @"abc";
+  mismatchOnly.decision = SNTEventStateAllowBinary;
+  mismatchOnly.identityUnverified = YES;
+  XCTAssertEqualObjects([mismatchOnly uniqueID], @"abc:mismatch");
+
+  SNTStoredExecutionEvent* auditAndMismatch = [[SNTStoredExecutionEvent alloc] init];
+  auditAndMismatch.fileSHA256 = @"abc";
+  auditAndMismatch.decision = SNTEventStateAllowBinary;
+  auditAndMismatch.auditReturn = YES;
+  auditAndMismatch.identityUnverified = YES;
+  XCTAssertEqualObjects([auditAndMismatch uniqueID], @"abc:audit:mismatch");
+
+  NSArray<NSString*>* keys = @[
+    [normal uniqueID], [auditOnly uniqueID], [mismatchOnly uniqueID], [auditAndMismatch uniqueID]
+  ];
+  XCTAssertEqual([NSSet setWithArray:keys].count, keys.count);
+}
+
+- (void)testUnactionableEventNoWhenIdentityUnverifiedWithHash {
+  SNTStoredExecutionEvent* se = [[SNTStoredExecutionEvent alloc] init];
+  se.decision = SNTEventStateAllowBinary;
+  se.fileSHA256 = @"abc";
+  se.identityUnverified = YES;
+  XCTAssertFalse([se unactionableEvent]);
+
+  se.identityUnverified = NO;  // ordinary allow stays unactionable
+  XCTAssertTrue([se unactionableEvent]);
+}
+
+- (void)testUnactionableEventYesWhenIdentityUnverifiedWithoutHash {
+  SNTStoredExecutionEvent* se = [[SNTStoredExecutionEvent alloc] init];
+  se.decision = SNTEventStateAllowUnknown;
+  se.identityUnverified = YES;
+  se.filePath = @"/tmp/gone";
+  se.cdhash = @"aabbccdd";
+  XCTAssertTrue([se unactionableEvent]);
+
+  se.cdhash = nil;
+  XCTAssertTrue([se unactionableEvent]);
+
+  // A block is never unactionable, hash or no hash.
+  se.decision = SNTEventStateBlockUnknown;
+  XCTAssertFalse([se unactionableEvent]);
+}
+
+- (SNTStoredExecutionEvent*)roundTripped:(SNTStoredExecutionEvent*)se {
+  NSData* data = [NSKeyedArchiver archivedDataWithRootObject:se
+                                       requiringSecureCoding:YES
+                                                       error:nil];
+  XCTAssertNotNil(data);
+  NSSet* allowed = [NSSet setWithObject:[SNTStoredExecutionEvent class]];
+  return [NSKeyedUnarchiver unarchivedObjectOfClasses:allowed fromData:data error:nil];
+}
+
+- (void)testIdentityVendorMatchedSurvivesSecureCodingRoundTrip {
+  SNTStoredExecutionEvent* se = [[SNTStoredExecutionEvent alloc] init];
+  se.identityUnverified = YES;
+  se.identityVendorMatched = YES;
+  se.fileSHA256 = @"abc";
+
+  SNTStoredExecutionEvent* out = [self roundTripped:se];
+  XCTAssertTrue(out.identityUnverified);
+  XCTAssertTrue(out.identityVendorMatched);
+  XCTAssertEqualObjects(out.fileSHA256, @"abc");
+}
+
+- (void)testIdentityVendorMatchedDefaultsToNoAndSurvivesRoundTrip {
+  // A spurious identityVendorMatched on decode would route this through the
+  // verified branches in -createRuleForStandaloneModeEvent:.
+  SNTStoredExecutionEvent* se = [[SNTStoredExecutionEvent alloc] init];
+  se.identityUnverified = YES;
+  se.fileSHA256 = @"abc";
+
+  SNTStoredExecutionEvent* out = [self roundTripped:se];
+  XCTAssertTrue(out.identityUnverified);
+  XCTAssertFalse(out.identityVendorMatched);
+}
+
 @end
