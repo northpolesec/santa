@@ -188,6 +188,43 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   }
 }
 
+- (void)checkUnverifiedCounter:(const NSString*)reason
+                      decision:(NSString*)decision
+                      expected:(NSNumber*)expectedValue {
+  NSString* want = [NSString stringWithFormat:@"%@,%@", reason, decision];
+  NSDictionary* counter =
+      [[SNTMetricSet sharedInstance] export][@"metrics"][@"/santa/unverified_executions"];
+  NSNumber* got = @0;
+  for (NSDictionary* fieldValue in counter[@"fields"][@"reason,decision"]) {
+    if ([want isEqualToString:fieldValue[@"value"]]) {
+      got = fieldValue[@"data"];
+      break;
+    }
+  }
+  XCTAssertEqualObjects(got, expectedValue, @"%@ counter does not match expected value", want);
+}
+
+// Sum over every field value of the metric, so that a second increment for the
+// same execution under any other value is caught.
+- (long long)totalForMetric:(NSString*)name {
+  NSDictionary* metric = [[SNTMetricSet sharedInstance] export][@"metrics"][name];
+  long long total = 0;
+  for (NSString* fields in metric[@"fields"]) {
+    for (NSDictionary* fieldValue in metric[@"fields"][fields]) {
+      total += [fieldValue[@"data"] longLongValue];
+    }
+  }
+  return total;
+}
+
+// One execution with an unconfirmed identity: counted once by decision, and once
+// by why its identity went unconfirmed.
+- (void)checkCountedOnceAsUnverified:(const NSString*)reason decision:(NSString*)decision {
+  XCTAssertEqual([self totalForMetric:@"/santa/events"], 1);
+  XCTAssertEqual([self totalForMetric:@"/santa/unverified_executions"], 1);
+  [self checkUnverifiedCounter:reason decision:decision expected:@1];
+}
+
 - (void)testSynchronousShouldProcessExecEvent {
   es_file_t file = MakeESFile("foo");
   es_process_t proc = MakeESProcess(&file);
@@ -410,6 +447,9 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
 
   [self validateExecEvent:SNTActionRespondDeny];
   [self checkMetricCounters:kBlockBinary expected:@1];
+  // A confirmed identity is not counted as unverified.
+  XCTAssertEqual([self totalForMetric:@"/santa/events"], 1);
+  XCTAssertEqual([self totalForMetric:@"/santa/unverified_executions"], 0);
 }
 
 - (void)testCDHashAllowRule {
@@ -897,7 +937,8 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
 
   // Never cacheable: the decision describes a file nothing could read.
   [self validateExecEvent:SNTActionRespondAllowNoCache];
-  [self checkMetricCounters:kAllowNoFileInfo expected:@1];
+  [self checkMetricCounters:kAllowUnknown expected:@1];
+  [self checkCountedOnceAsUnverified:kUnverifiedUnreadable decision:@"Allow"];
 }
 
 - (void)testUnreadableFailClosed {
@@ -912,7 +953,8 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
 
   // Never cacheable: the deny describes a file nothing could read.
   [self validateExecEvent:SNTActionRespondDenyOnce];
-  [self checkMetricCounters:kDenyNoFileInfo expected:@1];
+  [self checkMetricCounters:kBlockUnknown expected:@1];
+  [self checkCountedOnceAsUnverified:kUnverifiedUnreadable decision:@"Block"];
 }
 
 - (void)testMissingShasumUsesClientModeDefault {
@@ -3005,6 +3047,7 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   XCTAssertEqual(cd.decision, SNTEventStateBlockBinaryMismatch);
   XCTAssertFalse(cd.cacheable);
   [self checkMetricCounters:kBlockBinaryMismatch expected:@1];
+  [self checkCountedOnceAsUnverified:kUnverifiedChanged decision:@"Block"];
 }
 
 - (void)testUnreadableFileIsDeniedInMonitorModeUnderBlockUnverified {
@@ -3027,9 +3070,8 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   XCTAssertTrue(cd.identityMismatched);
   XCTAssertFalse(cd.cacheable);
   XCTAssertEqualObjects(cd.decisionExtra, @"Executable could not be read");
-  [self checkMetricCounters:kDenyNoFileInfo expected:@1];
   [self checkMetricCounters:kBlockBinaryMismatch expected:@1];
-  [self checkMetricCounters:kAllowNoFileInfo expected:@0];
+  [self checkCountedOnceAsUnverified:kUnverifiedUnreadable decision:@"Block"];
 
   OCMVerifyAllWithDelay(self.mockEventDatabase, 1);
   XCTAssertNotNil(reported);
@@ -3055,9 +3097,8 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   XCTAssertFalse(cd.holdAndAsk);
   XCTAssertEqualObjects(cd.decisionExtra, @"Executable could not be read");
 
-  [self checkMetricCounters:kAllowNoFileInfo expected:@1];
-  [self checkMetricCounters:kDenyNoFileInfo expected:@0];
   [self checkMetricCounters:kAllowUnknown expected:@1];
+  [self checkCountedOnceAsUnverified:kUnverifiedUnreadable decision:@"Allow"];
 
   OCMVerifyAllWithDelay(self.mockEventDatabase, 1);
   XCTAssertEqual(reported.decision, SNTEventStateAllowUnknown);
@@ -3104,6 +3145,8 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   XCTAssertEqualObjects(cd.decisionExtra,
                         @"Executable identity confirmed by signing vendor only; Sandbox "
                         @"profile requires a confirmed executable identity");
+  [self checkMetricCounters:kBlockBinaryMismatch expected:@1];
+  [self checkCountedOnceAsUnverified:kUnverifiedVendorMatched decision:@"Block"];
 }
 
 - (void)testUnreadableFileIsDeniedFailClosedUnderReport {
@@ -3124,10 +3167,9 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   XCTAssertFalse(cd.holdAndAsk);
   XCTAssertEqualObjects(cd.decisionExtra, @"Executable could not be read");
 
-  [self checkMetricCounters:kDenyNoFileInfo expected:@1];
-  [self checkMetricCounters:kAllowNoFileInfo expected:@0];
   [self checkMetricCounters:kBlockBinaryMismatch expected:@0];
   [self checkMetricCounters:kBlockUnknown expected:@1];
+  [self checkCountedOnceAsUnverified:kUnverifiedUnreadable decision:@"Block"];
 
   OCMVerifyAllWithDelay(self.mockEventDatabase, 1);
   XCTAssertEqual(reported.decision, SNTEventStateBlockUnknown);
@@ -3228,6 +3270,7 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   XCTAssertEqualObjects(cd.decisionExtra, @"Executable identity could not be confirmed");
   [self checkMetricCounters:kAllowUnknown expected:@1];
   [self checkMetricCounters:kBlockBinaryMismatch expected:@0];
+  [self checkCountedOnceAsUnverified:kUnverifiedChanged decision:@"Allow"];
 
   OCMVerifyAllWithDelay(self.mockEventDatabase, 1);
   XCTAssertEqual(reported.decision, SNTEventStateAllowUnknown);
@@ -3303,6 +3346,7 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   XCTAssertFalse(cd.holdAndAsk);
   [self checkMetricCounters:kBlockUnknown expected:@1];
   [self checkMetricCounters:kBlockBinaryMismatch expected:@0];
+  [self checkCountedOnceAsUnverified:kUnverifiedChanged decision:@"Block"];
 
   OCMVerifyAllWithDelay(self.mockEventDatabase, 1);
   XCTAssertEqual(reported.decision, SNTEventStateBlockUnknown);
@@ -3467,6 +3511,7 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   XCTAssertFalse(cd.cacheable);
   [self checkMetricCounters:kBlockBinary expected:@1];
   [self checkMetricCounters:kBlockBinaryMismatch expected:@0];
+  [self checkCountedOnceAsUnverified:kUnverifiedChanged decision:@"Block"];
 
   OCMVerifyAllWithDelay(self.mockEventDatabase, 1);
   XCTAssertEqual(reported.decision, SNTEventStateBlockBinary);
@@ -3496,6 +3541,7 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   XCTAssertTrue(cd.identityMismatched);
   XCTAssertFalse(cd.cacheable);
   [self checkMetricCounters:kBlockBinaryMismatch expected:@1];
+  [self checkCountedOnceAsUnverified:kUnverifiedChanged decision:@"Block"];
 }
 
 // Vendor-matched: the rule decision stands, marked vendor-matched, and is force-stored under
@@ -3527,6 +3573,8 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   XCTAssertTrue(cd.identityMismatched);
   XCTAssertTrue(cd.identityVendorMatched);
   XCTAssertEqualObjects(cd.decisionExtra, @"Executable identity confirmed by signing vendor only");
+  [self checkMetricCounters:kAllowTeamID expected:@1];
+  [self checkCountedOnceAsUnverified:kUnverifiedVendorMatched decision:@"Allow"];
 
   OCMVerifyAllWithDelay(self.mockEventDatabase, 1);
   XCTAssertEqual(reported.decision, SNTEventStateAllowTeamID);
@@ -3609,10 +3657,12 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   XCTAssertEqualObjects(cd.signingID, @"myteamid:example.signing.id");
   XCTAssertEqualObjects(cd.cdhash, @"aa00000000000000000000000000000000000000");
 
-  [self checkMetricCounters:kDenyNoFileInfo expected:failClosed ? @1 : @0];
-  [self checkMetricCounters:kAllowNoFileInfo expected:failClosed ? @0 : @1];
   [self checkMetricCounters:failClosed ? kBlockUnknown : kAllowUnknown expected:@1];
   [self checkMetricCounters:kBlockBinaryMismatch expected:@0];
+  [self checkCountedOnceAsUnverified:code == SNTErrorCodeIdentityMismatch
+                                         ? kUnverifiedChangedUnevaluable
+                                         : kUnverifiedUnreadable
+                            decision:failClosed ? @"Block" : @"Allow"];
 
   OCMVerifyAllWithDelay(self.mockEventDatabase, 1);
   XCTAssertEqual(reported.decision, wantDecision);
@@ -3660,6 +3710,7 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   XCTAssertTrue(cd.identityMismatched);
   XCTAssertFalse(cd.holdAndAsk);
   [self checkMetricCounters:kBlockBinaryMismatch expected:@1];
+  [self checkCountedOnceAsUnverified:kUnverifiedChangedUnevaluable decision:@"Block"];
 }
 
 // BlockUnverified denies a confirmed mismatch, like BlockChanged: the confirmed-mismatch wording
@@ -3678,9 +3729,8 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   XCTAssertFalse(cd.holdAndAsk);
   XCTAssertEqualObjects(cd.decisionExtra, @"Executable identity could not be confirmed");
   [self checkMetricCounters:kBlockBinaryMismatch expected:@1];
-  // The mismatch deny is not the unreadable-target deny, so it does not count
-  // towards the fleet-sizing counter.
-  [self checkMetricCounters:kDenyNoFileInfo expected:@0];
+  // A confirmed mismatch, not the unreadable target BlockUnverified adds.
+  [self checkCountedOnceAsUnverified:kUnverifiedChangedUnevaluable decision:@"Block"];
 }
 
 // The integrity-policy deny, the more specific reason, wins over FailClosed. Both post
@@ -3701,7 +3751,7 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   XCTAssertEqualObjects(cd.decisionExtra, @"Executable could not be read");
   [self checkMetricCounters:kBlockBinaryMismatch expected:@1];
   [self checkMetricCounters:kBlockUnknown expected:@0];
-  [self checkMetricCounters:kDenyNoFileInfo expected:@1];
+  [self checkCountedOnceAsUnverified:kUnverifiedUnreadable decision:@"Block"];
 }
 
 // Unopenable target: FailClosed governs, including under the default.

@@ -81,6 +81,7 @@ static const size_t kMaxAllowedPathLength = MAXPATHLEN - 1;  // -1 to account fo
 @property SNTSyncdQueue* syncdQueue;
 @property SNTTimedRuleKills* timedRuleKills;
 @property SNTMetricCounter* events;
+@property SNTMetricCounter* unverifiedExecutions;
 @property santa::ProcessControlBlock processControlBlock;
 
 @property dispatch_queue_t eventQueue;
@@ -212,6 +213,11 @@ static bool SameBinary(const es_process_t* a, NSString* aSHA256, const es_proces
     _events = [metricSet counterWithName:@"/santa/events"
                               fieldNames:@[ @"action_response" ]
                                 helpText:@"Events processed by Santa per response"];
+    _unverifiedExecutions =
+        [metricSet counterWithName:@"/santa/unverified_executions"
+                        fieldNames:@[ @"reason", @"decision" ]
+                          helpText:@"Executions Santa could not confirm are of the file it "
+                                   @"evaluated, per reason and decision"];
   }
   return self;
 }
@@ -225,7 +231,17 @@ static bool SameBinary(const es_process_t* a, NSString* aSHA256, const es_proces
   [self.timedRuleKills recordKillForDecision:cd process:token];
 }
 
-- (void)incrementEventCounters:(SNTEventState)eventType {
+// Counts every execution exactly once in /santa/events, by its decision. An
+// unconfirmed identity is not a decision: it is counted separately, by
+// unverifiedReason, which is nil when the identity was confirmed.
+- (void)incrementEventCounters:(SNTEventState)eventType
+              unverifiedReason:(const NSString*)unverifiedReason {
+  if (unverifiedReason) {
+    [_unverifiedExecutions incrementForFieldValues:@[
+      (NSString*)unverifiedReason, (eventType & SNTEventStateAllow) ? @"Allow" : @"Block"
+    ]];
+  }
+
   const NSString* eventTypeStr;
 
   switch (eventType) {
@@ -502,17 +518,13 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
     } else {
       LOGE(@"%@ and denying action", reason);
     }
-    // A policy deny of a confirmed mismatch is not an unreadable-target outcome.
-    if (!(identityMismatch && policyDenies)) {
-      [self.events incrementForFieldValues:@[ allowed ? (NSString*)kAllowNoFileInfo
-                                                      : (NSString*)kDenyNoFileInfo ]];
-    }
-
     // Never cached and never held: the disposition came from policy, not a
     // rule, and a read that fails once must not govern a later exec of the vnode.
     [self respondAndReportTerminalDecision:cd
                                     action:allowed ? SNTActionRespondAllowNoCache
                                                    : SNTActionRespondDenyOnce
+                          unverifiedReason:identityMismatch ? kUnverifiedChangedUnevaluable
+                                                            : kUnverifiedUnreadable
                                    binInfo:nil
                                 targetProc:targetProc
                                      esMsg:esMsg
@@ -540,6 +552,7 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
                                                              configState:configState];
       [self respondAndReportTerminalDecision:cd
                                       action:SNTActionRespondDenyOnce
+                            unverifiedReason:kUnverifiedChanged
                                      binInfo:binInfo
                                   targetProc:targetProc
                                        esMsg:esMsg
@@ -550,6 +563,9 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
     // A previous evaluation's identity describes a different file.
     existingDecision = nil;
   }
+  const NSString* unverifiedReason = !identityMismatched     ? nil
+                                     : identityVendorMatched ? kUnverifiedVendorMatched
+                                                             : kUnverifiedChanged;
 
   // TODO(markowsky): Maybe add a metric here for how many large executables we're seeing.
   // if (binInfo.fileSize > SomeUpperLimit) ...
@@ -643,6 +659,7 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
           cd.decisionExtra ? [NSString stringWithFormat:@"%@; %@", cd.decisionExtra, extra] : extra;
       [self respondAndReportTerminalDecision:cd
                                       action:SNTActionRespondDenyOnce
+                            unverifiedReason:unverifiedReason
                                      binInfo:binInfo
                                   targetProc:targetProc
                                        esMsg:esMsg
@@ -765,7 +782,7 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
   }
 
   // Increment metric counters
-  [self incrementEventCounters:cd.decision];
+  [self incrementEventCounters:cd.decision unverifiedReason:unverifiedReason];
 
   // Log to database if necessary.
   if (ShouldStoreEventForDecision(cd, config, configState)) {
@@ -913,6 +930,7 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
 // not retained, so it cannot apply to later execs of the vnode.
 - (void)respondAndReportTerminalDecision:(SNTCachedDecision*)cd
                                   action:(SNTAction)action
+                        unverifiedReason:(const NSString*)unverifiedReason
                                  binInfo:(SNTFileInfo*)binInfo
                               targetProc:(const es_process_t*)targetProc
                                    esMsg:(const Message&)esMsg
@@ -932,7 +950,7 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
     cd.sha256 = binInfo.SHA256;
   }
 
-  [self incrementEventCounters:cd.decision];
+  [self incrementEventCounters:cd.decision unverifiedReason:unverifiedReason];
 
   SNTConfigurator* config = [SNTConfigurator configurator];
   if (!ShouldStoreEventForDecision(cd, config, configState)) {

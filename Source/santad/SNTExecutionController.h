@@ -46,13 +46,18 @@ const static NSString* kAllowCompilerCDHash = @"AllowCompilerCDHash";
 const static NSString* kAllowCompilerSigningID = @"AllowCompilerSigningID";
 const static NSString* kAllowTransitive = @"AllowTransitive";
 const static NSString* kUnknownEventState = @"Unknown";
-const static NSString* kAllowNoFileInfo = @"AllowNoFileInfo";
-const static NSString* kDenyNoFileInfo = @"DenyNoFileInfo";
 const static NSString* kBlockLongPath = @"BlockLongPath";
 const static NSString* kBlockCELFallback = @"BlockCELFallback";
 const static NSString* kBlockBinaryMismatch = @"BlockBinaryMismatch";
 const static NSString* kAllowCELFallback = @"AllowCELFallback";
 const static NSString* kAllowPlatform = @"AllowPlatform";
+
+// How an execution's identity went unconfirmed: the reason field of
+// /santa/unverified_executions.
+const static NSString* kUnverifiedUnreadable = @"Unreadable";
+const static NSString* kUnverifiedChangedUnevaluable = @"ChangedUnevaluable";
+const static NSString* kUnverifiedChanged = @"Changed";
+const static NSString* kUnverifiedVendorMatched = @"VendorMatched";
 
 @class SNTBelievableClock;
 @class SNTCachedDecision;
