@@ -540,7 +540,6 @@ objc_library(
     hdrs = ["CELActivation.h"],
     deps = [
         ":SNTPolicyProcessor",
-        "//Source/common:MOLCodesignChecker",
         "//Source/common:SigningIDHelpers",
         "//Source/common:String",
         "//Source/common/cel:CEL",

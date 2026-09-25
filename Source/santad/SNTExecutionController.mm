@@ -570,16 +570,32 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
   // TODO(markowsky): Maybe add a metric here for how many large executables we're seeing.
   // if (binInfo.fileSize > SomeUpperLimit) ...
 
-  // When re-evaluating with a cached decision, use the pre-computed signing
-  // metadata to avoid expensive codesign verification.
-  ActivationCallbackBlock activationBlock =
-      existingDecision ? santa::CreateCELActivationBlock(
-                             esMsg, existingDecision.rawSigningID, existingDecision.teamID,
-                             existingDecision.platformBinary, existingDecision.signingTime,
-                             existingDecision.secureSigningTime, existingDecision.rawEntitlements,
-                             _processTree, _celNow)
-                       : santa::CreateCELActivationBlock(
-                             esMsg, [binInfo codesignCheckerWithError:NULL], _processTree, _celNow);
+  // CEL sees the identity rules are matched on: the kernel's, under the same
+  // CS_SIGNED and CS_VALID gate. Content-derived values come from the file, or
+  // from a cached decision's pre-computed signing metadata, which avoids
+  // expensive codesign verification.
+  ActivationCallbackBlock activationBlock = [&] {
+    BOOL kernelSigned =
+        (targetProc->codesigning_flags & CS_SIGNED) && (targetProc->codesigning_flags & CS_VALID);
+    NSString* signingID = kernelSigned ? santa::StringTokenToNSString(targetProc->signing_id) : nil;
+    NSString* teamID = kernelSigned ? santa::StringTokenToNSString(targetProc->team_id) : nil;
+    if (existingDecision) {
+      return santa::CreateCELActivationBlock(
+          esMsg, signingID, teamID, targetProc->is_platform_binary, existingDecision.signingTime,
+          existingDecision.secureSigningTime, existingDecision.rawEntitlements, _processTree,
+          _celNow);
+    } else {
+      // The file's content-derived values are withheld only when CEL would pair
+      // them with a kernel identity they may not belong to. Without one, they give
+      // CEL nothing an ad hoc signature couldn't.
+      BOOL withholdContent = identityMismatched && !identityVendorMatched &&
+                             (teamID || targetProc->is_platform_binary);
+      MOLCodesignChecker* csInfo = withholdContent ? nil : [binInfo codesignCheckerWithError:NULL];
+      return santa::CreateCELActivationBlock(
+          esMsg, signingID, teamID, targetProc->is_platform_binary, csInfo.signingTime,
+          csInfo.secureSigningTime, csInfo.entitlements, _processTree, _celNow);
+    }
+  }();
 
   SNTCachedDecision* cd = [self.policyProcessor decisionForFileInfo:binInfo
                                                       targetProcess:targetProc

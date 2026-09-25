@@ -664,7 +664,6 @@ static void UpdateCachedDecisionSigningInfo(
   cd.certSHA256 = csInfo.leafCertificate.SHA256;
   cd.certCommonName = csInfo.leafCertificate.commonName;
   cd.certChain = csInfo.certificates;
-  cd.rawSigningID = csInfo.signingID;
 
   NSDictionary* entitlements = csInfo.entitlements;
   cd.rawEntitlements = [entitlements sntDeepCopy];

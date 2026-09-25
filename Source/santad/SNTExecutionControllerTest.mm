@@ -3429,6 +3429,167 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   XCTAssertNil(cd.signingID);
 }
 
+// CEL sees the identity the rule was matched on, the kernel's, not the one the on-disk
+// signature presents.
+- (void)testUnconfirmedIdentityCELSeesTheKernelIdentityUnderReport {
+  OCMStub([self.mockConfigurator clientMode]).andReturn(SNTClientModeMonitor);
+  [self stubExecutableIntegrityPolicy:SNTExecutableIntegrityPolicyReport];
+  [self stubUnrescuableMismatchWithOnDiskSigningID:@"other.signing.id" onDiskTeamID:@"OTHERTEAMS"];
+  OCMStub([self.mockCodesignChecker platformBinary]).andReturn(YES);
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateCELv2;
+  rule.type = SNTRuleTypeSigningID;
+  rule.celExpr = @"target.team_id == 'myteamid' && "
+                 @"target.signing_id == 'myteamid:example.signing.id' && "
+                 @"!target.is_platform_binary ? ALLOWLIST : BLOCKLIST";
+  [self stubRule:rule
+      forIdentifiers:{.binarySHA256 = @"a",
+                      .signingID = @"myteamid:example.signing.id",
+                      .teamID = @(kExampleTeamID)}];
+
+  SNTCachedDecision* cd = [self
+      postedDecisionForExecEvent:SNTActionRespondAllowNoCache
+                  cachedDecision:nil
+                    messageSetup:^(es_message_t* msg) {
+                      msg->event.exec.target->team_id = MakeESStringToken(kExampleTeamID);
+                      msg->event.exec.target->signing_id = MakeESStringToken(kExampleSigningID);
+                    }];
+
+  XCTAssertEqual(cd.decision, SNTEventStateAllowSigningID);
+  XCTAssertTrue(cd.identityMismatched);
+}
+
+// Re-evaluating a cached decision gives CEL the kernel's identity too, not the
+// on-disk signature's or the cached decision's already-formatted signing ID.
+- (void)testCELSeesTheKernelIdentityWhenReevaluatingACachedDecision {
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
+  OCMStub([self.mockCodesignChecker signingID]).andReturn(@"other.signing.id");
+  OCMStub([self.mockCodesignChecker teamID]).andReturn(@"OTHERTEAMS");
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateCELv2;
+  rule.type = SNTRuleTypeSigningID;
+  rule.celExpr = @"target.team_id == 'myteamid' && "
+                 @"target.signing_id == 'myteamid:example.signing.id' ? ALLOWLIST : BLOCKLIST";
+  [self stubRule:rule
+      forIdentifiers:{.binarySHA256 = @"a",
+                      .signingID = @"myteamid:example.signing.id",
+                      .teamID = @(kExampleTeamID)}];
+
+  SNTCachedDecision* existing = [[SNTCachedDecision alloc] init];
+  existing.teamID = @(kExampleTeamID);
+  existing.signingID = @"myteamid:example.signing.id";
+
+  SNTCachedDecision* cd = [self
+      postedDecisionForExecEvent:SNTActionRespondAllow
+                  cachedDecision:existing
+                    messageSetup:^(es_message_t* msg) {
+                      msg->event.exec.target->team_id = MakeESStringToken(kExampleTeamID);
+                      msg->event.exec.target->signing_id = MakeESStringToken(kExampleSigningID);
+                    }];
+
+  XCTAssertEqual(cd.decision, SNTEventStateAllowSigningID);
+}
+
+// A CELv2 rule that allows only when CEL sees the entitlement the on-disk
+// signature presents.
+- (SNTRule*)onDiskEntitlementCELRuleOfType:(SNTRuleType)type {
+  OCMStub([self.mockCodesignChecker entitlements]).andReturn(@{@"com.example.entitlement" : @YES});
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateCELv2;
+  rule.type = type;
+  rule.celExpr = @"'com.example.entitlement' in target.entitlements ? ALLOWLIST : BLOCKLIST";
+  return rule;
+}
+
+// The file's entitlements would otherwise be paired with a team identity they
+// may not belong to.
+- (void)testCELIsNotGivenTheFileContentOfATeamSignedUnconfirmedIdentityUnderReport {
+  OCMStub([self.mockConfigurator clientMode]).andReturn(SNTClientModeMonitor);
+  [self stubExecutableIntegrityPolicy:SNTExecutableIntegrityPolicyReport];
+  [self stubUnrescuableMismatchWithOnDiskSigningID:@"other.signing.id" onDiskTeamID:@"OTHERTEAMS"];
+  [self stubRule:[self onDiskEntitlementCELRuleOfType:SNTRuleTypeSigningID]
+      forIdentifiers:{.binarySHA256 = @"a",
+                      .signingID = @"myteamid:example.signing.id",
+                      .teamID = @(kExampleTeamID)}];
+
+  SNTCachedDecision* cd = [self
+      postedDecisionForExecEvent:SNTActionRespondDeny
+                  cachedDecision:nil
+                    messageSetup:^(es_message_t* msg) {
+                      msg->event.exec.target->team_id = MakeESStringToken(kExampleTeamID);
+                      msg->event.exec.target->signing_id = MakeESStringToken(kExampleSigningID);
+                    }];
+
+  XCTAssertEqual(cd.decision, SNTEventStateBlockSigningID);
+}
+
+// Platform status is an identity too: the file's entitlements must not be
+// paired with it.
+- (void)testCELIsNotGivenTheFileContentOfAPlatformUnconfirmedIdentityUnderReport {
+  OCMStub([self.mockConfigurator clientMode]).andReturn(SNTClientModeMonitor);
+  [self stubExecutableIntegrityPolicy:SNTExecutableIntegrityPolicyReport];
+  [self stubUnrescuableMismatchWithOnDiskSigningID:@"other.signing.id" onDiskTeamID:nil];
+  [self stubRule:[self onDiskEntitlementCELRuleOfType:SNTRuleTypeSigningID]
+      forIdentifiers:{.binarySHA256 = @"a", .signingID = @"platform:example.signing.id"}];
+
+  SNTCachedDecision* cd = [self postedDecisionForExecEvent:SNTActionRespondDeny
+                                            cachedDecision:nil
+                                              messageSetup:^(es_message_t* msg) {
+                                                msg->event.exec.target->is_platform_binary = true;
+                                                msg->event.exec.target->signing_id =
+                                                    MakeESStringToken(kExampleSigningID);
+                                              }];
+
+  XCTAssertEqual(cd.decision, SNTEventStateBlockSigningID);
+}
+
+// An ad hoc image gives CEL no identity to pair the file's entitlements with,
+// so they are given as read.
+- (void)testCELIsGivenTheFileContentOfAnAdhocUnconfirmedIdentityUnderReport {
+  OCMStub([self.mockConfigurator clientMode]).andReturn(SNTClientModeMonitor);
+  [self stubExecutableIntegrityPolicy:SNTExecutableIntegrityPolicyReport];
+  [self stubUnrescuableMismatchWithOnDiskSigningID:@"other.signing.id" onDiskTeamID:@"OTHERTEAMS"];
+  [self stubRule:[self onDiskEntitlementCELRuleOfType:SNTRuleTypeBinary]
+      forIdentifiers:{.binarySHA256 = @"a"}];
+
+  SNTCachedDecision* cd = [self
+      postedDecisionForExecEvent:SNTActionRespondAllowNoCache
+                  cachedDecision:nil
+                    messageSetup:^(es_message_t* msg) {
+                      msg->event.exec.target->codesigning_flags = CS_SIGNED | CS_VALID | CS_ADHOC;
+                      msg->event.exec.target->signing_id = MakeESStringToken(kExampleSigningID);
+                    }];
+
+  XCTAssertEqual(cd.decision, SNTEventStateAllowBinary);
+  XCTAssertTrue(cd.identityMismatched);
+}
+
+// The vendor match establishes that the file presents the kernel's identity, so
+// its entitlements are given as read.
+- (void)testCELIsGivenTheFileContentOfAVendorMatchedIdentity {
+  [self stubUnconfirmedIdentity];
+  [self stubMatchingOnDiskSigningID];
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
+  OCMStub([self.mockCodesignChecker teamID]).andReturn(@(kExampleTeamID));
+  [self stubRule:[self onDiskEntitlementCELRuleOfType:SNTRuleTypeSigningID]
+      forIdentifiers:{.binarySHA256 = @"a",
+                      .signingID = @"myteamid:example.signing.id",
+                      .teamID = @(kExampleTeamID)}];
+
+  SNTCachedDecision* cd = [self
+      postedDecisionForExecEvent:SNTActionRespondAllowNoCache
+                  cachedDecision:nil
+                    messageSetup:^(es_message_t* msg) {
+                      msg->event.exec.target->team_id = MakeESStringToken(kExampleTeamID);
+                      msg->event.exec.target->signing_id = MakeESStringToken(kExampleSigningID);
+                    }];
+
+  XCTAssertEqual(cd.decision, SNTEventStateAllowSigningID);
+  XCTAssertTrue(cd.identityVendorMatched);
+}
+
 // A rule-matched allow under Ignore is left to the upload settings, which
 // do not store it. This is the pair that makes 3's storage meaningful.
 - (void)testUnconfirmedIdentityRuleMatchedAllowIsNotStoredUnderIgnore {

@@ -49,7 +49,6 @@
 @property NSArray<MOLCertificate*>* certChain;
 @property NSString* teamID;
 @property NSString* signingID;
-@property NSString* rawSigningID;
 @property NSString* cdhash;
 @property NSDictionary* entitlements;
 @property NSDictionary* rawEntitlements;

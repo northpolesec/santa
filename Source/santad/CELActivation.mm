@@ -24,7 +24,6 @@
 #include <string>
 #include <vector>
 
-#import "Source/common/MOLCodesignChecker.h"
 #import "Source/common/SigningIDHelpers.h"
 #include "Source/common/String.h"
 #include "Source/common/cel/Activation.h"
@@ -276,15 +275,6 @@ ActivationCallbackBlock CreateCELActivationBlock(
       return makeActivation.operator()<false>();
     }
   };
-}
-
-ActivationCallbackBlock CreateCELActivationBlock(
-    const Message& esMsg, MOLCodesignChecker* csInfo,
-    std::shared_ptr<santad::process_tree::ProcessTree> processTree,
-    std::function<absl::Time()> now) {
-  return CreateCELActivationBlock(esMsg, csInfo.signingID, csInfo.teamID, csInfo.platformBinary,
-                                  csInfo.signingTime, csInfo.secureSigningTime, csInfo.entitlements,
-                                  std::move(processTree), std::move(now));
 }
 
 }  // namespace santa
