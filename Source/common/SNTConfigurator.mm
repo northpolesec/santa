@@ -1050,8 +1050,10 @@ static SNTConfigurator* sharedConfigurator = nil;
 }
 
 - (void)setSyncServerExecutableIntegrityPolicy:(SNTExecutableIntegrityPolicy)policy {
-  if (policy > SNTExecutableIntegrityPolicyUnknown &&
-      policy <= SNTExecutableIntegrityPolicyIgnore) {
+  if (policy == SNTExecutableIntegrityPolicyUnknown) {
+    [self updateSyncStateForKey:kExecutableIntegrityPolicyKey value:nil];
+  } else if (policy > SNTExecutableIntegrityPolicyUnknown &&
+             policy <= SNTExecutableIntegrityPolicyIgnore) {
     [self updateSyncStateForKey:kExecutableIntegrityPolicyKey value:@(policy)];
   }
 }

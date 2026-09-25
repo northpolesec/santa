@@ -545,29 +545,31 @@ void HandleV2Responses(const ::pbv2::PreflightResponse& resp, SNTSyncState* sync
     }
   }
 
-  switch (resp.executable_integrity_policy()) {
-    case ::pbv2::BLOCK_CHANGED:
-      syncState.executableIntegrityPolicy = SNTExecutableIntegrityPolicyBlockChanged;
-      break;
-    case ::pbv2::BLOCK_UNVERIFIED:
-      syncState.executableIntegrityPolicy = SNTExecutableIntegrityPolicyBlockUnverified;
-      break;
-    case ::pbv2::REPORT:
-      syncState.executableIntegrityPolicy = SNTExecutableIntegrityPolicyReport;
-      break;
-    case ::pbv2::IGNORE:
-      syncState.executableIntegrityPolicy = SNTExecutableIntegrityPolicyIgnore;
-      break;
-    default:
-      // UNSPECIFIED, absent, or a value from a newer server: leave sync state
-      // untouched so the profile value or the default keeps governing. A value
-      // this client does not know is logged, so that case is distinguishable
-      // from the server simply not sending the field.
-      if (resp.executable_integrity_policy() != ::pbv2::EXECUTABLE_INTEGRITY_POLICY_UNSPECIFIED) {
+  // Absent leaves the synced policy alone. An explicit UNSPECIFIED clears it so the profile value
+  // or the default governs again. A value from a newer server is also left alone: the JSON parser
+  // drops an unknown enum name as if absent, so this keeps both transports consistent.
+  if (resp.has_executable_integrity_policy()) {
+    switch (resp.executable_integrity_policy()) {
+      case ::pbv2::EXECUTABLE_INTEGRITY_POLICY_UNSPECIFIED:
+        syncState.executableIntegrityPolicy = @(SNTExecutableIntegrityPolicyUnknown);
+        break;
+      case ::pbv2::BLOCK_CHANGED:
+        syncState.executableIntegrityPolicy = @(SNTExecutableIntegrityPolicyBlockChanged);
+        break;
+      case ::pbv2::BLOCK_UNVERIFIED:
+        syncState.executableIntegrityPolicy = @(SNTExecutableIntegrityPolicyBlockUnverified);
+        break;
+      case ::pbv2::REPORT:
+        syncState.executableIntegrityPolicy = @(SNTExecutableIntegrityPolicyReport);
+        break;
+      case ::pbv2::IGNORE:
+        syncState.executableIntegrityPolicy = @(SNTExecutableIntegrityPolicyIgnore);
+        break;
+      default:
         SLOGW(@"Ignoring unrecognized ExecutableIntegrityPolicy value from sync server: %d",
               resp.executable_integrity_policy());
-      }
-      break;
+        break;
+    }
   }
 
   // Similar to `block_usb_mount`, `allowed_network_mount_hosts` state can change

@@ -57,7 +57,8 @@
 @property(readonly, nonatomic) SNTExecutableIntegrityPolicy executableIntegrityPolicy;
 
 ///
-///  Set the ExecutableIntegrityPolicy as received from a sync server.
+///  Set the ExecutableIntegrityPolicy as received from a sync server. Unknown clears the synced
+///  value so the profile value or the default governs again.
 ///
 - (void)setSyncServerExecutableIntegrityPolicy:(SNTExecutableIntegrityPolicy)policy;
 

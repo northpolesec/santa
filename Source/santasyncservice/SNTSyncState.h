@@ -75,9 +75,9 @@
 
 /// Settings sent from server during preflight that are set during postflight.
 @property SNTClientMode clientMode;
-/// Sync v2 only. SNTExecutableIntegrityPolicyUnknown means the server did not
-/// send a policy, so the profile value or the built-in default governs.
-@property SNTExecutableIntegrityPolicy executableIntegrityPolicy;
+/// Sync v2 only. nil means the server did not send a policy, so the synced value is left alone.
+/// SNTExecutableIntegrityPolicyUnknown clears the synced value so the profile or default governs.
+@property NSNumber* executableIntegrityPolicy;
 @property NSString* allowlistRegex;
 @property NSString* blocklistRegex;
 @property NSNumber* enableBundles;

@@ -73,8 +73,7 @@ SNTConfigBundle* PostflightConfigBundle(SNTSyncState* syncState) {
   SNTConfigBundle* bundle = [[SNTConfigBundle alloc] init];
 
   bundle.clientMode = syncState.clientMode ? @(syncState.clientMode) : nil;
-  bundle.executableIntegrityPolicy =
-      syncState.executableIntegrityPolicy ? @(syncState.executableIntegrityPolicy) : nil;
+  bundle.executableIntegrityPolicy = syncState.executableIntegrityPolicy;
   bundle.syncType = syncState.syncType != SNTSyncTypeNormal ? @(SNTSyncTypeNormal) : nil;
   bundle.allowlistRegex = syncState.allowlistRegex;
   bundle.blocklistRegex = syncState.blocklistRegex;

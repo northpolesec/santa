@@ -548,7 +548,8 @@
   [self stubRequestBody:respData response:nil error:nil validateBlock:nil];
 
   XCTAssertTrue([sut sync]);
-  XCTAssertEqual(self.syncState.executableIntegrityPolicy, SNTExecutableIntegrityPolicyReport);
+  XCTAssertEqualObjects(self.syncState.executableIntegrityPolicy,
+                        @(SNTExecutableIntegrityPolicyReport));
 }
 
 - (void)testPreflightExecutableIntegrityPolicyAbsent {
@@ -562,16 +563,35 @@
 
   XCTAssertTrue([sut sync]);
   XCTAssertEqual(self.syncState.clientMode, SNTClientModeLockdown);
-  XCTAssertEqual(self.syncState.executableIntegrityPolicy, SNTExecutableIntegrityPolicyUnknown);
+  XCTAssertNil(self.syncState.executableIntegrityPolicy);
 }
 
-- (void)testPreflightExecutableIntegrityPolicyUnspecifiedOrUnknownValueLeavesSyncStateUnset {
+- (void)testPreflightExecutableIntegrityPolicyUnspecifiedClearsSyncState {
   if (!self.syncState.isSyncV2) return;
 
-  for (NSString* value in @[ @"\"EXECUTABLE_INTEGRITY_POLICY_UNSPECIFIED\"", @"99" ]) {
+  [self setupDefaultDaemonConnResponses];
+  SNTSyncPreflight* sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
+
+  NSData* respData =
+      [@"{\"client_mode\": \"LOCKDOWN\", \"batch_size\": 100, "
+       @"\"executable_integrity_policy\": "
+       @"\"EXECUTABLE_INTEGRITY_POLICY_UNSPECIFIED\"}" dataUsingEncoding:NSUTF8StringEncoding];
+
+  [self stubRequestBody:respData response:nil error:nil validateBlock:nil];
+
+  XCTAssertTrue([sut sync]);
+  XCTAssertEqualObjects(self.syncState.executableIntegrityPolicy,
+                        @(SNTExecutableIntegrityPolicyUnknown));
+}
+
+- (void)testPreflightExecutableIntegrityPolicyUnknownValueLeavesSyncStateUnset {
+  if (!self.syncState.isSyncV2) return;
+
+  // A number is kept by the parser as an open enum value; an unknown name is dropped as absent.
+  for (NSString* value in @[ @"99", @"\"EXECUTABLE_INTEGRITY_POLICY_FROM_THE_FUTURE\"" ]) {
     [self setupDefaultDaemonConnResponses];
-    // Non-default seed: catches an arm that writes Unknown back.
-    self.syncState.executableIntegrityPolicy = SNTExecutableIntegrityPolicyReport;
+    // Non-default seed: catches an arm that clears it.
+    self.syncState.executableIntegrityPolicy = @(SNTExecutableIntegrityPolicyReport);
     SNTSyncPreflight* sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
 
     NSData* respData =
@@ -583,8 +603,9 @@
 
     XCTAssertTrue([sut sync]);
     XCTAssertEqual(self.syncState.clientMode, SNTClientModeLockdown);
-    XCTAssertEqual(self.syncState.executableIntegrityPolicy, SNTExecutableIntegrityPolicyReport,
-                   @"executable_integrity_policy: %@", value);
+    XCTAssertEqualObjects(self.syncState.executableIntegrityPolicy,
+                          @(SNTExecutableIntegrityPolicyReport), @"executable_integrity_policy: %@",
+                          value);
   }
 }
 
@@ -604,7 +625,7 @@
   // Proof the v1 path actually ran and applied the rest of the response.
   XCTAssertEqual(self.syncState.clientMode, SNTClientModeLockdown);
   XCTAssertEqual(self.syncState.eventBatchSize, 100);
-  XCTAssertEqual(self.syncState.executableIntegrityPolicy, SNTExecutableIntegrityPolicyUnknown);
+  XCTAssertNil(self.syncState.executableIntegrityPolicy);
 }
 
 - (void)testReschedulePreflightFail {
