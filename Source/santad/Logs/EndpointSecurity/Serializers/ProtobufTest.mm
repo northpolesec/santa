@@ -2141,6 +2141,103 @@ void SerializeAndCheckNonESEvents(
   XCTAssertFalse(santaMsg2.execution().has_rule_id());
 }
 
+- (void)testSerializeExecIdentityUnverified {
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+
+  es_file_t procFile = MakeESFile("foo", MakeStat(100));
+  es_file_t procFileTarget = MakeESFile("fooexec", MakeStat(300));
+  es_process_t proc = MakeESProcess(&procFile, MakeAuditToken(12, 34), MakeAuditToken(56, 78));
+  es_process_t procTarget =
+      MakeESProcess(&procFileTarget, MakeAuditToken(23, 45), MakeAuditToken(67, 89));
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_EXEC, &proc);
+  esMsg.event.exec.target = &procTarget;
+  esMsg.event.exec.last_fd = 0;
+
+  mockESApi->SetExpectationsRetainReleaseMessage();
+  EXPECT_CALL(*mockESApi, ExecArgCount).WillOnce(testing::Return(0));
+  EXPECT_CALL(*mockESApi, ExecEnvCount).WillOnce(testing::Return(0));
+  if (esMsg.version >= 4) {
+    EXPECT_CALL(*mockESApi, ExecFDCount).WillOnce(testing::Return(0));
+  }
+
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+  cd.decision = SNTEventStateBlockUnknown;
+  cd.decisionClientMode = SNTClientModeLockdown;
+  cd.identityMismatched = YES;
+
+  std::shared_ptr<Serializer> serializer = Protobuf::Create(mockESApi, nil);
+  auto enrichedMsg = Enricher().Enrich(Message(mockESApi, &esMsg));
+
+  const auto& execMsg = std::get<santa::EnrichedExec>(enrichedMsg->GetEnrichedMessage());
+  std::vector<uint8_t> vec = serializer->SerializeMessage(execMsg, cd);
+
+  ::pbv1::SantaMessage santaMsg;
+  XCTAssertTrue(santaMsg.ParseFromString(std::string(vec.begin(), vec.end())));
+  XCTAssertTrue(santaMsg.has_execution());
+  // The marker does not change decision/reason: they stay the rule outcome
+  // (Unknown here), not REASON_BINARY_MISMATCH.
+  XCTAssertEqual(santaMsg.execution().decision(), ::pbv1::Execution::DECISION_DENY);
+  XCTAssertEqual(santaMsg.execution().reason(), ::pbv1::Execution::REASON_UNKNOWN);
+  XCTAssertTrue(santaMsg.execution().identity_unverified());
+
+  cd.identityMismatched = NO;
+  mockESApi->SetExpectationsRetainReleaseMessage();
+  EXPECT_CALL(*mockESApi, ExecArgCount).WillOnce(testing::Return(0));
+  EXPECT_CALL(*mockESApi, ExecEnvCount).WillOnce(testing::Return(0));
+  if (esMsg.version >= 4) {
+    EXPECT_CALL(*mockESApi, ExecFDCount).WillOnce(testing::Return(0));
+  }
+
+  auto enrichedMsg2 = Enricher().Enrich(Message(mockESApi, &esMsg));
+  const auto& execMsg2 = std::get<santa::EnrichedExec>(enrichedMsg2->GetEnrichedMessage());
+  vec = serializer->SerializeMessage(execMsg2, cd);
+
+  ::pbv1::SantaMessage santaMsg2;
+  XCTAssertTrue(santaMsg2.ParseFromString(std::string(vec.begin(), vec.end())));
+  XCTAssertTrue(santaMsg2.has_execution());
+  XCTAssertEqual(santaMsg2.execution().decision(), ::pbv1::Execution::DECISION_DENY);
+  XCTAssertFalse(santaMsg2.execution().has_identity_unverified());
+}
+
+// Guards against coupling the marker to denies.
+- (void)testSerializeExecIdentityUnverifiedOnAnAllow {
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+
+  es_file_t procFile = MakeESFile("foo", MakeStat(100));
+  es_file_t procFileTarget = MakeESFile("fooexec", MakeStat(300));
+  es_process_t proc = MakeESProcess(&procFile, MakeAuditToken(12, 34), MakeAuditToken(56, 78));
+  es_process_t procTarget =
+      MakeESProcess(&procFileTarget, MakeAuditToken(23, 45), MakeAuditToken(67, 89));
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_EXEC, &proc);
+  esMsg.event.exec.target = &procTarget;
+  esMsg.event.exec.last_fd = 0;
+
+  mockESApi->SetExpectationsRetainReleaseMessage();
+  EXPECT_CALL(*mockESApi, ExecArgCount).WillOnce(testing::Return(0));
+  EXPECT_CALL(*mockESApi, ExecEnvCount).WillOnce(testing::Return(0));
+  if (esMsg.version >= 4) {
+    EXPECT_CALL(*mockESApi, ExecFDCount).WillOnce(testing::Return(0));
+  }
+
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+  cd.decision = SNTEventStateAllowBinary;
+  cd.decisionClientMode = SNTClientModeMonitor;
+  cd.identityMismatched = YES;
+
+  std::shared_ptr<Serializer> serializer = Protobuf::Create(mockESApi, nil);
+  auto enrichedMsg = Enricher().Enrich(Message(mockESApi, &esMsg));
+
+  const auto& execMsg = std::get<santa::EnrichedExec>(enrichedMsg->GetEnrichedMessage());
+  std::vector<uint8_t> vec = serializer->SerializeMessage(execMsg, cd);
+
+  ::pbv1::SantaMessage santaMsg;
+  XCTAssertTrue(santaMsg.ParseFromString(std::string(vec.begin(), vec.end())));
+  XCTAssertTrue(santaMsg.has_execution());
+  XCTAssertEqual(santaMsg.execution().decision(), ::pbv1::Execution::DECISION_ALLOW);
+  XCTAssertEqual(santaMsg.execution().reason(), ::pbv1::Execution::REASON_BINARY);
+  XCTAssertTrue(santaMsg.execution().identity_unverified());
+}
+
 - (void)testSerializeFileAccessRuleId {
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   mockESApi->SetExpectationsRetainReleaseMessage();

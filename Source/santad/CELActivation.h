@@ -26,8 +26,6 @@
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
 
-@class MOLCodesignChecker;
-
 namespace santa {
 
 // Create a block that returns a santa::cel::Activation object for the given
@@ -46,11 +44,6 @@ ActivationCallbackBlock _Nonnull CreateCELActivationBlock(
     const Message& esMsg, NSString* _Nullable signingID, NSString* _Nullable teamID,
     BOOL isPlatformBinary, NSDate* _Nullable signingTime, NSDate* _Nullable secureSigningTime,
     NSDictionary* _Nullable entitlements,
-    std::shared_ptr<santad::process_tree::ProcessTree> processTree,
-    std::function<absl::Time()> now = absl::Now);
-
-ActivationCallbackBlock _Nonnull CreateCELActivationBlock(
-    const Message& esMsg, MOLCodesignChecker* _Nullable csInfo,
     std::shared_ptr<santad::process_tree::ProcessTree> processTree,
     std::function<absl::Time()> now = absl::Now);
 

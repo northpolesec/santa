@@ -49,7 +49,6 @@
 @property NSArray<MOLCertificate*>* certChain;
 @property NSString* teamID;
 @property NSString* signingID;
-@property NSString* rawSigningID;
 @property NSString* cdhash;
 @property NSDictionary* entitlements;
 @property NSDictionary* rawEntitlements;
@@ -82,6 +81,11 @@
 /// cached decision as an input to a later decision, rather than as a record of
 /// a past one, must not trust the identity fields when this is set.
 @property BOOL identityMismatched;
+
+/// YES when identity could not be confirmed exactly but the signing vendor matched the
+/// kernel's (the vendor match). Implies identityMismatched, not conversely: Report and
+/// Ignore let vendor-unmatched reads reach evaluation too. Copied to the stored event.
+@property BOOL identityVendorMatched;
 
 @property BOOL cacheable;
 @property BOOL holdAndAsk;

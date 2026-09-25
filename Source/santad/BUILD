@@ -296,7 +296,6 @@ objc_library(
         "//Source/common:SNTLogging",
         "//Source/common:SNTRule",
         "//Source/common:SNTRuleIdentifiers",
-        "//Source/common:SigningIDHelpers",
         "//Source/common:String",
         "//Source/common/cel:CEL",
         "//Source/common/processtree:process_tree",
@@ -541,7 +540,6 @@ objc_library(
     hdrs = ["CELActivation.h"],
     deps = [
         ":SNTPolicyProcessor",
-        "//Source/common:MOLCodesignChecker",
         "//Source/common:SigningIDHelpers",
         "//Source/common:String",
         "//Source/common/cel:CEL",
@@ -610,6 +608,7 @@ objc_library(
         "//Source/common:SNTRule",
         "//Source/common:SNTStoredExecutionEvent",
         "//Source/common:SantaVnode",
+        "//Source/common:SigningIDHelpers",
         "//Source/common:String",
         "//Source/common:Unit",
         "//Source/common/es:EndpointSecurityAPI",
