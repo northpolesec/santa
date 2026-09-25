@@ -380,6 +380,9 @@ typename santa::ProtoTraits<IsV2>::EventT* MessageForExecutionEvent(
     if (event.auditReturn) {
       e->set_audit_return(true);
     }
+    for (NSString* annotation in event.annotations) {
+      e->add_annotations(NSStringToUTF8String(annotation));
+    }
   }
 
   if (event.identityUnverified) {

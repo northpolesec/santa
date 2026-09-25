@@ -94,6 +94,7 @@
 
   ENCODE(coder, loggedInUsers);
   ENCODE(coder, currentSessions);
+  ENCODE(coder, annotations);
 
   ENCODE(coder, quarantineDataURL);
   ENCODE(coder, quarantineRefererURL);
@@ -145,6 +146,7 @@
 
     DECODE_ARRAY(decoder, loggedInUsers, NSString);
     DECODE_ARRAY(decoder, currentSessions, NSString);
+    DECODE_ARRAY(decoder, annotations, NSString);
 
     DECODE(decoder, quarantineDataURL, NSString);
     DECODE(decoder, quarantineRefererURL, NSString);

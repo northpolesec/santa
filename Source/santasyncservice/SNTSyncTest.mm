@@ -2274,6 +2274,44 @@
   XCTAssertTrue([sut sync]);
 }
 
+- (void)testEventUploadAnnotations {
+  SNTSyncEventUpload* sut = [[SNTSyncEventUpload alloc] initWithState:self.syncState];
+  self.syncState.eventBatchSize = 50;
+
+  SNTStoredExecutionEvent* execEvent = [[SNTStoredExecutionEvent alloc] init];
+  execEvent.fileSHA256 = @"aabbccdd";
+  execEvent.filePath = @"/usr/bin/test";
+  execEvent.decision = SNTEventStateBlockBinary;
+  execEvent.occurrenceDate = [NSDate dateWithTimeIntervalSince1970:1700000000];
+  execEvent.pid = @(1234);
+  execEvent.ppid = @(1);
+  execEvent.annotations = @[ @"alpha", @"zeta" ];
+
+  NSArray* events = @[ execEvent ];
+  OCMStub([self.daemonConnRop databaseEventsPending:([OCMArg invokeBlockWithArgs:events, nil])]);
+
+  [self stubRequestBody:nil
+               response:nil
+                  error:nil
+          validateBlock:^BOOL(NSURLRequest* req) {
+            NSDictionary* requestDict = [self dictFromRequest:req];
+            NSArray* execEvents = requestDict[kEvents];
+            XCTAssertEqual(execEvents.count, 1);
+            NSDictionary* event = execEvents[0];
+
+            // Sync v1 reserves the field.
+            if (self.syncState.isSyncV2) {
+              XCTAssertEqualObjects(event[@"annotations"], (@[ @"alpha", @"zeta" ]));
+            } else {
+              XCTAssertNil(event[@"annotations"]);
+            }
+
+            return YES;
+          }];
+
+  XCTAssertTrue([sut sync]);
+}
+
 - (void)testEventUploadIdentityUnverifiedAbsentWhenFalse {
   SNTSyncEventUpload* sut = [[SNTSyncEventUpload alloc] initWithState:self.syncState];
   self.syncState.eventBatchSize = 50;
