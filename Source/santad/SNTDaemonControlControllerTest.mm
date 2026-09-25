@@ -464,6 +464,24 @@ static NSString* const kBinarySHA256 =
   [cfg stopMocking];
 }
 
+- (void)testUpdateSyncSettingsPassesUnknownExecutableIntegrityPolicyToClearIt {
+  id cfg = [self mockConfiguratorForSyncSettings];
+  OCMExpect([cfg setSyncServerExecutableIntegrityPolicy:SNTExecutableIntegrityPolicyUnknown]);
+
+  SNTConfigBundle* bundle = [[SNTConfigBundle alloc] init];
+  bundle.executableIntegrityPolicy = @(SNTExecutableIntegrityPolicyUnknown);
+
+  __block BOOL replied = NO;
+  [self.sut updateSyncSettings:bundle
+                         reply:^{
+                           replied = YES;
+                         }];
+
+  XCTAssertTrue(replied);
+  OCMVerifyAll(cfg);
+  [cfg stopMocking];
+}
+
 - (void)testUpdateSyncSettingsWithoutExecutableIntegrityPolicyLeavesItAlone {
   id cfg = [self mockConfiguratorForSyncSettings];
   OCMReject([cfg setSyncServerExecutableIntegrityPolicy:SNTExecutableIntegrityPolicyUnknown])

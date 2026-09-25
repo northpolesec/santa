@@ -1079,11 +1079,16 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
   [cfg setSyncServerExecutableIntegrityPolicy:(SNTExecutableIntegrityPolicy)99];
   XCTAssertEqual(cfg.executableIntegrityPolicy, SNTExecutableIntegrityPolicyReport);
 
+  // Unknown clears the sync value, so the profile governs again. It was the only synced key, so
+  // the plist is removed from disk too.
+  [cfg setSyncServerExecutableIntegrityPolicy:SNTExecutableIntegrityPolicyUnknown];
+  XCTAssertNil(cfg.syncState[@"ExecutableIntegrityPolicy"]);
+  XCTAssertEqual(cfg.executableIntegrityPolicy, SNTExecutableIntegrityPolicyBlockUnverified);
+  XCTAssertFalse([self.fileMgr fileExistsAtPath:plistPath]);
+
   // An out-of-range value already in sync state falls back to the profile
   cfg.syncState[@"ExecutableIntegrityPolicy"] = @99;
   XCTAssertEqual(cfg.executableIntegrityPolicy, SNTExecutableIntegrityPolicyBlockUnverified);
-
-  XCTAssertTrue([self.fileMgr removeItemAtPath:plistPath error:nil]);
 }
 
 // Fails if kExecutableIntegrityPolicyKey is missing from _syncServerKeyTypes as

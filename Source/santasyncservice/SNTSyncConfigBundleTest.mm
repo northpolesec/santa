@@ -116,11 +116,12 @@
   bundle = PostflightConfigBundle(syncState);
   XCTAssertEqualObjects(bundle.clientMode, @(SNTClientModeMonitor));
 
-  syncState.executableIntegrityPolicy = SNTExecutableIntegrityPolicyUnknown;
+  // Unknown is passed through: it tells the daemon to clear the synced value.
+  syncState.executableIntegrityPolicy = @(SNTExecutableIntegrityPolicyUnknown);
   bundle = PostflightConfigBundle(syncState);
-  XCTAssertNil(bundle.executableIntegrityPolicy);
+  XCTAssertEqualObjects(bundle.executableIntegrityPolicy, @(SNTExecutableIntegrityPolicyUnknown));
 
-  syncState.executableIntegrityPolicy = SNTExecutableIntegrityPolicyReport;
+  syncState.executableIntegrityPolicy = @(SNTExecutableIntegrityPolicyReport);
   bundle = PostflightConfigBundle(syncState);
   XCTAssertEqualObjects(bundle.executableIntegrityPolicy, @(SNTExecutableIntegrityPolicyReport));
 
