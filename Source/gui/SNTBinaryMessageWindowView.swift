@@ -218,7 +218,7 @@ struct SNTBinaryMessageEventView: View {
 
     HStack(spacing: 20.0) {
       VStack(alignment: .trailing, spacing: 10.0) {
-        if !unverified && e?.fileBundleName != "" {
+        if !unverified, let bundleName = e?.fileBundleName, !bundleName.isEmpty {
           Text("Application").bold().font(Font.system(size: 12.0))
         } else if let filePath = e?.filePath, !filePath.isEmpty {
           Text("Filename").bold().font(Font.system(size: 12.0))
@@ -247,7 +247,7 @@ struct SNTBinaryMessageEventView: View {
         }
 
         if !unverified {
-          if let publisher = e?.publisherInfo {
+          if let publisher = e?.publisherInfo, !publisher.isEmpty {
             TextWithLimit(publisher)
           }
         } else if let signingID = e?.signingID, !signingID.isEmpty {
