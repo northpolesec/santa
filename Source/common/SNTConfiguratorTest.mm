@@ -1016,6 +1016,39 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
   XCTAssertTrue([self.fileMgr removeItemAtPath:plistPath error:nil]);
 }
 
+#pragma mark - OverrideFileAccessAction tests
+
+- (void)testSyncServerOverrideFileAccessAction {
+  NSString* plistPath = [NSString stringWithFormat:@"%@/override-faa-action.plist", self.testDir];
+  SNTConfigurator* cfg = [self configuratorWithEmptySyncStateAtPath:plistPath];
+
+  XCTAssertEqual(cfg.overrideFileAccessAction, SNTOverrideFileAccessActionNone);
+
+  // Profile values, case-insensitive; an unknown value means None
+  cfg.configState[@"OverrideFileAccessAction"] = @"Audit_Only";
+  XCTAssertEqual(cfg.overrideFileAccessAction, SNTOverrideFileAccessActionAuditOnly);
+  cfg.configState[@"OverrideFileAccessAction"] = @"bogus";
+  XCTAssertEqual(cfg.overrideFileAccessAction, SNTOverrideFileAccessActionNone);
+
+  // The strings SNTSyncPreflight stores for each sync proto value
+  [cfg setSyncServerOverrideFileAccessAction:@"AUDIT_ONLY"];
+  XCTAssertEqual(cfg.overrideFileAccessAction, SNTOverrideFileAccessActionAuditOnly);
+  [cfg setSyncServerOverrideFileAccessAction:@"DISABLE"];
+  XCTAssertEqual(cfg.overrideFileAccessAction, SNTOverrideFileAccessActionDisable);
+  [cfg setSyncServerOverrideFileAccessAction:@"NONE"];
+  XCTAssertEqual(cfg.overrideFileAccessAction, SNTOverrideFileAccessActionNone);
+
+  // Deprecated form is still accepted
+  [cfg setSyncServerOverrideFileAccessAction:@"auditonly"];
+  XCTAssertEqual(cfg.overrideFileAccessAction, SNTOverrideFileAccessActionAuditOnly);
+
+  // An unknown value is rejected, so the earlier sync value stays
+  [cfg setSyncServerOverrideFileAccessAction:@"bogus"];
+  XCTAssertEqual(cfg.overrideFileAccessAction, SNTOverrideFileAccessActionAuditOnly);
+
+  XCTAssertTrue([self.fileMgr removeItemAtPath:plistPath error:nil]);
+}
+
 #pragma mark - ExecutableIntegrityPolicy tests
 
 - (void)testExecutableIntegrityPolicy {

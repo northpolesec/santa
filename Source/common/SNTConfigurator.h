@@ -1069,9 +1069,11 @@ extern NSString* _Nonnull const kStateTempAdminTargetUIDKey;
 /// occurs. This setting will apply across all rules in the file access policy.
 ///
 /// Possible values are
-///   * "AuditOnly": When a rule is violated, it will be logged, but the access
+///   * "audit_only": When a rule is violated, it will be logged, but the access
 ///     will not be blocked
-///   * "Disable": No access will be logged or blocked.
+///   * "disable": No access will be logged or blocked.
+///   * "none": Enforce the file access policy as configured.
+/// Values are case-insensitive.
 ///
 /// If not set, no override will take place and the file acces spolicy will
 /// apply as configured.

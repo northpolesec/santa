@@ -16,6 +16,7 @@
 #import "Source/common/SNTConfigurator.h"
 
 #include <sys/stat.h>
+#include <optional>
 #include <set>
 #include <string>
 
@@ -69,6 +70,21 @@ static SNTRemovableMediaAction ActionFromString(NSString* action) {
   }
   LOGW(@"Unrecognized RemovableMediaAction value: %@, defaulting to Allow", action);
   return SNTRemovableMediaActionAllow;
+}
+
+// Returns nullopt for an unrecognized value. An empty string means None.
+static std::optional<SNTOverrideFileAccessAction> OverrideFileAccessActionFromString(
+    NSString* action) {
+  NSString* a = [action lowercaseString];
+  // Note: `auditonly` without an underscore is a deprecated, but still accepted form.
+  if ([a isEqualToString:@"audit_only"] || [a isEqualToString:@"auditonly"]) {
+    return SNTOverrideFileAccessActionAuditOnly;
+  }
+  if ([a isEqualToString:@"disable"]) return SNTOverrideFileAccessActionDisable;
+  if ([a isEqualToString:@"none"] || [a isEqualToString:@""]) {
+    return SNTOverrideFileAccessActionNone;
+  }
+  return std::nullopt;
 }
 
 static SNTExecutableIntegrityPolicy ExecutableIntegrityPolicyFromString(NSString* policy) {
@@ -1969,31 +1985,15 @@ static SNTConfigurator* sharedConfigurator = nil;
 }
 
 - (void)setSyncServerOverrideFileAccessAction:(NSString*)action {
-  NSString* a = [action lowercaseString];
-  if ([a isEqualToString:@"auditonly"] || [a isEqualToString:@"disable"] ||
-      [a isEqualToString:@"none"] || [a isEqualToString:@""]) {
+  if (OverrideFileAccessActionFromString(action)) {
     [self updateSyncStateForKey:kOverrideFileAccessActionKey value:action];
   }
 }
 
 - (SNTOverrideFileAccessAction)overrideFileAccessAction {
-  NSString* action = [self.syncState[kOverrideFileAccessActionKey] lowercaseString];
-
-  if (!action) {
-    action = [self.configState[kOverrideFileAccessActionKey] lowercaseString];
-    if (!action) {
-      return SNTOverrideFileAccessActionNone;
-    }
-  }
-
-  // Note: `auditonly` without an underscore is a deprecated, but still accepted form.
-  if ([action isEqualToString:@"audit_only"] || [action isEqualToString:@"auditonly"]) {
-    return SNTOverrideFileAccessActionAuditOnly;
-  } else if ([action isEqualToString:@"disable"]) {
-    return SNTOverrideFileAccessActionDisable;
-  } else {
-    return SNTOverrideFileAccessActionNone;
-  }
+  NSString* action = self.syncState[kOverrideFileAccessActionKey];
+  if (!action) action = self.configState[kOverrideFileAccessActionKey];
+  return OverrideFileAccessActionFromString(action).value_or(SNTOverrideFileAccessActionNone);
 }
 
 ///

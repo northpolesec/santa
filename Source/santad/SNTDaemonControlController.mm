@@ -577,6 +577,10 @@ static NSString* TAMUsernameForUID(uid_t uid) {
   }
 }
 
+- (void)overrideFileAccessAction:(void (^)(SNTOverrideFileAccessAction))reply {
+  reply([[SNTConfigurator configurator] overrideFileAccessAction]);
+}
+
 - (void)clientMode:(void (^)(SNTClientMode))reply {
   reply([[SNTConfigurator configurator] clientMode]);
 }
