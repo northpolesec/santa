@@ -138,8 +138,8 @@
   XCTAssertNil([SNTBlockMessage eventDetailURLForEvent:se customURL:@"null"]);
 }
 
-// The URL is reachable from the dialog and the copied text, so it withholds too.
-- (void)testEventDetailURLDropsContentDerivedTokensWhenIdentityIsUnverified {
+// The URL is reachable from the dialog, the copied text, and the TTY, so it withholds too.
+- (void)testEventDetailURLIsWithheldWhenItUsesUnverifiedContent {
   SNTStoredExecutionEvent* se = [[SNTStoredExecutionEvent alloc] init];
 
   se.fileSHA256 = @"my_fi";
@@ -152,13 +152,23 @@
   se.identityUnverified = YES;
   se.identityVendorMatched = NO;
 
+  for (NSString* token in @[
+         @"%file_sha%", @"%file_identifier%", @"%bundle_or_file_identifier%", @"%file_bundle_id%"
+       ]) {
+    NSString* url = [@"http://localhost/blockables/" stringByAppendingString:token];
+    XCTAssertNil([SNTBlockMessage eventDetailURLForEvent:se customURL:url], @"%@", token);
+  }
+
+  // A template with no content-derived token still resolves.
+  XCTAssertEqualObjects(
+      [SNTBlockMessage eventDetailURLForEvent:se
+                                    customURL:@"http://localhost?ti=%team_id%&un=%username%"]
+          .absoluteString,
+      @"http://localhost?ti=SNT&un=my_un");
+
   NSString* url = @"http://"
                   @"localhost?fs=%file_sha%&fi=%file_identifier%&bfi=%bundle_or_file_identifier%&"
                   @"fbid=%file_bundle_id%&ti=%team_id%&si=%signing_id%&ch=%cdhash%&un=%username%";
-
-  XCTAssertEqualObjects([SNTBlockMessage eventDetailURLForEvent:se customURL:url].absoluteString,
-                        @"http://localhost?fs=&fi=&bfi=&fbid=&ti=SNT&si=SNT%3As.n.t&ch=abc&"
-                        @"un=my_un");
 
   // The vendor-matched shape keeps today's URL: its read was corroborated.
   se.identityVendorMatched = YES;

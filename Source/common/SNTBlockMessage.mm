@@ -329,17 +329,14 @@ static id EncodedValueOrNull(id value) {
 //
 + (NSDictionary*)eventDetailTemplateMappingForEvent:(SNTStoredExecutionEvent*)event {
   SNTConfigurator* config = [SNTConfigurator configurator];
-  // Content-derived tokens are blank for an unconfirmed read. Empty, not nil: nil leaves the
-  // literal token in the URL.
-  BOOL contentUnverified = event.contentAttributesUnverified;
-  NSString* bundleOrFileIdentifier =
-      contentUnverified ? @"" : (event.fileSHA256 ? event.fileBundleHash ?: event.fileSHA256 : nil);
   return @{
-    @"%file_sha%" : EncodedValueOrNull(bundleOrFileIdentifier),
-    @"%file_identifier%" : EncodedValueOrNull(contentUnverified ? @"" : event.fileSHA256),
-    @"%bundle_or_file_identifier%" : EncodedValueOrNull(bundleOrFileIdentifier),
+    @"%file_sha%" :
+        EncodedValueOrNull(event.fileSHA256 ? event.fileBundleHash ?: event.fileSHA256 : nil),
+    @"%file_identifier%" : EncodedValueOrNull(event.fileSHA256),
+    @"%bundle_or_file_identifier%" :
+        EncodedValueOrNull(event.fileSHA256 ? event.fileBundleHash ?: event.fileSHA256 : nil),
     @"%username%" : EncodedValueOrNull(event.executingUser),
-    @"%file_bundle_id%" : EncodedValueOrNull(contentUnverified ? @"" : event.fileBundleID),
+    @"%file_bundle_id%" : EncodedValueOrNull(event.fileBundleID),
     @"%team_id%" : EncodedValueOrNull(event.teamID),
     @"%signing_id%" : EncodedValueOrNull(event.signingID),
     @"%cdhash%" : EncodedValueOrNull(event.cdhash),
@@ -410,6 +407,15 @@ static id EncodedValueOrNull(id value) {
 }
 
 + (NSURL*)eventDetailURLForEvent:(SNTStoredExecutionEvent*)event customURL:(NSString*)url {
+  // A vendor-unmatched read's content-derived values may describe a different file than the one
+  // that ran, so a URL built from them is withheld rather than filled in.
+  if (event.contentAttributesUnverified) {
+    for (NSString* token in @[
+           @"%file_sha%", @"%file_identifier%", @"%bundle_or_file_identifier%", @"%file_bundle_id%"
+         ]) {
+      if ([url containsString:token]) return nil;
+    }
+  }
   return [self eventDetailURLForEvent:event
                             customURL:url
                       templateMapping:[self eventDetailTemplateMappingForEvent:event]];
