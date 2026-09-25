@@ -133,6 +133,36 @@ required:
   `}
 />
 
+## Require a hardware security key on a Mac without Touch ID <AddedBadge added={"2026.9"} /> {#require-security-key}
+
+Touch ID is unavailable on a desktop Mac and in clamshell mode, which leaves a
+password as the only way to approve. A security key covers those machines with
+something that has to be physically present and cannot be typed. Use
+`REQUIRE_PRESENCE` where either will do. Requires Santa 2026.9 or later.
+
+Like Touch ID, this establishes that a person was there, not which person. See
+[User Authorization](/features/binary-authorization#user-authorization).
+
+```clike
+euid == 0 ? REQUIRE_SECURITY_KEY : ALLOWLIST
+```
+
+The example below runs the tool as root, so a key touch is required:
+
+<PlaygroundLink
+  expression={`euid == 0 ? REQUIRE_SECURITY_KEY : ALLOWLIST`}
+  context={`
+    target:
+      signing_id: "EQHXZ8M8AV:com.example.admintool"
+    args:
+      - "--flag"
+    envs:
+      HOME: "/var/root"
+    euid: 0
+    cwd: "/Applications"
+  `}
+/>
+
 ## Audit out-of-hours use before enforcing <AddedBadge added={"2026.8"} /> {#audit-before-enforcing}
 
 Both policy slots allow the process to run. Out-of-hours executions arrive as

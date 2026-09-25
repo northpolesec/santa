@@ -97,7 +97,7 @@ double watchdogRAMPeak = 0;
 
 ///
 ///  Called when caches should be flushed (rules changed, explicit flush command, etc.).
-///  Flushes both the auth result cache and TouchID approval cache.
+///  Flushes both the auth result cache and the user authorization approval cache.
 ///
 @property(copy) void (^flushCacheBlock)(santa::FlushCacheMode, santa::FlushCacheReason);
 

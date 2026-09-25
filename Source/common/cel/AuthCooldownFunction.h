@@ -12,8 +12,8 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
-#ifndef SANTA_COMMON_CEL_TOUCHIDFUNCTION_H
-#define SANTA_COMMON_CEL_TOUCHIDFUNCTION_H
+#ifndef SANTA_COMMON_CEL_AUTHCOOLDOWNFUNCTION_H
+#define SANTA_COMMON_CEL_AUTHCOOLDOWNFUNCTION_H
 
 #include "absl/status/status.h"
 
@@ -29,16 +29,16 @@
 namespace santa {
 namespace cel {
 
-// Register TouchID cooldown functions at compile time (type checking).
-// These functions are only available in CELv2.
-absl::Status AddTouchIDCooldownCompilerLibrary(::cel::CompilerBuilder& builder);
+// Register the authorization cooldown functions at compile time (type
+// checking). These functions are only available in CELv2.
+absl::Status AddAuthCooldownCompilerLibrary(::cel::CompilerBuilder& builder);
 
-// Register TouchID cooldown functions at runtime.
-absl::Status RegisterTouchIDCooldownFunctions(
+// Register the authorization cooldown functions at runtime.
+absl::Status RegisterAuthCooldownFunctions(
     ::google::api::expr::runtime::CelFunctionRegistry* registry,
     const ::google::api::expr::runtime::InterpreterOptions& options);
 
 }  // namespace cel
 }  // namespace santa
 
-#endif  // SANTA_COMMON_CEL_TOUCHIDFUNCTION_H
+#endif  // SANTA_COMMON_CEL_AUTHCOOLDOWNFUNCTION_H

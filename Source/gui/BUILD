@@ -19,13 +19,38 @@ filegroup(
 )
 
 objc_library(
+    name = "SNTFido2Helper",
+    srcs = ["SNTFido2Helper.mm"],
+    hdrs = ["SNTFido2Helper.h"],
+    module_name = "santa_gui_SNTFido2Helper",
+    sdk_frameworks = [
+        "AppKit",
+        "CoreFoundation",
+        "IOKit",
+        "Security",
+    ],
+    deps = [
+        ":SNTMessageView",
+        ":SNTMessageWindowController",
+        "//Source/common:SNTConfigurator",
+        "//Source/common:SNTError",
+        "//Source/common:SNTLogging",
+        "@libfido2//:fido2",
+    ],
+)
+
+objc_library(
     name = "SNTAuthorizationHelper",
     srcs = ["SNTAuthorizationHelper.mm"],
     hdrs = ["SNTAuthorizationHelper.h"],
     module_name = "santa_gui_SNTAuthorizationHelper",
     sdk_frameworks = ["LocalAuthentication"],
     deps = [
+        ":SNTFido2Helper",
+        "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
+        "//Source/common:SNTError",
+        "//Source/common:SNTLogging",
         "//Source/common:SNTStoredExecutionEvent",
     ],
 )
@@ -34,12 +59,15 @@ swift_library(
     name = "SNTMessageView",
     srcs = [
         "MoonLandingIcon.swift",
+        "SNTFido2PromptView.swift",
         "SNTMessageView.swift",
     ],
     generates_header = 1,
     module_name = "santa_gui_SNTMessageView",
+    # Deliberately does not depend on :SNTAuthorizationHelper. That target
+    # depends on :SNTFido2Helper, which needs this module's generated header for
+    # the prompt view, so the dependency would be a cycle.
     deps = [
-        ":SNTAuthorizationHelper",
         "//Source/common:SNTConfigBundle",
         "//Source/common:SNTConfigurator",
     ],
@@ -560,11 +588,24 @@ santa_unit_test(
     ],
 )
 
+santa_unit_test(
+    name = "SNTFido2HelperTest",
+    srcs = [
+        "SNTFido2HelperTest.mm",
+    ],
+    deps = [
+        ":SNTAuthorizationHelper",
+        ":SNTFido2Helper",
+        "//Source/common:SNTError",
+    ],
+)
+
 test_suite(
     name = "unit_tests",
     tests = [
         ":SNTAuthorizationHelperTest",
         ":SNTBinaryMessageWindowControllerTest",
+        ":SNTFido2HelperTest",
         ":SNTNotificationManagerTest",
         ":SNTSystemExtensionDelegateTest",
     ],

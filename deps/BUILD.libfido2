@@ -1,0 +1,105 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+# libfido2 has no Bazel build of its own; these targets stand in for its CMake
+# build, configured for macOS + BoringSSL.
+
+# Feature macros libfido2's sources test for. They describe what the macOS
+# platform provides, and are shared by both targets below.
+HAVE_DEFINES = [
+    "HAVE_ARC4RANDOM_BUF",
+    "HAVE_ASPRINTF",
+    "HAVE_ERR_H",
+    "HAVE_GETLINE",
+    "HAVE_GETOPT",
+    "HAVE_GETPAGESIZE",
+    "HAVE_POSIX_IOCTL",
+    "HAVE_READPASSPHRASE",
+    "HAVE_SIGNAL_H",
+    "HAVE_STRLCAT",
+    "HAVE_STRLCPY",
+    "HAVE_STRSEP",
+    "HAVE_TIMINGSAFE_BCMP",
+    "HAVE_UNISTD_H",
+]
+
+cc_library(
+    name = "openbsd_compat",
+    srcs = [
+        "openbsd-compat/explicit_bzero.c",
+        "openbsd-compat/freezero.c",
+        "openbsd-compat/recallocarray.c",
+    ],
+    hdrs = glob(["openbsd-compat/*.h"]),
+    copts = [
+        "-DHAVE_CLOCK_GETTIME",
+        "-DHAVE_MEMSET_S",
+        "-Wno-unused-parameter",
+    ],
+    defines = HAVE_DEFINES,
+    # Do NOT add includes = ["openbsd-compat"] here. The openbsd-compat
+    # directory contains shim headers (e.g. time.h, err.h) that shadow system
+    # headers and cause infinite include recursion. libfido2 sources already
+    # reference the compat header via a relative path:
+    #   #include "../openbsd-compat/openbsd-compat.h"
+    deps = ["@boringssl//:crypto"],
+)
+
+cc_library(
+    name = "fido2",
+    srcs = glob(
+        ["src/*.c"],
+        exclude = [
+            # Non-macOS HID backends. hid_osx.c is the one macOS uses; it does
+            # not need hid_unix.c.
+            "src/hid_freebsd.c",
+            "src/hid_hidapi.c",
+            "src/hid_linux.c",
+            "src/hid_netbsd.c",
+            "src/hid_openbsd.c",
+            "src/hid_unix.c",
+            "src/hid_win.c",
+            # Windows-only.
+            "src/winhello.c",
+            # Transports Santa does not use, and which would pull in Linux
+            # netlink and PC/SC.
+            "src/netlink.c",
+            "src/nfc.c",
+            "src/nfc_linux.c",
+            "src/pcsc.c",
+        ],
+    ),
+    hdrs = glob([
+        "src/*.h",
+        "src/fido/*.h",
+    ]),
+    copts = [
+        "-D_FIDO_INTERNAL",
+        "-DHAVE_CLOCK_GETTIME",
+        "-DHAVE_MEMSET_S",
+        # BoringSSL has the same direct HKDF API as LibreSSL, not the OpenSSL
+        # EVP_MD_meth_dup/EVP_PKEY_HKDF path. Pretend to be a recent LibreSSL so
+        # the modern code paths are taken and the old-version compat branches
+        # (memcpy of EVP_MD structs) are skipped.
+        "-DLIBRESSL_VERSION_NUMBER=0x4000000fL",
+        "-Wno-unused-parameter",
+    ],
+    defines = HAVE_DEFINES + [
+        "TLS=__thread",
+        "_FIDO_MAJOR=1",
+        "_FIDO_MINOR=17",
+        "_FIDO_PATCH=0",
+    ],
+    includes = ["src"],
+    linkopts = [
+        "-framework CoreFoundation",
+        "-framework IOKit",
+        # src/compress.c uses zlib for largeBlob compression.
+        "-lz",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":openbsd_compat",
+        "@boringssl//:crypto",
+        "@libcbor//:cbor",
+    ],
+)

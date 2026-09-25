@@ -48,7 +48,7 @@ struct EvaluationResult {
   ReturnValue value;
   bool cacheable;
   std::optional<uint64_t>
-      touchIDCooldownMinutes;  // nullopt = no caching (prompt every time)
+      authCooldownMinutes;  // nullopt = no caching (prompt every time)
   // Set when policy_for_range() matched an open window with a kill_on_expiry()
   // policy. The deadline is only recorded if the execution is allowed to run.
   std::optional<PendingKill> pendingKill;
@@ -58,7 +58,7 @@ struct EvaluationResult {
                    std::optional<PendingKill> kill = std::nullopt)
       : value(v),
         cacheable(c),
-        touchIDCooldownMinutes(cooldown),
+        authCooldownMinutes(cooldown),
         pendingKill(std::move(kill)) {}
 };
 

@@ -21,7 +21,7 @@ bazel_dep(name = "flatbuffers", version = "25.12.19.bcr.1")
 bazel_dep(name = "protos", version = "1.0.1", repo_name = "northpolesec_protos")
 git_override(
     module_name = "protos",
-    commit = "c816f05a419782b19123bb39fb80a8d8a53e4f21",
+    commit = "8bcece6fb420b8b22042454b42785241b3e8803a",
     remote = "https://github.com/northpolesec/protos",
 )
 
@@ -55,6 +55,8 @@ non_module_deps = use_extension("//deps:non_module_deps.bzl", "non_module_deps")
 use_repo(non_module_deps, "FMDB")
 use_repo(non_module_deps, "OCMock")
 use_repo(non_module_deps, "nats_c")
+use_repo(non_module_deps, "libcbor")
+use_repo(non_module_deps, "libfido2")
 
 # Hedron's Compile Commands Extractor
 # Note: Moved to a fork because the original project's maintenance status is in limbo.

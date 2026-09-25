@@ -18,6 +18,7 @@ def base_localization(write_out=False):
   files_to_localize.append('Source/common/SNTBlockMessage.mm')
   files_to_localize.append('Source/common/SNTRuleTimeWindow.mm')
   files_to_localize.append('Source/gui/SNTAuthorizationHelper.mm')
+  files_to_localize.append('Source/gui/SNTFido2Helper.mm')
   files_to_localize.append('Source/gui/SNTNotificationManager.mm')
   files_to_localize.append('Source/gui/SNTStatusItemManager.mm')
 

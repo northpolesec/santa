@@ -123,8 +123,12 @@
 /// The decision depends on the user approving execution.
 @property BOOL holdAndAsk;
 
-/// Skip showing the block dialog and go directly to TouchID authorization.
-@property BOOL silentTouchID;
+/// Skip showing the block dialog and go directly to authorization.
+@property BOOL silentAuthorization;
+
+/// How the user must authorize this execution. Only meaningful when holdAndAsk
+/// is set.
+@property SNTAuthorizationMethod authorizationMethod;
 
 /// The matched rule requires running under `santactl sandbox`. Surfaced so the
 /// GUI and CLI can indicate the sandbox requirement as part of the block

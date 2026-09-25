@@ -30,4 +30,20 @@ def _non_module_deps_impl(_module_ctx):
         patch_args = ["-p1"],
     )
 
+    # libcbor is a dependency of libfido2.
+    git_repository(
+        name = "libcbor",
+        remote = "https://github.com/PJK/libcbor.git",
+        commit = "6730c20ab487c0b4dc5fb3fea918937085355bac",  # tag = v0.14.0
+        build_file = Label("//deps:BUILD.libcbor"),
+    )
+
+    # libfido2 provides FIDO2/WebAuthn hardware security key support.
+    git_repository(
+        name = "libfido2",
+        remote = "https://github.com/Yubico/libfido2.git",
+        commit = "b974e7cf2ee7392134cc12c08b76a068cf250dd8",  # tag = 1.17.0
+        build_file = Label("//deps:BUILD.libfido2"),
+    )
+
 non_module_deps = module_extension(implementation = _non_module_deps_impl)

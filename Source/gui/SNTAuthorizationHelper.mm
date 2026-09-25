@@ -18,7 +18,10 @@
 #import <LocalAuthentication/LocalAuthentication.h>
 
 #import "Source/common/SNTConfigurator.h"
+#import "Source/common/SNTError.h"
+#import "Source/common/SNTLogging.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
+#import "Source/gui/SNTFido2Helper.h"
 
 // Upper bound on how long the interactive Temporary Admin Mode justification
 // prompt may stay open. santad reaches this prompt over a synchronous XPC proxy
@@ -153,7 +156,62 @@ static const NSTimeInterval kAdminJustificationPromptTimeoutSeconds = 120;
 + (void)authorizeExecutionForEvent:(SNTStoredExecutionEvent*)event
                         replyBlock:(void (^)(BOOL success))replyBlock {
   NSString* reason = [self executionAuthorizationReasonForEvent:event];
-  [self authorizeWithReason:reason replyBlock:replyBlock];
+
+  switch (event.authorizationMethod) {
+    case SNTAuthorizationMethodTouchID:
+      [self authorizeWithReason:reason replyBlock:replyBlock];
+      break;
+    case SNTAuthorizationMethodSecurityKey: {
+      [SNTFido2Helper authorizeWithReason:reason
+                      offerTouchIDInstead:NO
+                               replyBlock:^(SNTFido2Result result) {
+                                 replyBlock(result == SNTFido2ResultApproved);
+                               }];
+      break;
+    }
+    case SNTAuthorizationMethodPresence:
+      [self authorizePresenceWithReason:reason replyBlock:replyBlock];
+      break;
+    default: {
+      // A method this build does not know about, from an event archived by a
+      // newer Santa. Deny: any method we could fall back to might be weaker
+      // than the one the rule asked for.
+      LOGE(@"Denying a hold that requires unknown authorization method %ld",
+           (long)event.authorizationMethod);
+      dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        replyBlock(NO);
+      });
+      break;
+    }
+  }
+}
+
+// Either method satisfies a presence requirement. Start on the security key,
+// whose prompt carries a button to switch to Touch ID, and fall back on its own
+// when no key is attached to touch.
++ (void)authorizePresenceWithReason:(NSString*)reason
+                         replyBlock:(void (^)(BOOL success))replyBlock {
+  BOOL touchIDAvailable = [self canAuthorizeWithTouchID:NULL];
+
+  [SNTFido2Helper authorizeWithReason:reason
+                  offerTouchIDInstead:touchIDAvailable
+                           replyBlock:^(SNTFido2Result result) {
+                             switch (result) {
+                               case SNTFido2ResultApproved: replyBlock(YES); break;
+                               // Nothing was asked of the user in either case,
+                               // so falling back is not a second chance at a
+                               // prompt they already refused.
+                               case SNTFido2ResultNoDevice:
+                               case SNTFido2ResultUseTouchID:
+                                 if (touchIDAvailable) {
+                                   [self authorizeWithReason:reason replyBlock:replyBlock];
+                                 } else {
+                                   replyBlock(NO);
+                                 }
+                                 break;
+                               case SNTFido2ResultDenied: replyBlock(NO); break;
+                             }
+                           }];
 }
 
 + (NSString*)executionAuthorizationReasonForEvent:(SNTStoredExecutionEvent*)event {
@@ -197,6 +255,30 @@ static const NSTimeInterval kAdminJustificationPromptTimeoutSeconds = 120;
 + (BOOL)canAuthorizeWithTouchID:(NSError**)error {
   LAContext* context = [[LAContext alloc] init];
   return [context canEvaluatePolicy:[self authorizationPolicy] error:error];
+}
+
++ (BOOL)canAuthorizeWithMethod:(SNTAuthorizationMethod)method error:(NSError**)error {
+  switch (method) {
+    case SNTAuthorizationMethodTouchID: return [self canAuthorizeWithTouchID:error];
+    // Whether a key is attached can only be answered by enumerating IOKit,
+    // which must not happen on the main thread this runs on. Assume it can be,
+    // so the user is offered the prompt and can still plug one in; the attempt
+    // itself reports back when nothing is attached.
+    case SNTAuthorizationMethodSecurityKey:
+    case SNTAuthorizationMethodPresence: return YES;
+    default:
+      // Unknown to this build, so nothing here can satisfy it.
+      [SNTError populateError:error
+                     withCode:SNTErrorCodeAuthorizationMethodUnavailable
+                      message:NSLocalizedString(
+                                  @"This Mac is not set up for the authorization this rule "
+                                  @"requires. Contact your administrator.",
+                                  @"Shown when a rule requires an authorization method the Mac "
+                                  @"cannot offer")
+                       detail:[NSString stringWithFormat:@"Unknown authorization method %ld",
+                                                         (long)method]];
+      return NO;
+  }
 }
 
 @end

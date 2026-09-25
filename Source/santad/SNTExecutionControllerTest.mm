@@ -1405,7 +1405,7 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   currentDecision.holdAndAsk = YES;
   currentDecision.decisionClientMode = SNTClientModeLockdown;
   currentDecision.sha256 = @"cachedsha256";
-  currentDecision.touchIDCooldownMinutes = @(5);  // 5 minute cooldown for caching
+  currentDecision.authCooldownMinutes = @(5);  // 5 minute cooldown for caching
 
   {
     Message msg(mockESApi, &esMsg);
@@ -1439,8 +1439,8 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   secondDecision.decision = SNTEventStateBlockUnknown;
   secondDecision.holdAndAsk = YES;
   secondDecision.decisionClientMode = SNTClientModeLockdown;
-  secondDecision.sha256 = @"cachedsha256";       // Same SHA256 - should hit cache
-  secondDecision.touchIDCooldownMinutes = @(5);  // Same cooldown
+  secondDecision.sha256 = @"cachedsha256";    // Same SHA256 - should hit cache
+  secondDecision.authCooldownMinutes = @(5);  // Same cooldown
   currentDecision = secondDecision;
 
   // Second execution with same controller (cache persists)
@@ -1469,6 +1469,182 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
 
   // The notification queue should NOT have been called for the second execution
   XCTAssertNil(capturedReplyBlock, @"No reply block should be captured for cached execution");
+
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+  [mockNotifierQueue stopMocking];
+  [mockPolicyProcessor stopMocking];
+}
+
+// An approval granted under one authorization method must not satisfy a later
+// hold that demands a different one.
+- (void)testApprovalCacheDoesNotCrossAuthorizationMethods {
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"cachedsha256");
+  OCMStub([self.mockConfigurator clientMode]).andReturn(SNTClientModeLockdown);
+
+  // Create mock notifier queue that captures the reply block
+  id mockNotifierQueue = OCMClassMock([SNTNotificationQueue class]);
+  __block NotificationReplyBlock capturedReplyBlock = nil;
+  OCMStub([mockNotifierQueue addEvent:OCMOCK_ANY
+                    withCustomMessage:OCMOCK_ANY
+                            customURL:OCMOCK_ANY
+                eventDetailButtonText:OCMOCK_ANY
+                          configState:OCMOCK_ANY
+                             andReply:OCMOCK_ANY])
+      .andDo(^(NSInvocation* invocation) {
+        __unsafe_unretained NotificationReplyBlock block;
+        [invocation getArgument:&block atIndex:7];
+        capturedReplyBlock = [block copy];
+      });
+
+  LogExecutionBlock loggerBlock = ^(Message esMsg) {
+  };
+
+  santa::ProcessControlBlock processControl = ^bool(pid_t pid, santa::ProcessControl control) {
+    return true;
+  };
+
+  // Create mock policy processor that returns a new decision each time
+  id mockPolicyProcessor = OCMClassMock([SNTPolicyProcessor class]);
+  __block SNTCachedDecision* currentDecision = nil;
+
+  es_file_t file = MakeESFile("foo");
+  es_process_t proc = MakeESProcess(&file);
+  es_file_t fileExec = MakeESFile("bar", {.st_dev = 12, .st_ino = 34});
+  es_process_t procExec = MakeESProcess(&fileExec);
+  procExec.is_platform_binary = false;
+  procExec.codesigning_flags = CS_SIGNED | CS_VALID;
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_EXEC, &proc);
+  esMsg.event.exec.target = &procExec;
+
+  OCMStub([mockPolicyProcessor decisionForFileInfo:OCMOCK_ANY
+                                     targetProcess:&procExec
+                                      imageCPUType:0
+                                       configState:OCMOCK_ANY
+                                activationCallback:OCMOCK_ANY
+                                    cachedDecision:OCMOCK_ANY])
+      .ignoringNonObjectArgs()
+      .andDo(^(NSInvocation* invocation) {
+        [invocation setReturnValue:&currentDecision];
+      });
+
+  std::shared_ptr<santa::santad::process_tree::ProcessTree> processTree;
+
+  SNTExecutionController* controller = [[SNTExecutionController alloc]
+        initWithRuleTable:self.mockRuleDatabase
+               eventTable:self.mockEventDatabase
+            notifierQueue:mockNotifierQueue
+               syncdQueue:nil
+                   logger:loggerBlock
+                ttyWriter:santa::TTYWriter::Create(true)
+          policyProcessor:mockPolicyProcessor
+      processControlBlock:processControl
+              processTree:processTree
+      sandboxExpectations:std::make_shared<santa::SandboxExpectations>()
+           timedRuleKills:nil
+          believableClock:nil];
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+
+  // Track all actions received to verify the flow
+  __block NSMutableArray<NSNumber*>* receivedActions = [NSMutableArray array];
+
+  // First execution: holds for Touch ID (cache is empty)
+  currentDecision = [[SNTCachedDecision alloc] init];
+  currentDecision.decision = SNTEventStateBlockUnknown;
+  currentDecision.holdAndAsk = YES;
+  currentDecision.decisionClientMode = SNTClientModeLockdown;
+  currentDecision.sha256 = @"cachedsha256";
+  currentDecision.authCooldownMinutes = @(5);  // 5 minute cooldown for caching
+  currentDecision.authorizationMethod = SNTAuthorizationMethodTouchID;
+
+  {
+    Message msg(mockESApi, &esMsg);
+    [controller validateExecEvent:msg
+                   cachedDecision:nil
+                       postAction:^bool(SNTAction action, SNTCachedDecision* cd) {
+                         [receivedActions addObject:@(action)];
+                         return true;
+                       }];
+  }
+
+  // First action should be SNTActionRespondHold (process held for TouchID)
+  XCTAssertGreaterThanOrEqual(receivedActions.count, 1UL);
+  XCTAssertEqual([receivedActions[0] integerValue], SNTActionRespondHold,
+                 @"First execution should hold for TouchID");
+
+  XCTAssertNotNil(capturedReplyBlock, @"Reply block should have been captured");
+  // Simulate successful TouchID auth
+  capturedReplyBlock(YES);
+
+  XCTAssertEqual(currentDecision.decision, SNTEventStateAllowUnknown);
+  XCTAssertEqualObjects(currentDecision.decisionExtra, @"TouchID Approved");
+
+  // A second execution of the same binary, but under a rule that demands a
+  // security key, must still hold: the Touch ID approval does not count.
+  capturedReplyBlock = nil;
+  [receivedActions removeAllObjects];
+
+  SNTCachedDecision* secondDecision = [[SNTCachedDecision alloc] init];
+  secondDecision.decision = SNTEventStateBlockUnknown;
+  secondDecision.holdAndAsk = YES;
+  secondDecision.decisionClientMode = SNTClientModeLockdown;
+  secondDecision.sha256 = @"cachedsha256";  // Same SHA256, different method
+  secondDecision.authCooldownMinutes = @(5);
+  secondDecision.authorizationMethod = SNTAuthorizationMethodSecurityKey;
+  currentDecision = secondDecision;
+
+  mockESApi->SetExpectationsRetainReleaseMessage();
+  {
+    Message msg(mockESApi, &esMsg);
+    [controller validateExecEvent:msg
+                   cachedDecision:nil
+                       postAction:^bool(SNTAction action, SNTCachedDecision* cd) {
+                         [receivedActions addObject:@(action)];
+                         return true;
+                       }];
+  }
+
+  XCTAssertGreaterThanOrEqual(receivedActions.count, 1UL);
+  XCTAssertEqual([receivedActions[0] integerValue], SNTActionRespondHold,
+                 @"A Touch ID approval must not satisfy a security key hold");
+  XCTAssertTrue(secondDecision.holdAndAsk, @"holdAndAsk should not be cleared across methods");
+  XCTAssertNotNil(capturedReplyBlock, @"The security key hold should prompt");
+  capturedReplyBlock(YES);
+  XCTAssertEqualObjects(secondDecision.decisionExtra, @"Security Key Approved");
+
+  // A third execution under the same method now hits the cache.
+  capturedReplyBlock = nil;
+  [receivedActions removeAllObjects];
+
+  SNTCachedDecision* thirdDecision = [[SNTCachedDecision alloc] init];
+  thirdDecision.decision = SNTEventStateBlockUnknown;
+  thirdDecision.holdAndAsk = YES;
+  thirdDecision.decisionClientMode = SNTClientModeLockdown;
+  thirdDecision.sha256 = @"cachedsha256";
+  thirdDecision.authCooldownMinutes = @(5);
+  thirdDecision.authorizationMethod = SNTAuthorizationMethodSecurityKey;
+  currentDecision = thirdDecision;
+
+  mockESApi->SetExpectationsRetainReleaseMessage();
+  {
+    Message msg(mockESApi, &esMsg);
+    [controller validateExecEvent:msg
+                   cachedDecision:nil
+                       postAction:^bool(SNTAction action, SNTCachedDecision* cd) {
+                         [receivedActions addObject:@(action)];
+                         return true;
+                       }];
+  }
+
+  XCTAssertGreaterThanOrEqual(receivedActions.count, 1UL);
+  SNTAction thirdAction = (SNTAction)[receivedActions[0] integerValue];
+  XCTAssertTrue(thirdAction == SNTActionRespondAllow || thirdAction == SNTActionRespondAllowNoCache,
+                @"Same method within the cooldown should hit the cache (got %ld)",
+                (long)thirdAction);
+  XCTAssertEqualObjects(thirdDecision.decisionExtra, @"Security Key Cached");
+  XCTAssertNil(capturedReplyBlock, @"No reply block should be captured for a cached execution");
 
   XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
   [mockNotifierQueue stopMocking];
@@ -1713,7 +1889,7 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   XCTAssertEqualObjects(cd.decisionExtra, @"TouchID Approved After Expiry");
 }
 
-// Test that flushTouchIDApprovalCache clears the cache
+// Test that flushAuthApprovalCache clears the cache
 - (void)testFlushTouchIDApprovalCache {
   SNTExecutionController* controller = [[SNTExecutionController alloc]
         initWithRuleTable:self.mockRuleDatabase
@@ -1730,7 +1906,7 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
           believableClock:nil];
 
   // Just verify that flush doesn't crash - the cache internals are private
-  XCTAssertNoThrow([controller flushTouchIDApprovalCache]);
+  XCTAssertNoThrow([controller flushAuthApprovalCache]);
 }
 
 - (void)testSeatbeltRuleNoExpectationDenies {
@@ -4194,7 +4370,7 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   XCTAssertEqualObjects(actions.firstObject, @(SNTActionRespondHold));
   XCTAssertTrue(held.holdAndAsk);
   XCTAssertTrue(held.identityMismatched);
-  XCTAssertEqualObjects(held.touchIDCooldownMinutes, @5);
+  XCTAssertEqualObjects(held.authCooldownMinutes, @5);
 
   XCTAssertNotNil(capturedReplyBlock, @"the prompt was never shown");
   capturedReplyBlock(YES);

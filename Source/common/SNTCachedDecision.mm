@@ -92,8 +92,9 @@
   copy.identityMismatched = _identityMismatched;
   copy.identityVendorMatched = _identityVendorMatched;
   copy.holdAndAsk = _holdAndAsk;
-  copy.silentTouchID = _silentTouchID;
-  copy.touchIDCooldownMinutes = _touchIDCooldownMinutes;
+  copy.silentAuthorization = _silentAuthorization;
+  copy.authCooldownMinutes = _authCooldownMinutes;
+  copy.authorizationMethod = _authorizationMethod;
   copy.timedRuleKillDeadline = _timedRuleKillDeadline;
   copy.timedRuleKillNotifyAt = _timedRuleKillNotifyAt;
   copy.timedRuleKillRuleType = _timedRuleKillRuleType;

@@ -83,8 +83,8 @@
 }
 
 - (void)showWindow:(id)sender {
-  // If silentTouchID is set, skip showing the window and directly trigger TouchID.
-  if (self.event.silentTouchID && self.replyBlock) {
+  // If silentAuthorization is set, skip showing the window and directly trigger TouchID.
+  if (self.event.silentAuthorization && self.replyBlock) {
     [self performSilentTouchIDAuthorization];
     return;
   }

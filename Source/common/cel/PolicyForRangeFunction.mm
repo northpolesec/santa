@@ -26,6 +26,7 @@
 #include <vector>
 
 #include "Source/common/cel/result.pb.h"
+#include "absl/container/flat_hash_set.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/match.h"
@@ -166,6 +167,17 @@ absl::StatusOr<std::vector<int64_t>> DayList(const cel_runtime::CelValue& value,
   return days;
 }
 
+// The cooldown helpers in AuthCooldownFunction.mm, which return a grantable
+// policy. Kept as overload ids because that is all a checked reference gives us.
+const absl::flat_hash_set<std::string> kGrantableCooldownOverloadIDs = {
+    "require_touchid_with_cooldown_minutes_int",
+    "require_touchid_only_with_cooldown_minutes_int",
+    "require_security_key_with_cooldown_minutes_int",
+    "require_security_key_only_with_cooldown_minutes_int",
+    "require_presence_with_cooldown_minutes_int",
+    "require_presence_only_with_cooldown_minutes_int",
+};
+
 // Policies that let a process start, and so leave something to quit at expiry.
 bool IsGrantable(::santa::cel::v2::ReturnValue value) {
   switch (value) {
@@ -173,7 +185,11 @@ bool IsGrantable(::santa::cel::v2::ReturnValue value) {
     case ::santa::cel::v2::AUDIT:
     case ::santa::cel::v2::SEATBELT:
     case ::santa::cel::v2::REQUIRE_TOUCHID:
-    case ::santa::cel::v2::REQUIRE_TOUCHID_ONLY: return true;
+    case ::santa::cel::v2::REQUIRE_TOUCHID_ONLY:
+    case ::santa::cel::v2::REQUIRE_SECURITY_KEY:
+    case ::santa::cel::v2::REQUIRE_SECURITY_KEY_ONLY:
+    case ::santa::cel::v2::REQUIRE_PRESENCE:
+    case ::santa::cel::v2::REQUIRE_PRESENCE_ONLY: return true;
     default: return false;
   }
 }
@@ -300,8 +316,7 @@ bool ValidateWrappedPolicy(::cel::ValidationContext& context, const ::cel::Expr&
     }
   }
   if (ref && policy.has_call_expr() && ref->overload_id().size() == 1 &&
-      (ref->overload_id()[0] == "require_touchid_with_cooldown_minutes_int" ||
-       ref->overload_id()[0] == "require_touchid_only_with_cooldown_minutes_int")) {
+      kGrantableCooldownOverloadIDs.contains(ref->overload_id()[0])) {
     return true;
   }
   context.ReportErrorAt(policy.id(),

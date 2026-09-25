@@ -89,8 +89,12 @@
 
 @property BOOL cacheable;
 @property BOOL holdAndAsk;
-@property BOOL silentTouchID;
-@property NSNumber* touchIDCooldownMinutes;  // nil = no caching (prompt every time)
+@property BOOL silentAuthorization;
+@property NSNumber* authCooldownMinutes;  // nil = no caching (prompt every time)
+
+/// How the user must authorize a held execution. Only meaningful when
+/// holdAndAsk is set. Standalone mode holds leave this at Touch ID.
+@property SNTAuthorizationMethod authorizationMethod;
 
 /// Set when the matching rule's policy_for_range() evaluated in-window with a
 /// kill_on_expiry() policy: the executions recorded under the rule are quit at

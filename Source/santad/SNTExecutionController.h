@@ -147,9 +147,9 @@ using LogExecutionBlock = void (^)(santa::Message esMsg);
 @property(nonatomic, readonly) SNTRuleTable* ruleTable;
 
 ///
-///  Flushes the TouchID approval cache. Should be called when rules change
+///  Flushes the user authorization approval cache. Should be called when rules change
 ///  to ensure policy updates take effect immediately.
 ///
-- (void)flushTouchIDApprovalCache;
+- (void)flushAuthApprovalCache;
 
 @end

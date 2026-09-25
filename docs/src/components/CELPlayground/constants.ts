@@ -79,6 +79,29 @@ export const VARIABLES: CELVariable[] = [
     documentation: "Require Touch ID only policy constant",
   },
   {
+    name: "REQUIRE_SECURITY_KEY",
+    type: "string",
+    documentation: "Require a touch on an attached FIDO2 security key policy constant",
+  },
+  {
+    name: "REQUIRE_SECURITY_KEY_ONLY",
+    type: "string",
+    documentation:
+      "Require a touch on an attached FIDO2 security key only policy constant",
+  },
+  {
+    name: "REQUIRE_PRESENCE",
+    type: "string",
+    documentation:
+      "Require Touch ID or a touch on an attached FIDO2 security key policy constant",
+  },
+  {
+    name: "REQUIRE_PRESENCE_ONLY",
+    type: "string",
+    documentation:
+      "Require Touch ID or a touch on an attached FIDO2 security key only policy constant",
+  },
+  {
     name: "ancestors",
     type: "list",
     dynamic: true,

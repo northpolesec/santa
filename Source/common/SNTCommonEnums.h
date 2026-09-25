@@ -142,6 +142,18 @@ typedef NS_ENUM(NSInteger, SNTExecutableIntegrityPolicy) {
   SNTExecutableIntegrityPolicyIgnore = 4,
 };
 
+/// How a held execution must be authorized by the user. Set from the CEL return
+/// value that held the execution; Standalone mode holds always use Touch ID.
+///
+/// Touch ID is zero so that a decision, or an archived event, from a Santa that
+/// predates this enum decodes to the existing behavior.
+typedef NS_ENUM(NSInteger, SNTAuthorizationMethod) {
+  SNTAuthorizationMethodTouchID = 0,
+  SNTAuthorizationMethodSecurityKey = 1,
+  // Either Touch ID or a security key.
+  SNTAuthorizationMethodPresence = 2,
+};
+
 typedef NS_ENUM(uint64_t, SNTEventState) {
   // Bits 0-15 bits store non-decision types
   SNTEventStateUnknown = 0,

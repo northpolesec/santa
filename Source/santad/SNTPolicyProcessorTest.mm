@@ -1002,6 +1002,44 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   }
 }
 
+// Standalone has no expression to name an authorization method, so it must ask
+// for presence: Touch ID or a security key, whichever the Mac has.
+- (void)testStandaloneHoldsForPresence {
+  id mockRuleTable = OCMClassMock([SNTRuleTable class]);
+  SNTPolicyProcessor* processor =
+      [[SNTPolicyProcessor alloc] initWithRuleTable:mockRuleTable
+                                 entitlementsFilter:santa::EntitlementsFilter::Create(@[], @[])];
+  id mockConfigurator = OCMClassMock([SNTConfigurator class]);
+  OCMStub([mockConfigurator clientMode]).andReturn(SNTClientModeStandalone);
+  processor.configurator = mockConfigurator;
+
+  id mockFileInfo = OCMClassMock([SNTFileInfo class]);
+
+  SNTCachedDecision* cached = [[SNTCachedDecision alloc] init];
+  cached.sha256 = @"a326a1fb48074202e9ad41e4cd1e389eeea372c8c6f7d7e80da81176d5d9430e";
+  cached.codesignValidationStatus = @(errSecSuccess);
+
+  es_file_t file = MakeESFile("/tmp/unknown");
+  es_process_t proc = MakeESProcess(&file);
+  proc.is_platform_binary = false;
+  proc.codesigning_flags = CS_SIGNED | CS_VALID;
+  SNTConfigState* configState = [[SNTConfigState alloc] initWithConfig:mockConfigurator];
+
+  SNTCachedDecision* cd = [processor decisionForFileInfo:mockFileInfo
+                                           targetProcess:&proc
+                                            imageCPUType:CPU_TYPE_ARM64
+                                             configState:configState
+                                      activationCallback:nil
+                                          cachedDecision:cached];
+
+  XCTAssertTrue(cd.holdAndAsk);
+  XCTAssertEqual(cd.authorizationMethod, SNTAuthorizationMethodPresence);
+
+  [mockFileInfo stopMocking];
+  [mockConfigurator stopMocking];
+  [mockRuleTable stopMocking];
+}
+
 - (void)testDecisionBlocksFreshCodesignValidationFailure {
   // A signature failure is not recorded, so it must be re-derived on every
   // execution. Also the only coverage of the fresh failure path.
