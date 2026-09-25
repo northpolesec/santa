@@ -222,6 +222,10 @@ constexpr CELAnnotator::Entry kForkAndExec = {.fork = true, .exec = true};
   AddCELAnnotation(*self.tree, tool->pid_, tooLong, kForkAndExec);
   XCTAssertFalse([self has:tooLong on:tool]);
 
+  // Reachable from a rule such as add_annotation(args[1], ...) with crafted argv.
+  AddCELAnnotation(*self.tree, tool->pid_, "\xff\xfe", kForkAndExec);
+  XCTAssertFalse([self has:"\xff\xfe" on:tool]);
+
   for (size_t i = 0; i < CELAnnotator::kMaxEntries; i++) {
     AddCELAnnotation(*self.tree, tool->pid_, "MARK" + std::to_string(i), kForkAndExec);
   }

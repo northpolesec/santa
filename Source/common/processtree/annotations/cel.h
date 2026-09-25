@@ -90,7 +90,8 @@ class CELAnnotator : public Annotator {
 
 // Add `name` to the CEL annotations on `p`, replacing that process's
 // CELAnnotator with one that also carries the new entry. A name longer than
-// kMaxNameLength, an empty name, or an add past kMaxEntries is dropped.
+// kMaxNameLength, an empty name, a name that is not valid UTF-8, or an add past
+// kMaxEntries is dropped.
 // Re-adding an existing name updates its propagation.
 void AddCELAnnotation(ProcessTree& tree, struct Pid p, std::string_view name,
                       CELAnnotator::Entry entry);
