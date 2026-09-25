@@ -107,6 +107,44 @@ export const SantaConfigKeyGroups: SantaConfigGroups = {
       type: "bool",
     },
     {
+      key: "ExecutableIntegrityPolicy",
+      description: `What Santa does when it cannot confirm that the file it evaluated is the image
+        the kernel loaded. If the file on disk still has the signing identity the kernel reported,
+        Santa evaluates it normally and this key does not apply. This key applies when the file on
+        disk has a different signing identity, or has no contents left to check. If Santa cannot
+        open the file at all, the \`FailClosed\` key decides what happens, unless this key is set
+        to \`BlockUnverified\`.
+
+A binary a \`SEATBELT\` rule would sandbox is denied outright whenever its identity could not be
+confirmed, under every value of this key and in every client mode.`,
+      type: "string",
+      syncConfigurable: true,
+      defaultValue: "BlockChanged",
+      possibleValues: [
+        {
+          value: "BlockChanged",
+          description:
+            "Deny and report the execution, regardless of the client mode and regardless of FailClosed.",
+        },
+        {
+          value: "BlockUnverified",
+          description:
+            "Deny and report the execution, and also any execution whose target Santa could not open at all, regardless of the client mode and regardless of FailClosed. Short-lived build outputs and binaries on unreliable network or removable volumes may be denied under this value, because Santa cannot read them.",
+        },
+        {
+          value: "Report",
+          description:
+            "Evaluate against the file's on-disk content. The resulting event is always stored for the sync server, regardless of the normal upload settings.",
+        },
+        {
+          value: "Ignore",
+          description:
+            "The same as Report, except the event is stored only under Santa's normal upload settings rather than always being forced.",
+        },
+      ],
+      versionAdded: "2026.9",
+    },
+    {
       key: "EnableStandalonePasswordFallback",
       description:
         "If true, Santa will fallback to password authorization for Standalone mode.",

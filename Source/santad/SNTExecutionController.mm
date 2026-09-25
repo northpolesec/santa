@@ -46,6 +46,7 @@
 #import "Source/common/SNTStoredExecutionEvent.h"
 #include "Source/common/SantaCache.h"
 #include "Source/common/SantaVnode.h"
+#import "Source/common/SigningIDHelpers.h"
 #include "Source/common/String.h"
 #include "Source/common/SystemResources.h"
 #include "Source/common/Unit.h"
@@ -82,6 +83,7 @@ static const size_t kMaxAllowedPathLength = MAXPATHLEN - 1;  // -1 to account fo
 @property SNTSyncdQueue* syncdQueue;
 @property SNTTimedRuleKills* timedRuleKills;
 @property SNTMetricCounter* events;
+@property SNTMetricCounter* unverifiedExecutions;
 @property santa::ProcessControlBlock processControlBlock;
 
 @property dispatch_queue_t eventQueue;
@@ -213,6 +215,11 @@ static bool SameBinary(const es_process_t* a, NSString* aSHA256, const es_proces
     _events = [metricSet counterWithName:@"/santa/events"
                               fieldNames:@[ @"action_response" ]
                                 helpText:@"Events processed by Santa per response"];
+    _unverifiedExecutions =
+        [metricSet counterWithName:@"/santa/unverified_executions"
+                        fieldNames:@[ @"reason", @"decision" ]
+                          helpText:@"Executions Santa could not confirm are of the file it "
+                                   @"evaluated, per reason and decision"];
   }
   return self;
 }
@@ -226,7 +233,17 @@ static bool SameBinary(const es_process_t* a, NSString* aSHA256, const es_proces
   [self.timedRuleKills recordKillForDecision:cd process:token];
 }
 
-- (void)incrementEventCounters:(SNTEventState)eventType {
+// Counts every execution exactly once in /santa/events, by its decision. An
+// unconfirmed identity is not a decision: it is counted separately, by
+// unverifiedReason, which is nil when the identity was confirmed.
+- (void)incrementEventCounters:(SNTEventState)eventType
+              unverifiedReason:(const NSString*)unverifiedReason {
+  if (unverifiedReason) {
+    [_unverifiedExecutions incrementForFieldValues:@[
+      (NSString*)unverifiedReason, (eventType & SNTEventStateAllow) ? @"Allow" : @"Block"
+    ]];
+  }
+
   const NSString* eventTypeStr;
 
   switch (eventType) {
@@ -394,6 +411,50 @@ static BOOL SignedIdentityMatchesReported(const es_process_t* targetProc,
   return targetProc->is_platform_binary && csInfo.platformBinary;
 }
 
+// Report and Ignore let an unconfirmed execution proceed, not allow: rule evaluation runs
+// against the on-disk content, or failClosed decides when nothing was read. SEATBELT
+// targets are denied regardless; see the cd.seatbeltRequired block.
+static BOOL ExecutableIntegrityPolicyAllowsMismatch(SNTExecutableIntegrityPolicy policy) {
+  return policy == SNTExecutableIntegrityPolicyReport ||
+         policy == SNTExecutableIntegrityPolicyIgnore;
+}
+
+// Whether an execution's event is written to the event table. Report adds one
+// clause: an unconfirmed read stores its event even when it was allowed, so the
+// condition stays measurable where the upload settings would suppress it.
+static BOOL ShouldStoreEventForDecision(SNTCachedDecision* cd, SNTConfigurator* config,
+                                        SNTConfigState* configState) {
+  return config.enableAllEventUpload ||
+         (cd.decision == SNTEventStateAllowUnknown && !config.disableUnknownEventUpload) ||
+         cd.auditReturn || (cd.decision & SNTEventStateAllow) == 0 ||
+         (configState.executableIntegrityPolicy == SNTExecutableIntegrityPolicyReport &&
+          cd.identityMismatched);
+}
+
+// Suppresses the block UI for an execution the kernel will kill for code
+// signature invalidity: the exec cannot succeed no matter what Santa decides,
+// and the user would otherwise blame Santa for a kill it didn't cause. The
+// policy still applies and the block is still logged and uploaded.
+static void SuppressBlockUIIfKernelWillKill(SNTCachedDecision* cd, const es_process_t* targetProc,
+                                            cpu_type_t imageCPUType) {
+  if (!santa::KernelWillKillForCodeSigning(targetProc->codesigning_flags, imageCPUType) ||
+      (cd.decision & SNTEventStateAllow) != 0) {
+    return;
+  }
+
+  cd.silentBlockGUI = YES;
+  cd.silentBlockTTY = YES;
+  cd.holdAndAsk = NO;
+  NSString* extra = @"Kernel will kill the process for code signature invalidity; "
+                    @"suppressing block UI";
+  cd.decisionExtra =
+      cd.decisionExtra ? [NSString stringWithFormat:@"%@; %@", cd.decisionExtra, extra] : extra;
+  LOGW(@"Denying %@ but suppressing block UI: the kernel will kill this process for code "
+       @"signature invalidity (codesigning_flags=0x%x). The exec would have failed regardless of "
+       @"Santa's decision.",
+       santa::StringTokenToNSString(targetProc->executable->path), targetProc->codesigning_flags);
+}
+
 // Returns YES when the decision grants compiler status
 static BOOL DecisionIsCompiler(SNTEventState decision) {
   return decision == SNTEventStateAllowCompilerBinary ||
@@ -431,80 +492,116 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
   SNTFileInfo* binInfo = [[SNTFileInfo alloc] initWithEndpointSecurityFile:targetProc->executable
                                                                      error:&fileInfoError];
   if (unlikely(!binInfo)) {
-    // The initializer can return nil after establishing a mismatch. That is not
-    // the same condition as being unable to read a file, so it must not be
-    // routed through failClosed.
-    if (fileInfoError.code == SNTErrorCodeIdentityMismatch) {
-      LOGE(@"Failed to confirm identity of %@ and denying action",
-           @(targetProc->executable->path.data));
-      SNTCachedDecision* cd = [self mismatchDecisionForProcess:targetProc configState:configState];
-      [self denyAndReportEarlyDenialForDecision:cd
-                                        binInfo:binInfo
-                                     targetProc:targetProc
-                                          esMsg:esMsg
-                                    configState:configState
-                                     postAction:postAction];
-      return;
-    }
+    // Nothing was read that a rule could match: either the file could not be
+    // read, or SNTFileInfo confirmed a mismatch before giving up. The integrity
+    // policy may deny outright; otherwise failClosed decides, as for any unknown.
+    BOOL identityMismatch = fileInfoError.code == SNTErrorCodeIdentityMismatch;
+    SNTExecutableIntegrityPolicy policy = configState.executableIntegrityPolicy;
+    BOOL policyDenies = identityMismatch ? !ExecutableIntegrityPolicyAllowsMismatch(policy)
+                                         : policy == SNTExecutableIntegrityPolicyBlockUnverified;
 
-    if (config.failClosed) {
-      LOGE(@"Failed to read file %@: %@ and denying action", @(targetProc->executable->path.data),
-           fileInfoError.localizedDescription);
-      postAction(SNTActionRespondDeny, nil);
-      [self.events incrementForFieldValues:@[ (NSString*)kDenyNoFileInfo ]];
-    } else {
-      LOGE(@"Failed to read file %@: %@ but allowing action", @(targetProc->executable->path.data),
-           fileInfoError.localizedDescription);
-      postAction(SNTActionRespondAllow, nil);
-      [self.events incrementForFieldValues:@[ (NSString*)kAllowNoFileInfo ]];
+    SNTCachedDecision* cd = [self unverifiedIdentityDecisionForProcess:targetProc
+                                                           configState:configState];
+    if (!policyDenies) {
+      cd.decision = config.failClosed ? SNTEventStateBlockUnknown : SNTEventStateAllowUnknown;
     }
+    if (!identityMismatch) {
+      cd.decisionExtra = @"Executable could not be read";
+    }
+    BOOL allowed = (cd.decision & SNTEventStateAllow) != 0;
+
+    NSString* path = @(targetProc->executable->path.data);
+    NSString* reason = identityMismatch
+                           ? [NSString stringWithFormat:@"Failed to confirm identity of %@", path]
+                           : [NSString stringWithFormat:@"Failed to read file %@: %@", path,
+                                                        fileInfoError.localizedDescription];
+    if (allowed) {
+      LOGW(@"%@ but allowing action", reason);
+    } else {
+      LOGE(@"%@ and denying action", reason);
+    }
+    // Never cached and never held: the disposition came from policy, not a
+    // rule, and a read that fails once must not govern a later exec of the vnode.
+    [self respondAndReportTerminalDecision:cd
+                                    action:allowed ? SNTActionRespondAllowNoCache
+                                                   : SNTActionRespondDenyOnce
+                          unverifiedReason:identityMismatch ? kUnverifiedChangedUnevaluable
+                                                            : kUnverifiedUnreadable
+                                   binInfo:nil
+                                targetProc:targetProc
+                                     esMsg:esMsg
+                               configState:configState
+                                postAction:postAction];
     return;
   }
 
   // The stat the event carried did not describe the file that was opened, so
-  // every content-derived value below describes a different file. Proceed only
-  // when the file on disk still presents the signing vendor the kernel
-  // reported, keeping the evaluation within a vendor an administrator has
-  // already made a policy statement about.
+  // every content-derived value below describes a different file. Evaluation still
+  // proceeds when the file on disk presents the signing vendor the kernel reported
+  // (the vendor match), keeping it within a vendor an administrator has already made
+  // a policy statement about.
   BOOL identityMismatched = binInfo.identityVerification == SNTFileInfoIdentityMismatch;
+  BOOL identityVendorMatched = NO;
   if (unlikely(identityMismatched)) {
     MOLCodesignChecker* csInfo = [binInfo codesignCheckerWithError:NULL];
-    if (!SignedIdentityMatchesReported(targetProc, csInfo)) {
+    identityVendorMatched = SignedIdentityMatchesReported(targetProc, csInfo);
+    if (!identityVendorMatched &&
+        !ExecutableIntegrityPolicyAllowsMismatch(configState.executableIntegrityPolicy)) {
       // Denied irrespective of client mode, including Monitor: this is a
       // tampering condition, and Santa already responds to those without
       // consulting the mode. See SNTEndpointSecurityTamperResistance.
-      SNTCachedDecision* cd = [self mismatchDecisionForProcess:targetProc configState:configState];
-      [self denyAndReportEarlyDenialForDecision:cd
-                                        binInfo:binInfo
-                                     targetProc:targetProc
-                                          esMsg:esMsg
-                                    configState:configState
-                                     postAction:postAction];
+      SNTCachedDecision* cd = [self unverifiedIdentityDecisionForProcess:targetProc
+                                                             configState:configState];
+      [self respondAndReportTerminalDecision:cd
+                                      action:SNTActionRespondDenyOnce
+                            unverifiedReason:kUnverifiedChanged
+                                     binInfo:binInfo
+                                  targetProc:targetProc
+                                       esMsg:esMsg
+                                 configState:configState
+                                  postAction:postAction];
       return;
     }
-    // Vendor matches. Identity carried by a decision from a previous evaluation
-    // describes a different file, so it cannot be reused for this one.
+    // A previous evaluation's identity describes a different file.
     existingDecision = nil;
   }
+  const NSString* unverifiedReason = !identityMismatched     ? nil
+                                     : identityVendorMatched ? kUnverifiedVendorMatched
+                                                             : kUnverifiedChanged;
 
   // TODO(markowsky): Maybe add a metric here for how many large executables we're seeing.
   // if (binInfo.fileSize > SomeUpperLimit) ...
 
-  // When re-evaluating with a cached decision, use the pre-computed signing
-  // metadata to avoid expensive codesign verification.
-  ActivationCallbackBlock activationBlock =
-      existingDecision ? santa::CreateCELActivationBlock(
-                             esMsg, existingDecision.rawSigningID, existingDecision.teamID,
-                             existingDecision.platformBinary, existingDecision.signingTime,
-                             existingDecision.secureSigningTime, existingDecision.rawEntitlements,
-                             _processTree, _celNow)
-                       : santa::CreateCELActivationBlock(
-                             esMsg, [binInfo codesignCheckerWithError:NULL], _processTree, _celNow);
+  // CEL sees the identity rules are matched on: the kernel's, under the same
+  // CS_SIGNED and CS_VALID gate. Content-derived values come from the file, or
+  // from a cached decision's pre-computed signing metadata, which avoids
+  // expensive codesign verification.
+  ActivationCallbackBlock activationBlock = [&] {
+    BOOL kernelSigned =
+        (targetProc->codesigning_flags & CS_SIGNED) && (targetProc->codesigning_flags & CS_VALID);
+    NSString* signingID = kernelSigned ? santa::StringTokenToNSString(targetProc->signing_id) : nil;
+    NSString* teamID = kernelSigned ? santa::StringTokenToNSString(targetProc->team_id) : nil;
+    if (existingDecision) {
+      return santa::CreateCELActivationBlock(
+          esMsg, signingID, teamID, targetProc->is_platform_binary, existingDecision.signingTime,
+          existingDecision.secureSigningTime, existingDecision.rawEntitlements, _processTree,
+          _celNow);
+    } else {
+      // The file's content-derived values are withheld only when CEL would pair
+      // them with a kernel identity they may not belong to. Without one, they give
+      // CEL nothing an ad hoc signature couldn't.
+      BOOL withholdContent = identityMismatched && !identityVendorMatched &&
+                             (teamID || targetProc->is_platform_binary);
+      MOLCodesignChecker* csInfo = withholdContent ? nil : [binInfo codesignCheckerWithError:NULL];
+      return santa::CreateCELActivationBlock(
+          esMsg, signingID, teamID, targetProc->is_platform_binary, csInfo.signingTime,
+          csInfo.secureSigningTime, csInfo.entitlements, _processTree, _celNow);
+    }
+  }();
 
-  cpu_type_t imageCPUType = esMsg->version >= 6 ? esMsg->event.exec.image_cputype : CPU_TYPE_ANY;
   SNTCachedDecision* cd = [self.policyProcessor decisionForFileInfo:binInfo
                                                       targetProcess:targetProc
-                                                       imageCPUType:imageCPUType
+                                                       imageCPUType:esMsg->event.exec.image_cputype
                                                         configState:configState
                                                  activationCallback:activationBlock
                                                      cachedDecision:existingDecision];
@@ -514,8 +611,9 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
 
   if (unlikely(identityMismatched)) {
     cd.identityMismatched = YES;
-    // Matched to the event by signing vendor only, so the result applies to
-    // this invocation alone.
+    cd.identityVendorMatched = identityVendorMatched;
+    // The evaluation ran against a file that was matched to the event by
+    // signing vendor at best, so its result applies to this invocation alone.
     cd.cacheable = NO;
     // Compiler status is a statement about a specific file, so it cannot follow
     // from an evaluation of a different one. Clearing the bits matters:
@@ -528,7 +626,9 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
         default: break;
       }
     }
-    NSString* extra = @"Executable identity confirmed by signing vendor only";
+    NSString* extra = identityVendorMatched
+                          ? @"Executable identity confirmed by signing vendor only"
+                          : @"Executable identity could not be confirmed";
     cd.decisionExtra =
         cd.decisionExtra ? [NSString stringWithFormat:@"%@; %@", cd.decisionExtra, extra] : extra;
   }
@@ -566,23 +666,23 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
   // so the action below becomes SNTActionRespondAllowNoCache rather than
   // SNTActionRespondAllow.
   if (cd.seatbeltRequired) {
-    // A profile is registered for a specific file, so an expectation match
-    // against an unconfirmed read does not establish that the loaded image is
-    // the one it was registered for. Not redundant with the comparisons that
-    // follow: the strict one uses kernel-reported values, the fallback does not.
-    //
-    // It cannot live in the identity gate earlier in this method:
-    // cd.seatbeltRequired is only known once rule evaluation has run.
+    // A profile is registered for a specific file, so an unconfirmed read cannot satisfy it:
+    // the fallback comparison below uses the on-disk hash. Checked here, not in the identity
+    // gate above, because seatbeltRequired is known only after rule evaluation.
     if (unlikely(identityMismatched)) {
       cd.decision = SNTEventStateBlockBinaryMismatch;
       cd.cacheable = NO;
-      cd.decisionExtra = @"Sandbox profile requires a confirmed executable identity";
-      [self denyAndReportEarlyDenialForDecision:cd
-                                        binInfo:binInfo
-                                     targetProc:targetProc
-                                          esMsg:esMsg
-                                    configState:configState
-                                     postAction:postAction];
+      NSString* extra = @"Sandbox profile requires a confirmed executable identity";
+      cd.decisionExtra =
+          cd.decisionExtra ? [NSString stringWithFormat:@"%@; %@", cd.decisionExtra, extra] : extra;
+      [self respondAndReportTerminalDecision:cd
+                                      action:SNTActionRespondDenyOnce
+                            unverifiedReason:unverifiedReason
+                                     binInfo:binInfo
+                                  targetProc:targetProc
+                                       esMsg:esMsg
+                                 configState:configState
+                                  postAction:postAction];
       return;
     }
 
@@ -625,24 +725,7 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
     }
   }
 
-  // When the kernel kills the target for code signature invalidity, this exec
-  // cannot succeed no matter what Santa decides. The policy still applies and
-  // the block is still logged and uploaded, but no UI is shown: the user would
-  // otherwise blame Santa for a kill it didn't cause.
-  if (santa::KernelWillKillForCodeSigning(targetProc->codesigning_flags, imageCPUType) &&
-      (cd.decision & SNTEventStateAllow) == 0) {
-    cd.silentBlockGUI = YES;
-    cd.silentBlockTTY = YES;
-    cd.holdAndAsk = NO;
-    NSString* extra = @"Kernel will kill the process for code signature invalidity; "
-                      @"suppressing block UI";
-    cd.decisionExtra =
-        cd.decisionExtra ? [NSString stringWithFormat:@"%@; %@", cd.decisionExtra, extra] : extra;
-    LOGW(@"Denying %@ but suppressing block UI: the kernel will kill this process for code "
-         @"signature invalidity (codesigning_flags=0x%x). The exec would have failed regardless of "
-         @"Santa's decision.",
-         santa::StringTokenToNSString(targetProc->executable->path), targetProc->codesigning_flags);
-  }
+  SuppressBlockUIIfKernelWillKill(cd, targetProc, esMsg->event.exec.image_cputype);
 
   // Formulate an initial action from the decision.
   SNTAction action = (SNTEventStateAllow & cd.decision)
@@ -672,8 +755,10 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
   std::pair<pid_t, int> pidAndVersion =
       std::make_pair(newProcPid, audit_token_to_pidversion(targetProc->audit_token));
 
-  // Check TouchID approval cache before prompting - only if cooldown was specified
-  if (cd.holdAndAsk && cd.sha256 && cd.touchIDCooldownMinutes != nil) {
+  // Check the TouchID approval cache (only when a cooldown is set). Skipped for an
+  // unconfirmed read, like the write below: a hit converts this exec to an allow, but the
+  // key is the hash of the file read, not the loaded image.
+  if (cd.holdAndAsk && cd.sha256 && !cd.identityMismatched && cd.touchIDCooldownMinutes != nil) {
     uint64_t cooldownMinutes = [cd.touchIDCooldownMinutes unsignedLongLongValue];
     if (cooldownMinutes > 0) {
       uint64_t cachedTimestamp = _touchIDApprovalCache->get(santa::NSStringToUTF8String(cd.sha256));
@@ -715,12 +800,10 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
   }
 
   // Increment metric counters
-  [self incrementEventCounters:cd.decision];
+  [self incrementEventCounters:cd.decision unverifiedReason:unverifiedReason];
 
   // Log to database if necessary.
-  if (config.enableAllEventUpload ||
-      (cd.decision == SNTEventStateAllowUnknown && !config.disableUnknownEventUpload) ||
-      cd.auditReturn || (cd.decision & SNTEventStateAllow) == 0) {
+  if (ShouldStoreEventForDecision(cd, config, configState)) {
     SNTStoredExecutionEvent* se = [self storedExecutionEventForDecision:cd
                                                                 binInfo:binInfo
                                                              targetProc:targetProc
@@ -760,7 +843,7 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
                 cd.decision == SNTEventStateBlockUnknown) {
               // Create a rule for the binary that was allowed by the user in
               // standalone mode and notify the sync service.
-              [self createRuleForStandaloneModeEvent:se identityMismatched:cd.identityMismatched];
+              [self createRuleForStandaloneModeEvent:se];
             }
 
             // Update decision to reflect that it was allowed via TouchID,
@@ -828,11 +911,11 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
   }
 }
 
-// Decision for an execution denied because the file's identity could not be
-// confirmed. Everything here is kernel-reported, so it is available even when
-// the file could not be read; content-derived values are the caller's to add.
-- (SNTCachedDecision*)mismatchDecisionForProcess:(const es_process_t*)targetProc
-                                     configState:(SNTConfigState*)configState {
+// Decision for an execution Santa could not confirm is the loaded image (a confirmed mismatch
+// or an unreadable file). Built from kernel-reported values only; content-derived ones
+// are the caller's to add. decision and decisionExtra default to a mismatch deny.
+- (SNTCachedDecision*)unverifiedIdentityDecisionForProcess:(const es_process_t*)targetProc
+                                               configState:(SNTConfigState*)configState {
   SNTCachedDecision* cd =
       [[SNTCachedDecision alloc] initWithEndpointSecurityFile:targetProc->executable];
   cd.decision = SNTEventStateBlockBinaryMismatch;
@@ -841,44 +924,56 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
   cd.identityMismatched = YES;
   cd.codesigningFlags = targetProc->codesigning_flags;
   cd.teamID = santa::StringTokenToNSString(targetProc->team_id);
-  cd.signingID = santa::StringTokenToNSString(targetProc->signing_id);
+  // Normalized like every cd.signingID producer: an ID with neither a team ID nor platform
+  // status cannot match or mint a rule, so it is nil.
+  cd.signingID = FormatSigningID(santa::StringTokenToNSString(targetProc->signing_id), cd.teamID,
+                                 targetProc->is_platform_binary);
+  // There may be no content hash to describe this execution with. The CDHash is
+  // then the only identifier the stored event can dedup on, and without one the
+  // event table drops it. See -[SNTStoredExecutionEvent uniqueID].
+  if (targetProc->codesigning_flags & CS_SIGNED) {
+    cd.cdhash = santa::StringToNSString(
+        santa::BufToHexString(targetProc->cdhash, sizeof(targetProc->cdhash)));
+  }
   cd.decisionExtra = @"Executable identity could not be confirmed";
   return cd;
 }
 
-// Denies an execution that returns before the common reporting path at the end
-// of -validateExecEvent:cachedDecision:postAction:, then reports it.
+// Responds to and reports an execution that returns before the common path's tail in
+// -validateExecEvent:cachedDecision:postAction:, mirroring it. binInfo is nil when the
+// target could not be read.
 //
-// The order matches the common path, and both halves of it matter. Cache the
-// decision, respond, then report. Reporting is unbounded work and must never
-// precede the response. Caching precedes the response because ES delivers
-// NOTIFY_EXEC even for a denied exec and that telemetry recovers the decision
-// by vnode.
-//
-// SNTActionRespondDenyOnce, never SNTActionRespondDeny: the latter is retained
-// for the deny cache interval and would apply to later executions of the vnode.
-- (void)denyAndReportEarlyDenialForDecision:(SNTCachedDecision*)cd
-                                    binInfo:(SNTFileInfo*)binInfo
-                                 targetProc:(const es_process_t*)targetProc
-                                      esMsg:(const Message&)esMsg
-                                configState:(SNTConfigState*)configState
-                                 postAction:(bool (^)(SNTAction, SNTCachedDecision*))postAction {
-  [[SNTDecisionCache sharedCache] cacheDecision:cd];
-  postAction(SNTActionRespondDenyOnce, cd);
+// Order: cache, respond, report. Reporting is unbounded work. Caching comes first because
+// NOTIFY_EXEC for a denied exec recovers the decision by vnode. DenyOnce, unlike Deny, is
+// not retained, so it cannot apply to later execs of the vnode.
+- (void)respondAndReportTerminalDecision:(SNTCachedDecision*)cd
+                                  action:(SNTAction)action
+                        unverifiedReason:(const NSString*)unverifiedReason
+                                 binInfo:(SNTFileInfo*)binInfo
+                              targetProc:(const es_process_t*)targetProc
+                                   esMsg:(const Message&)esMsg
+                             configState:(SNTConfigState*)configState
+                              postAction:(bool (^)(SNTAction, SNTCachedDecision*))postAction {
+  // Callers return before the common path's call to this.
+  SuppressBlockUIIfKernelWillKill(cd, targetProc, esMsg->event.exec.image_cputype);
 
-  // Report-only: this names the file that was read, not the image the kernel
-  // loaded, which is why this denies. Hashing is proportional to file size, so
-  // it waits for the response.
-  //
-  // It mutates the decision already in SNTDecisionCache, which is how the
-  // telemetry picks the hash up. Nothing authorizes on it: DenyOnce leaves no
-  // AuthResultCache entry to reuse, and readers that could act on it test
-  // identityMismatched first.
+  [[SNTDecisionCache sharedCache] cacheDecision:cd];
+  postAction(action, cd);
+
+  // Report-only, and after the response because hashing scales with file size. On a mismatch
+  // deny it names the file read, not the loaded image. Telemetry reads it from the cached
+  // decision. Nothing authorizes on it: no response here leaves a reusable allow in
+  // AuthResultCache, and readers that could act on it check identityMismatched first.
   if (!cd.sha256) {
     cd.sha256 = binInfo.SHA256;
   }
 
-  [self incrementEventCounters:cd.decision];
+  [self incrementEventCounters:cd.decision unverifiedReason:unverifiedReason];
+
+  SNTConfigurator* config = [SNTConfigurator configurator];
+  if (!ShouldStoreEventForDecision(cd, config, configState)) {
+    return;
+  }
 
   SNTStoredExecutionEvent* se =
       [self storedExecutionEventForDecision:cd
@@ -886,21 +981,21 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
                                  targetProc:targetProc
                                       esMsg:esMsg
                                         pid:audit_token_to_pid(targetProc->audit_token)];
-
-  SNTConfigurator* config = [SNTConfigurator configurator];
   if (config.syncBaseURL) {
     dispatch_async(_eventQueue, ^{
       [self.eventTable addStoredEvent:se];
     });
   }
 
-  [self reportBlockedExecutionEvent:se
-                           decision:cd
-                            binInfo:binInfo
-                         targetProc:targetProc
-                        configState:configState
-                        stoppedProc:false
-                         replyBlock:nil];
+  if (!ACTION_IS_ALLOW(action)) {
+    [self reportBlockedExecutionEvent:se
+                             decision:cd
+                              binInfo:binInfo
+                           targetProc:targetProc
+                          configState:configState
+                          stoppedProc:false
+                           replyBlock:nil];
+  }
 }
 
 // Builds the stored event describing an execution. Shared by the common
@@ -919,6 +1014,8 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
   se.filePath = binInfo.path ?: santa::StringTokenToNSString(targetProc->executable->path);
   se.decision = cd.decision;
   se.auditReturn = cd.auditReturn;
+  se.identityUnverified = cd.identityMismatched;
+  se.identityVendorMatched = cd.identityVendorMatched;
   se.holdAndAsk = cd.holdAndAsk;
   se.silentTouchID = cd.silentTouchID;
   se.seatbeltRequired = cd.seatbeltRequired;
@@ -1028,11 +1125,16 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
       // Escape sequences `\033[1m` and `\033[0m` begin/end bold lettering
       [msg appendFormat:@"\n\033[1mSanta\033[0m\n\n%@\n\n", s.string];
       [msg appendFormat:@"\033[1mReason:    \033[0m %@\n"
-                        @"\033[1mPath:      \033[0m %@\n"
-                        @"\033[1mIdentifier:\033[0m %@\n"
-                        @"\033[1mParent:    \033[0m %@ (%@)\n\n",
-                        [SNTBlockMessage blockReasonForEvent:se], se.filePath, se.fileSHA256,
-                        se.parentName, se.ppid];
+                        @"\033[1mPath:      \033[0m %@\n",
+                        [SNTBlockMessage blockReasonForEvent:se], se.filePath];
+      // Omitted without a hash, or for an unconfirmed read, whose hash describes the file read,
+      // which may not be the loaded image, so it is not offered as an identifier to allowlist
+      // (matches the GUI). CDHash is not substituted: it is kernel-sourced only for signed
+      // images.
+      if (se.fileSHA256.length && !se.contentAttributesUnverified) {
+        [msg appendFormat:@"\033[1mIdentifier:\033[0m %@\n", se.fileSHA256];
+      }
+      [msg appendFormat:@"\033[1mParent:    \033[0m %@ (%@)\n\n", se.parentName, se.ppid];
       NSURL* detailURL =
           [SNTBlockMessage eventDetailURLForEvent:se
                                         customURL:(cd.customURL ?: config.eventDetailURL)];
@@ -1099,21 +1201,35 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
 
 // Creates a rule for the binary that was allowed by the user in standalone mode.
 //
-// `identityMismatched` gates only the identifiers derived from the file that was
-// read. A signing ID is kernel-reported for the loaded image, so it names the
-// right file either way; a content hash names whatever was read and must not be
-// turned into a rule.
-- (void)createRuleForStandaloneModeEvent:(SNTStoredExecutionEvent*)se
-                      identityMismatched:(BOOL)identityMismatched {
+// A vendor-unmatched unverified read gets its own branch: se.signingStatus describes the
+// on-disk file, which may not be the loaded image. Vendor-matched and verified reads fall
+// through: the vendor match already corroborated the vendor.
+- (void)createRuleForStandaloneModeEvent:(SNTStoredExecutionEvent*)se {
   SNTRuleType ruleType;
   NSString* ruleIdentifier;
   SNTRuleState newRuleState;
 
-  if (se.signingStatus == SNTSigningStatusProduction && se.signingID) {
+  if (se.identityUnverified && !se.identityVendorMatched) {
+    // Only a kernel-vouched, certificate-backed identity may mint a rule: page integrity
+    // enforced, signed, not ad hoc, and team-qualified. Ad hoc signatures are not
+    // certificate-backed, so their identifiers are not trusted (as in
+    // SNTEndpointSecurityAdapter.mm and process_tree_macos.mm).
+    if (santa::CdhashStrictlyEnforced(se.codesigningFlags) && (se.codesigningFlags & CS_SIGNED) &&
+        !(se.codesigningFlags & CS_ADHOC) && se.teamID.length && se.signingID.length) {
+      ruleType = SNTRuleTypeSigningID;
+      ruleIdentifier = se.signingID;
+      newRuleState = SNTRuleStateAllowLocalSigningID;
+    } else {
+      LOGW(@"Not creating standalone rule for unverified execution of %@", se.filePath);
+      return;
+    }
+  } else if (se.signingStatus == SNTSigningStatusProduction && se.signingID) {
     ruleType = SNTRuleTypeSigningID;
     ruleIdentifier = se.signingID;
     newRuleState = SNTRuleStateAllowLocalSigningID;
-  } else if (se.fileSHA256 && !identityMismatched) {
+  } else if (se.fileSHA256 && !se.identityUnverified) {
+    // A hash names what was read, not what ran, so neither mismatch shape (including
+    // vendor-matched) mints one.
     ruleType = SNTRuleTypeBinary;
     ruleIdentifier = se.fileSHA256;
     newRuleState = SNTRuleStateAllowLocalBinary;

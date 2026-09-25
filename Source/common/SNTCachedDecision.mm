@@ -42,7 +42,6 @@
     _cdhash = previous.cdhash;
     _teamID = previous.teamID;
     _signingID = previous.signingID;
-    _rawSigningID = previous.rawSigningID;
     _certSHA256 = previous.certSHA256;
     _certCommonName = previous.certCommonName;
     _certChain = previous.certChain;
@@ -53,6 +52,7 @@
     _signingTime = previous.signingTime;
     _codesignValidationStatus = previous.codesignValidationStatus;
     _identityMismatched = previous.identityMismatched;
+    _identityVendorMatched = previous.identityVendorMatched;
   }
   return self;
 }
@@ -69,7 +69,6 @@
   copy.certChain = _certChain;
   copy.teamID = _teamID;
   copy.signingID = _signingID;
-  copy.rawSigningID = _rawSigningID;
   copy.cdhash = _cdhash;
   copy.entitlements = _entitlements;
   copy.rawEntitlements = _rawEntitlements;
@@ -91,6 +90,7 @@
   copy.ruleId = _ruleId;
   copy.cacheable = _cacheable;
   copy.identityMismatched = _identityMismatched;
+  copy.identityVendorMatched = _identityVendorMatched;
   copy.holdAndAsk = _holdAndAsk;
   copy.silentTouchID = _silentTouchID;
   copy.touchIDCooldownMinutes = _touchIDCooldownMinutes;

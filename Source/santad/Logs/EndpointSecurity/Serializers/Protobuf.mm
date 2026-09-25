@@ -629,6 +629,10 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedExec& msg, SNTCach
     pb_exec->set_audit_return(true);
   }
 
+  if (cd.identityMismatched) {
+    pb_exec->set_identity_unverified(true);
+  }
+
   return FinalizeProto(santa_msg);
 }
 
