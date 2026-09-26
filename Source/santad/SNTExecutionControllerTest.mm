@@ -21,6 +21,7 @@
 #include <string>
 #include <vector>
 
+#include "Source/common/processtree/annotations/cel.h"
 #include "Source/common/processtree/process.h"
 #include "Source/common/processtree/process_tree.h"
 #include "Source/common/processtree/process_tree_test_helpers.h"
@@ -637,6 +638,41 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
 
   OCMVerifyAllWithDelay(self.mockEventDatabase, 1);
   [self checkMetricCounters:kBlockCertificate expected:@1];
+}
+
+- (void)testBlockedEventCarriesSortedCELAnnotations {
+  using namespace santa::santad::process_tree;
+  auto tree = std::make_shared<ProcessTreeTestPeer>(std::vector<std::unique_ptr<Annotator>>{});
+  std::shared_ptr<const Process> init = tree->InsertInit();
+  struct Pid target = {.pid = 800, .pidversion = 1};
+  tree->HandleFork(1, init, target);
+  AddCELAnnotation(*tree, target, "zeta", {});
+  AddCELAnnotation(*tree, target, "alpha", {});
+
+  self.sut = [self makeControllerWithProcessTree:tree];
+
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateBlock;
+  rule.type = SNTRuleTypeBinary;
+  [self stubRule:rule forIdentifiers:{.binarySHA256 = @"a"}];
+
+  __block SNTStoredExecutionEvent* reported = nil;
+  OCMExpect([self.mockEventDatabase
+      addStoredEvent:[OCMArg checkWithBlock:^BOOL(SNTStoredExecutionEvent* se) {
+        reported = se;
+        return YES;
+      }]]);
+
+  [self validateExecEvent:SNTActionRespondDeny
+             messageSetup:^(es_message_t* msg) {
+               msg->event.exec.target->audit_token = santa::MakeStubAuditToken(800, 1);
+             }];
+
+  OCMVerifyAllWithDelay(self.mockEventDatabase, 1);
+  XCTAssertEqualObjects(reported.annotations, (@[ @"alpha", @"zeta" ]));
 }
 
 - (void)testBinaryAllowCompilerRule {

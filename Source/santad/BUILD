@@ -615,6 +615,7 @@ objc_library(
         "//Source/common/es:EndpointSecurityMessage",
         "//Source/common/processtree:process",
         "//Source/common/processtree:process_tree",
+        "//Source/common/processtree/annotations:cel",
         "@abseil-cpp//absl/synchronization",
         "@abseil-cpp//absl/time",
     ],
@@ -2023,6 +2024,7 @@ santa_unit_test(
         "//Source/common/processtree:process",
         "//Source/common/processtree:process_tree",
         "//Source/common/processtree:process_tree_test_helpers",
+        "//Source/common/processtree/annotations:cel",
         "@OCMock",
     ],
 )

@@ -51,8 +51,10 @@
 #include "Source/common/SystemResources.h"
 #include "Source/common/Unit.h"
 #include "Source/common/es/EndpointSecurityAPI.h"
+#include "Source/common/processtree/annotations/cel.h"
 #include "Source/common/processtree/process.h"
 #include "Source/common/processtree/process_tree.h"
+#include "Source/common/processtree/process_tree_macos.h"
 #include "Source/santad/CELActivation.h"
 #import "Source/santad/DataLayer/SNTEventTable.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
@@ -1033,6 +1035,21 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
   se.entitlementsFiltered = cd.entitlementsFiltered;
   se.secureSigningTime = cd.secureSigningTime;
   se.signingTime = cd.signingTime;
+
+  // Read after evaluation, so this includes anything the rule for this exec added.
+  if (_processTree) {
+    auto annotation = _processTree->GetAnnotation<santa::santad::process_tree::CELAnnotator>(
+        santa::santad::process_tree::PidFromAuditToken(targetProc->audit_token));
+    if (annotation && *annotation) {
+      if (auto pb = (*annotation)->Proto()) {
+        NSMutableArray<NSString*>* names = [NSMutableArray arrayWithCapacity:pb->cel_size()];
+        for (const std::string& name : pb->cel()) {
+          [names addObject:santa::StringToNSString(name)];
+        }
+        se.annotations = names;
+      }
+    }
+  }
 
   // Bundle data
   se.fileBundleID = [binInfo bundleIdentifier];

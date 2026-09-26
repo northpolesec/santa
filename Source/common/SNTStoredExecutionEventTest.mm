@@ -161,6 +161,14 @@
   XCTAssertEqualObjects(out.fileSHA256, @"abc");
 }
 
+- (void)testAnnotationsSurviveSecureCodingRoundTrip {
+  SNTStoredExecutionEvent* se = [[SNTStoredExecutionEvent alloc] init];
+  se.annotations = @[ @"alpha", @"zeta" ];
+
+  SNTStoredExecutionEvent* out = [self roundTripped:se];
+  XCTAssertEqualObjects(out.annotations, (@[ @"alpha", @"zeta" ]));
+}
+
 - (void)testIdentityVendorMatchedDefaultsToNoAndSurvivesRoundTrip {
   // A spurious identityVendorMatched on decode would route this through the
   // verified branches in -createRuleForStandaloneModeEvent:.

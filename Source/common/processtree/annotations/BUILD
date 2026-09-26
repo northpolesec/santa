@@ -36,6 +36,7 @@ cc_library(
         "//Source/common/processtree:process_tree",
         "//Source/common/processtree:process_tree_cc_proto",
         "@abseil-cpp//absl/container:flat_hash_map",
+        "@cel-cpp//internal:utf8",
     ],
 )
 

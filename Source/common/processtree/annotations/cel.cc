@@ -25,6 +25,7 @@
 #include "Source/common/processtree/process.h"
 #include "Source/common/processtree/process_tree.h"
 #include "Source/common/processtree/process_tree.pb.h"
+#include "internal/utf8.h"
 
 namespace ptpb = ::santa::pb::v1::process_tree;
 
@@ -80,7 +81,11 @@ std::optional<ptpb::Annotations> CELAnnotator::Proto() const {
 
 void AddCELAnnotation(ProcessTree& tree, const struct Pid p,
                       std::string_view name, CELAnnotator::Entry entry) {
-  if (name.empty() || name.size() > CELAnnotator::kMaxNameLength) {
+  // CEL only checks string validity in debug builds, so a name built from
+  // argv or a path can carry arbitrary bytes. Every consumer (telemetry, sync,
+  // NSString) needs UTF-8.
+  if (name.empty() || name.size() > CELAnnotator::kMaxNameLength ||
+      !::cel::internal::Utf8IsValid(name)) {
     return;
   }
 

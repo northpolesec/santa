@@ -107,6 +107,10 @@
 /// uploaded identity_unverified marker deliberately covers both shapes.
 @property BOOL identityVendorMatched;
 
+/// Names of the CEL annotations (add_annotation()) on the executing process when this event was
+/// created, sorted. Nil when there are none.
+@property(nullable) NSArray<NSString*>* annotations;
+
 /// YES for the vendor-unmatched unverified shape (identityUnverified with no vendor match): this
 /// event's content-derived attributes (fileSHA256, signingChain and its derived publisherInfo,
 /// bundle info) may describe a different file than the one that actually ran, so UI
