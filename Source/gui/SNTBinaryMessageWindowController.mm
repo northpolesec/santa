@@ -121,6 +121,9 @@
   // Don't return a bare "binary:" prefix when fileSHA256 is missing —
   // that would silence every hash-less event under one shared key.
   if (!self.event.fileSHA256.length) return nil;
+  // An unverified hash may not be what ran; silencing it would also hide real
+  // blocks of that hash. nil also drops the silence checkbox.
+  if (self.event.contentAttributesUnverified) return nil;
   return [@"binary:" stringByAppendingString:self.event.fileSHA256];
 }
 
@@ -129,6 +132,22 @@
     _replyBlock(NO);
     _replyBlock = nil;
   }
+}
+
+- (NSString*)queueDedupeHash {
+  NSString* silenceKey = [self messageHash];
+  if (silenceKey) return silenceKey;
+
+  // Still dedupe unverified blocks by path: it stays constant while a
+  // self-rewriting image's hash changes on each re-exec, so a loop can't stack
+  // unsilenceable windows. The prefix keeps it distinct from "binary:" silence
+  // keys. Held responses are never deduped, matching -messageHash: a deduped
+  // message is answered NO without a prompt.
+  if (!self.event.holdAndAsk && self.event.contentAttributesUnverified &&
+      self.event.filePath.length) {
+    return [@"unverified-path:" stringByAppendingString:self.event.filePath];
+  }
+  return nil;
 }
 
 - (void)performSilentTouchIDAuthorization {

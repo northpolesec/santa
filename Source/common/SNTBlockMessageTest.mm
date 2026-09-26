@@ -62,6 +62,45 @@
   XCTAssertEqualObjects([other string], @"A different message");
 }
 
+- (void)testAttributedBlockMessageForEventIdentityUnverified {
+  SNTStoredExecutionEvent* unmarked = [[SNTStoredExecutionEvent alloc] init];
+  unmarked.decision = SNTEventStateBlockUnknown;
+
+  SNTStoredExecutionEvent* se = [[SNTStoredExecutionEvent alloc] init];
+  se.decision = SNTEventStateBlockUnknown;
+  se.identityUnverified = YES;
+  se.identityVendorMatched = NO;
+
+  NSAttributedString* baseline = [SNTBlockMessage attributedBlockMessageForEvent:unmarked
+                                                                   customMessage:nil];
+  NSAttributedString* got = [SNTBlockMessage attributedBlockMessageForEvent:se customMessage:nil];
+
+  XCTAssertEqualObjects(
+      [got string],
+      [[baseline string]
+          stringByAppendingString:@"\n\nThis application's identity could not be verified"]);
+}
+
+// The vendor match corroborates the read, so no banner is shown.
+- (void)testAttributedBlockMessageForEventVendorMatchedOmitsBanner {
+  SNTStoredExecutionEvent* se = [[SNTStoredExecutionEvent alloc] init];
+  se.decision = SNTEventStateBlockUnknown;
+  se.identityUnverified = YES;
+  se.identityVendorMatched = YES;
+
+  SNTStoredExecutionEvent* unmarked = [[SNTStoredExecutionEvent alloc] init];
+  unmarked.decision = SNTEventStateBlockUnknown;
+
+  NSAttributedString* got = [SNTBlockMessage attributedBlockMessageForEvent:se customMessage:nil];
+  NSAttributedString* wantUnchanged = [SNTBlockMessage attributedBlockMessageForEvent:unmarked
+                                                                        customMessage:nil];
+
+  XCTAssertFalse([[got string] containsString:@"identity could not be verified"],
+                 @"vendor-matched event must not show the unverified-identity banner, got \"%@\"",
+                 [got string]);
+  XCTAssertEqualObjects([got string], [wantUnchanged string]);
+}
+
 - (void)testEventDetailURLForEvent {
   SNTStoredExecutionEvent* se = [[SNTStoredExecutionEvent alloc] init];
 
@@ -97,6 +136,45 @@
 
   XCTAssertNil([SNTBlockMessage eventDetailURLForEvent:se customURL:nil]);
   XCTAssertNil([SNTBlockMessage eventDetailURLForEvent:se customURL:@"null"]);
+}
+
+// The URL is reachable from the dialog, the copied text, and the TTY, so it withholds too.
+- (void)testEventDetailURLIsWithheldWhenItUsesUnverifiedContent {
+  SNTStoredExecutionEvent* se = [[SNTStoredExecutionEvent alloc] init];
+
+  se.fileSHA256 = @"my_fi";
+  se.fileBundleHash = @"my_fbh";
+  se.executingUser = @"my_un";
+  se.fileBundleID = @"s.n.t";
+  se.cdhash = @"abc";
+  se.teamID = @"SNT";
+  se.signingID = @"SNT:s.n.t";
+  se.identityUnverified = YES;
+  se.identityVendorMatched = NO;
+
+  for (NSString* token in @[
+         @"%file_sha%", @"%file_identifier%", @"%bundle_or_file_identifier%", @"%file_bundle_id%"
+       ]) {
+    NSString* url = [@"http://localhost/blockables/" stringByAppendingString:token];
+    XCTAssertNil([SNTBlockMessage eventDetailURLForEvent:se customURL:url], @"%@", token);
+  }
+
+  // A template with no content-derived token still resolves.
+  XCTAssertEqualObjects(
+      [SNTBlockMessage eventDetailURLForEvent:se
+                                    customURL:@"http://localhost?ti=%team_id%&un=%username%"]
+          .absoluteString,
+      @"http://localhost?ti=SNT&un=my_un");
+
+  NSString* url = @"http://"
+                  @"localhost?fs=%file_sha%&fi=%file_identifier%&bfi=%bundle_or_file_identifier%&"
+                  @"fbid=%file_bundle_id%&ti=%team_id%&si=%signing_id%&ch=%cdhash%&un=%username%";
+
+  // The vendor-matched shape keeps today's URL: its read was corroborated.
+  se.identityVendorMatched = YES;
+  XCTAssertEqualObjects([SNTBlockMessage eventDetailURLForEvent:se customURL:url].absoluteString,
+                        @"http://localhost?fs=my_fbh&fi=my_fi&bfi=my_fbh&fbid=s.n.t&ti=SNT&"
+                        @"si=SNT%3As.n.t&ch=abc&un=my_un");
 }
 
 - (void)testEventDetailURLForFileAccessEvent {
