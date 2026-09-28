@@ -1788,6 +1788,7 @@ santa_unit_test(
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTStoredExecutionEvent",
+        "//Source/common:SantaVnode",
         "//Source/common:TestUtils",
         "//Source/common/es:EndpointSecurityEnrichedTypes",
         "//Source/common/es:EndpointSecurityEnricher",
@@ -1795,6 +1796,8 @@ santa_unit_test(
         "//Source/common/es:MockEndpointSecurityAPI",
         "@OCMock",
         "@googletest//:gtest",
+        "@santanetd//src/santanetd:SNDProcessFlows",
+        "@santanetd//src/santanetd:SNDProcessInfo",
     ],
 )
 
@@ -2169,8 +2172,10 @@ santa_unit_test(
         ":AuthResultCache",
         ":DiskArbitrationTestLib",
         ":Metrics",
+        ":SNTDecisionCache",
         ":SNTEndpointSecurityDeviceManager",
         "//Source/common:Platform",
+        "//Source/common:SNTCachedDecision",
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTDeviceEvent",

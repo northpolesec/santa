@@ -843,10 +843,14 @@ NS_ASSUME_NONNULL_BEGIN
 
   event.process.filePath = @(m->process->executable->path.data);
   event.process.cdhash = cd.cdhash;
-  event.process.fileSHA256 = cd.sha256;
   event.process.signingID = cd.signingID;
   event.process.teamID = cd.teamID;
-  event.process.signingChain = cd.certChain;
+  // An unconfirmed decision's hash and certificates describe a different file;
+  // only the execution event reports them.
+  if (!cd.identityMismatched) {
+    event.process.fileSHA256 = cd.sha256;
+    event.process.signingChain = cd.certChain;
+  }
   event.process.pid = @(santa::Pid(m->process->audit_token));
   event.process.pidversion = @(santa::Pidversion(m->process->audit_token));
   event.process.executingUserID = @(santa::EffectiveUser(m->process->audit_token));

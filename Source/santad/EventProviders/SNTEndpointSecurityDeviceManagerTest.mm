@@ -28,6 +28,7 @@
 #include <set>
 
 #include "Source/common/Platform.h"
+#import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTDeviceEvent.h"
@@ -41,6 +42,7 @@
 #import "Source/santad/EventProviders/DiskArbitrationTestUtil.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityDeviceManager.h"
 #include "Source/santad/Metrics.h"
+#import "Source/santad/SNTDecisionCache.h"
 
 using santa::AuthResultCache;
 using santa::EventDisposition;
@@ -746,6 +748,44 @@ class MockAuthResultCache : public AuthResultCache {
                   fsTypeName:@"smbfs"
                 allowedHosts:@[]
           expectedAuthResult:ES_AUTH_RESULT_DENY];
+  } else {
+    XCTSkip(@"Test requires macOS 15 or later");
+  }
+}
+
+- (void)testNetworkMountEventOmitsUnconfirmedIdentity {
+  if (@available(macOS 15.0, *)) {
+    SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+    cd.sha256 = @"abc123";
+    cd.certChain = @[];
+    cd.teamID = @"ABCDE12345";
+    cd.identityMismatched = YES;
+    id mockDecisionCache = OCMClassMock([SNTDecisionCache class]);
+    OCMStub([mockDecisionCache sharedCache]).andReturn(mockDecisionCache);
+    OCMStub([mockDecisionCache cachedDecisionForFile:{}]).ignoringNonObjectArgs().andReturn(cd);
+
+    OCMStub([self.mockConfigurator blockNetworkMount]).andReturn(YES);
+    OCMStub([self.mockConfigurator allowedNetworkMountHosts]).andReturn(@[]);
+
+    XCTestExpectation* expectation =
+        [self expectationWithDescription:@"Wait for networkMountCallback to trigger"];
+    __block SNTStoredNetworkMountEvent* observedEvent;
+    [self triggerTestNetworkMountEvent:ES_EVENT_TYPE_AUTH_MOUNT
+        mountFromURL:@"smb://server.example.com/share"
+        fsTypeName:@"smbfs"
+        expectedAuthResult:ES_AUTH_RESULT_DENY
+        deviceManagerSetup:^(SNTEndpointSecurityDeviceManager* dm) {
+        }
+        networkMountCallback:^(SNTStoredNetworkMountEvent* event) {
+          observedEvent = event;
+          [expectation fulfill];
+        }];
+    [self waitForExpectations:@[ expectation ] timeout:60.0];
+
+    XCTAssertNil(observedEvent.process.fileSHA256);
+    XCTAssertNil(observedEvent.process.signingChain);
+    XCTAssertEqualObjects(observedEvent.process.teamID, @"ABCDE12345");
+    [mockDecisionCache stopMocking];
   } else {
     XCTSkip(@"Test requires macOS 15 or later");
   }

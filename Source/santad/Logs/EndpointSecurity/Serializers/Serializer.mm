@@ -116,9 +116,14 @@ std::vector<uint8_t> Serializer::SerializeFileAccess(
 std::vector<uint8_t> Serializer::SerializeNetworkFlows(SNDProcessFlows* processFlows,
                                                        struct timespec window_start,
                                                        struct timespec window_end) {
-  return SerializeNetworkFlows(
-      processFlows, window_start, window_end,
-      [decision_cache_ cachedDecisionForVnode:[processFlows.processInfo vnode]]);
+  SNTCachedDecision* cd = [decision_cache_ cachedDecisionForVnode:[processFlows.processInfo vnode]];
+  // A decision from an unconfirmed read carries values derived from the file
+  // that was read, not from this process's image. Only the execution event
+  // reports them, marked identity_unverified.
+  if (cd.identityMismatched) {
+    cd = nil;
+  }
+  return SerializeNetworkFlows(processFlows, window_start, window_end, cd);
 }
 
 };  // namespace santa

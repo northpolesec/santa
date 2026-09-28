@@ -29,6 +29,7 @@
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
+#include "Source/common/SantaVnode.h"
 #include "Source/common/TestUtils.h"
 #include "Source/common/es/EnrichedTypes.h"
 #include "Source/common/es/Enricher.h"
@@ -37,6 +38,8 @@
 #include "Source/santad/Logs/EndpointSecurity/Serializers/BasicString.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Serializer.h"
 #import "Source/santad/SNTDecisionCache.h"
+#import "src/santanetd/SNDProcessFlows.h"
+#import "src/santanetd/SNDProcessInfo.h"
 
 using santa::BasicString;
 using santa::Enricher;
@@ -76,6 +79,21 @@ std::string BasicStringSerializeMessage(es_message_t* esMsg) {
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   return BasicStringSerializeMessage(mockESApi, esMsg, nil);
 }
+
+// Records the decision the base class passes to the serializer.
+class NetworkFlowsCapturingBasicString : public BasicString {
+ public:
+  using BasicString::BasicString;
+  using Serializer::SerializeNetworkFlows;
+
+  std::vector<uint8_t> SerializeNetworkFlows(SNDProcessFlows* pf, struct timespec start,
+                                             struct timespec end, SNTCachedDecision* cd) override {
+    captured_cd = cd;
+    return BasicString::SerializeNetworkFlows(pf, start, end, cd);
+  }
+
+  SNTCachedDecision* captured_cd;
+};
 
 @interface BasicStringTest : XCTestCase
 @property id mockConfigurator;
@@ -1499,6 +1517,30 @@ std::string BasicStringSerializeMessage(es_message_t* esMsg) {
 
     XCTAssertCppStringEqual(santa::GetReasonString(state), want);
   }
+}
+
+- (void)testSerializeNetworkFlowsOmitsUnconfirmedDecision {
+  SantaVnode vnode = {.fsid = 1, .fileid = 2};
+  id processInfo = OCMClassMock([SNDProcessInfo class]);
+  OCMStub([(SNDProcessInfo*)processInfo vnode]).andReturn(vnode);
+  id processFlows = OCMClassMock([SNDProcessFlows class]);
+  OCMStub([processFlows processInfo]).andReturn(processInfo);
+
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+  cd.sha256 = @"abc123";
+  OCMStub([self.mockDecisionCache cachedDecisionForVnode:vnode])
+      .ignoringNonObjectArgs()
+      .andReturn(cd);
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  NetworkFlowsCapturingBasicString bs(mockESApi, self.mockDecisionCache, false);
+
+  bs.SerializeNetworkFlows(processFlows, {}, {});
+  XCTAssertEqual(bs.captured_cd, cd);
+
+  cd.identityMismatched = YES;
+  bs.SerializeNetworkFlows(processFlows, {}, {});
+  XCTAssertNil(bs.captured_cd);
 }
 
 - (void)testGetModeString {

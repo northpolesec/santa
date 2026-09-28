@@ -1479,6 +1479,72 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess& proc) {
   XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
 }
 
+// A cached decision from an unconfirmed read describes a different file than the
+// process's image, so the event gets neither its hash nor its certificates. The
+// cached entry still blocks a rehydrate: the insert is first-writer-wins.
+- (void)testProcessTargetAndPolicyOmitsUnconfirmedIdentity {
+  es_file_t esFile = MakeESFile("/proc/instigator");
+  esFile.stat = MakeStat();
+  esFile.stat.st_size = 1024;
+  es_process_t esProc = MakeESProcess(&esFile);
+  esProc.codesigning_flags = CS_SIGNED | CS_VALID;
+  esProc.team_id = MakeESStringToken("");
+  esProc.signing_id = MakeESStringToken("");
+
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_OPEN, &esProc);
+  es_file_t targetFile = MakeESFile("/etc/hosts");
+  esMsg.event.open.file = &targetFile;
+  esMsg.event.open.fflag = FWRITE;
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+  Message msg(mockESApi, &esMsg);
+
+  std::vector<Message::PathTarget> targets = msg.PathTargets();
+  XCTAssertEqual(targets.size(), 1);
+
+  SNTCachedDecision* existingCd = [[SNTCachedDecision alloc] init];
+  existingCd.sha256 = @"unconfirmed-sha256";
+  existingCd.certChain = @[];
+  existingCd.identityMismatched = YES;
+
+  __block SNTStoredFileAccessEvent* observedEvent;
+  FAAPolicyProcessor::StoreAccessEventBlock storeBlock = ^(SNTStoredFileAccessEvent* event, bool) {
+    observedEvent = event;
+  };
+
+  MockFAAPolicyProcessor faaPolicyProcessor(self.dcMock, nullptr, nullptr, nullptr, nullptr, 0, 0,
+                                            nil, storeBlock);
+
+  EXPECT_CALL(faaPolicyProcessor, GetCachedDecision(testing::_))
+      .WillOnce(testing::Return(existingCd));
+  EXPECT_CALL(faaPolicyProcessor, ApplyPolicy)
+      .WillOnce(testing::Return(
+          FAAPolicyProcessor::DecisionAndOptions{FileAccessPolicyDecision::kAllowedAuditOnly, {}}));
+
+  auto matcher = ^FAAPolicyProcessor::PolicyMatch(const santa::WatchItemPolicyBase&,
+                                                  const Message::PathTarget&, const Message&) {
+    return {true, nullptr};
+  };
+  SNTFileAccessDeniedBlock deniedBlock =
+      ^(SNTStoredFileAccessEvent*, NSString*, NSString*, NSString*) {
+      };
+
+  auto policy = std::make_shared<santa::WatchItemPolicyBase>("test-policy", "v1");
+  policy->audit_only = true;
+  FAAPolicyProcessor::TargetPolicyPair pair{0, policy};
+
+  faaPolicyProcessor.ProcessTargetAndPolicyWrapper(msg, pair, matcher, deniedBlock,
+                                                   SNTOverrideFileAccessActionNone);
+
+  XCTAssertNotNil(observedEvent);
+  XCTAssertEqualObjects(observedEvent.process.fileSHA256, @"<unknown sha>");
+  XCTAssertNil(observedEvent.process.signingChain);
+  XCTAssertTrue(OCMVerifyAll(self.dcMock));
+
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+}
+
 // Covers the FAA-side async branch: when the executing binary is larger than
 // kMaxSyncRehydrateBytes we dispatch asyncRehydrateAndCacheDecisionForFileInfo:
 // instead of the sync version, and the current event still emits the
