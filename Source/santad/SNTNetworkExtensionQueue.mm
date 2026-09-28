@@ -242,13 +242,21 @@ static const NSTimeInterval kNetworkFlowDialogDedupeInterval = 60;
     SNTCachedDecision* cd = [self.decisionCache cachedDecisionForVnode:[decision vnode]];
     if (!cd && event.process.filePath) {
       SNTFileInfo* fi = [[SNTFileInfo alloc] initWithPath:event.process.filePath error:NULL];
+      // The path can name a different file than the process is running, e.g.
+      // after an in-place update.
+      if (fi && !([fi vnode] == [decision vnode])) {
+        fi = nil;
+      }
       if (fi.fileSize > kMaxSyncRehydrateBytes) {
         [self.decisionCache asyncRehydrateAndCacheDecisionForFileInfo:fi];
       } else if (fi) {
         cd = [self.decisionCache rehydrateAndCacheDecisionForFileInfo:fi];
       }
     }
-    if (cd) {
+    // A decision from an unconfirmed read carries the hash and certificates of
+    // the file that was read, not of this process's image. Only the execution
+    // event reports them, marked identity_unverified.
+    if (cd && !cd.identityMismatched) {
       event.process.fileSHA256 = cd.sha256;
       event.process.signingChain = cd.certChain;
     }

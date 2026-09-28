@@ -629,6 +629,12 @@ FAAPolicyProcessor::DecisionAndOptions FAAPolicyProcessor::ProcessTargetAndPolic
              msg->process->executable->path.data, err.localizedDescription);
       }
     }
+    // An unconfirmed decision's hash and certificates describe a different file;
+    // only the execution event reports them. Checked here to also catch the one
+    // a rehydrate returns after losing the insert race.
+    if (unlikely(cd.identityMismatched)) {
+      cd = nil;
+    }
     SNTStoredFileAccessEvent* event = [[SNTStoredFileAccessEvent alloc] init];
 
     event.accessedPath = StringToNSString(target.Path());

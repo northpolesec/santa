@@ -18,6 +18,7 @@
 #import <OCMock/OCMock.h>
 #import <XCTest/XCTest.h>
 
+#include <sys/stat.h>
 #include <unistd.h>
 #include <memory>
 
@@ -361,6 +362,34 @@
   XCTAssertEqualObjects(event.process.signingChain, @[]);
 }
 
+- (void)testHandleNetworkFlowDecisionsOmitsUnconfirmedIdentity {
+  [self stubNetworkExtensionEnabled];
+
+  SNTStoredNetworkFlowEvent* event = [[SNTStoredNetworkFlowEvent alloc] init];
+  event.process.filePath = @"/usr/bin/curl";
+
+  SantaVnode vnode = {.fsid = 1, .fileid = 2};
+  id decision = OCMClassMock([SNDNetworkFlowDecision class]);
+  OCMStub([decision storedEvent]).andReturn(event);
+  OCMStub([(SNDNetworkFlowDecision*)decision vnode]).andReturn(vnode);
+
+  // Content-derived values from a read that was not the loaded image.
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+  cd.sha256 = @"abc123";
+  cd.certChain = @[];
+  cd.identityMismatched = YES;
+  OCMStub([self.mockDecisionCache cachedDecisionForVnode:vnode])
+      .ignoringNonObjectArgs()
+      .andReturn(cd);
+
+  OCMExpect([self.mockSyncdQueue addStoredEvent:event]);
+  [self.sut handleNetworkFlowDecisions:@[ decision ]];
+  OCMVerifyAll(self.mockSyncdQueue);
+
+  XCTAssertNil(event.process.fileSHA256);
+  XCTAssertNil(event.process.signingChain);
+}
+
 - (void)testHandleNetworkFlowDecisionsNilConverterNoOps {
   [self stubNetworkExtensionEnabled];
 
@@ -382,12 +411,24 @@
   return path;
 }
 
+- (SantaVnode)vnodeForPath:(NSString*)path {
+  struct stat sb = {};
+  XCTAssertEqual(stat(path.fileSystemRepresentation, &sb), 0);
+  return SantaVnode::VnodeForFile(sb);
+}
+
 // A mock decision whose storedEvent points at the given on-disk path, with a cache
 // miss so the handler falls through to rehydrate.
 - (id)decisionForCacheMissWithEvent:(SNTStoredNetworkFlowEvent*)event {
+  return [self decisionForCacheMissWithEvent:event vnode:SantaVnode{}];
+}
+
+// As above, for a process running the given vnode. Rehydration requires it to be
+// the vnode of the file at the event's path.
+- (id)decisionForCacheMissWithEvent:(SNTStoredNetworkFlowEvent*)event vnode:(SantaVnode)vnode {
   id decision = OCMClassMock([SNDNetworkFlowDecision class]);
   OCMStub([decision storedEvent]).andReturn(event);
-  OCMStub([(SNDNetworkFlowDecision*)decision vnode]).andReturn(SantaVnode{});
+  OCMStub([(SNDNetworkFlowDecision*)decision vnode]).andReturn(vnode);
   // cachedDecisionForVnode: left unstubbed -> nil (miss).
   return decision;
 }
@@ -398,7 +439,7 @@
 
   SNTStoredNetworkFlowEvent* event = [[SNTStoredNetworkFlowEvent alloc] init];
   event.process.filePath = path;
-  id decision = [self decisionForCacheMissWithEvent:event];
+  id decision = [self decisionForCacheMissWithEvent:event vnode:[self vnodeForPath:path]];
 
   OCMExpect([self.mockDecisionCache rehydrateAndCacheDecisionForFileInfo:OCMOCK_ANY]);
   OCMReject([self.mockDecisionCache asyncRehydrateAndCacheDecisionForFileInfo:OCMOCK_ANY]);
@@ -417,7 +458,7 @@
 
   SNTStoredNetworkFlowEvent* event = [[SNTStoredNetworkFlowEvent alloc] init];
   event.process.filePath = path;
-  id decision = [self decisionForCacheMissWithEvent:event];
+  id decision = [self decisionForCacheMissWithEvent:event vnode:[self vnodeForPath:path]];
 
   // Oversized binary: warm the cache async, never hash on this serial queue.
   OCMExpect([self.mockDecisionCache asyncRehydrateAndCacheDecisionForFileInfo:OCMOCK_ANY]);
@@ -428,6 +469,27 @@
 
   OCMVerifyAll(self.mockDecisionCache);
   OCMVerifyAll(self.mockSyncdQueue);
+  [[NSFileManager defaultManager] removeItemAtPath:path error:nil];
+}
+
+- (void)testHandleNetworkFlowDecisionsSkipsRehydrateWhenPathNamesAnotherFile {
+  [self stubNetworkExtensionEnabled];
+  NSString* path = [self tempFileOfSize:1024 name:@"flow-replaced.bin"];
+
+  SNTStoredNetworkFlowEvent* event = [[SNTStoredNetworkFlowEvent alloc] init];
+  event.process.filePath = path;
+  // The process runs a file other than the one now at its path.
+  id decision = [self decisionForCacheMissWithEvent:event vnode:SantaVnode{.fsid = 1, .fileid = 2}];
+
+  OCMReject([self.mockDecisionCache rehydrateAndCacheDecisionForFileInfo:OCMOCK_ANY]);
+  OCMReject([self.mockDecisionCache asyncRehydrateAndCacheDecisionForFileInfo:OCMOCK_ANY]);
+  OCMExpect([self.mockSyncdQueue addStoredEvent:event]);  // still uploads, thin
+
+  [self.sut handleNetworkFlowDecisions:@[ decision ]];
+
+  OCMVerifyAll(self.mockSyncdQueue);
+  XCTAssertNil(event.process.fileSHA256);
+  XCTAssertNil(event.process.signingChain);
   [[NSFileManager defaultManager] removeItemAtPath:path error:nil];
 }
 
