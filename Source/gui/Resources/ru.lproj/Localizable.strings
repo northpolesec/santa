@@ -350,10 +350,10 @@
 "Executable changed during launch" = "Исполняемый файл изменён во время запуска";
 
 /* Appended to the block/Standalone message when Santa could not confirm the executed file's identity against what the kernel loaded */
-"<br /><br />This application's identity could not be verified" = "<br /><br />Не удалось проверить подлинность этого приложения";
+"<br /><br />This application's identity could not be verified" = "<br /><br />Не удалось проверить идентичность этого приложения";
 
 /* Authorize execution of an application with an unverifiable identity */
-"authorize execution of %@, whose identity could not be verified" = "разрешить запуск %@, подлинность которого не удалось проверить";
+"authorize execution of %@, whose identity could not be verified" = "разрешить выполнение %@, идентичность которого не удалось проверить";
 
 /* Authorize execution of an unidentifiable application with an unverifiable identity */
-"authorize execution of an application whose identity could not be verified" = "разрешить запуск приложения, подлинность которого не удалось проверить";
+"authorize execution of an application whose identity could not be verified" = "разрешить выполнение приложения, идентичность которого не удалось проверить";
