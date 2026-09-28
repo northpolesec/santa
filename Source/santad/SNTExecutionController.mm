@@ -503,7 +503,7 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
     SNTCachedDecision* cd = [self unverifiedIdentityDecisionForProcess:targetProc
                                                            configState:configState];
     if (!policyDenies) {
-      cd.decision = config.failClosed ? SNTEventStateBlockUnknown : SNTEventStateAllowUnknown;
+      cd.decision = configState.failClosed ? SNTEventStateBlockUnknown : SNTEventStateAllowUnknown;
     }
     if (!identityMismatch) {
       cd.decisionExtra = @"Executable could not be read";

@@ -74,6 +74,7 @@ using ActivationCallbackBlock =
 - (BOOL)decision:(nonnull SNTCachedDecision*)cd
                      forRule:(nonnull SNTRule*)rule
          withTransitiveRules:(BOOL)transitive
+                  failClosed:(BOOL)failClosed
     andCELActivationCallback:(nullable ActivationCallbackBlock)activationCallback;
 
 @end

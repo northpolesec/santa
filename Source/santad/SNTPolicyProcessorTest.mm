@@ -50,6 +50,7 @@ static const int64_t kDecidingRuleID = 48213;
 @interface SNTPolicyProcessor (Testing)
 @property SNTConfigurator* configurator;
 - (BOOL)evaluateCELFallbackExpressions:(SNTCachedDecision*)cd
+                            failClosed:(BOOL)failClosed
                     activationCallback:(ActivationCallbackBlock)activationCallback;
 - (void)compileFallbackRules:(NSArray<SNTCELFallbackRule*>*)rules;
 - (NSString*)fileIsScopeAllowed:(SNTFileInfo*)fi;
@@ -122,6 +123,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   BOOL decisionIsFinal = [self.processor decision:cd
                                           forRule:rule
                               withTransitiveRules:transitiveRules
+                                       failClosed:NO
                          andCELActivationCallback:nil];
   XCTAssertEqual(cd.decision, decision);
   XCTAssertEqual(decisionIsFinal, final);
@@ -190,7 +192,11 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
   SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
   cd.cdhash = rule.identifier;
-  [self.processor decision:cd forRule:rule withTransitiveRules:YES andCELActivationCallback:nil];
+  [self.processor decision:cd
+                       forRule:rule
+           withTransitiveRules:YES
+                    failClosed:NO
+      andCELActivationCallback:nil];
   XCTAssertEqual(cd.decision, SNTEventStateBlockCDHash);
   XCTAssertTrue(cd.silentBlockGUI);
   XCTAssertFalse(cd.silentBlockTTY);
@@ -207,7 +213,11 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
   SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
   cd.cdhash = rule.identifier;
-  [self.processor decision:cd forRule:rule withTransitiveRules:YES andCELActivationCallback:nil];
+  [self.processor decision:cd
+                       forRule:rule
+           withTransitiveRules:YES
+                    failClosed:NO
+      andCELActivationCallback:nil];
   XCTAssertEqual(cd.decision, SNTEventStateBlockCDHash);
   XCTAssertFalse(cd.silentBlockGUI);
   XCTAssertTrue(cd.silentBlockTTY);
@@ -766,7 +776,11 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
   cd.sha256 = rule.identifier;
 
-  [self.processor decision:cd forRule:rule withTransitiveRules:YES andCELActivationCallback:nil];
+  [self.processor decision:cd
+                       forRule:rule
+           withTransitiveRules:YES
+                    failClosed:NO
+      andCELActivationCallback:nil];
 
   XCTAssertEqualObjects(cd.customMsg, @"Custom Message");
   XCTAssertEqualObjects(cd.customURL, @"https://example.com");
@@ -1517,6 +1531,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     [self.processor decision:cd
                          forRule:r
              withTransitiveRules:YES
+                      failClosed:NO
         andCELActivationCallback:activation];
     XCTAssertEqual(cd.decision, SNTEventStateAllowBinary);
     XCTAssertFalse(cd.silentBlockGUI);
@@ -1530,6 +1545,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     [self.processor decision:cd
                          forRule:r
              withTransitiveRules:YES
+                      failClosed:NO
         andCELActivationCallback:activation];
     XCTAssertEqual(cd.decision, SNTEventStateBlockBinary);
     XCTAssertFalse(cd.silentBlockGUI);
@@ -1543,6 +1559,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     [self.processor decision:cd
                          forRule:r
              withTransitiveRules:YES
+                      failClosed:NO
         andCELActivationCallback:activation];
     XCTAssertEqual(cd.decision, SNTEventStateAllowBinary);
     XCTAssertFalse(cd.silentBlockGUI);
@@ -1556,6 +1573,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     [self.processor decision:cd
                          forRule:r
              withTransitiveRules:YES
+                      failClosed:NO
         andCELActivationCallback:activation];
     XCTAssertEqual(cd.decision, SNTEventStateAllowBinary);
     XCTAssertFalse(cd.silentBlockGUI);
@@ -1569,6 +1587,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     [self.processor decision:cd
                          forRule:r
              withTransitiveRules:YES
+                      failClosed:NO
         andCELActivationCallback:activation];
     XCTAssertEqual(cd.decision, SNTEventStateBlockBinary);
     XCTAssertTrue(cd.silentBlockGUI);
@@ -1582,6 +1601,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     [self.processor decision:cd
                          forRule:r
              withTransitiveRules:YES
+                      failClosed:NO
         andCELActivationCallback:activation];
     XCTAssertEqual(cd.decision, SNTEventStateBlockBinary);
     XCTAssertFalse(cd.silentBlockGUI);
@@ -1595,6 +1615,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     [self.processor decision:cd
                          forRule:r
              withTransitiveRules:YES
+                      failClosed:NO
         andCELActivationCallback:activation];
     XCTAssertEqual(cd.decision, SNTEventStateAllowBinary);
     XCTAssertFalse(cd.silentBlockGUI);
@@ -1608,6 +1629,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     [self.processor decision:cd
                          forRule:r
              withTransitiveRules:YES
+                      failClosed:NO
         andCELActivationCallback:activation];
     XCTAssertEqual(cd.decision, SNTEventStateBlockBinary);
     XCTAssertTrue(cd.holdAndAsk);
@@ -1626,6 +1648,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     [self.processor decision:cd
                          forRule:r
              withTransitiveRules:YES
+                      failClosed:NO
         andCELActivationCallback:activation];
     XCTAssertEqual(cd.decision, SNTEventStateBlockBinary);
     XCTAssertTrue(cd.seatbeltRequired);
@@ -1654,10 +1677,50 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     [self.processor decision:cd
                          forRule:r
              withTransitiveRules:YES
+                      failClosed:NO
         andCELActivationCallback:activation];
     XCTAssertEqual(cd.decision, SNTEventStateBlockBinary);
     XCTAssertTrue(cd.seatbeltRequired);
     XCTAssertFalse(cd.cacheable);
+  }
+}
+
+// A CEL rule that cannot be evaluated follows the failClosed the caller
+// snapshotted with the decision's client mode, not the live configurator's.
+- (void)testCELFailureFollowsSnapshottedFailClosed {
+  ActivationCallbackBlock activation =
+      ^std::unique_ptr<::google::api::expr::runtime::BaseActivation>(bool) {
+    return nullptr;
+  };
+  SNTRule* rule = [[SNTRule alloc]
+         initWithIdentifier:@"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+                      state:SNTRuleStateCELv2
+                       type:SNTRuleTypeBinary
+                  customMsg:nil
+                  customURL:nil
+      eventDetailButtonText:nil
+                  timestamp:0
+                    comment:nil
+                    celExpr:@"this is not ( cel"
+             seatbeltPolicy:nil
+                     ruleId:0
+                      error:NULL];
+  XCTAssertNotNil(rule);
+
+  for (BOOL failClosed : {NO, YES}) {
+    id mockConfigurator = OCMClassMock([SNTConfigurator class]);
+    OCMStub([mockConfigurator failClosed]).andReturn(!failClosed);
+    self.processor.configurator = mockConfigurator;
+    SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+    cd.sha256 = rule.identifier;
+    BOOL decided = [self.processor decision:cd
+                                    forRule:rule
+                        withTransitiveRules:YES
+                                 failClosed:failClosed
+                   andCELActivationCallback:activation];
+    XCTAssertEqual(decided, failClosed);
+    XCTAssertEqual(cd.decision, failClosed ? SNTEventStateBlockUnknown : SNTEventStateUnknown);
+    [mockConfigurator stopMocking];
   }
 }
 
@@ -1733,6 +1796,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   [self.processor decision:cd1
                        forRule:r
            withTransitiveRules:YES
+                    failClosed:NO
       andCELActivationCallback:activation];
   XCTAssertEqual(cd1.decision, SNTEventStateAllowBinary);
 
@@ -1742,6 +1806,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   [self.processor decision:cd2
                        forRule:r
            withTransitiveRules:YES
+                    failClosed:NO
       andCELActivationCallback:activation];
   XCTAssertEqual(cd2.decision, SNTEventStateAllowBinary);
 
@@ -1798,6 +1863,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   [self.processor decision:cd
                        forRule:inRange
            withTransitiveRules:YES
+                    failClosed:NO
       andCELActivationCallback:[self fallbackTestActivationCallback]];
   XCTAssertEqual(cd.decision, SNTEventStateAllowBinary);
   XCTAssertFalse(cd.cacheable);
@@ -1809,6 +1875,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   [self.processor decision:outCD
                        forRule:outOfRange
            withTransitiveRules:YES
+                    failClosed:NO
       andCELActivationCallback:[self fallbackTestActivationCallback]];
   XCTAssertEqual(outCD.decision, SNTEventStateBlockBinary);
   XCTAssertFalse(outCD.cacheable);
@@ -1835,6 +1902,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   [self.processor decision:cd
                        forRule:rule
            withTransitiveRules:YES
+                    failClosed:NO
       andCELActivationCallback:[self fallbackTestActivationCallback]];
 
   XCTAssertEqual(cd.decision, SNTEventStateAllowSigningID);
@@ -1868,6 +1936,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   [self.processor decision:cd
                        forRule:noKill
            withTransitiveRules:YES
+                    failClosed:NO
       andCELActivationCallback:[self fallbackTestActivationCallback]];
   XCTAssertEqual(cd.decision, SNTEventStateAllowBinary);
   XCTAssertNil(cd.timedRuleKillDeadline);
@@ -1892,6 +1961,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   BOOL decisionIsFinal = [self.processor decision:cd
                                           forRule:rule
                               withTransitiveRules:YES
+                                       failClosed:NO
                          andCELActivationCallback:[self fallbackTestActivationCallback]];
 
   XCTAssertFalse(decisionIsFinal, @"TEAMID + AllowCompiler is not a decision this rule can make");
@@ -1909,12 +1979,14 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   [self.processor decision:cd
                        forRule:killing
            withTransitiveRules:YES
+                    failClosed:NO
       andCELActivationCallback:[self fallbackTestActivationCallback]];
   XCTAssertNotNil(cd.timedRuleKillDeadline);
 
   [self.processor decision:cd
                        forRule:[self celV2RuleWithExpr:@"ALLOWLIST"]
            withTransitiveRules:YES
+                    failClosed:NO
       andCELActivationCallback:[self fallbackTestActivationCallback]];
   [self assertNoTimedKillOn:cd];
 }
@@ -1931,6 +2003,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   BOOL decisionIsFinal = [self.processor decision:cd
                                           forRule:r
                               withTransitiveRules:YES
+                                       failClosed:NO
                          andCELActivationCallback:[self fallbackTestActivationCallback]];
   XCTAssertFalse(decisionIsFinal);
   XCTAssertEqual(cd.decision, SNTEventStateUnknown);
@@ -2034,6 +2107,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     [self.processor decision:cd
                          forRule:r
              withTransitiveRules:YES
+                      failClosed:NO
         andCELActivationCallback:activation];
     XCTAssertEqual(cd.decision, SNTEventStateAllowBinary);
     XCTAssertFalse(cd.cacheable);
@@ -2047,6 +2121,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     [self.processor decision:cd
                          forRule:r
              withTransitiveRules:YES
+                      failClosed:NO
         andCELActivationCallback:activation];
     XCTAssertEqual(cd.decision, SNTEventStateBlockBinary);
     XCTAssertFalse(cd.cacheable);
@@ -2062,6 +2137,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     [self.processor decision:cd
                          forRule:r
              withTransitiveRules:YES
+                      failClosed:NO
         andCELActivationCallback:activation];
     XCTAssertEqual(cd.decision, SNTEventStateBlockBinary);
     XCTAssertFalse(cd.silentBlockGUI);
@@ -2077,6 +2153,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     [self.processor decision:cd
                          forRule:r
              withTransitiveRules:YES
+                      failClosed:NO
         andCELActivationCallback:activation];
     XCTAssertEqual(cd.decision, SNTEventStateAllowBinary);
     XCTAssertFalse(cd.cacheable);
@@ -2090,6 +2167,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     [self.processor decision:cd
                          forRule:r
              withTransitiveRules:YES
+                      failClosed:NO
         andCELActivationCallback:activation];
     XCTAssertEqual(cd.decision, SNTEventStateAllowBinary);
     XCTAssertFalse(cd.cacheable);
@@ -2104,6 +2182,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     [self.processor decision:cd
                          forRule:r
              withTransitiveRules:YES
+                      failClosed:NO
         andCELActivationCallback:activation];
     XCTAssertEqual(cd.decision, SNTEventStateBlockBinary);
     XCTAssertFalse(cd.silentBlockGUI);
@@ -2120,6 +2199,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     [self.processor decision:cd
                          forRule:r
              withTransitiveRules:YES
+                      failClosed:NO
         andCELActivationCallback:activation];
     XCTAssertEqual(cd.decision, SNTEventStateAllowBinary);
     XCTAssertFalse(cd.cacheable);
@@ -2133,6 +2213,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     [self.processor decision:cd
                          forRule:r
              withTransitiveRules:YES
+                      failClosed:NO
         andCELActivationCallback:activation];
     XCTAssertEqual(cd.decision, SNTEventStateAllowBinary);
     XCTAssertFalse(cd.cacheable);
@@ -2222,6 +2303,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
   BOOL handled =
       [self.processor evaluateCELFallbackExpressions:cd
+                                          failClosed:NO
                                   activationCallback:[self fallbackTestActivationCallback]];
   XCTAssertTrue(handled);
   XCTAssertEqual(cd.decision, SNTEventStateAllowCELFallback);
@@ -2236,6 +2318,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
   BOOL handled =
       [self.processor evaluateCELFallbackExpressions:cd
+                                          failClosed:NO
                                   activationCallback:[self fallbackTestActivationCallback]];
   XCTAssertTrue(handled);
   XCTAssertEqual(cd.decision, SNTEventStateBlockCELFallback);
@@ -2250,6 +2333,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
   BOOL handled =
       [self.processor evaluateCELFallbackExpressions:cd
+                                          failClosed:NO
                                   activationCallback:[self fallbackTestActivationCallback]];
   XCTAssertTrue(handled);
   XCTAssertEqual(cd.decision, SNTEventStateBlockCELFallback);
@@ -2267,6 +2351,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
   BOOL handled =
       [self.processor evaluateCELFallbackExpressions:cd
+                                          failClosed:NO
                                   activationCallback:[self fallbackTestActivationCallback]];
   XCTAssertTrue(handled);
   XCTAssertEqual(cd.decision, SNTEventStateAllowCELFallback);
@@ -2290,6 +2375,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
   BOOL handled =
       [self.processor evaluateCELFallbackExpressions:cd
+                                          failClosed:NO
                                   activationCallback:[self fallbackTestActivationCallback]];
   XCTAssertTrue(handled);
   XCTAssertEqual(cd.decision, SNTEventStateAllowCELFallback);
@@ -2309,6 +2395,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
   BOOL handled =
       [self.processor evaluateCELFallbackExpressions:cd
+                                          failClosed:NO
                                   activationCallback:[self fallbackTestActivationCallback]];
   XCTAssertTrue(handled);
   XCTAssertEqual(cd.decision, SNTEventStateAllowCELFallback);
@@ -2328,6 +2415,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
   BOOL handled =
       [self.processor evaluateCELFallbackExpressions:cd
+                                          failClosed:NO
                                   activationCallback:[self fallbackTestActivationCallback]];
   XCTAssertTrue(handled);
   XCTAssertEqual(cd.decision, SNTEventStateAllowCELFallback);
@@ -2344,6 +2432,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
   BOOL handled =
       [self.processor evaluateCELFallbackExpressions:cd
+                                          failClosed:NO
                                   activationCallback:[self fallbackTestActivationCallback]];
   XCTAssertFalse(handled);
 }
@@ -2358,6 +2447,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
   BOOL handled =
       [self.processor evaluateCELFallbackExpressions:cd
+                                          failClosed:NO
                                   activationCallback:[self fallbackTestActivationCallback]];
   XCTAssertTrue(handled);
   XCTAssertEqual(cd.decision, SNTEventStateBlockCELFallback);
@@ -2370,6 +2460,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
   BOOL handled =
       [self.processor evaluateCELFallbackExpressions:cd
+                                          failClosed:NO
                                   activationCallback:[self fallbackTestActivationCallback]];
   XCTAssertFalse(handled);
 }
@@ -2385,6 +2476,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
   BOOL handled =
       [self.processor evaluateCELFallbackExpressions:cd
+                                          failClosed:NO
                                   activationCallback:[self fallbackTestActivationCallback]];
   XCTAssertTrue(handled);
   XCTAssertEqual(cd.decision, SNTEventStateAllowCELFallback);
@@ -2400,6 +2492,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
   BOOL handled =
       [self.processor evaluateCELFallbackExpressions:cd
+                                          failClosed:NO
                                   activationCallback:[self fallbackTestActivationCallback]];
   // args has ["arg0", "arg1"], so size(args) > 0 is true, returning BLOCKLIST
   XCTAssertTrue(handled);
@@ -2420,6 +2513,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
   BOOL handled =
       [self.processor evaluateCELFallbackExpressions:cd
+                                          failClosed:NO
                                   activationCallback:[self fallbackTestActivationCallback]];
   XCTAssertFalse(handled);
   XCTAssertEqual(cd.decision, SNTEventStateUnknown);
@@ -2435,6 +2529,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
   XCTAssertTrue([self.processor
       evaluateCELFallbackExpressions:control
+                          failClosed:NO
                   activationCallback:[self fallbackTestActivationCallback]]);
   XCTAssertEqual(control.decision, SNTEventStateAllowCELFallback);
 }
@@ -2449,6 +2544,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
   BOOL handled =
       [self.processor evaluateCELFallbackExpressions:cd
+                                          failClosed:NO
                                   activationCallback:[self fallbackTestActivationCallback]];
   XCTAssertFalse(handled);
 }
@@ -2460,7 +2556,9 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
   cd.sha256 = @"aabbccdd";
 
-  BOOL handled = [self.processor evaluateCELFallbackExpressions:cd activationCallback:nil];
+  BOOL handled = [self.processor evaluateCELFallbackExpressions:cd
+                                                     failClosed:NO
+                                             activationCallback:nil];
   XCTAssertFalse(handled);
 }
 
@@ -2476,6 +2574,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
   BOOL handled =
       [self.processor evaluateCELFallbackExpressions:cd
+                                          failClosed:NO
                                   activationCallback:[self fallbackTestActivationCallback]];
   XCTAssertTrue(handled);
   XCTAssertEqual(cd.decision, SNTEventStateBlockCELFallback);
@@ -2500,6 +2599,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   sanityCD.sha256 = @"aabbccdd";
   BOOL sanityHandled =
       [self.processor evaluateCELFallbackExpressions:sanityCD
+                                          failClosed:NO
                                   activationCallback:[self fallbackTestActivationCallback]];
   XCTAssertTrue(sanityHandled);
   XCTAssertEqual(sanityCD.decision, SNTEventStateAllowCELFallback);
@@ -2533,6 +2633,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
         cd.sha256 = @"aabbccdd";
         BOOL handled =
             [processor evaluateCELFallbackExpressions:cd
+                                           failClosed:NO
                                    activationCallback:[self fallbackTestActivationCallback]];
         // A correct swap always yields a fallback decision (see the test's doc
         // comment), so NO — or any other decision — is a failure.
@@ -2565,7 +2666,11 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
   SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
   cd.cdhash = rule.identifier;
-  [self.processor decision:cd forRule:rule withTransitiveRules:YES andCELActivationCallback:nil];
+  [self.processor decision:cd
+                       forRule:rule
+           withTransitiveRules:YES
+                    failClosed:NO
+      andCELActivationCallback:nil];
   XCTAssertEqual(cd.decision, SNTEventStateBlockCDHash);
   XCTAssertEqual(cd.ruleId, 42LL);
 }
@@ -2581,7 +2686,11 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
   SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
   cd.sha256 = rule.identifier;
-  [self.processor decision:cd forRule:rule withTransitiveRules:YES andCELActivationCallback:nil];
+  [self.processor decision:cd
+                       forRule:rule
+           withTransitiveRules:YES
+                    failClosed:NO
+      andCELActivationCallback:nil];
   XCTAssertEqual(cd.decision, SNTEventStateAllowBinary);
   XCTAssertEqual(cd.ruleId, 0LL);
 }

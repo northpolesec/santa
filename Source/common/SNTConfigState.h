@@ -27,6 +27,7 @@
 // YES when `clientMode` is Monitor only because a Temporary Monitor Mode
 // session is active.
 @property(readonly) BOOL inTemporaryMonitorMode;
+@property(readonly) BOOL failClosed;
 @property(readonly) SNTExecutableIntegrityPolicy executableIntegrityPolicy;
 @property(readonly) BOOL enableNotificationSilences;
 @property(readonly) NSString* eventDetailText;

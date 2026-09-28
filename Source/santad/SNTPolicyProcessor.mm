@@ -254,6 +254,7 @@ struct FallbackBatch {
 }
 
 - (BOOL)evaluateCELFallbackExpressions:(SNTCachedDecision*)cd
+                            failClosed:(BOOL)failClosed
                     activationCallback:(ActivationCallbackBlock)activationCallback {
   // celEvaluatorV2_, not celFallbackEvaluatorV2_: fallback plans are compiled by
   // the fallback evaluator but evaluated through celEvaluatorV2_ below, since a
@@ -287,7 +288,8 @@ struct FallbackBatch {
                                                          cachedDecision:cd
                                                              activation:*activation
                                                               evalArena:&evalArena
-                                                      inFallbackContext:YES];
+                                                      inFallbackContext:YES
+                                                             failClosed:failClosed];
 
     if (!celResult.succeeded) {
       if (celResult.decisionMade) {
@@ -315,7 +317,8 @@ struct FallbackBatch {
                    cachedDecision:(SNTCachedDecision*)cd
                        activation:(const ::google::api::expr::runtime::BaseActivation&)activation
                         evalArena:(google::protobuf::Arena*)evalArena
-                inFallbackContext:(BOOL)inFallbackContext {
+                inFallbackContext:(BOOL)inFallbackContext
+                       failClosed:(BOOL)failClosed {
   int returnValue = 0;
   bool cacheable = true;
   std::optional<uint64_t> touchIDCooldownMinutes;
@@ -329,7 +332,7 @@ struct FallbackBatch {
     if (!evalResult.ok()) {
       LOGE(@"Failed to evaluate CEL expression: %s",
            std::string(evalResult.status().message()).c_str());
-      if (self.configurator.failClosed) {
+      if (failClosed) {
         cd.decision = SNTEventStateBlockUnknown;
         return {.succeeded = false, .decisionMade = true, .resultState = {}};
       }
@@ -348,7 +351,7 @@ struct FallbackBatch {
     if (!evalResult.ok()) {
       LOGE(@"Failed to evaluate CEL expression: %s",
            std::string(evalResult.status().message()).c_str());
-      if (self.configurator.failClosed) {
+      if (failClosed) {
         cd.decision = SNTEventStateBlockUnknown;
         return {.succeeded = false, .decisionMade = true, .resultState = {}};
       }
@@ -450,13 +453,14 @@ struct FallbackBatch {
 
 - (CELEvaluationResult)evaluateCELExpressionForRule:(SNTRule*)rule
                                      cachedDecision:(SNTCachedDecision*)cd
+                                         failClosed:(BOOL)failClosed
                                  activationCallback:(ActivationCallbackBlock)activationCallback {
   bool useV2 = (rule.state == SNTRuleStateCELv2);
   auto activation = activationCallback(useV2);
 
   if ((useV2 && !celPlanCacheV2_) || (!useV2 && !celPlanCacheV1_)) {
     LOGE(@"CEL v%d evaluator unavailable", useV2 ? 2 : 1);
-    if (self.configurator.failClosed) {
+    if (failClosed) {
       cd.decision = SNTEventStateBlockUnknown;
       return {.succeeded = false, .decisionMade = true, .resultState = {}};
     }
@@ -470,7 +474,7 @@ struct FallbackBatch {
   if (!planResult.ok()) {
     LOGE(@"Failed to compile CEL rule (%@): %s", rule.celExpr,
          std::string(planResult.status().message()).c_str());
-    if (self.configurator.failClosed) {
+    if (failClosed) {
       cd.decision = SNTEventStateBlockUnknown;
       return {.succeeded = false, .decisionMade = true, .resultState = {}};
     }
@@ -488,7 +492,8 @@ struct FallbackBatch {
                               cachedDecision:cd
                                   activation:*activation
                                    evalArena:&evalArena
-                           inFallbackContext:NO];
+                           inFallbackContext:NO
+                                  failClosed:failClosed];
 }
 
 // Sets the GUI/TTY notification suppression flags on the cached decision based
@@ -511,6 +516,7 @@ static void ApplySilentBlock(SNTCachedDecision* cd, SNTRuleState state) {
 - (BOOL)decision:(SNTCachedDecision*)cd
                      forRule:(SNTRule*)rule
          withTransitiveRules:(BOOL)enableTransitiveRules
+                  failClosed:(BOOL)failClosed
     andCELActivationCallback:(ActivationCallbackBlock)activationCallback {
   SNTRuleState state = rule.state;
   SNTRuleType type = rule.type;
@@ -524,6 +530,7 @@ static void ApplySilentBlock(SNTCachedDecision* cd, SNTRuleState state) {
   if ((state == SNTRuleStateCEL || state == SNTRuleStateCELv2) && activationCallback) {
     CELEvaluationResult celResult = [self evaluateCELExpressionForRule:rule
                                                         cachedDecision:cd
+                                                            failClosed:failClosed
                                                     activationCallback:activationCallback];
     if (!celResult.succeeded) {
       return celResult.decisionMade;
@@ -784,6 +791,7 @@ static BOOL SignatureVerdictIsStable(SNTCachedDecision* cd) {
     if ([self decision:cd
                              forRule:rule
                  withTransitiveRules:self.configurator.enableTransitiveRules
+                          failClosed:configState.failClosed
             andCELActivationCallback:activationCallback]) {
       return cd;
     }
@@ -797,7 +805,9 @@ static BOOL SignatureVerdictIsStable(SNTCachedDecision* cd) {
     return cd;
   }
 
-  if ([self evaluateCELFallbackExpressions:cd activationCallback:activationCallback]) {
+  if ([self evaluateCELFallbackExpressions:cd
+                                failClosed:configState.failClosed
+                        activationCallback:activationCallback]) {
     return cd;
   }
 
