@@ -348,3 +348,12 @@
 
 /* Block reason when the executable on disk no longer matches the file the decision was evaluated against */
 "Executable changed during launch" = "Executable changed during launch";
+
+/* Appended to the block/Standalone message when Santa could not confirm the executed file's identity against what the kernel loaded */
+"<br /><br />This application's identity could not be verified" = "<br /><br />This application's identity could not be verified";
+
+/* Authorize execution of an application with an unverifiable identity */
+"authorize execution of %@, whose identity could not be verified" = "authorize execution of %@, whose identity could not be verified";
+
+/* Authorize execution of an unidentifiable application with an unverifiable identity */
+"authorize execution of an application whose identity could not be verified" = "authorize execution of an application whose identity could not be verified";

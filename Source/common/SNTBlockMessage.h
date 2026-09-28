@@ -61,6 +61,8 @@ NS_ASSUME_NONNULL_BEGIN
 ///
 ///  Return a URL generated from the EventDetailURL configuration key
 ///  after replacing templates in the URL with values from the event.
+///  Returns nil for a contentAttributesUnverified event when the template uses a
+///  content-derived token (file hash or bundle identifier).
 ///
 + (nullable NSURL*)eventDetailURLForEvent:(nullable SNTStoredExecutionEvent*)event
                                 customURL:(nullable NSString*)url;

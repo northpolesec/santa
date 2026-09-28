@@ -156,6 +156,7 @@ struct BinaryView: View {
   @State var clientModeOverride: SNTClientMode = .lockdown
   @State var allowNotificationSilence: Bool = true
   @State var holdAndAsk: Bool = false
+  @State var identityUnverified: Bool = false
   @State var brandingCompanyName: String = ""
   @State var brandingCompanyLogo: String = ""
   @State var brandingCompanyLogoDark: String = ""
@@ -257,6 +258,11 @@ struct BinaryView: View {
               Text(verbatim: "Hold and ask (TouchID)")
             }
           }
+          HStack {
+            Toggle(isOn: $identityUnverified) {
+              Text(verbatim: "Identity unverified")
+            }
+          }
           CommonPropertiesView(
             brandingCompanyName: $brandingCompanyName,
             brandingCompanyLogo: $brandingCompanyLogo,
@@ -305,6 +311,7 @@ struct BinaryView: View {
         event.ppid = 2511
         event.executingUser = executingUser
         event.holdAndAsk = holdAndAsk
+        event.identityUnverified = identityUnverified
 
         switch dateOverride {
         case .Apr1: Date.overrideDate = Date(timeIntervalSince1970: 1711980915)
@@ -328,7 +335,7 @@ struct BinaryView: View {
             eventDetailButtonText: eventDetailButtonText.isEmpty ? nil : (eventDetailButtonText as NSString),
             configState: SNTConfigState(config: SNTConfigurator.configurator()),
             bundleProgress: SNTBundleProgress(),
-            silenceable: !holdAndAsk,
+            silenceable: !holdAndAsk && !identityUnverified,
             uiStateCallback: { interval in print("Silence interval was set to \(interval)") },
             replyCallback: { approved in print("Did user approve execution: \(approved)") }
           ),
