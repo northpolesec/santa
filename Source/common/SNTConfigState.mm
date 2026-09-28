@@ -24,6 +24,7 @@
   if (self) {
     _clientMode = config.clientMode;
     _inTemporaryMonitorMode = config.inTemporaryMonitorMode;
+    _failClosed = config.failClosed;
     _executableIntegrityPolicy = config.executableIntegrityPolicy;
     _enableNotificationSilences = config.enableNotificationSilences;
     _eventDetailText = config.eventDetailText;
@@ -40,6 +41,7 @@
 - (void)encodeWithCoder:(NSCoder*)coder {
   ENCODE_BOXABLE(coder, clientMode);
   ENCODE_BOXABLE(coder, inTemporaryMonitorMode);
+  ENCODE_BOXABLE(coder, failClosed);
   ENCODE_BOXABLE(coder, executableIntegrityPolicy);
   ENCODE_BOXABLE(coder, enableNotificationSilences);
   ENCODE(coder, eventDetailText);
@@ -52,6 +54,7 @@
   if (self) {
     DECODE_SELECTOR(decoder, clientMode, NSNumber, integerValue);
     DECODE_SELECTOR(decoder, inTemporaryMonitorMode, NSNumber, boolValue);
+    DECODE_SELECTOR(decoder, failClosed, NSNumber, boolValue);
     DECODE_SELECTOR(decoder, executableIntegrityPolicy, NSNumber, integerValue);
     DECODE_SELECTOR(decoder, enableNotificationSilences, NSNumber, boolValue);
     DECODE(decoder, eventDetailText, NSString);
