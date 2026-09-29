@@ -67,7 +67,10 @@ extern bool ParseConfigSingleWatchItem(NSString* name, std::string_view policy_v
                                        SetSharedDataWatchItemPolicy* data_policies,
                                        SetSharedProcessWatchItemPolicy* proc_policies,
                                        NSError** err);
-extern std::variant<Unit, SetPairPathAndType> VerifyConfigWatchItemPaths(NSArray<id>* paths,
+extern std::optional<std::string> NormalizeRulePath(std::string_view path,
+                                                    WatchItemPathType path_type);
+extern std::variant<Unit, SetPairPathAndType> VerifyConfigWatchItemPaths(NSString* name,
+                                                                         NSArray<id>* paths,
                                                                          NSError** err);
 extern std::variant<Unit, WatchItemProcessList> VerifyConfigWatchItemProcesses(
     NSDictionary* watch_item, NSString* key, const WatchItemProcessOptions* rule_options,
@@ -134,6 +137,7 @@ static bool ParseConfigSingleWatchItem(NSString* name, std::string_view policy_v
                                            WatchItems::DataSource::kDatabase, data_policies,
                                            proc_policies, err);
 }
+using santa::NormalizeRulePath;
 using santa::VerifyConfigWatchItemPaths;
 using santa::WatchItemPolicyBase;
 using santa::WatchItemProcessAction;
@@ -552,28 +556,29 @@ BlockGenResult CreatePolicyBlockGen() {
   NSError* err;
 
   // Test no paths specified
-  path_list = VerifyConfigWatchItemPaths(@[], &err);
+  path_list = VerifyConfigWatchItemPaths(@"rule", @[], &err);
   XCTAssertTrue(std::holds_alternative<Unit>(path_list));
 
   // Test invalid types in paths array
-  path_list = VerifyConfigWatchItemPaths(@[ @(0) ], &err);
+  path_list = VerifyConfigWatchItemPaths(@"rule", @[ @(0) ], &err);
   XCTAssertTrue(std::holds_alternative<Unit>(path_list));
 
   // Test path array with long string
-  path_list = VerifyConfigWatchItemPaths(@[ RepeatedString(@"A", PATH_MAX + 1) ], &err);
+  path_list = VerifyConfigWatchItemPaths(@"rule", @[ RepeatedString(@"A", PATH_MAX + 1) ], &err);
   XCTAssertTrue(std::holds_alternative<Unit>(path_list));
 
   // Test path array dictionary with missing required key
-  path_list = VerifyConfigWatchItemPaths(@[ @{@"FakePath" : @"A"} ], &err);
+  path_list = VerifyConfigWatchItemPaths(@"rule", @[ @{@"FakePath" : @"A"} ], &err);
   XCTAssertTrue(std::holds_alternative<Unit>(path_list));
 
   // Test path array dictionary with long string
   path_list = VerifyConfigWatchItemPaths(
-      @[ @{kWatchItemConfigKeyPathsPath : RepeatedString(@"A", PATH_MAX + 1)} ], &err);
+      @"rule", @[ @{kWatchItemConfigKeyPathsPath : RepeatedString(@"A", PATH_MAX + 1)} ], &err);
   XCTAssertTrue(std::holds_alternative<Unit>(path_list));
 
   // Test path array dictionary with default path type
-  path_list = VerifyConfigWatchItemPaths(@[ @{kWatchItemConfigKeyPathsPath : @"A"} ], &err);
+  path_list =
+      VerifyConfigWatchItemPaths(@"rule", @[ @{kWatchItemConfigKeyPathsPath : @"A"} ], &err);
   XCTAssertTrue(std::holds_alternative<SetPairPathAndType>(path_list));
   XCTAssertEqual(std::get<SetPairPathAndType>(path_list).size(), 1);
   XCTAssertCStringEqual((*std::get<SetPairPathAndType>(path_list).begin()).first.c_str(), "A");
@@ -582,12 +587,90 @@ BlockGenResult CreatePolicyBlockGen() {
 
   // Test path array dictionary with custom path type
   path_list = VerifyConfigWatchItemPaths(
+      @"rule",
       @[ @{kWatchItemConfigKeyPathsPath : @"A", kWatchItemConfigKeyPathsIsPrefix : @(YES)} ], &err);
   XCTAssertTrue(std::holds_alternative<SetPairPathAndType>(path_list));
   XCTAssertEqual(std::get<SetPairPathAndType>(path_list).size(), 1);
   XCTAssertCStringEqual((*std::get<SetPairPathAndType>(path_list).begin()).first.c_str(), "A");
   XCTAssertEqual((*std::get<SetPairPathAndType>(path_list).begin()).second,
                  WatchItemPathType::kPrefix);
+}
+
+- (void)testNormalizeRulePath {
+  constexpr WatchItemPathType kLiteral = WatchItemPathType::kLiteral;
+  constexpr WatchItemPathType kPrefix = WatchItemPathType::kPrefix;
+
+  struct Case {
+    std::string_view path;
+    WatchItemPathType type;
+    std::optional<std::string> want;
+  };
+
+  const Case cases[] = {
+      // Rewrites: repeated slashes collapse, and literals drop a trailing slash.
+      // Prefixes keep theirs, since "/a/" and "/a" match different sets.
+      {"/a//b", kLiteral, "/a/b"},
+      {"///a///b///", kPrefix, "/a/b/"},
+      {"/a/b/", kLiteral, "/a/b"},
+      {"/a//b/", kLiteral, "/a/b"},
+      {"a//b", kLiteral, "a/b"},
+
+      // Unchanged: every path that can match today must be byte-identical
+      {"/a/b", kLiteral, "/a/b"},
+      {"/a/b", kPrefix, "/a/b"},
+      {"/a/b/", kPrefix, "/a/b/"},
+      {"/Users/*/Library/", kPrefix, "/Users/*/Library/"},
+      {"/Users/*/Library/Cookies", kLiteral, "/Users/*/Library/Cookies"},
+      {"/", kPrefix, "/"},
+      {"/", kLiteral, "/"},
+      {"A", kLiteral, "A"},
+      {"/Users/u/.ssh/id_rsa", kLiteral, "/Users/u/.ssh/id_rsa"},
+      {"/a/..foo", kLiteral, "/a/..foo"},
+      {"/a/b.", kLiteral, "/a/b."},
+
+      // Rejected: "." and ".." have no safe textual reading
+      {"/a/./b", kLiteral, std::nullopt},
+      {"/a/b/../c", kLiteral, std::nullopt},
+      {"/a/b/..", kPrefix, std::nullopt},
+      {"/a/.", kLiteral, std::nullopt},
+      {"/..", kLiteral, std::nullopt},
+      {"./a", kLiteral, std::nullopt},
+      {"/Users/*/../x", kPrefix, std::nullopt},
+
+      // Rejected: a rewrite must never widen a rule to the whole filesystem
+      {"//", kPrefix, std::nullopt},
+      {"///", kPrefix, std::nullopt},
+      {"//", kLiteral, std::nullopt},
+  };
+
+  for (const Case& c : cases) {
+    std::optional<std::string> got = NormalizeRulePath(c.path, c.type);
+    XCTAssertTrue(got == c.want, @"path: '%s' (%s), got: '%s', want: '%s'", c.path.data(),
+                  c.type == kPrefix ? "prefix" : "literal", got ? got->c_str() : "<rejected>",
+                  c.want ? c.want->c_str() : "<rejected>");
+  }
+}
+
+- (void)testVerifyConfigWatchItemPathsNormalizes {
+  NSError* err;
+
+  std::variant<Unit, SetPairPathAndType> path_list = VerifyConfigWatchItemPaths(
+      @"rule",
+      @[
+        @"/a//b/",
+        @{kWatchItemConfigKeyPathsPath : @"/c//d/", kWatchItemConfigKeyPathsIsPrefix : @(YES)}
+      ],
+      &err);
+  XCTAssertTrue(std::holds_alternative<SetPairPathAndType>(path_list));
+  XCTAssertTrue(std::get<SetPairPathAndType>(path_list) ==
+                SetPairPathAndType({{"/a/b", WatchItemPathType::kLiteral},
+                                    {"/c/d/", WatchItemPathType::kPrefix}}));
+
+  // One unusable path rejects the whole rule, with an error naming the path
+  err = nil;
+  path_list = VerifyConfigWatchItemPaths(@"rule", @[ @"/ok", @"/a/../b" ], &err);
+  XCTAssertTrue(std::holds_alternative<Unit>(path_list));
+  XCTAssertTrue([err.localizedDescription containsString:@"/a/../b"]);
 }
 
 - (void)testVerifyConfigWatchItemProcesses {

@@ -403,6 +403,7 @@ SNTFileAccessRule* FAARuleFromProtoFAARuleAdd(const ::pbv2::FileAccessRule::Add&
                                      &err)) {
     return [[SNTFileAccessRule alloc] initAddRuleWithName:name details:details];
   } else {
+    SLOGW(@"Ignoring invalid file access rule '%@': %@", name, err.localizedDescription);
     return nil;
   }
 }
