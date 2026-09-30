@@ -299,6 +299,20 @@ struct WatchItemPolicyBase {
   bool has_read_access_override = false;
 };
 
+// Returns the path to watch for one glob expansion of a rule path. A trailing
+// slash restricts glob expansion to directories, but Endpoint Security reports a
+// directory without one, so a literal drops it after expansion. A prefix keeps
+// it, since "/a/" and "/a" match different sets. A path ending in "//" is one
+// the parser kept because it has no safe rewrite, so it is left alone rather
+// than stripped, which could turn "//" into a live rule on "/".
+inline std::string WatchPathForMatch(std::string match, WatchItemPathType path_type) {
+  if (path_type == WatchItemPathType::kLiteral && match.size() > 1 && match.back() == '/' &&
+      match[match.size() - 2] != '/') {
+    match.pop_back();
+  }
+  return match;
+}
+
 struct DataWatchItemPolicy : public WatchItemPolicyBase {
   DataWatchItemPolicy(std::string_view n, std::string_view v, std::string_view p,
                       WatchItemPathType pt = kWatchItemPolicyDefaultPathType,
@@ -340,7 +354,8 @@ struct ProcessWatchItemPolicy : public WatchItemPolicyBase {
     for (const auto& pt_pair : path_type_pairs) {
       std::vector<std::string> matches = FindMatches(@(pt_pair.first.c_str()));
 
-      for (const auto& match : matches) {
+      for (const std::string& expanded : matches) {
+        const std::string match = WatchPathForMatch(expanded, pt_pair.second);
         if (pt_pair.second == WatchItemPathType::kPrefix) {
           tree->InsertPrefix(match.c_str(), santa::Unit{});
         } else {

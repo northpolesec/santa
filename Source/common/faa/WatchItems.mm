@@ -294,15 +294,14 @@ bool VerifyConfigKeyArray(NSDictionary* dict, NSString* key, Class expected, NSE
 }
 
 /// Rewrites a rule path into the form Endpoint Security delivers, where that is
-/// unambiguous: repeated slashes collapse, and a literal drops its trailing
-/// slash. A prefix keeps its trailing slash, since "/a/" and "/a" match
-/// different sets.
+/// unambiguous: repeated slashes collapse. A trailing slash is kept, since it
+/// restricts glob expansion to directories (see WatchPathForMatch).
 ///
 /// Returns nullopt when there is no safe rewrite: for a path with a "." or ".."
 /// component, and for one that would reduce to "/". "." and ".." have no safe
 /// textual reading: ".." disagrees with the kernel when the preceding component
 /// is a symlink, and can erase a glob. A "/" prefix would match every file.
-std::optional<std::string> NormalizeRulePath(std::string_view path, WatchItemPathType path_type) {
+std::optional<std::string> NormalizeRulePath(std::string_view path) {
   std::string out;
   out.reserve(path.size());
   for (char c : path) {
@@ -315,10 +314,6 @@ std::optional<std::string> NormalizeRulePath(std::string_view path, WatchItemPat
   std::string bounded = "/" + out + "/";
   if (bounded.find("/./") != std::string::npos || bounded.find("/../") != std::string::npos) {
     return std::nullopt;
-  }
-
-  if (path_type == WatchItemPathType::kLiteral && out.size() > 1 && out.back() == '/') {
-    out.pop_back();
   }
 
   if (out != path && (out.empty() || out == "/")) {
@@ -355,7 +350,7 @@ std::variant<Unit, SetPairPathAndType> VerifyConfigWatchItemPaths(NSString* name
   // is rejected, which allows every access.
   auto add_path = [&](NSString* path_str, WatchItemPathType path_type) {
     std::string raw = NSStringToUTF8String(path_str);
-    std::optional<std::string> normalized = NormalizeRulePath(raw, path_type);
+    std::optional<std::string> normalized = NormalizeRulePath(raw);
     if (!normalized) {
       LOGW(@"File access rule '%@': path '%s' is not canonical and is not expected to match "
            @"file access events",
@@ -916,7 +911,8 @@ bool DataWatchItems::Build(SetSharedDataWatchItemPolicy data_policies) {
   for (const std::shared_ptr<DataWatchItemPolicy>& item : data_policies) {
     std::vector<std::string> matches = FindMatches(@(item->path.c_str()));
 
-    for (const auto& match : matches) {
+    for (const std::string& expanded : matches) {
+      const std::string match = WatchPathForMatch(expanded, item->path_type);
       if (item->path_type == WatchItemPathType::kPrefix) {
         tree_->InsertPrefix(match.c_str(), item);
       } else {

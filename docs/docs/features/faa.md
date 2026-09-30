@@ -194,11 +194,13 @@ monitor access on symbolic links. This is important as some common paths on
 macOS are symbolic links (e.g. `/tmp` and `/var` are both symlinks into
 `/private`)
 
-Configured `Path` values should be canonical. Santa collapses repeated slashes
-and removes the trailing slash from a literal path, logging a warning for each
-rewritten path. A path with a `.` or `..` component, or of two or more slashes
-and nothing else, is kept as configured and logged with a warning. Such a path
-is not expected to match any file access.
+Configured `Path` values should be canonical. Santa collapses repeated slashes,
+logging a warning for each rewritten path. A literal path with a trailing slash
+matches each directory it names, and a glob such as `/data/*/` matches only
+directories. Neither matches the paths inside those directories; set
+`IsPrefix` for that. A path with a `.` or `..` component, or of two or more
+slashes and nothing else, is kept as configured and logged with a warning. Such
+a path is not expected to match any file access.
 
 ### Process Matching
 

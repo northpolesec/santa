@@ -67,8 +67,7 @@ extern bool ParseConfigSingleWatchItem(NSString* name, std::string_view policy_v
                                        SetSharedDataWatchItemPolicy* data_policies,
                                        SetSharedProcessWatchItemPolicy* proc_policies,
                                        NSError** err);
-extern std::optional<std::string> NormalizeRulePath(std::string_view path,
-                                                    WatchItemPathType path_type);
+extern std::optional<std::string> NormalizeRulePath(std::string_view path);
 extern std::variant<Unit, SetPairPathAndType> VerifyConfigWatchItemPaths(NSString* name,
                                                                          NSArray<id>* paths,
                                                                          NSError** err);
@@ -597,58 +596,86 @@ BlockGenResult CreatePolicyBlockGen() {
 }
 
 - (void)testNormalizeRulePath {
-  constexpr WatchItemPathType kLiteral = WatchItemPathType::kLiteral;
-  constexpr WatchItemPathType kPrefix = WatchItemPathType::kPrefix;
-
   struct Case {
     std::string_view path;
-    WatchItemPathType type;
     std::optional<std::string> want;
   };
 
   const Case cases[] = {
-      // Rewrites: repeated slashes collapse, and literals drop a trailing slash.
-      // Prefixes keep theirs, since "/a/" and "/a" match different sets.
-      {"/a//b", kLiteral, "/a/b"},
-      {"///a///b///", kPrefix, "/a/b/"},
-      {"/a/b/", kLiteral, "/a/b"},
-      {"/a//b/", kLiteral, "/a/b"},
-      {"a//b", kLiteral, "a/b"},
+      // Rewrites: repeated slashes collapse
+      {"/a//b", "/a/b"},
+      {"///a///b///", "/a/b/"},
+      {"/a//b/", "/a/b/"},
+      {"a//b", "a/b"},
 
-      // Unchanged: every path that can match today must be byte-identical
-      {"/a/b", kLiteral, "/a/b"},
-      {"/a/b", kPrefix, "/a/b"},
-      {"/a/b/", kPrefix, "/a/b/"},
-      {"/Users/*/Library/", kPrefix, "/Users/*/Library/"},
-      {"/Users/*/Library/Cookies", kLiteral, "/Users/*/Library/Cookies"},
-      {"/", kPrefix, "/"},
-      {"/", kLiteral, "/"},
-      {"A", kLiteral, "A"},
-      {"/Users/u/.ssh/id_rsa", kLiteral, "/Users/u/.ssh/id_rsa"},
-      {"/a/..foo", kLiteral, "/a/..foo"},
-      {"/a/b.", kLiteral, "/a/b."},
+      // Unchanged: every path that can match today must be byte-identical. A
+      // trailing slash is kept, since it restricts glob expansion to
+      // directories and marks a prefix's directory boundary.
+      {"/a/b", "/a/b"},
+      {"/a/b/", "/a/b/"},
+      {"/Users/*/Library/", "/Users/*/Library/"},
+      {"/Users/*/Library/Cookies", "/Users/*/Library/Cookies"},
+      {"/", "/"},
+      {"A", "A"},
+      {"/Users/u/.ssh/id_rsa", "/Users/u/.ssh/id_rsa"},
+      {"/a/..foo", "/a/..foo"},
+      {"/a/b.", "/a/b."},
 
       // No safe rewrite: "." and ".." have no safe textual reading
-      {"/a/./b", kLiteral, std::nullopt},
-      {"/a/b/../c", kLiteral, std::nullopt},
-      {"/a/b/..", kPrefix, std::nullopt},
-      {"/a/.", kLiteral, std::nullopt},
-      {"/..", kLiteral, std::nullopt},
-      {"./a", kLiteral, std::nullopt},
-      {"/Users/*/../x", kPrefix, std::nullopt},
+      {"/a/./b", std::nullopt},
+      {"/a/b/../c", std::nullopt},
+      {"/a/b/..", std::nullopt},
+      {"/a/.", std::nullopt},
+      {"/..", std::nullopt},
+      {"./a", std::nullopt},
+      {"/Users/*/../x", std::nullopt},
 
       // No safe rewrite: a rewrite must never widen a rule to the whole filesystem
-      {"//", kPrefix, std::nullopt},
-      {"///", kPrefix, std::nullopt},
-      {"//", kLiteral, std::nullopt},
+      {"//", std::nullopt},
+      {"///", std::nullopt},
   };
 
   for (const Case& c : cases) {
-    std::optional<std::string> got = NormalizeRulePath(c.path, c.type);
-    XCTAssertTrue(got == c.want, @"path: '%s' (%s), got: '%s', want: '%s'", c.path.data(),
-                  c.type == kPrefix ? "prefix" : "literal",
+    std::optional<std::string> got = NormalizeRulePath(c.path);
+    XCTAssertTrue(got == c.want, @"path: '%s', got: '%s', want: '%s'", c.path.data(),
                   got ? got->c_str() : "<no safe rewrite>",
                   c.want ? c.want->c_str() : "<no safe rewrite>");
+  }
+}
+
+- (void)testLiteralTrailingSlashWatchesDirectoriesOnly {
+  [self createTestDirStructure:@[
+    @{@"d" : @[ @"file1", @{@"sub1" : @[]}, @{@"sub2" : @[]} ]},
+    @{@"e" : @[]},
+  ]];
+
+  // A trailing slash restricts glob expansion to directories. The literal then
+  // watches each directory itself, which is how Endpoint Security reports it.
+  std::string root = self.testDir.UTF8String;
+  std::string dirGlob = root + "/d/*/";
+  std::string dir = root + "/e/";
+  std::vector<std::string> targets = {
+      root + "/d/sub1",   root + "/d/sub2", root + "/d/file1", root + "/d/sub1/",
+      root + "/d/sub1/x", root + "/e",      root + "/e/x",
+  };
+  std::vector<bool> want = {true, true, false, false, false, true, false};
+
+  DataWatchItems items;
+  items.Build({
+      std::make_shared<DataWatchItemPolicy>("glob", "v1", dirGlob),
+      std::make_shared<DataWatchItemPolicy>("dir", "v1", dir),
+  });
+  auto [targetPolicies, blockGen] = CreatePolicyBlockGen();
+  items.FindPolicies(blockGen(targets));
+
+  ProcessWatchItemPolicy procPolicy(
+      "proc", "v1", {{dirGlob, WatchItemPathType::kLiteral}, {dir, WatchItemPathType::kLiteral}});
+
+  for (size_t i = 0; i < targets.size(); i++) {
+    const bool expected = want[i];
+    XCTAssertEqual(targetPolicies[i].has_value(), expected, @"data target: %s", targets[i].c_str());
+    XCTAssertEqual(procPolicy.tree->Contains(targets[i].c_str()), expected, @"process target: %s",
+                   targets[i].c_str());
   }
 }
 
@@ -664,7 +691,7 @@ BlockGenResult CreatePolicyBlockGen() {
       &err);
   XCTAssertTrue(std::holds_alternative<SetPairPathAndType>(path_list));
   XCTAssertTrue(std::get<SetPairPathAndType>(path_list) ==
-                SetPairPathAndType({{"/a/b", WatchItemPathType::kLiteral},
+                SetPairPathAndType({{"/a/b/", WatchItemPathType::kLiteral},
                                     {"/c/d/", WatchItemPathType::kPrefix}}));
 
   // A path with no safe rewrite is kept exactly as configured, including its

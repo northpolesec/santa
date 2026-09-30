@@ -38,6 +38,39 @@ using santa::WatchItemRuleType;
 
 @implementation WatchItemPolicyTest
 
+- (void)testWatchPathForMatch {
+  constexpr WatchItemPathType kLiteral = WatchItemPathType::kLiteral;
+  constexpr WatchItemPathType kPrefix = WatchItemPathType::kPrefix;
+
+  struct Case {
+    std::string match;
+    WatchItemPathType type;
+    std::string want;
+  };
+
+  const Case cases[] = {
+      // A literal drops the trailing slash that restricted expansion to directories
+      {"/a/b/", kLiteral, "/a/b"},
+      {"/a/b", kLiteral, "/a/b"},
+
+      // A prefix keeps it, since "/a/" and "/a" match different sets
+      {"/a/b/", kPrefix, "/a/b/"},
+
+      // Root, and paths the parser kept because they have no safe rewrite, are
+      // unchanged. Stripping "//" would turn a dead rule into a live one on "/".
+      {"/", kLiteral, "/"},
+      {"//", kLiteral, "//"},
+      {"///", kLiteral, "///"},
+      {"/a/./b//", kLiteral, "/a/./b//"},
+  };
+
+  for (const Case& c : cases) {
+    std::string got = santa::WatchPathForMatch(c.match, c.type);
+    XCTAssertTrue(got == c.want, @"match: '%s' (%s), got: '%s', want: '%s'", c.match.c_str(),
+                  c.type == kPrefix ? "prefix" : "literal", got.c_str(), c.want.c_str());
+  }
+}
+
 - (void)testProcessWatchItemPolicy {
   // Make sure the equality operator for a WatchItemProcess covers all members.
   // Note: WatchItemProcess isn't assignable (it has a const member), so each
