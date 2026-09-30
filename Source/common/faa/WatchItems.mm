@@ -28,6 +28,7 @@
 #include <optional>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -292,10 +293,41 @@ bool VerifyConfigKeyArray(NSDictionary* dict, NSString* key, Class expected, NSE
   return success;
 }
 
+/// Rewrites a rule path into the form Endpoint Security delivers, where that is
+/// unambiguous: repeated slashes collapse. A trailing slash is kept, since it
+/// restricts glob expansion to directories (see WatchPathForMatch).
+///
+/// Returns nullopt when there is no safe rewrite: for a path with a "." or ".."
+/// component, and for one that would reduce to "/". "." and ".." have no safe
+/// textual reading: ".." disagrees with the kernel when the preceding component
+/// is a symlink, and can erase a glob. A "/" prefix would match every file.
+std::optional<std::string> NormalizeRulePath(std::string_view path) {
+  std::string out;
+  out.reserve(path.size());
+  for (char c : path) {
+    if (c != '/' || out.empty() || out.back() != '/') {
+      out.push_back(c);
+    }
+  }
+
+  // With slashes collapsed, a "." or ".." component is one bounded by slashes.
+  std::string bounded = "/" + out + "/";
+  if (bounded.find("/./") != std::string::npos || bounded.find("/../") != std::string::npos) {
+    return std::nullopt;
+  }
+
+  if (out != path && (out.empty() || out == "/")) {
+    return std::nullopt;
+  }
+
+  return out;
+}
+
 /// The `Paths` array can contain only `string` and `dict` types:
 /// - For `string` types, the default path type `kDefaultPathType` is used
 /// - For `dict` types, there is a required `Path` key. and an optional
 ///   `IsPrefix` key to set the path type to something other than the default
+/// Each path is rewritten by NormalizeRulePath where that is safe.
 ///
 /// Example:
 /// <array>
@@ -307,9 +339,31 @@ bool VerifyConfigKeyArray(NSDictionary* dict, NSString* key, Class expected, NSE
 ///     <true/>
 ///   </dict>
 /// </array>
-std::variant<Unit, SetPairPathAndType> VerifyConfigWatchItemPaths(NSArray<id>* paths,
+std::variant<Unit, SetPairPathAndType> VerifyConfigWatchItemPaths(NSString* name,
+                                                                  NSArray<id>* paths,
                                                                   NSError** err) {
   SetPairPathAndType path_list;
+
+  // A path with no safe rewrite is kept as configured, although no event is
+  // expected to match it. Dropping it could loosen the rule: a ProcessesWithAllowedPaths rule
+  // whose paths are all dead denies every access, but a rule left with no paths
+  // is rejected, which allows every access.
+  auto add_path = [&](NSString* path_str, WatchItemPathType path_type) {
+    std::string raw = NSStringToUTF8String(path_str);
+    std::optional<std::string> normalized = NormalizeRulePath(raw);
+    if (!normalized) {
+      LOGW(@"File access rule '%@': path '%s' is not canonical and is not expected to match "
+           @"file access events",
+           name, raw.c_str());
+      path_list.insert({std::move(raw), path_type});
+    } else {
+      if (*normalized != raw) {
+        LOGW(@"File access rule '%@': path '%s' normalized to '%s'", name, raw.c_str(),
+             normalized->c_str());
+      }
+      path_list.insert({std::move(*normalized), path_type});
+    }
+  };
 
   for (id path in paths) {
     if ([path isKindOfClass:[NSDictionary class]]) {
@@ -330,7 +384,7 @@ std::variant<Unit, SetPairPathAndType> VerifyConfigWatchItemPaths(NSArray<id>* p
         return Unit{};
       }
 
-      path_list.insert({NSStringToUTF8String(path_str), path_type});
+      add_path(path_str, path_type);
     } else if ([path isKindOfClass:[NSString class]]) {
       if (!LenRangeValidator(1, PATH_MAX)(path, err)) {
         [SNTError populateError:err
@@ -339,7 +393,7 @@ std::variant<Unit, SetPairPathAndType> VerifyConfigWatchItemPaths(NSArray<id>* p
         return Unit{};
       }
 
-      path_list.insert({NSStringToUTF8String(((NSString*)path)), kWatchItemPolicyDefaultPathType});
+      add_path((NSString*)path, kWatchItemPolicyDefaultPathType);
     } else {
       [SNTError
           populateError:err
@@ -605,7 +659,7 @@ bool ParseConfigSingleWatchItem(NSString* name, std::string_view fallback_policy
   }
 
   std::variant<Unit, SetPairPathAndType> path_list =
-      VerifyConfigWatchItemPaths(watch_item[kWatchItemConfigKeyPaths], err);
+      VerifyConfigWatchItemPaths(name, watch_item[kWatchItemConfigKeyPaths], err);
 
   if (std::holds_alternative<Unit>(path_list)) {
     return false;
@@ -650,7 +704,7 @@ bool ParseConfigSingleWatchItem(NSString* name, std::string_view fallback_policy
   std::string policy_version;
   // If the options dictionary contains a version key, use its value so long as it's valid
   if (options[kWatchItemConfigKeyOptionsVersion]) {
-    if (!VerifyConfigKey(options, kWatchItemConfigKeyOptionsVersion, [NSString class], nil, true,
+    if (!VerifyConfigKey(options, kWatchItemConfigKeyOptionsVersion, [NSString class], err, true,
                          LenRangeValidator(1, kVersionMaxLength))) {
       return false;
     }
@@ -857,7 +911,8 @@ bool DataWatchItems::Build(SetSharedDataWatchItemPolicy data_policies) {
   for (const std::shared_ptr<DataWatchItemPolicy>& item : data_policies) {
     std::vector<std::string> matches = FindMatches(@(item->path.c_str()));
 
-    for (const auto& match : matches) {
+    for (const std::string& expanded : matches) {
+      const std::string match = WatchPathForMatch(expanded, item->path_type);
       if (item->path_type == WatchItemPathType::kPrefix) {
         tree_->InsertPrefix(match.c_str(), item);
       } else {

@@ -67,7 +67,9 @@ extern bool ParseConfigSingleWatchItem(NSString* name, std::string_view policy_v
                                        SetSharedDataWatchItemPolicy* data_policies,
                                        SetSharedProcessWatchItemPolicy* proc_policies,
                                        NSError** err);
-extern std::variant<Unit, SetPairPathAndType> VerifyConfigWatchItemPaths(NSArray<id>* paths,
+extern std::optional<std::string> NormalizeRulePath(std::string_view path);
+extern std::variant<Unit, SetPairPathAndType> VerifyConfigWatchItemPaths(NSString* name,
+                                                                         NSArray<id>* paths,
                                                                          NSError** err);
 extern std::variant<Unit, WatchItemProcessList> VerifyConfigWatchItemProcesses(
     NSDictionary* watch_item, NSString* key, const WatchItemProcessOptions* rule_options,
@@ -134,6 +136,7 @@ static bool ParseConfigSingleWatchItem(NSString* name, std::string_view policy_v
                                            WatchItems::DataSource::kDatabase, data_policies,
                                            proc_policies, err);
 }
+using santa::NormalizeRulePath;
 using santa::VerifyConfigWatchItemPaths;
 using santa::WatchItemPolicyBase;
 using santa::WatchItemProcessAction;
@@ -552,28 +555,29 @@ BlockGenResult CreatePolicyBlockGen() {
   NSError* err;
 
   // Test no paths specified
-  path_list = VerifyConfigWatchItemPaths(@[], &err);
+  path_list = VerifyConfigWatchItemPaths(@"rule", @[], &err);
   XCTAssertTrue(std::holds_alternative<Unit>(path_list));
 
   // Test invalid types in paths array
-  path_list = VerifyConfigWatchItemPaths(@[ @(0) ], &err);
+  path_list = VerifyConfigWatchItemPaths(@"rule", @[ @(0) ], &err);
   XCTAssertTrue(std::holds_alternative<Unit>(path_list));
 
   // Test path array with long string
-  path_list = VerifyConfigWatchItemPaths(@[ RepeatedString(@"A", PATH_MAX + 1) ], &err);
+  path_list = VerifyConfigWatchItemPaths(@"rule", @[ RepeatedString(@"A", PATH_MAX + 1) ], &err);
   XCTAssertTrue(std::holds_alternative<Unit>(path_list));
 
   // Test path array dictionary with missing required key
-  path_list = VerifyConfigWatchItemPaths(@[ @{@"FakePath" : @"A"} ], &err);
+  path_list = VerifyConfigWatchItemPaths(@"rule", @[ @{@"FakePath" : @"A"} ], &err);
   XCTAssertTrue(std::holds_alternative<Unit>(path_list));
 
   // Test path array dictionary with long string
   path_list = VerifyConfigWatchItemPaths(
-      @[ @{kWatchItemConfigKeyPathsPath : RepeatedString(@"A", PATH_MAX + 1)} ], &err);
+      @"rule", @[ @{kWatchItemConfigKeyPathsPath : RepeatedString(@"A", PATH_MAX + 1)} ], &err);
   XCTAssertTrue(std::holds_alternative<Unit>(path_list));
 
   // Test path array dictionary with default path type
-  path_list = VerifyConfigWatchItemPaths(@[ @{kWatchItemConfigKeyPathsPath : @"A"} ], &err);
+  path_list =
+      VerifyConfigWatchItemPaths(@"rule", @[ @{kWatchItemConfigKeyPathsPath : @"A"} ], &err);
   XCTAssertTrue(std::holds_alternative<SetPairPathAndType>(path_list));
   XCTAssertEqual(std::get<SetPairPathAndType>(path_list).size(), 1);
   XCTAssertCStringEqual((*std::get<SetPairPathAndType>(path_list).begin()).first.c_str(), "A");
@@ -582,12 +586,129 @@ BlockGenResult CreatePolicyBlockGen() {
 
   // Test path array dictionary with custom path type
   path_list = VerifyConfigWatchItemPaths(
+      @"rule",
       @[ @{kWatchItemConfigKeyPathsPath : @"A", kWatchItemConfigKeyPathsIsPrefix : @(YES)} ], &err);
   XCTAssertTrue(std::holds_alternative<SetPairPathAndType>(path_list));
   XCTAssertEqual(std::get<SetPairPathAndType>(path_list).size(), 1);
   XCTAssertCStringEqual((*std::get<SetPairPathAndType>(path_list).begin()).first.c_str(), "A");
   XCTAssertEqual((*std::get<SetPairPathAndType>(path_list).begin()).second,
                  WatchItemPathType::kPrefix);
+}
+
+- (void)testNormalizeRulePath {
+  struct Case {
+    std::string_view path;
+    std::optional<std::string> want;
+  };
+
+  const Case cases[] = {
+      // Rewrites: repeated slashes collapse
+      {"/a//b", "/a/b"},
+      {"///a///b///", "/a/b/"},
+      {"/a//b/", "/a/b/"},
+      {"a//b", "a/b"},
+
+      // Unchanged: every path that can match today must be byte-identical. A
+      // trailing slash is kept, since it restricts glob expansion to
+      // directories and marks a prefix's directory boundary.
+      {"/a/b", "/a/b"},
+      {"/a/b/", "/a/b/"},
+      {"/Users/*/Library/", "/Users/*/Library/"},
+      {"/Users/*/Library/Cookies", "/Users/*/Library/Cookies"},
+      {"/", "/"},
+      {"A", "A"},
+      {"/Users/u/.ssh/id_rsa", "/Users/u/.ssh/id_rsa"},
+      {"/a/..foo", "/a/..foo"},
+      {"/a/b.", "/a/b."},
+
+      // No safe rewrite: "." and ".." have no safe textual reading
+      {"/a/./b", std::nullopt},
+      {"/a/b/../c", std::nullopt},
+      {"/a/b/..", std::nullopt},
+      {"/a/.", std::nullopt},
+      {"/..", std::nullopt},
+      {"./a", std::nullopt},
+      {"/Users/*/../x", std::nullopt},
+
+      // No safe rewrite: a rewrite must never widen a rule to the whole filesystem
+      {"//", std::nullopt},
+      {"///", std::nullopt},
+  };
+
+  for (const Case& c : cases) {
+    std::optional<std::string> got = NormalizeRulePath(c.path);
+    XCTAssertTrue(got == c.want, @"path: '%s', got: '%s', want: '%s'", c.path.data(),
+                  got ? got->c_str() : "<no safe rewrite>",
+                  c.want ? c.want->c_str() : "<no safe rewrite>");
+  }
+}
+
+- (void)testLiteralTrailingSlashWatchesDirectoriesOnly {
+  [self createTestDirStructure:@[
+    @{@"d" : @[ @"file1", @{@"sub1" : @[]}, @{@"sub2" : @[]} ]},
+    @{@"e" : @[]},
+  ]];
+
+  // A trailing slash restricts glob expansion to directories. The literal then
+  // watches each directory itself, which is how Endpoint Security reports it.
+  std::string root = self.testDir.UTF8String;
+  std::string dirGlob = root + "/d/*/";
+  std::string dir = root + "/e/";
+  std::vector<std::string> targets = {
+      root + "/d/sub1",   root + "/d/sub2", root + "/d/file1", root + "/d/sub1/",
+      root + "/d/sub1/x", root + "/e",      root + "/e/x",
+  };
+  std::vector<bool> want = {true, true, false, false, false, true, false};
+
+  DataWatchItems items;
+  items.Build({
+      std::make_shared<DataWatchItemPolicy>("glob", "v1", dirGlob),
+      std::make_shared<DataWatchItemPolicy>("dir", "v1", dir),
+  });
+  auto [targetPolicies, blockGen] = CreatePolicyBlockGen();
+  items.FindPolicies(blockGen(targets));
+
+  ProcessWatchItemPolicy procPolicy(
+      "proc", "v1", {{dirGlob, WatchItemPathType::kLiteral}, {dir, WatchItemPathType::kLiteral}});
+
+  for (size_t i = 0; i < targets.size(); i++) {
+    const bool expected = want[i];
+    XCTAssertEqual(targetPolicies[i].has_value(), expected, @"data target: %s", targets[i].c_str());
+    XCTAssertEqual(procPolicy.tree->Contains(targets[i].c_str()), expected, @"process target: %s",
+                   targets[i].c_str());
+  }
+}
+
+- (void)testVerifyConfigWatchItemPathsNormalizes {
+  NSError* err;
+
+  std::variant<Unit, SetPairPathAndType> path_list = VerifyConfigWatchItemPaths(
+      @"rule",
+      @[
+        @"/a//b/",
+        @{kWatchItemConfigKeyPathsPath : @"/c//d/", kWatchItemConfigKeyPathsIsPrefix : @(YES)}
+      ],
+      &err);
+  XCTAssertTrue(std::holds_alternative<SetPairPathAndType>(path_list));
+  XCTAssertTrue(std::get<SetPairPathAndType>(path_list) ==
+                SetPairPathAndType({{"/a/b/", WatchItemPathType::kLiteral},
+                                    {"/c/d/", WatchItemPathType::kPrefix}}));
+
+  // A path with no safe rewrite is kept exactly as configured, including its
+  // repeated slashes, so the rule loads and behaves as it did before
+  // normalization existed.
+  path_list = VerifyConfigWatchItemPaths(
+      @"rule",
+      @[
+        @"/ok", @"/a//../b",
+        @{kWatchItemConfigKeyPathsPath : @"//", kWatchItemConfigKeyPathsIsPrefix : @(YES)}
+      ],
+      &err);
+  XCTAssertTrue(std::holds_alternative<SetPairPathAndType>(path_list));
+  XCTAssertTrue(std::get<SetPairPathAndType>(path_list) ==
+                SetPairPathAndType({{"/ok", WatchItemPathType::kLiteral},
+                                    {"/a//../b", WatchItemPathType::kLiteral},
+                                    {"//", WatchItemPathType::kPrefix}}));
 }
 
 - (void)testVerifyConfigWatchItemProcesses {
@@ -1319,6 +1440,23 @@ BlockGenResult CreatePolicyBlockGen() {
   XCTAssertEqual(data_policies.size(), 3);
   XCTAssertEqual(proc_policies.size(), 2);
   XCTAssertEqual(num_rules, 5);
+}
+
+- (void)testParseConfigSingleWatchItemInvalidVersionSetsError {
+  SetSharedDataWatchItemPolicy data_policies;
+  SetSharedProcessWatchItemPolicy proc_policies;
+  NSError* err;
+
+  // Sync always sends the rule's version, which can be empty. The rejection
+  // must carry a reason so callers can report it.
+  NSDictionary* watchItem = @{
+    kWatchItemConfigKeyPaths : @[ @"/a" ],
+    kWatchItemConfigKeyOptions : @{kWatchItemConfigKeyOptionsVersion : @""},
+  };
+  XCTAssertFalse(ParseConfigSingleWatchItem(@"rule", kVersion, watchItem, &data_policies,
+                                            &proc_policies, &err));
+  NSString* wantKey = [NSString stringWithFormat:@"key '%@'", kWatchItemConfigKeyOptionsVersion];
+  XCTAssertTrue([err.localizedDescription containsString:wantKey]);
 }
 
 - (void)testParseConfigSingleWatchItemGeneral {
