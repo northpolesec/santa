@@ -272,7 +272,8 @@ SNTCachedDecision* MakeCachedDecision(struct stat sb, SNTEventState decision) {
 
   // launchd is a platform binary: no teamID, but signingID is retained.
   XCTAssertNil(cd.teamID);
-  XCTAssertNotNil(cd.signingID);
+  XCTAssertEqualObjects(cd.signingID, @"platform:com.apple.xpc.launchd");
+  XCTAssertEqualObjects(cd.rawSigningID, @"com.apple.xpc.launchd");
 
   [dc forgetCachedDecisionForVnode:fi.vnode];
 }

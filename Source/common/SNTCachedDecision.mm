@@ -42,6 +42,7 @@
     _cdhash = previous.cdhash;
     _teamID = previous.teamID;
     _signingID = previous.signingID;
+    _rawSigningID = previous.rawSigningID;
     _certSHA256 = previous.certSHA256;
     _certCommonName = previous.certCommonName;
     _certChain = previous.certChain;
@@ -69,6 +70,7 @@
   copy.certChain = _certChain;
   copy.teamID = _teamID;
   copy.signingID = _signingID;
+  copy.rawSigningID = _rawSigningID;
   copy.cdhash = _cdhash;
   copy.entitlements = _entitlements;
   copy.rawEntitlements = _rawEntitlements;

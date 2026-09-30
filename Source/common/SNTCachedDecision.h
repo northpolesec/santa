@@ -49,6 +49,8 @@
 @property NSArray<MOLCertificate*>* certChain;
 @property NSString* teamID;
 @property NSString* signingID;
+/// The signing ID, without the TeamID or "platform" prefix that signingID carries.
+@property NSString* rawSigningID;
 @property NSString* cdhash;
 @property NSDictionary* entitlements;
 @property NSDictionary* rawEntitlements;

@@ -44,6 +44,7 @@ objc_library(
     hdrs = ["NetworkFlowsSerializer.h"],
     deps = [
         "@protobuf",
+        "@santa//Source/common:SNTCachedDecision",
     ],
 )
 

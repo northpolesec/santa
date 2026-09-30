@@ -1167,6 +1167,7 @@ static int InterruptStepProgressHandler(void* context) {
   XCTAssertEqualObjects(csInfo.cdhash, cd.cdhash, @"cdhashes should match");
   XCTAssertEqualObjects(csInfo.certificates, cd.certChain, @"cert chains should match");
   XCTAssertEqualObjects(signingID, cd.signingID, @"signing IDs should match");
+  XCTAssertEqualObjects(@"com.apple.trustd", cd.rawSigningID, @"raw signing IDs should match");
   XCTAssertEqualObjects(teamID, cd.teamID, @"team IDs should match");
 }
 

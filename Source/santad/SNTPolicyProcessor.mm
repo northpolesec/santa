@@ -893,6 +893,7 @@ static BOOL SignatureVerdictIsStable(SNTCachedDecision* cd) {
 
     if (targetProc->codesigning_flags & CS_SIGNED && targetProc->codesigning_flags & CS_VALID) {
       if (targetProc->signing_id.length > 0) {
+        cd.rawSigningID = santa::StringTokenToNSString(targetProc->signing_id);
         if (targetProc->team_id.length > 0) {
           entitlementsFilterTeamID = targetProc->team_id.data;
           cd.teamID = santa::StringTokenToNSString(targetProc->team_id);

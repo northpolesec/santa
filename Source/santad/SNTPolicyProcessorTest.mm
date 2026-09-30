@@ -871,6 +871,7 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
 
   XCTAssertEqualObjects(cd.teamID, @"EQHXZ8M8AV");
   XCTAssertEqualObjects(cd.signingID, @"EQHXZ8M8AV:com.apple.ls");
+  XCTAssertEqualObjects(cd.rawSigningID, @"com.apple.ls");
   // /bin/ls validates cleanly, so the fresh path must record the success. This
   // is the sole production write of the property the whole feature consumes.
   XCTAssertEqualObjects(cd.codesignValidationStatus, @(errSecSuccess));
