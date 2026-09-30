@@ -3,6 +3,9 @@ allowBuilds:
   core-js: false
   esbuild: false
 
+minimumReleaseAgeExclude:
+  - '@buf/northpolesec_protos.bufbuild_es@2.15.0-20260925201459-be7fb260496c.1'
+
 overrides:
   "@babel/core@<7.29.6": 7.29.6
   "@babel/plugin-transform-modules-systemjs@<7.29.4": 7.29.4

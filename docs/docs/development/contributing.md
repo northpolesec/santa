@@ -40,7 +40,7 @@ us to respond.
 
 Santa's codebase is generally written to adhere to Google's
 [C++](https://google.github.io/styleguide/cppguide.html) and
-[Objective-C](https://google.github.io/styleguide/objcguide.xml) style guides.
+[Objective-C](https://google.github.io/styleguide/objcguide.html) style guides.
 To avoid wasting time discussing the finer points of code style, we use
 clang-format to enforce cohesive styling. You can run `./Testing/fix.sh` in your
 workspace to automatically format your code before submitting your PR. A GitHub

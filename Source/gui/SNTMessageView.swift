@@ -16,7 +16,6 @@ import SwiftUI
 
 import santa_common_SNTConfigBundle
 import santa_common_SNTConfigurator
-import santa_gui_SNTAuthorizationHelper
 
 extension SNTConfigBundle {
   // The value of `enableNotificationSilences`, defaulting to true when the
@@ -324,34 +323,6 @@ public struct CopyDetailsButton: View {
     .keyboardShortcut("c", modifiers: [.command, .shift])
     .help("⇧ ⌘  c")
   }
-}
-
-// CanAuthorizeWithTouchID checks if TouchID is available on the current device
-// and returns an error if it is not.
-public func CanAuthorizeWithTouchID() -> (Bool, NSError?) {
-  do {
-    try SNTAuthorizationHelper.canAuthorizeWithTouchID()
-    return (true, nil)
-  } catch let error as NSError {
-    return (false, error)
-  }
-}
-
-// StandaloneButton is only used in Standalone mode. It's a replacement for the
-// Open event button.
-//
-// It is intended to be used for all approvals in the future if in standalone
-// mode.
-public func StandaloneButton(action: @escaping () -> Void) -> some View {
-  Button(
-    action: action,
-    label: {
-      let t = NSLocalizedString("Approve", comment: "Default text for Approve")
-      Text(t).frame(maxWidth: 200.0)
-    }
-  )
-  .keyboardShortcut(.return, modifiers: .command)
-  .help("⌘ Return")
 }
 
 public func DismissButton(

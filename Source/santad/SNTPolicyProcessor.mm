@@ -40,6 +40,7 @@
 #include "absl/status/statusor.h"
 #include "absl/time/time.h"
 #include "cel/v1.pb.h"
+#include "celv2/v2.pb.h"
 
 static constexpr uint64_t kCELPlanCacheMaxSize = 128;
 
@@ -58,6 +59,19 @@ struct CELEvaluationResult {
 };
 
 static void ApplySilentBlock(SNTCachedDecision* cd, SNTRuleState state);
+
+// The authorization method each hold-for-user CELv2 return value asks for. Only
+// called for those values; anything else holds with Touch ID, which is what
+// Standalone mode uses.
+static SNTAuthorizationMethod AuthorizationMethodForReturnValue(int returnValue) {
+  switch (static_cast<::santa::cel::v2::ReturnValue>(returnValue)) {
+    case ::santa::cel::v2::REQUIRE_SECURITY_KEY:
+    case ::santa::cel::v2::REQUIRE_SECURITY_KEY_ONLY: return SNTAuthorizationMethodSecurityKey;
+    case ::santa::cel::v2::REQUIRE_PRESENCE:
+    case ::santa::cel::v2::REQUIRE_PRESENCE_ONLY: return SNTAuthorizationMethodPresence;
+    default: return SNTAuthorizationMethodTouchID;
+  }
+}
 
 static NSDate* NSDateFromAbslTime(absl::Time t) {
   return [NSDate dateWithTimeIntervalSince1970:absl::ToDoubleSeconds(t - absl::UnixEpoch())];
@@ -321,7 +335,7 @@ struct FallbackBatch {
                        failClosed:(BOOL)failClosed {
   int returnValue = 0;
   bool cacheable = true;
-  std::optional<uint64_t> touchIDCooldownMinutes;
+  std::optional<uint64_t> authCooldownMinutes;
   std::optional<santa::cel::PendingKill> pendingKill;
 
   if (useV2) {
@@ -341,7 +355,7 @@ struct FallbackBatch {
 
     returnValue = static_cast<int>(evalResult->value);
     cacheable = evalResult->cacheable;
-    touchIDCooldownMinutes = evalResult->touchIDCooldownMinutes;
+    authCooldownMinutes = evalResult->authCooldownMinutes;
     pendingKill = evalResult->pendingKill;
   } else {
     const auto& v1Activation = static_cast<const santa::cel::Activation<false>&>(activation);
@@ -389,18 +403,22 @@ struct FallbackBatch {
         cd.auditReturn = YES;
         resultState = SNTRuleStateAllow;
         break;
+      // The *_ONLY variants are identical to their counterparts but skip the
+      // Santa dialog and go straight to authorization.
       case ReturnValue::REQUIRE_TOUCHID_ONLY:
-        // REQUIRE_TOUCHID_ONLY is like REQUIRE_TOUCHID but it skips the Santa dialog
-        cd.silentTouchID = YES;
-        [[fallthrough]];
+      case ReturnValue::REQUIRE_SECURITY_KEY_ONLY:
+      case ReturnValue::REQUIRE_PRESENCE_ONLY: cd.silentAuthorization = YES; [[fallthrough]];
       case ReturnValue::REQUIRE_TOUCHID:
-        // REQUIRE_TOUCHID responses are not cacheable.
+      case ReturnValue::REQUIRE_SECURITY_KEY:
+      case ReturnValue::REQUIRE_PRESENCE:
+        // Responses that hold for user authorization are not cacheable.
+        cd.authorizationMethod = AuthorizationMethodForReturnValue(returnValue);
         cd.holdAndAsk = YES;
         cd.cacheable = NO;
         resultState = SNTRuleStateBlock;
-        // Extract cooldown if specified via require_touchid_with_cooldown_minutes()
-        if (touchIDCooldownMinutes.has_value()) {
-          cd.touchIDCooldownMinutes = @(touchIDCooldownMinutes.value());
+        // Extract cooldown if specified via <policy>_with_cooldown_minutes()
+        if (authCooldownMinutes.has_value()) {
+          cd.authCooldownMinutes = @(authCooldownMinutes.value());
         }
         break;
       case ReturnValue::SEATBELT:
@@ -833,7 +851,14 @@ static BOOL SignatureVerdictIsStable(SNTCachedDecision* cd) {
 
   switch (configState.clientMode) {
     case SNTClientModeMonitor: cd.decision = SNTEventStateAllowUnknown; return cd;
-    case SNTClientModeStandalone: cd.holdAndAsk = YES; [[fallthrough]];
+    case SNTClientModeStandalone:
+      // Standalone has no expression to name a method, so accept either. Where
+      // no key is attached this is Touch ID, exactly as before; where one is,
+      // the user gets the choice. That matters most on the desktop and
+      // clamshell Macs that have no Touch ID at all.
+      cd.holdAndAsk = YES;
+      cd.authorizationMethod = SNTAuthorizationMethodPresence;
+      [[fallthrough]];
     case SNTClientModeLockdown: cd.decision = SNTEventStateBlockUnknown; return cd;
     default: cd.decision = SNTEventStateBlockUnknown; return cd;
   }

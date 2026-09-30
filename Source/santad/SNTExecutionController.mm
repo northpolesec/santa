@@ -63,6 +63,7 @@
 #import "Source/santad/SNTNotificationQueue.h"
 #import "Source/santad/SNTSyncdQueue.h"
 #import "Source/santad/SNTTimedRuleKills.h"
+#include "absl/strings/str_cat.h"
 #include "absl/synchronization/mutex.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
@@ -94,6 +95,32 @@ static const size_t kMaxAllowedPathLength = MAXPATHLEN - 1;  // -1 to account fo
 // The result is not merely a label: the caller assigns it to cd.decision and the action is
 // formulated from (SNTEventStateAllow & cd.decision), so mapping a state to an allow here
 // authorizes the execution.
+// The name of an authorization method, as it appears in decisionExtra (and so
+// in the telemetry `explain` field).
+static NSString* AuthorizationMethodName(SNTAuthorizationMethod method) {
+  switch (method) {
+    case SNTAuthorizationMethodSecurityKey: return @"Security Key";
+    case SNTAuthorizationMethodPresence: return @"Presence";
+    // Spelled without a space for continuity with the telemetry Santa emitted
+    // before any other method existed.
+    case SNTAuthorizationMethodTouchID: break;
+  }
+  return @"TouchID";
+}
+
+static NSString* DecisionExtra(SNTAuthorizationMethod method, NSString* outcome) {
+  return [NSString stringWithFormat:@"%@ %@", AuthorizationMethodName(method), outcome];
+}
+
+// The approval cooldown cache is keyed on the authorization method as well as
+// the content hash. Without the method an approval granted under one method
+// would satisfy a later rule that demands a different one, so a Touch ID
+// approval would stand in for a REQUIRE_SECURITY_KEY hold and the key would
+// never be presented.
+static std::string AuthApprovalCacheKey(NSString* sha256, SNTAuthorizationMethod method) {
+  return absl::StrCat(static_cast<int>(method), ":", santa::NSStringToUTF8String(sha256));
+}
+
 static SNTEventState BlockToAllowDecision(SNTEventState blockDecision) {
   switch (blockDecision) {
     case SNTEventStateBlockUnknown: return SNTEventStateAllowUnknown;
@@ -138,10 +165,11 @@ static bool SameBinary(const es_process_t* a, NSString* aSHA256, const es_proces
   std::shared_ptr<TTYWriter> _ttyWriter;
   std::unique_ptr<SantaCache<std::pair<pid_t, int>, bool>> _procSignalCache;
 
-  // Cache of TouchID approvals: SHA-256 (as std::string) -> timestamp (nanoseconds since boot)
+  // Cache of user authorization approvals: key (see AuthApprovalCacheKey) ->
+  // timestamp (nanoseconds since boot).
   // Note: We use std::string instead of NSString* because SantaCache uses == for key comparison,
   // which would compare pointer addresses for NSString*, not string contents.
-  std::unique_ptr<SantaCache<std::string, uint64_t>> _touchIDApprovalCache;
+  std::unique_ptr<SantaCache<std::string, uint64_t>> _authApprovalCache;
 
   std::shared_ptr<santa::santad::process_tree::ProcessTree> _processTree;
   std::shared_ptr<santa::SandboxExpectations> _sandboxExpectations;
@@ -184,7 +212,7 @@ static bool SameBinary(const es_process_t* a, NSString* aSHA256, const es_proces
     _ttyWriter = std::move(ttyWriter);
     _policyProcessor = policyProcessor;
     _procSignalCache = std::make_unique<SantaCache<std::pair<pid_t, int>, bool>>(100000);
-    _touchIDApprovalCache = std::make_unique<SantaCache<std::string, uint64_t>>(100);
+    _authApprovalCache = std::make_unique<SantaCache<std::string, uint64_t>>(100);
     _sandboxedSeatbeltProcs = std::make_unique<SantaCache<std::pair<pid_t, int>, bool>>(100000);
     _processControlBlock = processControlBlock;
     _processTree = std::move(processTree);
@@ -755,19 +783,20 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
   std::pair<pid_t, int> pidAndVersion =
       std::make_pair(newProcPid, audit_token_to_pidversion(targetProc->audit_token));
 
-  // Check the TouchID approval cache (only when a cooldown is set). Skipped for an
+  // Check the authorization approval cache (only when a cooldown is set). Skipped for an
   // unconfirmed read, like the write below: a hit converts this exec to an allow, but the
   // key is the hash of the file read, not the loaded image.
-  if (cd.holdAndAsk && cd.sha256 && !cd.identityMismatched && cd.touchIDCooldownMinutes != nil) {
-    uint64_t cooldownMinutes = [cd.touchIDCooldownMinutes unsignedLongLongValue];
+  if (cd.holdAndAsk && cd.sha256 && !cd.identityMismatched && cd.authCooldownMinutes != nil) {
+    uint64_t cooldownMinutes = [cd.authCooldownMinutes unsignedLongLongValue];
     if (cooldownMinutes > 0) {
-      uint64_t cachedTimestamp = _touchIDApprovalCache->get(santa::NSStringToUTF8String(cd.sha256));
+      uint64_t cachedTimestamp =
+          _authApprovalCache->get(AuthApprovalCacheKey(cd.sha256, cd.authorizationMethod));
       if (cachedTimestamp > 0) {
         uint64_t expiryTime = cachedTimestamp + (cooldownMinutes * 60 * NSEC_PER_SEC);
         if (GetCurrentUptime() < expiryTime) {
-          // Cache hit - skip TouchID prompt
+          // Cache hit - skip the authorization prompt
           cd.holdAndAsk = NO;
-          cd.decisionExtra = @"TouchID Cached";
+          cd.decisionExtra = DecisionExtra(cd.authorizationMethod, @"Cached");
           cd.decision = BlockToAllowDecision(cd.decision);
           action = (cd.cacheable ? SNTActionRespondAllow : SNTActionRespondAllowNoCache);
           // Update the cached decision with the new state
@@ -849,17 +878,17 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
             // Update decision to reflect that it was allowed via TouchID,
             // preserving the rule type (e.g., BlockSigningID -> AllowSigningID)
             cd.decision = BlockToAllowDecision(cd.decision);
-            cd.decisionExtra = @"TouchID Approved";
+            cd.decisionExtra = DecisionExtra(cd.authorizationMethod, @"Approved");
 
-            // Cache the TouchID approval so subsequent executions within the cooldown period
+            // Cache the approval so subsequent executions within the cooldown period
             // don't require re-authorization - only if cooldown was specified and > 0
             // The cooldown cache is keyed on the content hash, which names the
             // file that was read. Skip it for an unconfirmed read, so a later
             // execution is not matched against someone else's approval.
-            if (cd.sha256 && !cd.identityMismatched && cd.touchIDCooldownMinutes != nil &&
-                [cd.touchIDCooldownMinutes unsignedLongLongValue] > 0) {
-              std::string sha256Key = santa::NSStringToUTF8String(cd.sha256);
-              self->_touchIDApprovalCache->set(sha256Key, GetCurrentUptime());
+            if (cd.sha256 && !cd.identityMismatched && cd.authCooldownMinutes != nil &&
+                [cd.authCooldownMinutes unsignedLongLongValue] > 0) {
+              self->_authApprovalCache->set(AuthApprovalCacheKey(cd.sha256, cd.authorizationMethod),
+                                            GetCurrentUptime());
             }
 
             if (stoppedProc) {
@@ -876,7 +905,8 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
             [self recordTimedRuleKillForDecision:cd process:targetProc->audit_token];
           } else {
             // Decision stays as-is; only the extra field says why.
-            cd.decisionExtra = authenticated ? @"TouchID Approved After Expiry" : @"TouchID Denied";
+            cd.decisionExtra = DecisionExtra(cd.authorizationMethod,
+                                             authenticated ? @"Approved After Expiry" : @"Denied");
 
             // Nothing approved this execution in time, so kill the stopped process.
             if (stoppedProc) {
@@ -1017,7 +1047,8 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
   se.identityUnverified = cd.identityMismatched;
   se.identityVendorMatched = cd.identityVendorMatched;
   se.holdAndAsk = cd.holdAndAsk;
-  se.silentTouchID = cd.silentTouchID;
+  se.silentAuthorization = cd.silentAuthorization;
+  se.authorizationMethod = cd.authorizationMethod;
   se.seatbeltRequired = cd.seatbeltRequired;
   se.staticRule = cd.staticRule;
   se.ruleId = cd.ruleId;
@@ -1276,8 +1307,8 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
   // TODO: Notify the sync service of the new rule.
 }
 
-- (void)flushTouchIDApprovalCache {
-  _touchIDApprovalCache->clear();
+- (void)flushAuthApprovalCache {
+  _authApprovalCache->clear();
 }
 
 @end

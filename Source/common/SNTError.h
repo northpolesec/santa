@@ -80,6 +80,9 @@ typedef NS_ENUM(NSInteger, SNTErrorCode) {
   SNTErrorCodeTAMNoConsoleUser = 915,
   SNTErrorCodeTAMSessionAlreadyActive = 916,
   SNTErrorCodeTAMJustificationRequired = 917,
+
+  // User authorization errors
+  SNTErrorCodeAuthorizationMethodUnavailable = 1010,
 };
 
 @interface SNTError : NSObject

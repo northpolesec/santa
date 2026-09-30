@@ -139,10 +139,12 @@ The rule never needs editing for it.
 
 ## Policies
 
-Both policy slots accept any policy a CEL rule can return, including
-`require_touchid_with_cooldown_minutes(N)` and
-`require_touchid_only_with_cooldown_minutes(N)`. The out-of-range slot does not
-have to block. These three combinations cover most needs:
+Both policy slots accept any policy a CEL rule can return, including the
+cooldown helpers: `require_touchid_with_cooldown_minutes(N)`,
+`require_security_key_with_cooldown_minutes(N)`,
+`require_presence_with_cooldown_minutes(N)` and their `_only_` variants. The
+out-of-range slot does not have to block. These three combinations cover most
+needs:
 
 | In range | Out of range | Effect |
 | -------- | ------------ | ------ |
@@ -153,9 +155,9 @@ have to block. These three combinations cover most needs:
 `kill_on_expiry()` is narrower. It accepts only policies that let a process
 start, because a blocked execution leaves nothing to quit: `ALLOWLIST`,
 `AUDIT`, `SEATBELT`, `REQUIRE_TOUCHID`, `REQUIRE_TOUCHID_ONLY`,
-`require_touchid_with_cooldown_minutes(N)` and
-`require_touchid_only_with_cooldown_minutes(N)`. The wrapped policy must be
-written out in the call; a computed policy, such as a ternary inside
+`REQUIRE_SECURITY_KEY`, `REQUIRE_SECURITY_KEY_ONLY`, `REQUIRE_PRESENCE`,
+`REQUIRE_PRESENCE_ONLY` and any of the cooldown helpers. The wrapped policy
+must be written out in the call; a computed policy, such as a ternary inside
 `kill_on_expiry()`, is refused.
 
 :::note
@@ -328,9 +330,12 @@ The daemon logs every step of a pending quit:
   "the working day", and name a zone for anything that has to be the same
   instant everywhere.
 
-- **Reach for Touch ID before a hard block.** An out-of-range
+- **Reach for an authorization prompt before a hard block.** An out-of-range
   `require_touchid_with_cooldown_minutes(N)` keeps the exception path open, and
-  every use is still recorded.
+  every use is still recorded. Use
+  `require_security_key_with_cooldown_minutes(N)` where the approval has to be a
+  touch on a hardware key, or `require_presence_with_cooldown_minutes(N)` where
+  either will do.
 
 - **Warn people before you quit their work.** `kill_on_expiry()` on a short
   window gives a short warning. A window of an hour or more gives users real
