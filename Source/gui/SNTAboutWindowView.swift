@@ -32,7 +32,7 @@ import santa_gui_SNTMessageView
 struct SNTAboutWindowView: View {
   let w: NSWindow?
   let c = SNTConfigurator.configurator()
-  let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
+  let v = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "unknown"
   let isLite = santa.SNTIsLiteInstall()
 
   @State private var isDragging = false
