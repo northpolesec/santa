@@ -712,7 +712,7 @@ bool ParseConfigSingleWatchItem(NSString* name, std::string_view fallback_policy
   std::string policy_version;
   // If the options dictionary contains a version key, use its value so long as it's valid
   if (options[kWatchItemConfigKeyOptionsVersion]) {
-    if (!VerifyConfigKey(options, kWatchItemConfigKeyOptionsVersion, [NSString class], nil, true,
+    if (!VerifyConfigKey(options, kWatchItemConfigKeyOptionsVersion, [NSString class], err, true,
                          LenRangeValidator(1, kVersionMaxLength))) {
       return false;
     }

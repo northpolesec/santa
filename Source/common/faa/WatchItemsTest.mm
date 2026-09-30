@@ -1404,6 +1404,23 @@ BlockGenResult CreatePolicyBlockGen() {
   XCTAssertEqual(num_rules, 5);
 }
 
+- (void)testParseConfigSingleWatchItemInvalidVersionSetsError {
+  SetSharedDataWatchItemPolicy data_policies;
+  SetSharedProcessWatchItemPolicy proc_policies;
+  NSError* err;
+
+  // Sync always sends the rule's version, which can be empty. The rejection
+  // must carry a reason so callers can report it.
+  NSDictionary* watchItem = @{
+    kWatchItemConfigKeyPaths : @[ @"/a" ],
+    kWatchItemConfigKeyOptions : @{kWatchItemConfigKeyOptionsVersion : @""},
+  };
+  XCTAssertFalse(ParseConfigSingleWatchItem(@"rule", kVersion, watchItem, &data_policies,
+                                            &proc_policies, &err));
+  NSString* wantKey = [NSString stringWithFormat:@"key '%@'", kWatchItemConfigKeyOptionsVersion];
+  XCTAssertTrue([err.localizedDescription containsString:wantKey]);
+}
+
 - (void)testParseConfigSingleWatchItemGeneral {
   SetSharedDataWatchItemPolicy data_policies;
   SetSharedProcessWatchItemPolicy proc_policies;
