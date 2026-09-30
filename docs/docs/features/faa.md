@@ -196,8 +196,9 @@ macOS are symbolic links (e.g. `/tmp` and `/var` are both symlinks into
 
 Configured `Path` values should be canonical. Santa collapses repeated slashes
 and removes the trailing slash from a literal path, logging a warning for each
-rewritten path. A rule with a `.` or `..` path component, or a path of two or
-more slashes and nothing else, is rejected. A path of `/` is accepted.
+rewritten path. A path with a `.` or `..` component, or of two or more slashes
+and nothing else, is kept as configured and logged with a warning. Such a path
+is not expected to match any file access.
 
 ### Process Matching
 

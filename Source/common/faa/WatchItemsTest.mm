@@ -628,7 +628,7 @@ BlockGenResult CreatePolicyBlockGen() {
       {"/a/..foo", kLiteral, "/a/..foo"},
       {"/a/b.", kLiteral, "/a/b."},
 
-      // Rejected: "." and ".." have no safe textual reading
+      // No safe rewrite: "." and ".." have no safe textual reading
       {"/a/./b", kLiteral, std::nullopt},
       {"/a/b/../c", kLiteral, std::nullopt},
       {"/a/b/..", kPrefix, std::nullopt},
@@ -637,7 +637,7 @@ BlockGenResult CreatePolicyBlockGen() {
       {"./a", kLiteral, std::nullopt},
       {"/Users/*/../x", kPrefix, std::nullopt},
 
-      // Rejected: a rewrite must never widen a rule to the whole filesystem
+      // No safe rewrite: a rewrite must never widen a rule to the whole filesystem
       {"//", kPrefix, std::nullopt},
       {"///", kPrefix, std::nullopt},
       {"//", kLiteral, std::nullopt},
@@ -646,8 +646,9 @@ BlockGenResult CreatePolicyBlockGen() {
   for (const Case& c : cases) {
     std::optional<std::string> got = NormalizeRulePath(c.path, c.type);
     XCTAssertTrue(got == c.want, @"path: '%s' (%s), got: '%s', want: '%s'", c.path.data(),
-                  c.type == kPrefix ? "prefix" : "literal", got ? got->c_str() : "<rejected>",
-                  c.want ? c.want->c_str() : "<rejected>");
+                  c.type == kPrefix ? "prefix" : "literal",
+                  got ? got->c_str() : "<no safe rewrite>",
+                  c.want ? c.want->c_str() : "<no safe rewrite>");
   }
 }
 
@@ -666,11 +667,21 @@ BlockGenResult CreatePolicyBlockGen() {
                 SetPairPathAndType({{"/a/b", WatchItemPathType::kLiteral},
                                     {"/c/d/", WatchItemPathType::kPrefix}}));
 
-  // One unusable path rejects the whole rule, with an error naming the path
-  err = nil;
-  path_list = VerifyConfigWatchItemPaths(@"rule", @[ @"/ok", @"/a/../b" ], &err);
-  XCTAssertTrue(std::holds_alternative<Unit>(path_list));
-  XCTAssertTrue([err.localizedDescription containsString:@"/a/../b"]);
+  // A path with no safe rewrite is kept exactly as configured, including its
+  // repeated slashes, so the rule loads and behaves as it did before
+  // normalization existed.
+  path_list = VerifyConfigWatchItemPaths(
+      @"rule",
+      @[
+        @"/ok", @"/a//../b",
+        @{kWatchItemConfigKeyPathsPath : @"//", kWatchItemConfigKeyPathsIsPrefix : @(YES)}
+      ],
+      &err);
+  XCTAssertTrue(std::holds_alternative<SetPairPathAndType>(path_list));
+  XCTAssertTrue(std::get<SetPairPathAndType>(path_list) ==
+                SetPairPathAndType({{"/ok", WatchItemPathType::kLiteral},
+                                    {"/a//../b", WatchItemPathType::kLiteral},
+                                    {"//", WatchItemPathType::kPrefix}}));
 }
 
 - (void)testVerifyConfigWatchItemProcesses {

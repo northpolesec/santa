@@ -298,10 +298,10 @@ bool VerifyConfigKeyArray(NSDictionary* dict, NSString* key, Class expected, NSE
 /// slash. A prefix keeps its trailing slash, since "/a/" and "/a" match
 /// different sets.
 ///
-/// Returns nullopt for a path with a "." or ".." component. These have no safe
+/// Returns nullopt when there is no safe rewrite: for a path with a "." or ".."
+/// component, and for one that would reduce to "/". "." and ".." have no safe
 /// textual reading: ".." disagrees with the kernel when the preceding component
-/// is a symlink, and can erase a glob. Also returns nullopt for a rewrite that
-/// reduces the path to "/", which as a prefix would match every file.
+/// is a symlink, and can erase a glob. A "/" prefix would match every file.
 std::optional<std::string> NormalizeRulePath(std::string_view path, WatchItemPathType path_type) {
   std::string out;
   out.reserve(path.size());
@@ -332,7 +332,7 @@ std::optional<std::string> NormalizeRulePath(std::string_view path, WatchItemPat
 /// - For `string` types, the default path type `kDefaultPathType` is used
 /// - For `dict` types, there is a required `Path` key. and an optional
 ///   `IsPrefix` key to set the path type to something other than the default
-/// Each path is rewritten or rejected by NormalizeRulePath.
+/// Each path is rewritten by NormalizeRulePath where that is safe.
 ///
 /// Example:
 /// <array>
@@ -349,24 +349,25 @@ std::variant<Unit, SetPairPathAndType> VerifyConfigWatchItemPaths(NSString* name
                                                                   NSError** err) {
   SetPairPathAndType path_list;
 
+  // A path with no safe rewrite is kept as configured, although no event is
+  // expected to match it. Dropping it could loosen the rule: a ProcessesWithAllowedPaths rule
+  // whose paths are all dead denies every access, but a rule left with no paths
+  // is rejected, which allows every access.
   auto add_path = [&](NSString* path_str, WatchItemPathType path_type) {
     std::string raw = NSStringToUTF8String(path_str);
     std::optional<std::string> normalized = NormalizeRulePath(raw, path_type);
     if (!normalized) {
-      [SNTError populateError:err
-                   withFormat:@"Invalid path '%@': '.' and '..' components are not supported, "
-                              @"and a path cannot be only slashes",
-                              path_str];
-      return false;
+      LOGW(@"File access rule '%@': path '%s' is not canonical and is not expected to match "
+           @"file access events",
+           name, raw.c_str());
+      path_list.insert({std::move(raw), path_type});
+    } else {
+      if (*normalized != raw) {
+        LOGW(@"File access rule '%@': path '%s' normalized to '%s'", name, raw.c_str(),
+             normalized->c_str());
+      }
+      path_list.insert({std::move(*normalized), path_type});
     }
-
-    if (*normalized != raw) {
-      LOGW(@"File access rule '%@': path '%s' normalized to '%s'", name, raw.c_str(),
-           normalized->c_str());
-    }
-
-    path_list.insert({std::move(*normalized), path_type});
-    return true;
   };
 
   for (id path in paths) {
@@ -388,9 +389,7 @@ std::variant<Unit, SetPairPathAndType> VerifyConfigWatchItemPaths(NSString* name
         return Unit{};
       }
 
-      if (!add_path(path_str, path_type)) {
-        return Unit{};
-      }
+      add_path(path_str, path_type);
     } else if ([path isKindOfClass:[NSString class]]) {
       if (!LenRangeValidator(1, PATH_MAX)(path, err)) {
         [SNTError populateError:err
@@ -399,9 +398,7 @@ std::variant<Unit, SetPairPathAndType> VerifyConfigWatchItemPaths(NSString* name
         return Unit{};
       }
 
-      if (!add_path((NSString*)path, kWatchItemPolicyDefaultPathType)) {
-        return Unit{};
-      }
+      add_path((NSString*)path, kWatchItemPolicyDefaultPathType);
     } else {
       [SNTError
           populateError:err
