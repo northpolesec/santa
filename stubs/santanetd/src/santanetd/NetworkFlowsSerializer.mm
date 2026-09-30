@@ -14,14 +14,19 @@
 
 #import "src/santanetd/NetworkFlowsSerializer.h"
 
+#import "Source/common/SNTCachedDecision.h"
+
 @class SNDProcessFlows;
-@class SNTCachedDecision;
 
 namespace santanetd {
 
 void PopulateNetworkActivityProcess(google::protobuf::Arena*,
                                     ::santa::pb::v1::NetworkActivity_Process*, SNDProcessFlows*,
-                                    SNTCachedDecision*) {}
+                                    SNTCachedDecision* cd) {
+  // The real serializer reads rawSigningID, and nothing in santa does. Reading it here
+  // keeps santa from dropping it without noticing.
+  (void)cd.rawSigningID;
+}
 
 std::string FormatNetworkFlowsBasicString(SNDProcessFlows*, SNTCachedDecision*) {
   return {};

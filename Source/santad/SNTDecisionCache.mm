@@ -167,6 +167,7 @@
 
     cd.teamID = csc.teamID;
     cd.signingID = FormatSigningID(csc);
+    cd.rawSigningID = csc.signingID;
 
     // Ensure that if no teamID exists but a signingID does exist, that the binary
     // is a platform binary. If not, remove the signingID.

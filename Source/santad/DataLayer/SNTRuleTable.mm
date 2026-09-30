@@ -232,6 +232,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
     cd.decisionExtra = systemBin ? @"critical system binary" : @"santa binary";
     cd.sha256 = binInfo.SHA256;
     cd.signingID = FormatSigningID(csInfo);
+    cd.rawSigningID = csInfo.signingID;
     cd.cdhash = csInfo.cdhash;
     cd.secureSigningTime = csInfo.secureSigningTime;
     cd.signingTime = csInfo.signingTime;

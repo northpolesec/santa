@@ -76,6 +76,19 @@
   XCTAssertEqualObjects(copy.codesignValidationStatus, @(errSecCSUnsigned));
 }
 
+- (void)testRawSigningIDSurvivesCopyAndCachedIdentityInit {
+  // A reused decision and a critical system binary's reach the decision cache
+  // through these, and santanetd reads rawSigningID from there.
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+  cd.rawSigningID = @"com.apple.trustd";
+
+  SNTCachedDecision* copy = [cd copy];
+  SNTCachedDecision* derived = [[SNTCachedDecision alloc] initWithCachedIdentity:cd];
+
+  XCTAssertEqualObjects(copy.rawSigningID, @"com.apple.trustd");
+  XCTAssertEqualObjects(derived.rawSigningID, @"com.apple.trustd");
+}
+
 - (void)testIdentityUnverifiedDefaultsToNo {
   SNTCachedDecision* cd = [[SNTCachedDecision alloc] initWithVnode:(SantaVnode){}];
 
