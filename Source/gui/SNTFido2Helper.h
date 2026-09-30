@@ -20,8 +20,8 @@ NS_ASSUME_NONNULL_BEGIN
 typedef NS_ENUM(NSInteger, SNTFido2Result) {
   /// A key attached to this Mac was touched.
   SNTFido2ResultApproved,
-  /// A key was attached but nothing approved: the touch timed out, the user
-  /// cancelled, or every device reported an error.
+  /// A key was attached but nothing approved: the user cancelled or closed the
+  /// prompt, or every device reported an error.
   SNTFido2ResultDenied,
   /// No FIDO2 device is attached, so the user was never asked. A caller that
   /// accepts more than one method should try another rather than deny.

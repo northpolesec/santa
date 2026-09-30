@@ -32,20 +32,21 @@ static const size_t kMaxFido2Devices = 8;
 // without waiting on the others.
 static const int kTouchPollIntervalMS = 200;
 
-// How long to wait for the user to touch their key. The prompt's Cancel button
-// does not interrupt libfido2 -- the handle is not safe to touch from another
-// thread -- so an abandoned request occupies the serial queue until this
-// expires. Keep it short enough that a user who cancels and retries is not left
-// waiting on the previous attempt.
-static const int kTouchTimeoutMS = 30000;
+// Total time libfido2 may spend on each device operation that takes no timeout
+// of its own: opening the device and starting or cancelling the touch request.
+// Without one libfido2 waits indefinitely on a device that keeps sending
+// keepalives, and opening happens before the prompt is shown, so the user would
+// have nothing to cancel. A healthy key answers in well under this.
+static const int kDeviceOperationTimeoutMS = 2000;
 
 // State shared between the background authorization and the prompt's buttons.
 // The reply block runs at most once; whichever side claims the request first
 // wins and the other is discarded.
 @interface SNTFido2Request : NSObject
 @property(nonatomic) NSWindow* promptWindow;
-/// Set when a prompt button has taken the request over, so the device loop can
-/// stop early and free the queue for the next request.
+/// Set once the prompt has claimed the request by being answered or closed, so
+/// the device loop can stop and free the queue for the next request. The loop
+/// has no deadline of its own.
 @property(atomic) BOOL abandoned;
 - (BOOL)claim;
 @end
@@ -140,12 +141,13 @@ static const int kTouchTimeoutMS = 30000;
                                 request:(SNTFido2Request*)request
                              replyBlock:(void (^)(SNTFido2Result))replyBlock {
   // Neither button interrupts the device operation in flight; they abandon it.
-  // The result that eventually arrives is discarded by the claim below.
+  // Claim before abandoning: the device loop answers Denied as soon as it sees
+  // abandoned, and would otherwise win the claim and drop this result.
   auto finish = ^(SNTFido2Result result) {
-    request.abandoned = YES;
     if (![request claim]) {
       return;
     }
+    request.abandoned = YES;
     [self dismissPromptForRequest:request];
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
       replyBlock(result);
@@ -166,6 +168,18 @@ static const int kTouchTimeoutMS = 30000;
             finish(SNTFido2ResultUseTouchID);
           }];
 
+  // The device loop has no deadline, so a prompt closed any way other than its
+  // buttons must still end it. Every path closes the window, which also removes
+  // this observer; for a request already claimed, finish does nothing.
+  __block id closeObserver = [[NSNotificationCenter defaultCenter]
+      addObserverForName:NSWindowWillCloseNotification
+                  object:window
+                   queue:nil
+              usingBlock:^(NSNotification* note) {
+                [[NSNotificationCenter defaultCenter] removeObserver:closeObserver];
+                finish(SNTFido2ResultDenied);
+              }];
+
   // Above Santa's notification windows (NSModalPanelWindowLevel).
   [window setContentSize:window.contentViewController.view.fittingSize];
   window.level = NSPopUpMenuWindowLevel;
@@ -174,8 +188,6 @@ static const int kTouchTimeoutMS = 30000;
   [NSApp activateIgnoringOtherApps:YES];
   return window;
 }
-
-#pragma mark - Device operations
 
 #pragma mark - Device operations
 
@@ -213,6 +225,9 @@ static const int kTouchTimeoutMS = 30000;
     if (!dev) {
       break;
     }
+    // ponytail: the budget is per device, so the prompt can be up to
+    // kMaxFido2Devices times this late; share one deadline if that ever matters.
+    fido_dev_set_timeout(dev, kDeviceOperationTimeoutMS);
     if ((r = fido_dev_open(dev, path)) != FIDO_OK) {
       LOGE(@"FIDO2: Failed to open device at %s (error: %d)", path, r);
       fido_dev_free(&dev);
@@ -242,18 +257,16 @@ static const int kTouchTimeoutMS = 30000;
   devices.clear();
 }
 
-// Polls every device in turn until one reports a touch, the deadline passes, or
-// a prompt button takes the request over.
+// Polls every device in turn until one reports a touch or the prompt is
+// answered or closed. Like Touch ID, there is no deadline: the prompt stays up
+// until the user acts on it.
 + (SNTFido2Result)waitForTouchOnDevices:(std::vector<fido_dev_t*>&)devices
                                 request:(SNTFido2Request*)request {
   LOGI(@"FIDO2: Waiting for a touch on any of %zu attached key(s)...", devices.size());
 
-  uint64_t deadline =
-      clock_gettime_nsec_np(CLOCK_MONOTONIC) + (uint64_t)kTouchTimeoutMS * NSEC_PER_MSEC;
-
   // Devices that error out are dropped as we go; running out means every key
-  // failed, which is a denial rather than a timeout.
-  while (!devices.empty() && clock_gettime_nsec_np(CLOCK_MONOTONIC) < deadline) {
+  // failed, which is a denial.
+  while (!devices.empty()) {
     if (request.abandoned) {
       return SNTFido2ResultDenied;
     }
@@ -261,6 +274,13 @@ static const int kTouchTimeoutMS = 30000;
     for (auto it = devices.begin(); it != devices.end();) {
       int touched = 0;
       int r = fido_dev_get_touch_status(*it, &touched, kTouchPollIntervalMS);
+      // A FIDO2 key gives up on a touch request after a timeout of its own, so
+      // ask again for as long as the prompt is up. Keys disagree on the code:
+      // CTAP 2.1 keys such as the YubiKey 5 report OPERATION_DENIED after about
+      // 30 seconds. libfido2 already asks again for U2F-only keys.
+      if (r == FIDO_ERR_USER_ACTION_TIMEOUT || r == FIDO_ERR_OPERATION_DENIED) {
+        r = fido_dev_get_touch_begin(*it);
+      }
       if (r != FIDO_OK) {
         LOGE(@"FIDO2: Device stopped responding (error: %d)", r);
         fido_dev_close(*it);
@@ -276,7 +296,7 @@ static const int kTouchTimeoutMS = 30000;
     }
   }
 
-  LOGE(@"FIDO2: No key was touched");
+  LOGE(@"FIDO2: Every attached key stopped responding");
   return SNTFido2ResultDenied;
 }
 
