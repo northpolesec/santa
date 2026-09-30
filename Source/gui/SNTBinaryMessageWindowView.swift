@@ -404,11 +404,14 @@ struct SNTBinaryMessageWindowView: View {
           )
         }
 
+        // The authorization prompt carries its own Cancel. Dismissing here would
+        // close this dialog but leave that prompt, and its key request, running.
         DismissButton(
           customText: getDismissText(),
           silence: preventFutureNotifications,
           action: dismissButton
         )
+        .disabled(isAuthenticating)
       }
     }.fixedSize()
   }
