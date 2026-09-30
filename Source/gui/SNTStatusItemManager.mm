@@ -310,8 +310,7 @@ static void SetMenuItemTitle(NSMenuItem* item, NSString* title) {
 
   // Add version string and about menu item
   NSString* santaVersionString = [NSString
-      stringWithFormat:@"Santa v%@%@",
-                       [[NSBundle mainBundle] infoDictionary][@"CFBundleShortVersionString"],
+      stringWithFormat:@"Santa v%@%@", [[NSBundle mainBundle] infoDictionary][@"CFBundleVersion"],
                        santa::SNTIsLiteInstall() ? @" (Lite)" : @""];
   [menu addItem:[self menuItemWithTitle:santaVersionString andAction:nil]];
   [menu addItem:[self menuItemWithTitle:@"About Santa" andAction:@selector(aboutMenuItemClicked:)]];
