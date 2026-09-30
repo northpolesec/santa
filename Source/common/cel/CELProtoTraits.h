@@ -85,6 +85,14 @@ struct CELProtoTraits<true> {
       ::santa::cel::v2::REQUIRE_TOUCHID;
   static constexpr ReturnValue REQUIRE_TOUCHID_ONLY =
       ::santa::cel::v2::REQUIRE_TOUCHID_ONLY;
+  static constexpr ReturnValue REQUIRE_SECURITY_KEY =
+      ::santa::cel::v2::REQUIRE_SECURITY_KEY;
+  static constexpr ReturnValue REQUIRE_SECURITY_KEY_ONLY =
+      ::santa::cel::v2::REQUIRE_SECURITY_KEY_ONLY;
+  static constexpr ReturnValue REQUIRE_PRESENCE =
+      ::santa::cel::v2::REQUIRE_PRESENCE;
+  static constexpr ReturnValue REQUIRE_PRESENCE_ONLY =
+      ::santa::cel::v2::REQUIRE_PRESENCE_ONLY;
   static constexpr ReturnValue SEATBELT = ::santa::cel::v2::SEATBELT;
   static constexpr ReturnValue AUDIT = ::santa::cel::v2::AUDIT;
 

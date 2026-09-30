@@ -1080,8 +1080,8 @@ class ScopedHostZone {
       XCTFail("Failed to evaluate: %s", result.status().message().data());
     } else {
       XCTAssertEqual(result.value().value, ReturnValue::REQUIRE_TOUCHID);
-      XCTAssertTrue(result.value().touchIDCooldownMinutes.has_value());
-      XCTAssertEqual(result.value().touchIDCooldownMinutes.value(), 10ULL);
+      XCTAssertTrue(result.value().authCooldownMinutes.has_value());
+      XCTAssertEqual(result.value().authCooldownMinutes.value(), 10ULL);
     }
   }
   {
@@ -1092,8 +1092,8 @@ class ScopedHostZone {
       XCTFail("Failed to evaluate: %s", result.status().message().data());
     } else {
       XCTAssertEqual(result.value().value, ReturnValue::REQUIRE_TOUCHID_ONLY);
-      XCTAssertTrue(result.value().touchIDCooldownMinutes.has_value());
-      XCTAssertEqual(result.value().touchIDCooldownMinutes.value(), 5ULL);
+      XCTAssertTrue(result.value().authCooldownMinutes.has_value());
+      XCTAssertEqual(result.value().authCooldownMinutes.value(), 5ULL);
     }
   }
   {
@@ -1104,8 +1104,8 @@ class ScopedHostZone {
       XCTFail("Failed to evaluate: %s", result.status().message().data());
     } else {
       XCTAssertEqual(result.value().value, ReturnValue::REQUIRE_TOUCHID);
-      XCTAssertTrue(result.value().touchIDCooldownMinutes.has_value());
-      XCTAssertEqual(result.value().touchIDCooldownMinutes.value(), 15ULL);
+      XCTAssertTrue(result.value().authCooldownMinutes.has_value());
+      XCTAssertEqual(result.value().authCooldownMinutes.value(), 15ULL);
     }
   }
   {
@@ -1115,7 +1115,7 @@ class ScopedHostZone {
       XCTFail("Failed to evaluate: %s", result.status().message().data());
     } else {
       XCTAssertEqual(result.value().value, ReturnValue::REQUIRE_TOUCHID);
-      XCTAssertFalse(result.value().touchIDCooldownMinutes.has_value());
+      XCTAssertFalse(result.value().authCooldownMinutes.has_value());
     }
   }
   {
@@ -1126,8 +1126,8 @@ class ScopedHostZone {
       XCTFail("Failed to evaluate: %s", result.status().message().data());
     } else {
       XCTAssertEqual(result.value().value, ReturnValue::REQUIRE_TOUCHID);
-      XCTAssertTrue(result.value().touchIDCooldownMinutes.has_value());
-      XCTAssertEqual(result.value().touchIDCooldownMinutes.value(), 0ULL);
+      XCTAssertTrue(result.value().authCooldownMinutes.has_value());
+      XCTAssertEqual(result.value().authCooldownMinutes.value(), 0ULL);
     }
   }
   {
@@ -1138,9 +1138,78 @@ class ScopedHostZone {
       XCTFail("Failed to evaluate: %s", result.status().message().data());
     } else {
       XCTAssertEqual(result.value().value, ReturnValue::REQUIRE_TOUCHID);
-      XCTAssertTrue(result.value().touchIDCooldownMinutes.has_value());
-      XCTAssertEqual(result.value().touchIDCooldownMinutes.value(), 0ULL);
+      XCTAssertTrue(result.value().authCooldownMinutes.has_value());
+      XCTAssertEqual(result.value().authCooldownMinutes.value(), 0ULL);
     }
+  }
+}
+
+// The security key and presence policies behave exactly like the Touch ID ones:
+// a bare constant carries no cooldown, the helper attaches one.
+- (void)testSecurityKeyAndPresenceCooldownFunctions {
+  using ReturnValue = santa::cel::CELProtoTraits<true>::ReturnValue;
+
+  auto activation = MakeActivation<true>();
+  auto sut = santa::cel::Evaluator<true>::Create();
+  XCTAssertTrue(sut.ok());
+
+  const struct {
+    const char* constant;
+    const char* helper;
+    ReturnValue value;
+  } cases[] = {
+      {"REQUIRE_SECURITY_KEY", "require_security_key_with_cooldown_minutes",
+       ReturnValue::REQUIRE_SECURITY_KEY},
+      {"REQUIRE_SECURITY_KEY_ONLY", "require_security_key_only_with_cooldown_minutes",
+       ReturnValue::REQUIRE_SECURITY_KEY_ONLY},
+      {"REQUIRE_PRESENCE", "require_presence_with_cooldown_minutes", ReturnValue::REQUIRE_PRESENCE},
+      {"REQUIRE_PRESENCE_ONLY", "require_presence_only_with_cooldown_minutes",
+       ReturnValue::REQUIRE_PRESENCE_ONLY},
+  };
+
+  for (const auto& c : cases) {
+    auto bare = sut.value()->CompileAndEvaluate(c.constant, *activation);
+    if (!bare.ok()) {
+      XCTFail("Failed to evaluate %s: %s", c.constant, bare.status().message().data());
+    } else {
+      XCTAssertEqual(bare.value().value, c.value, @"%s", c.constant);
+      XCTAssertFalse(bare.value().authCooldownMinutes.has_value(), @"%s", c.constant);
+    }
+
+    std::string expr = absl::StrCat(c.helper, "(30)");
+    auto cooldown = sut.value()->CompileAndEvaluate(expr, *activation);
+    if (!cooldown.ok()) {
+      XCTFail("Failed to evaluate %s: %s", expr.c_str(), cooldown.status().message().data());
+    } else {
+      XCTAssertEqual(cooldown.value().value, c.value, @"%s", expr.c_str());
+      XCTAssertTrue(cooldown.value().authCooldownMinutes.has_value(), @"%s", expr.c_str());
+      XCTAssertEqual(cooldown.value().authCooldownMinutes.value(), 30ULL, @"%s", expr.c_str());
+    }
+  }
+}
+
+// Every hold-for-authorization policy lives in the v2 ReturnValue enum only, so
+// a v1 expression naming one must fail to compile rather than evaluate to
+// something else. v1 rules still reach clients through StaticRules, santactl,
+// and sync servers that are not on v2.
+- (void)testAuthorizationPoliciesNotAvailableInV1 {
+  auto activation = MakeActivation<false>();
+  auto sut = santa::cel::Evaluator<false>::Create();
+  XCTAssertTrue(sut.ok());
+
+  for (const char* expr : {
+           "REQUIRE_TOUCHID",
+           "REQUIRE_TOUCHID_ONLY",
+           "REQUIRE_SECURITY_KEY",
+           "REQUIRE_SECURITY_KEY_ONLY",
+           "REQUIRE_PRESENCE",
+           "REQUIRE_PRESENCE_ONLY",
+           "require_security_key_with_cooldown_minutes(10)",
+           "require_security_key_only_with_cooldown_minutes(10)",
+           "require_presence_with_cooldown_minutes(10)",
+           "require_presence_only_with_cooldown_minutes(10)",
+       }) {
+    XCTAssertFalse(sut.value()->CompileAndEvaluate(expr, *activation).ok(), @"%s", expr);
   }
 }
 
@@ -1317,8 +1386,8 @@ class ScopedHostZone {
       XCTFail(@"Failed to evaluate: %s", result.status().message().data());
     } else {
       XCTAssertEqual(result.value().value, ReturnValue::REQUIRE_TOUCHID);
-      XCTAssertTrue(result.value().touchIDCooldownMinutes.has_value());
-      XCTAssertEqual(result.value().touchIDCooldownMinutes.value(), 30ULL);
+      XCTAssertTrue(result.value().authCooldownMinutes.has_value());
+      XCTAssertEqual(result.value().authCooldownMinutes.value(), 30ULL);
     }
   }
   {
@@ -1330,8 +1399,8 @@ class ScopedHostZone {
       XCTFail(@"Failed to evaluate: %s", result.status().message().data());
     } else {
       XCTAssertEqual(result.value().value, ReturnValue::REQUIRE_TOUCHID);
-      XCTAssertTrue(result.value().touchIDCooldownMinutes.has_value());
-      XCTAssertEqual(result.value().touchIDCooldownMinutes.value(), 15ULL);
+      XCTAssertTrue(result.value().authCooldownMinutes.has_value());
+      XCTAssertEqual(result.value().authCooldownMinutes.value(), 15ULL);
     }
   }
   {
@@ -1436,9 +1505,15 @@ class ScopedHostZone {
     return sut.value()->CompileAndEvaluate(expr, *activation);
   };
 
-  for (const char* policy : {"ALLOWLIST", "AUDIT", "SEATBELT", "REQUIRE_TOUCHID",
-                             "REQUIRE_TOUCHID_ONLY", "require_touchid_with_cooldown_minutes(30)",
-                             "require_touchid_only_with_cooldown_minutes(5)"}) {
+  for (const char* policy :
+       {"ALLOWLIST", "AUDIT", "SEATBELT", "REQUIRE_TOUCHID", "REQUIRE_TOUCHID_ONLY",
+        "REQUIRE_SECURITY_KEY", "REQUIRE_SECURITY_KEY_ONLY", "REQUIRE_PRESENCE",
+        "REQUIRE_PRESENCE_ONLY", "require_touchid_with_cooldown_minutes(30)",
+        "require_touchid_only_with_cooldown_minutes(5)",
+        "require_security_key_with_cooldown_minutes(30)",
+        "require_security_key_only_with_cooldown_minutes(5)",
+        "require_presence_with_cooldown_minutes(30)",
+        "require_presence_only_with_cooldown_minutes(5)"}) {
     std::string expr =
         absl::StrCat("policy_for_range(duration('30m'), kill_on_expiry(", policy, "))");
     XCTAssertTrue(evaluate(expr).ok(), @"%s", expr.c_str());
@@ -1466,8 +1541,8 @@ class ScopedHostZone {
   XCTAssertTrue(cooldown.ok());
   XCTAssertEqual(cooldown.value().value,
                  santa::cel::CELProtoTraits<true>::ReturnValue::REQUIRE_TOUCHID);
-  XCTAssertTrue(cooldown.value().touchIDCooldownMinutes.has_value());
-  XCTAssertEqual(*cooldown.value().touchIDCooldownMinutes, 30ULL);
+  XCTAssertTrue(cooldown.value().authCooldownMinutes.has_value());
+  XCTAssertEqual(*cooldown.value().authCooldownMinutes, 30ULL);
   XCTAssertTrue(cooldown.value().pendingKill.has_value());
 }
 
@@ -2149,8 +2224,8 @@ class ScopedHostZone {
       XCTFail(@"Failed to evaluate: %s", result.status().message().data());
     } else {
       XCTAssertEqual(result.value().value, ReturnValue::REQUIRE_TOUCHID);
-      XCTAssertTrue(result.value().touchIDCooldownMinutes.has_value());
-      XCTAssertEqual(*result.value().touchIDCooldownMinutes, 30u);
+      XCTAssertTrue(result.value().authCooldownMinutes.has_value());
+      XCTAssertEqual(*result.value().authCooldownMinutes, 30u);
     }
   }
 

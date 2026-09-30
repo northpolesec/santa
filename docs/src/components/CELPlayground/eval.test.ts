@@ -115,6 +115,35 @@ describe("evaluate", () => {
     expect(result.isV2).toBe(true);
   });
 
+  // These come from the pinned @buf schema package, which moves independently
+  // of the proto. Without the bump they are simply absent and the playground
+  // reports an unknown identifier.
+  it("knows the security key and presence constants", () => {
+    for (const name of [
+      "REQUIRE_SECURITY_KEY",
+      "REQUIRE_SECURITY_KEY_ONLY",
+      "REQUIRE_PRESENCE",
+      "REQUIRE_PRESENCE_ONLY",
+    ]) {
+      const result = evaluate(name, DEFAULT_YAML);
+      expect(result.valid, name).toBe(true);
+      expect(result.isV2, name).toBe(true);
+    }
+  });
+
+  it("knows the security key and presence cooldown helpers", () => {
+    for (const fn of [
+      "require_security_key_with_cooldown_minutes",
+      "require_security_key_only_with_cooldown_minutes",
+      "require_presence_with_cooldown_minutes",
+      "require_presence_only_with_cooldown_minutes",
+    ]) {
+      const result = evaluate(`${fn}(30)`, DEFAULT_YAML);
+      expect(result.valid, fn).toBe(true);
+      expect(result.isV2, fn).toBe(true);
+    }
+  });
+
   it("detects V2 functions", () => {
     const result = evaluate(
       "require_touchid_with_cooldown_minutes(30)",

@@ -84,7 +84,8 @@
   ENCODE_BOXABLE(coder, identityUnverified);
   ENCODE_BOXABLE(coder, identityVendorMatched);
   ENCODE_BOXABLE(coder, holdAndAsk);
-  ENCODE_BOXABLE(coder, silentTouchID);
+  ENCODE_BOXABLE(coder, silentAuthorization);
+  ENCODE_BOXABLE(coder, authorizationMethod);
   ENCODE_BOXABLE(coder, seatbeltRequired);
   ENCODE_BOXABLE(coder, staticRule);
   ENCODE_BOXABLE(coder, ruleId);
@@ -136,7 +137,8 @@
     DECODE_SELECTOR(decoder, identityUnverified, NSNumber, boolValue);
     DECODE_SELECTOR(decoder, identityVendorMatched, NSNumber, boolValue);
     DECODE_SELECTOR(decoder, holdAndAsk, NSNumber, boolValue);
-    DECODE_SELECTOR(decoder, silentTouchID, NSNumber, boolValue);
+    DECODE_SELECTOR(decoder, silentAuthorization, NSNumber, boolValue);
+    DECODE_SELECTOR(decoder, authorizationMethod, NSNumber, integerValue);
     DECODE_SELECTOR(decoder, seatbeltRequired, NSNumber, boolValue);
     DECODE_SELECTOR(decoder, staticRule, NSNumber, boolValue);
     DECODE_SELECTOR(decoder, ruleId, NSNumber, longLongValue);

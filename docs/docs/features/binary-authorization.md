@@ -652,6 +652,52 @@ event/telemetry output this is the `UNKNOWN` case:
 - Lockdown: All unknown executions are blocked.
 
 - Standalone: All unknown executions are held until the user approves them,
-  either by using TouchID or entering their password. If they approve the
+  with Touch ID, a security key, or their password. If they approve the
   execution the execution is allowed to continue (without requiring
   re-execution) and a local SigningID or SHA-256 rule is automatically created.
+
+
+## User Authorization <AddedBadge added={"2026.9"} /> {#user-authorization}
+
+A CEL rule can hold an execution until the user authorizes it. The return value
+chooses what the user has to present:
+
+| Value | The user must authorize with |
+| ----- | ---------------------------- |
+| `REQUIRE_TOUCHID` | Touch ID (or a password, if `EnableStandalonePasswordFallback` is set) |
+| `REQUIRE_SECURITY_KEY` | A touch on a FIDO2 hardware security key attached to the Mac |
+| `REQUIRE_PRESENCE` | Either of the above |
+
+Each has an `_ONLY` variant that goes straight to the authorization prompt
+without showing the usual Santa block dialog, and a
+`<value>_with_cooldown_minutes(N)` helper that caches an approval for `N`
+minutes. An approval is cached against the method that was used, so an approval
+given with Touch ID never satisfies a later `REQUIRE_SECURITY_KEY` hold.
+
+Standalone client mode asks for presence, so either will do there too.
+
+### Security Keys
+
+Nothing needs enabling. A rule that returns `REQUIRE_SECURITY_KEY` or
+`REQUIRE_PRESENCE` is itself the opt-in, and Standalone mode asks for presence,
+so a user with a key can approve with it on a Mac that has no Touch ID.
+
+A `REQUIRE_SECURITY_KEY` hold with no key attached is denied. A
+`REQUIRE_PRESENCE` hold falls back to Touch ID, because the user was never asked
+for anything.
+
+:::warning
+
+This checks **user presence** only: that someone touched a FIDO2 key attached to
+the Mac. It does not establish which key, or whose. Any key that any person is
+holding will satisfy it, so it is no proof of identity — treat it as "a person
+was physically at this machine", which is also all `REQUIRE_TOUCHID` proves when
+`EnableStandalonePasswordFallback` allows a password.
+
+Verifying a *particular* key means checking an assertion against a public key
+registered to a user in advance. WebAuthn only exposes the attestation that
+identifies an authenticator at registration time, never during authorization, so
+that needs an enrollment service and a way to distribute the resulting
+credentials. Santa has neither yet.
+
+:::

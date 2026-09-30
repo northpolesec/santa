@@ -32,9 +32,9 @@
 
 #include "Source/common/cel/Activation.h"
 #include "Source/common/cel/AnnotationFunction.h"
+#include "Source/common/cel/AuthCooldownFunction.h"
 #include "Source/common/cel/PolicyForRangeFunction.h"
 #include "Source/common/cel/RelativeTimeFunction.h"
-#include "Source/common/cel/TouchIDFunction.h"
 #include "Source/common/cel/result.pb.h"
 
 namespace cel_runtime = ::google::api::expr::runtime;
@@ -64,9 +64,9 @@ static absl::StatusOr<std::unique_ptr<::cel::Compiler>> CreateCompiler(
     return result;
   }
 
-  // Add TouchID cooldown and relative-time functions for CELv2 only
+  // Add authorization cooldown and relative-time functions for CELv2 only
   if constexpr (IsV2) {
-    if (auto result = santa::cel::AddTouchIDCooldownCompilerLibrary(*builder); !result.ok()) {
+    if (auto result = santa::cel::AddAuthCooldownCompilerLibrary(*builder); !result.ok()) {
       return result;
     }
     if (auto result = santa::cel::AddRelativeTimeCompilerLibrary(*builder); !result.ok()) {
@@ -166,9 +166,9 @@ absl::StatusOr<std::unique_ptr<::cel_runtime::CelExpression>> Evaluator<IsV2>::C
     return result;
   }
 
-  // Register TouchID cooldown and relative-time functions for CELv2 only
+  // Register authorization cooldown and relative-time functions for CELv2 only
   if constexpr (IsV2) {
-    if (auto result = santa::cel::RegisterTouchIDCooldownFunctions(builder->GetRegistry(), options);
+    if (auto result = santa::cel::RegisterAuthCooldownFunctions(builder->GetRegistry(), options);
         !result.ok()) {
       return result;
     }

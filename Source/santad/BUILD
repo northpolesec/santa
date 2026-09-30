@@ -302,6 +302,7 @@ objc_library(
         "@FMDB",
         "@abseil-cpp//absl/container:flat_hash_map",
         "@northpolesec_protos//cel:v1_cc_proto",
+        "@northpolesec_protos//celv2:v2_cc_proto",
     ],
 )
 
@@ -616,6 +617,7 @@ objc_library(
         "//Source/common/processtree:process",
         "//Source/common/processtree:process_tree",
         "//Source/common/processtree/annotations:cel",
+        "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/synchronization",
         "@abseil-cpp//absl/time",
     ],

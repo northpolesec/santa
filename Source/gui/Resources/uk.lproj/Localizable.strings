@@ -357,3 +357,14 @@
 
 /* Authorize execution of an unidentifiable application with an unverifiable identity */
 "authorize execution of an application whose identity could not be verified" = "дозволити виконання програми, ідентичність якої не вдалося перевірити";
+/* Waiting for authorization */
+"Authorizing…" = "Авторизація…";
+
+/* Security key prompt title */
+"Touch your security key" = "Торкніться свого ключа безпеки";
+
+/* Switch from security key to Touch ID */
+"Use Touch ID Instead" = "Використати Touch ID натомість";
+
+/* Shown when a rule requires an authorization method the Mac cannot offer */
+"This Mac is not set up for the authorization this rule requires. Contact your administrator." = "Цей Mac не налаштовано для авторизації, якої вимагає це правило. Зверніться до свого адміністратора.";

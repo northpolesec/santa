@@ -14,9 +14,12 @@
 
 #import <Foundation/Foundation.h>
 
+#import "Source/common/SNTCommonEnums.h"
+
 @class SNTStoredExecutionEvent;
 
-/// Helper class for TouchID/LocalAuthentication authorization.
+/// Helper class for user authorization: TouchID/LocalAuthentication and FIDO2
+/// hardware security keys.
 @interface SNTAuthorizationHelper : NSObject
 
 /// Authorize temporary monitor mode via TouchID.
@@ -31,7 +34,7 @@
                                                    (void (^)(BOOL authenticated,
                                                              NSString* justification))replyBlock;
 
-/// Authorize execution of a binary via TouchID.
+/// Authorize execution of a binary, using the method the event asks for.
 + (void)authorizeExecutionForEvent:(SNTStoredExecutionEvent*)event
                         replyBlock:(void (^)(BOOL success))replyBlock;
 
@@ -40,5 +43,8 @@
 
 /// Check if TouchID authorization is available on this device.
 + (BOOL)canAuthorizeWithTouchID:(NSError**)error;
+
+/// Check if the given authorization method can be used on this device.
++ (BOOL)canAuthorizeWithMethod:(SNTAuthorizationMethod)method error:(NSError**)error;
 
 @end

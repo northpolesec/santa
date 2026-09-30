@@ -22,6 +22,44 @@ import santa_common_SNTStoredExecutionEvent
 import santa_gui_SNTAuthorizationHelper
 import santa_gui_SNTMessageView
 
+// CanAuthorize checks whether the authorization method this event asks for is
+// available on this device, and returns an error if it is not.
+func CanAuthorize(_ event: SNTStoredExecutionEvent?) -> (Bool, NSError?) {
+  do {
+    try SNTAuthorizationHelper.canAuthorize(
+      with: event?.authorizationMethod ?? .touchID
+    )
+    return (true, nil)
+  } catch let error as NSError {
+    return (false, error)
+  }
+}
+
+// StandaloneButton is only used for holdAndAsk events. It's a replacement for
+// the Open event button.
+//
+// It is intended to be used for all approvals in the future if in standalone
+// mode.
+func StandaloneButton(isAuthenticating: Bool, action: @escaping () -> Void) -> some View {
+  Button(
+    action: action,
+    label: {
+      if isAuthenticating {
+        HStack(spacing: 6) {
+          ProgressView().controlSize(.small)
+          Text(NSLocalizedString("Authorizing…", comment: "Waiting for authorization"))
+        }.frame(maxWidth: 200.0)
+      } else {
+        let t = NSLocalizedString("Approve", comment: "Default text for Approve")
+        Text(t).frame(maxWidth: 200.0)
+      }
+    }
+  )
+  .disabled(isAuthenticating)
+  .keyboardShortcut(.return, modifiers: .command)
+  .help("⌘ Return")
+}
+
 // A small class that will ferry bundle hashing state from SNTBinaryMessageWindowController
 // to SwiftUI.
 @objc public class SNTBundleProgress: NSObject, ObservableObject {
@@ -293,6 +331,7 @@ struct SNTBinaryMessageWindowView: View {
   @State public var preventFutureNotifications = false
   @State public var preventFutureNotificationPeriod: TimeInterval = NotificationSilencePeriods[0]
   @State private var repliedToCallback = false
+  @State private var isAuthenticating = false
 
   let c = SNTConfigurator.configurator()
 
@@ -312,7 +351,11 @@ struct SNTBinaryMessageWindowView: View {
   }
 
   var body: some View {
-    SNTMessageView(
+    // Building an LAContext is not free, so ask once per render rather than
+    // once per use.
+    let (canAuthz, authzErr) = CanAuthorize(event)
+
+    return SNTMessageView(
       SNTBlockMessage.attributedBlockMessage(for: event, customMessage: customMsg as String?)
     ) {
       SNTBinaryMessageEventView(e: event!, customURL: customURL)
@@ -337,25 +380,22 @@ struct SNTBinaryMessageWindowView: View {
         .animation(.spring(duration: 0.4), value: bundleProgress.isFinished)
       }
 
-      // Display the standalone error message to the user if one is provided.
-      if event?.holdAndAsk ?? false {
-        let (canAuthz, err) = CanAuthorizeWithTouchID()
-        if !canAuthz {
-          Group {
-            if let errMsg = err {
-              Text(errMsg.localizedDescription).foregroundColor(.red)
-            }
-          }.task {
-            // If this is a holdAndAsk event but TouchID is not available,
-            // call the reply block immediately with false.
-            let _ = callReplyCallback(false)
+      // Display an error and auto-deny if no authorization method is available.
+      if event?.holdAndAsk ?? false, !canAuthz {
+        Group {
+          if let errMsg = authzErr {
+            Text(errMsg.localizedDescription).foregroundColor(.red)
           }
+        }.task {
+          // If this is a holdAndAsk event but the authorization method it asks
+          // for is not available, call the reply block immediately with false.
+          let _ = callReplyCallback(false)
         }
       }
 
       HStack(spacing: 15.0) {
-        if shouldAddStandaloneButton(event) {
-          StandaloneButton(action: standAloneButton)
+        if shouldAddStandaloneButton(event, canAuthorize: canAuthz) {
+          StandaloneButton(isAuthenticating: isAuthenticating, action: standAloneButton)
         } else if shouldAddOpenButton() {
           OpenEventButton(
             customText: (eventDetailButtonText as String?) ?? configState.eventDetailText,
@@ -364,26 +404,24 @@ struct SNTBinaryMessageWindowView: View {
           )
         }
 
+        // The authorization prompt carries its own Cancel. Dismissing here would
+        // close this dialog but leave that prompt, and its key request, running.
         DismissButton(
           customText: getDismissText(),
           silence: preventFutureNotifications,
           action: dismissButton
         )
+        .disabled(isAuthenticating)
       }
     }.fixedSize()
   }
 
-  func shouldAddStandaloneButton(_ event: SNTStoredExecutionEvent?) -> Bool {
+  func shouldAddStandaloneButton(_ event: SNTStoredExecutionEvent?, canAuthorize: Bool) -> Bool {
     if event?.holdAndAsk ?? false == false {
       return false
     }
 
-    let (canAuthz, _) = CanAuthorizeWithTouchID()
-    if !canAuthz {
-      return false
-    }
-
-    return true
+    return canAuthorize
   }
 
   func shouldAddOpenButton() -> Bool {
@@ -418,8 +456,12 @@ struct SNTBinaryMessageWindowView: View {
       return
     }
 
+    isAuthenticating = true
     SNTAuthorizationHelper.authorizeExecution(for: e) { success in
+      // SNTAuthorizationHelper guarantees this never runs on the main thread,
+      // which .sync depends on.
       DispatchQueue.main.sync {
+        isAuthenticating = false
         callReplyCallback(success)
         window?.close()
       }

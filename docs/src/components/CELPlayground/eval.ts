@@ -100,14 +100,30 @@ const GRANTABLE_POLICIES = [
   "SEATBELT",
   "REQUIRE_TOUCHID",
   "REQUIRE_TOUCHID_ONLY",
+  "REQUIRE_SECURITY_KEY",
+  "REQUIRE_SECURITY_KEY_ONLY",
+  "REQUIRE_PRESENCE",
+  "REQUIRE_PRESENCE_ONLY",
 ];
 const GRANTABLE_VALUES = new Set(
-  GRANTABLE_POLICIES.map((name) => v2Entries.nameToValue[name]),
+  GRANTABLE_POLICIES.map((name) => v2Entries.nameToValue[name]).filter(
+    (value) => value !== undefined,
+  ),
 );
-const TOUCHID_HELPERS = [
-  "require_touchid_with_cooldown_minutes",
-  "require_touchid_only_with_cooldown_minutes",
-];
+// The policies a cooldown helper can carry. Anything missing from the pinned
+// schema package is skipped, so this list may name a policy before that
+// package catches up.
+const COOLDOWN_HELPER_POLICIES = [
+  "REQUIRE_TOUCHID",
+  "REQUIRE_TOUCHID_ONLY",
+  "REQUIRE_SECURITY_KEY",
+  "REQUIRE_SECURITY_KEY_ONLY",
+  "REQUIRE_PRESENCE",
+  "REQUIRE_PRESENCE_ONLY",
+].filter((name) => v2Entries.nameToValue[name] !== undefined);
+const cooldownHelperName = (policy: string) =>
+  `${policy.toLowerCase()}_with_cooldown_minutes`;
+const COOLDOWN_HELPERS = COOLDOWN_HELPER_POLICIES.map(cooldownHelperName);
 
 function startOfDay(now: Date, zone: Zone): Date {
   const civil = toCivil(now, zone);
@@ -192,15 +208,14 @@ function buildEnvironment(): Environment {
 
   // Register V2 custom functions
   // Note: These return fixed values; the minutes parameter is ignored
-  // since actual TouchID behavior cannot be simulated in a playground.
-  env.registerFunction(
-    "require_touchid_with_cooldown_minutes(int): int",
-    (_minutes: bigint) => v2Entries.nameToValue["REQUIRE_TOUCHID"],
-  );
-  env.registerFunction(
-    "require_touchid_only_with_cooldown_minutes(int): int",
-    (_minutes: bigint) => v2Entries.nameToValue["REQUIRE_TOUCHID_ONLY"],
-  );
+  // since actual authorization behavior cannot be simulated in a playground.
+  for (const policy of COOLDOWN_HELPER_POLICIES) {
+    const value = v2Entries.nameToValue[policy];
+    env.registerFunction(
+      `${cooldownHelperName(policy)}(int): int`,
+      (_minutes: bigint) => value,
+    );
+  }
 
   // Relative-time helpers (V2). today() is the start of the current day in the
   // host's zone, today(tz) the same in a named zone, and now() the current
@@ -437,7 +452,7 @@ export function validateTimeRules(ast: any): void {
             `${wrapped.args} cannot be used with kill_on_expiry() because it does not allow a process to start`,
           );
         }
-      } else if (!(wrapped && TOUCHID_HELPERS.some((helper) => isCall(wrapped, helper)))) {
+      } else if (!(wrapped && COOLDOWN_HELPERS.some((helper) => isCall(wrapped, helper)))) {
         throw new Error("kill_on_expiry() requires a statically known allow-like policy");
       }
 

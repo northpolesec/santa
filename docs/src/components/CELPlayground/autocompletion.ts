@@ -374,6 +374,46 @@ export const celWorkshopFunctions: CELCompletionItem[] = [
     v2Only: true,
   },
   {
+    label: "require_security_key_with_cooldown_minutes",
+    kind: "function",
+    detail: "require_security_key_with_cooldown_minutes(minutes) -> REQUIRE_SECURITY_KEY",
+    documentation:
+      "Returns REQUIRE_SECURITY_KEY. The cooldown parameter specifies the number of minutes before a security key is required again.",
+    insertText: "require_security_key_with_cooldown_minutes(${1:minutes})",
+    insertTextRules: "insertAsSnippet",
+    v2Only: true,
+  },
+  {
+    label: "require_security_key_only_with_cooldown_minutes",
+    kind: "function",
+    detail: "require_security_key_only_with_cooldown_minutes(minutes) -> REQUIRE_SECURITY_KEY_ONLY",
+    documentation:
+      "Returns REQUIRE_SECURITY_KEY_ONLY. The cooldown parameter specifies the number of minutes before a security key is required again.",
+    insertText: "require_security_key_only_with_cooldown_minutes(${1:minutes})",
+    insertTextRules: "insertAsSnippet",
+    v2Only: true,
+  },
+  {
+    label: "require_presence_with_cooldown_minutes",
+    kind: "function",
+    detail: "require_presence_with_cooldown_minutes(minutes) -> REQUIRE_PRESENCE",
+    documentation:
+      "Returns REQUIRE_PRESENCE. The cooldown parameter specifies the number of minutes before Touch ID or a security key is required again.",
+    insertText: "require_presence_with_cooldown_minutes(${1:minutes})",
+    insertTextRules: "insertAsSnippet",
+    v2Only: true,
+  },
+  {
+    label: "require_presence_only_with_cooldown_minutes",
+    kind: "function",
+    detail: "require_presence_only_with_cooldown_minutes(minutes) -> REQUIRE_PRESENCE_ONLY",
+    documentation:
+      "Returns REQUIRE_PRESENCE_ONLY. The cooldown parameter specifies the number of minutes before Touch ID or a security key is required again.",
+    insertText: "require_presence_only_with_cooldown_minutes(${1:minutes})",
+    insertTextRules: "insertAsSnippet",
+    v2Only: true,
+  },
+  {
     label: "today",
     kind: "function",
     detail: "today([tz]) -> timestamp",
@@ -427,7 +467,7 @@ export const celWorkshopFunctions: CELCompletionItem[] = [
     kind: "function",
     detail: "kill_on_expiry(policy) -> policy",
     documentation:
-      "Wraps the in-range policy of policy_for_range() so the processes the rule allowed are quit when the window closes. Accepts only policies that let a process start: ALLOWLIST, AUDIT, SEATBELT, REQUIRE_TOUCHID, REQUIRE_TOUCHID_ONLY and the Touch ID cooldown helpers. Requires Workshop and Santa 2026.8+.",
+      "Wraps the in-range policy of policy_for_range() so the processes the rule allowed are quit when the window closes. Accepts only policies that let a process start: ALLOWLIST, AUDIT, SEATBELT, REQUIRE_TOUCHID, REQUIRE_TOUCHID_ONLY, REQUIRE_SECURITY_KEY, REQUIRE_SECURITY_KEY_ONLY, REQUIRE_PRESENCE, REQUIRE_PRESENCE_ONLY and the cooldown helpers. Requires Workshop and Santa 2026.8+.",
     insertText: "kill_on_expiry(${1:ALLOWLIST})",
     insertTextRules: "insertAsSnippet",
     v2Only: true,
@@ -588,6 +628,10 @@ export const celLanguageDefinition = {
     // Workshop custom functions
     "require_touchid_with_cooldown_minutes",
     "require_touchid_only_with_cooldown_minutes",
+    "require_security_key_with_cooldown_minutes",
+    "require_security_key_only_with_cooldown_minutes",
+    "require_presence_with_cooldown_minutes",
+    "require_presence_only_with_cooldown_minutes",
     "today",
     "days",
     "now",

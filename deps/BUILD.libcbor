@@ -1,0 +1,60 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+# libcbor ships a BUILD file of its own, but it shells out to CMake. This file
+# replaces it with a hermetic build. Both generated headers below are normally
+# produced by the CMake configure step.
+
+genrule(
+    name = "cbor_configuration_h",
+    srcs = ["src/cbor/configuration.h.in"],
+    outs = ["src/cbor/configuration.h"],
+    cmd = """
+        sed -e 's/$${PROJECT_VERSION_MAJOR}/0/g' \
+            -e 's/$${PROJECT_VERSION_MINOR}/14/g' \
+            -e 's/$${PROJECT_VERSION_PATCH}/0/g' \
+            -e 's/$${CBOR_BUFFER_GROWTH}/2/g' \
+            -e 's/$${CBOR_MAX_STACK_SIZE}/2048/g' \
+            -e 's/#cmakedefine01 CBOR_PRETTY_PRINTER/#define CBOR_PRETTY_PRINTER 1/g' \
+            -e 's/$${CBOR_RESTRICT_SPECIFIER}/restrict/g' \
+            $< > $@
+    """,
+)
+
+# CMake generates this with GenerateExportHeader. libcbor is statically linked
+# here, so the visibility attributes are all that is needed.
+genrule(
+    name = "cbor_export_h",
+    outs = ["src/cbor/cbor_export.h"],
+    cmd = "\n".join([
+        "cat > $@ <<'CBOR_EXPORT_EOF'",
+        "#ifndef CBOR_EXPORT_H",
+        "#define CBOR_EXPORT_H",
+        "",
+        "#define CBOR_EXPORT __attribute__((visibility(\"default\")))",
+        "#define CBOR_NO_EXPORT __attribute__((visibility(\"hidden\")))",
+        "",
+        "#endif /* CBOR_EXPORT_H */",
+        "CBOR_EXPORT_EOF",
+    ]),
+)
+
+cc_library(
+    name = "cbor",
+    srcs = [
+        "src/allocators.c",
+        "src/cbor.c",
+    ] + glob([
+        "src/cbor/*.c",
+        "src/cbor/internal/*.c",
+    ]),
+    hdrs = ["src/cbor.h"] + glob([
+        "src/cbor/*.h",
+        "src/cbor/internal/*.h",
+    ]),
+    includes = ["src"],
+    textual_hdrs = [
+        ":cbor_configuration_h",
+        ":cbor_export_h",
+    ],
+    visibility = ["//visibility:public"],
+)
