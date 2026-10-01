@@ -38,7 +38,9 @@
 #include "Source/santasyncservice/ProtoTraits.h"
 #import "Source/santasyncservice/SNTSyncLogging.h"
 #import "Source/santasyncservice/SNTSyncState.h"
+#include "celv2/v2.pb.h"
 #include "google/protobuf/arena.h"
+#include "google/protobuf/json/json.h"
 
 namespace pbv2 = ::santa::sync::v2;
 
@@ -387,6 +389,20 @@ typename santa::ProtoTraits<IsV2>::EventT* MessageForExecutionEvent(
 
   if (event.identityUnverified) {
     e->set_identity_unverified(true);
+  }
+
+  // The sync protos have no field for the CEL context yet, so log what would
+  // have been uploaded instead.
+  if (event.celContext) {
+    ::santa::cel::v2::ExecutionContext ctx;
+    std::string json;
+    if (ctx.ParseFromArray(event.celContext.bytes, (int)event.celContext.length) &&
+        google::protobuf::json::MessageToJsonString(ctx, &json).ok()) {
+      SLOGI(@"CEL context for %@ (rule %lld, audit %d): %s", event.filePath, event.ruleId,
+            event.auditReturn, json.c_str());
+    } else {
+      SLOGW(@"Failed to decode CEL context for %@", event.filePath);
+    }
   }
 
   return e;

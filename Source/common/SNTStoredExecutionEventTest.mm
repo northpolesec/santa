@@ -169,6 +169,14 @@
   XCTAssertEqualObjects(out.annotations, (@[ @"alpha", @"zeta" ]));
 }
 
+- (void)testCELContextSurvivesSecureCodingRoundTrip {
+  SNTStoredExecutionEvent* se = [[SNTStoredExecutionEvent alloc] init];
+  se.celContext = [@"ctx" dataUsingEncoding:NSUTF8StringEncoding];
+
+  SNTStoredExecutionEvent* out = [self roundTripped:se];
+  XCTAssertEqualObjects(out.celContext, se.celContext);
+}
+
 - (void)testIdentityVendorMatchedDefaultsToNoAndSurvivesRoundTrip {
   // A spurious identityVendorMatched on decode would route this through the
   // verified branches in -createRuleForStandaloneModeEvent:.

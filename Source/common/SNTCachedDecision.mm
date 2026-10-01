@@ -103,6 +103,7 @@
   copy.timedRuleKillWindowEnd = _timedRuleKillWindowEnd;
   copy.timedRuleKillWindowZone = _timedRuleKillWindowZone;
   copy.auditReturn = _auditReturn;
+  copy.celContext = _celContext;
   return copy;
 }
 

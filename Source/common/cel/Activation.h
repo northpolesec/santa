@@ -102,6 +102,11 @@ class Activation : public ::google::api::expr::runtime::BaseActivation {
   // with whichever later rule succeeds.
   void FlushStagedAnnotations(bool commit) const;
 
+  // Returns the context the evaluation saw: target, plus each lazy field it
+  // actually read. Fields that were never read are left unset, and are not
+  // computed here.
+  typename Traits::ExecutionContextT SnapshotContext() const;
+
   template <bool V2>
   friend class Evaluator;
 

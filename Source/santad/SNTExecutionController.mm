@@ -1014,6 +1014,7 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
   se.filePath = binInfo.path ?: santa::StringTokenToNSString(targetProc->executable->path);
   se.decision = cd.decision;
   se.auditReturn = cd.auditReturn;
+  se.celContext = cd.celContext;
   se.identityUnverified = cd.identityMismatched;
   se.identityVendorMatched = cd.identityVendorMatched;
   se.holdAndAsk = cd.holdAndAsk;

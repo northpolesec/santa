@@ -42,6 +42,10 @@
 #include "cel/v1.pb.h"
 
 static constexpr uint64_t kCELPlanCacheMaxSize = 128;
+// ponytail: one flat cap on the serialized CEL context. args and envs can reach
+// ARG_MAX, and the context rides along in the events table and the upload
+// batch. A larger context is dropped rather than truncated.
+static constexpr size_t kMaxCELContextBytes = 64 * 1024;
 
 enum class PlatformBinaryState {
   kRuntimeTrue = 0,
@@ -422,6 +426,20 @@ struct FallbackBatch {
       default:
         LOGW(@"Unexpected return value from CEL expression: %d", returnValue);
         return {.succeeded = false, .decisionMade = false, .resultState = {}};
+    }
+
+    // Keep the context a block or AUDIT was decided on, so an admin can see why.
+    if (cd.auditReturn || resultState == SNTRuleStateBlock ||
+        resultState == SNTRuleStateSilentBlock || resultState == SNTRuleStateSilentBlockGUI ||
+        resultState == SNTRuleStateSilentBlockTTY) {
+      std::string ctx = static_cast<const santa::cel::Activation<true>&>(activation)
+                            .SnapshotContext()
+                            .SerializeAsString();
+      if (ctx.size() <= kMaxCELContextBytes) {
+        cd.celContext = [NSData dataWithBytes:ctx.data() length:ctx.size()];
+      } else {
+        LOGW(@"Dropping CEL context of %zu bytes (limit %zu)", ctx.size(), kMaxCELContextBytes);
+      }
     }
   } else {
     using ReturnValue = santa::cel::CELProtoTraits<false>::ReturnValue;

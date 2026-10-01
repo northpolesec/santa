@@ -113,4 +113,8 @@
 /// distinguished from regular allow decisions on the server.
 @property BOOL auditReturn;
 
+/// The serialized santa.cel.v2.ExecutionContext a CELv2 expression saw when it
+/// returned a block or AUDIT: target, plus each lazy field it read.
+@property NSData* celContext;
+
 @end

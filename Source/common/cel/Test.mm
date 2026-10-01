@@ -874,6 +874,88 @@ class ScopedHostZone {
   }
 }
 
+- (void)testSnapshotContext {
+  using ExecutableFileT = santa::cel::CELProtoTraits<true>::ExecutableFileT;
+  using AncestorT = santa::cel::CELProtoTraits<true>::AncestorT;
+  using FileDescriptorT = santa::cel::CELProtoTraits<true>::FileDescriptorT;
+
+  auto sut = santa::cel::Evaluator<true>::Create();
+  XCTAssertTrue(sut.ok());
+
+  auto makeActivation = [] {
+    auto f = std::make_unique<ExecutableFileT>();
+    f->set_team_id("EQHXZ8M8AV");
+    return std::make_unique<santa::cel::Activation<true>>(
+        std::move(f),
+        ^std::vector<std::string>() {
+          return {"/usr/bin/test", "--ctx"};
+        },
+        ^std::map<std::string, std::string>() {
+          return {{"FOO", "bar"}};
+        },
+        ^uid_t() {
+          return 501;
+        },
+        ^std::string() {
+          return "/tmp";
+        },
+        ^std::string() {
+          return "/usr/bin/test";
+        },
+        ^std::vector<AncestorT>() {
+          AncestorT a;
+          a.set_team_id("ANCESTOR");
+          return {a};
+        },
+        ^std::vector<FileDescriptorT>() {
+          return {};
+        });
+  };
+
+  {
+    // Only target and the lazy field the expression read are populated.
+    auto activation = makeActivation();
+    auto result =
+        sut.value()->CompileAndEvaluate("args[1] == '--ctx' ? BLOCKLIST : ALLOWLIST", *activation);
+    XCTAssertTrue(result.ok());
+    auto ctx = activation->SnapshotContext();
+    XCTAssertEqual(ctx.target().team_id(), "EQHXZ8M8AV");
+    XCTAssertEqual(ctx.args_size(), 2);
+    XCTAssertEqual(ctx.args(1), "--ctx");
+    XCTAssertEqual(ctx.envs_size(), 0);
+    XCTAssertEqual(ctx.euid(), 0);
+    XCTAssertEqual(ctx.cwd(), "");
+    XCTAssertEqual(ctx.ancestors_size(), 0);
+  }
+  {
+    // A target-only expression reads nothing lazy.
+    auto activation = makeActivation();
+    auto result = sut.value()->CompileAndEvaluate(
+        "target.team_id == 'EQHXZ8M8AV' ? AUDIT : ALLOWLIST", *activation);
+    XCTAssertTrue(result.ok());
+    auto ctx = activation->SnapshotContext();
+    XCTAssertEqual(ctx.target().team_id(), "EQHXZ8M8AV");
+    XCTAssertEqual(ctx.args_size(), 0);
+    XCTAssertEqual(ctx.path(), "");
+  }
+  {
+    // Every lazy field that was read comes along whole.
+    auto activation = makeActivation();
+    auto result = sut.value()->CompileAndEvaluate(
+        "envs['FOO'] == 'bar' && euid == 501 && cwd == '/tmp' && "
+        "ancestors.exists(a, a.team_id == 'ANCESTOR') ? BLOCKLIST : ALLOWLIST",
+        *activation);
+    XCTAssertTrue(result.ok());
+    auto ctx = activation->SnapshotContext();
+    XCTAssertEqual(ctx.envs().at("FOO"), "bar");
+    XCTAssertEqual(ctx.euid(), 501);
+    XCTAssertEqual(ctx.cwd(), "/tmp");
+    XCTAssertEqual(ctx.ancestors_size(), 1);
+    XCTAssertEqual(ctx.ancestors(0).team_id(), "ANCESTOR");
+    XCTAssertEqual(ctx.args_size(), 0);
+  }
+}
+
 - (void)testV2Only {
   auto argsFn = ^std::vector<std::string>() {
     return {"hello", "world"};

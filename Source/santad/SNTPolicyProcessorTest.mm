@@ -1683,6 +1683,59 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     XCTAssertTrue(cd.seatbeltRequired);
     XCTAssertFalse(cd.cacheable);
   }
+  {
+    // A CELv2 block keeps the context it was decided on.
+    SNTRule* r = createCELRule(@"'arg1' in args ? BLOCKLIST : ALLOWLIST", true);
+    SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+    cd.sha256 = r.identifier;
+    [self.processor decision:cd
+                         forRule:r
+             withTransitiveRules:YES
+                      failClosed:NO
+        andCELActivationCallback:activation];
+    XCTAssertEqual(cd.decision, SNTEventStateBlockBinary);
+    santa::cel::v2::ExecutionContext ctx;
+    XCTAssertTrue(ctx.ParseFromArray(cd.celContext.bytes, (int)cd.celContext.length));
+    XCTAssertEqual(ctx.target().signing_time().seconds(), 1717987200);
+    XCTAssertEqual(ctx.args_size(), 2);
+    XCTAssertEqual(ctx.args(0), "arg1");
+    XCTAssertEqual(ctx.envs_size(), 0);
+  }
+  {
+    // So does AUDIT.
+    SNTRule* r = createCELRule(@"AUDIT", true);
+    SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+    cd.sha256 = r.identifier;
+    [self.processor decision:cd
+                         forRule:r
+             withTransitiveRules:YES
+                      failClosed:NO
+        andCELActivationCallback:activation];
+    XCTAssertEqual(cd.decision, SNTEventStateAllowBinary);
+    XCTAssertTrue(cd.auditReturn);
+    santa::cel::v2::ExecutionContext ctx;
+    XCTAssertTrue(ctx.ParseFromArray(cd.celContext.bytes, (int)cd.celContext.length));
+    XCTAssertEqual(ctx.target().signing_time().seconds(), 1717987200);
+    XCTAssertEqual(ctx.args_size(), 0);
+  }
+  {
+    // Allows, and CELv1, keep nothing.
+    for (NSNumber* v2 in @[ @YES, @NO ]) {
+      SNTRule* r = createCELRule(v2.boolValue ? @"'arg1' in args ? ALLOWLIST : BLOCKLIST"
+                                              : @"'arg1' in args ? BLOCKLIST : ALLOWLIST",
+                                 v2.boolValue);
+      SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+      cd.sha256 = r.identifier;
+      [self.processor decision:cd
+                           forRule:r
+               withTransitiveRules:YES
+                        failClosed:NO
+          andCELActivationCallback:activation];
+      XCTAssertEqual(cd.decision,
+                     v2.boolValue ? SNTEventStateAllowBinary : SNTEventStateBlockBinary);
+      XCTAssertNil(cd.celContext);
+    }
+  }
 }
 
 // A CEL rule that cannot be evaluated follows the failClosed the caller

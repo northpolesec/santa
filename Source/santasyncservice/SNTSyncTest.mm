@@ -44,6 +44,7 @@
 #import "Source/santasyncservice/SNTSyncRuleDownload.h"
 #import "Source/santasyncservice/SNTSyncStage.h"
 #import "Source/santasyncservice/SNTSyncState.h"
+#include "celv2/v2.pb.h"
 
 @interface SNTSyncStage (XSSI)
 - (NSData*)stripXssi:(NSData*)data;
@@ -2306,6 +2307,39 @@
               XCTAssertNil(event[@"annotations"]);
             }
 
+            return YES;
+          }];
+
+  XCTAssertTrue([sut sync]);
+}
+
+- (void)testEventUploadWithCELContext {
+  SNTSyncEventUpload* sut = [[SNTSyncEventUpload alloc] initWithState:self.syncState];
+  self.syncState.eventBatchSize = 50;
+
+  ::santa::cel::v2::ExecutionContext ctx;
+  ctx.add_args("--ctx");
+  std::string bytes = ctx.SerializeAsString();
+
+  SNTStoredExecutionEvent* execEvent = [[SNTStoredExecutionEvent alloc] init];
+  execEvent.fileSHA256 = @"aabbccdd";
+  execEvent.filePath = @"/usr/bin/test";
+  execEvent.decision = SNTEventStateBlockBinary;
+  execEvent.occurrenceDate = [NSDate dateWithTimeIntervalSince1970:1700000000];
+  execEvent.celContext = [NSData dataWithBytes:bytes.data() length:bytes.size()];
+
+  NSArray* events = @[ execEvent ];
+  OCMStub([self.daemonConnRop databaseEventsPending:([OCMArg invokeBlockWithArgs:events, nil])]);
+
+  // The sync protos have no CEL context field yet: the context is only logged,
+  // and the event uploads as before.
+  [self stubRequestBody:nil
+               response:nil
+                  error:nil
+          validateBlock:^BOOL(NSURLRequest* req) {
+            NSArray* execEvents = [self dictFromRequest:req][kEvents];
+            XCTAssertEqual(execEvents.count, 1);
+            XCTAssertEqualObjects(execEvents[0][@"file_sha256"], @"aabbccdd");
             return YES;
           }];
 

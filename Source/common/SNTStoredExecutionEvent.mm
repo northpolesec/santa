@@ -81,6 +81,7 @@
   ENCODE(coder, executingUser);
   ENCODE_BOXABLE(coder, decision);
   ENCODE_BOXABLE(coder, auditReturn);
+  ENCODE(coder, celContext);
   ENCODE_BOXABLE(coder, identityUnverified);
   ENCODE_BOXABLE(coder, identityVendorMatched);
   ENCODE_BOXABLE(coder, holdAndAsk);
@@ -133,6 +134,7 @@
     DECODE(decoder, executingUser, NSString);
     DECODE_SELECTOR(decoder, decision, NSNumber, unsignedLongLongValue);
     DECODE_SELECTOR(decoder, auditReturn, NSNumber, boolValue);
+    DECODE(decoder, celContext, NSData);
     DECODE_SELECTOR(decoder, identityUnverified, NSNumber, boolValue);
     DECODE_SELECTOR(decoder, identityVendorMatched, NSNumber, boolValue);
     DECODE_SELECTOR(decoder, holdAndAsk, NSNumber, boolValue);

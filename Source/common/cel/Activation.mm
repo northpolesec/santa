@@ -370,6 +370,38 @@ bool Activation<IsV2>::IsResultCacheable() const {
 }
 
 template <bool IsV2>
+typename Activation<IsV2>::Traits::ExecutionContextT Activation<IsV2>::SnapshotContext() const {
+  typename Traits::ExecutionContextT ctx;
+  if (file_) {
+    *ctx.mutable_target() = *file_;
+  }
+  if (args_.HasValue()) {
+    ctx.mutable_args()->Add(args_().begin(), args_().end());
+  }
+  if (envs_.HasValue()) {
+    ctx.mutable_envs()->insert(envs_().begin(), envs_().end());
+  }
+  if (euid_.HasValue()) {
+    ctx.set_euid(euid_());
+  }
+  if (cwd_.HasValue()) {
+    ctx.set_cwd(cwd_());
+  }
+  if (path_.HasValue()) {
+    ctx.set_path(path_());
+  }
+  if constexpr (IsV2) {
+    if (ancestors_.HasValue()) {
+      ctx.mutable_ancestors()->Add(ancestors_().begin(), ancestors_().end());
+    }
+    if (fds_.HasValue()) {
+      ctx.mutable_fds()->Add(fds_().begin(), fds_().end());
+    }
+  }
+  return ctx;
+}
+
+template <bool IsV2>
 ::cel::Type Activation<IsV2>::CELType(google::protobuf::FieldDescriptor::CppType type,
                                       const google::protobuf::Descriptor* messageType) {
   switch (type) {

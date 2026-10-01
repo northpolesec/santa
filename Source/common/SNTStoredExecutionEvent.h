@@ -94,6 +94,10 @@
 /// is uploaded so audit matches can be distinguished on the sync server.
 @property BOOL auditReturn;
 
+/// The serialized santa.cel.v2.ExecutionContext the deciding CEL expression saw
+/// (mirrors SNTCachedDecision.celContext).
+@property(nullable) NSData* celContext;
+
 /// YES when the identity fields on this event could not be confirmed to be
 /// the file the kernel loaded (mirrors SNTCachedDecision.identityMismatched).
 /// Independent of -decision: an unverified execution can still be allowed or
