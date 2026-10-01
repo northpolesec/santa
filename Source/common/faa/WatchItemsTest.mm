@@ -41,8 +41,10 @@ using santa::DataWatchItems;
 using santa::IterateTargetsBlock;
 using santa::kWatchItemPolicyDefaultAllowReadAccess;
 using santa::kWatchItemPolicyDefaultAuditOnly;
+using santa::kWatchItemPolicyDefaultParentDirectoryProtection;
 using santa::kWatchItemPolicyDefaultPathType;
 using santa::kWatchItemPolicyDefaultRuleType;
+using santa::LookupPoliciesBeneathBlock;
 using santa::LookupPolicyBlock;
 using santa::PairPathAndType;
 using santa::ProcessWatchItemPolicy;
@@ -50,6 +52,7 @@ using santa::SetPairPathAndType;
 using santa::SetSharedDataWatchItemPolicy;
 using santa::SetSharedProcessWatchItemPolicy;
 using santa::Unit;
+using santa::WatchItemParentDirectoryProtection;
 using santa::WatchItemPathType;
 using santa::WatchItemProcess;
 using santa::WatchItemProcessList;
@@ -189,7 +192,7 @@ BlockGenResult CreatePolicyBlockGen() {
 
   auto blockGen = ^IterateTargetsBlock(std::vector<std::string> paths) {
     targetPolicies->clear();
-    return ^(santa::LookupPolicyBlock block) {
+    return ^(santa::LookupPolicyBlock block, santa::LookupPoliciesBeneathBlock) {
       for (const auto& path : paths) {
         targetPolicies->push_back(block(path));
       }
@@ -1103,11 +1106,18 @@ BlockGenResult CreatePolicyBlockGen() {
   // Options that only make sense rule-wide are rejected, not ignored
   for (NSString* key in @[
          kWatchItemConfigKeyOptionsAuditOnly, kWatchItemConfigKeyOptionsRuleType,
-         kWatchItemConfigKeyOptionsInvertProcessExceptions
+         kWatchItemConfigKeyOptionsInvertProcessExceptions,
+         kWatchItemConfigKeyOptionsParentDirectoryProtection
        ]) {
     XCTAssertTrue(std::holds_alternative<Unit>(
         verify(@[ @{kWatchItemConfigKeyProcessesBinaryPath : @"pa", key : @(NO)} ], &err)));
   }
+  XCTAssertTrue(std::holds_alternative<Unit>(verify(
+      @[ @{
+        kWatchItemConfigKeyProcessesBinaryPath : @"pa",
+        kWatchItemConfigKeyOptionsParentDirectoryProtection : kParentDirectoryProtectionAudit,
+      } ],
+      &err)));
 
   // With no overrides set, every option is inherited from the rule
   {
@@ -1966,6 +1976,367 @@ BlockGenResult CreatePolicyBlockGen() {
       blockGen({MakeTestDirPathTarget(@"/foo/appv1/plugins/does_not_yet_exist")}));
   XCTAssertEqual(targetPolicies.size(), 1);
   XCTAssertCStringEqual(targetPolicies[0].value_or(MakeBadPolicy())->name.c_str(), "n3");
+}
+
+- (void)testDataWatchItemsAncestorPaths {
+  SetSharedDataWatchItemPolicy policies{
+      std::make_shared<DataWatchItemPolicy>("chrome", "v1", "/u/lib/chrome/default/",
+                                            WatchItemPathType::kPrefix),
+      std::make_shared<DataWatchItemPolicy>("keychain", "v1", "/u/lib/keychains/login.db"),
+      std::make_shared<DataWatchItemPolicy>("lib", "v1", "/u/lib"),
+  };
+
+  DataWatchItems watchItems;
+  watchItems.Build(policies);
+
+  // Every ancestor is watched as a literal, except /u/lib which is already a
+  // watched literal. The trailing slash makes the prefix's own directory an
+  // ancestor.
+  SetPairPathAndType want = {
+      {"/u", WatchItemPathType::kLiteral},
+      {"/u/lib/chrome", WatchItemPathType::kLiteral},
+      {"/u/lib/chrome/default", WatchItemPathType::kLiteral},
+      {"/u/lib/keychains", WatchItemPathType::kLiteral},
+  };
+  XCTAssertTrue(watchItems.AncestorPathsDifference(DataWatchItems()) == want);
+}
+
+- (void)testDataWatchItemsAncestorPathsSkipsNonCanonicalPaths {
+  // A rule path with a ".." component is kept as configured but matches no
+  // event, so its real leading directories must not be watched as ancestors
+  DataWatchItems watchItems;
+  watchItems.Build({
+      std::make_shared<DataWatchItemPolicy>("dead", "v1", "/u/docs/../secrets"),
+  });
+
+  XCTAssertTrue(watchItems.AncestorPathsDifference(DataWatchItems()).empty());
+}
+
+- (void)testDataWatchItemsAncestorPathsDifference {
+  auto chrome = std::make_shared<DataWatchItemPolicy>("chrome", "v1", "/u/lib/chrome/cookies");
+  auto keychain =
+      std::make_shared<DataWatchItemPolicy>("keychain", "v1", "/u/lib/keychains/login.db");
+  auto lib = std::make_shared<DataWatchItemPolicy>("lib", "v1", "/u/lib");
+
+  DataWatchItems both;
+  DataWatchItems keychainOnly;
+  DataWatchItems keychainAndLib;
+  both.Build({chrome, keychain});
+  keychainOnly.Build({keychain});
+  keychainAndLib.Build({keychain, lib});
+
+  // Removing a rule removes only the ancestors no remaining path shares
+  XCTAssertTrue(both.AncestorPathsDifference(keychainOnly) ==
+                SetPairPathAndType({{"/u/lib/chrome", WatchItemPathType::kLiteral}}));
+  XCTAssertTrue(keychainOnly.AncestorPathsDifference(both).empty());
+
+  // A literal rule on an ancestor moves the path from the ancestor set to the
+  // watched set, and back when the rule is removed
+  XCTAssertTrue(keychainOnly.AncestorPathsDifference(keychainAndLib) ==
+                SetPairPathAndType({{"/u/lib", WatchItemPathType::kLiteral}}));
+  XCTAssertTrue((keychainAndLib - keychainOnly) ==
+                SetPairPathAndType({{"/u/lib", WatchItemPathType::kLiteral}}));
+  XCTAssertTrue(keychainAndLib.AncestorPathsDifference(keychainOnly).empty());
+}
+
+- (void)testDataWatchItemsPoliciesBeneath {
+  SetSharedDataWatchItemPolicy policies{
+      std::make_shared<DataWatchItemPolicy>("chrome", "v1", "/u/lib/chrome/default/",
+                                            WatchItemPathType::kPrefix),
+      std::make_shared<DataWatchItemPolicy>("keychain", "v1", "/u/lib/keychains/login.db"),
+      std::make_shared<DataWatchItemPolicy>("lib", "v1", "/u/lib"),
+  };
+
+  DataWatchItems watchItems;
+  watchItems.Build(policies);
+
+  using Names = std::vector<std::string>;
+  auto beneath = [&watchItems](const std::string& dir) {
+    __block Names names;
+    watchItems.FindPolicies(^(LookupPolicyBlock, LookupPoliciesBeneathBlock lookupBeneath) {
+      for (const auto& policy : lookupBeneath(dir)) {
+        names.push_back(policy->name);
+      }
+    });
+    return names;
+  };
+
+  // Policies beneath a directory are sorted by name
+  XCTAssertTrue(beneath("/u") == Names({"chrome", "keychain", "lib"}));
+  XCTAssertTrue(beneath("/u/lib") == Names({"chrome", "keychain"}));
+  XCTAssertTrue(beneath("/u/lib/chrome/default") == Names({"chrome"}));
+
+  // Watched paths themselves, paths below them, siblings, and unrelated paths
+  // have nothing beneath them
+  XCTAssertTrue(beneath("/u/lib/keychains/login.db").empty());
+  XCTAssertTrue(beneath("/u/lib/chrome/default/x").empty());
+  XCTAssertTrue(beneath("/u/li").empty());
+  XCTAssertTrue(beneath("/other").empty());
+}
+
+- (void)testParseConfigSingleWatchItemParentDirectoryProtection {
+  // Returns the setting of the single policy the rule parses to, or nullopt if
+  // the rule is rejected
+  auto parse = [](NSDictionary* watchItem) -> std::optional<WatchItemParentDirectoryProtection> {
+    SetSharedDataWatchItemPolicy data_policies;
+    SetSharedProcessWatchItemPolicy proc_policies;
+    NSError* err;
+    if (!ParseConfigSingleWatchItem(@"rule", kVersion, watchItem, &data_policies, &proc_policies,
+                                    &err) ||
+        data_policies.size() + proc_policies.size() != 1) {
+      return std::nullopt;
+    }
+    return data_policies.empty() ? (*proc_policies.begin())->parent_directory_protection
+                                 : (*data_policies.begin())->parent_directory_protection;
+  };
+  auto withOptions = ^NSDictionary*(NSDictionary* options) {
+    return @{kWatchItemConfigKeyPaths : @[ @"/a/b" ], kWatchItemConfigKeyOptions : options};
+  };
+  NSString* key = kWatchItemConfigKeyOptionsParentDirectoryProtection;
+
+  // The current default. Flipping kWatchItemPolicyDefaultParentDirectoryProtection
+  // changes this line and nothing else.
+  XCTAssertEqual(kWatchItemPolicyDefaultParentDirectoryProtection,
+                 WatchItemParentDirectoryProtection::kAudit);
+
+  // An absent key, or absent options, gives the default
+  XCTAssertEqual(parse(@{kWatchItemConfigKeyPaths : @[ @"/a/b" ]}),
+                 kWatchItemPolicyDefaultParentDirectoryProtection);
+  XCTAssertEqual(parse(withOptions(@{})), kWatchItemPolicyDefaultParentDirectoryProtection);
+
+  XCTAssertEqual(parse(withOptions(@{key : @"disabled"})),
+                 WatchItemParentDirectoryProtection::kDisabled);
+  XCTAssertEqual(parse(withOptions(@{key : @"audit"})), WatchItemParentDirectoryProtection::kAudit);
+  XCTAssertEqual(parse(withOptions(@{key : @"enforce"})),
+                 WatchItemParentDirectoryProtection::kEnforce);
+  // Values are case-insensitive, like Action and RuleType
+  XCTAssertEqual(parse(withOptions(@{key : @"Enforce"})),
+                 WatchItemParentDirectoryProtection::kEnforce);
+
+  // Invalid values and types reject the rule. Booleans are not aliases.
+  XCTAssertFalse(parse(withOptions(@{key : @"block"})).has_value());
+  XCTAssertFalse(parse(withOptions(@{key : @""})).has_value());
+  XCTAssertFalse(parse(withOptions(@{key : @(YES)})).has_value());
+
+  // Process rules carry the setting too
+  XCTAssertEqual(parse(withOptions(@{
+                   kWatchItemConfigKeyOptionsRuleType : kRuleTypeProcessesWithDeniedPaths,
+                   key : @"enforce",
+                 })),
+                 WatchItemParentDirectoryProtection::kEnforce);
+
+  // A ProcessesWithAllowedPaths rule accepts the key and ignores it: it never
+  // matches an ancestor
+  {
+    SetSharedDataWatchItemPolicy data_policies;
+    SetSharedProcessWatchItemPolicy proc_policies;
+    NSError* err;
+    XCTAssertTrue(ParseConfigSingleWatchItem(
+        @"rule", kVersion, withOptions(@{
+          kWatchItemConfigKeyOptionsRuleType : kRuleTypeProcessesWithAllowedPaths,
+          key : @"enforce",
+        }),
+        &data_policies, &proc_policies, &err));
+    XCTAssertEqual(proc_policies.size(), 1);
+    XCTAssertEqual((*proc_policies.begin())->MatchesTarget("/a", true),
+                   ProcessWatchItemPolicy::TargetMatch::kNone);
+  }
+
+  // The key cannot be set per process
+  XCTAssertFalse(parse(@{
+                   kWatchItemConfigKeyPaths : @[ @"/a/b" ],
+                   kWatchItemConfigKeyProcessesWithOptions : @[ @{
+                     kWatchItemConfigKeyProcessesBinaryPath : @"pa",
+                     key : @"disabled",
+                   } ],
+                 })
+                     .has_value());
+}
+
+- (void)testDataWatchItemsParentDirectoryProtectionDisabled {
+  auto policy = [](const char* name, const char* path, WatchItemParentDirectoryProtection pdp) {
+    return std::make_shared<DataWatchItemPolicy>(
+        name, "v1", path, kWatchItemPolicyDefaultPathType, kWatchItemPolicyDefaultAuditOnly,
+        kWatchItemPolicyDefaultRuleType, santa::WatchItemProcessOptions{}, WatchItemProcessList{},
+        0, pdp);
+  };
+  auto disabledChrome =
+      policy("chrome", "/u/lib/chrome/cookies", WatchItemParentDirectoryProtection::kDisabled);
+  auto auditChrome =
+      policy("chrome", "/u/lib/chrome/cookies", WatchItemParentDirectoryProtection::kAudit);
+  auto keychain =
+      policy("keychain", "/u/lib/keychains/login.db", WatchItemParentDirectoryProtection::kEnforce);
+
+  DataWatchItems withDisabled;
+  DataWatchItems withAudit;
+  withDisabled.Build({disabledChrome, keychain});
+  withAudit.Build({auditChrome, keychain});
+
+  using Names = std::vector<std::string>;
+  auto beneath = [](const DataWatchItems& watchItems, const std::string& dir) {
+    __block Names names;
+    watchItems.FindPolicies(^(LookupPolicyBlock, LookupPoliciesBeneathBlock lookupBeneath) {
+      for (const auto& policy : lookupBeneath(dir)) {
+        names.push_back(policy->name);
+      }
+    });
+    return names;
+  };
+
+  // A disabled rule contributes no ancestors. Directories shared with a rule
+  // that is not disabled stay watched.
+  XCTAssertTrue(withDisabled.AncestorPathsDifference(DataWatchItems()) ==
+                SetPairPathAndType({
+                    {"/u", WatchItemPathType::kLiteral},
+                    {"/u/lib", WatchItemPathType::kLiteral},
+                    {"/u/lib/keychains", WatchItemPathType::kLiteral},
+                }));
+  XCTAssertTrue(beneath(withDisabled, "/u/lib") == Names({"keychain"}));
+  XCTAssertTrue(beneath(withDisabled, "/u/lib/chrome").empty());
+
+  // The disabled rule's own path is still watched
+  XCTAssertTrue((withDisabled - DataWatchItems()) ==
+                SetPairPathAndType({
+                    {"/u/lib/chrome/cookies", WatchItemPathType::kLiteral},
+                    {"/u/lib/keychains/login.db", WatchItemPathType::kLiteral},
+                }));
+
+  // Switching between disabled and audit changes only the ancestors
+  XCTAssertTrue(withAudit.AncestorPathsDifference(withDisabled) ==
+                SetPairPathAndType({{"/u/lib/chrome", WatchItemPathType::kLiteral}}));
+  XCTAssertTrue(withDisabled.AncestorPathsDifference(withAudit).empty());
+  XCTAssertTrue((withAudit - withDisabled).empty());
+  XCTAssertTrue(beneath(withAudit, "/u/lib") == Names({"chrome", "keychain"}));
+}
+
+- (void)testDataWatchItemsUpdatedCallbackParentDirectoryProtectionChange {
+  dispatch_queue_t q =
+      dispatch_queue_create("com.northpolesec.santa.test.watch_items.q", DISPATCH_QUEUE_SERIAL);
+  auto watchItems = std::make_shared<WatchItemsPeer>((NSString*)nil, q);
+
+  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+  __block SetPairPathAndType gotNewAncestors;
+  __block SetPairPathAndType gotRemovedAncestors;
+  watchItems->RegisterDataWatchItemsUpdatedCallback(^(
+      size_t count, const SetPairPathAndType& newPaths, const SetPairPathAndType& removedPaths,
+      const SetPairPathAndType& newAncestorPaths, const SetPairPathAndType& removedAncestorPaths) {
+    gotNewAncestors = newAncestorPaths;
+    gotRemovedAncestors = removedAncestorPaths;
+    dispatch_semaphore_signal(sema);
+  });
+
+  NSDictionary* (^rule)(NSString*) = ^NSDictionary*(NSString* pdp) {
+    return @{
+      kWatchItemConfigKeyPaths : @[ @"/u/lib/chrome/cookies" ],
+      kWatchItemConfigKeyOptions : @{kWatchItemConfigKeyOptionsParentDirectoryProtection : pdp},
+    };
+  };
+  SetPairPathAndType ancestors = {
+      {"/u", WatchItemPathType::kLiteral},
+      {"/u/lib", WatchItemPathType::kLiteral},
+      {"/u/lib/chrome", WatchItemPathType::kLiteral},
+  };
+
+  watchItems->ReloadConfig(WrapWatchItemsConfig(@{@"chrome" : rule(@"disabled")}));
+  XCTAssertSemaTrue(sema, 5, "Callback not invoked for the initial config");
+  XCTAssertTrue(gotNewAncestors.empty());
+
+  // Changing only the setting is a config change, so it is applied
+  watchItems->ReloadConfig(WrapWatchItemsConfig(@{@"chrome" : rule(@"audit")}));
+  XCTAssertSemaTrue(sema, 5, "Callback not invoked after enabling the setting");
+  XCTAssertTrue(gotNewAncestors == ancestors);
+  XCTAssertTrue(gotRemovedAncestors.empty());
+
+  watchItems->ReloadConfig(WrapWatchItemsConfig(@{@"chrome" : rule(@"disabled")}));
+  XCTAssertSemaTrue(sema, 5, "Callback not invoked after disabling the setting");
+  XCTAssertTrue(gotNewAncestors.empty());
+  XCTAssertTrue(gotRemovedAncestors == ancestors);
+}
+
+- (void)testDataWatchItemsUpdatedCallbackAncestorPaths {
+  dispatch_queue_t q =
+      dispatch_queue_create("com.northpolesec.santa.test.watch_items.q", DISPATCH_QUEUE_SERIAL);
+  auto watchItems = std::make_shared<WatchItemsPeer>((NSString*)nil, q);
+
+  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+  __block SetPairPathAndType gotNewAncestors;
+  __block SetPairPathAndType gotRemovedAncestors;
+  watchItems->RegisterDataWatchItemsUpdatedCallback(^(
+      size_t count, const SetPairPathAndType& newPaths, const SetPairPathAndType& removedPaths,
+      const SetPairPathAndType& newAncestorPaths, const SetPairPathAndType& removedAncestorPaths) {
+    gotNewAncestors = newAncestorPaths;
+    gotRemovedAncestors = removedAncestorPaths;
+    dispatch_semaphore_signal(sema);
+  });
+
+  NSDictionary* chrome = @{kWatchItemConfigKeyPaths : @[ @"/u/lib/chrome/cookies" ]};
+  NSDictionary* keychain = @{kWatchItemConfigKeyPaths : @[ @"/u/lib/keychains/login.db" ]};
+
+  watchItems->ReloadConfig(WrapWatchItemsConfig(@{@"chrome" : chrome, @"keychain" : keychain}));
+  XCTAssertSemaTrue(sema, 5, "Callback not invoked for the initial config");
+  XCTAssertTrue(gotNewAncestors == SetPairPathAndType({
+                                       {"/u", WatchItemPathType::kLiteral},
+                                       {"/u/lib", WatchItemPathType::kLiteral},
+                                       {"/u/lib/chrome", WatchItemPathType::kLiteral},
+                                       {"/u/lib/keychains", WatchItemPathType::kLiteral},
+                                   }));
+  XCTAssertTrue(gotRemovedAncestors.empty());
+
+  watchItems->ReloadConfig(WrapWatchItemsConfig(@{@"keychain" : keychain}));
+  XCTAssertSemaTrue(sema, 5, "Callback not invoked after removing a rule");
+  XCTAssertTrue(gotNewAncestors.empty());
+  XCTAssertTrue(gotRemovedAncestors ==
+                SetPairPathAndType({{"/u/lib/chrome", WatchItemPathType::kLiteral}}));
+}
+
+- (void)testUpdatedCallbacksReportTheirOwnUpdateCounts {
+  dispatch_queue_t q =
+      dispatch_queue_create("com.northpolesec.santa.test.watch_items.q", DISPATCH_QUEUE_SERIAL);
+  auto watchItems = std::make_shared<WatchItemsPeer>((NSString*)nil, q);
+
+  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+  __block std::vector<size_t> dataCounts;
+  __block std::vector<size_t> procCounts;
+  watchItems->RegisterDataWatchItemsUpdatedCallback(
+      ^(size_t count, const SetPairPathAndType&, const SetPairPathAndType&,
+        const SetPairPathAndType&, const SetPairPathAndType&) {
+        dataCounts.push_back(count);
+        dispatch_semaphore_signal(sema);
+      });
+  watchItems->RegisterProcWatchItemsUpdatedCallback(^(size_t count) {
+    procCounts.push_back(count);
+    dispatch_semaphore_signal(sema);
+  });
+
+  NSDictionary* (^procRule)(NSString*) = ^NSDictionary*(NSString* path) {
+    return @{
+      kWatchItemConfigKeyPaths : @[ path ],
+      kWatchItemConfigKeyOptions :
+          @{kWatchItemConfigKeyOptionsRuleType : @"ProcessesWithDeniedPaths"},
+      kWatchItemConfigKeyProcesses : @[ @{kWatchItemConfigKeyProcessesTeamID : @"ABCDEFGHIJ"} ],
+    };
+  };
+
+  // Hold the callback queue so both reloads complete before either callback
+  // runs. Each callback must still report the count from its own update.
+  dispatch_suspend(q);
+  watchItems->ReloadConfig(WrapWatchItemsConfig(@{
+    @"d1" : @{kWatchItemConfigKeyPaths : @[ @"/d1" ]},
+    @"d2" : @{kWatchItemConfigKeyPaths : @[ @"/d2" ]},
+    @"p1" : procRule(@"/p1"),
+    @"p2" : procRule(@"/p2"),
+  }));
+  watchItems->ReloadConfig(WrapWatchItemsConfig(@{
+    @"d1" : @{kWatchItemConfigKeyPaths : @[ @"/d1" ]},
+    @"p1" : procRule(@"/p1"),
+  }));
+  dispatch_resume(q);
+
+  for (int i = 0; i < 4; i++) {
+    XCTAssertSemaTrue(sema, 5, "Callback not invoked");
+  }
+  XCTAssertTrue(dataCounts == std::vector<size_t>({2, 1}));
+  XCTAssertTrue(procCounts == std::vector<size_t>({2, 1}));
 }
 
 - (void)testDataWatchItemsSubtraction {

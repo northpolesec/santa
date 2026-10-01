@@ -234,8 +234,14 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
 
   watch_items->RegisterDataWatchItemsUpdatedCallback(
       ^(size_t count, const santa::SetPairPathAndType& new_paths,
-        const santa::SetPairPathAndType& removed_paths) {
-        [data_faa_client watchItemsCount:count newPaths:new_paths removedPaths:removed_paths];
+        const santa::SetPairPathAndType& removed_paths,
+        const santa::SetPairPathAndType& new_ancestor_paths,
+        const santa::SetPairPathAndType& removed_ancestor_paths) {
+        [data_faa_client watchItemsCount:count
+                                newPaths:new_paths
+                            removedPaths:removed_paths
+                        newAncestorPaths:new_ancestor_paths
+                    removedAncestorPaths:removed_ancestor_paths];
       });
 
   data_faa_client.fileAccessDeniedBlock = ^(SNTStoredFileAccessEvent* event, NSString* customMsg,

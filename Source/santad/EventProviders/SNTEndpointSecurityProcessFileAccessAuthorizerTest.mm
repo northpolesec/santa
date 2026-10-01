@@ -22,6 +22,9 @@
 
 #include <memory>
 #include <set>
+#include <vector>
+
+#import "Source/common/SNTConfigurator.h"
 
 #include "Source/common/TestUtils.h"
 #include "Source/common/es/Message.h"
@@ -35,6 +38,7 @@ using santa::MockFAAPolicyProcessor;
 using santa::PairPathAndType;
 using santa::ProcessWatchItemPolicy;
 using santa::SetPairPathAndType;
+using santa::WatchItemParentDirectoryProtection;
 using santa::WatchItemPathType;
 using santa::WatchItemProcess;
 
@@ -211,6 +215,124 @@ void SetExpectationsForProcessFileAccessAuthorizerInit(
   XCTAssertEqual(considered->size(), 2);
   XCTAssertCppStringEqual((*considered)[0], "withopts1");
   XCTAssertCppStringEqual((*considered)[1], "withopts2");
+}
+
+/// A ProcessesWithDeniedPaths rule's parent directory protection decides a
+/// rename of a directory that holds one of its paths, but not a rename of the
+/// path itself.
+- (void)testParentDirectoryProtection {
+  id mockConfigurator = OCMClassMock([SNTConfigurator class]);
+  OCMStub([mockConfigurator configurator]).andReturn(mockConfigurator);
+  OCMStub([mockConfigurator overrideFileAccessAction]).andReturn(SNTOverrideFileAccessActionNone);
+  OCMStub([mockConfigurator enableBadSignatureProtection]).andReturn(NO);
+
+  es_file_t procFile = MakeESFile("/proc/watched");
+  es_process_t esProc = MakeESProcess(&procFile);
+  esProc.codesigning_flags = CS_SIGNED | CS_VALID;
+
+  struct stat dirStat = MakeStat();
+  dirStat.st_mode = S_IFDIR | 0755;
+  es_file_t ancestorDir = MakeESFile("/a/b", dirStat);
+  es_file_t deniedDir = MakeESFile("/a/b/c", dirStat);
+  es_file_t destDir = MakeESFile("/x");
+
+  struct Outcome {
+    es_auth_result_t result;
+    std::vector<FileAccessPolicyDecision> stored;
+  };
+
+  // Responds to the watched process renaming `source` under a rule denying it
+  // /a/b/c
+  auto rename = [&](WatchItemParentDirectoryProtection pdp, es_file_t* source) {
+    es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_RENAME, &esProc, ActionType::Auth);
+    esMsg.event.rename.source = source;
+    esMsg.event.rename.destination_type = ES_DESTINATION_TYPE_NEW_PATH;
+    esMsg.event.rename.destination.new_path.dir = &destDir;
+    esMsg.event.rename.destination.new_path.filename = MakeESStringToken("moved");
+
+    auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+    mockESApi->SetExpectationsESNewClient();
+    mockESApi->SetExpectationsRetainReleaseMessage();
+    SetExpectationsForProcessFileAccessAuthorizerInit(mockESApi);
+
+    Outcome outcome = {};
+    dispatch_semaphore_t respondedSema = dispatch_semaphore_create(0);
+    dispatch_semaphore_t processedSema = dispatch_semaphore_create(0);
+    // A directory tree operation is never cacheable
+    EXPECT_CALL(*mockESApi, RespondAuthResult(testing::_, testing::_, testing::_, false))
+        .WillOnce([&outcome, respondedSema](const santa::Client&, const santa::Message&,
+                                            es_auth_result_t result, bool) {
+          outcome.result = result;
+          dispatch_semaphore_signal(respondedSema);
+          return true;
+        });
+
+    __block std::vector<FileAccessPolicyDecision> stored;
+    auto mockFAA =
+        std::make_shared<MockFAAPolicyProcessor>(nil, nullptr, nullptr, nullptr, nullptr, 0, 0, nil,
+                                                 ^(SNTStoredFileAccessEvent* event, bool) {
+                                                   stored.push_back(event.decision);
+                                                 });
+    EXPECT_CALL(*mockFAA, PolicyMatchesProcess).WillRepeatedly(testing::Return(true));
+    mockFAA->UseRealPolicyEvaluation();
+    auto mockFAAProxy = std::make_shared<santa::ProcessFAAPolicyProcessorProxy>(mockFAA);
+
+    auto pwip = std::make_shared<ProcessWatchItemPolicy>(
+        "rule", "v1", SetPairPathAndType{{"/a/b/c", WatchItemPathType::kLiteral}},
+        /*audit_only=*/false, santa::WatchItemRuleType::kProcessesWithDeniedPaths,
+        santa::WatchItemProcessOptions{},
+        santa::WatchItemProcessList{WatchItemProcess("/proc/watched", "", "", {}, "", false)}, 0,
+        pdp);
+    IterateProcessPoliciesBlock iterPoliciesBlock = ^(CheckPolicyBlock block) {
+      block(pwip);
+    };
+
+    SNTEndpointSecurityProcessFileAccessAuthorizer* procFAAClient =
+        [[SNTEndpointSecurityProcessFileAccessAuthorizer alloc] initWithESAPI:mockESApi
+                                                                      metrics:nullptr
+                                                           faaPolicyProcessor:mockFAAProxy
+                                                  iterateProcessPoliciesBlock:iterPoliciesBlock];
+    procFAAClient.fileAccessDeniedBlock =
+        ^(SNTStoredFileAccessEvent*, NSString*, NSString*, NSString*) {
+        };
+
+    [procFAAClient handleMessage:santa::Message(mockESApi, &esMsg)
+              recordEventMetrics:^(santa::EventDisposition) {
+                dispatch_semaphore_signal(processedSema);
+              }];
+    XCTAssertSemaTrue(respondedSema, 5, "Rename was not responded to");
+    XCTAssertSemaTrue(processedSema, 5, "Rename was not processed");
+    outcome.stored = stored;
+
+    XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+    return outcome;
+  };
+
+  using Stored = std::vector<FileAccessPolicyDecision>;
+
+  // An ancestor match is audited in audit mode, denied in enforce mode, and not
+  // evaluated at all when disabled
+  Outcome got = rename(WatchItemParentDirectoryProtection::kAudit, &ancestorDir);
+  XCTAssertEqual(got.result, ES_AUTH_RESULT_ALLOW);
+  XCTAssertTrue(got.stored == Stored({FileAccessPolicyDecision::kAllowedAuditOnly}));
+
+  got = rename(WatchItemParentDirectoryProtection::kEnforce, &ancestorDir);
+  XCTAssertEqual(got.result, ES_AUTH_RESULT_DENY);
+  XCTAssertTrue(got.stored == Stored({FileAccessPolicyDecision::kDenied}));
+
+  got = rename(WatchItemParentDirectoryProtection::kDisabled, &ancestorDir);
+  XCTAssertEqual(got.result, ES_AUTH_RESULT_ALLOW);
+  XCTAssertTrue(got.stored.empty());
+
+  // A direct match is denied whatever the setting
+  for (WatchItemParentDirectoryProtection pdp : {WatchItemParentDirectoryProtection::kAudit,
+                                                 WatchItemParentDirectoryProtection::kDisabled}) {
+    got = rename(pdp, &deniedDir);
+    XCTAssertEqual(got.result, ES_AUTH_RESULT_DENY);
+    XCTAssertTrue(got.stored == Stored({FileAccessPolicyDecision::kDenied}));
+  }
+
+  [mockConfigurator stopMocking];
 }
 
 @end

@@ -658,6 +658,31 @@ changes in the release notes of any future release that changes them.`,
                       defaultValue: true,
                     },
                     {
+                      key: "ParentDirectoryProtection",
+                      description: `How the rule treats renaming or cloning a directory that contains one of its
+                      paths, which moves or copies those paths along with the directory. Has no effect on
+                      \`ProcessesWithAllowedPaths\` rules`,
+                      type: "string",
+                      possibleValues: [
+                        {
+                          value: "audit",
+                          description: `The operation is evaluated against the rule as if \`AuditOnly\` were true:
+                          violations are logged but not blocked`,
+                        },
+                        {
+                          value: "enforce",
+                          description: `The operation is evaluated against the rule as if it accessed the rule's
+                          paths directly`,
+                        },
+                        {
+                          value: "disabled",
+                          description: `The operation is not evaluated against the rule`,
+                        },
+                      ],
+                      defaultValue: "audit",
+                      versionAdded: "2026.9",
+                    },
+                    {
                       key: "InvertProcessExceptions",
                       description: `Please use \`RuleType\` instead. If false, behaves like RuleType
                       \`PathsWithAllowedProcesses\`. If true, behaves like RuleType \`PathsWithDeniedProcesses\`. This

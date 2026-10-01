@@ -260,6 +260,31 @@ NSDictionary* OptionsFromProtoFAARuleAdd(const ::pbv2::FileAccessRule::Add& pbAd
     optionsDict[kWatchItemConfigKeyOptionsRuleId] = @(pbAddRule.rule_id());
   }
 
+  switch (pbAddRule.parent_directory_protection()) {
+    // Unspecified means Santa's default, which is conveyed by omitting the key.
+    case ::pbv2::FileAccessRule::PARENT_DIRECTORY_PROTECTION_UNSPECIFIED: break;
+    case ::pbv2::FileAccessRule::PARENT_DIRECTORY_PROTECTION_DISABLED:
+      optionsDict[kWatchItemConfigKeyOptionsParentDirectoryProtection] =
+          kParentDirectoryProtectionDisabled;
+      break;
+    case ::pbv2::FileAccessRule::PARENT_DIRECTORY_PROTECTION_AUDIT:
+      optionsDict[kWatchItemConfigKeyOptionsParentDirectoryProtection] =
+          kParentDirectoryProtectionAudit;
+      break;
+    case ::pbv2::FileAccessRule::PARENT_DIRECTORY_PROTECTION_ENFORCE:
+      optionsDict[kWatchItemConfigKeyOptionsParentDirectoryProtection] =
+          kParentDirectoryProtectionEnforce;
+      break;
+    default:
+      // A value from a newer server. Enforce rather than drop the rule, which
+      // would leave its paths unprotected.
+      SLOGW(@"File access rule '%@': unknown parent directory protection %d, using enforce",
+            StringToNSString(pbAddRule.name()), pbAddRule.parent_directory_protection());
+      optionsDict[kWatchItemConfigKeyOptionsParentDirectoryProtection] =
+          kParentDirectoryProtectionEnforce;
+      break;
+  }
+
   return optionsDict;
 }
 

@@ -58,6 +58,10 @@ enum class FAAClientType {
   kProcess,
 };
 
+// Returns true if the message moves or clones a directory, and with it every
+// path beneath the directory.
+bool IsDirectoryTreeOperation(const Message& msg);
+
 class FAAPolicyProcessor {
  public:
   struct ESResult {
@@ -65,7 +69,15 @@ class FAAPolicyProcessor {
     bool cacheable;
   };
 
-  using TargetPolicyPair = std::pair<size_t, std::optional<std::shared_ptr<WatchItemPolicyBase>>>;
+  /// A message target, by index, and the policy to evaluate it against.
+  /// `via_ancestor` is set when the target is a parent directory of the
+  /// policy's paths rather than a path the policy watches, so the policy's
+  /// parent directory protection applies.
+  struct TargetPolicyPair {
+    size_t target_index;
+    std::optional<std::shared_ptr<WatchItemPolicyBase>> policy;
+    bool via_ancestor = false;
+  };
 
   /// The outcome of asking a client whether a policy applies to a message.
   /// `options` points at the overrides of the process that was matched, when
@@ -146,6 +158,14 @@ class FAAPolicyProcessor {
 
   virtual NSString* __strong GetCertificateHash(const es_file_t* es_file);
 
+  /// Whether a target of the current message has shown a dialog or TTY line.
+  /// A directory tree operation pairs one target with every policy beneath it,
+  /// but the user is notified once per target.
+  struct TargetUIState {
+    bool dialog_shown = false;
+    bool tty_shown = false;
+  };
+
   /// General flow of processing an ES message for FAA violations:
   /// 1. Client presents a vector of pairs of target paths being accessed and associated policies
   /// 2. Iterate each pair and compute a FileAccessPolicyDecision (ProcessTargetAndPolicy())
@@ -159,9 +179,12 @@ class FAAPolicyProcessor {
   ///                target being evaluated is readable
   ///         5. Apply the matched process's action, or invert results and/or set audit-only
   ///            based on configured options
-  ///     2. Apply override if configured
-  ///     3. Log telemetry if denied/audit-only and not rate-limited (LogTelemetry())
-  ///     4. Notify the user if configured (SNTFileAccessDeniedBlock(), LogTTY())
+  ///     2. Downgrade a denial to audit-only if the pair came from a parent directory of the
+  ///        policy's paths and the policy audits parent directories
+  ///     3. Apply override if configured
+  ///     4. Log telemetry if denied/audit-only and not rate-limited (LogTelemetry())
+  ///     5. Notify the user if configured and the target has not already
+  ///        notified for this message (SNTFileAccessDeniedBlock(), LogTTY())
   /// 3. Combine results of each target into an ES decision
   /// 4. Return the final ES decision
   FAAPolicyProcessor::ESResult ProcessMessage(
@@ -181,7 +204,8 @@ class FAAPolicyProcessor {
                                             const TargetPolicyPair& target_policy_pair,
                                             CheckIfPolicyMatchesBlock checkIfPolicyMatchesBlock,
                                             SNTFileAccessDeniedBlock file_access_denied_block,
-                                            SNTOverrideFileAccessAction override_action);
+                                            SNTOverrideFileAccessAction override_action,
+                                            TargetUIState& ui_state);
 
   virtual DecisionAndOptions ApplyPolicy(
       const Message& msg, const Message::PathTarget& target,

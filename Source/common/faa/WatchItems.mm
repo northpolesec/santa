@@ -29,6 +29,7 @@
 #include <set>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -60,6 +61,7 @@ NSString* const kWatchItemConfigKeyOptionsEventDetailURL = kWatchItemConfigKeyEv
 NSString* const kWatchItemConfigKeyOptionsEventDetailText = kWatchItemConfigKeyEventDetailText;
 NSString* const kWatchItemConfigKeyOptionsVersion = kWatchItemConfigKeyVersion;
 NSString* const kWatchItemConfigKeyOptionsRuleId = @"RuleId";
+NSString* const kWatchItemConfigKeyOptionsParentDirectoryProtection = @"ParentDirectoryProtection";
 NSString* const kWatchItemConfigKeyProcesses = @"Processes";
 NSString* const kWatchItemConfigKeyProcessesBinaryPath = @"BinaryPath";
 NSString* const kWatchItemConfigKeyProcessesCertificateSha256 = @"CertificateSha256";
@@ -78,6 +80,10 @@ NSString* const kRuleTypeProcessesWithDeniedPaths = @"processeswithdeniedpaths";
 NSString* const kProcessActionAllow = @"allow";
 NSString* const kProcessActionAudit = @"audit";
 NSString* const kProcessActionDeny = @"deny";
+
+NSString* const kParentDirectoryProtectionDisabled = @"disabled";
+NSString* const kParentDirectoryProtectionAudit = @"audit";
+NSString* const kParentDirectoryProtectionEnforce = @"enforce";
 
 // https://developer.apple.com/help/account/manage-your-team/locate-your-team-id/
 static constexpr NSUInteger kMaxTeamIDLength = 10;
@@ -166,6 +172,19 @@ std::optional<WatchItemProcessAction> GetProcessAction(NSString* action) {
     return WatchItemProcessAction::kAudit;
   } else if ([action isEqualToString:kProcessActionDeny]) {
     return WatchItemProcessAction::kDeny;
+  } else {
+    return std::nullopt;
+  }
+}
+
+std::optional<WatchItemParentDirectoryProtection> GetParentDirectoryProtection(NSString* value) {
+  value = [value lowercaseString];
+  if ([value isEqualToString:kParentDirectoryProtectionDisabled]) {
+    return WatchItemParentDirectoryProtection::kDisabled;
+  } else if ([value isEqualToString:kParentDirectoryProtectionAudit]) {
+    return WatchItemParentDirectoryProtection::kAudit;
+  } else if ([value isEqualToString:kParentDirectoryProtectionEnforce]) {
+    return WatchItemParentDirectoryProtection::kEnforce;
   } else {
     return std::nullopt;
   }
@@ -469,7 +488,8 @@ std::optional<WatchItemProcessOptions> VerifyConfigWatchItemProcessOptions(
   // value could leave the process blocked when the intent was to audit it.
   for (NSString* key in @[
          kWatchItemConfigKeyOptionsAuditOnly, kWatchItemConfigKeyOptionsRuleType,
-         kWatchItemConfigKeyOptionsInvertProcessExceptions
+         kWatchItemConfigKeyOptionsInvertProcessExceptions,
+         kWatchItemConfigKeyOptionsParentDirectoryProtection
        ]) {
     if (process[key]) {
       [SNTError populateError:err
@@ -629,6 +649,8 @@ std::variant<Unit, WatchItemProcessList> VerifyConfigWatchItemProcesses(
 ///     <string>...</string>
 ///     <key>EventDetailText</key>
 ///     <string>...</string>
+///     <key>ParentDirectoryProtection</key>
+///     <string>enforce</string>
 ///   </dict>
 ///   <key>Processes</key>
 ///   <array>
@@ -693,6 +715,13 @@ bool ParseConfigSingleWatchItem(NSString* name, std::string_view fallback_policy
                          NonNegativeValidator())) {
       return false;
     }
+
+    if (!VerifyConfigKey(options, kWatchItemConfigKeyOptionsParentDirectoryProtection,
+                         [NSString class], err, false,
+                         ValidValuesValidator<WatchItemParentDirectoryProtection>(
+                             GetParentDirectoryProtection))) {
+      return false;
+    }
   }
 
   // The rule's own options. Each ProcessesWithOptions entry is merged over these.
@@ -732,6 +761,10 @@ bool ParseConfigSingleWatchItem(NSString* name, std::string_view fallback_policy
     }
   }
 
+  WatchItemParentDirectoryProtection parent_directory_protection =
+      GetParentDirectoryProtection(options[kWatchItemConfigKeyOptionsParentDirectoryProtection])
+          .value_or(kWatchItemPolicyDefaultParentDirectoryProtection);
+
   // ProcessesWithOptions entries are evaluated ahead of Processes entries, so
   // they come first in the combined list that matching iterates.
   std::variant<Unit, WatchItemProcessList> procs_with_options = VerifyConfigWatchItemProcesses(
@@ -764,7 +797,8 @@ bool ParseConfigSingleWatchItem(NSString* name, std::string_view fallback_policy
       for (const PairPathAndType& path_type_pair : std::get<SetPairPathAndType>(path_list)) {
         data_policies->insert(std::make_shared<DataWatchItemPolicy>(
             NSStringToUTF8StringView(name), policy_version, path_type_pair.first,
-            path_type_pair.second, audit_only, rule_type, *rule_options, procs, rule_id));
+            path_type_pair.second, audit_only, rule_type, *rule_options, procs, rule_id,
+            parent_directory_protection));
       }
 
       break;
@@ -773,7 +807,8 @@ bool ParseConfigSingleWatchItem(NSString* name, std::string_view fallback_policy
     case WatchItemRuleType::kProcessesWithDeniedPaths:
       proc_policies->insert(std::make_shared<ProcessWatchItemPolicy>(
           NSStringToUTF8StringView(name), policy_version, std::get<SetPairPathAndType>(path_list),
-          audit_only, rule_type, std::move(*rule_options), std::move(procs), rule_id));
+          audit_only, rule_type, std::move(*rule_options), std::move(procs), rule_id,
+          parent_directory_protection));
 
       break;
   }
@@ -895,19 +930,28 @@ bool ParseConfig(NSDictionary* config, WatchItems::DataSource data_source,
 
 #pragma mark DataWatchItems
 
-SetPairPathAndType DataWatchItems::operator-(const DataWatchItems& other) const {
+static SetPairPathAndType Difference(const SetPairPathAndType& a, const SetPairPathAndType& b) {
   // NB: std::set_difference requires the container is ordered. Use a simple
   // loop here instead since our data is unordered.
   SetPairPathAndType diff;
-  for (const auto& p : paths_) {
-    if (other.paths_.find(p) == other.paths_.end()) {
+  for (const auto& p : a) {
+    if (b.find(p) == b.end()) {
       diff.insert(p);
     }
   }
   return diff;
 }
 
+SetPairPathAndType DataWatchItems::operator-(const DataWatchItems& other) const {
+  return Difference(paths_, other.paths_);
+}
+
+SetPairPathAndType DataWatchItems::AncestorPathsDifference(const DataWatchItems& other) const {
+  return Difference(ancestor_paths_, other.ancestor_paths_);
+}
+
 bool DataWatchItems::Build(SetSharedDataWatchItemPolicy data_policies) {
+  absl::flat_hash_map<std::string, SetSharedDataWatchItemPolicy> beneath;
   for (const std::shared_ptr<DataWatchItemPolicy>& item : data_policies) {
     std::vector<std::string> matches = FindMatches(@(item->path.c_str()));
 
@@ -920,7 +964,27 @@ bool DataWatchItems::Build(SetSharedDataWatchItemPolicy data_policies) {
       }
 
       paths_.insert({match.c_str(), item->path_type});
+
+      if (item->parent_directory_protection != WatchItemParentDirectoryProtection::kDisabled) {
+        for (std::string& dir : AncestorDirectories(match)) {
+          beneath[std::move(dir)].insert(item);
+        }
+      }
     }
+  }
+
+  for (const auto& [dir, policies] : beneath) {
+    // A watched literal already receives every event, so it is not also watched
+    // as an ancestor. This keeps each literal path's mute state owned by one set.
+    if (!paths_.contains({dir, WatchItemPathType::kLiteral})) {
+      ancestor_paths_.insert({dir, WatchItemPathType::kLiteral});
+    }
+
+    std::vector<std::shared_ptr<DataWatchItemPolicy>> sorted(policies.begin(), policies.end());
+    std::sort(sorted.begin(), sorted.end(), [](const auto& a, const auto& b) {
+      return std::tie(a->name, a->version, a->rule_id) < std::tie(b->name, b->version, b->rule_id);
+    });
+    policies_beneath_.emplace(dir, std::move(sorted));
   }
 
   return true;
@@ -930,6 +994,13 @@ void DataWatchItems::FindPolicies(IterateTargetsBlock iterateTargetsBlock) const
   iterateTargetsBlock(
       ^std::optional<std::shared_ptr<WatchItemPolicyBase>>(const std::string& path) {
         return tree_->LookupLongestMatchingPrefix(path);
+      },
+      ^std::vector<std::shared_ptr<WatchItemPolicyBase>>(const std::string& path) {
+        auto it = policies_beneath_.find(path);
+        if (it == policies_beneath_.end()) {
+          return {};
+        }
+        return {it->second.begin(), it->second.end()};
       });
 }
 
@@ -1068,6 +1139,10 @@ void WatchItems::UpdateCurrentState(DataWatchItems new_data_watch_items,
     SetPairPathAndType paths_to_watch = new_data_watch_items - data_watch_items_;
     // Paths to stop watching are in the current set, but not new
     SetPairPathAndType paths_to_stop_watching = data_watch_items_ - new_data_watch_items;
+    SetPairPathAndType ancestor_paths_to_watch =
+        new_data_watch_items.AncestorPathsDifference(data_watch_items_);
+    SetPairPathAndType ancestor_paths_to_stop_watching =
+        data_watch_items_.AncestorPathsDifference(new_data_watch_items);
 
     std::swap(data_watch_items_, new_data_watch_items);
     std::swap(proc_watch_items_, new_proc_watch_items);
@@ -1094,20 +1169,27 @@ void WatchItems::UpdateCurrentState(DataWatchItems new_data_watch_items,
 
     LOGD(@"Changes to file access rules detected, notifying registered clients.");
 
+    // Note: The blocks below run after lock_ is released, so every guarded
+    // value they need is copied here. A later update may already have replaced
+    // data_watch_items_ and proc_watch_items_ by the time a block runs.
     if (data_watch_items_updated_callback_) {
+      DataWatchItemsUpdatedBlock callback = data_watch_items_updated_callback_;
+      size_t count = data_watch_items_.Count();
       // Note: Enable clients on an async queue in case they perform any
       // synchronous work that could trigger ES events. Otherwise they might
       // trigger AUTH ES events that would attempt to re-enter this object and
       // potentially deadlock.
       dispatch_async(q_, ^{
-        data_watch_items_updated_callback_(data_watch_items_.Count(), paths_to_watch,
-                                           paths_to_stop_watching);
+        callback(count, paths_to_watch, paths_to_stop_watching, ancestor_paths_to_watch,
+                 ancestor_paths_to_stop_watching);
       });
     }
 
     if (proc_watch_items_updated_callback_) {
+      ProcWatchItemsUpdatedBlock callback = proc_watch_items_updated_callback_;
+      size_t count = proc_watch_items_.Count();
       dispatch_async(q_, ^{
-        proc_watch_items_updated_callback_(proc_watch_items_.Count());
+        callback(count);
       });
     }
   }

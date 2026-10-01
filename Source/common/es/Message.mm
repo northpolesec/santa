@@ -37,7 +37,10 @@ static inline void PushBackPathTarget(std::vector<Message::PathTarget>& vec, con
   std::string full_path;
   full_path.reserve(dir->path.length + 1 + name.length);
   full_path.append(dir->path.data, dir->path.length);
-  full_path += '/';
+  // The root directory's path already ends in a slash
+  if (!full_path.ends_with('/')) {
+    full_path += '/';
+  }
   full_path.append(name.data, name.length);
   vec.push_back({std::move(full_path), false, nullptr, dir->path_truncated});
 }

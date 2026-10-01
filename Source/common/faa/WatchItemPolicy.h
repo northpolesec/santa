@@ -73,6 +73,19 @@ enum class WatchItemRuleType {
   kProcessesWithDeniedPaths,
 };
 
+/// How a rule treats renaming or cloning a directory that contains one of its
+/// paths, at any depth. Such an operation moves or copies the rule's paths
+/// along with the directory. Has no effect on kProcessesWithAllowedPaths rules.
+enum class WatchItemParentDirectoryProtection {
+  // The operation is not evaluated against the rule.
+  kDisabled,
+  // The operation is evaluated against the rule, and a violation is logged
+  // but not blocked.
+  kAudit,
+  // The operation is evaluated as if it accessed the rule's paths directly.
+  kEnforce,
+};
+
 static constexpr WatchItemPathType kWatchItemPolicyDefaultPathType = WatchItemPathType::kLiteral;
 static constexpr bool kWatchItemPolicyDefaultAllowReadAccess = false;
 static constexpr bool kWatchItemPolicyDefaultAuditOnly = true;
@@ -80,6 +93,8 @@ static constexpr WatchItemRuleType kWatchItemPolicyDefaultRuleType =
     WatchItemRuleType::kPathsWithAllowedProcesses;
 static constexpr bool kWatchItemPolicyDefaultEnableSilentMode = false;
 static constexpr bool kWatchItemPolicyDefaultEnableSilentTTYMode = false;
+static constexpr WatchItemParentDirectoryProtection
+    kWatchItemPolicyDefaultParentDirectoryProtection = WatchItemParentDirectoryProtection::kAudit;
 
 /// The outcome a `ProcessesWithOptions` entry states for itself, bypassing the
 /// rule's `rule_type` and `audit_only` options. `kInherit` defers to the rule
@@ -242,15 +257,16 @@ struct WatchItemProcess {
 };
 
 struct WatchItemPolicyBase {
-  WatchItemPolicyBase(std::string_view n, std::string_view v,
-                      bool ao = kWatchItemPolicyDefaultAuditOnly,
-                      WatchItemRuleType rt = kWatchItemPolicyDefaultRuleType,
-                      WatchItemProcessOptions opts = {}, WatchItemProcessList procs = {},
-                      int64_t rid = 0)
+  WatchItemPolicyBase(
+      std::string_view n, std::string_view v, bool ao = kWatchItemPolicyDefaultAuditOnly,
+      WatchItemRuleType rt = kWatchItemPolicyDefaultRuleType, WatchItemProcessOptions opts = {},
+      WatchItemProcessList procs = {}, int64_t rid = 0,
+      WatchItemParentDirectoryProtection pdp = kWatchItemPolicyDefaultParentDirectoryProtection)
       : name(n),
         version(v),
         audit_only(ao),
         rule_type(rt),
+        parent_directory_protection(pdp),
         options(std::move(opts)),
         processes(std::move(procs)),
         rule_id(rid) {
@@ -268,7 +284,9 @@ struct WatchItemPolicyBase {
     // Note: WatchItemProcessOptions::operator== does not consider custom_message,
     // event_detail_url or event_detail_text.
     return name == other.name && version == other.version && audit_only == other.audit_only &&
-           rule_type == other.rule_type && options == other.options && processes == other.processes;
+           rule_type == other.rule_type &&
+           parent_directory_protection == other.parent_directory_protection &&
+           options == other.options && processes == other.processes;
   }
 
   virtual bool operator!=(const WatchItemPolicyBase& other) const { return !(*this == other); }
@@ -280,11 +298,13 @@ struct WatchItemPolicyBase {
 
   std::string name;
   std::string version;  // WIP - No current way to control via config
-  // Note: audit_only and rule_type are deliberately not part of `options` -
-  // they are the two things a per-process entry cannot override, which is why
-  // WatchItemProcessAction exists.
+  // Note: audit_only, rule_type and parent_directory_protection are
+  // deliberately not part of `options` - they are the things a per-process
+  // entry cannot override. WatchItemProcessAction exists to state an outcome
+  // in place of the first two.
   bool audit_only;
   WatchItemRuleType rule_type;
+  WatchItemParentDirectoryProtection parent_directory_protection;
   // The rule's own options, used for any event where the matched process had no
   // overrides of its own. `action` is always kInherit here.
   WatchItemProcessOptions options;
@@ -313,14 +333,34 @@ inline std::string WatchPathForMatch(std::string match, WatchItemPathType path_t
   return match;
 }
 
+// Returns each ancestor directory of `path`, shortest first, excluding "/". A
+// trailing slash marks the path itself as a directory, so it is included.
+// A path the parser kept because it has no safe rewrite (a "." or ".."
+// component, or only slashes) matches no event, so it has no ancestors: they
+// could be real directories the rule never names.
+inline std::vector<std::string> AncestorDirectories(std::string_view path) {
+  std::string bounded = std::string(path) + "/";
+  if (path.find("//") != std::string_view::npos || bounded.find("/./") != std::string::npos ||
+      bounded.find("/../") != std::string::npos) {
+    return {};
+  }
+
+  std::vector<std::string> ancestors;
+  for (size_t i = path.find('/', 1); i != std::string_view::npos; i = path.find('/', i + 1)) {
+    ancestors.emplace_back(path.substr(0, i));
+  }
+  return ancestors;
+}
+
 struct DataWatchItemPolicy : public WatchItemPolicyBase {
-  DataWatchItemPolicy(std::string_view n, std::string_view v, std::string_view p,
-                      WatchItemPathType pt = kWatchItemPolicyDefaultPathType,
-                      bool ao = kWatchItemPolicyDefaultAuditOnly,
-                      WatchItemRuleType rt = kWatchItemPolicyDefaultRuleType,
-                      WatchItemProcessOptions opts = {}, WatchItemProcessList procs = {},
-                      int64_t rid = 0)
-      : WatchItemPolicyBase(n, v, ao, rt, std::move(opts), std::move(procs), rid),
+  DataWatchItemPolicy(
+      std::string_view n, std::string_view v, std::string_view p,
+      WatchItemPathType pt = kWatchItemPolicyDefaultPathType,
+      bool ao = kWatchItemPolicyDefaultAuditOnly,
+      WatchItemRuleType rt = kWatchItemPolicyDefaultRuleType, WatchItemProcessOptions opts = {},
+      WatchItemProcessList procs = {}, int64_t rid = 0,
+      WatchItemParentDirectoryProtection pdp = kWatchItemPolicyDefaultParentDirectoryProtection)
+      : WatchItemPolicyBase(n, v, ao, rt, std::move(opts), std::move(procs), rid, pdp),
         path(p),
         path_type(pt) {}
 
@@ -342,12 +382,13 @@ struct DataWatchItemPolicy : public WatchItemPolicyBase {
 };
 
 struct ProcessWatchItemPolicy : public WatchItemPolicyBase {
-  ProcessWatchItemPolicy(std::string_view n, std::string_view v, SetPairPathAndType pt,
-                         bool ao = kWatchItemPolicyDefaultAuditOnly,
-                         WatchItemRuleType rt = kWatchItemPolicyDefaultRuleType,
-                         WatchItemProcessOptions opts = {}, WatchItemProcessList procs = {},
-                         int64_t rid = 0)
-      : WatchItemPolicyBase(n, v, ao, rt, std::move(opts), std::move(procs), rid),
+  ProcessWatchItemPolicy(
+      std::string_view n, std::string_view v, SetPairPathAndType pt,
+      bool ao = kWatchItemPolicyDefaultAuditOnly,
+      WatchItemRuleType rt = kWatchItemPolicyDefaultRuleType, WatchItemProcessOptions opts = {},
+      WatchItemProcessList procs = {}, int64_t rid = 0,
+      WatchItemParentDirectoryProtection pdp = kWatchItemPolicyDefaultParentDirectoryProtection)
+      : WatchItemPolicyBase(n, v, ao, rt, std::move(opts), std::move(procs), rid, pdp),
         path_type_pairs(std::move(pt)),
         tree(std::make_unique<santa::PrefixTree<santa::Unit>>()) {
     // Build tree
@@ -360,6 +401,12 @@ struct ProcessWatchItemPolicy : public WatchItemPolicyBase {
           tree->InsertPrefix(match.c_str(), santa::Unit{});
         } else {
           tree->InsertLiteral(match.c_str(), santa::Unit{});
+        }
+
+        if (parent_directory_protection != WatchItemParentDirectoryProtection::kDisabled) {
+          for (std::string& dir : AncestorDirectories(match)) {
+            ancestor_dirs.insert(std::move(dir));
+          }
         }
       }
     }
@@ -378,8 +425,32 @@ struct ProcessWatchItemPolicy : public WatchItemPolicyBase {
 
   bool operator!=(const WatchItemPolicyBase& other) const override { return !(*this == other); }
 
+  enum class TargetMatch {
+    kNone,
+    kDirect,
+    kAncestor,
+  };
+
+  // Returns how an operation on `path` is covered by this policy's paths.
+  // When the operation moves or clones a directory tree, ancestor directories
+  // of those paths are covered too, but only for ProcessesWithDeniedPaths. For
+  // ProcessesWithAllowedPaths, covering an ancestor would allow its whole tree.
+  TargetMatch MatchesTarget(std::string_view path, bool directory_tree_op) const {
+    // Note: Paths vended by Message::PathTarget are null-terminated.
+    if (tree->Contains(path.data())) {
+      return TargetMatch::kDirect;
+    }
+    if (directory_tree_op && rule_type == WatchItemRuleType::kProcessesWithDeniedPaths &&
+        ancestor_dirs.contains(path)) {
+      return TargetMatch::kAncestor;
+    }
+    return TargetMatch::kNone;
+  }
+
   SetPairPathAndType path_type_pairs;
   std::unique_ptr<santa::PrefixTree<Unit>> tree;
+  // Empty when parent_directory_protection is kDisabled.
+  absl::flat_hash_set<std::string> ancestor_dirs;
 };
 
 // Hash and equality call operators for values of shared_ptr types

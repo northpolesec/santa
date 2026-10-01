@@ -72,6 +72,8 @@ here](/configuration/faa.md)
 				<true/>
 				<key>RuleType</key>
 				<string>PathsWithAllowedProcesses</string>
+				<key>ParentDirectoryProtection</key>
+				<string>enforce</string>
 				<key>EventDetailText</key>
 				<string>Only some files can access the important file foo!</string>
 			</dict>
@@ -201,6 +203,56 @@ directories. Neither matches the paths inside those directories; set
 `IsPrefix` for that. A path with a `.` or `..` component, or of two or more
 slashes and nothing else, is kept as configured and logged with a warning. Such
 a path is not expected to match any file access.
+
+#### Parent Directories
+
+Renaming or cloning a directory also moves or clones every path beneath it. The
+`ParentDirectoryProtection` rule option sets how a rule treats these operations
+on a parent directory of one of its monitored paths:
+
+- `audit` (default): Santa evaluates the operation against the rule, and treats
+  the rule as if `AuditOnly` were true. Violations are logged but not blocked,
+  and no notification is shown. As with `AuditOnly`, a process with an invalid
+  signature is still blocked when
+  [EnableBadSignatureProtection](/configuration/keys#EnableBadSignatureProtection)
+  is enabled.
+- `enforce`: Santa evaluates the operation against the rule as if it targeted
+  the rule's paths directly. The rule's `AuditOnly` option decides whether a
+  violation is blocked.
+- `disabled`: Santa does not evaluate the operation against the rule. A process
+  can then move or copy the rule's paths out of place by renaming or cloning a
+  parent directory.
+
+The option belongs to the rule whose paths are inside the directory. It does not
+change how a rule treats operations on its own paths. For example, when the
+rules monitoring paths inside `~/Library` use `enforce`, renaming `~/Library`
+requires that the process be allowed by each of those rules. To let a tool move
+such a directory, add the tool to the exceptions of each of those rules.
+Cloning a directory only reads it, so rules with paths beneath the source
+directory allow the clone when `AllowReadAccess` is true. Rules with paths
+beneath the destination are evaluated separately and can still deny it.
+Each rule logs its own event, with the directory as the accessed path.
+
+Process-centric `ProcessesWithAllowedPaths` rules ignore the option: a parent
+directory is outside the allowed paths, so operations on it are already denied.
+
+Keep the following in mind when you enable this protection:
+
+- An exception on one rule does not let a tool move or clone a directory that
+  contains another rule's paths. The event names the inner rule and gives the
+  directory as the accessed path. To allow the tool, add it to the exceptions of
+  the inner rule.
+- Tools that move whole directory trees are evaluated too. Examples are renaming
+  a user's home folder (with Users & Groups, `sysadminctl`, or an MDM),
+  Migration Assistant, and backup or restore tools that move `~/Library`,
+  `Application Support`, or browser profile directories.
+- Moving a directory onto a parent directory of a monitored path is evaluated
+  against every rule with paths beneath that path, whatever the moved directory
+  contains.
+- Parent directories come from the paths that a rule's globs matched when they
+  were last evaluated. A rule whose glob matches nothing yet, such as a browser
+  profile without a `Cookies` file, has no parent directories. A new profile is
+  not protected until the next evaluation, the same as for the paths themselves.
 
 ### Process Matching
 

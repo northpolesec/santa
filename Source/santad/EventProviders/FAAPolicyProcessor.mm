@@ -30,6 +30,7 @@
 #import "Source/common/SNTStoredFileAccessEvent.h"
 #include "Source/common/String.h"
 #include "Source/common/es/EnrichedTypes.h"
+#include "absl/container/inlined_vector.h"
 
 // Terminal value that will never match a valid cert hash.
 NSString* const kBadCertHash = @"BAD_CERT_HASH";
@@ -49,6 +50,20 @@ static constexpr uint32_t kOpenFlagsIndicatingWrite = FWRITE | O_APPEND | O_TRUN
 bool IsBlockDecision(FileAccessPolicyDecision decision) {
   return decision == FileAccessPolicyDecision::kDenied ||
          decision == FileAccessPolicyDecision::kDeniedInvalidSignature;
+}
+
+// Note: copyfile(2) is absent because the kernel rejects a directory source or
+// target with EISDIR before the MAC hook, so AUTH_COPYFILE never carries a tree.
+bool IsDirectoryTreeOperation(const Message& msg) {
+  switch (msg->event_type) {
+    case ES_EVENT_TYPE_AUTH_CLONE: return S_ISDIR(msg->event.clone.source->stat.st_mode);
+    case ES_EVENT_TYPE_AUTH_RENAME:
+      // A swap (RENAME_SWAP) also moves an existing destination to the source path.
+      return S_ISDIR(msg->event.rename.source->stat.st_mode) ||
+             (msg->event.rename.destination_type == ES_DESTINATION_TYPE_EXISTING_FILE &&
+              S_ISDIR(msg->event.rename.destination.existing_file->stat.st_mode));
+    default: return false;
+  }
 }
 
 FileAccessPolicyDecision ApplyOverrideToDecision(FileAccessPolicyDecision decision,
@@ -577,9 +592,9 @@ void FAAPolicyProcessor::LogTTY(SNTStoredFileAccessEvent* event, URLTextPair lin
 FAAPolicyProcessor::DecisionAndOptions FAAPolicyProcessor::ProcessTargetAndPolicy(
     const Message& msg, const TargetPolicyPair& target_policy_pair,
     CheckIfPolicyMatchesBlock check_if_policy_matches_block,
-    SNTFileAccessDeniedBlock file_access_denied_block,
-    SNTOverrideFileAccessAction override_action) {
-  const Message::PathTarget& target = msg.PathTargetAtIndex(target_policy_pair.first);
+    SNTFileAccessDeniedBlock file_access_denied_block, SNTOverrideFileAccessAction override_action,
+    TargetUIState& ui_state) {
+  const Message::PathTarget& target = msg.PathTargetAtIndex(target_policy_pair.target_index);
 
   if (target.truncated) {
     LOGW(@"FAA: truncated path target on event=%d, pid=%d, proc=%s", msg->event_type,
@@ -588,9 +603,19 @@ FAAPolicyProcessor::DecisionAndOptions FAAPolicyProcessor::ProcessTargetAndPolic
   }
 
   const std::optional<std::shared_ptr<WatchItemPolicyBase>> optional_policy =
-      target_policy_pair.second;
+      target_policy_pair.policy;
   DecisionAndOptions result =
       ApplyPolicy(msg, target, optional_policy, check_if_policy_matches_block);
+
+  // A parent directory in audit mode is treated as if the rule were audit-only.
+  // Like audit-only, this leaves kDeniedInvalidSignature blocking.
+  if (target_policy_pair.via_ancestor && result.decision == FileAccessPolicyDecision::kDenied &&
+      optional_policy.has_value() &&
+      (*optional_policy)->parent_directory_protection ==
+          WatchItemParentDirectoryProtection::kAudit) {
+    result.decision = FileAccessPolicyDecision::kAllowedAuditOnly;
+  }
+
   FileAccessPolicyDecision decision = ApplyOverrideToDecision(result.decision, override_action);
   result.decision = decision;
 
@@ -602,7 +627,7 @@ FAAPolicyProcessor::DecisionAndOptions FAAPolicyProcessor::ProcessTargetAndPolic
     // back to the rule's options for the same defensive reason as above.
     const WatchItemProcessOptions& options = result.options ? *result.options : policy->options;
 
-    LogTelemetry(*policy, msg, target_policy_pair.first, decision);
+    LogTelemetry(*policy, msg, target_policy_pair.target_index, decision);
 
     SNTCachedDecision* cd = GetCachedDecision(msg->process->executable->stat);
     // Only when nothing is cached: first-writer-wins means a rehydrate cannot add
@@ -659,23 +684,32 @@ FAAPolicyProcessor::DecisionAndOptions FAAPolicyProcessor::ProcessTargetAndPolic
     event.process.parent.pid = @(audit_token_to_pid(msg->process->parent_audit_token));
     event.process.parent.filePath = StringToNSString(msg.ParentProcessPath());
 
-    URLTextPair link_info;
-    if (generate_event_detail_link_block_) {
-      link_info =
-          generate_event_detail_link_block_(options.event_detail_url, options.event_detail_text);
-    }
-
     if (store_access_event_block_) {
       store_access_event_block_(event, IsBlockDecision(decision));
     }
 
     if (IsBlockDecision(decision)) {
-      if (ShouldShowUI(options)) {
+      // The first blocking policy that wants each surface shows it for the
+      // target. The TTY is marked shown when a policy is chosen, not when a line
+      // prints: LogTTY skips a policy that already messaged this process, and
+      // the next policy must not print in its place.
+      const bool show_dialog = !ui_state.dialog_shown && ShouldShowUI(options);
+      const bool message_tty = !ui_state.tty_shown && ShouldMessageTTY(options, msg);
+
+      URLTextPair link_info;
+      if ((show_dialog || message_tty) && generate_event_detail_link_block_) {
+        link_info =
+            generate_event_detail_link_block_(options.event_detail_url, options.event_detail_text);
+      }
+
+      if (show_dialog) {
+        ui_state.dialog_shown = true;
         file_access_denied_block(event, OptionalStringToNSString(options.custom_message),
                                  link_info.first, link_info.second);
       }
 
-      if (ShouldMessageTTY(options, msg)) {
+      if (message_tty) {
+        ui_state.tty_shown = true;
         LogTTY(event, link_info, msg, *policy, options);
       }
     }
@@ -696,25 +730,34 @@ FAAPolicyProcessor::ESResult FAAPolicyProcessor::ProcessMessage(
     FAAClientType client_type) {
   es_auth_result_t policy_result = ES_AUTH_RESULT_ALLOW;
   bool cacheable = true;
+  // Indexed by target. Messages have at most two path targets.
+  absl::InlinedVector<TargetUIState, 2> ui_states;
 
   for (const TargetPolicyPair& target_policy_pair : target_policy_pairs) {
-    const Message::PathTarget& path_target = msg.PathTargetAtIndex(target_policy_pair.first);
+    const size_t target_index = target_policy_pair.target_index;
+    const Message::PathTarget& path_target = msg.PathTargetAtIndex(target_index);
+    if (target_index >= ui_states.size()) {
+      ui_states.resize(target_index + 1);
+    }
     DecisionAndOptions result =
         ProcessTargetAndPolicy(msg, target_policy_pair, check_if_policy_matches_block,
-                               file_access_denied_block, overrideAction);
+                               file_access_denied_block, overrideAction, ui_states[target_index]);
     FileAccessPolicyDecision decision = result.decision;
     // Populate the reads_cache_ if:
     //   1. The policy applied
     //   2. The process wasn't invalid
     //   3. A devno/ino pair existed for the target
     //   4. The effective policy allowed read access
+    //   5. The policy watches the target itself. A policy paired with a parent
+    //      directory of its paths says nothing about reads of that directory,
+    //      which the policy watching it decides.
     // Note: As long as a policy allows read access, the caller's read cache can be updated
     // regardless of the RuleType of the policy.
     if (decision != FileAccessPolicyDecision::kNoPolicy &&
         decision != FileAccessPolicyDecision::kDeniedInvalidSignature && !path_target.truncated &&
         path_target.is_readable && path_target.unsafe_file &&
-        target_policy_pair.second.has_value() && result.options &&
-        result.options->allow_read_access) {
+        target_policy_pair.policy.has_value() && !target_policy_pair.via_ancestor &&
+        result.options && result.options->allow_read_access) {
       reads_cache_.Set(MakeReadsCacheKey(msg->process->audit_token, client_type),
                        std::pair<dev_t, ino_t>({path_target.unsafe_file->stat.st_dev,
                                                 path_target.unsafe_file->stat.st_ino}));

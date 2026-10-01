@@ -457,6 +457,22 @@ std::string GetProcessPath(pid_t pid) {
     XCTAssertTrue(targets[0].truncated);
     XCTAssertFalse(targets[1].truncated);
   }
+
+  // A compound path in the root directory has a single leading slash
+  {
+    Message msg(mockESApi, &esMsg);
+    es_file_t rootDir = MakeESFile("/", MakeStat(800));
+    esMsg.event_type = ES_EVENT_TYPE_AUTH_RENAME;
+    esMsg.event.rename.source = &testFile1;
+    esMsg.event.rename.destination_type = ES_DESTINATION_TYPE_NEW_PATH;
+    esMsg.event.rename.destination.new_path.dir = &rootDir;
+    esMsg.event.rename.destination.new_path.filename = testTok;
+
+    std::vector<Message::PathTarget> targets = msg.PathTargets();
+
+    XCTAssertEqual(targets.size(), 2);
+    XCTAssertCppStringEqual(targets[1].Path(), std::string("/test_tok"));
+  }
 }
 
 - (void)testPathTargetsNotify {
