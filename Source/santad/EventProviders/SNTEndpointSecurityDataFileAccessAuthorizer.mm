@@ -100,7 +100,9 @@ using santa::Message;
   }
 
   __block std::vector<FAAPolicyProcessor::TargetPolicyPair> targetPolicyPairs;
-  __block auto pathTargets = msg.PathTargets();
+  // Blocks capture C++ references by reference, so this does not copy the
+  // targets. The block runs synchronously, while msg is alive.
+  const auto& pathTargets = msg.PathTargets();
 
   self.findPoliciesForTargetsBlock(^(santa::LookupPolicyBlock lookupPolicyBlock) {
     size_t idx = 0;

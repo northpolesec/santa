@@ -404,8 +404,9 @@ See [Custom Branding](/configuration/branding) for examples of how this appears 
     },
     {
       key: "FileChangesPrefixFilters",
-      description: `Array of path prefix strings. When an event is logged, if the target
-        path (e.g. the file being written/removed/etc ) matches a prefix it will not be logged`,
+      description: `Array of path prefix strings. Target paths (e.g. the file being
+        written/removed/etc) that match a prefix are ignored. Events with multiple targets
+        (e.g. rename) are logged if any target is not prefix filtered and matches FileChangesRegex`,
       type: "string",
       repeated: true,
     },

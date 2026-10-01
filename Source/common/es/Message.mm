@@ -102,7 +102,7 @@ std::string Message::GetProcessPath(audit_token_t* tok) const {
   }
 }
 
-const std::vector<Message::PathTarget> Message::PathTargets() {
+const std::vector<Message::PathTarget>& Message::PathTargets() {
   if (path_targets_.size() == 0) {
     PopulatePathTargets();
   }
@@ -115,6 +115,7 @@ void Message::PopulatePathTargets() {
   targets.reserve(2);
 
   switch (es_msg_->event_type) {
+    case ES_EVENT_TYPE_NOTIFY_CLONE:
     case ES_EVENT_TYPE_AUTH_CLONE:
       PushBackPathTarget(targets, es_msg_->event.clone.source, true);
       PushBackPathTarget(targets, es_msg_->event.clone.target_dir,
@@ -132,6 +133,7 @@ void Message::PopulatePathTargets() {
       }
       break;
 
+    case ES_EVENT_TYPE_NOTIFY_COPYFILE:
     case ES_EVENT_TYPE_AUTH_COPYFILE:
       PushBackPathTarget(targets, es_msg_->event.copyfile.source, true);
       if (es_msg_->event.copyfile.target_file) {
@@ -142,11 +144,13 @@ void Message::PopulatePathTargets() {
       }
       break;
 
+    case ES_EVENT_TYPE_NOTIFY_EXCHANGEDATA:
     case ES_EVENT_TYPE_AUTH_EXCHANGEDATA:
       PushBackPathTarget(targets, es_msg_->event.exchangedata.file1);
       PushBackPathTarget(targets, es_msg_->event.exchangedata.file2);
       break;
 
+    case ES_EVENT_TYPE_NOTIFY_LINK:
     case ES_EVENT_TYPE_AUTH_LINK:
       PushBackPathTarget(targets, es_msg_->event.link.source);
       PushBackPathTarget(targets, es_msg_->event.link.target_dir,
@@ -157,6 +161,7 @@ void Message::PopulatePathTargets() {
       PushBackPathTarget(targets, es_msg_->event.open.file, true);
       break;
 
+    case ES_EVENT_TYPE_NOTIFY_RENAME:
     case ES_EVENT_TYPE_AUTH_RENAME:
       PushBackPathTarget(targets, es_msg_->event.rename.source);
       if (es_msg_->event.rename.destination_type == ES_DESTINATION_TYPE_EXISTING_FILE) {
@@ -174,6 +179,11 @@ void Message::PopulatePathTargets() {
       PushBackPathTarget(targets, es_msg_->event.truncate.target);
       break;
 
+    case ES_EVENT_TYPE_NOTIFY_CLOSE:
+      PushBackPathTarget(targets, es_msg_->event.close.target);
+      break;
+
+    case ES_EVENT_TYPE_NOTIFY_UNLINK:
     case ES_EVENT_TYPE_AUTH_UNLINK:
       PushBackPathTarget(targets, es_msg_->event.unlink.target);
       break;

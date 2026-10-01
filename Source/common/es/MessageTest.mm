@@ -459,4 +459,118 @@ std::string GetProcessPath(pid_t pid) {
   }
 }
 
+- (void)testPathTargetsNotify {
+  // NOTIFY variants must produce the same targets as their AUTH counterparts
+  es_file_t testFile1 = MakeESFile("test_file_1", MakeStat(100));
+  es_file_t testFile2 = MakeESFile("test_file_2", MakeStat(200));
+  es_file_t testDir = MakeESFile("test_dir", MakeStat(300));
+  es_string_token_t testTok = MakeESStringToken("test_tok");
+  std::string dirTok = std::string(testDir.path.data) + "/" + std::string(testTok.data);
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+
+  es_message_t esMsg = {};
+  esMsg.event.rename.source = &testFile1;
+  esMsg.event.rename.destination_type = ES_DESTINATION_TYPE_NEW_PATH;
+  esMsg.event.rename.destination.new_path.dir = &testDir;
+  esMsg.event.rename.destination.new_path.filename = testTok;
+
+  std::vector<Message::PathTarget> authTargets;
+  {
+    esMsg.event_type = ES_EVENT_TYPE_AUTH_RENAME;
+    Message msg(mockESApi, &esMsg);
+    authTargets = msg.PathTargets();
+  }
+
+  {
+    esMsg.event_type = ES_EVENT_TYPE_NOTIFY_RENAME;
+    Message msg(mockESApi, &esMsg);
+    const std::vector<Message::PathTarget>& targets = msg.PathTargets();
+
+    // Repeated calls return the same cached vector
+    XCTAssertEqual(&targets, &msg.PathTargets());
+
+    XCTAssertEqual(targets.size(), 2);
+    XCTAssertEqual(targets.size(), authTargets.size());
+    for (size_t i = 0; i < targets.size(); i++) {
+      XCTAssertCppStringEqual(targets[i].Path(), authTargets[i].Path());
+      XCTAssertEqual(targets[i].unsafe_file, authTargets[i].unsafe_file);
+    }
+    XCTAssertCppStringEqual(targets[1].Path(), dirTok);
+  }
+
+  {
+    esMsg.event_type = ES_EVENT_TYPE_NOTIFY_EXCHANGEDATA;
+    esMsg.event.exchangedata.file1 = &testFile1;
+    esMsg.event.exchangedata.file2 = &testFile2;
+    Message msg(mockESApi, &esMsg);
+    const std::vector<Message::PathTarget>& targets = msg.PathTargets();
+
+    XCTAssertEqual(targets.size(), 2);
+    XCTAssertEqual(targets[0].unsafe_file, &testFile1);
+    XCTAssertEqual(targets[1].unsafe_file, &testFile2);
+  }
+
+  {
+    esMsg.event_type = ES_EVENT_TYPE_NOTIFY_LINK;
+    esMsg.event.link.source = &testFile1;
+    esMsg.event.link.target_dir = &testDir;
+    esMsg.event.link.target_filename = testTok;
+    Message msg(mockESApi, &esMsg);
+    const std::vector<Message::PathTarget>& targets = msg.PathTargets();
+
+    XCTAssertEqual(targets.size(), 2);
+    XCTAssertEqual(targets[0].unsafe_file, &testFile1);
+    XCTAssertCppStringEqual(targets[1].Path(), dirTok);
+  }
+
+  {
+    esMsg.event_type = ES_EVENT_TYPE_NOTIFY_CLONE;
+    esMsg.event.clone.source = &testFile1;
+    esMsg.event.clone.target_dir = &testDir;
+    esMsg.event.clone.target_name = testTok;
+    Message msg(mockESApi, &esMsg);
+    const std::vector<Message::PathTarget>& targets = msg.PathTargets();
+
+    XCTAssertEqual(targets.size(), 2);
+    XCTAssertEqual(targets[0].unsafe_file, &testFile1);
+    XCTAssertCppStringEqual(targets[1].Path(), dirTok);
+  }
+
+  {
+    esMsg.event_type = ES_EVENT_TYPE_NOTIFY_COPYFILE;
+    esMsg.event.copyfile.source = &testFile1;
+    esMsg.event.copyfile.target_file = nullptr;
+    esMsg.event.copyfile.target_dir = &testDir;
+    esMsg.event.copyfile.target_name = testTok;
+    Message msg(mockESApi, &esMsg);
+    const std::vector<Message::PathTarget>& targets = msg.PathTargets();
+
+    XCTAssertEqual(targets.size(), 2);
+    XCTAssertEqual(targets[0].unsafe_file, &testFile1);
+    XCTAssertCppStringEqual(targets[1].Path(), dirTok);
+  }
+
+  {
+    esMsg.event_type = ES_EVENT_TYPE_NOTIFY_CLOSE;
+    esMsg.event.close.target = &testFile1;
+    Message msg(mockESApi, &esMsg);
+    const std::vector<Message::PathTarget>& targets = msg.PathTargets();
+
+    XCTAssertEqual(targets.size(), 1);
+    XCTAssertEqual(targets[0].unsafe_file, &testFile1);
+  }
+
+  {
+    esMsg.event_type = ES_EVENT_TYPE_NOTIFY_UNLINK;
+    esMsg.event.unlink.target = &testFile2;
+    Message msg(mockESApi, &esMsg);
+    const std::vector<Message::PathTarget>& targets = msg.PathTargets();
+
+    XCTAssertEqual(targets.size(), 1);
+    XCTAssertEqual(targets[0].unsafe_file, &testFile2);
+  }
+}
+
 @end

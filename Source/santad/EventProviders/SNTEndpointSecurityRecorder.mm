@@ -41,19 +41,6 @@ using santa::PrefixTree;
 using santa::Unit;
 using santa::santad::process_tree::ProcessTree;
 
-es_file_t* GetTargetFileForPrefixTree(const es_message_t* msg) {
-  switch (msg->event_type) {
-    case ES_EVENT_TYPE_NOTIFY_CLONE: return msg->event.clone.source;
-    case ES_EVENT_TYPE_NOTIFY_CLOSE: return msg->event.close.target;
-    case ES_EVENT_TYPE_NOTIFY_COPYFILE: return msg->event.copyfile.source;
-    case ES_EVENT_TYPE_NOTIFY_EXCHANGEDATA: return msg->event.exchangedata.file1;
-    case ES_EVENT_TYPE_NOTIFY_LINK: return msg->event.link.source;
-    case ES_EVENT_TYPE_NOTIFY_RENAME: return msg->event.rename.source;
-    case ES_EVENT_TYPE_NOTIFY_UNLINK: return msg->event.unlink.target;
-    default: return NULL;
-  }
-}
-
 @interface SNTEndpointSecurityRecorder ()
 @property SNTCompilerController* compilerController;
 @property(nonatomic, strong) id<SNTLoginWindowSessionHandler> loginWindowSessionHandler;
@@ -161,15 +148,9 @@ es_file_t* GetTargetFileForPrefixTree(const es_message_t* msg) {
     case ES_EVENT_TYPE_NOTIFY_LINK: OS_FALLTHROUGH;
     case ES_EVENT_TYPE_NOTIFY_RENAME: OS_FALLTHROUGH;
     case ES_EVENT_TYPE_NOTIFY_UNLINK: {
-      es_file_t* targetFile = GetTargetFileForPrefixTree(&(*esMsg));
-
-      if (!targetFile) {
-        break;
-      }
-
       // Only log file changes that match the given regex. When no regex is
-      // configured these events are never logged, so bail before transcoding
-      // the path to an NSString.
+      // configured these events are never logged, so bail before inspecting
+      // any targets.
       NSRegularExpression* fileChangesRegex = [self.configurator fileChangesRegex];
       if (!fileChangesRegex) {
         // Note: Do not record metrics in this case. These are not considered "drops"
@@ -178,16 +159,39 @@ es_file_t* GetTargetFileForPrefixTree(const es_message_t* msg) {
         // to filter on the kernel side rather than in user space.
         return;
       }
-      NSString* targetPath = santa::StringTokenToNSString(targetFile->path);
-      if ([fileChangesRegex rangeOfFirstMatchInString:targetPath
-                                              options:0
-                                                range:NSMakeRange(0, targetPath.length)]
-              .location == NSNotFound) {
-        return;
+
+      // Events like rename, clone, copyfile, exchangedata, and link have more than
+      // one target. Log the event if any target is outside FileChangesPrefixFilters
+      // and matches FileChangesRegex, so e.g. a rename from a filtered path into a
+      // watched path is still logged.
+      bool shouldLog = false;
+      bool prefixFiltered = false;
+      for (const Message::PathTarget& target : esMsg.PathTargets()) {
+        std::string_view path = target.Path();
+        // Path() is always null-terminated
+        if (self->_prefixTree->HasPrefix(path.data())) {
+          prefixFiltered = true;
+          continue;
+        }
+
+        NSString* targetPath = santa::StringToNSString(path);
+        // Paths that are not valid UTF-8 fail to convert. Treat these as a regex miss.
+        if (targetPath &&
+            [fileChangesRegex rangeOfFirstMatchInString:targetPath
+                                                options:0
+                                                  range:NSMakeRange(0, targetPath.length)]
+                    .location != NSNotFound) {
+          shouldLog = true;
+          break;
+        }
       }
 
-      if (self->_prefixTree->HasPrefix(targetFile->path.data)) {
-        recordEventMetrics(EventDisposition::kDropped);
+      if (!shouldLog) {
+        // Note: Only prefix filtered events are recorded as drops. Regex misses are
+        // not considered a failure case.
+        if (prefixFiltered) {
+          recordEventMetrics(EventDisposition::kDropped);
+        }
         return;
       }
 

@@ -82,7 +82,10 @@ class Message {
   std::string ParentProcessPath() const;
 
   // This method is not thread safe until after the first completed call.
-  const std::vector<Message::PathTarget> PathTargets();
+  // The returned reference is only valid while this Message is alive and not
+  // moved from. Copying the vector does not extend the lifetime of simple paths
+  // or unsafe_file, which point into the es_message_t.
+  const std::vector<Message::PathTarget>& PathTargets();
 
   inline bool HasPathTarget(size_t index) const {
     return index < path_targets_.size();
