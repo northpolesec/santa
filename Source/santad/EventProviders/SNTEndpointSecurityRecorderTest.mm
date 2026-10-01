@@ -21,6 +21,7 @@
 #include <cstddef>
 
 #include <memory>
+#include <optional>
 #include <set>
 
 #include "Source/common/Platform.h"
@@ -412,6 +413,7 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
         __autoreleasing dispatch_semaphore_t* semaMetrics) {
         esMsg->event_type = ES_EVENT_TYPE_NOTIFY_EXCHANGEDATA;
         esMsg->event.exchangedata.file1 = &targetFileMatchesRegex;
+        esMsg->event.exchangedata.file2 = &targetFileMissesRegex;
         prefixTree->InsertPrefix(esMsg->event.exchangedata.file1->path.data, Unit{});
         Message msg(mockESApi, esMsg);
         OCMExpect([mockCC handleEvent:msg withLogger:nullptr]).ignoringNonObjectArgs();
@@ -435,6 +437,8 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
   {
     esMsg->event_type = ES_EVENT_TYPE_NOTIFY_LINK;
     esMsg->event.link.source = &targetFileMatchesRegex;
+    esMsg->event.link.target_dir = &targetFileMissesRegex;
+    esMsg->event.link.target_filename = MakeESStringToken("foo");
     prefixTree->InsertPrefix(esMsg->event.link.source->path.data, Unit{});
     Message msg(mockESApi, esMsg);
 
@@ -503,56 +507,162 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
   XCTAssertTrue(OCMVerifyAll(self.mockConfigurator));
 }
 
-- (void)testGetTargetFileForPrefixTree {
-  // Ensure `GetTargetFileForPrefixTree` returns expected field for each
-  // subscribed event type in the `SNTEndpointSecurityRecorder`.
-  extern es_file_t* GetTargetFileForPrefixTree(const es_message_t* msg);
+es_file_t dirFoo = MakeESFile("/foo");
+es_file_t targetFileMatchesRegexFiltered = MakeESFile("/foo/matches/filtered");
+es_file_t targetFileMatchesRegexInvalidUTF8 = MakeESFile("/foo/matches\xff\xfe");
+constexpr const char* kFilteredPrefix = "/foo/matches/";
 
-  es_file_t cloneFile = MakeESFile("clone");
-  es_file_t closeFile = MakeESFile("close");
-  es_file_t copyfileFile = MakeESFile("copyfile");
-  es_file_t exchangedataFile = MakeESFile("exchangedata");
-  es_file_t linkFile = MakeESFile("link");
-  es_file_t renameFile = MakeESFile("rename");
-  es_file_t unlinkFile = MakeESFile("unlink");
-  es_message_t esMsg;
+// Handles a file change event built by `setup` and verifies the outcome. A
+// disposition of kProcessed means the event is logged, kDropped means it was
+// prefix filtered, and nullopt means it was filtered without recording metrics.
+- (void)checkFileChangeEvent:(void (^)(es_message_t* esMsg,
+                                       std::shared_ptr<PrefixTree<Unit>> prefixTree))setup
+                 disposition:(std::optional<EventDisposition>)disposition {
+  TestHelperBlock testBlock = ^(
+      es_message_t* esMsg, std::shared_ptr<MockEndpointSecurityAPI> mockESApi, id mockCC,
+      SNTEndpointSecurityRecorder* recorderClient, std::shared_ptr<PrefixTree<Unit>> prefixTree,
+      __autoreleasing dispatch_semaphore_t* sema,
+      __autoreleasing dispatch_semaphore_t* semaMetrics) {
+    setup(esMsg, prefixTree);
+    Message msg(mockESApi, esMsg);
+    OCMExpect([mockCC handleEvent:msg withLogger:nullptr]).ignoringNonObjectArgs();
 
-  esMsg.event_type = ES_EVENT_TYPE_NOTIFY_CLONE;
-  esMsg.event.clone.source = &cloneFile;
-  XCTAssertEqual(GetTargetFileForPrefixTree(&esMsg), &cloneFile);
+    XCTAssertNoThrow([recorderClient handleMessage:std::move(msg)
+                                recordEventMetrics:^(EventDisposition d) {
+                                  if (disposition.has_value()) {
+                                    XCTAssertEqual(d, *disposition);
+                                  } else {
+                                    XCTFail("Metrics record callback should not be called here");
+                                  }
+                                  dispatch_semaphore_signal(*semaMetrics);
+                                }]);
 
-  esMsg.event_type = ES_EVENT_TYPE_NOTIFY_CLOSE;
-  esMsg.event.close.target = &closeFile;
-  XCTAssertEqual(GetTargetFileForPrefixTree(&esMsg), &closeFile);
+    if (disposition.has_value()) {
+      XCTAssertSemaTrue(*semaMetrics, 5, "Metrics not recorded within expected window");
+    }
+    if (disposition == EventDisposition::kProcessed) {
+      XCTAssertSemaTrue(*sema, 5, "Log wasn't called within expected time window");
+    }
+  };
 
-  esMsg.event_type = ES_EVENT_TYPE_NOTIFY_COPYFILE;
-  esMsg.event.clone.source = &copyfileFile;
-  XCTAssertEqual(GetTargetFileForPrefixTree(&esMsg), &copyfileFile);
+  [self handleMessageShouldLog:(disposition == EventDisposition::kProcessed) withBlock:testBlock];
+}
 
-  esMsg.event_type = ES_EVENT_TYPE_NOTIFY_LINK;
-  esMsg.event.link.source = &linkFile;
-  XCTAssertEqual(GetTargetFileForPrefixTree(&esMsg), &linkFile);
+- (void)testHandleMessageMultipleTargets {
+  // RENAME to a new path: source misses regex, destination matches
+  [self
+      checkFileChangeEvent:^(es_message_t* esMsg, std::shared_ptr<PrefixTree<Unit>> prefixTree) {
+        esMsg->event_type = ES_EVENT_TYPE_NOTIFY_RENAME;
+        esMsg->event.rename.source = &targetFileMissesRegex;
+        esMsg->event.rename.destination_type = ES_DESTINATION_TYPE_NEW_PATH;
+        esMsg->event.rename.destination.new_path.dir = &dirFoo;
+        esMsg->event.rename.destination.new_path.filename = MakeESStringToken("matches_new");
+      }
+               disposition:EventDisposition::kProcessed];
 
-  esMsg.event_type = ES_EVENT_TYPE_NOTIFY_RENAME;
-  esMsg.event.rename.source = &renameFile;
-  XCTAssertEqual(GetTargetFileForPrefixTree(&esMsg), &renameFile);
+  // RENAME over an existing file: source prefix filtered, destination matches
+  [self
+      checkFileChangeEvent:^(es_message_t* esMsg, std::shared_ptr<PrefixTree<Unit>> prefixTree) {
+        esMsg->event_type = ES_EVENT_TYPE_NOTIFY_RENAME;
+        esMsg->event.rename.source = &targetFileMatchesRegexFiltered;
+        esMsg->event.rename.destination_type = ES_DESTINATION_TYPE_EXISTING_FILE;
+        esMsg->event.rename.destination.existing_file = &targetFileMatchesAlsoRegex;
+        prefixTree->InsertPrefix(kFilteredPrefix, Unit{});
+      }
+               disposition:EventDisposition::kProcessed];
 
-  esMsg.event_type = ES_EVENT_TYPE_NOTIFY_UNLINK;
-  esMsg.event.unlink.target = &unlinkFile;
-  XCTAssertEqual(GetTargetFileForPrefixTree(&esMsg), &unlinkFile);
+  // RENAME: both targets prefix filtered
+  [self
+      checkFileChangeEvent:^(es_message_t* esMsg, std::shared_ptr<PrefixTree<Unit>> prefixTree) {
+        esMsg->event_type = ES_EVENT_TYPE_NOTIFY_RENAME;
+        esMsg->event.rename.source = &targetFileMatchesRegexFiltered;
+        esMsg->event.rename.destination_type = ES_DESTINATION_TYPE_NEW_PATH;
+        esMsg->event.rename.destination.new_path.dir = &targetFileMatchesRegex;
+        esMsg->event.rename.destination.new_path.filename = MakeESStringToken("filtered_new");
+        prefixTree->InsertPrefix(kFilteredPrefix, Unit{});
+      }
+               disposition:EventDisposition::kDropped];
 
-  esMsg.event_type = ES_EVENT_TYPE_NOTIFY_EXCHANGEDATA;
-  esMsg.event.exchangedata.file1 = &exchangedataFile;
-  XCTAssertEqual(GetTargetFileForPrefixTree(&esMsg), &exchangedataFile);
+  // RENAME: source prefix filtered, destination misses regex
+  [self
+      checkFileChangeEvent:^(es_message_t* esMsg, std::shared_ptr<PrefixTree<Unit>> prefixTree) {
+        esMsg->event_type = ES_EVENT_TYPE_NOTIFY_RENAME;
+        esMsg->event.rename.source = &targetFileMatchesRegexFiltered;
+        esMsg->event.rename.destination_type = ES_DESTINATION_TYPE_EXISTING_FILE;
+        esMsg->event.rename.destination.existing_file = &targetFileMissesRegex;
+        prefixTree->InsertPrefix(kFilteredPrefix, Unit{});
+      }
+               disposition:EventDisposition::kDropped];
 
-  esMsg.event_type = ES_EVENT_TYPE_NOTIFY_EXEC;
-  XCTAssertEqual(GetTargetFileForPrefixTree(&esMsg), nullptr);
+  // RENAME: both targets miss regex
+  [self
+      checkFileChangeEvent:^(es_message_t* esMsg, std::shared_ptr<PrefixTree<Unit>> prefixTree) {
+        esMsg->event_type = ES_EVENT_TYPE_NOTIFY_RENAME;
+        esMsg->event.rename.source = &targetFileMissesRegex;
+        esMsg->event.rename.destination_type = ES_DESTINATION_TYPE_NEW_PATH;
+        esMsg->event.rename.destination.new_path.dir = &dirFoo;
+        esMsg->event.rename.destination.new_path.filename = MakeESStringToken("misses_new");
+      }
+               disposition:std::nullopt];
 
-  esMsg.event_type = ES_EVENT_TYPE_NOTIFY_FORK;
-  XCTAssertEqual(GetTargetFileForPrefixTree(&esMsg), nullptr);
+  // CLOSE: path is not valid UTF-8, treated as a regex miss
+  [self
+      checkFileChangeEvent:^(es_message_t* esMsg, std::shared_ptr<PrefixTree<Unit>> prefixTree) {
+        esMsg->event_type = ES_EVENT_TYPE_NOTIFY_CLOSE;
+        esMsg->event.close.modified = true;
+        esMsg->event.close.target = &targetFileMatchesRegexInvalidUTF8;
+      }
+               disposition:std::nullopt];
 
-  esMsg.event_type = ES_EVENT_TYPE_NOTIFY_EXIT;
-  XCTAssertEqual(GetTargetFileForPrefixTree(&esMsg), nullptr);
+  // RENAME: source is not valid UTF-8, destination matches
+  [self
+      checkFileChangeEvent:^(es_message_t* esMsg, std::shared_ptr<PrefixTree<Unit>> prefixTree) {
+        esMsg->event_type = ES_EVENT_TYPE_NOTIFY_RENAME;
+        esMsg->event.rename.source = &targetFileMatchesRegexInvalidUTF8;
+        esMsg->event.rename.destination_type = ES_DESTINATION_TYPE_EXISTING_FILE;
+        esMsg->event.rename.destination.existing_file = &targetFileMatchesAlsoRegex;
+      }
+               disposition:EventDisposition::kProcessed];
+
+  // CLONE: source misses regex, target matches
+  [self
+      checkFileChangeEvent:^(es_message_t* esMsg, std::shared_ptr<PrefixTree<Unit>> prefixTree) {
+        esMsg->event_type = ES_EVENT_TYPE_NOTIFY_CLONE;
+        esMsg->event.clone.source = &targetFileMissesRegex;
+        esMsg->event.clone.target_dir = &dirFoo;
+        esMsg->event.clone.target_name = MakeESStringToken("matches_clone");
+      }
+               disposition:EventDisposition::kProcessed];
+
+  // COPYFILE to a new file: source misses regex, target matches
+  [self
+      checkFileChangeEvent:^(es_message_t* esMsg, std::shared_ptr<PrefixTree<Unit>> prefixTree) {
+        esMsg->event_type = ES_EVENT_TYPE_NOTIFY_COPYFILE;
+        esMsg->event.copyfile.source = &targetFileMissesRegex;
+        esMsg->event.copyfile.target_file = nullptr;
+        esMsg->event.copyfile.target_dir = &dirFoo;
+        esMsg->event.copyfile.target_name = MakeESStringToken("matches_copy");
+      }
+               disposition:EventDisposition::kProcessed];
+
+  // EXCHANGEDATA: file1 misses regex, file2 matches
+  [self
+      checkFileChangeEvent:^(es_message_t* esMsg, std::shared_ptr<PrefixTree<Unit>> prefixTree) {
+        esMsg->event_type = ES_EVENT_TYPE_NOTIFY_EXCHANGEDATA;
+        esMsg->event.exchangedata.file1 = &targetFileMissesRegex;
+        esMsg->event.exchangedata.file2 = &targetFileMatchesRegex;
+      }
+               disposition:EventDisposition::kProcessed];
+
+  // LINK: source misses regex, new link matches
+  [self
+      checkFileChangeEvent:^(es_message_t* esMsg, std::shared_ptr<PrefixTree<Unit>> prefixTree) {
+        esMsg->event_type = ES_EVENT_TYPE_NOTIFY_LINK;
+        esMsg->event.link.source = &targetFileMissesRegex;
+        esMsg->event.link.target_dir = &dirFoo;
+        esMsg->event.link.target_filename = MakeESStringToken("matches_link");
+      }
+               disposition:EventDisposition::kProcessed];
 }
 
 - (void)testHandleExecWithHoldAndAskSkipsLogging {

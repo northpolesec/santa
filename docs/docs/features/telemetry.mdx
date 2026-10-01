@@ -383,6 +383,11 @@ Applies when using the `protobuf` or `json` log types.
   monitoring. These paths will not be matched against the `FileChangesRegex`,
   which can be a performance improvement for noisy paths.
 
+For events with more than one target path (rename, clone, copyfile,
+exchangedata, and link), the event is logged if any target path is not excluded
+by `FileChangesPrefixFilters` and matches `FileChangesRegex`. For example, a
+rename from an excluded path into a monitored path is logged.
+
 ### Additional Options
 
 - `EnableMachineIDDecoration`: Adds machine ID to filelog entries
