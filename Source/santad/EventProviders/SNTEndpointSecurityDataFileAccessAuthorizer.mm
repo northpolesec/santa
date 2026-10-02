@@ -28,9 +28,11 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <set>
 #include <type_traits>
 #include <utility>
 #include <variant>
+#include <vector>
 
 #include "Source/common/AuditUtilities.h"
 #import "Source/common/SNTConfigurator.h"
@@ -44,6 +46,42 @@ using santa::EndpointSecurityAPI;
 using santa::FAAPolicyProcessor;
 using santa::FindPoliciesForTargetsBlock;
 using santa::Message;
+
+static const std::set<es_event_type_t> kAncestorPathEvents = {
+    ES_EVENT_TYPE_AUTH_CLONE,
+    ES_EVENT_TYPE_AUTH_RENAME,
+};
+
+namespace santa {
+
+// Pairs each target with the policy watching it. When the operation moves or
+// clones a directory, each target is also paired with the policy of every
+// watched path beneath it, since those paths move or are cloned along with it.
+// The policy watching the target comes first, and only the others are marked
+// as via an ancestor.
+std::vector<FAAPolicyProcessor::TargetPolicyPair> TargetPolicyPairs(
+    const std::vector<Message::PathTarget>& targets, bool directory_tree_op,
+    LookupPolicyBlock lookup_policy_block,
+    LookupPoliciesBeneathBlock lookup_policies_beneath_block) {
+  std::vector<FAAPolicyProcessor::TargetPolicyPair> pairs;
+  pairs.reserve(targets.size());
+  for (size_t idx = 0; idx < targets.size(); idx++) {
+    std::string path(targets[idx].Path());
+    std::optional<std::shared_ptr<WatchItemPolicyBase>> watching = lookup_policy_block(path);
+    pairs.emplace_back(idx, watching);
+    if (directory_tree_op) {
+      for (std::shared_ptr<WatchItemPolicyBase>& policy : lookup_policies_beneath_block(path)) {
+        // A policy watching both the target and a path beneath it applies once
+        if (watching != policy) {
+          pairs.push_back({idx, std::move(policy), /*via_ancestor=*/true});
+        }
+      }
+    }
+  }
+  return pairs;
+}
+
+}  // namespace santa
 
 @interface SNTEndpointSecurityDataFileAccessAuthorizer ()
 @property SNTConfigurator* configurator;
@@ -103,17 +141,16 @@ using santa::Message;
   // Blocks capture C++ references by reference, so this does not copy the
   // targets. The block runs synchronously, while msg is alive.
   const auto& pathTargets = msg.PathTargets();
+  const bool directoryTreeOp = santa::IsDirectoryTreeOperation(msg);
 
-  self.findPoliciesForTargetsBlock(^(santa::LookupPolicyBlock lookupPolicyBlock) {
-    size_t idx = 0;
-    for (const auto& target : pathTargets) {
-      targetPolicyPairs.emplace_back(idx, lookupPolicyBlock(target.Path().data()));
-      idx++;
-    }
+  self.findPoliciesForTargetsBlock(^(santa::LookupPolicyBlock lookupPolicyBlock,
+                                     santa::LookupPoliciesBeneathBlock lookupPoliciesBeneathBlock) {
+    targetPolicyPairs = santa::TargetPolicyPairs(pathTargets, directoryTreeOp, lookupPolicyBlock,
+                                                 lookupPoliciesBeneathBlock);
   });
 
   FAAPolicyProcessor::ESResult result = _faaPolicyProcessorProxy->ProcessMessage(
-      msg, targetPolicyPairs,
+      msg, std::move(targetPolicyPairs),
       ^FAAPolicyProcessor::PolicyMatch(const santa::WatchItemPolicyBase& base_policy,
                                        const Message::PathTarget& target, const Message& msg) {
         // Note: Iteration order is meaningful. ProcessesWithOptions entries
@@ -128,7 +165,11 @@ using santa::Message;
       },
       self.fileAccessDeniedBlock, overrideAction);
 
-  [self respondToMessage:msg withAuthResult:result.auth_result cacheable:result.cacheable];
+  // Directory tree operations are decided by the policies beneath the
+  // directory, which the ES cache has no knowledge of.
+  [self respondToMessage:msg
+          withAuthResult:result.auth_result
+               cacheable:result.cacheable && !directoryTreeOp];
 }
 
 - (void)handleMessage:(santa::Message&&)esMsg
@@ -210,16 +251,24 @@ using santa::Message;
 }
 
 - (void)watchItemsCount:(size_t)count
-               newPaths:(const santa::SetPairPathAndType&)newPaths
-           removedPaths:(const santa::SetPairPathAndType&)removedPaths {
+                newPaths:(const santa::SetPairPathAndType&)newPaths
+            removedPaths:(const santa::SetPairPathAndType&)removedPaths
+        newAncestorPaths:(const santa::SetPairPathAndType&)newAncestorPaths
+    removedAncestorPaths:(const santa::SetPairPathAndType&)removedAncestorPaths {
   if (count == 0) {
     [self disable];
   } else {
-    // Stop watching removed paths
+    // Stop watching removed paths. This must happen before any muting below:
+    // a literal path can move between the watched and ancestor sets, keeping
+    // the same ES mute key, and unmuting clears every event on that key.
     [super unmuteTargetPaths:removedPaths];
+    [super unmuteTargetPaths:removedAncestorPaths];
 
-    // Begin watching the added paths
+    // Begin watching the added paths. Ancestor directories of watched paths
+    // are only watched for the operations that move or clone them, and with
+    // them the watched paths beneath.
     [super muteTargetPaths:newPaths];
+    [super muteTargetPaths:newAncestorPaths forEvents:kAncestorPathEvents];
 
     // begin receiving events (if not already)
     [self enable];

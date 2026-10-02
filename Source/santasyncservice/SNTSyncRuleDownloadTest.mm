@@ -135,6 +135,36 @@ extern SNTNetworkFlowRule* NetworkFlowRuleFromProto(const ::pbv2::NetworkFlowRul
   }
 }
 
+- (void)testOptionsFromProtoFAARuleAddParentDirectoryProtection {
+  auto pdp = [](::pbv2::FileAccessRule::ParentDirectoryProtection value) {
+    ::pbv2::FileAccessRule::Add addRule;
+    addRule.set_parent_directory_protection(value);
+    return OptionsFromProtoFAARuleAdd(addRule)[kWatchItemConfigKeyOptionsParentDirectoryProtection];
+  };
+
+  // Unspecified omits the key, so the client applies its default
+  XCTAssertNil(pdp(::pbv2::FileAccessRule::PARENT_DIRECTORY_PROTECTION_UNSPECIFIED));
+  XCTAssertEqualObjects(pdp(::pbv2::FileAccessRule::PARENT_DIRECTORY_PROTECTION_DISABLED),
+                        kParentDirectoryProtectionDisabled);
+  XCTAssertEqualObjects(pdp(::pbv2::FileAccessRule::PARENT_DIRECTORY_PROTECTION_AUDIT),
+                        kParentDirectoryProtectionAudit);
+  XCTAssertEqualObjects(pdp(::pbv2::FileAccessRule::PARENT_DIRECTORY_PROTECTION_ENFORCE),
+                        kParentDirectoryProtectionEnforce);
+
+  // A value from a newer server enforces rather than dropping the rule
+  XCTAssertEqualObjects(pdp(static_cast<::pbv2::FileAccessRule::ParentDirectoryProtection>(123)),
+                        kParentDirectoryProtectionEnforce);
+
+  ::pbv2::FileAccessRule wi;
+  ::pbv2::FileAccessRule::Add* addRule = wi.mutable_add();
+  addRule->set_name("my_test_rule");
+  addRule->set_version("v1");
+  addRule->add_paths()->set_path("/foo");
+  addRule->set_parent_directory_protection(
+      static_cast<::pbv2::FileAccessRule::ParentDirectoryProtection>(123));
+  XCTAssertNotNil(FAARuleFromProtoFileAccessRule(wi));
+}
+
 - (void)testOptionsFromProtoFAARuleAddBadValue {
   ::pbv2::FileAccessRule::Add addRule;
   addRule.set_rule_type(static_cast<::pbv2::FileAccessRule::RuleType>(123));

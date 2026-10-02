@@ -59,6 +59,25 @@ class MockFAAPolicyProcessor : public FAAPolicyProcessor {
                FAAPolicyProcessor::CheckIfPolicyMatchesBlock checkIfPolicyMatchesBlock),
               (override));
 
+  /// Routes the mocked policy evaluation methods to the real implementations.
+  /// Every process has an empty cached decision.
+  void UseRealPolicyEvaluation() {
+    EXPECT_CALL(*this, GetCachedDecision)
+        .WillRepeatedly(testing::Return([[SNTCachedDecision alloc] init]));
+    EXPECT_CALL(*this, PolicyAllowsReadsForTarget)
+        .WillRepeatedly(
+            [this](const Message& msg, const Message::PathTarget& target, bool allow_read_access) {
+              return PolicyAllowsReadsForTargetWrapper(msg, target, allow_read_access);
+            });
+    EXPECT_CALL(*this, ApplyPolicy)
+        .WillRepeatedly(
+            [this](const Message& msg, const Message::PathTarget& target,
+                   const std::optional<std::shared_ptr<WatchItemPolicyBase>> optional_policy,
+                   FAAPolicyProcessor::CheckIfPolicyMatchesBlock block) {
+              return ApplyPolicyWrapper(msg, target, optional_policy, block);
+            });
+  }
+
   //
   // Wrappers for calling into private methods
   //
@@ -82,8 +101,27 @@ class MockFAAPolicyProcessor : public FAAPolicyProcessor {
       const Message& msg, const FAAPolicyProcessor::TargetPolicyPair& target_policy_pair,
       FAAPolicyProcessor::CheckIfPolicyMatchesBlock checkIfPolicyMatchesBlock,
       SNTFileAccessDeniedBlock fileAccessDeniedBlock, SNTOverrideFileAccessAction overrideAction) {
+    FAAPolicyProcessor::TargetUIState ui_state;
     return FAAPolicyProcessor::ProcessTargetAndPolicy(
-        msg, target_policy_pair, checkIfPolicyMatchesBlock, fileAccessDeniedBlock, overrideAction);
+        msg, target_policy_pair, checkIfPolicyMatchesBlock, fileAccessDeniedBlock, overrideAction,
+        ui_state);
+  }
+
+  FAAPolicyProcessor::ESResult ProcessMessageWrapper(
+      const Message& msg, std::vector<FAAPolicyProcessor::TargetPolicyPair> target_policy_pairs,
+      FAAPolicyProcessor::CheckIfPolicyMatchesBlock checkIfPolicyMatchesBlock,
+      SNTFileAccessDeniedBlock fileAccessDeniedBlock) {
+    return FAAPolicyProcessor::ProcessMessage(
+        msg, std::move(target_policy_pairs), checkIfPolicyMatchesBlock, fileAccessDeniedBlock,
+        SNTOverrideFileAccessActionNone, FAAClientType::kData);
+  }
+
+  std::optional<FAAPolicyProcessor::ESResult> ImmediateResponseWrapper(const Message& msg) {
+    return FAAPolicyProcessor::ImmediateResponse(msg, FAAClientType::kData);
+  }
+
+  bool HaveMessagedTTYForPolicyWrapper(const WatchItemPolicyBase& policy, const Message& msg) {
+    return FAAPolicyProcessor::HaveMessagedTTYForPolicy(policy, msg);
   }
 };
 

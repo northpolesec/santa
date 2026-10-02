@@ -500,14 +500,15 @@ static NSString* TAMUsernameForUID(uid_t uid) {
   __block NSString* ruleName;
   __block NSString* ruleVersion;
 
-  _watchItems->FindPoliciesForTargets(^(santa::LookupPolicyBlock lookup_policy_block) {
-    std::optional<std::shared_ptr<santa::WatchItemPolicyBase>> policy =
-        lookup_policy_block(path.UTF8String);
-    if (policy.has_value()) {
-      ruleName = santa::StringToNSString((*policy)->name);
-      ruleVersion = santa::StringToNSString((*policy)->version);
-    }
-  });
+  _watchItems->FindPoliciesForTargets(
+      ^(santa::LookupPolicyBlock lookup_policy_block, santa::LookupPoliciesBeneathBlock) {
+        std::optional<std::shared_ptr<santa::WatchItemPolicyBase>> policy =
+            lookup_policy_block(path.UTF8String);
+        if (policy.has_value()) {
+          ruleName = santa::StringToNSString((*policy)->name);
+          ruleVersion = santa::StringToNSString((*policy)->version);
+        }
+      });
 
   reply(ruleName, ruleVersion);
 }
