@@ -15,6 +15,8 @@
 #include "Source/common/cel/Activation.h"
 
 #include "Source/common/cel/result.pb.h"
+#include "absl/strings/match.h"
+#include "absl/strings/str_replace.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 
@@ -333,7 +335,12 @@ std::vector<std::pair<absl::string_view, ::cel::Type>> Activation<IsV2>::GetVari
 template <bool IsV2>
 void Activation<IsV2>::FlushStagedAnnotations(bool commit) const {
   if (commit && annotations_.add) {
-    for (const auto& [name, propagation] : stagedAnnotations_) {
+    std::optional<std::string> session;
+    for (auto& [name, propagation] : stagedAnnotations_) {
+      if (annotations_.session && absl::StrContains(name, kSessionPlaceholder)) {
+        if (!session) session = annotations_.session();
+        absl::StrReplaceAll({{kSessionPlaceholder, *session}}, &name);
+      }
       annotations_.add(name, propagation);
     }
   }

@@ -32,6 +32,7 @@
 #include "Source/common/es/EndpointSecurityAPI.h"
 #include "Source/common/processtree/annotations/cel.h"
 #include "Source/common/processtree/process_tree_macos.h"
+#include "absl/strings/str_cat.h"
 
 namespace {
 
@@ -76,6 +77,14 @@ santa::cel::AnnotationHooks AnnotationHooksFor(std::shared_ptr<ProcessTree> proc
                              santa::santad::process_tree::PidFromAuditToken(
                                  esMsg->event.exec.target->audit_token),
                              name, EntryFor(propagation));
+          },
+      // pidversion changes on exec, so this names this exec of the target and
+      // matches the pid and pidversion its telemetry carries.
+      .session =
+          [esMsg]() {
+            auto pid = santa::santad::process_tree::PidFromAuditToken(
+                esMsg->event.exec.target->audit_token);
+            return absl::StrCat(pid.pid, "-", pid.pidversion);
           },
   };
 }
