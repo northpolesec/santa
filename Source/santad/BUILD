@@ -130,11 +130,21 @@ objc_library(
 )
 
 objc_library(
+    name = "PendingExecCoordinator",
+    srcs = ["PendingExecCoordinator.mm"],
+    hdrs = ["PendingExecCoordinator.h"],
+    deps = [
+        "//Source/common:SantaVnode",
+    ],
+)
+
+objc_library(
     name = "SNTCompilerController",
     srcs = ["SNTCompilerController.mm"],
     hdrs = ["SNTCompilerController.h"],
     deps = [
         ":EndpointSecurityLogger",
+        ":PendingExecCoordinator",
         ":SNTDatabaseController",
         ":SNTDecisionCache",
         ":SNTRuleTable",
@@ -420,6 +430,7 @@ objc_library(
     hdrs = ["SNTExecutionController.h"],
     deps = [
         ":CELActivation",
+        ":PendingExecCoordinator",
         ":ProcessControl",
         ":SNTDecisionCache",
         ":SNTEventTable",
@@ -1155,6 +1166,7 @@ objc_library(
         ":EndpointSecurityLogger",
         ":EntitlementsFilter",
         ":Metrics",
+        ":PendingExecCoordinator",
         ":ProcessControl",
         ":SNTCompilerController",
         ":SNTDatabaseController",
@@ -1611,6 +1623,7 @@ santa_unit_test(
     ],
     deps = [
         ":EntitlementsFilter",
+        ":PendingExecCoordinator",
         ":ProcessControl",
         ":SNTDatabaseController",
         ":SNTDecisionCache",
@@ -1618,6 +1631,7 @@ santa_unit_test(
         ":SNTExecutionController",
         ":SNTPolicyProcessor",
         ":SNTRuleTable",
+        ":SNTSyncdQueue",
         ":SandboxExpectations",
         "//Source/common:AuditUtilities",
         "//Source/common:MOLCertificate",
@@ -1796,6 +1810,16 @@ santa_unit_test(
 )
 
 santa_unit_test(
+    name = "PendingExecCoordinatorTest",
+    srcs = ["PendingExecCoordinatorTest.mm"],
+    deps = [
+        ":PendingExecCoordinator",
+        "//Source/common:SantaVnode",
+        "@googletest//:gtest",
+    ],
+)
+
+santa_unit_test(
     name = "SNTCompilerControllerTest",
     srcs = ["SNTCompilerControllerTest.mm"],
     sdk_dylibs = [
@@ -1803,6 +1827,7 @@ santa_unit_test(
     ],
     deps = [
         ":EndpointSecurityLogger",
+        ":PendingExecCoordinator",
         ":SNTCompilerController",
         ":SNTDecisionCache",
         "//Source/common:SNTCachedDecision",
@@ -1832,6 +1857,7 @@ test_suite(
         ":FAAPolicyProcessorTest",
         ":KillingMachineTest",
         ":MetricsTest",
+        ":PendingExecCoordinatorTest",
         ":RateLimiterTest",
         ":SNTApplicationCoreMetricsTest",
         ":SNTBinaryUploadControllerTest",

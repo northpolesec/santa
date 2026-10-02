@@ -247,6 +247,7 @@ static NSString* const kBlockNetworkMountKey = @"BlockNetworkMount";
 static NSString* const kAllowedNetworkMountHosts = @"AllowedNetworkMountHosts";
 static NSString* const kEnableTransitiveRulesKey = @"EnableTransitiveRules";
 static NSString* const kEnableTransitiveRulesKeyDeprecated = @"EnableTransitiveWhitelisting";
+static NSString* const kCompilerTransitiveWaitMilliseconds = @"CompilerTransitiveWaitMilliseconds";
 static NSString* const kAllowedPathRegexKey = @"AllowedPathRegex";
 static NSString* const kAllowedPathRegexKeyDeprecated = @"WhitelistRegex";
 static NSString* const kBlockedPathRegexKey = @"BlockedPathRegex";
@@ -339,6 +340,7 @@ static NSString* const kPushTokenChainKey = @"PushTokenChain";
       kFailClosedKey : number,
       kEnableTransitiveRulesKey : number,
       kEnableTransitiveRulesKeyDeprecated : number,
+      kCompilerTransitiveWaitMilliseconds : number,
       kFileChangesRegexKey : re,
       kFileChangesPrefixFiltersKey : array,
       kAllowedPathRegexKey : re,
@@ -771,6 +773,10 @@ static SNTConfigurator* sharedConfigurator = nil;
   return [self syncAndConfigStateSet];
 }
 
++ (NSSet*)keyPathsForValuesAffectingCompilerTransitiveWaitMilliseconds {
+  return [self configStateSet];
+}
+
 + (NSSet*)keyPathsForValuesAffectingEnableAllEventUpload {
   return [self syncAndConfigStateSet];
 }
@@ -1019,6 +1025,12 @@ static SNTConfigurator* sharedConfigurator = nil;
 
 - (void)setEnableTransitiveRules:(BOOL)enabled {
   [self updateSyncStateForKey:kEnableTransitiveRulesKey value:@(enabled)];
+}
+
+- (uint32_t)compilerTransitiveWaitMilliseconds {
+  return self.configState[kCompilerTransitiveWaitMilliseconds]
+             ? [self.configState[kCompilerTransitiveWaitMilliseconds] unsignedIntValue]
+             : 2000;
 }
 
 - (BOOL)enableBundles {

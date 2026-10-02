@@ -984,6 +984,13 @@ extern NSString* _Nonnull const kEnableMenuItemUserOverride;
 ///
 @property BOOL enableTransitiveRules;
 
+///
+///  The number of milliseconds to hold the execution of a freshly compiled,
+///  not-yet-allowlisted binary while its transitive rule is being created.
+///  Only applies in lockdown mode when a compiler is active. Default 2000.
+///
+@property(readonly) uint32_t compilerTransitiveWaitMilliseconds;
+
 #pragma mark Server Auth Settings
 
 ///

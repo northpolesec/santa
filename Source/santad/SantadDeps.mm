@@ -82,7 +82,9 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator* configurator,
     exit(EXIT_FAILURE);
   }
 
-  SNTCompilerController* compiler_controller = [[SNTCompilerController alloc] init];
+  auto pending_exec_coordinator = std::make_shared<santa::PendingExecCoordinator>();
+  SNTCompilerController* compiler_controller =
+      [[SNTCompilerController alloc] initWithPendingExecCoordinator:pending_exec_coordinator];
   if (!compiler_controller) {
     LOGE(@"Failed to initialize compiler controller.");
     exit(EXIT_FAILURE);
@@ -200,7 +202,8 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator* configurator,
                                         policyProcessor:policy_processor
                                     processControlBlock:processControlBlock
                                             processTree:process_tree
-                                    sandboxExpectations:sandbox_expectations];
+                                    sandboxExpectations:sandbox_expectations
+                                 pendingExecCoordinator:pending_exec_coordinator];
   if (!exec_controller) {
     LOGE(@"Failed to initialize exec controller.");
     exit(EXIT_FAILURE);
@@ -256,7 +259,8 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator* configurator,
       esapi, logger, std::move(metrics), std::move(watch_items), std::move(auth_result_cache),
       control_connection, compiler_controller, notifier_queue, syncd_queue, netext_queue,
       exec_controller, prefix_tree, std::move(tty_writer), std::move(process_tree),
-      std::move(entitlements_filter), std::move(sandbox_expectations));
+      std::move(entitlements_filter), std::move(sandbox_expectations),
+      std::move(pending_exec_coordinator));
 }
 
 SantadDeps::SantadDeps(
@@ -269,7 +273,8 @@ SantadDeps::SantadDeps(
     std::shared_ptr<::TTYWriter> tty_writer,
     std::shared_ptr<santa::santad::process_tree::ProcessTree> process_tree,
     std::shared_ptr<santa::EntitlementsFilter> entitlements_filter,
-    std::shared_ptr<santa::SandboxExpectations> sandbox_expectations)
+    std::shared_ptr<santa::SandboxExpectations> sandbox_expectations,
+    std::shared_ptr<santa::PendingExecCoordinator> pending_exec_coordinator)
     : esapi_(std::move(esapi)),
       logger_(std::move(logger)),
       metrics_(std::move(metrics)),
@@ -282,6 +287,7 @@ SantadDeps::SantadDeps(
       syncd_queue_(syncd_queue),
       netext_queue_(netext_queue),
       exec_controller_(exec_controller),
+      pending_exec_coordinator_(std::move(pending_exec_coordinator)),
       prefix_tree_(prefix_tree),
       tty_writer_(std::move(tty_writer)),
       process_tree_(std::move(process_tree)),

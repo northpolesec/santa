@@ -17,9 +17,12 @@
 
 #include <bsm/libbsm.h>
 
+#include <memory>
+
 #import "Source/common/SNTCommonEnums.h"
 #include "Source/common/es/Message.h"
 #include "Source/common/processtree/process_tree.h"
+#include "Source/santad/PendingExecCoordinator.h"
 #include "Source/santad/ProcessControl.h"
 #import "Source/santad/SNTPolicyProcessor.h"
 #include "Source/santad/SandboxExpectations.h"
@@ -71,17 +74,18 @@ using LogExecutionBlock = void (^)(santa::Message esMsg);
 ///
 @interface SNTExecutionController : NSObject
 
-- (instancetype)initWithRuleTable:(SNTRuleTable*)ruleTable
-                       eventTable:(SNTEventTable*)eventTable
-                    notifierQueue:(SNTNotificationQueue*)notifierQueue
-                       syncdQueue:(SNTSyncdQueue*)syncdQueue
-                           logger:(LogExecutionBlock)logger
-                        ttyWriter:(std::shared_ptr<santa::TTYWriter>)ttyWriter
-                  policyProcessor:(SNTPolicyProcessor*)policyProcessor
-              processControlBlock:(santa::ProcessControlBlock)processControlBlock
-                      processTree:
-                          (std::shared_ptr<santa::santad::process_tree::ProcessTree>)processTree
-              sandboxExpectations:(std::shared_ptr<santa::SandboxExpectations>)sandboxExpectations;
+- (instancetype)
+         initWithRuleTable:(SNTRuleTable*)ruleTable
+                eventTable:(SNTEventTable*)eventTable
+             notifierQueue:(SNTNotificationQueue*)notifierQueue
+                syncdQueue:(SNTSyncdQueue*)syncdQueue
+                    logger:(LogExecutionBlock)logger
+                 ttyWriter:(std::shared_ptr<santa::TTYWriter>)ttyWriter
+           policyProcessor:(SNTPolicyProcessor*)policyProcessor
+       processControlBlock:(santa::ProcessControlBlock)processControlBlock
+               processTree:(std::shared_ptr<santa::santad::process_tree::ProcessTree>)processTree
+       sandboxExpectations:(std::shared_ptr<santa::SandboxExpectations>)sandboxExpectations
+    pendingExecCoordinator:(std::shared_ptr<santa::PendingExecCoordinator>)pendingExecCoordinator;
 
 ///
 ///  Handles the logic of deciding whether to allow the binary to run or not, sends the response to

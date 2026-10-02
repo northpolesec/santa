@@ -120,6 +120,7 @@ static bool SameBinary(const es_process_t* a, NSString* aSHA256, const es_proces
   LogExecutionBlock _logger;
   std::shared_ptr<TTYWriter> _ttyWriter;
   std::unique_ptr<SantaCache<std::pair<pid_t, int>, bool>> _procSignalCache;
+  std::shared_ptr<santa::PendingExecCoordinator> _pendingExecCoordinator;
 
   // Cache of TouchID approvals: SHA-256 (as std::string) -> timestamp (nanoseconds since boot)
   // Note: We use std::string instead of NSString* because SantaCache uses == for key comparison,
@@ -140,17 +141,18 @@ static bool SameBinary(const es_process_t* a, NSString* aSHA256, const es_proces
 
 #pragma mark Initializers
 
-- (instancetype)initWithRuleTable:(SNTRuleTable*)ruleTable
-                       eventTable:(SNTEventTable*)eventTable
-                    notifierQueue:(SNTNotificationQueue*)notifierQueue
-                       syncdQueue:(SNTSyncdQueue*)syncdQueue
-                           logger:(LogExecutionBlock)logger
-                        ttyWriter:(std::shared_ptr<TTYWriter>)ttyWriter
-                  policyProcessor:(SNTPolicyProcessor*)policyProcessor
-              processControlBlock:(santa::ProcessControlBlock)processControlBlock
-                      processTree:
-                          (std::shared_ptr<santa::santad::process_tree::ProcessTree>)processTree
-              sandboxExpectations:(std::shared_ptr<santa::SandboxExpectations>)sandboxExpectations {
+- (instancetype)
+         initWithRuleTable:(SNTRuleTable*)ruleTable
+                eventTable:(SNTEventTable*)eventTable
+             notifierQueue:(SNTNotificationQueue*)notifierQueue
+                syncdQueue:(SNTSyncdQueue*)syncdQueue
+                    logger:(LogExecutionBlock)logger
+                 ttyWriter:(std::shared_ptr<TTYWriter>)ttyWriter
+           policyProcessor:(SNTPolicyProcessor*)policyProcessor
+       processControlBlock:(santa::ProcessControlBlock)processControlBlock
+               processTree:(std::shared_ptr<santa::santad::process_tree::ProcessTree>)processTree
+       sandboxExpectations:(std::shared_ptr<santa::SandboxExpectations>)sandboxExpectations
+    pendingExecCoordinator:(std::shared_ptr<santa::PendingExecCoordinator>)pendingExecCoordinator {
   self = [super init];
   if (self) {
     _ruleTable = ruleTable;
@@ -166,6 +168,7 @@ static bool SameBinary(const es_process_t* a, NSString* aSHA256, const es_proces
     _processControlBlock = processControlBlock;
     _processTree = std::move(processTree);
     _sandboxExpectations = std::move(sandboxExpectations);
+    _pendingExecCoordinator = std::move(pendingExecCoordinator);
 
     _eventQueue =
         dispatch_queue_create("com.northpolesec.santa.daemon.event_upload", DISPATCH_QUEUE_SERIAL);
@@ -310,6 +313,32 @@ static bool SameBinary(const es_process_t* a, NSString* aSHA256, const es_proces
 - (void)forgetSandboxedSeatbeltProc:(const audit_token_t&)token {
   _sandboxedSeatbeltProcs->remove(
       std::make_pair(audit_token_to_pid(token), audit_token_to_pidversion(token)));
+}
+
+// Recently-written compiler output is the only candidate for a transitive-rule
+// wait. Window is generous relative to a build's final link step.
+static const uint64_t kCompilerOutputRecencySeconds = 60;
+
+- (BOOL)shouldHoldForPendingTransitiveRule:(SNTCachedDecision*)cd
+                                    target:(const es_process_t*)targetProc {
+  // Only the lockdown "unknown, no rule matched" case is a candidate. Never
+  // override an explicit block rule, and never act in monitor mode (where the
+  // default already allows and the async close path still creates the rule).
+  if (cd.decision != SNTEventStateBlockUnknown) return NO;
+  if (!_pendingExecCoordinator) return NO;
+  if (![[SNTConfigurator configurator] enableTransitiveRules]) return NO;
+
+  // Only wait when a compiler is currently or was very recently active.
+  if (!_pendingExecCoordinator->CompilerActiveRecently()) return NO;
+
+  // Only wait for freshly written files; compiler output is brand new.
+  struct timespec bt = targetProc->executable->stat.st_birthtimespec;
+  if (bt.tv_sec == 0) return NO;
+  uint64_t nowSec = (uint64_t)time(NULL);
+  if (nowSec < (uint64_t)bt.tv_sec) return NO;
+  if (nowSec - (uint64_t)bt.tv_sec > kCompilerOutputRecencySeconds) return NO;
+
+  return YES;
 }
 
 - (void)validateExecEvent:(const Message&)esMsg
@@ -496,6 +525,88 @@ static bool SameBinary(const es_process_t* a, NSString* aSHA256, const es_proces
     _procSignalCache->set(pidAndVersion, true);
     stoppedProc = self.processControlBlock(newProcPid, ProcessControl::Suspend);
     postAction(SNTActionRespondHold, cd);
+  } else if ([self shouldHoldForPendingTransitiveRule:cd target:targetProc]) {
+    // A compiler is active and this brand-new, not-yet-allowlisted binary is
+    // about to run. Its transitive rule is created asynchronously on the
+    // compiler's NOTIFY_CLOSE, which is batched and frequently lands after this
+    // exec. Suspend the target and wait for the rule rather than racing it.
+    //
+    // Ordering is load-bearing (invariant I4): publish pendingTransitive so the
+    // Recorder defers logging, suspend, respond `Hold` to ES, and ONLY THEN arm
+    // the wait. Resolution always runs async on the coordinator queue, so
+    // responding `Hold` first guarantees the `Hold` AuthResultCache entry is set
+    // before any `HoldAllowed`/`HoldDenied` transition overwrites it.
+    cd.pendingTransitive = YES;
+    [[SNTDecisionCache sharedCache] cacheDecision:cd];
+
+    _procSignalCache->set(pidAndVersion, true);
+    BOOL suspended = self.processControlBlock(newProcPid, ProcessControl::Suspend);
+
+    // If the suspend failed, ProcessControl has already killed the target. We
+    // cannot hold a process that is not actually stopped, so abandon the hold
+    // and fall through to the normal synchronous block/deny response below.
+    // Clearing pendingTransitive re-permits that synchronous path.
+    if (!suspended) {
+      cd.pendingTransitive = NO;
+      _procSignalCache->remove(pidAndVersion);
+      [[SNTDecisionCache sharedCache] cacheDecision:cd];
+      postAction(action, cd);
+    } else {
+      postAction(SNTActionRespondHold, cd);
+
+      SantaVnode vnode = SantaVnode::VnodeForFile(targetProc->executable);
+      uint32_t timeoutMs = [[SNTConfigurator configurator] compilerTransitiveWaitMilliseconds];
+      __block Message esMsgCopy(esMsg);
+      _pendingExecCoordinator->Wait(vnode, timeoutMs, ^(bool ruleCreated) {
+        // Runs exactly once, on the coordinator queue (invariants I1/I4). From
+        // the moment the wait is armed this block is the sole owner of `cd`.
+        if (ruleCreated) {
+          cd.decision = SNTEventStateAllowTransitive;
+          cd.decisionExtra = @"Transitive rule created during exec hold";
+          self.processControlBlock(newProcPid, ProcessControl::Resume);
+        } else {
+          cd.decisionExtra = @"No transitive rule created before timeout";
+          self.processControlBlock(newProcPid, ProcessControl::Kill);
+
+          // A timed-out hold is a block: notify the user like any other lockdown
+          // block (GUI dialog, blocked-event sync upload, TTY message). The
+          // resume/allow arm above stays silent. `targetProc` does not outlive
+          // validateExecEvent, so re-derive it from the retained `esMsgCopy`, and
+          // build/report before `_logger` consumes `esMsgCopy` below. A transitive
+          // hold has no interactive GUI reply, so the reply block is nil.
+          const es_process_t* heldTargetProc = esMsgCopy->event.exec.target;
+          SNTStoredExecutionEvent* se = [self storedExecutionEventForCachedDecision:cd
+                                                                            binInfo:binInfo
+                                                                         targetProc:heldTargetProc
+                                                                              esMsg:esMsgCopy];
+          [self reportStoredExecutionEvent:se
+                            cachedDecision:cd
+                                   binInfo:binInfo
+                                    config:config
+                               configState:configState
+                                targetProc:heldTargetProc
+                                   blocked:YES
+                               stoppedProc:YES
+                                replyBlock:nil];
+        }
+        cd.pendingTransitive = NO;
+        [[SNTDecisionCache sharedCache] cacheDecision:cd];
+        // Record the counter against the resolved decision (AllowTransitive on
+        // resume, the unknown block on kill), not the pre-hold state.
+        [self incrementEventCounters:cd.decision];
+        self->_logger(std::move(esMsgCopy));
+        self->_procSignalCache->remove(pidAndVersion);
+        postAction(ruleCreated ? SNTActionHoldAllowed : SNTActionHoldDenied, cd);
+      });
+
+      // The held exec's metric counter, telemetry log, and DB/GUI/TTY reporting
+      // are all handled by the resolve block above (which notifies on a timed-out
+      // kill and stays silent on a resume). Returning here keeps that block the
+      // sole owner of `cd`: nothing on this synchronous thread touches `cd` once
+      // the wait is armed, which is safe even when the wait resolves immediately
+      // on the coordinator queue (the recently-created path).
+      return;
+    }
   } else {
     // Respond with the decision.
     postAction(action, cd);
@@ -504,193 +615,243 @@ static bool SameBinary(const es_process_t* a, NSString* aSHA256, const es_proces
   // Increment metric counters
   [self incrementEventCounters:cd.decision];
 
-  // Log to database if necessary.
-  if (config.enableAllEventUpload ||
-      (cd.decision == SNTEventStateAllowUnknown && !config.disableUnknownEventUpload) ||
-      cd.auditReturn || (cd.decision & SNTEventStateAllow) == 0) {
-    SNTStoredExecutionEvent* se = [[SNTStoredExecutionEvent alloc] init];
-    se.occurrenceDate = [[NSDate alloc] init];
-    se.fileSHA256 = cd.sha256;
-    se.filePath = binInfo.path;
-    se.decision = cd.decision;
-    se.auditReturn = cd.auditReturn;
-    se.holdAndAsk = cd.holdAndAsk;
-    se.silentTouchID = cd.silentTouchID;
-    se.seatbeltRequired = cd.seatbeltRequired;
-    se.staticRule = cd.staticRule;
-    se.ruleId = cd.ruleId;
+  // Log to database if necessary. A pending-transitive hold defers all of this
+  // (sync upload, GUI, event table, TTY) to its resolve block, which reports once
+  // with the final decision; skip the synchronous path here.
+  if (!cd.pendingTransitive &&
+      (config.enableAllEventUpload ||
+       (cd.decision == SNTEventStateAllowUnknown && !config.disableUnknownEventUpload) ||
+       cd.auditReturn || (cd.decision & SNTEventStateAllow) == 0)) {
+    SNTStoredExecutionEvent* se = [self storedExecutionEventForCachedDecision:cd
+                                                                      binInfo:binInfo
+                                                                   targetProc:targetProc
+                                                                        esMsg:esMsg];
 
-    se.signingChain = cd.certChain;
-    se.teamID = cd.teamID;
-    se.signingID = cd.signingID;
-    se.cdhash = cd.cdhash;
-    se.codesigningFlags = cd.codesigningFlags;
-    se.signingStatus = cd.signingStatus;
-    se.pid = @(newProcPid);
-    se.ppid = @(audit_token_to_pid(targetProc->parent_audit_token));
-    se.parentName = @(esMsg.ParentProcessName().c_str());
-    se.entitlements = cd.entitlements;
-    se.entitlementsFiltered = cd.entitlementsFiltered;
-    se.secureSigningTime = cd.secureSigningTime;
-    se.signingTime = cd.signingTime;
+    BOOL blocked = action != SNTActionRespondAllow && action != SNTActionRespondAllowCompiler &&
+                   action != SNTActionRespondAllowNoCache;
 
-    // Bundle data
-    se.fileBundleID = [binInfo bundleIdentifier];
-    se.fileBundleName = [binInfo bundleName];
-    se.fileBundlePath = [binInfo bundlePath];
-    if ([binInfo bundleShortVersionString]) {
-      se.fileBundleVersionString = [binInfo bundleShortVersionString];
-    }
-    if ([binInfo bundleVersion]) {
-      se.fileBundleVersion = [binInfo bundleVersion];
-    }
+    NotificationReplyBlock replyBlock = nil;
 
-    // User data
-    struct passwd* user = getpwuid(audit_token_to_ruid(targetProc->audit_token));
-    if (user) se.executingUser = @(user->pw_name);
-    NSArray *loggedInUsers, *currentSessions;
-    [self loggedInUsers:&loggedInUsers sessions:&currentSessions];
-    se.currentSessions = currentSessions;
-    se.loggedInUsers = loggedInUsers;
-
-    // Quarantine data
-    se.quarantineDataURL = binInfo.quarantineDataURL;
-    se.quarantineRefererURL = binInfo.quarantineRefererURL;
-    se.quarantineTimestamp = binInfo.quarantineTimestamp;
-    se.quarantineAgentBundleID = binInfo.quarantineAgentBundleID;
-
-    // Only store events if there is a sync server configured.
-    if (config.syncBaseURL) {
-      dispatch_async(_eventQueue, ^{
-        [self.eventTable addStoredEvent:se];
-      });
-    }
-
-    // If binary was blocked, do the needful
-    if (action != SNTActionRespondAllow && action != SNTActionRespondAllowCompiler &&
-        action != SNTActionRespondAllowNoCache) {
-      if (config.enableBundles && binInfo.bundle) {
-        // If the binary is part of a bundle, find and hash all the related binaries in the bundle.
-        // Let the GUI know hashing is needed. Once the hashing is complete the GUI will send a
-        // message to santad to perform the upload logic for bundles.
-        // See syncBundleEvent:relatedEvents: for more info.
-        se.needsBundleHash = YES;
-      } else if (config.syncBaseURL) {
-        // So the server has something to show the user straight away, initiate an event
-        // upload for the blocked binary rather than waiting for the next sync.
-        dispatch_async(_eventQueue, ^{
-          [self.syncdQueue addStoredEvent:se];
-        });
-      }
-
-      if (!cd.silentBlockTTY) {
-        _ttyWriter->Write(targetProc, ^NSString* {
-          if (cd.holdAndAsk) {
-            if (stoppedProc) {
-              return @"---\n\033[1mSanta\033[0m\n\nHolding execution of this "
-                     @"binary until approval is granted in the GUI...\n";
-            } else {
-              return @"---\n\033[1mSanta\033[0m\n\nUnable to hold execution so "
-                     @"the process was killed\n---\n\n";
-            }
+    // holdAndAsk (TouchID) is never combined with a silent block, so its reply
+    // block is built unconditionally here and only fires via the GUI below. It
+    // captures synchronous locals (esMsg, the held pid), so it is built here
+    // rather than inside the shared report helper.
+    if (blocked && cd.holdAndAsk) {
+      // Copy the esMsg to ensure that when the passed-in ref goes away
+      // we're still holding a valid Message object inside the replyBlock.
+      __block Message esMsgCopy(esMsg);
+      replyBlock = ^(BOOL authenticated) {
+        LOGD(@"User responded to block event for %@ with authenticated: %d", se.filePath,
+             authenticated);
+        if (authenticated) {
+          if (cd.decisionClientMode == SNTClientModeStandalone &&
+              cd.decision == SNTEventStateBlockUnknown) {
+            // Create a rule for the binary that was allowed by the user in
+            // standalone mode and notify the sync service.
+            [self createRuleForStandaloneModeEvent:se];
           }
 
-          // Let the user know what happened on the terminal
-          NSAttributedString* s = [SNTBlockMessage attributedBlockMessageForEvent:se
-                                                                    customMessage:cd.customMsg];
+          // Update decision to reflect that it was allowed via TouchID,
+          // preserving the rule type (e.g., BlockSigningID -> AllowSigningID)
+          cd.decision = BlockToAllowDecision(cd.decision);
+          cd.decisionExtra = @"TouchID Approved";
 
-          NSMutableString* msg = [NSMutableString stringWithCapacity:1024];
-          // Escape sequences `\033[1m` and `\033[0m` begin/end bold lettering
-          [msg appendFormat:@"\n\033[1mSanta\033[0m\n\n%@\n\n", s.string];
-          [msg appendFormat:@"\033[1mReason:    \033[0m %@\n"
-                            @"\033[1mPath:      \033[0m %@\n"
-                            @"\033[1mIdentifier:\033[0m %@\n"
-                            @"\033[1mParent:    \033[0m %@ (%@)\n\n",
-                            [SNTBlockMessage blockReasonForEvent:se], se.filePath, se.fileSHA256,
-                            se.parentName, se.ppid];
-          NSURL* detailURL =
-              [SNTBlockMessage eventDetailURLForEvent:se
-                                            customURL:(cd.customURL ?: config.eventDetailURL)];
-          if (detailURL) {
-            [msg appendFormat:@"More info:\n%@\n", detailURL.absoluteString];
-          }
-          return msg;
-        });
-      }
-
-      NotificationReplyBlock replyBlock = nil;
-
-      // holdAndAsk (TouchID) is never combined with a silent block, so its reply
-      // block is built unconditionally here and only fires via the GUI below.
-      if (cd.holdAndAsk) {
-        // Copy the esMsg to ensure that when the passed-in ref goes away
-        // we're still holding a valid Message object inside the replyBlock.
-        __block Message esMsgCopy(esMsg);
-        replyBlock = ^(BOOL authenticated) {
-          LOGD(@"User responded to block event for %@ with authenticated: %d", se.filePath,
-               authenticated);
-          if (authenticated) {
-            if (cd.decisionClientMode == SNTClientModeStandalone &&
-                cd.decision == SNTEventStateBlockUnknown) {
-              // Create a rule for the binary that was allowed by the user in
-              // standalone mode and notify the sync service.
-              [self createRuleForStandaloneModeEvent:se];
-            }
-
-            // Update decision to reflect that it was allowed via TouchID,
-            // preserving the rule type (e.g., BlockSigningID -> AllowSigningID)
-            cd.decision = BlockToAllowDecision(cd.decision);
-            cd.decisionExtra = @"TouchID Approved";
-
-            // Cache the TouchID approval so subsequent executions within the cooldown period
-            // don't require re-authorization - only if cooldown was specified and > 0
-            if (cd.sha256 && cd.touchIDCooldownMinutes != nil &&
-                [cd.touchIDCooldownMinutes unsignedLongLongValue] > 0) {
-              std::string sha256Key = santa::NSStringToUTF8String(cd.sha256);
-              self->_touchIDApprovalCache->set(sha256Key, GetCurrentUptime());
-            }
-
-            if (stoppedProc) {
-              _ttyWriter->Write(targetProc, @"Authorized, allowing execution\n---\n\n");
-            }
-
-            // Allow the binary to begin running.
-            self.processControlBlock(newProcPid, ProcessControl::Resume);
-          } else {
-            // Decision stays as-is when TouchID is denied, just populate the extra field.
-            cd.decisionExtra = @"TouchID Denied";
-
-            // The user did not approve, so kill the stopped process.
-            if (stoppedProc) {
-              _ttyWriter->Write(targetProc, @"Authorization not given, denying execution\n---\n\n");
-            }
-            self.processControlBlock(newProcPid, ProcessControl::Kill);
+          // Cache the TouchID approval so subsequent executions within the cooldown period
+          // don't require re-authorization - only if cooldown was specified and > 0
+          if (cd.sha256 && cd.touchIDCooldownMinutes != nil &&
+              [cd.touchIDCooldownMinutes unsignedLongLongValue] > 0) {
+            std::string sha256Key = santa::NSStringToUTF8String(cd.sha256);
+            self->_touchIDApprovalCache->set(sha256Key, GetCurrentUptime());
           }
 
-          // Clear holdAndAsk and update cache so it's recorded as a final decision
-          cd.holdAndAsk = NO;
-          [[SNTDecisionCache sharedCache] cacheDecision:cd];
+          if (stoppedProc) {
+            _ttyWriter->Write(targetProc, @"Authorized, allowing execution\n---\n\n");
+          }
 
-          // Log the execution event (since NOTIFY was suppressed during holdAndAsk)
-          self->_logger(std::move(esMsgCopy));
+          // Allow the binary to begin running.
+          self.processControlBlock(newProcPid, ProcessControl::Resume);
+        } else {
+          // Decision stays as-is when TouchID is denied, just populate the extra field.
+          cd.decisionExtra = @"TouchID Denied";
 
-          _procSignalCache->remove(pidAndVersion);
-          postAction(authenticated ? SNTActionHoldAllowed : SNTActionHoldDenied, cd);
-        };
-      }
+          // The user did not approve, so kill the stopped process.
+          if (stoppedProc) {
+            _ttyWriter->Write(targetProc, @"Authorization not given, denying execution\n---\n\n");
+          }
+          self.processControlBlock(newProcPid, ProcessControl::Kill);
+        }
 
-      // Suppress the GUI for a silent-GUI block, but never when holding for
-      // approval: a held process depends on the GUI reply to resume or be killed,
-      // so it must always be shown even if the flags were somehow combined.
-      if (!cd.silentBlockGUI || cd.holdAndAsk) {
-        // Let the user know what happened in the GUI.
-        [self.notifierQueue addEvent:se
-                   withCustomMessage:cd.customMsg
-                           customURL:cd.customURL ?: config.eventDetailURL
+        // Clear holdAndAsk and update cache so it's recorded as a final decision
+        cd.holdAndAsk = NO;
+        [[SNTDecisionCache sharedCache] cacheDecision:cd];
+
+        // Log the execution event (since NOTIFY was suppressed during holdAndAsk)
+        self->_logger(std::move(esMsgCopy));
+
+        _procSignalCache->remove(pidAndVersion);
+        postAction(authenticated ? SNTActionHoldAllowed : SNTActionHoldDenied, cd);
+      };
+    }
+
+    [self reportStoredExecutionEvent:se
+                      cachedDecision:cd
+                             binInfo:binInfo
+                              config:config
                          configState:configState
-                            andReply:replyBlock];
+                          targetProc:targetProc
+                             blocked:blocked
+                         stoppedProc:stoppedProc
+                          replyBlock:replyBlock];
+  }
+}
+
+// Builds the SNTStoredExecutionEvent describing this exec. Shared by the
+// synchronous block/upload path and the deferred transitive-hold resolve path so
+// the (large) field-by-field construction lives in exactly one place. `targetProc`
+// and `esMsg` must describe the same exec the decision was made for.
+- (SNTStoredExecutionEvent*)storedExecutionEventForCachedDecision:(SNTCachedDecision*)cd
+                                                          binInfo:(SNTFileInfo*)binInfo
+                                                       targetProc:(const es_process_t*)targetProc
+                                                            esMsg:(const Message&)esMsg {
+  SNTStoredExecutionEvent* se = [[SNTStoredExecutionEvent alloc] init];
+  se.occurrenceDate = [[NSDate alloc] init];
+  se.fileSHA256 = cd.sha256;
+  se.filePath = binInfo.path;
+  se.decision = cd.decision;
+  se.auditReturn = cd.auditReturn;
+  se.holdAndAsk = cd.holdAndAsk;
+  se.silentTouchID = cd.silentTouchID;
+  se.seatbeltRequired = cd.seatbeltRequired;
+  se.staticRule = cd.staticRule;
+  se.ruleId = cd.ruleId;
+
+  se.signingChain = cd.certChain;
+  se.teamID = cd.teamID;
+  se.signingID = cd.signingID;
+  se.cdhash = cd.cdhash;
+  se.codesigningFlags = cd.codesigningFlags;
+  se.signingStatus = cd.signingStatus;
+  se.pid = @(audit_token_to_pid(targetProc->audit_token));
+  se.ppid = @(audit_token_to_pid(targetProc->parent_audit_token));
+  se.parentName = @(esMsg.ParentProcessName().c_str());
+  se.entitlements = cd.entitlements;
+  se.entitlementsFiltered = cd.entitlementsFiltered;
+  se.secureSigningTime = cd.secureSigningTime;
+  se.signingTime = cd.signingTime;
+
+  // Bundle data
+  se.fileBundleID = [binInfo bundleIdentifier];
+  se.fileBundleName = [binInfo bundleName];
+  se.fileBundlePath = [binInfo bundlePath];
+  if ([binInfo bundleShortVersionString]) {
+    se.fileBundleVersionString = [binInfo bundleShortVersionString];
+  }
+  if ([binInfo bundleVersion]) {
+    se.fileBundleVersion = [binInfo bundleVersion];
+  }
+
+  // User data
+  struct passwd* user = getpwuid(audit_token_to_ruid(targetProc->audit_token));
+  if (user) se.executingUser = @(user->pw_name);
+  NSArray *loggedInUsers, *currentSessions;
+  [self loggedInUsers:&loggedInUsers sessions:&currentSessions];
+  se.currentSessions = currentSessions;
+  se.loggedInUsers = loggedInUsers;
+
+  // Quarantine data
+  se.quarantineDataURL = binInfo.quarantineDataURL;
+  se.quarantineRefererURL = binInfo.quarantineRefererURL;
+  se.quarantineTimestamp = binInfo.quarantineTimestamp;
+  se.quarantineAgentBundleID = binInfo.quarantineAgentBundleID;
+
+  return se;
+}
+
+// Stores the event and, when the exec was blocked, initiates the blocked-event
+// sync upload, writes the TTY block message, and posts the GUI notification.
+// Shared by the synchronous path and the transitive-hold resolve path. The
+// caller supplies the GUI reply block (the interactive holdAndAsk reply for the
+// synchronous TouchID path; nil for a transitive hold, which has no GUI reply).
+- (void)reportStoredExecutionEvent:(SNTStoredExecutionEvent*)se
+                    cachedDecision:(SNTCachedDecision*)cd
+                           binInfo:(SNTFileInfo*)binInfo
+                            config:(SNTConfigurator*)config
+                       configState:(SNTConfigState*)configState
+                        targetProc:(const es_process_t*)targetProc
+                           blocked:(BOOL)blocked
+                       stoppedProc:(BOOL)stoppedProc
+                        replyBlock:(NotificationReplyBlock)replyBlock {
+  // Only store events if there is a sync server configured.
+  if (config.syncBaseURL) {
+    dispatch_async(_eventQueue, ^{
+      [self.eventTable addStoredEvent:se];
+    });
+  }
+
+  if (!blocked) {
+    return;
+  }
+
+  // If binary was blocked, do the needful
+  if (config.enableBundles && binInfo.bundle) {
+    // If the binary is part of a bundle, find and hash all the related binaries in the bundle.
+    // Let the GUI know hashing is needed. Once the hashing is complete the GUI will send a
+    // message to santad to perform the upload logic for bundles.
+    // See syncBundleEvent:relatedEvents: for more info.
+    se.needsBundleHash = YES;
+  } else if (config.syncBaseURL) {
+    // So the server has something to show the user straight away, initiate an event
+    // upload for the blocked binary rather than waiting for the next sync.
+    dispatch_async(_eventQueue, ^{
+      [self.syncdQueue addStoredEvent:se];
+    });
+  }
+
+  if (!cd.silentBlockTTY) {
+    _ttyWriter->Write(targetProc, ^NSString* {
+      if (cd.holdAndAsk) {
+        if (stoppedProc) {
+          return @"---\n\033[1mSanta\033[0m\n\nHolding execution of this "
+                 @"binary until approval is granted in the GUI...\n";
+        } else {
+          return @"---\n\033[1mSanta\033[0m\n\nUnable to hold execution so "
+                 @"the process was killed\n---\n\n";
+        }
       }
-    }
+
+      // Let the user know what happened on the terminal
+      NSAttributedString* s = [SNTBlockMessage attributedBlockMessageForEvent:se
+                                                                customMessage:cd.customMsg];
+
+      NSMutableString* msg = [NSMutableString stringWithCapacity:1024];
+      // Escape sequences `\033[1m` and `\033[0m` begin/end bold lettering
+      [msg appendFormat:@"\n\033[1mSanta\033[0m\n\n%@\n\n", s.string];
+      [msg appendFormat:@"\033[1mReason:    \033[0m %@\n"
+                        @"\033[1mPath:      \033[0m %@\n"
+                        @"\033[1mIdentifier:\033[0m %@\n"
+                        @"\033[1mParent:    \033[0m %@ (%@)\n\n",
+                        [SNTBlockMessage blockReasonForEvent:se], se.filePath, se.fileSHA256,
+                        se.parentName, se.ppid];
+      NSURL* detailURL =
+          [SNTBlockMessage eventDetailURLForEvent:se
+                                        customURL:(cd.customURL ?: config.eventDetailURL)];
+      if (detailURL) {
+        [msg appendFormat:@"More info:\n%@\n", detailURL.absoluteString];
+      }
+      return msg;
+    });
+  }
+
+  // Suppress the GUI for a silent-GUI block, but never when holding for
+  // approval: a held process depends on the GUI reply to resume or be killed,
+  // so it must always be shown even if the flags were somehow combined.
+  if (!cd.silentBlockGUI || cd.holdAndAsk) {
+    // Let the user know what happened in the GUI.
+    [self.notifierQueue addEvent:se
+               withCustomMessage:cd.customMsg
+                       customURL:cd.customURL ?: config.eventDetailURL
+                     configState:configState
+                        andReply:replyBlock];
   }
 }
 

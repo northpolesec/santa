@@ -614,4 +614,15 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
   XCTAssertEqualWithAccuracy(sut.dnsUpstreamTimeoutSecs, 30.0, 0.0001);
 }
 
+- (void)testCompilerTransitiveWaitMillisecondsDefault {
+  SNTConfigurator* sut = [[SNTConfigurator alloc] init];
+  XCTAssertEqual(sut.compilerTransitiveWaitMilliseconds, 2000u);
+}
+
+- (void)testCompilerTransitiveWaitMillisecondsOverride {
+  SNTConfigurator* sut = [[SNTConfigurator alloc] init];
+  sut.configState[@"CompilerTransitiveWaitMilliseconds"] = @(500);
+  XCTAssertEqual(sut.compilerTransitiveWaitMilliseconds, 500u);
+}
+
 @end

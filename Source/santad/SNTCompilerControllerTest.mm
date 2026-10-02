@@ -30,10 +30,12 @@
 #include "Source/common/es/Message.h"
 #include "Source/common/es/MockEndpointSecurityAPI.h"
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
+#import "Source/santad/PendingExecCoordinator.h"
 #import "Source/santad/SNTDecisionCache.h"
 
 using santa::Logger;
 using santa::Message;
+using santa::PendingExecCoordinator;
 
 static const pid_t PID_MAX = 99999;
 
@@ -514,6 +516,17 @@ static const pid_t PID_MAX = 99999;
     [mockCompilerController stopMocking];
     [mockFileInfo stopMocking];
   }
+}
+
+- (void)testReportsCompilerActivity {
+  auto coord = std::make_shared<PendingExecCoordinator>(/*window_ms=*/10000);
+  SNTCompilerController* cc = [[SNTCompilerController alloc] initWithPendingExecCoordinator:coord];
+
+  XCTAssertFalse(coord->CompilerActiveRecently());
+  [cc setProcess:self.tok1 isCompiler:true];
+  XCTAssertTrue(coord->CompilerActiveRecently());
+  [cc setProcess:self.tok1 isCompiler:false];
+  XCTAssertTrue(coord->CompilerActiveRecently());  // still within window after clear
 }
 
 @end

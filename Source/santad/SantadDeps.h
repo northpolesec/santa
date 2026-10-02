@@ -33,6 +33,7 @@
 #include "Source/santad/EventProviders/AuthResultCache.h"
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
 #include "Source/santad/Metrics.h"
+#include "Source/santad/PendingExecCoordinator.h"
 #include "Source/santad/ProcessControl.h"
 #import "Source/santad/SNTCompilerController.h"
 #import "Source/santad/SNTExecutionController.h"
@@ -65,7 +66,8 @@ class SantadDeps {
       std::shared_ptr<santa::TTYWriter> tty_writer,
       std::shared_ptr<santa::santad::process_tree::ProcessTree> process_tree,
       std::shared_ptr<santa::EntitlementsFilter> entitlements_filter,
-      std::shared_ptr<santa::SandboxExpectations> sandbox_expectations);
+      std::shared_ptr<santa::SandboxExpectations> sandbox_expectations,
+      std::shared_ptr<santa::PendingExecCoordinator> pending_exec_coordinator);
 
   std::shared_ptr<santa::AuthResultCache> AuthResultCache();
   std::shared_ptr<santa::Enricher> Enricher();
@@ -98,6 +100,7 @@ class SantadDeps {
   SNTSyncdQueue* syncd_queue_;
   SNTNetworkExtensionQueue* netext_queue_;
   SNTExecutionController* exec_controller_;
+  std::shared_ptr<santa::PendingExecCoordinator> pending_exec_coordinator_;
   std::shared_ptr<santa::PrefixTree<santa::Unit>> prefix_tree_;
   std::shared_ptr<santa::TTYWriter> tty_writer_;
   std::shared_ptr<santa::santad::process_tree::ProcessTree> process_tree_;

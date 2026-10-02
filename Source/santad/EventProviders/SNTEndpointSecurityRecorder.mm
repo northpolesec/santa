@@ -129,12 +129,13 @@ es_file_t* GetTargetFileForPrefixTree(const es_message_t* msg) {
     return;
   }
 
-  // For NOTIFY_EXEC with holdAndAsk pending, skip logging here.
-  // The event will be logged after TouchID authentication completes.
+  // For NOTIFY_EXEC with a held execution pending (holdAndAsk TouchID approval
+  // or a transitive-rule wait), skip logging here. The event will be logged with
+  // its final decision once the hold resolves.
   if (esMsg->event_type == ES_EVENT_TYPE_NOTIFY_EXEC) {
     SNTCachedDecision* cd = [[SNTDecisionCache sharedCache]
         cachedDecisionForFile:esMsg->event.exec.target->executable->stat];
-    if (cd && cd.holdAndAsk) {
+    if (cd && (cd.holdAndAsk || cd.pendingTransitive)) {
       return;
     }
   }

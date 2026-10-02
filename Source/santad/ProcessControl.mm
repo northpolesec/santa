@@ -37,7 +37,14 @@ ProcessControlBlock ProdSuspendResumeBlock() {
           kill(pid, SIGKILL);
           return false;
         }
-        pid_suspend(pid);
+        // pid_suspend() returns 0 on success. If it fails the target is not
+        // actually suspended, so kill it and report failure to keep the hold
+        // fail-closed rather than letting an unheld process keep running.
+        if (pid_suspend(pid) != 0) {
+          LOGW(@"pid_suspend() failed, killing the target process %d", pid);
+          kill(pid, SIGKILL);
+          return false;
+        }
         return true;
       case ProcessControl::Resume:
         if (pid_resume == nullptr) {

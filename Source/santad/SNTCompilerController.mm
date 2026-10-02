@@ -57,10 +57,20 @@ static constexpr std::string_view kIgnoredCompilerProcessPathPrefix = "/dev/";
 // security issue, and is self-healing.
 @interface SNTCompilerController () {
   std::atomic<int32_t> _compilerPIDs[PID_MAX];
+  std::shared_ptr<santa::PendingExecCoordinator> _pendingExecCoordinator;
 }
 @end
 
 @implementation SNTCompilerController
+
+- (instancetype)initWithPendingExecCoordinator:
+    (std::shared_ptr<santa::PendingExecCoordinator>)coordinator {
+  self = [super init];
+  if (self) {
+    _pendingExecCoordinator = std::move(coordinator);
+  }
+  return self;
+}
 
 - (BOOL)isCompiler:(const audit_token_t&)tok {
   pid_t pid = audit_token_to_pid(tok);
@@ -86,6 +96,9 @@ static constexpr std::string_view kIgnoredCompilerProcessPathPrefix = "/dev/";
   } else {
     int32_t val = isCompiler ? audit_token_to_pidversion(tok) : 0;
     self->_compilerPIDs[pid].store(val, std::memory_order_relaxed);
+    if (_pendingExecCoordinator) {
+      _pendingExecCoordinator->RecordCompilerActivity();
+    }
     if (isCompiler) {
       LOGD(@"Watching compiler pid=%d pidver=%d", pid, val);
     }
@@ -241,6 +254,9 @@ static constexpr std::string_view kIgnoredCompilerProcessPathPrefix = "/dev/";
         } else {
           logger->LogAllowlist(esMsg, santa::NSStringToUTF8StringView(targetFile.SHA256),
                                santa::NSStringToUTF8StringView(targetFile.path));
+          if (_pendingExecCoordinator) {
+            _pendingExecCoordinator->NotifyRuleCreated(targetFile.vnode);
+          }
         }
       }
     }
