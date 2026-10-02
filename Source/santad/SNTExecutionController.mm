@@ -430,9 +430,10 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
                                                                      error:&fileInfoError];
   if (unlikely(!binInfo)) {
     // The initializer can return nil after establishing a mismatch. That is not
-    // the same condition as being unable to read a file, so it must not be
-    // routed through failClosed.
-    if (fileInfoError.code == SNTErrorCodeIdentityMismatch) {
+    // the same condition as being unable to read a file, so outside Monitor mode
+    // it must not be routed through failClosed.
+    BOOL identityMismatched = fileInfoError.code == SNTErrorCodeIdentityMismatch;
+    if (identityMismatched && configState.clientMode != SNTClientModeMonitor) {
       LOGE(@"Failed to confirm identity of %@ and denying action",
            @(targetProc->executable->path.data));
       SNTCachedDecision* cd = [self mismatchDecisionForProcess:targetProc configState:configState];
@@ -453,24 +454,25 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
     } else {
       LOGE(@"Failed to read file %@: %@ but allowing action", @(targetProc->executable->path.data),
            fileInfoError.localizedDescription);
-      postAction(SNTActionRespondAllow, nil);
+      // An unconfirmed identity must not be cached as an allow for later executions.
+      postAction(identityMismatched ? SNTActionRespondAllowNoCache : SNTActionRespondAllow, nil);
       [self.events incrementForFieldValues:@[ (NSString*)kAllowNoFileInfo ]];
     }
     return;
   }
 
   // The stat the event carried did not describe the file that was opened, so
-  // every content-derived value below describes a different file. Proceed only
-  // when the file on disk still presents the signing vendor the kernel
-  // reported, keeping the evaluation within a vendor an administrator has
-  // already made a policy statement about.
+  // every content-derived value below describes a different file. Outside
+  // Monitor mode, proceed only when the file on disk still presents the signing
+  // vendor the kernel reported, keeping the evaluation within a vendor an
+  // administrator has already made a policy statement about.
   BOOL identityMismatched = binInfo.identityVerification == SNTFileInfoIdentityMismatch;
+  BOOL vendorConfirmed = YES;
   if (unlikely(identityMismatched)) {
     MOLCodesignChecker* csInfo = [binInfo codesignCheckerWithError:NULL];
-    if (!SignedIdentityMatchesReported(targetProc, csInfo)) {
-      // Denied irrespective of client mode, including Monitor: this is a
-      // tampering condition, and Santa already responds to those without
-      // consulting the mode. See SNTEndpointSecurityTamperResistance.
+    vendorConfirmed = SignedIdentityMatchesReported(targetProc, csInfo);
+    // Monitor mode still evaluates policy against the file that was read.
+    if (!vendorConfirmed && configState.clientMode != SNTClientModeMonitor) {
       SNTCachedDecision* cd = [self mismatchDecisionForProcess:targetProc configState:configState];
       [self denyAndReportEarlyDenialForDecision:cd
                                         binInfo:binInfo
@@ -480,8 +482,8 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
                                      postAction:postAction];
       return;
     }
-    // Vendor matches. Identity carried by a decision from a previous evaluation
-    // describes a different file, so it cannot be reused for this one.
+    // Identity carried by a decision from a previous evaluation describes a
+    // different file, so it cannot be reused for this one.
     existingDecision = nil;
   }
 
@@ -512,8 +514,8 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
 
   if (unlikely(identityMismatched)) {
     cd.identityMismatched = YES;
-    // Matched to the event by signing vendor only, so the result applies to
-    // this invocation alone.
+    // Not matched to the event by identity, so the result applies to this
+    // invocation alone.
     cd.cacheable = NO;
     // Compiler status is a statement about a specific file, so it cannot follow
     // from an evaluation of a different one. Clearing the bits matters:
@@ -526,7 +528,8 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
         default: break;
       }
     }
-    NSString* extra = @"Executable identity confirmed by signing vendor only";
+    NSString* extra = vendorConfirmed ? @"Executable identity confirmed by signing vendor only"
+                                      : @"Executable identity could not be confirmed";
     cd.decisionExtra =
         cd.decisionExtra ? [NSString stringWithFormat:@"%@; %@", cd.decisionExtra, extra] : extra;
   }

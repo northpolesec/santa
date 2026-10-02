@@ -2459,10 +2459,50 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   XCTAssertTrue(cd.identityMismatched);
 }
 
-- (void)testUnconfirmedIdentityIsDeniedInMonitorMode {
-  // Denied regardless of client mode: a tampering condition, which Santa
-  // already treats as mode-independent.
+- (void)testUnconfirmedIdentityIsEvaluatedInMonitorMode {
+  // The vendor does not match, but Monitor mode still runs policy rather than
+  // denying outright.
   OCMStub([self.mockConfigurator clientMode]).andReturn(SNTClientModeMonitor);
+  [self stubUnconfirmedIdentity];
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
+
+  SNTCachedDecision* cd = [self postedDecisionForExecEvent:SNTActionRespondAllowNoCache
+                                            cachedDecision:nil
+                                              messageSetup:^(es_message_t* msg) {
+                                                msg->event.exec.target->codesigning_flags =
+                                                    CS_SIGNED | CS_VALID;
+                                              }];
+
+  XCTAssertEqual(cd.decision, SNTEventStateAllowUnknown);
+  XCTAssertTrue(cd.identityMismatched);
+  XCTAssertFalse(cd.cacheable);
+  XCTAssertEqualObjects(cd.decisionExtra, @"Executable identity could not be confirmed");
+  [self checkMetricCounters:kBlockBinaryMismatch expected:@0];
+}
+
+- (void)testUnconfirmedIdentityBlockRuleAppliesInMonitorMode {
+  OCMStub([self.mockConfigurator clientMode]).andReturn(SNTClientModeMonitor);
+  [self stubUnconfirmedIdentity];
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateBlock;
+  rule.type = SNTRuleTypeBinary;
+  [self stubRule:rule forIdentifiers:{.binarySHA256 = @"a"}];
+
+  SNTCachedDecision* cd = [self postedDecisionForExecEvent:SNTActionRespondDeny
+                                            cachedDecision:nil
+                                              messageSetup:^(es_message_t* msg) {
+                                                msg->event.exec.target->codesigning_flags =
+                                                    CS_SIGNED | CS_VALID;
+                                              }];
+
+  XCTAssertEqual(cd.decision, SNTEventStateBlockBinary);
+  XCTAssertTrue(cd.identityMismatched);
+}
+
+- (void)testUnconfirmedIdentityIsDeniedInLockdownMode {
+  OCMStub([self.mockConfigurator clientMode]).andReturn(SNTClientModeLockdown);
   [self stubUnconfirmedIdentity];
   OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
 
@@ -2474,6 +2514,7 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
                                               }];
 
   XCTAssertEqual(cd.decision, SNTEventStateBlockBinaryMismatch);
+  [self checkMetricCounters:kBlockBinaryMismatch expected:@1];
 }
 
 - (void)testUnconfirmedIdentityDropsCompilerStatus {
@@ -2640,6 +2681,29 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   XCTAssertTrue(cd.identityMismatched);
 }
 
+- (void)testNilFileInfoFromAnIdentityMismatchIsAllowedWithoutCachingInMonitorMode {
+  // Monitor mode takes the ordinary read-failure path, but the allow must not
+  // be cached for later executions of the vnode.
+  OCMStub([self.mockConfigurator clientMode]).andReturn(SNTClientModeMonitor);
+
+  [self.mockFileInfo stopMocking];
+  self.mockFileInfo = OCMClassMock([SNTFileInfo class]);
+  OCMStub([self.mockFileInfo alloc]).andReturn(self.mockFileInfo);
+  NSError* mismatchError = [NSError errorWithDomain:@"com.northpolesec.santa.common"
+                                               code:SNTErrorCodeIdentityMismatch
+                                           userInfo:nil];
+  OCMStub([self.mockFileInfo initWithEndpointSecurityFile:NULL error:[OCMArg setTo:mismatchError]])
+      .ignoringNonObjectArgs()
+      .andReturn(nil);
+
+  [self postedDecisionForExecEvent:SNTActionRespondAllowNoCache
+                    cachedDecision:nil
+                      messageSetup:nil];
+
+  [self checkMetricCounters:kAllowNoFileInfo expected:@1];
+  [self checkMetricCounters:kBlockBinaryMismatch expected:@0];
+}
+
 - (void)testSeatbeltRequiredWithUnconfirmedIdentityIsDenied {
   // The fallback comparison is derived from the file that was read, so this is
   // the case the guard exists for: the expectation matches and the exec would
@@ -2677,6 +2741,44 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
 
   XCTAssertEqual(cd.decision, SNTEventStateBlockBinaryMismatch);
   XCTAssertFalse(cd.cacheable);
+}
+
+- (void)testSeatbeltRequiredWithUnconfirmedIdentityIsDeniedInMonitorMode {
+  // The seatbelt guard still applies: an unconfirmed read cannot establish that
+  // the loaded image is the one the profile was registered for.
+  OCMStub([self.mockConfigurator clientMode]).andReturn(SNTClientModeMonitor);
+  [self stubUnconfirmedIdentity];
+  [self stubMatchingOnDiskSigningID];
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"cafebabe");
+  OCMStub([self.mockCodesignChecker teamID]).andReturn(@(kExampleTeamID));
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateSeatbelt;
+  rule.type = SNTRuleTypeBinary;
+  [self stubRule:rule
+      forIdentifiers:{.binarySHA256 = @"cafebabe",
+                      .signingID = @"myteamid:example.signing.id",
+                      .teamID = @(kExampleTeamID)}];
+
+  SNTCachedDecision* cd = [self
+      postedDecisionForExecEvent:SNTActionRespondDenyOnce
+                  cachedDecision:nil
+                    messageSetup:^(es_message_t* msg) {
+                      msg->process->audit_token = santa::MakeStubAuditToken(703, 1);
+                      msg->event.exec.target->codesigning_flags = CS_SIGNED | CS_VALID;
+                      msg->event.exec.target->team_id = MakeESStringToken(kExampleTeamID);
+                      msg->event.exec.target->signing_id = MakeESStringToken(kExampleSigningID);
+                      msg->event.exec.target->executable->stat.st_dev = 17;
+                      msg->event.exec.target->executable->stat.st_ino = 42;
+
+                      const uint8_t cdhash[20] = {0};
+                      _sandboxExpectations->Register(
+                          msg->process->audit_token,
+                          MakeSandboxRequest(17, 42, cdhash, @"cafebabe"));
+                    }];
+
+  XCTAssertEqual(cd.decision, SNTEventStateBlockBinaryMismatch);
 }
 
 // Registers a seatbelt expectation for (500, 1) and authorizes it, which records
