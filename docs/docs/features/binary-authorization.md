@@ -373,7 +373,9 @@ subsequent executions are faster. All other fields (`path`, `args`, `envs`,
 `euid`, `cwd`, `ancestors`) are **not cacheable** and may impact performance
 if used in rules for frequently-executed binaries. Expressions that call
 `today()`, `now()` or `policy_for_range()` are also **not cacheable**, since
-their result depends on when the execution happens.
+their result depends on when the execution happens, as are expressions that
+call `add_annotation()` or `has_annotation()`, since they act on a specific
+process.
 
 :::
 
@@ -390,6 +392,8 @@ following helper functions are available. They require [Workshop](https://northp
 | `weekdays()` | `list<int>` | The constant `[1, 2, 3, 4, 5]`, Monday through Friday, in the `0` (Sunday) through `6` (Saturday) numbering used by `policy_for_range()` and `getDayOfWeek()`. Requires Workshop and Santa 2026.8+ |
 | `policy_for_range(...)` | policy | Returns one policy while a time window is open and another while it is closed. Four forms: a weekly `HH:MM` window on the host's clock, the same window in a named time zone, a fixed span between two timestamps, or a duration counted from the execution. Never cacheable. See [Time Based Rules](/features/time-based-rules). Requires Workshop and Santa 2026.8+ |
 | `kill_on_expiry(policy)` | policy | Wraps the in-range policy of `policy_for_range()` so the processes the rule allowed are quit when the window closes. Accepts only policies that let a process start. See [Time Based Rules](/features/time-based-rules#kill-on-expiry). Requires Workshop and Santa 2026.8+ |
+| `add_annotation(names, propagation, policy)` | policy | Annotates the executing process with `names` (a string or a list of strings) and returns `policy` unchanged. `propagation` is how far the annotation follows the process's descendants: `NONE`, `FORK_ONLY`, `EXEC_ONLY` or `FORK_AND_EXEC`. The form without `propagation` uses `FORK_AND_EXEC`. Every `{session}` in a name is replaced with an ID for this execution of the process, so each run of a tool gets its own annotation. The ID is the process's PID and PID version, so `claude-code-{session}` becomes e.g. `claude-code-4521-18734`. Must produce the rule's result. Never cacheable. Requires Workshop and Santa 2026.9+ |
+| `has_annotation(name)` | `bool` | Whether the executing process carries the annotation `name`. Names match exactly and `{session}` is not expanded, so if a rule needs `has_annotation()`, attach both the unsuffixed and suffixed versions of the annotation, e.g. `add_annotation(['claude-code-{session}', 'claude-code'], ALLOWLIST)`. Never cacheable. Requires Workshop and Santa 2026.9+ |
 
 Some examples of valid CEL expressions:
 
@@ -407,6 +411,14 @@ target.secure_signing_time > today() - days(90)
 // own clock, and block it at any other time. Requires Workshop and Santa 2026.8+.
 // See /features/time-based-rules. This expression will NOT be cacheable.
 policy_for_range(weekdays(), '09:00', '17:00', ALLOWLIST, BLOCKLIST)
+
+// Annotate each run of Claude Code and everything it starts. The session
+// annotation groups executions by run; the plain one is what a fallback rule
+// can test for with has_annotation('claude-code'). Requires Workshop and
+// Santa 2026.9+. This expression will NOT be cacheable.
+// If Claude Code runs as PID 4521 with PID version 18734, it and everything it
+// starts get both claude-code-4521-18734 and claude-code.
+add_annotation(['claude-code-{session}', 'claude-code'], ALLOWLIST)
 
 // Only allow Chrome from this team, block other apps.
 // Useful when attached to a TEAMID rule to allow a specific app.

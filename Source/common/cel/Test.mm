@@ -96,6 +96,7 @@ struct FakeAnnotations {
               added.push_back({name, propagation});
               present.insert(name);
             },
+        .session = [] { return std::string("123-4"); },
     };
   }
 };
@@ -2340,6 +2341,55 @@ class ScopedHostZone {
     }
     XCTAssertEqual(annotations.added.size(), 2u);
     XCTAssertEqual(annotations.added[0].first, "F");
+  }
+}
+
+- (void)testAddAnnotationSessionPlaceholder {
+  auto sut = santa::cel::Evaluator<true>::Create();
+  XCTAssertTrue(sut.ok());
+
+  FakeAnnotations annotations;
+  auto evaluate = [&](absl::string_view expr, santa::cel::AnnotationHooks hooks) {
+    auto activation = MakeActivation<true>(absl::Now, std::move(hooks));
+    return sut.value()->CompileAndEvaluate(expr, *activation);
+  };
+
+  {
+    // Only the names that ask for it get the session; every occurrence is
+    // replaced.
+    XCTAssertTrue(evaluate("add_annotation(['claude-code-{session}', 'claude-code', "
+                           "'{session}/{session}'], ALLOWLIST)",
+                           annotations.Hooks())
+                      .ok());
+    XCTAssertEqual(annotations.added.size(), 3u);
+    XCTAssertEqual(annotations.added[0].first, "claude-code-123-4");
+    XCTAssertEqual(annotations.added[1].first, "claude-code");
+    XCTAssertEqual(annotations.added[2].first, "123-4/123-4");
+  }
+
+  {
+    // has_annotation() matches literally, so the unsuffixed name is the one a
+    // later rule can test for.
+    auto result = evaluate("has_annotation('claude-code-{session}') ? BLOCKLIST : "
+                           "has_annotation('claude-code') ? ALLOWLIST : BLOCKLIST",
+                           annotations.Hooks());
+    if (!result.ok()) {
+      XCTFail(@"Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value,
+                     santa::cel::CELProtoTraits<true>::ReturnValue::ALLOWLIST);
+    }
+  }
+
+  annotations.added.clear();
+
+  {
+    // Without a session hook the placeholder is left as written.
+    santa::cel::AnnotationHooks hooks = annotations.Hooks();
+    hooks.session = nullptr;
+    XCTAssertTrue(evaluate("add_annotation('claude-code-{session}', ALLOWLIST)", hooks).ok());
+    XCTAssertEqual(annotations.added.size(), 1u);
+    XCTAssertEqual(annotations.added[0].first, "claude-code-{session}");
   }
 }
 

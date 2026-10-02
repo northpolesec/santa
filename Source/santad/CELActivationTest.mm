@@ -206,6 +206,8 @@ std::string MakeRawCDHash() {
 // add_annotation() and has_annotation() end to end against a real process tree:
 // a rule on the tool stamps the annotation, and a fallback on a descendant's
 // exec sees it. This is the ancestor-walk replacement the functions exist for.
+// A {session} name expands to the tool's pid and pidversion, and descendants
+// inherit it like any other name.
 - (void)testAnnotationsAcrossTheProcessTree {
   using ReturnValue = santa::cel::CELProtoTraits<true>::ReturnValue;
 
@@ -252,7 +254,8 @@ std::string MakeRawCDHash() {
 
   {
     auto result = evaluate(toolPid, ruleEvaluator.value().get(),
-                           "add_annotation('BAZEL-CALL', FORK_AND_EXEC, ALLOWLIST)");
+                           "add_annotation(['BAZEL-CALL', 'BAZEL-CALL-{session}'], "
+                           "FORK_AND_EXEC, ALLOWLIST)");
     XCTAssertTrue(result.ok());
     XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
     // Otherwise the next exec of the same binary would skip the stamp entirely.
@@ -262,6 +265,7 @@ std::string MakeRawCDHash() {
   auto annotation = tree->GetAnnotation<CELAnnotator>(**tree->Get(toolPid));
   XCTAssertTrue(annotation.has_value());
   XCTAssertTrue((*annotation)->Has("BAZEL-CALL"));
+  XCTAssertTrue((*annotation)->Has("BAZEL-CALL-20-2"));
 
   // A descendant: the tool forks to 30.1, which execs to 30.2.
   Pid childPid = {.pid = 30, .pidversion = 2};
@@ -276,6 +280,8 @@ std::string MakeRawCDHash() {
     XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST_COMPILER);
     XCTAssertFalse(result.value().cacheable);
   }
+  auto childAnnotation = tree->GetAnnotation<CELAnnotator>(**tree->Get(childPid));
+  XCTAssertTrue(childAnnotation.has_value() && (*childAnnotation)->Has("BAZEL-CALL-20-2"));
 
   // An unrelated process gets no decision from the same fallback.
   Pid strangerPid = {.pid = 40, .pidversion = 1};

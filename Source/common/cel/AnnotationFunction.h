@@ -54,8 +54,16 @@ namespace cel {
 //     propagation; use separate calls to mix them. An empty list stamps
 //     nothing and still returns the policy.
 //
+//     Every "{session}" in a name is replaced with an id for the process being
+//     executed, so each run of a tool gets its own name and everything it
+//     spawns can be grouped by run. The expanded name is still subject to the
+//     annotation length limit.
+//
 //   has_annotation(string name) -> bool
-//     True if `name` is on the process being executed.
+//     True if `name` is on the process being executed. Names match literally:
+//     "{session}" is not expanded, as the id is not known when the rule is
+//     written. A rule that needs both must add the plain and suffixed names,
+//     e.g. add_annotation(['claude-code-{session}', 'claude-code'], ALLOWLIST).
 //
 // Together they replace an ancestor walk with a hash lookup. Instead of every
 // descendant re-matching the ancestor it cares about:
@@ -111,7 +119,12 @@ struct AnnotationHooks {
   std::function<void(const std::string& name,
                      AnnotationPropagation propagation)>
       add;
+  // The value kSessionPlaceholder expands to in an add_annotation() name. If
+  // unset, the placeholder is left as written.
+  std::function<std::string()> session;
 };
+
+inline constexpr absl::string_view kSessionPlaceholder = "{session}";
 
 // Annotations an evaluation has asked for but not yet applied. add_annotation()
 // appends here instead of writing straight through, and the Activation applies
