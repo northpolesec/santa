@@ -32,6 +32,7 @@
 #include "Source/common/PrefixTree.h"
 #include "Source/common/Timer.h"
 #include "Source/common/faa/WatchItemPolicy.h"
+#include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 
 extern NSString* const kWatchItemConfigKeyVersion;
@@ -51,6 +52,7 @@ extern NSString* const kWatchItemConfigKeyOptionsEventDetailText;
 extern NSString* const kWatchItemConfigKeyOptionsEventDetailURL;
 extern NSString* const kWatchItemConfigKeyOptionsVersion;
 extern NSString* const kWatchItemConfigKeyOptionsRuleId;
+extern NSString* const kWatchItemConfigKeyOptionsParentDirectoryProtection;
 extern NSString* const kWatchItemConfigKeyProcesses;
 extern NSString* const kWatchItemConfigKeyProcessesBinaryPath;
 extern NSString* const kWatchItemConfigKeyProcessesCertificateSha256;
@@ -69,6 +71,10 @@ extern NSString* const kRuleTypeProcessesWithDeniedPaths;
 extern NSString* const kProcessActionAllow;
 extern NSString* const kProcessActionAudit;
 extern NSString* const kProcessActionDeny;
+
+extern NSString* const kParentDirectoryProtectionDisabled;
+extern NSString* const kParentDirectoryProtectionAudit;
+extern NSString* const kParentDirectoryProtectionEnforce;
 
 namespace santa {
 
@@ -93,7 +99,10 @@ using IterateProcessPoliciesBlock = void (^)(CheckPolicyBlock);
 // cost of making it a little harder to read.
 using LookupPolicyBlock =
     std::optional<std::shared_ptr<WatchItemPolicyBase>> (^)(const std::string&);
-using IterateTargetsBlock = void (^)(LookupPolicyBlock);
+// Returns the policies of watched paths beneath the given directory.
+using LookupPoliciesBeneathBlock =
+    std::vector<std::shared_ptr<WatchItemPolicyBase>> (^)(const std::string&);
+using IterateTargetsBlock = void (^)(LookupPolicyBlock, LookupPoliciesBeneathBlock);
 using FindPoliciesForTargetsBlock = void (^)(IterateTargetsBlock);
 
 class DataWatchItems {
@@ -111,10 +120,14 @@ class DataWatchItems {
   bool operator==(const DataWatchItems& other) const { return paths_ == other.paths_; }
   bool operator!=(const DataWatchItems& other) const { return !(*this == other); }
   SetPairPathAndType operator-(const DataWatchItems& other) const;
+  // Returns the ancestor directory paths watched by this set but not by `other`.
+  SetPairPathAndType AncestorPathsDifference(const DataWatchItems& other) const;
 
   friend void swap(DataWatchItems& first, DataWatchItems& second) {
     std::swap(first.tree_, second.tree_);
     std::swap(first.paths_, second.paths_);
+    std::swap(first.policies_beneath_, second.policies_beneath_);
+    std::swap(first.ancestor_paths_, second.ancestor_paths_);
   }
 
   bool Build(SetSharedDataWatchItemPolicy data_policies);
@@ -125,6 +138,14 @@ class DataWatchItems {
  private:
   std::unique_ptr<santa::PrefixTree<std::shared_ptr<DataWatchItemPolicy>>> tree_;
   SetPairPathAndType paths_;
+  // Each ancestor directory of a watched path, mapped to the policies of the
+  // watched paths beneath it, less those with parent directory protection
+  // disabled. Sorted by name, version, then rule id, so a directory tree
+  // operation always reports the same policy first.
+  absl::flat_hash_map<std::string, std::vector<std::shared_ptr<DataWatchItemPolicy>>>
+      policies_beneath_;
+  // The keys of policies_beneath_ as literals, less any already in paths_.
+  SetPairPathAndType ancestor_paths_;
 };
 
 class ProcessWatchItems {
@@ -161,7 +182,9 @@ class WatchItems : public Timer<WatchItems>, public PassKey<WatchItems> {
 
   // Type aliases
   using DataWatchItemsUpdatedBlock = std::function<void(
-      size_t count, const SetPairPathAndType& new_paths, const SetPairPathAndType& removed_paths)>;
+      size_t count, const SetPairPathAndType& new_paths, const SetPairPathAndType& removed_paths,
+      const SetPairPathAndType& new_ancestor_paths,
+      const SetPairPathAndType& removed_ancestor_paths)>;
   using ProcWatchItemsUpdatedBlock = std::function<void(size_t count)>;
 
   // Factory methods

@@ -22,23 +22,29 @@
 
 #include <memory>
 #include <optional>
+#include <string>
+#include <vector>
 
 #import "Source/common/MOLCertificate.h"
 #import "Source/common/MOLCodesignChecker.h"
 #import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTFileInfo.h"
+#include "Source/common/String.h"
 #include "Source/common/TestUtils.h"
 #include "Source/common/es/Message.h"
 #include "Source/common/es/MockEndpointSecurityAPI.h"
 #include "Source/common/faa/WatchItemPolicy.h"
 #include "Source/santad/EventProviders/MockFAAPolicyProcessor.h"
 #import "Source/santad/SNTDecisionCache.h"
+#include "Source/santad/TTYWriter.h"
 
 using santa::FAAPolicyProcessor;
 using santa::Message;
 using santa::MockFAAPolicyProcessor;
+using santa::WatchItemParentDirectoryProtection;
 using santa::WatchItemPolicyBase;
 using santa::WatchItemProcess;
+using santa::WatchItemProcessOptions;
 
 namespace santa {
 extern FileAccessPolicyDecision ApplyOverrideToDecision(FileAccessPolicyDecision decision,
@@ -934,6 +940,119 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess& proc) {
   XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
 }
 
+- (void)testProcessMessageNotifiesOncePerTarget {
+  es_file_t procFile = MakeESFile("/proc/mover");
+  es_file_t ttyFile = MakeESFile("/dev/ttys000");
+  es_process_t esProc = MakeESProcess(&procFile);
+  esProc.tty = &ttyFile;
+  esProc.team_id = MakeESStringToken("");
+  esProc.signing_id = MakeESStringToken("");
+
+  // A directory rename: target 0 is the source, target 1 the destination
+  es_file_t srcFile = MakeESFile("/u/lib");
+  es_file_t destDir = MakeESFile("/v");
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_RENAME, &esProc);
+  esMsg.event.rename.source = &srcFile;
+  esMsg.event.rename.destination_type = ES_DESTINATION_TYPE_NEW_PATH;
+  esMsg.event.rename.destination.new_path.dir = &destDir;
+  esMsg.event.rename.destination.new_path.filename = MakeESStringToken("lib");
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+  Message msg(mockESApi, &esMsg);
+  XCTAssertEqual(msg.PathTargets().size(), 2);
+
+  auto matcher = ^FAAPolicyProcessor::PolicyMatch(const santa::WatchItemPolicyBase&,
+                                                  const Message::PathTarget&, const Message&) {
+    return {true, nullptr};
+  };
+
+  struct Notified {
+    es_auth_result_t result;
+    std::vector<std::string> stored;
+    std::vector<std::string> dialogs;
+    std::vector<std::string> ttys;
+  };
+
+  // Every policy denies. Returns the policies that stored an event, showed a
+  // dialog, or are recorded as having messaged the TTY, in pair order.
+  auto run = [&](const std::vector<FAAPolicyProcessor::TargetPolicyPair>& pairs,
+                 const WatchItemPolicyBase* alreadyMessagedTTY) {
+    __block std::vector<std::string> stored;
+    __block std::vector<std::string> dialogs;
+    MockFAAPolicyProcessor faaPolicyProcessor(
+        self.dcMock, nullptr, nullptr, santa::TTYWriter::Create(/*silent_tty_mode=*/true), nullptr,
+        0, 0, nil, ^(SNTStoredFileAccessEvent* event, bool) {
+          stored.push_back(santa::NSStringToUTF8String(event.ruleName));
+        });
+    EXPECT_CALL(faaPolicyProcessor, GetCachedDecision)
+        .WillRepeatedly(testing::Return([[SNTCachedDecision alloc] init]));
+    EXPECT_CALL(faaPolicyProcessor, ApplyPolicy)
+        .WillRepeatedly(testing::Return(
+            FAAPolicyProcessor::DecisionAndOptions{FileAccessPolicyDecision::kDenied, nullptr}));
+
+    if (alreadyMessagedTTY) {
+      faaPolicyProcessor.HaveMessagedTTYForPolicyWrapper(*alreadyMessagedTTY, msg);
+    }
+
+    Notified got;
+    got.result = faaPolicyProcessor
+                     .ProcessMessageWrapper(
+                         msg, pairs, matcher,
+                         ^(SNTStoredFileAccessEvent* event, NSString*, NSString*, NSString*) {
+                           dialogs.push_back(santa::NSStringToUTF8String(event.ruleName));
+                         })
+                     .auth_result;
+    got.stored = stored;
+    got.dialogs = dialogs;
+    for (const FAAPolicyProcessor::TargetPolicyPair& pair : pairs) {
+      if (faaPolicyProcessor.HaveMessagedTTYForPolicyWrapper(**pair.policy, msg)) {
+        got.ttys.push_back((*pair.policy)->name);
+      }
+    }
+    return got;
+  };
+
+  using Names = std::vector<std::string>;
+  auto policy = [](const char* name) {
+    return std::make_shared<santa::WatchItemPolicyBase>(name, "v1");
+  };
+
+  // Every policy stores an event, but each target shows one dialog and one TTY
+  // line, from the first policy
+  {
+    auto a = policy("a"), b = policy("b"), c = policy("c"), d = policy("d");
+    Notified got = run({{0, a}, {0, b}, {0, c}, {1, d}}, nullptr);
+    XCTAssertEqual(got.result, ES_AUTH_RESULT_DENY);
+    XCTAssertTrue(got.stored == Names({"a", "b", "c", "d"}));
+    XCTAssertTrue(got.dialogs == Names({"a", "d"}));
+    XCTAssertTrue(got.ttys == Names({"a", "d"}));
+  }
+
+  // A silent policy does not use up the target's dialog or TTY line, and each
+  // is chosen independently
+  {
+    auto a = policy("a"), b = policy("b"), c = policy("c");
+    a->options.silent = true;
+    b->options.silent_tty = true;
+    Notified got = run({{0, a}, {0, b}, {0, c}}, nullptr);
+    XCTAssertTrue(got.stored == Names({"a", "b", "c"}));
+    XCTAssertTrue(got.dialogs == Names({"b"}));
+    XCTAssertTrue(got.ttys == Names({"a"}));
+  }
+
+  // A chosen policy that already messaged this process prints nothing, and the
+  // next policy does not print in its place
+  {
+    auto a = policy("a"), b = policy("b");
+    Notified got = run({{0, a}, {0, b}}, a.get());
+    XCTAssertTrue(got.dialogs == Names({"a"}));
+    XCTAssertTrue(got.ttys == Names({"a"}));
+  }
+
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+}
+
 - (void)testGetCertificateHash {
   // Note: MakeStat() produces a non-regular-file mode, so SNTFileInfo init
   // fails for these fixtures and step 3 (sync/async rehydrate) is bypassed.
@@ -1823,6 +1942,313 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess& proc) {
   XCTAssertNotNil(observedEvent);
   XCTAssertEqualObjects(observedEvent.process.fileSHA256, @"<unknown sha>");
   XCTAssertTrue(OCMVerifyAll(self.dcMock));
+
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+}
+
+- (void)testIsDirectoryTreeOperation {
+  es_file_t procFile = MakeESFile("proc");
+  es_process_t esProc = MakeESProcess(&procFile);
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_OPEN, &esProc, ActionType::Auth);
+
+  struct stat dirStat = MakeStat();
+  dirStat.st_mode = S_IFDIR | 0755;
+  es_file_t dir = MakeESFile("/a/dir", dirStat);
+  struct stat fileStat = MakeStat();
+  fileStat.st_mode = S_IFREG | 0644;
+  es_file_t file = MakeESFile("/a/file", fileStat);
+  es_file_t targetDir = MakeESFile("/b");
+  es_string_token_t targetName = MakeESStringToken("new");
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+
+  es_message_t* esMsgPtr = &esMsg;
+  auto isDirTreeOp = [&mockESApi, esMsgPtr]() {
+    Message msg(mockESApi, esMsgPtr);
+    return santa::IsDirectoryTreeOperation(msg);
+  };
+
+  esMsg.event_type = ES_EVENT_TYPE_AUTH_CLONE;
+  esMsg.event.clone.target_dir = &targetDir;
+  esMsg.event.clone.target_name = targetName;
+  esMsg.event.clone.source = &dir;
+  XCTAssertTrue(isDirTreeOp());
+  esMsg.event.clone.source = &file;
+  XCTAssertFalse(isDirTreeOp());
+
+  esMsg.event_type = ES_EVENT_TYPE_AUTH_RENAME;
+  esMsg.event.rename.destination_type = ES_DESTINATION_TYPE_NEW_PATH;
+  esMsg.event.rename.destination.new_path.dir = &targetDir;
+  esMsg.event.rename.destination.new_path.filename = targetName;
+  esMsg.event.rename.source = &dir;
+  XCTAssertTrue(isDirTreeOp());
+  esMsg.event.rename.source = &file;
+  XCTAssertFalse(isDirTreeOp());
+
+  // A swap moves the destination to the source's path, so a directory
+  // destination moves its tree even when the source is a file.
+  esMsg.event.rename.destination_type = ES_DESTINATION_TYPE_EXISTING_FILE;
+  esMsg.event.rename.destination.existing_file = &dir;
+  XCTAssertTrue(isDirTreeOp());
+  esMsg.event.rename.destination.existing_file = &file;
+  XCTAssertFalse(isDirTreeOp());
+
+  // Other events never move a tree, even when they target a directory
+  esMsg.event_type = ES_EVENT_TYPE_AUTH_UNLINK;
+  esMsg.event.unlink.target = &dir;
+  XCTAssertFalse(isDirTreeOp());
+}
+
+- (void)testProcessMessageParentDirectoryProtection {
+  es_file_t procFile = MakeESFile("/proc/mover");
+  es_file_t ttyFile = MakeESFile("/dev/ttys000");
+  es_process_t esProc = MakeESProcess(&procFile);
+  esProc.tty = &ttyFile;
+  esProc.team_id = MakeESStringToken("");
+  esProc.signing_id = MakeESStringToken("");
+  esProc.codesigning_flags = CS_SIGNED | CS_VALID;
+
+  // A directory rename: target 0 is the source, target 1 the destination
+  struct stat dirStat = MakeStat();
+  dirStat.st_mode = S_IFDIR | 0755;
+  es_file_t srcDir = MakeESFile("/u/lib", dirStat);
+  es_file_t destDir = MakeESFile("/v");
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_RENAME, &esProc);
+  esMsg.event.rename.source = &srcDir;
+  esMsg.event.rename.destination_type = ES_DESTINATION_TYPE_NEW_PATH;
+  esMsg.event.rename.destination.new_path.dir = &destDir;
+  esMsg.event.rename.destination.new_path.filename = MakeESStringToken("lib");
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+  Message msg(mockESApi, &esMsg);
+  XCTAssertEqual(msg.PathTargets().size(), 2);
+
+  // Only matters for the invalidly signed process below
+  OCMStub([self.mockConfigurator enableBadSignatureProtection]).andReturn(YES);
+
+  using Names = std::vector<std::string>;
+  using Stored = std::vector<std::pair<std::string, FileAccessPolicyDecision>>;
+  struct Notified {
+    es_auth_result_t result;
+    Stored stored;
+    Names dialogs;
+    Names ttys;
+  };
+
+  // Evaluates the pairs with the real policy evaluation. The process matches no
+  // policy's processes, unless `matchedOptions` is given, in which case it
+  // matches every policy with those options.
+  auto run = [&](const std::vector<FAAPolicyProcessor::TargetPolicyPair>& pairs,
+                 const WatchItemProcessOptions* matchedOptions = nullptr) {
+    __block Stored stored;
+    __block Names dialogs;
+    MockFAAPolicyProcessor faaPolicyProcessor(
+        self.dcMock, nullptr, nullptr, santa::TTYWriter::Create(/*silent_tty_mode=*/true), nullptr,
+        0, 0, nil, ^(SNTStoredFileAccessEvent* event, bool) {
+          stored.emplace_back(santa::NSStringToUTF8String(event.ruleName), event.decision);
+        });
+    faaPolicyProcessor.UseRealPolicyEvaluation();
+
+    Notified got;
+    got.result =
+        faaPolicyProcessor
+            .ProcessMessageWrapper(
+                msg, pairs,
+                ^FAAPolicyProcessor::PolicyMatch(const WatchItemPolicyBase&,
+                                                 const Message::PathTarget&, const Message&) {
+                  return {matchedOptions != nullptr, matchedOptions};
+                },
+                ^(SNTStoredFileAccessEvent* event, NSString*, NSString*, NSString*) {
+                  dialogs.push_back(santa::NSStringToUTF8String(event.ruleName));
+                })
+            .auth_result;
+    got.stored = stored;
+    got.dialogs = dialogs;
+    for (const FAAPolicyProcessor::TargetPolicyPair& pair : pairs) {
+      if (pair.policy.has_value() &&
+          faaPolicyProcessor.HaveMessagedTTYForPolicyWrapper(**pair.policy, msg)) {
+        got.ttys.push_back((*pair.policy)->name);
+      }
+    }
+    return got;
+  };
+
+  // Every policy is enforcing and has no exceptions, so it denies the process
+  auto policy = [](const char* name, WatchItemParentDirectoryProtection pdp) {
+    return std::make_shared<WatchItemPolicyBase>(
+        name, "v1", /*audit_only=*/false, santa::WatchItemRuleType::kPathsWithAllowedProcesses,
+        WatchItemProcessOptions{}, santa::WatchItemProcessList{}, 0, pdp);
+  };
+  auto direct = policy("direct", WatchItemParentDirectoryProtection::kAudit);
+  auto beneathAudit = policy("beneathAudit", WatchItemParentDirectoryProtection::kAudit);
+  auto beneathEnforce = policy("beneathEnforce", WatchItemParentDirectoryProtection::kEnforce);
+
+  // Audit: a denial from beneath is audited, with no dialog or TTY line. The
+  // policy watching the target is unaffected by its own setting, so it still
+  // blocks and notifies.
+  {
+    Notified got = run({{0, direct}, {0, beneathAudit, true}, {1, std::nullopt}});
+    XCTAssertEqual(got.result, ES_AUTH_RESULT_DENY);
+    XCTAssertTrue(got.stored ==
+                  Stored({{"direct", FileAccessPolicyDecision::kDenied},
+                          {"beneathAudit", FileAccessPolicyDecision::kAllowedAuditOnly}}));
+    XCTAssertTrue(got.dialogs == Names({"direct"}));
+    XCTAssertTrue(got.ttys == Names({"direct"}));
+  }
+  {
+    Notified got = run({{0, beneathAudit, true}, {1, std::nullopt}});
+    XCTAssertEqual(got.result, ES_AUTH_RESULT_ALLOW);
+    XCTAssertTrue(got.stored ==
+                  Stored({{"beneathAudit", FileAccessPolicyDecision::kAllowedAuditOnly}}));
+    XCTAssertTrue(got.dialogs.empty());
+    XCTAssertTrue(got.ttys.empty());
+  }
+
+  // Enforce: a denial from beneath blocks and notifies
+  {
+    Notified got = run({{0, beneathEnforce, true}, {1, std::nullopt}});
+    XCTAssertEqual(got.result, ES_AUTH_RESULT_DENY);
+    XCTAssertTrue(got.stored == Stored({{"beneathEnforce", FileAccessPolicyDecision::kDenied}}));
+    XCTAssertTrue(got.dialogs == Names({"beneathEnforce"}));
+    XCTAssertTrue(got.ttys == Names({"beneathEnforce"}));
+  }
+
+  // A per-process Action of deny is audited too
+  {
+    WatchItemProcessOptions denyOptions;
+    denyOptions.action = santa::WatchItemProcessAction::kDeny;
+    Notified got = run({{0, beneathAudit, true}, {1, std::nullopt}}, &denyOptions);
+    XCTAssertEqual(got.result, ES_AUTH_RESULT_ALLOW);
+    XCTAssertTrue(got.stored ==
+                  Stored({{"beneathAudit", FileAccessPolicyDecision::kAllowedAuditOnly}}));
+    XCTAssertTrue(got.dialogs.empty());
+
+    got = run({{0, beneathEnforce, true}, {1, std::nullopt}}, &denyOptions);
+    XCTAssertEqual(got.result, ES_AUTH_RESULT_DENY);
+  }
+
+  // An invalidly signed process is still blocked in audit mode, as it is by an
+  // audit-only rule
+  esProc.codesigning_flags = CS_SIGNED;
+  {
+    Notified got = run({{0, beneathAudit, true}, {1, std::nullopt}});
+    XCTAssertEqual(got.result, ES_AUTH_RESULT_DENY);
+    XCTAssertTrue(got.stored ==
+                  Stored({{"beneathAudit", FileAccessPolicyDecision::kDeniedInvalidSignature}}));
+    XCTAssertTrue(got.dialogs == Names({"beneathAudit"}));
+  }
+  esProc.codesigning_flags = CS_SIGNED | CS_VALID;
+
+  // The global override action still applies after the parent directory
+  // setting, and only it converts an invalid signature denial
+  {
+    MockFAAPolicyProcessor faaPolicyProcessor(self.dcMock, nullptr, nullptr,
+                                              santa::TTYWriter::Create(/*silent_tty_mode=*/true),
+                                              nullptr, 0, 0, nil, nil);
+    faaPolicyProcessor.UseRealPolicyEvaluation();
+    auto matcher = ^FAAPolicyProcessor::PolicyMatch(const WatchItemPolicyBase&,
+                                                    const Message::PathTarget&, const Message&) {
+      return {false, nullptr};
+    };
+    SNTFileAccessDeniedBlock deniedBlock =
+        ^(SNTStoredFileAccessEvent*, NSString*, NSString*, NSString*) {
+        };
+    auto decide = [&](std::shared_ptr<WatchItemPolicyBase> p, SNTOverrideFileAccessAction action) {
+      return faaPolicyProcessor
+          .ProcessTargetAndPolicyWrapper(msg, {0, p, true}, matcher, deniedBlock, action)
+          .decision;
+    };
+
+    XCTAssertEqual(decide(beneathAudit, SNTOverrideFileAccessActionNone),
+                   FileAccessPolicyDecision::kAllowedAuditOnly);
+    XCTAssertEqual(decide(beneathAudit, SNTOverrideFileAccessActionDisable),
+                   FileAccessPolicyDecision::kNoPolicy);
+    XCTAssertEqual(decide(beneathEnforce, SNTOverrideFileAccessActionNone),
+                   FileAccessPolicyDecision::kDenied);
+    XCTAssertEqual(decide(beneathEnforce, SNTOverrideFileAccessActionAuditOnly),
+                   FileAccessPolicyDecision::kAllowedAuditOnly);
+
+    esProc.codesigning_flags = CS_SIGNED;
+    XCTAssertEqual(decide(beneathAudit, SNTOverrideFileAccessActionNone),
+                   FileAccessPolicyDecision::kDeniedInvalidSignature);
+    XCTAssertEqual(decide(beneathAudit, SNTOverrideFileAccessActionAuditOnly),
+                   FileAccessPolicyDecision::kAllowedAuditOnly);
+    esProc.codesigning_flags = CS_SIGNED | CS_VALID;
+  }
+
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+}
+
+// A policy beneath a cloned directory that allows reads must not let a later
+// read of the directory itself skip the policy watching it.
+- (void)testProcessMessageReadsCacheIgnoresPoliciesBeneath {
+  es_file_t procFile = MakeESFile("/proc/cloner");
+  es_process_t esProc = MakeESProcess(&procFile);
+  esProc.codesigning_flags = CS_SIGNED | CS_VALID;
+  OCMStub([self.mockConfigurator enableBadSignatureProtection]).andReturn(NO);
+
+  struct stat dirStat = MakeStat();
+  dirStat.st_mode = S_IFDIR | 0755;
+  es_file_t dir = MakeESFile("/a/b", dirStat);
+  es_file_t targetDir = MakeESFile("/x");
+
+  es_message_t cloneMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_CLONE, &esProc);
+  cloneMsg.event.clone.source = &dir;
+  cloneMsg.event.clone.target_dir = &targetDir;
+  cloneMsg.event.clone.target_name = MakeESStringToken("b");
+
+  es_message_t openMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_OPEN, &esProc);
+  openMsg.event.open.file = &dir;
+  openMsg.event.open.fflag = FREAD;
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+
+  // ruleA watches /a/b and denies reads. ruleB watches /a/b/c/d.txt and allows
+  // reads.
+  auto ruleA = std::make_shared<WatchItemPolicyBase>(
+      "ruleA", "v1", /*audit_only=*/false, santa::WatchItemRuleType::kPathsWithAllowedProcesses,
+      WatchItemProcessOptions{}, santa::WatchItemProcessList{}, 0,
+      WatchItemParentDirectoryProtection::kEnforce);
+  auto ruleB = std::make_shared<WatchItemPolicyBase>(
+      "ruleB", "v1", /*audit_only=*/false, santa::WatchItemRuleType::kPathsWithAllowedProcesses,
+      WatchItemProcessOptions{.allow_read_access = true}, santa::WatchItemProcessList{}, 0,
+      WatchItemParentDirectoryProtection::kEnforce);
+
+  // Returns whether, after the clone, a read-only open of the directory by the
+  // same process is answered without evaluating any policy
+  es_message_t* cloneMsgPtr = &cloneMsg;
+  es_message_t* openMsgPtr = &openMsg;
+  auto readAnsweredFromCache = [&](const std::vector<FAAPolicyProcessor::TargetPolicyPair>& pairs,
+                                   es_auth_result_t wantCloneResult) {
+    MockFAAPolicyProcessor faaPolicyProcessor(self.dcMock, nullptr, nullptr, nullptr, nullptr, 0, 0,
+                                              nil, nil);
+    faaPolicyProcessor.UseRealPolicyEvaluation();
+    Message clone(mockESApi, cloneMsgPtr);
+    XCTAssertEqual(clone.PathTargets().size(), 2);
+    XCTAssertEqual(
+        faaPolicyProcessor
+            .ProcessMessageWrapper(
+                clone, pairs,
+                ^FAAPolicyProcessor::PolicyMatch(const WatchItemPolicyBase&,
+                                                 const Message::PathTarget&, const Message&) {
+                  return {false, nullptr};
+                },
+                ^(SNTStoredFileAccessEvent*, NSString*, NSString*, NSString*){
+                })
+            .auth_result,
+        wantCloneResult);
+    return faaPolicyProcessor.ImmediateResponseWrapper(Message(mockESApi, openMsgPtr)).has_value();
+  };
+
+  // ruleA denies the clone, and ruleB beneath it caches nothing
+  XCTAssertFalse(readAnsweredFromCache({{0, ruleA}, {0, ruleB, true}, {1, std::nullopt}},
+                                       ES_AUTH_RESULT_DENY));
+
+  // A policy watching the directory itself that allows reads still caches them
+  XCTAssertTrue(readAnsweredFromCache({{0, ruleB}, {1, std::nullopt}}, ES_AUTH_RESULT_ALLOW));
 
   XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
 }

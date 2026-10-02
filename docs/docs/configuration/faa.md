@@ -91,6 +91,8 @@ Each rule contains three main components:
 				<true/>
 				<key>RuleType</key>
 				<string>PathsWithAllowedProcesses</string>
+				<key>ParentDirectoryProtection</key>
+				<string>enforce</string>
 			</dict>
 			<key>Processes</key>
 			<array>
@@ -196,6 +198,8 @@ The `Options` dictionary within each rule supports the following keys:
 - `AllowReadAccess` (optional): Boolean controlling whether read access is allowed. When `false`, both read and write access are monitored/blocked. When `true`, only write access is monitored/blocked. Defaults to `true` if not specified.
 
 - `AuditOnly` (optional): Boolean. When `true`, violations are logged but not blocked. Defaults to `true`.
+
+- `ParentDirectoryProtection` (optional): String. How the rule treats renaming or cloning a directory that contains one of its paths: `audit`, `enforce`, or `disabled`. Defaults to `audit`, which logs violations but does not block them. See [Parent Directories](/features/faa#parent-directories).
 
 - `EventDetailURL` (optional): Rule-specific URL that overrides the top-level EventDetailURL.
 

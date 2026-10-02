@@ -760,6 +760,7 @@ objc_library(
         "//Source/common/es:EndpointSecurityMessage",
         "//Source/common/es:SNTEndpointSecurityEventHandler",
         "//Source/common/faa:WatchItemPolicy",
+        "@abseil-cpp//absl/container:inlined_vector",
     ],
 )
 
@@ -2101,10 +2102,12 @@ santa_unit_test(
         ":FAAPolicyProcessor",
         ":MockFAAPolicyProcessor",
         ":SNTDecisionCache",
+        ":TTYWriter",
         "//Source/common:MOLCertificate",
         "//Source/common:MOLCodesignChecker",
         "//Source/common:SNTCachedDecision",
         "//Source/common:SNTFileInfo",
+        "//Source/common:String",
         "//Source/common:TestUtils",
         "//Source/common/es:EndpointSecurityMessage",
         "//Source/common/es:MockEndpointSecurityAPI",

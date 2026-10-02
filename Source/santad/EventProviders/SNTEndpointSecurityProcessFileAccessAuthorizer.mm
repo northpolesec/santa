@@ -97,16 +97,22 @@ using ProcessRuleCache = SantaCache<PidPidverPair, MatchedProcessPolicy>;
     return;
   }
 
+  const santa::WatchItemProcessOptions* matchedOptions = matchedPolicy.options;
+  const bool directoryTreeOp = santa::IsDirectoryTreeOperation(msg);
+
+  // Only a directory tree operation can match a target as an ancestor.
   std::vector<FAAPolicyProcessor::TargetPolicyPair> targetPolicyPairs;
-  size_t numTargets = msg.PathTargets().size();
-  for (size_t i = 0; i < numTargets; ++i) {
-    targetPolicyPairs.emplace_back(i, matchedPolicy.policy);
+  const std::vector<Message::PathTarget>& targets = msg.PathTargets();
+  targetPolicyPairs.reserve(targets.size());
+  for (size_t i = 0; i < targets.size(); ++i) {
+    targetPolicyPairs.push_back(
+        {i, matchedPolicy.policy,
+         directoryTreeOp && matchedPolicy.policy->MatchesTarget(targets[i].Path(), true) ==
+                                ProcessWatchItemPolicy::TargetMatch::kAncestor});
   }
 
-  const santa::WatchItemProcessOptions* matchedOptions = matchedPolicy.options;
-
   FAAPolicyProcessor::ESResult result = _faaPolicyProcessorProxy->ProcessMessage(
-      msg, targetPolicyPairs,
+      msg, std::move(targetPolicyPairs),
       ^FAAPolicyProcessor::PolicyMatch(const santa::WatchItemPolicyBase& base_policy,
                                        const Message::PathTarget& target, const Message& msg) {
         const ProcessWatchItemPolicy* policy =
@@ -116,11 +122,17 @@ using ProcessRuleCache = SantaCache<PidPidverPair, MatchedProcessPolicy>;
           return {false, matchedOptions};
         }
 
-        return {policy->tree->Contains(target.Path().data()), matchedOptions};
+        return {policy->MatchesTarget(target.Path(), directoryTreeOp) !=
+                    ProcessWatchItemPolicy::TargetMatch::kNone,
+                matchedOptions};
       },
       self.fileAccessDeniedBlock, overrideAction);
 
-  [self respondToMessage:msg withAuthResult:result.auth_result cacheable:result.cacheable];
+  // Directory tree operations are decided by the paths beneath the directory,
+  // which the ES cache has no knowledge of.
+  [self respondToMessage:msg
+          withAuthResult:result.auth_result
+               cacheable:result.cacheable && !directoryTreeOp];
 }
 
 - (void)handleMessage:(Message&&)esMsg

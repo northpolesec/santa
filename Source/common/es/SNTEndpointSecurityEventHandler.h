@@ -52,8 +52,10 @@ typedef void (^SNTFileAccessDeniedBlock)(SNTStoredFileAccessEvent* event, NSStri
 @protocol SNTDataFileAccessAuthorizer <SNTFileAccessAuthorizer>
 
 - (void)watchItemsCount:(size_t)count
-               newPaths:(const santa::SetPairPathAndType&)newPaths
-           removedPaths:(const santa::SetPairPathAndType&)removedPaths;
+                newPaths:(const santa::SetPairPathAndType&)newPaths
+            removedPaths:(const santa::SetPairPathAndType&)removedPaths
+        newAncestorPaths:(const santa::SetPairPathAndType&)newAncestorPaths
+    removedAncestorPaths:(const santa::SetPairPathAndType&)removedAncestorPaths;
 
 @end
 

@@ -18,6 +18,8 @@
 #import <XCTest/XCTest.h>
 
 #include <memory>
+#include <string>
+#include <vector>
 
 #include "Source/common/TestUtils.h"
 #include "absl/container/flat_hash_set.h"
@@ -28,6 +30,7 @@ using santa::ProcessWatchItemPolicy;
 using santa::SetPairPathAndType;
 using santa::SetSharedDataWatchItemPolicy;
 using santa::SetSharedProcessWatchItemPolicy;
+using santa::WatchItemParentDirectoryProtection;
 using santa::WatchItemPathType;
 using santa::WatchItemProcess;
 using santa::WatchItemProcessOptions;
@@ -68,6 +71,93 @@ using santa::WatchItemRuleType;
     std::string got = santa::WatchPathForMatch(c.match, c.type);
     XCTAssertTrue(got == c.want, @"match: '%s' (%s), got: '%s', want: '%s'", c.match.c_str(),
                   c.type == kPrefix ? "prefix" : "literal", got.c_str(), c.want.c_str());
+  }
+}
+
+- (void)testAncestorDirectories {
+  using santa::AncestorDirectories;
+  using Dirs = std::vector<std::string>;
+
+  XCTAssertTrue(AncestorDirectories("/a/b/c/d") == Dirs({"/a", "/a/b", "/a/b/c"}));
+  XCTAssertTrue(AncestorDirectories("/a/b/c/d/") == Dirs({"/a", "/a/b", "/a/b/c", "/a/b/c/d"}));
+  XCTAssertTrue(AncestorDirectories("/a/b/c/do") == Dirs({"/a", "/a/b", "/a/b/c"}));
+  XCTAssertTrue(AncestorDirectories("/a/") == Dirs({"/a"}));
+  XCTAssertTrue(AncestorDirectories("/a").empty());
+  XCTAssertTrue(AncestorDirectories("/").empty());
+
+  // Paths the parser kept because they have no safe rewrite have no ancestors
+  XCTAssertTrue(AncestorDirectories("/a/../b").empty());
+  XCTAssertTrue(AncestorDirectories("/a/./b").empty());
+  XCTAssertTrue(AncestorDirectories("/a/b/..").empty());
+  XCTAssertTrue(AncestorDirectories("/a/./b//").empty());
+  XCTAssertTrue(AncestorDirectories("//").empty());
+  XCTAssertTrue(AncestorDirectories("///").empty());
+
+  // Names that only begin with dots are ordinary components
+  XCTAssertTrue(AncestorDirectories("/a/.hidden/b") == Dirs({"/a", "/a/.hidden"}));
+  XCTAssertTrue(AncestorDirectories("/a/..b/c") == Dirs({"/a", "/a/..b"}));
+}
+
+- (void)testProcessWatchItemPolicyMatchesTarget {
+  using Match = ProcessWatchItemPolicy::TargetMatch;
+  SetPairPathAndType paths = {
+      {"/a/b/c", WatchItemPathType::kLiteral},
+      {"/x/y/", WatchItemPathType::kPrefix},
+  };
+
+  ProcessWatchItemPolicy denied("denied", "v1", paths, false,
+                                WatchItemRuleType::kProcessesWithDeniedPaths);
+
+  // Configured paths match directly regardless of the operation
+  XCTAssertEqual(denied.MatchesTarget("/a/b/c", false), Match::kDirect);
+  XCTAssertEqual(denied.MatchesTarget("/a/b/c", true), Match::kDirect);
+  XCTAssertEqual(denied.MatchesTarget("/x/y/z", false), Match::kDirect);
+
+  // Ancestors match only for directory tree operations
+  XCTAssertEqual(denied.MatchesTarget("/a/b", false), Match::kNone);
+  XCTAssertEqual(denied.MatchesTarget("/a/b", true), Match::kAncestor);
+  XCTAssertEqual(denied.MatchesTarget("/a", true), Match::kAncestor);
+  XCTAssertEqual(denied.MatchesTarget("/x/y", true), Match::kAncestor);
+  XCTAssertEqual(denied.MatchesTarget("/x", true), Match::kAncestor);
+
+  // Siblings, the root, and paths below a literal never match
+  XCTAssertEqual(denied.MatchesTarget("/a/bc", true), Match::kNone);
+  XCTAssertEqual(denied.MatchesTarget("/", true), Match::kNone);
+  XCTAssertEqual(denied.MatchesTarget("/a/b/c/d", true), Match::kNone);
+
+  // A path that is both configured and an ancestor of another configured path
+  // matches directly
+  ProcessWatchItemPolicy nested(
+      "nested", "v1",
+      {{"/a/b", WatchItemPathType::kLiteral}, {"/a/b/c", WatchItemPathType::kLiteral}}, false,
+      WatchItemRuleType::kProcessesWithDeniedPaths);
+  XCTAssertEqual(nested.MatchesTarget("/a/b", true), Match::kDirect);
+  XCTAssertEqual(nested.MatchesTarget("/a", true), Match::kAncestor);
+
+  // Allowed-paths rules never match ancestors, since that would allow the tree
+  ProcessWatchItemPolicy allowed("allowed", "v1", paths, false,
+                                 WatchItemRuleType::kProcessesWithAllowedPaths);
+  XCTAssertEqual(allowed.MatchesTarget("/a/b/c", true), Match::kDirect);
+  XCTAssertEqual(allowed.MatchesTarget("/a/b", true), Match::kNone);
+  XCTAssertEqual(allowed.MatchesTarget("/x/y", true), Match::kNone);
+
+  // With parent directory protection disabled the rule has no ancestors, and
+  // direct matches are unchanged
+  ProcessWatchItemPolicy disabled("disabled", "v1", paths, false,
+                                  WatchItemRuleType::kProcessesWithDeniedPaths, {}, {}, 0,
+                                  WatchItemParentDirectoryProtection::kDisabled);
+  XCTAssertTrue(disabled.ancestor_dirs.empty());
+  XCTAssertEqual(disabled.MatchesTarget("/a/b", true), Match::kNone);
+  XCTAssertEqual(disabled.MatchesTarget("/x", true), Match::kNone);
+  XCTAssertEqual(disabled.MatchesTarget("/a/b/c", true), Match::kDirect);
+  XCTAssertEqual(disabled.MatchesTarget("/x/y/z", false), Match::kDirect);
+
+  // Audit and enforce both match ancestors; the mode only changes the outcome
+  for (WatchItemParentDirectoryProtection pdp :
+       {WatchItemParentDirectoryProtection::kAudit, WatchItemParentDirectoryProtection::kEnforce}) {
+    ProcessWatchItemPolicy p("p", "v1", paths, false, WatchItemRuleType::kProcessesWithDeniedPaths,
+                             {}, {}, 0, pdp);
+    XCTAssertEqual(p.MatchesTarget("/a/b", true), Match::kAncestor);
   }
 }
 
@@ -285,6 +375,13 @@ using santa::WatchItemRuleType;
   // Check for expected equality.
   XCTAssertTrue(*sharedDataPolicy1 == *sharedDataPolicy2);
   XCTAssertFalse(*sharedDataPolicy1 == *sharedDataPolicy3);
+
+  // Parent directory protection is part of equality, so changing only it
+  // replaces the policy
+  XCTAssertFalse(*sharedDataPolicy1 ==
+                 DataWatchItemPolicy("name", "v1", "/foo", WatchItemPathType::kLiteral, true,
+                                     WatchItemRuleType::kPathsWithAllowedProcesses, {}, {}, 0,
+                                     WatchItemParentDirectoryProtection::kEnforce));
 
   // Insert the same item multiple times, it should only be added once
   dataSet.insert(sharedDataPolicy1);
