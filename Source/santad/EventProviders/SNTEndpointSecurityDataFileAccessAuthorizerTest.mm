@@ -30,6 +30,7 @@
 #include <optional>
 #include <set>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <variant>
 #include <vector>
@@ -48,7 +49,7 @@ using santa::WatchItemPathType;
 using santa::WatchItemPolicyBase;
 
 namespace santa {
-extern std::vector<FAAPolicyProcessor::TargetPolicyPair> TargetPolicyPairs(
+extern FAAPolicyProcessor::TargetPolicyPairList TargetPolicyPairs(
     const std::vector<Message::PathTarget>& targets, bool directory_tree_op,
     LookupPolicyBlock lookup_policy_block,
     LookupPoliciesBeneathBlock lookup_policies_beneath_block);
@@ -146,12 +147,12 @@ void SetExpectationsForDataFileAccessAuthorizerInit(
   };
 
   LookupPolicyBlock lookup =
-      ^std::optional<std::shared_ptr<WatchItemPolicyBase>>(const std::string& path) {
-    if (path == "/a/dir") return watched;
+      ^std::optional<std::shared_ptr<WatchItemPolicyBase>>(const char* path) {
+    if (std::string_view(path) == "/a/dir") return watched;
     return std::nullopt;
   };
   LookupPoliciesBeneathBlock lookupBeneath =
-      ^std::vector<std::shared_ptr<WatchItemPolicyBase>>(const std::string& path) {
+      ^std::vector<std::shared_ptr<WatchItemPolicyBase>>(std::string_view path) {
     // The policy watching /a/dir also watches a path beneath it
     if (path == "/a/dir") return {beneath1, watched, beneath2};
     if (path == "/b/new") return {beneathDest};
@@ -161,7 +162,7 @@ void SetExpectationsForDataFileAccessAuthorizerInit(
   // Flatten to (index, policy name, via ancestor) for exact comparison. "-" is
   // no policy.
   using Pairs = std::vector<std::tuple<size_t, std::string, bool>>;
-  auto names = [](const std::vector<FAAPolicyProcessor::TargetPolicyPair>& pairs) {
+  auto names = [](const FAAPolicyProcessor::TargetPolicyPairList& pairs) {
     Pairs out;
     for (const FAAPolicyProcessor::TargetPolicyPair& pair : pairs) {
       out.emplace_back(pair.target_index, pair.policy.has_value() ? (*pair.policy)->name : "-",

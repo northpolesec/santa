@@ -108,11 +108,12 @@ class MockFAAPolicyProcessor : public FAAPolicyProcessor {
   }
 
   FAAPolicyProcessor::ESResult ProcessMessageWrapper(
-      const Message& msg, std::vector<FAAPolicyProcessor::TargetPolicyPair> target_policy_pairs,
+      const Message& msg,
+      absl::Span<const FAAPolicyProcessor::TargetPolicyPair> target_policy_pairs,
       FAAPolicyProcessor::CheckIfPolicyMatchesBlock checkIfPolicyMatchesBlock,
       SNTFileAccessDeniedBlock fileAccessDeniedBlock) {
     return FAAPolicyProcessor::ProcessMessage(
-        msg, std::move(target_policy_pairs), checkIfPolicyMatchesBlock, fileAccessDeniedBlock,
+        msg, target_policy_pairs, checkIfPolicyMatchesBlock, fileAccessDeniedBlock,
         SNTOverrideFileAccessActionNone, FAAClientType::kData);
   }
 

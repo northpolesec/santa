@@ -992,10 +992,10 @@ bool DataWatchItems::Build(SetSharedDataWatchItemPolicy data_policies) {
 
 void DataWatchItems::FindPolicies(IterateTargetsBlock iterateTargetsBlock) const {
   iterateTargetsBlock(
-      ^std::optional<std::shared_ptr<WatchItemPolicyBase>>(const std::string& path) {
+      ^std::optional<std::shared_ptr<WatchItemPolicyBase>>(const char* path) {
         return tree_->LookupLongestMatchingPrefix(path);
       },
-      ^std::vector<std::shared_ptr<WatchItemPolicyBase>>(const std::string& path) {
+      ^std::vector<std::shared_ptr<WatchItemPolicyBase>>(std::string_view path) {
         auto it = policies_beneath_.find(path);
         if (it == policies_beneath_.end()) {
           return {};
