@@ -101,7 +101,7 @@ using ProcessRuleCache = SantaCache<PidPidverPair, MatchedProcessPolicy>;
   const bool directoryTreeOp = santa::IsDirectoryTreeOperation(msg);
 
   // Only a directory tree operation can match a target as an ancestor.
-  std::vector<FAAPolicyProcessor::TargetPolicyPair> targetPolicyPairs;
+  FAAPolicyProcessor::TargetPolicyPairList targetPolicyPairs;
   const std::vector<Message::PathTarget>& targets = msg.PathTargets();
   targetPolicyPairs.reserve(targets.size());
   for (size_t i = 0; i < targets.size(); ++i) {
@@ -112,7 +112,7 @@ using ProcessRuleCache = SantaCache<PidPidverPair, MatchedProcessPolicy>;
   }
 
   FAAPolicyProcessor::ESResult result = _faaPolicyProcessorProxy->ProcessMessage(
-      msg, std::move(targetPolicyPairs),
+      msg, targetPolicyPairs,
       ^FAAPolicyProcessor::PolicyMatch(const santa::WatchItemPolicyBase& base_policy,
                                        const Message::PathTarget& target, const Message& msg) {
         const ProcessWatchItemPolicy* policy =

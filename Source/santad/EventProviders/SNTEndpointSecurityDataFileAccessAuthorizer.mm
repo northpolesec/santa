@@ -29,6 +29,7 @@
 #include <memory>
 #include <optional>
 #include <set>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <variant>
@@ -59,15 +60,16 @@ namespace santa {
 // watched path beneath it, since those paths move or are cloned along with it.
 // The policy watching the target comes first, and only the others are marked
 // as via an ancestor.
-std::vector<FAAPolicyProcessor::TargetPolicyPair> TargetPolicyPairs(
+FAAPolicyProcessor::TargetPolicyPairList TargetPolicyPairs(
     const std::vector<Message::PathTarget>& targets, bool directory_tree_op,
     LookupPolicyBlock lookup_policy_block,
     LookupPoliciesBeneathBlock lookup_policies_beneath_block) {
-  std::vector<FAAPolicyProcessor::TargetPolicyPair> pairs;
+  FAAPolicyProcessor::TargetPolicyPairList pairs;
   pairs.reserve(targets.size());
   for (size_t idx = 0; idx < targets.size(); idx++) {
-    std::string path(targets[idx].Path());
-    std::optional<std::shared_ptr<WatchItemPolicyBase>> watching = lookup_policy_block(path);
+    // Path() is null-terminated, so the lookups need no string copy
+    std::string_view path = targets[idx].Path();
+    std::optional<std::shared_ptr<WatchItemPolicyBase>> watching = lookup_policy_block(path.data());
     pairs.emplace_back(idx, watching);
     if (directory_tree_op) {
       for (std::shared_ptr<WatchItemPolicyBase>& policy : lookup_policies_beneath_block(path)) {
@@ -137,7 +139,7 @@ std::vector<FAAPolicyProcessor::TargetPolicyPair> TargetPolicyPairs(
     return;
   }
 
-  __block std::vector<FAAPolicyProcessor::TargetPolicyPair> targetPolicyPairs;
+  __block FAAPolicyProcessor::TargetPolicyPairList targetPolicyPairs;
   // Blocks capture C++ references by reference, so this does not copy the
   // targets. The block runs synchronously, while msg is alive.
   const auto& pathTargets = msg.PathTargets();
@@ -150,7 +152,7 @@ std::vector<FAAPolicyProcessor::TargetPolicyPair> TargetPolicyPairs(
   });
 
   FAAPolicyProcessor::ESResult result = _faaPolicyProcessorProxy->ProcessMessage(
-      msg, std::move(targetPolicyPairs),
+      msg, targetPolicyPairs,
       ^FAAPolicyProcessor::PolicyMatch(const santa::WatchItemPolicyBase& base_policy,
                                        const Message::PathTarget& target, const Message& msg) {
         // Note: Iteration order is meaningful. ProcessesWithOptions entries

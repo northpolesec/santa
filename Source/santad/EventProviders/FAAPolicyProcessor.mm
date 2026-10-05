@@ -724,7 +724,7 @@ static inline FAAPolicyProcessor::ReadsCacheKey MakeReadsCacheKey(const audit_to
 }
 
 FAAPolicyProcessor::ESResult FAAPolicyProcessor::ProcessMessage(
-    const Message& msg, std::vector<TargetPolicyPair> target_policy_pairs,
+    const Message& msg, absl::Span<const TargetPolicyPair> target_policy_pairs,
     CheckIfPolicyMatchesBlock check_if_policy_matches_block,
     SNTFileAccessDeniedBlock file_access_denied_block, SNTOverrideFileAccessAction overrideAction,
     FAAClientType client_type) {

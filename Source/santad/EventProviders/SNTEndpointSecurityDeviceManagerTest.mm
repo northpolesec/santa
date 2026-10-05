@@ -1000,6 +1000,56 @@ class MockAuthResultCache : public AuthResultCache {
   }
 }
 
+// autofs trigger mounts are allowed without a host check. FailClosed is set so that evaluating the
+// mount as a network share denies it whether or not a host can be extracted from the mntfromname.
+- (void)testAutofsTriggerMountAllowed {
+  if (@available(macOS 15.0, *)) {
+    OCMStub([self.mockConfigurator failClosed]).andReturn(YES);
+
+    [self verifyNetworkMount:@"map auto_home"
+                  fsTypeName:@"autofs"
+                allowedHosts:@[]
+          expectedAuthResult:ES_AUTH_RESULT_ALLOW];
+  } else {
+    XCTSkip(@"Test requires macOS 15 or later");
+  }
+}
+
+- (void)testAutofsTriggerRemountAllowed {
+  if (@available(macOS 15.0, *)) {
+    OCMStub([self.mockConfigurator blockNetworkMount]).andReturn(YES);
+    OCMStub([self.mockConfigurator failClosed]).andReturn(YES);
+    OCMStub([self.mockConfigurator allowedNetworkMountHosts]).andReturn(@[]);
+
+    [self triggerTestNetworkMountEvent:ES_EVENT_TYPE_AUTH_REMOUNT
+        mountFromURL:@"map -hosts"
+        fsTypeName:@"autofs"
+        expectedAuthResult:ES_AUTH_RESULT_ALLOW
+        deviceManagerSetup:^(SNTEndpointSecurityDeviceManager* dm) {
+        }
+        networkMountCallback:^(SNTStoredNetworkMountEvent* event) {
+          XCTFail(@"Callback should not be called for an autofs remount");
+        }];
+  } else {
+    XCTSkip(@"Test requires macOS 15 or later");
+  }
+}
+
+// The autofs exemption is keyed on f_fstypename. The mntfromname is chosen by the caller, so a
+// network filesystem using an autofs-style name is still evaluated.
+- (void)testNetworkMountWithAutofsMapNameBlocked {
+  if (@available(macOS 15.0, *)) {
+    OCMStub([self.mockConfigurator failClosed]).andReturn(YES);
+
+    [self verifyNetworkMount:@"map auto_home"
+                  fsTypeName:@"nfs"
+                allowedHosts:@[]
+          expectedAuthResult:ES_AUTH_RESULT_DENY];
+  } else {
+    XCTSkip(@"Test requires macOS 15 or later");
+  }
+}
+
 #endif  // HAVE_MACOS_15
 
 #pragma mark - Removable Media Policy Tests

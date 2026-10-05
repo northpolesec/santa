@@ -194,7 +194,7 @@ BlockGenResult CreatePolicyBlockGen() {
     targetPolicies->clear();
     return ^(santa::LookupPolicyBlock block, santa::LookupPoliciesBeneathBlock) {
       for (const auto& path : paths) {
-        targetPolicies->push_back(block(path));
+        targetPolicies->push_back(block(path.c_str()));
       }
     };
   };
