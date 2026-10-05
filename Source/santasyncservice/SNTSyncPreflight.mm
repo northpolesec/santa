@@ -196,6 +196,23 @@ BOOL Preflight(SNTSyncPreflight* self, google::protobuf::Arena* arena,
     }
   }];
 
+  if constexpr (IsV2) {
+    [rop executableIntegrityPolicy:^(SNTExecutableIntegrityPolicy policy) {
+      switch (policy) {
+        case SNTExecutableIntegrityPolicyEnforce:
+          req->set_executable_integrity_policy(::pbv2::ENFORCE);
+          break;
+        case SNTExecutableIntegrityPolicyReport:
+          req->set_executable_integrity_policy(::pbv2::REPORT);
+          break;
+        case SNTExecutableIntegrityPolicyIgnore:
+          req->set_executable_integrity_policy(::pbv2::IGNORE);
+          break;
+        default: break;
+      }
+    }];
+  }
+
   // If user requested it or we've never had a successful sync, try from a clean slate.
   if (requestSyncType == SNTSyncTypeClean || requestSyncType == SNTSyncTypeCleanAll) {
     SLOGD(@"%@ sync requested by client",
@@ -553,11 +570,8 @@ void HandleV2Responses(const ::pbv2::PreflightResponse& resp, SNTSyncState* sync
       case ::pbv2::EXECUTABLE_INTEGRITY_POLICY_UNSPECIFIED:
         syncState.executableIntegrityPolicy = @(SNTExecutableIntegrityPolicyUnknown);
         break;
-      case ::pbv2::BLOCK_CHANGED:
-        syncState.executableIntegrityPolicy = @(SNTExecutableIntegrityPolicyBlockChanged);
-        break;
-      case ::pbv2::BLOCK_UNVERIFIED:
-        syncState.executableIntegrityPolicy = @(SNTExecutableIntegrityPolicyBlockUnverified);
+      case ::pbv2::ENFORCE:
+        syncState.executableIntegrityPolicy = @(SNTExecutableIntegrityPolicyEnforce);
         break;
       case ::pbv2::REPORT:
         syncState.executableIntegrityPolicy = @(SNTExecutableIntegrityPolicyReport);

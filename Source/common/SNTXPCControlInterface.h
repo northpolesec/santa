@@ -66,6 +66,12 @@ typedef NS_ENUM(NSInteger, SNTRuleAddSource) {
 - (void)updateSyncSettings:(SNTConfigBundle*)result reply:(void (^)(void))reply;
 
 ///
+///  The effective ExecutableIntegrityPolicy, reported to the sync server. Privileged only: it
+///  describes the host's enforcement posture, which is not shown to local users.
+///
+- (void)executableIntegrityPolicy:(void (^)(SNTExecutableIntegrityPolicy))reply;
+
+///
 ///  Syncd Ops
 ///
 - (void)postRuleSyncNotificationForApplication:(NSString*)app reply:(void (^)(void))reply;

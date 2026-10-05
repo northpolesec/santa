@@ -101,6 +101,15 @@
   XCTAssertEqualObjects([got string], [wantUnchanged string]);
 }
 
+// One reason covers both integrity denies: a file that changed during launch, and one that could
+// not be read.
+- (void)testBlockReasonForBinaryMismatch {
+  SNTStoredExecutionEvent* se = [[SNTStoredExecutionEvent alloc] init];
+  se.decision = SNTEventStateBlockBinaryMismatch;
+  XCTAssertEqualObjects([SNTBlockMessage blockReasonForEvent:se],
+                        @"Executable could not be verified");
+}
+
 - (void)testEventDetailURLForEvent {
   SNTStoredExecutionEvent* se = [[SNTStoredExecutionEvent alloc] init];
 

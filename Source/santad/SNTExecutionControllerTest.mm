@@ -91,6 +91,14 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
 - (void)createRuleForStandaloneModeEvent:(SNTStoredExecutionEvent*)se;
 @end
 
+@interface SNTConfigurator (Testing)
+- (instancetype)initWithSyncStateFile:(NSString*)syncStateFilePath
+                            stateFile:(NSString*)stateFilePath
+            syncStateAccessAuthorizer:(BOOL (^)(void))syncStateAccessAuthorizer
+                stateAccessAuthorizer:(BOOL (^)(void))stateAccessAuthorizer;
+@property NSMutableDictionary* configState;
+@end
+
 @interface SNTRule ()
 // Making these properties readwrite makes some tests much easier to write.
 @property(readwrite) SNTRuleState state;
@@ -970,6 +978,8 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   OCMStub([self.mockFileInfo initWithPath:OCMOCK_ANY error:[OCMArg setTo:nil]]).andReturn(nil);
 
   OCMStub([self.mockConfigurator failClosed]).andReturn(NO);
+  // FailClosed decides an unreadable target only under Report and Ignore.
+  [self stubExecutableIntegrityPolicy:SNTExecutableIntegrityPolicyReport];
 
   // Never cacheable: the decision describes a file nothing could read.
   [self validateExecEvent:SNTActionRespondAllowNoCache];
@@ -986,6 +996,8 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   OCMStub([self.mockFileInfo initWithPath:OCMOCK_ANY error:[OCMArg setTo:nil]]).andReturn(nil);
 
   OCMStub([self.mockConfigurator failClosed]).andReturn(YES);
+  // FailClosed decides an unreadable target only under Report and Ignore.
+  [self stubExecutableIntegrityPolicy:SNTExecutableIntegrityPolicyReport];
 
   // Never cacheable: the deny describes a file nothing could read.
   [self validateExecEvent:SNTActionRespondDenyOnce];
@@ -3242,10 +3254,33 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   return stored;
 }
 
-- (void)testUnconfirmedIdentityIsDeniedUnderBlockChanged {
-  // The default is the same deny the unstubbed-policy tests above exercise;
-  // this pins the named value to it.
-  [self stubExecutableIntegrityPolicy:SNTExecutableIntegrityPolicyBlockChanged];
+// Stubs the configurator with what a real one reports for this profile, so the Monitor cap and
+// FailClosed's mode check apply as they do in santad. A nil policy leaves the key unset.
+- (void)stubEffectiveConfigForClientMode:(SNTClientMode)mode
+                        configuredPolicy:(NSString*)policy
+                              failClosed:(BOOL)failClosed {
+  SNTConfigurator* real = [[SNTConfigurator alloc] initWithSyncStateFile:@"/does/not/need/to/exist"
+      stateFile:@"/does/not/need/to/exist"
+      syncStateAccessAuthorizer:^BOOL {
+        return NO;
+      }
+      stateAccessAuthorizer:^BOOL {
+        return NO;
+      }];
+  NSMutableDictionary* profile =
+      [@{@"ClientMode" : @(mode), @"FailClosed" : @(failClosed)} mutableCopy];
+  if (policy) profile[@"ExecutableIntegrityPolicy"] = policy;
+  real.configState = profile;
+
+  OCMStub([self.mockConfigurator clientMode]).andReturn(real.clientMode);
+  OCMStub([self.mockConfigurator failClosed]).andReturn(real.failClosed);
+  [self stubExecutableIntegrityPolicy:real.executableIntegrityPolicy];
+}
+
+- (void)testUnconfirmedIdentityIsDeniedUnderEnforce {
+  // The unstubbed-policy tests above read Unknown, which denies like Enforce;
+  // this pins Enforce itself.
+  [self stubExecutableIntegrityPolicy:SNTExecutableIntegrityPolicyEnforce];
   [self stubUnrescuableMismatch];
 
   SNTCachedDecision* cd = [self postedDecisionForExecEvent:SNTActionRespondDenyOnce
@@ -3262,13 +3297,14 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   [self checkCountedOnceAsUnverified:kUnverifiedChanged decision:@"Block"];
 }
 
-- (void)testUnreadableFileIsDeniedInMonitorModeUnderBlockUnverified {
-  // No mismatch was established: the file simply could not be read. FailClosed
-  // is off and the mode is Monitor, so only the policy can deny this.
-  OCMStub([self.mockConfigurator failClosed]).andReturn(NO);
-  OCMStub([self.mockConfigurator clientMode]).andReturn(SNTClientModeMonitor);
-  [self stubExecutableIntegrityPolicy:SNTExecutableIntegrityPolicyBlockUnverified];
-  [self stubFileInfoInitFailureWithCode:SNTErrorCodeFailedToOpen];
+// The Lockdown default, Enforce, denies both shapes that leave nothing to evaluate, whatever
+// FailClosed says. The policy is the reason, so the decision is the mismatch, not an Unknown.
+- (void)lockdownDefaultDeniesNilFileInfoWithErrorCode:(NSInteger)code failClosed:(BOOL)failClosed {
+  [self stubEffectiveConfigForClientMode:SNTClientModeLockdown
+                        configuredPolicy:nil
+                              failClosed:failClosed];
+  [self stubFileInfoInitFailureWithCode:code];
+  BOOL changed = code == SNTErrorCodeIdentityMismatch;
 
   __block SNTStoredExecutionEvent* reported = nil;
   [self expectStoredEventInto:&reported];
@@ -3277,17 +3313,62 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
                                             cachedDecision:nil
                                               messageSetup:nil];
 
-  XCTAssertNotNil(cd);
   XCTAssertEqual(cd.decision, SNTEventStateBlockBinaryMismatch);
   XCTAssertTrue(cd.identityMismatched);
   XCTAssertFalse(cd.cacheable);
-  XCTAssertEqualObjects(cd.decisionExtra, @"Executable could not be read");
+  XCTAssertFalse(cd.holdAndAsk);
+  XCTAssertEqualObjects(cd.decisionExtra, changed ? @"Executable identity could not be confirmed"
+                                                  : @"Executable could not be read");
   [self checkMetricCounters:kBlockBinaryMismatch expected:@1];
-  [self checkCountedOnceAsUnverified:kUnverifiedUnreadable decision:@"Block"];
+  [self checkMetricCounters:kBlockUnknown expected:@0];
+  [self checkCountedOnceAsUnverified:changed ? kUnverifiedChangedUnevaluable : kUnverifiedUnreadable
+                            decision:@"Block"];
 
   OCMVerifyAllWithDelay(self.mockEventDatabase, 1);
-  XCTAssertNotNil(reported);
   XCTAssertEqual(reported.decision, SNTEventStateBlockBinaryMismatch);
+  XCTAssertTrue(reported.identityUnverified);
+}
+
+- (void)testLockdownDefaultDeniesAnUnevaluableChangedTargetWithFailClosedOff {
+  [self lockdownDefaultDeniesNilFileInfoWithErrorCode:SNTErrorCodeIdentityMismatch failClosed:NO];
+}
+
+- (void)testLockdownDefaultDeniesAnUnevaluableChangedTargetWithFailClosedOn {
+  [self lockdownDefaultDeniesNilFileInfoWithErrorCode:SNTErrorCodeIdentityMismatch failClosed:YES];
+}
+
+- (void)testLockdownDefaultDeniesAnUnreadableTargetWithFailClosedOff {
+  [self lockdownDefaultDeniesNilFileInfoWithErrorCode:SNTErrorCodeFailedToOpen failClosed:NO];
+}
+
+- (void)testLockdownDefaultDeniesAnUnreadableTargetWithFailClosedOn {
+  [self lockdownDefaultDeniesNilFileInfoWithErrorCode:SNTErrorCodeFailedToOpen failClosed:YES];
+}
+
+// Monitor caps Enforce to Report, and FailClosed is always off in Monitor, so an unreadable
+// target is allowed as a marked unknown even with FailClosed configured.
+- (void)testUnreadableFileIsAllowedInMonitorModeByDefault {
+  [self stubEffectiveConfigForClientMode:SNTClientModeMonitor configuredPolicy:nil failClosed:YES];
+  [self stubFileInfoInitFailureWithCode:SNTErrorCodeFailedToOpen];
+
+  __block SNTStoredExecutionEvent* reported = nil;
+  [self expectStoredEventInto:&reported];
+
+  SNTCachedDecision* cd = [self postedDecisionForExecEvent:SNTActionRespondAllowNoCache
+                                            cachedDecision:nil
+                                              messageSetup:nil];
+
+  XCTAssertEqual(cd.decision, SNTEventStateAllowUnknown);
+  XCTAssertTrue(cd.identityMismatched);
+  XCTAssertFalse(cd.cacheable);
+  XCTAssertEqualObjects(cd.decisionExtra, @"Executable could not be read");
+  [self checkMetricCounters:kAllowUnknown expected:@1];
+  [self checkMetricCounters:kBlockBinaryMismatch expected:@0];
+  [self checkCountedOnceAsUnverified:kUnverifiedUnreadable decision:@"Allow"];
+
+  OCMVerifyAllWithDelay(self.mockEventDatabase, 1);
+  XCTAssertEqual(reported.decision, SNTEventStateAllowUnknown);
+  XCTAssertTrue(reported.identityUnverified);
 }
 
 - (void)testUnreadableFileIsAllowedFailOpenUnderReport {
@@ -3317,10 +3398,10 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   XCTAssertTrue(reported.identityUnverified);
 }
 
-- (void)testSeatbeltRequiredWithUnconfirmedIdentityIsDeniedUnderReport {
+- (void)testSeatbeltRequiredWithUnconfirmedIdentityIsDeniedInMonitorMode {
   // A sandbox profile is registered for a specific file, so an unconfirmed
-  // identity stays a deny under every policy value.
-  [self stubExecutableIntegrityPolicy:SNTExecutableIntegrityPolicyReport];
+  // identity stays a deny under every policy value and in every mode.
+  [self stubEffectiveConfigForClientMode:SNTClientModeMonitor configuredPolicy:nil failClosed:NO];
   [self stubUnconfirmedIdentity];
   [self stubMatchingOnDiskSigningID];
   OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
@@ -3389,33 +3470,38 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
 }
 
 // Standalone mode prompts by setting holdAndAsk, which only the policy
-// processor does. Under BlockChanged and BlockUnverified the mismatch denies
-// before rule evaluation, so neither can produce a prompt.
-- (void)standaloneUnconfirmedIdentityWithPolicy:(SNTExecutableIntegrityPolicy)policy
-                                     wantAction:(SNTAction)wantAction {
-  OCMStub([self.mockConfigurator clientMode]).andReturn(SNTClientModeStandalone);
-  [self stubExecutableIntegrityPolicy:policy];
+// processor does. Under the Standalone default, Enforce, an unconfirmed or
+// unreadable target denies before rule evaluation, so neither can prompt.
+- (void)testStandaloneDefaultDeniesAnUnconfirmedIdentityWithoutHolding {
+  [self stubEffectiveConfigForClientMode:SNTClientModeStandalone
+                        configuredPolicy:nil
+                              failClosed:NO];
   [self stubUnrescuableMismatch];
 
-  SNTCachedDecision* cd = [self postedDecisionForExecEvent:wantAction
+  SNTCachedDecision* cd = [self postedDecisionForExecEvent:SNTActionRespondDenyOnce
                                             cachedDecision:nil
                                               messageSetup:^(es_message_t* msg) {
                                                 msg->event.exec.target->codesigning_flags =
                                                     CS_SIGNED | CS_VALID;
                                               }];
 
-  // wantAction rules out a prompt; this pins the pre-evaluation mismatch deny.
+  // The action rules out a prompt; this pins the pre-evaluation mismatch deny.
   XCTAssertEqual(cd.decision, SNTEventStateBlockBinaryMismatch);
+  XCTAssertFalse(cd.holdAndAsk);
 }
 
-- (void)testStandaloneNeverHoldsUnconfirmedIdentityUnderBlockChanged {
-  [self standaloneUnconfirmedIdentityWithPolicy:SNTExecutableIntegrityPolicyBlockChanged
-                                     wantAction:SNTActionRespondDenyOnce];
-}
+- (void)testStandaloneDefaultDeniesAnUnreadableTargetWithoutHolding {
+  [self stubEffectiveConfigForClientMode:SNTClientModeStandalone
+                        configuredPolicy:nil
+                              failClosed:NO];
+  [self stubFileInfoInitFailureWithCode:SNTErrorCodeFailedToOpen];
 
-- (void)testStandaloneNeverHoldsUnconfirmedIdentityUnderBlockUnverified {
-  [self standaloneUnconfirmedIdentityWithPolicy:SNTExecutableIntegrityPolicyBlockUnverified
-                                     wantAction:SNTActionRespondDenyOnce];
+  SNTCachedDecision* cd = [self postedDecisionForExecEvent:SNTActionRespondDenyOnce
+                                            cachedDecision:nil
+                                              messageSetup:nil];
+
+  XCTAssertEqual(cd.decision, SNTEventStateBlockBinaryMismatch);
+  XCTAssertFalse(cd.holdAndAsk);
 }
 
 #pragma mark ExecutableIntegrityPolicy: flow-through
@@ -3491,6 +3577,39 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   // presentation read it there, and nothing else checks that the controller copies it.
   XCTAssertFalse(reported.identityVendorMatched);
   XCTAssertTrue(reported.contentAttributesUnverified);
+}
+
+// A configured Enforce is capped to Report in Monitor mode: the same flow-through and forced
+// store as Report itself.
+- (void)testUnconfirmedIdentityFlowsThroughInMonitorModeUnderConfiguredEnforce {
+  [self stubEffectiveConfigForClientMode:SNTClientModeMonitor
+                        configuredPolicy:@"Enforce"
+                              failClosed:NO];
+  // Otherwise AllowUnknown storage would mask Report's forced store.
+  OCMStub([self.mockConfigurator disableUnknownEventUpload]).andReturn(YES);
+  [self stubUnrescuableMismatch];
+
+  __block SNTStoredExecutionEvent* reported = nil;
+  [self expectStoredEventInto:&reported];
+
+  SNTCachedDecision* cd = [self postedDecisionForExecEvent:SNTActionRespondAllowNoCache
+                                            cachedDecision:nil
+                                              messageSetup:^(es_message_t* msg) {
+                                                msg->event.exec.target->codesigning_flags =
+                                                    CS_SIGNED | CS_VALID;
+                                              }];
+
+  XCTAssertEqual(cd.decision, SNTEventStateAllowUnknown);
+  XCTAssertTrue(cd.identityMismatched);
+  XCTAssertFalse(cd.cacheable);
+  XCTAssertFalse(cd.holdAndAsk);
+  [self checkMetricCounters:kAllowUnknown expected:@1];
+  [self checkMetricCounters:kBlockBinaryMismatch expected:@0];
+  [self checkCountedOnceAsUnverified:kUnverifiedChanged decision:@"Allow"];
+
+  OCMVerifyAllWithDelay(self.mockEventDatabase, 1);
+  XCTAssertEqual(reported.decision, SNTEventStateAllowUnknown);
+  XCTAssertTrue(reported.identityUnverified);
 }
 
 // Ignore reaches the same disposition but adds no forcing of its own.
@@ -3891,11 +4010,12 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   XCTAssertTrue(reported.identityUnverified);
 }
 
-// BlockUnverified keeps the early deny, like the default. Without this the
-// matrix would rest on BlockChanged alone.
-- (void)testUnconfirmedIdentityIsDeniedUnderBlockUnverified {
-  OCMStub([self.mockConfigurator clientMode]).andReturn(SNTClientModeMonitor);
-  [self stubExecutableIntegrityPolicy:SNTExecutableIntegrityPolicyBlockUnverified];
+// Enforce denies before rule evaluation, so an allow rule for the on-disk
+// content does not apply.
+- (void)testUnconfirmedIdentityIsDeniedUnderEnforceDespiteAnAllowRule {
+  [self stubEffectiveConfigForClientMode:SNTClientModeLockdown
+                        configuredPolicy:@"Enforce"
+                              failClosed:NO];
   [self stubUnrescuableMismatch];
 
   SNTRule* rule = [[SNTRule alloc] init];
@@ -4068,75 +4188,16 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
                         wantExtraText:@"Executable identity could not be confirmed"];
 }
 
-// Under the Block* values, the confirmed mismatch with nothing to evaluate is still the hard
-// mismatch deny.
-- (void)testNilFileInfoFromAnIdentityMismatchIsDeniedUnderBlockChanged {
-  OCMStub([self.mockConfigurator failClosed]).andReturn(NO);
-  [self stubExecutableIntegrityPolicy:SNTExecutableIntegrityPolicyBlockChanged];
-  [self stubFileInfoInitFailureWithCode:SNTErrorCodeIdentityMismatch];
-
-  SNTCachedDecision* cd = [self postedDecisionForExecEvent:SNTActionRespondDenyOnce
-                                            cachedDecision:nil
-                                              messageSetup:nil];
-
-  XCTAssertEqual(cd.decision, SNTEventStateBlockBinaryMismatch);
-  XCTAssertTrue(cd.identityMismatched);
-  XCTAssertFalse(cd.holdAndAsk);
-  [self checkMetricCounters:kBlockBinaryMismatch expected:@1];
-  [self checkCountedOnceAsUnverified:kUnverifiedChangedUnevaluable decision:@"Block"];
-}
-
-// BlockUnverified denies a confirmed mismatch, like BlockChanged: the confirmed-mismatch wording
-// and counter, not the could-not-read wording it uses for an unopenable target.
-- (void)testNilFileInfoFromAnIdentityMismatchIsDeniedUnderBlockUnverified {
-  OCMStub([self.mockConfigurator failClosed]).andReturn(NO);
-  [self stubExecutableIntegrityPolicy:SNTExecutableIntegrityPolicyBlockUnverified];
-  [self stubFileInfoInitFailureWithCode:SNTErrorCodeIdentityMismatch];
-
-  SNTCachedDecision* cd = [self postedDecisionForExecEvent:SNTActionRespondDenyOnce
-                                            cachedDecision:nil
-                                              messageSetup:nil];
-
-  XCTAssertEqual(cd.decision, SNTEventStateBlockBinaryMismatch);
-  XCTAssertTrue(cd.identityMismatched);
-  XCTAssertFalse(cd.holdAndAsk);
-  XCTAssertEqualObjects(cd.decisionExtra, @"Executable identity could not be confirmed");
-  [self checkMetricCounters:kBlockBinaryMismatch expected:@1];
-  // A confirmed mismatch, not the unreadable target BlockUnverified adds.
-  [self checkCountedOnceAsUnverified:kUnverifiedChangedUnevaluable decision:@"Block"];
-}
-
-// The integrity-policy deny, the more specific reason, wins over FailClosed. Both post
-// DenyOnce, so only the decision tells them apart.
-- (void)testBlockUnverifiedDenyWinsOverFailClosedForAnUnreadableTarget {
-  OCMStub([self.mockConfigurator failClosed]).andReturn(YES);
-  [self stubExecutableIntegrityPolicy:SNTExecutableIntegrityPolicyBlockUnverified];
-  [self stubFileInfoInitFailureWithCode:SNTErrorCodeFailedToOpen];
-
-  SNTCachedDecision* cd = [self postedDecisionForExecEvent:SNTActionRespondDenyOnce
-                                            cachedDecision:nil
-                                              messageSetup:nil];
-
-  XCTAssertNotEqual(cd.decision, SNTEventStateBlockUnknown);
-  XCTAssertEqual(cd.decision, SNTEventStateBlockBinaryMismatch);
-  XCTAssertTrue(cd.identityMismatched);
-  XCTAssertFalse(cd.holdAndAsk);
-  XCTAssertEqualObjects(cd.decisionExtra, @"Executable could not be read");
-  [self checkMetricCounters:kBlockBinaryMismatch expected:@1];
-  [self checkMetricCounters:kBlockUnknown expected:@0];
-  [self checkCountedOnceAsUnverified:kUnverifiedUnreadable decision:@"Block"];
-}
-
-// Unopenable target: FailClosed governs, including under the default.
-- (void)testUnreadableFileSynthesizesAnAllowEventUnderBlockChanged {
-  [self synthesizedDecisionWithPolicy:SNTExecutableIntegrityPolicyBlockChanged
+// Unopenable target under Report and Ignore: FailClosed governs.
+- (void)testUnreadableFileSynthesizesAnAllowEventUnderReport {
+  [self synthesizedDecisionWithPolicy:SNTExecutableIntegrityPolicyReport
                             errorCode:SNTErrorCodeFailedToOpen
                            failClosed:NO
                         wantExtraText:@"Executable could not be read"];
 }
 
-- (void)testUnreadableFileSynthesizesADenyEventUnderBlockChanged {
-  [self synthesizedDecisionWithPolicy:SNTExecutableIntegrityPolicyBlockChanged
+- (void)testUnreadableFileSynthesizesADenyEventUnderReport {
+  [self synthesizedDecisionWithPolicy:SNTExecutableIntegrityPolicyReport
                             errorCode:SNTErrorCodeFailedToOpen
                            failClosed:YES
                         wantExtraText:@"Executable could not be read"];
@@ -4153,6 +4214,7 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
 // whole deny-cache interval.
 - (void)testSynthesizedFailClosedDenyLeavesNoCacheEntry {
   OCMStub([self.mockConfigurator failClosed]).andReturn(YES);
+  [self stubExecutableIntegrityPolicy:SNTExecutableIntegrityPolicyReport];
   [self stubFileInfoInitFailureWithCode:SNTErrorCodeFailedToOpen];
 
   es_file_t file = MakeESFile("foo");
