@@ -346,8 +346,8 @@
 /* Timed rule kill reason: bare Certificate rule type name */
 "Certificate" = "Zertifikat";
 
-/* Block reason when the executable on disk no longer matches the file the decision was evaluated against */
-"Executable changed during launch" = "Ausführbare Datei während des Starts geändert";
+/* Block reason when Santa could not confirm the executable that ran: the file changed during launch, or could not be read */
+"Executable could not be verified" = "Ausführbare Datei konnte nicht überprüft werden";
 
 /* Appended to the block/Standalone message when Santa could not confirm the executed file's identity against what the kernel loaded */
 "<br /><br />This application's identity could not be verified" = "<br /><br />Die Identität dieser Anwendung konnte nicht überprüft werden";

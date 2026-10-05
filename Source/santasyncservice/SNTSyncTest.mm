@@ -538,18 +538,28 @@
   // executable_integrity_policy is a sync v2-only field.
   if (!self.syncState.isSyncV2) return;
 
-  [self setupDefaultDaemonConnResponses];
-  SNTSyncPreflight* sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
+  NSDictionary<NSString*, NSNumber*>* wire = @{
+    @"ENFORCE" : @(SNTExecutableIntegrityPolicyEnforce),
+    @"REPORT" : @(SNTExecutableIntegrityPolicyReport),
+    @"IGNORE" : @(SNTExecutableIntegrityPolicyIgnore),
+  };
+  for (NSString* name in wire) {
+    [self setupDefaultDaemonConnResponses];
+    // OCMock applies the first matching stub, so each response needs a fresh session.
+    self.syncState.session = OCMClassMock([NSURLSession class]);
+    self.syncState.executableIntegrityPolicy = nil;
+    SNTSyncPreflight* sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
 
-  NSData* respData =
-      [@"{\"client_mode\": \"LOCKDOWN\", \"batch_size\": 100, "
-       @"\"executable_integrity_policy\": \"REPORT\"}" dataUsingEncoding:NSUTF8StringEncoding];
+    NSData* respData =
+        [[NSString stringWithFormat:@"{\"client_mode\": \"LOCKDOWN\", \"batch_size\": 100, "
+                                    @"\"executable_integrity_policy\": \"%@\"}",
+                                    name] dataUsingEncoding:NSUTF8StringEncoding];
 
-  [self stubRequestBody:respData response:nil error:nil validateBlock:nil];
+    [self stubRequestBody:respData response:nil error:nil validateBlock:nil];
 
-  XCTAssertTrue([sut sync]);
-  XCTAssertEqualObjects(self.syncState.executableIntegrityPolicy,
-                        @(SNTExecutableIntegrityPolicyReport));
+    XCTAssertTrue([sut sync]);
+    XCTAssertEqualObjects(self.syncState.executableIntegrityPolicy, wire[name], @"%@", name);
+  }
 }
 
 - (void)testPreflightExecutableIntegrityPolicyAbsent {
@@ -588,8 +598,12 @@
   if (!self.syncState.isSyncV2) return;
 
   // A number is kept by the parser as an open enum value; an unknown name is dropped as absent.
-  for (NSString* value in @[ @"99", @"\"EXECUTABLE_INTEGRITY_POLICY_FROM_THE_FUTURE\"" ]) {
+  // 4 and BLOCK_CHANGED are from the pre-release numbering.
+  for (NSString* value in
+       @[ @"99", @"4", @"\"EXECUTABLE_INTEGRITY_POLICY_FROM_THE_FUTURE\"", @"\"BLOCK_CHANGED\"" ]) {
     [self setupDefaultDaemonConnResponses];
+    // OCMock applies the first matching stub, so each response needs a fresh session.
+    self.syncState.session = OCMClassMock([NSURLSession class]);
     // Non-default seed: catches an arm that clears it.
     self.syncState.executableIntegrityPolicy = @(SNTExecutableIntegrityPolicyReport);
     SNTSyncPreflight* sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
@@ -788,6 +802,40 @@
           }];
 
   [sut sync];
+}
+
+// Sync v2 reports the effective policy; v1 has no field for it and does not ask santad.
+- (void)testPreflightReportsExecutableIntegrityPolicy {
+  SNTSyncPreflight* sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
+
+  if (self.syncState.isSyncV2) {
+    OCMStub([self.daemonConnRop
+        executableIntegrityPolicy:([OCMArg
+                                      invokeBlockWithArgs:OCMOCK_VALUE(
+                                                              SNTExecutableIntegrityPolicyIgnore),
+                                                          nil])]);
+  } else {
+    OCMReject([self.daemonConnRop executableIntegrityPolicy:OCMOCK_ANY]);
+  }
+
+  __block BOOL checked = NO;
+  [self stubRequestBody:nil
+               response:nil
+                  error:nil
+          validateBlock:^BOOL(NSURLRequest* req) {
+            NSDictionary* requestDict = [self dictFromRequest:req];
+            if (self.syncState.isSyncV2) {
+              XCTAssertEqualObjects(requestDict[@"executable_integrity_policy"], @"IGNORE");
+            } else {
+              XCTAssertNil(requestDict[@"executable_integrity_policy"]);
+            }
+            checked = YES;
+            return YES;
+          }];
+
+  [sut sync];
+  XCTAssertTrue(checked);
+  OCMVerifyAll(self.daemonConnRop);
 }
 
 - (void)testPreflightSantanetdVersionOmittedWhenUnavailable {

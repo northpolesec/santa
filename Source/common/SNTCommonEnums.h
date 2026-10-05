@@ -130,16 +130,16 @@ typedef NS_ENUM(NSInteger, SNTClientMode) {
 };
 
 // Policy for an execution whose file cannot be confirmed as the image the kernel loaded
-// (the ExecutableIntegrityPolicy key), when the signing vendor does not match either.
+// (the ExecutableIntegrityPolicy key): the file changed during launch and its signing vendor
+// no longer matches, or Santa could not read it.
 //
 // Values are pinned: they are persisted in the sync-state plist, encoded across XPC, and
 // equal to the sync v2 ExecutableIntegrityPolicy enum on the wire.
 typedef NS_ENUM(NSInteger, SNTExecutableIntegrityPolicy) {
   SNTExecutableIntegrityPolicyUnknown = 0,
-  SNTExecutableIntegrityPolicyBlockChanged = 1,
-  SNTExecutableIntegrityPolicyBlockUnverified = 2,
-  SNTExecutableIntegrityPolicyReport = 3,
-  SNTExecutableIntegrityPolicyIgnore = 4,
+  SNTExecutableIntegrityPolicyEnforce = 1,
+  SNTExecutableIntegrityPolicyReport = 2,
+  SNTExecutableIntegrityPolicyIgnore = 3,
 };
 
 /// How a held execution must be authorized by the user. Set from the CEL return

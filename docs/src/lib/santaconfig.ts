@@ -101,40 +101,57 @@ export const SantaConfigKeyGroups: SantaConfigGroups = {
     },
     {
       key: "FailClosed",
-      description: `If true and the ClientMode is in \`LOCKDOWN\`: execution will be denied when there is an error reading
-        or processing an executable file and when Santa has to make a default response just prior to deadlines expiring.`,
+      description: `If true and the ClientMode is Lockdown or Standalone: execution will be denied when there is an error
+        reading or processing an executable file and when Santa has to make a default response just prior to deadlines
+        expiring.
+
+For an executable that Santa cannot read, this key applies only when \`ExecutableIntegrityPolicy\` is \`Report\` or
+\`Ignore\`. Under the default, \`Enforce\`, Santa denies that execution in Lockdown and Standalone modes whatever the
+value of this key.`,
       defaultValue: false,
       type: "bool",
     },
     {
       key: "ExecutableIntegrityPolicy",
       description: `What Santa does when it cannot confirm that the file it evaluated is the image
-        the kernel loaded. If the file on disk still has the signing identity the kernel reported,
-        Santa evaluates it normally and this key does not apply. This key applies when the file on
-        disk has a different signing identity, or has no contents left to check. If Santa cannot
-        open the file at all, the \`FailClosed\` key decides what happens, unless this key is set
-        to \`BlockUnverified\`.
+        the kernel loaded: the file changed during launch, or Santa could not read it. If the file
+        on disk still has the signing identity the kernel reported, Santa evaluates it normally and
+        this key does not apply.
+
+The default depends on the client mode. In Monitor mode, \`Enforce\` behaves as \`Report\`, so Santa
+does not deny an execution in Monitor mode because its file changed or could not be read, except
+for the \`SEATBELT\` case below. Temporary Monitor Mode counts as Monitor mode.
+
+| Client mode | Unset or \`Enforce\` | \`Report\` | \`Ignore\` |
+| ----------- | ------------------ | -------- | -------- |
+| Monitor     | \`Report\`           | \`Report\` | \`Ignore\` |
+| Lockdown    | \`Enforce\`          | \`Report\` | \`Ignore\` |
+| Standalone  | \`Enforce\`          | \`Report\` | \`Ignore\` |
+
+**Warning:** in Lockdown and Standalone modes, \`Enforce\` denies every binary that Santa cannot
+read. This includes short-lived build outputs and binaries on unreliable network or removable
+volumes. If this affects your fleet, use \`Report\`.
+
+Under \`Report\` and \`Ignore\`, Santa evaluates rules against the file on disk, which may not be
+the file that ran. If Santa cannot read the file, the \`FailClosed\` key decides what happens. The
+two values differ only in event storage. \`Report\` always stores the event for the sync server.
+\`Ignore\` stores the event under Santa's normal upload settings, so events can still be stored.
 
 A binary a \`SEATBELT\` rule would sandbox is denied outright whenever its identity could not be
 confirmed, under every value of this key and in every client mode.`,
       type: "string",
       syncConfigurable: true,
-      defaultValue: "BlockChanged",
+      defaultValue: "Enforce",
       possibleValues: [
         {
-          value: "BlockChanged",
+          value: "Enforce",
           description:
-            "Deny and report the execution, regardless of the client mode and regardless of FailClosed.",
-        },
-        {
-          value: "BlockUnverified",
-          description:
-            "Deny and report the execution, and also any execution whose target Santa could not open at all, regardless of the client mode and regardless of FailClosed. Short-lived build outputs and binaries on unreliable network or removable volumes may be denied under this value, because Santa cannot read them.",
+            "In Lockdown and Standalone modes, deny the execution, also when Santa cannot read the file, regardless of FailClosed. Standalone mode does not prompt the user. In Monitor mode, behave as Report.",
         },
         {
           value: "Report",
           description:
-            "Evaluate against the file's on-disk content. The resulting event is always stored for the sync server, regardless of the normal upload settings.",
+            "Evaluate rules against the file on disk. If Santa cannot read the file, FailClosed decides. The event is always stored for the sync server, regardless of the normal upload settings.",
         },
         {
           value: "Ignore",

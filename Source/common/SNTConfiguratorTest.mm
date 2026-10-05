@@ -1054,41 +1054,144 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
 - (void)testExecutableIntegrityPolicy {
   NSString* plistPath = [NSString stringWithFormat:@"%@/exec-integrity-policy.plist", self.testDir];
   SNTConfigurator* cfg = [self configuratorWithEmptySyncStateAtPath:plistPath];
+  // Lockdown, so the Monitor cap does not mask the resolved value.
+  cfg.configState[@"ClientMode"] = @(SNTClientModeLockdown);
 
   // Default
-  XCTAssertEqual(cfg.executableIntegrityPolicy, SNTExecutableIntegrityPolicyBlockChanged);
+  XCTAssertEqual(cfg.executableIntegrityPolicy, SNTExecutableIntegrityPolicyEnforce);
 
   // Profile values, case-insensitive
-  cfg.configState[@"ExecutableIntegrityPolicy"] = @"BlockUnverified";
-  XCTAssertEqual(cfg.executableIntegrityPolicy, SNTExecutableIntegrityPolicyBlockUnverified);
   cfg.configState[@"ExecutableIntegrityPolicy"] = @"report";
   XCTAssertEqual(cfg.executableIntegrityPolicy, SNTExecutableIntegrityPolicyReport);
-  cfg.configState[@"ExecutableIntegrityPolicy"] = @"IGNORE";
+  cfg.configState[@"ExecutableIntegrityPolicy"] = @"ENFORCE";
+  XCTAssertEqual(cfg.executableIntegrityPolicy, SNTExecutableIntegrityPolicyEnforce);
+  cfg.configState[@"ExecutableIntegrityPolicy"] = @"Ignore";
   XCTAssertEqual(cfg.executableIntegrityPolicy, SNTExecutableIntegrityPolicyIgnore);
 
-  // Invalid string fails closed to the default
-  cfg.configState[@"ExecutableIntegrityPolicy"] = @"AuditOnly";
-  XCTAssertEqual(cfg.executableIntegrityPolicy, SNTExecutableIntegrityPolicyBlockChanged);
+  // Empty, removed, and unrecognized strings resolve to the default
+  for (NSString* value in @[ @"", @"BlockChanged", @"BlockUnverified", @"AuditOnly" ]) {
+    cfg.configState[@"ExecutableIntegrityPolicy"] = value;
+    XCTAssertEqual(cfg.executableIntegrityPolicy, SNTExecutableIntegrityPolicyEnforce, @"%@",
+                   value);
+  }
 
-  // Sync state overrides the profile
-  cfg.configState[@"ExecutableIntegrityPolicy"] = @"BlockUnverified";
+  // A directly assigned profile value that is out of range or of the wrong type resolves to the
+  // default too, rather than to Unknown or a crash
+  for (id value in @[ @0, @99, @(-1), [NSData dataWithBytes:"x" length:1], @[ @"Report" ] ]) {
+    cfg.configState[@"ExecutableIntegrityPolicy"] = value;
+    XCTAssertEqual(cfg.executableIntegrityPolicy, SNTExecutableIntegrityPolicyEnforce, @"%@",
+                   value);
+  }
+
+  // Sync state overrides the profile, in both directions
+  cfg.configState[@"ExecutableIntegrityPolicy"] = @"Ignore";
   [cfg setSyncServerExecutableIntegrityPolicy:SNTExecutableIntegrityPolicyReport];
   XCTAssertEqual(cfg.executableIntegrityPolicy, SNTExecutableIntegrityPolicyReport);
+  cfg.configState[@"ExecutableIntegrityPolicy"] = @"Report";
+  [cfg setSyncServerExecutableIntegrityPolicy:SNTExecutableIntegrityPolicyEnforce];
+  XCTAssertEqual(cfg.executableIntegrityPolicy, SNTExecutableIntegrityPolicyEnforce);
 
   // The setter rejects an out-of-range value, so the earlier sync value stays
   [cfg setSyncServerExecutableIntegrityPolicy:(SNTExecutableIntegrityPolicy)99];
-  XCTAssertEqual(cfg.executableIntegrityPolicy, SNTExecutableIntegrityPolicyReport);
+  XCTAssertEqualObjects(cfg.syncState[@"ExecutableIntegrityPolicy"],
+                        @(SNTExecutableIntegrityPolicyEnforce));
+  XCTAssertEqual(cfg.executableIntegrityPolicy, SNTExecutableIntegrityPolicyEnforce);
 
-  // Unknown clears the sync value, so the profile governs again. It was the only synced key, so
-  // the plist is removed from disk too.
+  // Unknown clears the sync value, so the profile governs again. Only ExecutableIntegrityPolicy
+  // was synced, so the plist is removed from disk too.
   [cfg setSyncServerExecutableIntegrityPolicy:SNTExecutableIntegrityPolicyUnknown];
   XCTAssertNil(cfg.syncState[@"ExecutableIntegrityPolicy"]);
-  XCTAssertEqual(cfg.executableIntegrityPolicy, SNTExecutableIntegrityPolicyBlockUnverified);
+  XCTAssertEqual(cfg.executableIntegrityPolicy, SNTExecutableIntegrityPolicyReport);
   XCTAssertFalse([self.fileMgr fileExistsAtPath:plistPath]);
 
-  // An out-of-range value already in sync state falls back to the profile
+  // An out-of-range value already in sync state falls back to the profile, then the default
   cfg.syncState[@"ExecutableIntegrityPolicy"] = @99;
-  XCTAssertEqual(cfg.executableIntegrityPolicy, SNTExecutableIntegrityPolicyBlockUnverified);
+  XCTAssertEqual(cfg.executableIntegrityPolicy, SNTExecutableIntegrityPolicyReport);
+  // Only a number counts in sync state; a string that would parse as a valid value does not.
+  cfg.syncState[@"ExecutableIntegrityPolicy"] = @"3";
+  XCTAssertEqual(cfg.executableIntegrityPolicy, SNTExecutableIntegrityPolicyReport);
+  cfg.syncState[@"ExecutableIntegrityPolicy"] = [NSData dataWithBytes:"x" length:1];
+  XCTAssertEqual(cfg.executableIntegrityPolicy, SNTExecutableIntegrityPolicyReport);
+  [cfg.configState removeObjectForKey:@"ExecutableIntegrityPolicy"];
+  XCTAssertEqual(cfg.executableIntegrityPolicy, SNTExecutableIntegrityPolicyEnforce);
+}
+
+// The effective policy caps Enforce to Report in Monitor mode, including Temporary Monitor Mode,
+// and leaves every other resolved value alone.
+- (void)testExecutableIntegrityPolicyMonitorCap {
+  NSString* plistPath = [NSString stringWithFormat:@"%@/exec-integrity-cap.plist", self.testDir];
+  SNTConfigurator* cfg = [self configuratorWithEmptySyncStateAtPath:plistPath];
+
+  NSArray* resolved = @[ [NSNull null], @"Enforce", @"Report", @"Ignore" ];
+  NSDictionary<NSString*, NSArray<NSNumber*>*>* expected = @{
+    @"Monitor" : @[
+      @(SNTExecutableIntegrityPolicyReport), @(SNTExecutableIntegrityPolicyReport),
+      @(SNTExecutableIntegrityPolicyReport), @(SNTExecutableIntegrityPolicyIgnore)
+    ],
+    @"Lockdown" : @[
+      @(SNTExecutableIntegrityPolicyEnforce), @(SNTExecutableIntegrityPolicyEnforce),
+      @(SNTExecutableIntegrityPolicyReport), @(SNTExecutableIntegrityPolicyIgnore)
+    ],
+    @"Standalone" : @[
+      @(SNTExecutableIntegrityPolicyEnforce), @(SNTExecutableIntegrityPolicyEnforce),
+      @(SNTExecutableIntegrityPolicyReport), @(SNTExecutableIntegrityPolicyIgnore)
+    ],
+    @"TemporaryMonitorMode" : @[
+      @(SNTExecutableIntegrityPolicyReport), @(SNTExecutableIntegrityPolicyReport),
+      @(SNTExecutableIntegrityPolicyReport), @(SNTExecutableIntegrityPolicyIgnore)
+    ],
+  };
+  NSDictionary<NSString*, NSNumber*>* modes = @{
+    @"Monitor" : @(SNTClientModeMonitor),
+    @"Lockdown" : @(SNTClientModeLockdown),
+    @"Standalone" : @(SNTClientModeStandalone),
+    @"TemporaryMonitorMode" : @(SNTClientModeLockdown),
+  };
+
+  for (NSString* mode in modes) {
+    cfg.configState[@"ClientMode"] = modes[mode];
+    [cfg setInTemporaryMonitorMode:[mode isEqualToString:@"TemporaryMonitorMode"]];
+    for (NSUInteger i = 0; i < resolved.count; i++) {
+      if (resolved[i] == [NSNull null]) {
+        [cfg.configState removeObjectForKey:@"ExecutableIntegrityPolicy"];
+      } else {
+        cfg.configState[@"ExecutableIntegrityPolicy"] = resolved[i];
+      }
+      XCTAssertEqual(cfg.executableIntegrityPolicy,
+                     (SNTExecutableIntegrityPolicy)[expected[mode][i] integerValue], @"%@ / %@",
+                     mode, resolved[i]);
+    }
+  }
+  [cfg setInTemporaryMonitorMode:NO];
+
+  // The cap applies after precedence: a synced Enforce is capped too
+  cfg.configState[@"ClientMode"] = @(SNTClientModeMonitor);
+  cfg.configState[@"ExecutableIntegrityPolicy"] = @"Ignore";
+  [cfg setSyncServerExecutableIntegrityPolicy:SNTExecutableIntegrityPolicyEnforce];
+  XCTAssertEqual(cfg.executableIntegrityPolicy, SNTExecutableIntegrityPolicyReport);
+  [cfg setSyncServerClientMode:SNTClientModeLockdown];
+  XCTAssertEqual(cfg.executableIntegrityPolicy, SNTExecutableIntegrityPolicyEnforce);
+
+  [self.fileMgr removeItemAtPath:plistPath error:nil];
+}
+
+// The effective policy folds in the client mode, so every client-mode change must notify its
+// observers: a sync-state mode change and a Temporary Monitor Mode session.
+- (void)testClientModeChangeNotifiesExecutableIntegrityPolicyObservers {
+  NSString* plistPath = [NSString stringWithFormat:@"%@/exec-integrity-kvo.plist", self.testDir];
+  SNTConfigurator* cfg = [self configuratorWithEmptySyncStateAtPath:plistPath];
+  SNTKVORecordingObserver* observer = [[SNTKVORecordingObserver alloc] init];
+  [cfg addObserver:observer forKeyPath:@"executableIntegrityPolicy" options:0 context:NULL];
+
+  [cfg setSyncServerClientMode:SNTClientModeLockdown];
+  XCTAssertEqual([observer.firedKeyPaths countForObject:@"executableIntegrityPolicy"], 1);
+  [cfg setInTemporaryMonitorMode:YES];
+  XCTAssertEqual([observer.firedKeyPaths countForObject:@"executableIntegrityPolicy"], 2);
+  [cfg setInTemporaryMonitorMode:NO];
+  XCTAssertEqual([observer.firedKeyPaths countForObject:@"executableIntegrityPolicy"], 3);
+
+  [cfg removeObserver:observer forKeyPath:@"executableIntegrityPolicy" context:NULL];
+  [self.fileMgr removeItemAtPath:plistPath error:nil];
 }
 
 // Fails if kExecutableIntegrityPolicyKey is missing from _syncServerKeyTypes as
@@ -1098,13 +1201,13 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
       [NSString stringWithFormat:@"%@/exec-integrity-policy-roundtrip.plist", self.testDir];
   SNTConfigurator* writer = [self configuratorWithEmptySyncStateAtPath:plistPath];
 
-  [writer setSyncServerExecutableIntegrityPolicy:SNTExecutableIntegrityPolicyBlockUnverified];
-  XCTAssertEqual(writer.executableIntegrityPolicy, SNTExecutableIntegrityPolicyBlockUnverified);
+  [writer setSyncServerExecutableIntegrityPolicy:SNTExecutableIntegrityPolicyIgnore];
+  XCTAssertEqual(writer.executableIntegrityPolicy, SNTExecutableIntegrityPolicyIgnore);
   XCTAssertTrue([self.fileMgr fileExistsAtPath:plistPath],
                 @"Sanity: the sync state must be written");
 
   SNTConfigurator* restarted = [self configuratorWithEmptySyncStateAtPath:plistPath];
-  XCTAssertEqual(restarted.executableIntegrityPolicy, SNTExecutableIntegrityPolicyBlockUnverified,
+  XCTAssertEqual(restarted.executableIntegrityPolicy, SNTExecutableIntegrityPolicyIgnore,
                  @"A synced ExecutableIntegrityPolicy must survive a daemon restart");
 
   XCTAssertTrue([self.fileMgr removeItemAtPath:plistPath error:nil]);
@@ -1137,6 +1240,15 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
                                                           fromData:d
                                                              error:nil];
   XCTAssertEqual(cs2.executableIntegrityPolicy, SNTExecutableIntegrityPolicyReport);
+
+  // The captured value is the effective one: Enforce is capped to Report in Monitor mode.
+  cfg.configState[@"ClientMode"] = @(SNTClientModeMonitor);
+  cfg.configState[@"ExecutableIntegrityPolicy"] = @"Enforce";
+  XCTAssertEqual([[SNTConfigState alloc] initWithConfig:cfg].executableIntegrityPolicy,
+                 SNTExecutableIntegrityPolicyReport);
+  cfg.configState[@"ClientMode"] = @(SNTClientModeLockdown);
+  XCTAssertEqual([[SNTConfigState alloc] initWithConfig:cfg].executableIntegrityPolicy,
+                 SNTExecutableIntegrityPolicyEnforce);
 }
 
 @end

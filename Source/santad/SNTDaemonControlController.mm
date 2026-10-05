@@ -653,6 +653,10 @@ static NSString* TAMUsernameForUID(uid_t uid) {
   reply([SNTConfigurator configurator].disableUnknownEventUpload);
 }
 
+- (void)executableIntegrityPolicy:(void (^)(SNTExecutableIntegrityPolicy))reply {
+  reply([[SNTConfigurator configurator] executableIntegrityPolicy]);
+}
+
 - (void)updateSyncSettings:(SNTConfigBundle*)result reply:(void (^)(void))reply {
   SNTConfigurator* configurator = [SNTConfigurator configurator];
 
