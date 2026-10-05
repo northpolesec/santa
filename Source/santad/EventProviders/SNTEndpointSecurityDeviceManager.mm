@@ -789,6 +789,15 @@ NS_ASSUME_NONNULL_BEGIN
     return ES_AUTH_RESULT_ALLOW;
   }
 
+  // autofs mounts are automounter triggers (e.g. "map auto_home" on /System/Volumes/Data/home),
+  // not network shares. They only serve directories and symlinks to "/". Accessing one makes
+  // automountd mount the real filesystem separately, and that mount is evaluated on its own.
+  // Match on f_fstypename, which the kernel sets from the VFS table; f_mntfromname is chosen by
+  // the caller.
+  if (strncmp(eventStatFS->f_fstypename, "autofs", sizeof(eventStatFS->f_fstypename)) == 0) {
+    return ES_AUTH_RESULT_ALLOW;
+  }
+
   NSString* mountFromName = @(eventStatFS->f_mntfromname);
 
   // f_mntfromname uses protocol-specific formats that aren't always valid URLs.
