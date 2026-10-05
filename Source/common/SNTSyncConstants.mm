@@ -91,6 +91,7 @@ NSString* const kFileBundleExecutableRelPath = @"file_bundle_executable_rel_path
 NSString* const kFileBundleName = @"file_bundle_name";
 NSString* const kFileBundleVersion = @"file_bundle_version";
 NSString* const kFileBundleShortVersionString = @"file_bundle_version_string";
+NSString* const kFileBundleCategory = @"file_bundle_category";
 NSString* const kFileBundleHash = @"file_bundle_hash";
 NSString* const kFileBundleHashMilliseconds = @"file_bundle_hash_millis";
 NSString* const kFileBundleBinaryCount = @"file_bundle_binary_count";

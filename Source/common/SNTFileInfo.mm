@@ -623,6 +623,12 @@ static BOOL IsAllowedAncestorExtension(NSString* ext) {
   return [[self.infoPlist objectForKey:@"CFBundleShortVersionString"] description];
 }
 
+- (NSString*)bundleCategory {
+  // infoPlist falls back to an embedded plist, which does not describe a bundle.
+  if (!self.bundlePath) return nil;
+  return [[self.infoPlist objectForKey:@"LSApplicationCategoryType"] description];
+}
+
 #pragma mark Quarantine Data
 
 - (NSString*)quarantineDataURL {

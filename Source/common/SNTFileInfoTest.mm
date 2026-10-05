@@ -519,6 +519,7 @@ static es_file_t MakeESFile(NSString* path, const struct stat* sb) {
   XCTAssertEqualObjects([sut bundleName], @"BundleExample");
   XCTAssertEqualObjects([sut bundleVersion], @"1");
   XCTAssertEqualObjects([sut bundleShortVersionString], @"1.0");
+  XCTAssertEqualObjects([sut bundleCategory], @"public.app-category.developer-tools");
   XCTAssertEqualObjects([sut bundlePath], path);
 }
 

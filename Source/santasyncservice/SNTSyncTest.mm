@@ -1505,13 +1505,17 @@
                                                         fromData:eventData
                                                            error:&err];
   XCTAssertNil(err);
+  ((SNTStoredExecutionEvent*)events.firstObject).fileBundleCategory =
+      @"public.app-category.developer-tools";
 
   OCMStub([self.daemonConnRop databaseEventsPending:([OCMArg invokeBlockWithArgs:events, nil])]);
 
+  __block int requestCount = 0;
   [self stubRequestBody:nil
                response:nil
                   error:nil
           validateBlock:^BOOL(NSURLRequest* req) {
+            requestCount++;
             NSDictionary* requestDict = [self dictFromRequest:req];
             NSArray* events = requestDict[kEvents];
 
@@ -1519,6 +1523,12 @@
 
             NSDictionary* event = [events firstObject];
             XCTAssertEqualObjects(event[kFileBundleID], @"com.luckymarmot.Paw");
+            if (self.syncState.isSyncV2) {
+              XCTAssertEqualObjects(event[kFileBundleCategory],
+                                    @"public.app-category.developer-tools");
+            } else {
+              XCTAssertNil(event[kFileBundleCategory]);
+            }
             XCTAssertEqualObjects(event[kFileBundlePath], @"/Applications/Paw.app");
             XCTAssertEqualObjects(event[kFileBundleVersion], @"2003004001");
             XCTAssertEqualObjects(event[kFileBundleShortVersionString], @"2.3.4");
@@ -1532,7 +1542,8 @@
             return YES;
           }];
 
-  [sut sync];
+  XCTAssertTrue([sut sync]);
+  XCTAssertEqual(requestCount, 1);
 }
 
 - (void)testEventUploadBatching {
