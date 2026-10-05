@@ -40,6 +40,8 @@
 #include "Source/santad/Metrics.h"
 #import "Source/santad/SNTDecisionCache.h"
 #include "Source/santad/TTYWriter.h"
+#include "absl/container/inlined_vector.h"
+#include "absl/types/span.h"
 
 extern NSString* const kBadCertHash;
 
@@ -78,6 +80,9 @@ class FAAPolicyProcessor {
     std::optional<std::shared_ptr<WatchItemPolicyBase>> policy;
     bool via_ancestor = false;
   };
+  // Messages have at most two path targets, so only a directory tree
+  // operation that finds policies beneath a target spills to the heap.
+  using TargetPolicyPairList = absl::InlinedVector<TargetPolicyPair, 2>;
 
   /// The outcome of asking a client whether a policy applies to a message.
   /// `options` points at the overrides of the process that was matched, when
@@ -188,7 +193,7 @@ class FAAPolicyProcessor {
   /// 3. Combine results of each target into an ES decision
   /// 4. Return the final ES decision
   FAAPolicyProcessor::ESResult ProcessMessage(
-      const Message& msg, std::vector<TargetPolicyPair> target_policy_pairs,
+      const Message& msg, absl::Span<const TargetPolicyPair> target_policy_pairs,
       CheckIfPolicyMatchesBlock check_if_policy_matches_block,
       SNTFileAccessDeniedBlock file_access_denied_block, SNTOverrideFileAccessAction overrideAction,
       FAAClientType client_type);
@@ -244,13 +249,14 @@ class ProcessFAAPolicyProcessorProxy : public FAAPolicyProcessorProxy {
   ProcessFAAPolicyProcessorProxy(std::shared_ptr<FAAPolicyProcessor> policy_processor)
       : FAAPolicyProcessorProxy(std::move(policy_processor)) {}
   FAAPolicyProcessor::ESResult ProcessMessage(
-      const Message& msg, std::vector<FAAPolicyProcessor::TargetPolicyPair> target_policy_pairs,
+      const Message& msg,
+      absl::Span<const FAAPolicyProcessor::TargetPolicyPair> target_policy_pairs,
       FAAPolicyProcessor::CheckIfPolicyMatchesBlock check_if_policy_matches_block,
       SNTFileAccessDeniedBlock file_access_denied_block,
       SNTOverrideFileAccessAction overrideAction) {
     return policy_processor_->ProcessMessage(
-        msg, std::move(target_policy_pairs), check_if_policy_matches_block,
-        file_access_denied_block, overrideAction, FAAClientType::kProcess);
+        msg, target_policy_pairs, check_if_policy_matches_block, file_access_denied_block,
+        overrideAction, FAAClientType::kProcess);
   }
 
   std::optional<FAAPolicyProcessor::ESResult> ImmediateResponse(const Message& msg) {
@@ -268,13 +274,14 @@ class DataFAAPolicyProcessorProxy : public FAAPolicyProcessorProxy {
       : FAAPolicyProcessorProxy(std::move(policy_processor)) {}
 
   FAAPolicyProcessor::ESResult ProcessMessage(
-      const Message& msg, std::vector<FAAPolicyProcessor::TargetPolicyPair> target_policy_pairs,
+      const Message& msg,
+      absl::Span<const FAAPolicyProcessor::TargetPolicyPair> target_policy_pairs,
       FAAPolicyProcessor::CheckIfPolicyMatchesBlock check_if_policy_matches_block,
       SNTFileAccessDeniedBlock file_access_denied_block,
       SNTOverrideFileAccessAction overrideAction) {
     return policy_processor_->ProcessMessage(
-        msg, std::move(target_policy_pairs), check_if_policy_matches_block,
-        file_access_denied_block, overrideAction, FAAClientType::kData);
+        msg, target_policy_pairs, check_if_policy_matches_block, file_access_denied_block,
+        overrideAction, FAAClientType::kData);
   }
 
   std::optional<FAAPolicyProcessor::ESResult> ImmediateResponse(const Message& msg) {

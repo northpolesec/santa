@@ -25,6 +25,7 @@
 #include <optional>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -97,11 +98,11 @@ using IterateProcessPoliciesBlock = void (^)(CheckPolicyBlock);
 // However this made things complicated when WatchItems was restructured.
 // Allowing callers to define their own structures simplifies this code at the
 // cost of making it a little harder to read.
-using LookupPolicyBlock =
-    std::optional<std::shared_ptr<WatchItemPolicyBase>> (^)(const std::string&);
+// The path must be null-terminated.
+using LookupPolicyBlock = std::optional<std::shared_ptr<WatchItemPolicyBase>> (^)(const char*);
 // Returns the policies of watched paths beneath the given directory.
 using LookupPoliciesBeneathBlock =
-    std::vector<std::shared_ptr<WatchItemPolicyBase>> (^)(const std::string&);
+    std::vector<std::shared_ptr<WatchItemPolicyBase>> (^)(std::string_view);
 using IterateTargetsBlock = void (^)(LookupPolicyBlock, LookupPoliciesBeneathBlock);
 using FindPoliciesForTargetsBlock = void (^)(IterateTargetsBlock);
 

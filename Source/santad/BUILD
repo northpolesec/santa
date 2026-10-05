@@ -761,6 +761,7 @@ objc_library(
         "//Source/common/es:SNTEndpointSecurityEventHandler",
         "//Source/common/faa:WatchItemPolicy",
         "@abseil-cpp//absl/container:inlined_vector",
+        "@abseil-cpp//absl/types:span",
     ],
 )
 
