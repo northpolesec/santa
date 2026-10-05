@@ -624,9 +624,14 @@ static BOOL IsAllowedAncestorExtension(NSString* ext) {
 }
 
 - (NSString*)bundleCategory {
-  // infoPlist falls back to an embedded plist, which does not describe a bundle.
-  if (!self.bundlePath) return nil;
-  return [[self.infoPlist objectForKey:@"LSApplicationCategoryType"] description];
+  // Read the bundle's own Info.plist: infoPlist prefers an embedded plist, which does not describe
+  // the bundle.
+  NSString* bundlePath = [self locatedBundlePath];
+  if (!bundlePath) return nil;
+  if (!self.bundleInfoDict.count) {
+    self.bundleInfoDict = [self infoDictionaryForBundleDirectory:bundlePath];
+  }
+  return [[self.bundleInfoDict objectForKey:@"LSApplicationCategoryType"] description];
 }
 
 #pragma mark Quarantine Data
