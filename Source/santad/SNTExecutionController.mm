@@ -524,9 +524,8 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
     // read, or SNTFileInfo confirmed a mismatch before giving up. The integrity
     // policy may deny outright; otherwise failClosed decides, as for any unknown.
     BOOL identityMismatch = fileInfoError.code == SNTErrorCodeIdentityMismatch;
-    SNTExecutableIntegrityPolicy policy = configState.executableIntegrityPolicy;
-    BOOL policyDenies = identityMismatch ? !ExecutableIntegrityPolicyAllowsMismatch(policy)
-                                         : policy == SNTExecutableIntegrityPolicyBlockUnverified;
+    BOOL policyDenies =
+        !ExecutableIntegrityPolicyAllowsMismatch(configState.executableIntegrityPolicy);
 
     SNTCachedDecision* cd = [self unverifiedIdentityDecisionForProcess:targetProc
                                                            configState:configState];
@@ -575,9 +574,9 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
     identityVendorMatched = SignedIdentityMatchesReported(targetProc, csInfo);
     if (!identityVendorMatched &&
         !ExecutableIntegrityPolicyAllowsMismatch(configState.executableIntegrityPolicy)) {
-      // Denied irrespective of client mode, including Monitor: this is a
-      // tampering condition, and Santa already responds to those without
-      // consulting the mode. See SNTEndpointSecurityTamperResistance.
+      // The effective integrity policy decides. Enforce denies because the file
+      // that would be evaluated is not the one that ran. Monitor mode caps the
+      // effective policy at Report, so this deny never fires there.
       SNTCachedDecision* cd = [self unverifiedIdentityDecisionForProcess:targetProc
                                                              configState:configState];
       [self respondAndReportTerminalDecision:cd

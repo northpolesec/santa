@@ -346,8 +346,8 @@
 /* Timed rule kill reason: bare Certificate rule type name */
 "Certificate" = "証明書";
 
-/* Block reason when the executable on disk no longer matches the file the decision was evaluated against */
-"Executable changed during launch" = "起動中に実行ファイルが変更されました";
+/* Block reason when Santa could not confirm the executable that ran: the file changed during launch, or could not be read */
+"Executable could not be verified" = "実行ファイルを確認できませんでした";
 
 /* Appended to the block/Standalone message when Santa could not confirm the executed file's identity against what the kernel loaded */
 "<br /><br />This application's identity could not be verified" = "<br /><br />このアプリケーションの識別情報を確認できませんでした";

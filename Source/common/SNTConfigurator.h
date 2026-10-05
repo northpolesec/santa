@@ -51,8 +51,9 @@
 - (void)setSyncServerClientMode:(SNTClientMode)newMode;
 
 ///
-///  The policy applied when the file backing an execution cannot be confirmed to be the image the
-///  kernel loaded. Defaults to BlockChanged. Never returns Unknown.
+///  The effective policy applied when the file backing an execution cannot be confirmed to be the
+///  image the kernel loaded. Defaults to Enforce. Enforce is capped to Report when the effective
+///  client mode is Monitor. Never returns Unknown.
 ///
 @property(readonly, nonatomic) SNTExecutableIntegrityPolicy executableIntegrityPolicy;
 

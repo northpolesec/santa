@@ -87,13 +87,15 @@ static std::optional<SNTOverrideFileAccessAction> OverrideFileAccessActionFromSt
   return std::nullopt;
 }
 
+static BOOL IsValidExecutableIntegrityPolicy(NSInteger policy) {
+  return policy > SNTExecutableIntegrityPolicyUnknown &&
+         policy <= SNTExecutableIntegrityPolicyIgnore;
+}
+
 static SNTExecutableIntegrityPolicy ExecutableIntegrityPolicyFromString(NSString* policy) {
-  if (!policy.length) return SNTExecutableIntegrityPolicyBlockChanged;
-  if ([policy caseInsensitiveCompare:@"BlockChanged"] == NSOrderedSame) {
-    return SNTExecutableIntegrityPolicyBlockChanged;
-  }
-  if ([policy caseInsensitiveCompare:@"BlockUnverified"] == NSOrderedSame) {
-    return SNTExecutableIntegrityPolicyBlockUnverified;
+  if (!policy.length) return SNTExecutableIntegrityPolicyEnforce;
+  if ([policy caseInsensitiveCompare:@"Enforce"] == NSOrderedSame) {
+    return SNTExecutableIntegrityPolicyEnforce;
   }
   if ([policy caseInsensitiveCompare:@"Report"] == NSOrderedSame) {
     return SNTExecutableIntegrityPolicyReport;
@@ -101,8 +103,8 @@ static SNTExecutableIntegrityPolicy ExecutableIntegrityPolicyFromString(NSString
   if ([policy caseInsensitiveCompare:@"Ignore"] == NSOrderedSame) {
     return SNTExecutableIntegrityPolicyIgnore;
   }
-  LOGW(@"Unrecognized ExecutableIntegrityPolicy value: %@, defaulting to BlockChanged", policy);
-  return SNTExecutableIntegrityPolicyBlockChanged;
+  LOGW(@"Unrecognized ExecutableIntegrityPolicy value: %@, defaulting to Enforce", policy);
+  return SNTExecutableIntegrityPolicyEnforce;
 }
 
 @interface SNTConfigurator ()
@@ -596,7 +598,8 @@ static SNTConfigurator* sharedConfigurator = nil;
 }
 
 + (NSSet*)keyPathsForValuesAffectingExecutableIntegrityPolicy {
-  return [self syncAndConfigStateSet];
+  // Folds in the effective client mode, so it shares clientMode's dependencies.
+  return [self keyPathsForValuesAffectingClientMode];
 }
 
 + (NSSet*)keyPathsForValuesAffectingAllowedPathRegex {
@@ -1034,26 +1037,36 @@ static SNTConfigurator* sharedConfigurator = nil;
 }
 
 - (SNTExecutableIntegrityPolicy)executableIntegrityPolicy {
-  NSNumber* n = self.syncState[kExecutableIntegrityPolicyKey];
-  if (n) {
-    SNTExecutableIntegrityPolicy p = (SNTExecutableIntegrityPolicy)[n integerValue];
-    if (p > SNTExecutableIntegrityPolicyUnknown && p <= SNTExecutableIntegrityPolicyIgnore) {
-      return p;
-    }
+  SNTExecutableIntegrityPolicy p = [self resolvedExecutableIntegrityPolicy];
+  // Monitor mode caps Enforce to Report. Same shape as failClosed, which also folds in the
+  // effective mode.
+  if (p == SNTExecutableIntegrityPolicyEnforce && self.clientMode == SNTClientModeMonitor) {
+    return SNTExecutableIntegrityPolicyReport;
   }
-  // readForcedConfig stores the parsed value; a string is still parsed so a directly
-  // assigned configState can never yield Unknown.
+  return p;
+}
+
+- (SNTExecutableIntegrityPolicy)resolvedExecutableIntegrityPolicy {
+  id synced = self.syncState[kExecutableIntegrityPolicyKey];
+  if ([synced isKindOfClass:[NSNumber class]] &&
+      IsValidExecutableIntegrityPolicy([synced integerValue])) {
+    return (SNTExecutableIntegrityPolicy)[synced integerValue];
+  }
+  // readForcedConfig stores a valid parsed number. Anything else is still handled, so a directly
+  // assigned configState can never yield Unknown or an out-of-range value.
   id profile = self.configState[kExecutableIntegrityPolicyKey];
-  return [profile isKindOfClass:[NSNumber class]]
-             ? (SNTExecutableIntegrityPolicy)[profile integerValue]
-             : ExecutableIntegrityPolicyFromString(profile);
+  if ([profile isKindOfClass:[NSNumber class]] &&
+      IsValidExecutableIntegrityPolicy([profile integerValue])) {
+    return (SNTExecutableIntegrityPolicy)[profile integerValue];
+  }
+  if ([profile isKindOfClass:[NSString class]]) return ExecutableIntegrityPolicyFromString(profile);
+  return SNTExecutableIntegrityPolicyEnforce;
 }
 
 - (void)setSyncServerExecutableIntegrityPolicy:(SNTExecutableIntegrityPolicy)policy {
   if (policy == SNTExecutableIntegrityPolicyUnknown) {
     [self updateSyncStateForKey:kExecutableIntegrityPolicyKey value:nil];
-  } else if (policy > SNTExecutableIntegrityPolicyUnknown &&
-             policy <= SNTExecutableIntegrityPolicyIgnore) {
+  } else if (IsValidExecutableIntegrityPolicy(policy)) {
     [self updateSyncStateForKey:kExecutableIntegrityPolicyKey value:@(policy)];
   }
 }
