@@ -20,6 +20,7 @@
 #import <XCTest/XCTest.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include <sys/clonefile.h>
 #include <sys/stat.h>
 
 #include <memory>
@@ -328,119 +329,6 @@ static const pid_t PID_MAX = 99999;
     [mockCompilerController stopMocking];
     [mockFileInfo stopMocking];
   }
-  // Ensure transitive rules are created for RENAME events from the source path
-  {
-    esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_RENAME, &compilerProc);
-    esMsg.event.rename.source = &normalFile;
-    Message msg(mockESApi, &esMsg);
-
-    id mockCompilerController = OCMPartialMock(cc);
-    id mockFileInfo = OCMClassMock([SNTFileInfo class]);
-    OCMStub([mockFileInfo alloc]).andReturn(mockFileInfo);
-    OCMStub([mockFileInfo initWithEndpointSecurityFile:&normalFile error:[OCMArg anyObjectRef]])
-        .ignoringNonObjectArgs()
-        .andReturn(mockFileInfo);
-    OCMStub([mockFileInfo vnode]).andReturn(vnodeNormal);
-
-    OCMExpect([mockCompilerController
-                  createTransitiveRule:msg
-                                target:[OCMArg checkWithBlock:^BOOL(SNTFileInfo* fi) {
-                                  return fi.vnode.fsid == normalFile.stat.st_dev &&
-                                         fi.vnode.fileid == normalFile.stat.st_ino;
-                                }]
-                                logger:nullptr])
-        .ignoringNonObjectArgs();
-
-    XCTAssertTrue([cc handleEvent:msg withLogger:nullptr]);
-
-    XCTAssertTrue(OCMVerifyAll(mockCompilerController), "Unable to verify all expectations");
-    [mockCompilerController stopMocking];
-    [mockFileInfo stopMocking];
-  }
-  // Ensure transitive rules are created for RENAME events from the existing destinatio path as a
-  // fallback
-  {
-    es_file_t destFile = MakeESFile("dest", MakeStat(1000));
-    esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_RENAME, &compilerProc);
-    esMsg.event.rename.source = &normalFile;
-    esMsg.event.rename.destination_type = ES_DESTINATION_TYPE_EXISTING_FILE;
-    esMsg.event.rename.destination.existing_file = &destFile;
-    Message msg(mockESApi, &esMsg);
-    SantaVnode vnodeDest = SantaVnode::VnodeForFile(&destFile);
-
-    id mockCompilerController = OCMPartialMock(cc);
-    id mockFileInfo = OCMClassMock([SNTFileInfo class]);
-    OCMStub([mockFileInfo alloc]).andReturn(mockFileInfo);
-    // Return nil the first time when the source path is looked up
-    OCMExpect([mockFileInfo initWithEndpointSecurityFile:&normalFile error:[OCMArg anyObjectRef]])
-        .ignoringNonObjectArgs()
-        .andReturn(nil);
-    OCMExpect([mockFileInfo initWithEndpointSecurityFile:&destFile error:[OCMArg anyObjectRef]])
-        .ignoringNonObjectArgs()
-        .andReturn(mockFileInfo);
-    OCMStub([mockFileInfo vnode]).andReturn(vnodeDest);
-
-    OCMExpect([mockCompilerController
-                  createTransitiveRule:msg
-                                target:[OCMArg checkWithBlock:^BOOL(SNTFileInfo* fi) {
-                                  return fi.vnode.fsid == destFile.stat.st_dev &&
-                                         fi.vnode.fileid == destFile.stat.st_ino;
-                                }]
-                                logger:nullptr])
-        .ignoringNonObjectArgs();
-
-    XCTAssertTrue([cc handleEvent:msg withLogger:nullptr]);
-
-    XCTAssertTrue(OCMVerifyAll(mockCompilerController), "Unable to verify all expectations");
-    [mockCompilerController stopMocking];
-    [mockFileInfo stopMocking];
-  }
-  // Ensure transitive rules are created for RENAME events from the existing destinatio path as a
-  // fallback
-  {
-    es_file_t destDir = MakeESFile("/usr/bin", MakeStat(1000));
-    es_string_token_t destFilename = MakeESStringToken("true");
-    esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_RENAME, &compilerProc);
-    esMsg.event.rename.source = &normalFile;
-    esMsg.event.rename.destination_type = ES_DESTINATION_TYPE_NEW_PATH;
-    esMsg.event.rename.destination.new_path.dir = &destDir;
-    esMsg.event.rename.destination.new_path.filename = destFilename;
-    Message msg(mockESApi, &esMsg);
-    NSString* expectedTarget =
-        [NSString stringWithFormat:@"%s/%s", destDir.path.data, destFilename.data];
-
-    struct stat sbNewFile;
-    XCTAssertEqual(stat("/usr/bin/true", &sbNewFile), 0);
-    SantaVnode vnodeDest = SantaVnode::VnodeForFile(sbNewFile);
-
-    id mockCompilerController = OCMPartialMock(cc);
-    id mockFileInfo = OCMClassMock([SNTFileInfo class]);
-    OCMStub([mockFileInfo alloc]).andReturn(mockFileInfo);
-    OCMStub([mockFileInfo vnode]).andReturn(vnodeDest);
-
-    // Return nil the first time when the source path is looked up
-    OCMExpect([mockFileInfo initWithEndpointSecurityFile:&normalFile error:[OCMArg anyObjectRef]])
-        .ignoringNonObjectArgs()
-        .andReturn(nil);
-    OCMExpect([mockFileInfo initWithPath:expectedTarget error:[OCMArg anyObjectRef]])
-        .ignoringNonObjectArgs()
-        .andReturn(mockFileInfo);
-
-    OCMExpect([mockCompilerController
-                  createTransitiveRule:msg
-                                target:[OCMArg checkWithBlock:^BOOL(SNTFileInfo* fi) {
-                                  return fi.vnode.fsid == sbNewFile.st_dev &&
-                                         fi.vnode.fileid == sbNewFile.st_ino;
-                                }]
-                                logger:nullptr])
-        .ignoringNonObjectArgs();
-
-    XCTAssertTrue([cc handleEvent:msg withLogger:nullptr]);
-
-    XCTAssertTrue(OCMVerifyAll(mockCompilerController), "Unable to verify all expectations");
-    [mockCompilerController stopMocking];
-    [mockFileInfo stopMocking];
-  }
   // Ensure transitive rules are created for CLONE events from the source path
   {
     esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_CLONE, &compilerProc);
@@ -460,50 +348,6 @@ static const pid_t PID_MAX = 99999;
                                 target:[OCMArg checkWithBlock:^BOOL(SNTFileInfo* fi) {
                                   return fi.vnode.fsid == normalFile.stat.st_dev &&
                                          fi.vnode.fileid == normalFile.stat.st_ino;
-                                }]
-                                logger:nullptr])
-        .ignoringNonObjectArgs();
-
-    XCTAssertTrue([cc handleEvent:msg withLogger:nullptr]);
-
-    XCTAssertTrue(OCMVerifyAll(mockCompilerController), "Unable to verify all expectations");
-    [mockCompilerController stopMocking];
-    [mockFileInfo stopMocking];
-  }
-  // Ensure transitive rules are created for CLONE events from the target path as a fallback
-  {
-    es_file_t targetDir = MakeESFile("/usr/bin", MakeStat(1000));
-    es_string_token_t targetName = MakeESStringToken("true");
-    esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_CLONE, &compilerProc);
-    esMsg.event.clone.source = &normalFile;
-    esMsg.event.clone.target_dir = &targetDir;
-    esMsg.event.clone.target_name = targetName;
-    Message msg(mockESApi, &esMsg);
-    NSString* expectedTarget =
-        [NSString stringWithFormat:@"%s/%s", targetDir.path.data, targetName.data];
-
-    struct stat sbNewFile;
-    XCTAssertEqual(stat("/usr/bin/true", &sbNewFile), 0);
-    SantaVnode vnodeDest = SantaVnode::VnodeForFile(sbNewFile);
-
-    id mockCompilerController = OCMPartialMock(cc);
-    id mockFileInfo = OCMClassMock([SNTFileInfo class]);
-    OCMStub([mockFileInfo alloc]).andReturn(mockFileInfo);
-    OCMStub([mockFileInfo vnode]).andReturn(vnodeDest);
-
-    // Return nil the first time when the source path is looked up
-    OCMExpect([mockFileInfo initWithEndpointSecurityFile:&normalFile error:[OCMArg anyObjectRef]])
-        .ignoringNonObjectArgs()
-        .andReturn(nil);
-    OCMExpect([mockFileInfo initWithPath:expectedTarget error:[OCMArg anyObjectRef]])
-        .ignoringNonObjectArgs()
-        .andReturn(mockFileInfo);
-
-    OCMExpect([mockCompilerController
-                  createTransitiveRule:msg
-                                target:[OCMArg checkWithBlock:^BOOL(SNTFileInfo* fi) {
-                                  return fi.vnode.fsid == sbNewFile.st_dev &&
-                                         fi.vnode.fileid == sbNewFile.st_ino;
                                 }]
                                 logger:nullptr])
         .ignoringNonObjectArgs();
@@ -552,49 +396,226 @@ static const pid_t PID_MAX = 99999;
   [mockFileInfo stopMocking];
 }
 
-- (void)testRenameDoesNotFallBackToDestinationOnUnconfirmedIdentity {
-  // The destination fallback fires only when the source cannot be read at all,
-  // so a source that resolves but is unconfirmed must stop here rather than
-  // falling back to the destination path.
-  //
-  // What is asserted is that a resolvable but unconfirmed source creates no
-  // transitive rule. That the fallback is not entered follows from its own
-  // `if (!targetFile)` guard, which this test cannot exercise.
-  es_file_t file = MakeESFile("foo");
-  es_file_t normalFile = MakeESFile("bar");
-  es_file_t destDir = MakeESFile("/dest/dir");
+#pragma mark RENAME and CLONE target resolution
+
+- (NSString*)makeTempDir {
+  NSString* dir = [NSTemporaryDirectory()
+      stringByAppendingPathComponent:[NSString stringWithFormat:@"cc-rename-%@",
+                                                                [[NSUUID UUID] UUIDString]]];
+  XCTAssertTrue([[NSFileManager defaultManager] createDirectoryAtPath:dir
+                                          withIntermediateDirectories:YES
+                                                           attributes:nil
+                                                                error:nil]);
+  return dir;
+}
+
+- (struct stat)writeFile:(NSString*)path size:(NSUInteger)size fill:(uint8_t)fill {
+  NSMutableData* data = [NSMutableData dataWithLength:size];
+  memset(data.mutableBytes, fill, size);
+  XCTAssertTrue([data writeToFile:path atomically:NO]);
+  struct stat sb;
+  XCTAssertEqual(stat(path.UTF8String, &sb), 0);
+  return sb;
+}
+
+// Delivers `esMsg` from a compiler process and returns the file a transitive rule would be
+// created for, or nil if none would be.
+- (SNTFileInfo*)transitiveTargetForCompilerMessage:(es_message_t)esMsg {
+  es_file_t procFile = MakeESFile("foo");
   audit_token_t compilerTok = MakeAuditToken(12, 34);
-  es_process_t compilerProc = MakeESProcess(&file, compilerTok, {});
+  es_process_t compilerProc = MakeESProcess(&procFile, compilerTok, {});
+  esMsg.process = &compilerProc;
 
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   mockESApi->SetExpectationsRetainReleaseMessage();
 
   SNTCompilerController* cc = [[SNTCompilerController alloc] init];
   [cc setProcess:compilerTok isCompiler:true];
-
-  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_RENAME, &compilerProc);
-  esMsg.event.rename.source = &normalFile;
-  esMsg.event.rename.destination_type = ES_DESTINATION_TYPE_NEW_PATH;
-  esMsg.event.rename.destination.new_path.dir = &destDir;
-  esMsg.event.rename.destination.new_path.filename = MakeESStringToken("newname");
   Message msg(mockESApi, &esMsg);
 
+  __block SNTFileInfo* target;
   id mockCompilerController = OCMPartialMock(cc);
-  id mockFileInfo = OCMClassMock([SNTFileInfo class]);
-  OCMStub([mockFileInfo alloc]).andReturn(mockFileInfo);
-  OCMStub([mockFileInfo initWithEndpointSecurityFile:&normalFile error:[OCMArg anyObjectRef]])
-      .ignoringNonObjectArgs()
-      .andReturn(mockFileInfo);
-  OCMStub([mockFileInfo identityVerification]).andReturn(SNTFileInfoIdentityMismatch);
-
-  OCMReject([mockCompilerController createTransitiveRule:msg target:OCMOCK_ANY logger:nullptr])
+  OCMStub([mockCompilerController
+              createTransitiveRule:msg
+                            target:[OCMArg checkWithBlock:^BOOL(SNTFileInfo* fi) {
+                              target = fi;
+                              return YES;
+                            }]
+                            logger:nullptr])
       .ignoringNonObjectArgs();
 
-  XCTAssertFalse([cc handleEvent:msg withLogger:nullptr]);
+  [cc handleEvent:msg withLogger:nullptr];
 
-  XCTAssertTrue(OCMVerifyAll(mockCompilerController), "Unable to verify all expectations");
   [mockCompilerController stopMocking];
-  [mockFileInfo stopMocking];
+  return target;
+}
+
+// RENAME of `source` (described by `sourceStat`) to `dest`. `existingDestStat` describes the
+// file `dest` replaced, or is NULL if `dest` was a new path.
+- (SNTFileInfo*)transitiveTargetForRenameOf:(NSString*)source
+                                       stat:(struct stat)sourceStat
+                                         to:(NSString*)dest
+                           existingDestStat:(const struct stat*)existingDestStat {
+  es_file_t sourceFile = MakeESFile(source.UTF8String, sourceStat);
+  es_file_t existingFile;
+  es_file_t destDir;
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_RENAME, nullptr);
+  esMsg.event.rename.source = &sourceFile;
+  if (existingDestStat) {
+    existingFile = MakeESFile(dest.UTF8String, *existingDestStat);
+    esMsg.event.rename.destination_type = ES_DESTINATION_TYPE_EXISTING_FILE;
+    esMsg.event.rename.destination.existing_file = &existingFile;
+  } else {
+    destDir = MakeESFile(dest.stringByDeletingLastPathComponent.UTF8String);
+    esMsg.event.rename.destination_type = ES_DESTINATION_TYPE_NEW_PATH;
+    esMsg.event.rename.destination.new_path.dir = &destDir;
+    esMsg.event.rename.destination.new_path.filename =
+        MakeESStringToken(dest.lastPathComponent.UTF8String);
+  }
+  return [self transitiveTargetForCompilerMessage:esMsg];
+}
+
+// CLONE of `source` (described by `sourceStat`) to the new path `dest`.
+- (SNTFileInfo*)transitiveTargetForCloneOf:(NSString*)source
+                                      stat:(struct stat)sourceStat
+                                        to:(NSString*)dest {
+  es_file_t sourceFile = MakeESFile(source.UTF8String, sourceStat);
+  es_file_t destDir = MakeESFile(dest.stringByDeletingLastPathComponent.UTF8String);
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_CLONE, nullptr);
+  esMsg.event.clone.source = &sourceFile;
+  esMsg.event.clone.target_dir = &destDir;
+  esMsg.event.clone.target_name = MakeESStringToken(dest.lastPathComponent.UTF8String);
+  return [self transitiveTargetForCompilerMessage:esMsg];
+}
+
+- (void)testRenameHandledBeforeCompletionUsesSource {
+  NSString* dir = [self makeTempDir];
+  NSString* source = [dir stringByAppendingPathComponent:@"out.tmp"];
+  NSString* dest = [dir stringByAppendingPathComponent:@"out"];
+  struct stat sourceStat = [self writeFile:source size:1024 fill:'a'];
+  struct stat destStat = [self writeFile:dest size:10024 fill:'b'];
+  NSString* expected = [[SNTFileInfo alloc] initWithPath:source].SHA256;
+
+  // The rename has not happened yet, so the source path still names the renamed file.
+  SNTFileInfo* target = [self transitiveTargetForRenameOf:source
+                                                     stat:sourceStat
+                                                       to:dest
+                                         existingDestStat:&destStat];
+
+  XCTAssertEqualObjects(target.path, source);
+  XCTAssertEqualObjects(target.SHA256, expected);
+  [[NSFileManager defaultManager] removeItemAtPath:dir error:nil];
+}
+
+- (void)testRenameOverLargerExistingFileHashesRenamedFile {
+  NSString* dir = [self makeTempDir];
+  NSString* source = [dir stringByAppendingPathComponent:@"out.tmp"];
+  NSString* dest = [dir stringByAppendingPathComponent:@"out"];
+  struct stat sourceStat = [self writeFile:source size:1024 fill:'a'];
+  struct stat destStat = [self writeFile:dest size:10024 fill:'b'];
+  NSString* expected = [[SNTFileInfo alloc] initWithPath:source].SHA256;
+  XCTAssertEqual(rename(source.UTF8String, dest.UTF8String), 0);
+
+  // The replaced file's stat is larger than the renamed file. It must not be used to read
+  // the file now at `dest`.
+  SNTFileInfo* target = [self transitiveTargetForRenameOf:source
+                                                     stat:sourceStat
+                                                       to:dest
+                                         existingDestStat:&destStat];
+
+  XCTAssertEqualObjects(target.path, dest);
+  XCTAssertEqual(target.identityVerification, SNTFileInfoIdentityVerified);
+  XCTAssertEqualObjects(target.SHA256, expected);
+  [[NSFileManager defaultManager] removeItemAtPath:dir error:nil];
+}
+
+- (void)testRenameToNewPathHashesRenamedFile {
+  NSString* dir = [self makeTempDir];
+  NSString* source = [dir stringByAppendingPathComponent:@"out.tmp"];
+  NSString* dest = [dir stringByAppendingPathComponent:@"out"];
+  struct stat sourceStat = [self writeFile:source size:1024 fill:'a'];
+  NSString* expected = [[SNTFileInfo alloc] initWithPath:source].SHA256;
+  XCTAssertEqual(rename(source.UTF8String, dest.UTF8String), 0);
+
+  SNTFileInfo* target = [self transitiveTargetForRenameOf:source
+                                                     stat:sourceStat
+                                                       to:dest
+                                         existingDestStat:NULL];
+
+  XCTAssertEqualObjects(target.path, dest);
+  XCTAssertEqualObjects(target.SHA256, expected);
+  [[NSFileManager defaultManager] removeItemAtPath:dir error:nil];
+}
+
+- (void)testRenameSwapHashesRenamedFile {
+  NSString* dir = [self makeTempDir];
+  NSString* source = [dir stringByAppendingPathComponent:@"out.tmp"];
+  NSString* dest = [dir stringByAppendingPathComponent:@"out"];
+  struct stat sourceStat = [self writeFile:source size:1024 fill:'a'];
+  struct stat destStat = [self writeFile:dest size:1024 fill:'b'];
+  NSString* expected = [[SNTFileInfo alloc] initWithPath:source].SHA256;
+  XCTAssertEqual(renamex_np(source.UTF8String, dest.UTF8String, RENAME_SWAP), 0);
+
+  // After a swap the source path exists but holds the other file.
+  SNTFileInfo* target = [self transitiveTargetForRenameOf:source
+                                                     stat:sourceStat
+                                                       to:dest
+                                         existingDestStat:&destStat];
+
+  XCTAssertEqualObjects(target.path, dest);
+  XCTAssertEqualObjects(target.SHA256, expected);
+  [[NSFileManager defaultManager] removeItemAtPath:dir error:nil];
+}
+
+- (void)testRenameCreatesNoRuleWhenRenamedFileWasReplaced {
+  NSString* dir = [self makeTempDir];
+  NSString* source = [dir stringByAppendingPathComponent:@"out.tmp"];
+  NSString* dest = [dir stringByAppendingPathComponent:@"out"];
+  NSString* other = [dir stringByAppendingPathComponent:@"other"];
+  struct stat sourceStat = [self writeFile:source size:1024 fill:'a'];
+  XCTAssertEqual(rename(source.UTF8String, dest.UTF8String), 0);
+
+  // The file at `dest` is no longer the renamed file.
+  [self writeFile:other size:1024 fill:'c'];
+  XCTAssertEqual(rename(other.UTF8String, dest.UTF8String), 0);
+
+  XCTAssertNil([self transitiveTargetForRenameOf:source
+                                            stat:sourceStat
+                                              to:dest
+                                existingDestStat:NULL]);
+  [[NSFileManager defaultManager] removeItemAtPath:dir error:nil];
+}
+
+- (void)testCloneFallsBackToTargetWhenSourceIsGone {
+  NSString* dir = [self makeTempDir];
+  NSString* source = [dir stringByAppendingPathComponent:@"cached"];
+  NSString* dest = [dir stringByAppendingPathComponent:@"out"];
+  struct stat sourceStat = [self writeFile:source size:1024 fill:'a'];
+  NSString* expected = [[SNTFileInfo alloc] initWithPath:source].SHA256;
+  XCTAssertEqual(clonefile(source.UTF8String, dest.UTF8String, 0), 0);
+  XCTAssertEqual(unlink(source.UTF8String), 0);
+
+  SNTFileInfo* target = [self transitiveTargetForCloneOf:source stat:sourceStat to:dest];
+
+  XCTAssertEqualObjects(target.path, dest);
+  XCTAssertEqualObjects(target.SHA256, expected);
+  [[NSFileManager defaultManager] removeItemAtPath:dir error:nil];
+}
+
+- (void)testCloneCreatesNoRuleWhenTargetSizeDiffersFromSource {
+  NSString* dir = [self makeTempDir];
+  NSString* source = [dir stringByAppendingPathComponent:@"cached"];
+  NSString* dest = [dir stringByAppendingPathComponent:@"out"];
+  struct stat sourceStat = [self writeFile:source size:1024 fill:'a'];
+  XCTAssertEqual(clonefile(source.UTF8String, dest.UTF8String, 0), 0);
+  XCTAssertEqual(unlink(source.UTF8String), 0);
+
+  // The file at `dest` is no longer the clone.
+  XCTAssertEqual(unlink(dest.UTF8String), 0);
+  [self writeFile:dest size:10024 fill:'c'];
+
+  XCTAssertNil([self transitiveTargetForCloneOf:source stat:sourceStat to:dest]);
+  [[NSFileManager defaultManager] removeItemAtPath:dir error:nil];
 }
 
 @end
