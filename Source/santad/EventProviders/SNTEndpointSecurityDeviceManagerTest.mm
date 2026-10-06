@@ -1067,6 +1067,7 @@ static uint32_t FSTypeNum(NSString* fsTypeName) {
 // The autofs exemption requires f_type to match the kernel's autofs type number, not just the name.
 - (void)testAutofsNameWithMismatchedTypeNumBlocked {
   if (@available(macOS 15.0, *)) {
+    if (FSTypeNum(@"autofs") == 0) XCTSkip(@"autofs is not registered");
     OCMStub([self.mockConfigurator blockNetworkMount]).andReturn(YES);
     OCMStub([self.mockConfigurator failClosed]).andReturn(YES);
     OCMStub([self.mockConfigurator allowedNetworkMountHosts]).andReturn(@[]);
