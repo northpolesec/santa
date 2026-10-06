@@ -792,10 +792,21 @@ NS_ASSUME_NONNULL_BEGIN
   // autofs mounts are automounter triggers (e.g. "map auto_home" on /System/Volumes/Data/home),
   // not network shares. They only serve directories and symlinks to "/". Accessing one makes
   // automountd mount the real filesystem separately, and that mount is evaluated on its own.
-  // Match on f_fstypename, which the kernel sets from the VFS table; f_mntfromname is chosen by
-  // the caller.
+  // The fs type number in f_type is assigned by the kernel when autofs registers, so require it to
+  // match in addition to the name. If autofs is not found the mount falls through to the normal
+  // network mount evaluation.
   if (strncmp(eventStatFS->f_fstypename, "autofs", sizeof(eventStatFS->f_fstypename)) == 0) {
-    return ES_AUTH_RESULT_ALLOW;
+    struct vfsconf vfc;
+    if (getvfsbyname("autofs", &vfc) != 0) {
+      LOGI(@"Unable to look up autofs fs type number: %d", errno);
+    } else if (eventStatFS->f_type == (uint32_t)vfc.vfc_typenum) {
+      LOGD(@"Allowing autofs mount: %s on %s", eventStatFS->f_mntfromname,
+           eventStatFS->f_mntonname);
+      return ES_AUTH_RESULT_ALLOW;
+    } else {
+      LOGW(@"Mount reports fs type autofs with type number %u, expected %d", eventStatFS->f_type,
+           vfc.vfc_typenum);
+    }
   }
 
   NSString* mountFromName = @(eventStatFS->f_mntfromname);

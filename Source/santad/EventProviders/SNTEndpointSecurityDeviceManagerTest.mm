@@ -601,9 +601,16 @@ class MockAuthResultCache : public AuthResultCache {
 
 #if HAVE_MACOS_15
 
+// Returns the kernel's fs type number for the named filesystem, or 0 if it isn't registered.
+static uint32_t FSTypeNum(NSString* fsTypeName) {
+  struct vfsconf vfc;
+  return getvfsbyname(fsTypeName.UTF8String, &vfc) == 0 ? (uint32_t)vfc.vfc_typenum : 0;
+}
+
 - (void)triggerTestNetworkMountEvent:(es_event_type_t)eventType
                         mountFromURL:(NSString*)mountFromURL
                           fsTypeName:(NSString*)fsTypeName
+                           fsTypeNum:(uint32_t)fsTypeNum
                   expectedAuthResult:(es_auth_result_t)expectedAuthResult
                   deviceManagerSetup:(void (^)(SNTEndpointSecurityDeviceManager*))setupDMCallback
                 networkMountCallback:(void (^)(SNTStoredNetworkMountEvent*))networkMountCallback {
@@ -613,7 +620,7 @@ class MockAuthResultCache : public AuthResultCache {
   strncpy(fs.f_mntfromname, [mountFromURL UTF8String], sizeof(fs.f_mntfromname));
   strncpy(fs.f_mntonname, [test_mntonname UTF8String], sizeof(fs.f_mntonname));
   strncpy(fs.f_fstypename, [fsTypeName UTF8String], sizeof(fs.f_fstypename));
-  fs.f_type = 0;  // Network mount type
+  fs.f_type = fsTypeNum;
 
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   mockESApi->SetExpectationsESNewClient();
@@ -725,6 +732,7 @@ class MockAuthResultCache : public AuthResultCache {
   [self triggerTestNetworkMountEvent:ES_EVENT_TYPE_AUTH_MOUNT
       mountFromURL:mountFrom
       fsTypeName:fsTypeName
+      fsTypeNum:FSTypeNum(fsTypeName)
       expectedAuthResult:expectedAuthResult
       deviceManagerSetup:^(SNTEndpointSecurityDeviceManager* dm) {
       }
@@ -773,6 +781,7 @@ class MockAuthResultCache : public AuthResultCache {
     [self triggerTestNetworkMountEvent:ES_EVENT_TYPE_AUTH_MOUNT
         mountFromURL:@"smb://server.example.com/share"
         fsTypeName:@"smbfs"
+        fsTypeNum:0
         expectedAuthResult:ES_AUTH_RESULT_DENY
         deviceManagerSetup:^(SNTEndpointSecurityDeviceManager* dm) {
         }
@@ -809,6 +818,7 @@ class MockAuthResultCache : public AuthResultCache {
     [self triggerTestNetworkMountEvent:ES_EVENT_TYPE_AUTH_MOUNT
         mountFromURL:@"smb://server.example.com/share"
         fsTypeName:@"smbfs"
+        fsTypeNum:0
         expectedAuthResult:ES_AUTH_RESULT_ALLOW
         deviceManagerSetup:^(SNTEndpointSecurityDeviceManager* dm) {
         }
@@ -963,6 +973,7 @@ class MockAuthResultCache : public AuthResultCache {
     [self triggerTestNetworkMountEvent:ES_EVENT_TYPE_AUTH_MOUNT
         mountFromURL:@"/exports/data"
         fsTypeName:@"smbfs"
+        fsTypeNum:0
         expectedAuthResult:ES_AUTH_RESULT_DENY
         deviceManagerSetup:^(SNTEndpointSecurityDeviceManager* dm) {
         }
@@ -989,6 +1000,7 @@ class MockAuthResultCache : public AuthResultCache {
     [self triggerTestNetworkMountEvent:ES_EVENT_TYPE_AUTH_MOUNT
         mountFromURL:@"/exports/data"
         fsTypeName:@"smbfs"
+        fsTypeNum:0
         expectedAuthResult:ES_AUTH_RESULT_ALLOW
         deviceManagerSetup:^(SNTEndpointSecurityDeviceManager* dm) {
         }
@@ -1004,6 +1016,7 @@ class MockAuthResultCache : public AuthResultCache {
 // mount as a network share denies it whether or not a host can be extracted from the mntfromname.
 - (void)testAutofsTriggerMountAllowed {
   if (@available(macOS 15.0, *)) {
+    if (FSTypeNum(@"autofs") == 0) XCTSkip(@"autofs is not registered");
     OCMStub([self.mockConfigurator failClosed]).andReturn(YES);
 
     [self verifyNetworkMount:@"map auto_home"
@@ -1017,6 +1030,7 @@ class MockAuthResultCache : public AuthResultCache {
 
 - (void)testAutofsTriggerRemountAllowed {
   if (@available(macOS 15.0, *)) {
+    if (FSTypeNum(@"autofs") == 0) XCTSkip(@"autofs is not registered");
     OCMStub([self.mockConfigurator blockNetworkMount]).andReturn(YES);
     OCMStub([self.mockConfigurator failClosed]).andReturn(YES);
     OCMStub([self.mockConfigurator allowedNetworkMountHosts]).andReturn(@[]);
@@ -1024,6 +1038,7 @@ class MockAuthResultCache : public AuthResultCache {
     [self triggerTestNetworkMountEvent:ES_EVENT_TYPE_AUTH_REMOUNT
         mountFromURL:@"map -hosts"
         fsTypeName:@"autofs"
+        fsTypeNum:FSTypeNum(@"autofs")
         expectedAuthResult:ES_AUTH_RESULT_ALLOW
         deviceManagerSetup:^(SNTEndpointSecurityDeviceManager* dm) {
         }
@@ -1035,8 +1050,7 @@ class MockAuthResultCache : public AuthResultCache {
   }
 }
 
-// The autofs exemption is keyed on f_fstypename. The mntfromname is chosen by the caller, so a
-// network filesystem using an autofs-style name is still evaluated.
+// A network filesystem using an autofs-style mntfromname is still evaluated.
 - (void)testNetworkMountWithAutofsMapNameBlocked {
   if (@available(macOS 15.0, *)) {
     OCMStub([self.mockConfigurator failClosed]).andReturn(YES);
@@ -1045,6 +1059,34 @@ class MockAuthResultCache : public AuthResultCache {
                   fsTypeName:@"nfs"
                 allowedHosts:@[]
           expectedAuthResult:ES_AUTH_RESULT_DENY];
+  } else {
+    XCTSkip(@"Test requires macOS 15 or later");
+  }
+}
+
+// The autofs exemption requires f_type to match the kernel's autofs type number, not just the name.
+- (void)testAutofsNameWithMismatchedTypeNumBlocked {
+  if (@available(macOS 15.0, *)) {
+    OCMStub([self.mockConfigurator blockNetworkMount]).andReturn(YES);
+    OCMStub([self.mockConfigurator failClosed]).andReturn(YES);
+    OCMStub([self.mockConfigurator allowedNetworkMountHosts]).andReturn(@[]);
+
+    XCTestExpectation* expectation =
+        [self expectationWithDescription:@"Wait for networkMountCallback to trigger"];
+
+    [self triggerTestNetworkMountEvent:ES_EVENT_TYPE_AUTH_MOUNT
+        mountFromURL:@"map auto_home"
+        fsTypeName:@"autofs"
+        fsTypeNum:FSTypeNum(@"autofs") + 1
+        expectedAuthResult:ES_AUTH_RESULT_DENY
+        deviceManagerSetup:^(SNTEndpointSecurityDeviceManager* dm) {
+        }
+        networkMountCallback:^(SNTStoredNetworkMountEvent* event) {
+          XCTAssertEqualObjects(event.fsType, @"autofs");
+          [expectation fulfill];
+        }];
+
+    [self waitForExpectations:@[ expectation ] timeout:60.0];
   } else {
     XCTSkip(@"Test requires macOS 15 or later");
   }
