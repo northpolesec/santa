@@ -138,11 +138,9 @@ static constexpr std::string_view kIgnoredCompilerProcessPathPrefix = "/dev/";
       }
 
       {
-        // The renamed file is the `source` vnode. The event can be handled before or after the
-        // rename completes, so that vnode may be at either path: try the source path, then the
-        // destination, and verify each against the source's stat. Once the source path opens
-        // as that vnode, a later rename no longer matters. The destination's `existing_file`
-        // stat describes the file being replaced, never the renamed one, so it is not used.
+        // The event can be handled before or after the rename completes, so the `source` vnode
+        // may be at either path. Verify each against the source's stat. `existing_file` is the
+        // file being replaced, not the renamed one.
         const struct stat* renamedStat = &esMsg->event.rename.source->stat;
         NSString* destPath =
             esMsg->event.rename.destination_type == ES_DESTINATION_TYPE_EXISTING_FILE
