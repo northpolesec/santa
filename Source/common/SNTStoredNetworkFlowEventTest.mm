@@ -48,6 +48,8 @@
   e.direction = SNTNetworkFlowDirectionOutgoing;
   e.hostname = @"example.com";
   e.flowTime = [NSDate dateWithTimeIntervalSince1970:1700000000];
+  e.dnsQuestion = YES;
+  e.dnsQtype = 65;
   e.decision = SNTNetworkFlowDecisionBlock;
   e.decisionTier = SNTNetworkFlowTierDomain;
   e.ruleId = 7;
@@ -85,6 +87,8 @@
   XCTAssertEqual(d.direction, SNTNetworkFlowDirectionOutgoing);
   XCTAssertEqualObjects(d.hostname, @"example.com");
   XCTAssertEqualObjects(d.flowTime, [NSDate dateWithTimeIntervalSince1970:1700000000]);
+  XCTAssertTrue(d.dnsQuestion);
+  XCTAssertEqual(d.dnsQtype, 65);
   XCTAssertEqual(d.decision, SNTNetworkFlowDecisionBlock);
   XCTAssertEqual(d.decisionTier, SNTNetworkFlowTierDomain);
   XCTAssertEqual(d.ruleId, 7);

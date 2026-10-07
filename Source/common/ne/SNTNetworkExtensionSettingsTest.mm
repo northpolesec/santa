@@ -96,6 +96,7 @@
   SNTNetworkExtensionSettings* settings =
       [[SNTNetworkExtensionSettings alloc] initWithEnable:YES
                                         flowDefaultAction:SNTNetworkFlowDefaultActionDeny];
+  settings.protectedDNSNames = @[ @"sync.example.com", @"workshop.cloud" ];
   NSData* data = [NSKeyedArchiver archivedDataWithRootObject:settings
                                        requiringSecureCoding:YES
                                                        error:nil];
@@ -108,6 +109,8 @@
   XCTAssertNotNil(deserialized);
   XCTAssertTrue(deserialized.enable);
   XCTAssertEqual(deserialized.flowDefaultAction, SNTNetworkFlowDefaultActionDeny);
+  XCTAssertEqualObjects(deserialized.protectedDNSNames,
+                        (@[ @"sync.example.com", @"workshop.cloud" ]));
 
   settings = [[SNTNetworkExtensionSettings alloc] initWithEnable:NO
                                                flowDefaultAction:SNTNetworkFlowDefaultActionAllow];
@@ -179,6 +182,7 @@
   XCTAssertNotNil(deserialized);
   // Missing keys should result in default values (NO for BOOL).
   XCTAssertFalse(deserialized.enable);
+  XCTAssertNil(deserialized.protectedDNSNames);
 }
 
 - (void)testTimeoutDefaultFromEnableInit {
@@ -294,6 +298,17 @@
   XCTAssertEqual(b.hash, c.hash);
 }
 
+- (void)testEqualityAndHashDistinguishProtectedDNSNames {
+  // A changed sync host must reach santanetd, so the list is part of equality.
+  SNTNetworkExtensionSettings* a = [[SNTNetworkExtensionSettings alloc] initWithEnable:YES];
+  SNTNetworkExtensionSettings* b = [[SNTNetworkExtensionSettings alloc] initWithEnable:YES];
+  b.protectedDNSNames = @[ @"workshop.cloud" ];
+  XCTAssertNotEqualObjects(a, b);
+  a.protectedDNSNames = @[ @"workshop.cloud" ];
+  XCTAssertEqualObjects(a, b);
+  XCTAssertEqual(a.hash, b.hash);
+}
+
 - (void)testNetworkFlowRulesRoundTrip {
   // New santad ⇄ new santanetd: the rules ride inside Settings and survive the round-trip
   // alongside the scalar settings.
@@ -373,6 +388,7 @@
             networkFlowRules:@[ [[SNTNetworkFlowRule alloc] initAddRuleWithName:@"rule-1"
                                                                          ruleId:1
                                                                       protoBlob:blob] ]];
+  base.protectedDNSNames = @[ @"workshop.cloud" ];
 
   SNTNetworkExtensionSettings* attached = [base settingsByAttachingNetworkFlowRules:@[
     [[SNTNetworkFlowRule alloc] initAddRuleWithName:@"rule-2" ruleId:2 protoBlob:blob],
@@ -387,6 +403,7 @@
   XCTAssertEqual(attached.networkFlowRules.count, 2u);
   XCTAssertEqualObjects(attached.networkFlowRules[0].ruleName, @"rule-2");
   XCTAssertEqual(attached.networkFlowRules[0].ruleId, 2);
+  XCTAssertEqualObjects(attached.protectedDNSNames, @[ @"workshop.cloud" ]);
   // networkFlowRules is excluded from equality, so the copy compares equal to the receiver — the
   // property that lets it stand in as cached last-pushed state.
   XCTAssertEqualObjects(attached, base);
@@ -406,6 +423,7 @@
               [[SNTNetworkFlowRule alloc] initAddRuleWithName:@"rule-1" ruleId:1 protoBlob:blob],
               [[SNTNetworkFlowRule alloc] initAddRuleWithName:@"rule-2" ruleId:2 protoBlob:blob],
             ]];
+  newFormat.protectedDNSNames = @[ @"workshop.cloud" ];  // an older decoder ignores the key
   NSData* data = [NSKeyedArchiver archivedDataWithRootObject:newFormat
                                        requiringSecureCoding:YES
                                                        error:nil];

@@ -68,6 +68,9 @@ typedef NS_ENUM(int32_t, SNTNetworkFlowTier) {
 @property SNTNetworkFlowDirection direction;
 @property(nullable) NSString* hostname;
 @property(nullable) NSDate* flowTime;
+// Set for a DNS question decision: hostname is the question name; the remote is the resolver.
+@property BOOL dnsQuestion;
+@property uint16_t dnsQtype;  // DNS QTYPE: 1 = A, 28 = AAAA, 65 = HTTPS, ...
 
 // Outcome.
 @property SNTNetworkFlowDecision decision;

@@ -89,6 +89,25 @@ func networkFlowProtocolDescription(_ proto: Int32) -> String {
   }
 }
 
+// DNS QTYPE mnemonic for common types, else the number.
+func dnsQtypeName(_ qtype: UInt16) -> String {
+  switch qtype {
+  case 1: return "A"
+  case 2: return "NS"
+  case 5: return "CNAME"
+  case 6: return "SOA"
+  case 12: return "PTR"
+  case 15: return "MX"
+  case 16: return "TXT"
+  case 28: return "AAAA"
+  case 33: return "SRV"
+  case 64: return "SVCB"
+  case 65: return "HTTPS"
+  case 255: return "ANY"
+  default: return "\(qtype)"
+  }
+}
+
 // Render an address:port endpoint, bracketing IPv6 literals so "[addr]:port" stays unambiguous.
 func formatEndpoint(_ address: String?, _ port: UInt16?) -> String {
   let host = (address?.isEmpty == false) ? address! : "<unknown>"
@@ -102,8 +121,10 @@ func networkFlowRemote(_ e: SNTStoredNetworkFlowEvent?) -> String {
 
 // Build a plain-text dump of the event for an admin to paste alongside other telemetry.
 func copyNetworkFlowDetailsToClipboard(e: SNTStoredNetworkFlowEvent?) {
+  let blockedAction =
+    e?.dnsQuestion == true ? "from resolving a network name" : "from reaching a network destination"
   var s =
-    "Santa blocked \((e?.process?.filePath as NSString?)?.lastPathComponent ?? "<unknown>") from reaching a network destination"
+    "Santa blocked \((e?.process?.filePath as NSString?)?.lastPathComponent ?? "<unknown>") \(blockedAction)"
   s += "\nProcess:"
   s += "\n  Path           : \(e?.process?.filePath ?? "<unknown>")"
   s += "\n  SHA-256        : \(e?.process?.fileSHA256 ?? "<unknown>")"
@@ -121,6 +142,7 @@ func copyNetworkFlowDetailsToClipboard(e: SNTStoredNetworkFlowEvent?) {
   s += "\n  Protocol       : \(networkFlowProtocolDescription(e?.`protocol` ?? 0))"
   s += "\n  Remote         : \(networkFlowRemote(e))"
   if let host = e?.hostname, !host.isEmpty { s += "\n  Hostname       : \(host)" }
+  if let e = e, e.dnsQuestion { s += "\n  DNS QTYPE      : \(dnsQtypeName(e.dnsQtype))" }
   if let local = e?.localAddress, !local.isEmpty {
     s += "\n  Local          : \(formatEndpoint(local, e?.localPort))"
   }
@@ -222,6 +244,10 @@ struct NetworkFlowDetail: View {
   @State private var isShowingDetails = false
 
   var destinationText: String {
+    // For a DNS question, show the name and the record type, not the resolver.
+    if let e = e, e.dnsQuestion {
+      return "\(e.hostname ?? "<unknown>") (\(dnsQtypeName(e.dnsQtype)))"
+    }
     let host = e?.hostname ?? ""
     let dest = host.isEmpty ? (e?.remoteAddress ?? "<unknown>") : host
     return formatEndpoint(dest, e?.remotePort)
@@ -231,7 +257,11 @@ struct NetworkFlowDetail: View {
     HStack(spacing: 20.0) {
       VStack(alignment: .trailing, spacing: 10.0) {
         Text("Application").bold()
-        Text("Destination").bold()
+        if e?.dnsQuestion == true {
+          Text("DNS lookup", comment: "Label for the name a blocked DNS lookup asked for").bold()
+        } else {
+          Text("Destination").bold()
+        }
       }
 
       Divider()
@@ -273,7 +303,7 @@ struct SNTNetworkFlowMessageWindowView: View {
 
   var body: some View {
     SNTMessageView(
-      SNTBlockMessage.attributedBlockMessageForNetworkFlowEvent(withCustomMessage: event?.customMsg)
+      SNTBlockMessage.attributedBlockMessage(for: event, customMessage: event?.customMsg)
     ) {
       NetworkFlowDetail(e: event)
 

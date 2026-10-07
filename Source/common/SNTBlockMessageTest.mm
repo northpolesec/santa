@@ -243,6 +243,24 @@
   XCTAssertNil([SNTBlockMessage eventDetailURLForNetworkFlowEvent:nfe customURL:@"null"]);
 }
 
+- (void)testNetworkFlowBlockMessageUsesDNSTextForDNSQuestions {
+  SNTStoredNetworkFlowEvent* nfe = [[SNTStoredNetworkFlowEvent alloc] init];
+  XCTAssertTrue(
+      [[SNTBlockMessage attributedBlockMessageForNetworkFlowEvent:nfe customMessage:nil].string
+          containsString:@"reaching a network destination"]);
+
+  nfe.dnsQuestion = YES;
+  XCTAssertTrue(
+      [[SNTBlockMessage attributedBlockMessageForNetworkFlowEvent:nfe customMessage:nil].string
+          containsString:@"resolving a network name"]);
+
+  // The rule's custom message wins over the DNS default.
+  XCTAssertEqualObjects([SNTBlockMessage attributedBlockMessageForNetworkFlowEvent:nfe
+                                                                     customMessage:@"Ask IT"]
+                            .string,
+                        @"Ask IT");
+}
+
 - (void)testEventDetailURLForFileAccessEventFallback {
   SNTStoredFileAccessEvent* fae = [[SNTStoredFileAccessEvent alloc] init];
 
