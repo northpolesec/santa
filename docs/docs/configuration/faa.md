@@ -199,7 +199,7 @@ The `Options` dictionary within each rule supports the following keys:
 
 - `AuditOnly` (optional): Boolean. When `true`, violations are logged but not blocked. Defaults to `true`.
 
-- `ParentDirectoryProtection` (optional): String. How the rule treats renaming or cloning a directory that contains one of its paths: `audit`, `enforce`, or `disabled`. Defaults to `audit`, which logs violations but does not block them. See [Parent Directories](/features/faa#parent-directories).
+- `ParentDirectoryProtection` (optional): String. How the rule treats renaming or cloning a directory that contains one of its paths: `audit`, `enforce`, or `disabled`. Defaults to `audit`, which logs violations but does not block them. See [Parent Directories](/features/faa#parent-directories). Requires Santa 2026.9+.
 
 - `EventDetailURL` (optional): Rule-specific URL that overrides the top-level EventDetailURL.
 
