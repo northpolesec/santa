@@ -9,11 +9,6 @@ This policy will prevent reads of cookies from Google Chrome, from any profile
 managed by any user, except to Chrome itself and the Spotlight indexing
 process.
 
-Renaming or cloning a profile directory, or any directory above it, also moves
-or copies the cookies. Santa audits these operations by default. To block them,
-set the `ParentDirectoryProtection` option to `enforce`. See [Parent
-Directories](/features/faa#parent-directories).
-
 ```xml
 <key>ChromeCookies</key>
 <dict>
