@@ -205,6 +205,7 @@ struct NetworkFlowMoreDetailsView: View {
         row("Protocol", networkFlowProtocolDescription(e?.`protocol` ?? 0))
         row("Remote", networkFlowRemote(e))
         if let host = e?.hostname, !host.isEmpty { row("Hostname", host) }
+        if let e = e, e.dnsQuestion { row("DNS QTYPE", dnsQtypeName(e.dnsQtype)) }
         if let localAddress = e?.localAddress, !localAddress.isEmpty {
           row("Local", formatEndpoint(localAddress, e?.localPort))
         }
