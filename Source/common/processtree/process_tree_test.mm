@@ -24,7 +24,6 @@
 #include <condition_variable>
 #include <memory>
 #include <mutex>
-#include <set>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -950,6 +949,39 @@ using namespace santa::santad::process_tree;
   }
   XCTAssertFalse(tree->Get(child_pid).has_value());
   XCTAssertFalse(tree->AnnotationExists("MARK"));
+}
+
+- (void)testAnnotationIndexSurvivesReapOfOneCarrier {
+  std::vector<std::unique_ptr<Annotator>> annotators{};
+  auto tree = std::make_shared<ProcessTreeTestPeer>(std::move(annotators),
+                                                    /*removal_grace_ticks=*/10);
+  auto init = tree->InsertInit();
+  uint64_t event_id = 1;
+
+  // Two independent carriers of the same name. init is deliberately NOT
+  // annotated, so the count is exactly 2.
+  const struct Pid first_pid = {.pid = 2, .pidversion = 1};
+  const struct Pid second_pid = {.pid = 3, .pidversion = 1};
+  tree->HandleFork(event_id++, init, first_pid);
+  tree->HandleFork(event_id++, init, second_pid);
+  tree->AnnotateProcess(**tree->Get(first_pid),
+                        std::make_shared<IndexedTestAnnotator>(std::vector<std::string>{"MARK"}));
+  tree->AnnotateProcess(**tree->Get(second_pid),
+                        std::make_shared<IndexedTestAnnotator>(std::vector<std::string>{"MARK"}));
+
+  // The first carrier exits -- retired from the index at once -- and is then
+  // reaped once the grace elapses. The reap must NOT decrement a second time:
+  // the count is 1, not 0, so a stray decrement would erase a name the second
+  // carrier is still holding. This is what Process::indexed_ prevents.
+  tree->HandleExit(event_id++, **tree->Get(first_pid));
+  struct Pid churn_pid = {.pid = 10, .pidversion = 1};
+  for (int i = 0; i < 20; i++) {
+    tree->HandleFork(event_id++, init, churn_pid);
+    churn_pid.pid++;
+  }
+
+  XCTAssertFalse(tree->Get(first_pid).has_value());
+  XCTAssertTrue(tree->AnnotationExists("MARK"));
 }
 
 @end

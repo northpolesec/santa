@@ -356,10 +356,10 @@ void ProcessTree::UpdateAnnotation(
   Process& proc = *it->second;
   auto& annotations = proc.annotations_;
   const std::type_index key(typeid(T));
-  const T* current = nullptr;
-  if (auto found = annotations.find(key); found != annotations.end()) {
-    current = dynamic_cast<const T*>(found->second.get());
-  }
+  auto found = annotations.find(key);
+  const T* current = found != annotations.end()
+                         ? dynamic_cast<const T*>(found->second.get())
+                         : nullptr;
 
   std::shared_ptr<const T> next = update(current);
   if (next == nullptr) {
@@ -368,10 +368,14 @@ void ProcessTree::UpdateAnnotation(
 
   // The replacement may carry a different set of names, so swap the old set's
   // contribution for the new one's. Only for a process that is counted at all:
-  // one already retired must not re-enter the index.
+  // one already retired must not re-enter the index. Unindex the STORED
+  // annotation (found->second), not `current`: if the dynamic_cast above ever
+  // returned nullptr while the map entry existed, unindexing `current` would
+  // silently skip the decrement while insert_or_assign below still replaces
+  // the entry -- leaking an increment with no matching decrement.
   if (proc.indexed_) {
-    if (current) {
-      UnindexAnnotationLocked(*current);
+    if (found != annotations.end()) {
+      UnindexAnnotationLocked(*found->second);
     }
     IndexAnnotationLocked(*next);
   }

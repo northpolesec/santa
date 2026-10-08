@@ -37,8 +37,11 @@ std::shared_ptr<const Process> ProcessTreeTestPeer::InsertInit() {
   auto proc = std::make_shared<Process>(
       initpid, (Cred){.uid = 0, .gid = 0},
       std::make_shared<Program>((Program){.executable = "/init", .arguments = {"/init"}}), nullptr);
-  map_.emplace(initpid, proc);
-  IndexProcessLocked(*proc);
+  // Index only the winner of the first-wins insert, as every production
+  // publish site does (see IndexProcessLocked).
+  if (map_.emplace(initpid, proc).second) {
+    IndexProcessLocked(*proc);
+  }
   return proc;
 }
 

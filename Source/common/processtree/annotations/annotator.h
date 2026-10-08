@@ -85,6 +85,12 @@ class Annotator {
   //
   // The default contributes nothing, so an annotation that is not queryable by
   // name is simply absent from the index.
+  //
+  // Each yielded view must remain valid until ForEachIndexedName returns: the
+  // tree collects the views and uses them after the callback returns them all,
+  // rather than consuming each one inline. An implementation must therefore
+  // yield views into storage the annotation itself owns (e.g. a member
+  // std::string), never into a temporary.
   virtual void ForEachIndexedName(
       absl::FunctionRef<void(std::string_view)> f) const {}
 

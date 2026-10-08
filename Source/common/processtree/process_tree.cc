@@ -352,7 +352,12 @@ void ProcessTree::IndexAnnotationLocked(const Annotator& a) {
   // local first -- untouched by the analysis -- so the actual
   // annotation_index_ mutation below happens directly in this function's
   // body, where the ABSL_EXCLUSIVE_LOCKS_REQUIRED on the declaration covers it.
-  absl::InlinedVector<std::string_view, 4> names;
+  //
+  // Inline capacity 32: matches CELAnnotator::kMaxEntries (not referenced
+  // directly -- depending on annotations:cel here would be a dependency
+  // cycle), so a process carrying the max number of names still doesn't
+  // malloc inside mtx_ on the fork/exec path.
+  absl::InlinedVector<std::string_view, 32> names;
   a.ForEachIndexedName(
       [&names](std::string_view name) { names.push_back(name); });
 
@@ -369,8 +374,8 @@ void ProcessTree::IndexAnnotationLocked(const Annotator& a) {
 
 void ProcessTree::UnindexAnnotationLocked(const Annotator& a) {
   // See IndexAnnotationLocked for why the names are collected before
-  // annotation_index_ is touched.
-  absl::InlinedVector<std::string_view, 4> names;
+  // annotation_index_ is touched, and for the inline capacity of 32.
+  absl::InlinedVector<std::string_view, 32> names;
   a.ForEachIndexedName(
       [&names](std::string_view name) { names.push_back(name); });
 
