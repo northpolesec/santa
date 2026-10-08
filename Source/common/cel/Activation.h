@@ -79,12 +79,12 @@ class Activation : public ::google::api::expr::runtime::BaseActivation {
   std::optional<::google::api::expr::runtime::CelValue> FindValue(
       absl::string_view name, google::protobuf::Arena* arena) const override;
 
-  // Vends the lazy today(), now(), policy_for_range(), add_annotation() and
-  // has_annotation() functions for CELv2. Resolving them here (rather than
-  // registering eager functions) keeps them out of constant folding, lets them
-  // flag the evaluation as non-cacheable (and record a pending kill) on this
-  // activation as a side effect, and is how the annotation functions reach the
-  // process tree.
+  // Vends the lazy today(), now(), policy_for_range(), add_annotation(),
+  // has_annotation() and annotation_exists() functions for CELv2. Resolving
+  // them here (rather than registering eager functions) keeps them out of
+  // constant folding, lets them flag the evaluation as non-cacheable (and
+  // record a pending kill) on this activation as a side effect, and is how the
+  // annotation functions reach the process tree.
   std::vector<const ::google::api::expr::runtime::CelFunction*> FindFunctionOverloads(
       absl::string_view name) const override;
 
@@ -140,7 +140,8 @@ class Activation : public ::google::api::expr::runtime::BaseActivation {
   mutable std::unique_ptr<NowFunction> nowFn_;
   mutable std::vector<std::unique_ptr<PolicyForRangeFunction>> policyForRangeFns_;
   mutable StagedAnnotations stagedAnnotations_;
-  mutable std::vector<std::unique_ptr<HasAnnotationFunction>> hasAnnotationFns_;
+  mutable std::vector<std::unique_ptr<AnnotationPredicateFunction>> hasAnnotationFns_;
+  mutable std::vector<std::unique_ptr<AnnotationPredicateFunction>> annotationExistsFns_;
   mutable std::vector<std::unique_ptr<AddAnnotationFunction>> addAnnotationFns_;
 
   bool IsResultCacheable() const;

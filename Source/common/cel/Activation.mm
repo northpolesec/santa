@@ -255,8 +255,15 @@ std::vector<const cel_runtime::CelFunction*> Activation<IsV2>::FindFunctionOverl
     if (name == "has_annotation") {
       return LazyOverloads(hasAnnotationFns_, HasAnnotationDescriptors,
                            [this](cel_runtime::CelFunctionDescriptor descriptor) {
-                             return std::make_unique<HasAnnotationFunction>(
-                                 std::move(descriptor), &usedAnnotations_, annotations_);
+                             return std::make_unique<AnnotationPredicateFunction>(
+                                 std::move(descriptor), &usedAnnotations_, annotations_.has);
+                           });
+    }
+    if (name == "annotation_exists") {
+      return LazyOverloads(annotationExistsFns_, AnnotationExistsDescriptors,
+                           [this](cel_runtime::CelFunctionDescriptor descriptor) {
+                             return std::make_unique<AnnotationPredicateFunction>(
+                                 std::move(descriptor), &usedAnnotations_, annotations_.exists);
                            });
     }
     if (name == "add_annotation") {
@@ -358,8 +365,9 @@ bool Activation<IsV2>::IsResultCacheable() const {
     return false;
   }
 
-  // add_annotation() writes to the process tree and has_annotation() reads it,
-  // so the answer is per-process and re-running the expression is the point.
+  // add_annotation() writes to the process tree and has_annotation() /
+  // annotation_exists() read it, so the answer is per-process or per-moment
+  // and re-running the expression is the point.
   if (usedAnnotations_) {
     return false;
   }

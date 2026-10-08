@@ -86,6 +86,8 @@ std::unique_ptr<santa::cel::Activation<IsV2>> MakeActivation(
 // records what add_annotation() stamped.
 struct FakeAnnotations {
   std::set<std::string> present;
+  // Names some OTHER process in the tree carries, for annotation_exists().
+  std::set<std::string> anywhere;
   std::vector<std::pair<std::string, santa::cel::AnnotationPropagation>> added;
 
   santa::cel::AnnotationHooks Hooks() {
@@ -97,6 +99,7 @@ struct FakeAnnotations {
               present.insert(name);
             },
         .session = [] { return std::string("123-4"); },
+        .exists = [this](const std::string& name) { return anywhere.count(name) > 0; },
     };
   }
 };
@@ -2617,6 +2620,81 @@ class ScopedHostZone {
     auto activation = MakeActivation<false>();
     XCTAssertFalse(sut.value()->CompileAndEvaluate(expr, *activation).ok(),
                    @"%s unexpectedly compiled under CELv1", expr.c_str());
+  }
+}
+
+- (void)testAnnotationExists {
+  using ReturnValue = santa::cel::CELProtoTraits<true>::ReturnValue;
+
+  auto sut = santa::cel::Evaluator<true>::Create();
+  XCTAssertTrue(sut.ok());
+
+  FakeAnnotations annotations;
+  auto evaluate = [&](absl::string_view expr) {
+    auto activation = MakeActivation<true>(absl::Now, annotations.Hooks());
+    return sut.value()->CompileAndEvaluate(expr, *activation);
+  };
+
+  {
+    auto result = evaluate("annotation_exists('claude-code') ? ALLOWLIST : BLOCKLIST");
+    if (!result.ok()) {
+      XCTFail(@"Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::BLOCKLIST);
+      // Live tree state, so the answer must never be cached.
+      XCTAssertFalse(result.value().cacheable);
+    }
+  }
+
+  annotations.anywhere.insert("claude-code");
+
+  {
+    auto result = evaluate("annotation_exists('claude-code') ? ALLOWLIST : BLOCKLIST");
+    if (!result.ok()) {
+      XCTFail(@"Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
+      XCTAssertFalse(result.value().cacheable);
+    }
+  }
+
+  {
+    // It answers a different question from has_annotation(): nothing was
+    // stamped on THIS process, so "somebody else has it" is true.
+    auto result = evaluate("annotation_exists('claude-code') && !has_annotation('claude-code') "
+                           "? ALLOWLIST : BLOCKLIST");
+    if (!result.ok()) {
+      XCTFail(@"Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
+    }
+  }
+
+  {
+    // Unlike add_annotation(), it is a pure read, so it is legal off the
+    // result path -- here inside another call's argument.
+    auto result = evaluate("[annotation_exists('claude-code'), false][0] ? ALLOWLIST : BLOCKLIST");
+    if (!result.ok()) {
+      XCTFail(@"Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
+    }
+  }
+}
+
+- (void)testAnnotationExistsWithoutATree {
+  // An empty hook (santad built the activation with no process tree) answers
+  // false rather than erroring, as has_annotation() does.
+  auto sut = santa::cel::Evaluator<true>::Create();
+  XCTAssertTrue(sut.ok());
+
+  auto activation = MakeActivation<true>(absl::Now, santa::cel::AnnotationHooks{});
+  auto result = sut.value()->CompileAndEvaluate(
+      "annotation_exists('claude-code') ? ALLOWLIST : BLOCKLIST", *activation);
+  if (!result.ok()) {
+    XCTFail(@"Failed to evaluate: %s", result.status().message().data());
+  } else {
+    XCTAssertEqual(result.value().value, santa::cel::CELProtoTraits<true>::ReturnValue::BLOCKLIST);
   }
 }
 
