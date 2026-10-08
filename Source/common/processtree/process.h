@@ -137,7 +137,9 @@ class Process {
         parent_(std::move(parent)),
         refcnt_(0),
         tombstoned_(false),
-        indexed_(false) {}
+        indexed_(false),
+        pending_removal_(false),
+        removal_ts_(0) {}
   Process(const Process&) = delete;
   Process& operator=(const Process&) = delete;
   Process(Process&&) = delete;
@@ -165,6 +167,21 @@ class Process {
   // annotation index. Makes index/unindex idempotent, so a duplicate event
   // delivery running the same path twice cannot drift the counts.
   bool indexed_;
+  // True while a removal scheduled for this process is still live, i.e. the
+  // tree still intends to reap it. remove_at_ is a priority_queue, so an entry
+  // once pushed cannot be extracted; this flag is how a removal is cancelled
+  // (see ProcessTree::HandleExecDenied, which revives the actor of an exec
+  // that was denied and therefore never happened). DrainRemovals skips a
+  // popped entry whose process is no longer marked.
+  bool pending_removal_;
+  // mach_time of the MOST RECENT removal scheduled for this process. A process
+  // can have several entries in remove_at_ -- the Authorizer sees one exec as
+  // both AUTH_EXEC and NOTIFY_EXEC, and each schedules the actor -- and only
+  // the entry whose timestamp matches this one reaps it. That makes the grace
+  // always run from the latest event that said the process was gone, instead
+  // of letting a stale earlier entry reap it early. Meaningful only while
+  // pending_removal_ is true.
+  uint64_t removal_ts_;
 };
 
 }  // namespace santa::santad::process_tree

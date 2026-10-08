@@ -31,6 +31,7 @@
 #include "Source/common/es/Client.h"
 #include "Source/common/es/Message.h"
 #include "Source/common/es/MockEndpointSecurityAPI.h"
+#include "Source/common/processtree/process.h"
 #include "Source/common/processtree/process_tree.h"
 #include "Source/common/processtree/process_tree_macos.h"
 #include "Source/common/processtree/process_tree_test_helpers.h"
@@ -45,8 +46,11 @@ using santa::AuthResultCache;
 using santa::EventDisposition;
 using santa::Message;
 using santa::santad::process_tree::Annotator;
+using santa::santad::process_tree::Cred;
+using santa::santad::process_tree::Pid;
 using santa::santad::process_tree::PidFromAuditToken;
 using santa::santad::process_tree::ProcessTreeTestPeer;
+using santa::santad::process_tree::Program;
 
 class MockAuthResultCache : public AuthResultCache {
  public:
@@ -516,14 +520,14 @@ class MockAuthResultCache : public AuthResultCache {
 
 // The process tree is informed of an exec at AUTH time -- the tree-aware
 // superclass calls InformFromESEvent from -handleContextMessage:, which
-// handles AUTH_EXEC on the same path as NOTIFY_EXEC -- so the target
-// pidversion is already published when the authorizer answers. A DENY means
-// that process never comes into existence and no NOTIFY_EXEC/NOTIFY_EXIT will
-// ever arrive to retire it, so the authorizer must retire it itself or its
-// inherited annotations stay pinned in the tree's annotation index forever.
-// An ALLOW must NOT retire: that process does exist, and retiring a live
-// process would make it stop answering annotation_exists().
-- (void)testExecDenialRetiresTargetFromProcessTree {
+// handles AUTH_EXEC on the same path as NOTIFY_EXEC -- so by the time the
+// authorizer answers, the target pidversion has been published and the actor
+// retired. A DENY makes both wrong and the authorizer must unwind them: the
+// target never comes into existence (nothing else would ever retire it, and
+// its inherited annotations would stay pinned in the annotation index), while
+// the actor's execve fails with EPERM and it goes on running (retiring it
+// evicts a live process from the tree). An ALLOW must leave both alone.
+- (void)testExecDenialUnwindsTheExecInTheProcessTree {
   es_file_t file = MakeESFile("foo");
   es_process_t proc = MakeESProcess(&file, MakeAuditToken(12, 23), MakeAuditToken(1, 1));
   es_file_t execFile = MakeESFile("bar");
@@ -531,25 +535,37 @@ class MockAuthResultCache : public AuthResultCache {
   es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_EXEC, &proc, ActionType::Auth);
   esMsg.event.exec.target = &execProc;
   // The tree reaps a scheduled removal once the grace has elapsed past the
-  // scheduling timestamp, measured against the newest event timestamp it has
-  // seen. Stamping the message at 1 and the insert below at 100, with a grace
-  // of 1 tick, makes the retirement observable synchronously.
+  // scheduling timestamp, measured against the newest event timestamp seen.
+  // Stamping the message at 1, with a grace of 1 tick, makes the target's
+  // retirement observable the moment it is scheduled; the churn fork at 200
+  // below then carries the cutoff past the actor's own pending removal.
   esMsg.mach_time = 1;
 
-  const struct santa::santad::process_tree::Pid targetPid = PidFromAuditToken(execProc.audit_token);
+  const struct Pid actorPid = PidFromAuditToken(proc.audit_token);
+  const struct Pid targetPid = PidFromAuditToken(execProc.audit_token);
 
-  // Builds a tree already containing the exec target, as it would after the
-  // AUTH_EXEC was folded in.
+  // Builds a tree in the state the AUTH_EXEC leaves it in: the actor forked,
+  // then HandleExec run, which retires the actor and publishes the target.
   auto makeTree = [&] {
     std::vector<std::unique_ptr<Annotator>> annotators{};
     auto tree = std::make_shared<ProcessTreeTestPeer>(std::move(annotators),
                                                       /*removal_grace_ticks=*/1);
     auto init = tree->InsertInit();
-    tree->HandleFork(100, init, targetPid);
+    tree->HandleFork(100, init, actorPid);
+    tree->HandleExec(101, **tree->Get(actorPid), targetPid,
+                     (struct Program){.executable = "/bar", .arguments = {}},
+                     (struct Cred){.uid = 0, .gid = 0});
     return tree;
   };
 
-  // Denied: the target is retired and reaped.
+  // Drives the tree's clock past the actor's pending removal so whether it was
+  // cancelled becomes observable.
+  auto churnPastGrace = [](const std::shared_ptr<ProcessTreeTestPeer>& tree) {
+    tree->HandleFork(200, *tree->Get((struct Pid){.pid = 1, .pidversion = 1}),
+                     (struct Pid){.pid = 999, .pidversion = 1});
+  };
+
+  // Denied: the target is retired and reaped, the actor survives.
   {
     auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
     mockESApi->SetExpectationsESNewClient();
@@ -574,10 +590,14 @@ class MockAuthResultCache : public AuthResultCache {
       XCTAssertFalse(tree->Get(targetPid).has_value());
     }
 
+    churnPastGrace(tree);
+    XCTAssertTrue(tree->Get(actorPid).has_value());
+
     XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
   }
 
-  // Allowed: the tree is left alone.
+  // Allowed: the tree is left alone -- the target stays and the actor is
+  // reaped on the schedule HandleExec gave it.
   {
     auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
     mockESApi->SetExpectationsESNewClient();
@@ -600,6 +620,9 @@ class MockAuthResultCache : public AuthResultCache {
       [authClient respondToMessage:msg withAuthResult:ES_AUTH_RESULT_ALLOW cacheable:true];
       XCTAssertTrue(tree->Get(targetPid).has_value());
     }
+
+    churnPastGrace(tree);
+    XCTAssertFalse(tree->Get(actorPid).has_value());
 
     XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
   }

@@ -81,30 +81,52 @@ class ProcessTree {
   // Inform the tree of a process exit.
   void HandleExit(uint64_t timestamp, const Process& p);
 
-  // Retire a process the authorizer has decided will never come into
-  // existence, dropping it from the annotation index and scheduling it for
-  // removal from the tree.
+  // Undo the tree effects of an exec that Santa decided to DENY. Unlike the
+  // Handle* methods above this is driven by the authorization decision, not by
+  // an ES event; `timestamp` is the mach_time of the AUTH_EXEC being answered,
+  // and `actor`/`target` are the same two pids HandleExec was given.
   //
-  // This exists because the tree learns of an exec at AUTH time, BEFORE the
+  // It exists because the tree learns of an exec at AUTH time, BEFORE the
   // decision: the tree-aware client informs the tree from its context handler,
   // which runs HandleExec for ES_EVENT_TYPE_AUTH_EXEC as well as for
   // ES_EVENT_TYPE_NOTIFY_EXEC (see InformFromESEvent). So by the time Santa
-  // answers an AUTH_EXEC the target pidversion is already published, carrying
-  // everything it inherited. If the answer is DENY that pidversion never
-  // exists, no NOTIFY_EXEC or NOTIFY_EXIT will ever arrive for it, and nothing
-  // else would ever retire it -- the node would sit in map_ forever and pin
-  // every annotation name it inherited in annotation_index_, so
-  // AnnotationExists() would answer true for the life of the process. Each
-  // denied exec inside an annotated subtree would add another.
+  // answers, HandleExec has already published `target` and already retired
+  // `actor`. A DENY makes both of those wrong, in opposite directions:
   //
-  // Removal is deferred through remove_at_ exactly as HandleExit's is, rather
-  // than erasing outright, so a straggling delivery of the same exec to
-  // another client cannot reference a node that has already been reaped.
+  //  - `target` never comes into existence. No NOTIFY_EXEC or NOTIFY_EXIT will
+  //    ever arrive for it, so nothing else would ever retire it: the node
+  //    would sit in map_ forever and pin every annotation name it inherited in
+  //    annotation_index_, making AnnotationExists() answer true for the life
+  //    of the process. Each denied exec inside an annotated subtree adds
+  //    another. So the target is retired here, deferred through remove_at_
+  //    exactly as HandleExit's removal is, rather than erased outright, so a
+  //    straggling delivery of the same exec to another client cannot reference
+  //    a node that has already been reaped.
   //
-  // A no-op if `target` is not in the tree, and idempotent if called more than
-  // once for the same pid. Takes mtx_ itself, so it must not be called from
-  // anywhere already holding it.
-  void RetireProcess(uint64_t timestamp, struct Pid target);
+  //  - `actor` is still running. A denied execve(2) returns EPERM and the
+  //    process carries on with its old image, so retiring it was premature:
+  //    its annotations stop counting and, once the grace elapses, it is
+  //    evicted from map_ entirely. If the annotated process is the one that
+  //    attempted the blocked exec, AnnotationExists() goes FALSE while it is
+  //    still alive -- a false negative in an authorization gate -- and the
+  //    live process disappears from the tree. So the actor is revived:
+  //    re-indexed, un-tombstoned, and its pending removal cancelled. Simply
+  //    re-indexing would not do, because DrainRemovals unindexes again at the
+  //    erase site; the removal itself has to be called off.
+  //
+  // Both halves happen in one write-lock hold: they are one event and must not
+  // be observable half-applied.
+  //
+  // Reviving the actor is safe because the actor is necessarily still alive at
+  // this point: it is blocked in the kernel inside execve(2) waiting for this
+  // very response, so it cannot have exited, and this runs before the response
+  // is delivered.
+  //
+  // Each half is a no-op if its pid is not in the tree, and the whole call is
+  // idempotent. Takes mtx_ itself, so it must not be called from anywhere
+  // already holding it.
+  void HandleExecDenied(uint64_t timestamp, struct Pid actor,
+                        struct Pid target);
 
   // Result of GetExecActor. `proc` is the execing (actor) process; it is
   // populated only when `already_seen` is false (and may still be empty then if
@@ -266,6 +288,23 @@ class ProcessTree {
   void UnindexAnnotationLocked(const Annotator& a)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(mtx_);
 
+  // Queue `p` for removal at `timestamp` and record the schedule on the
+  // process, so DrainRemovals can tell a live entry from a cancelled or
+  // superseded one. Only processes in map_ may be scheduled: an entry nothing
+  // recorded could otherwise reap a node re-inserted under the same pid by a
+  // lagging client.
+  void ScheduleRemovalLocked(uint64_t timestamp, Process& p)
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mtx_);
+
+  // Cancel `p`'s pending removal and put it back in the annotation index. The
+  // inverse of "unindex + ScheduleRemovalLocked", for the one case where the
+  // tree is told a process is gone and then learns it is not: the actor of a
+  // denied exec. Clears tombstoned_ too, since DrainRemovals may already have
+  // tombstoned the process while the decision was outstanding and
+  // ReleaseProcess would otherwise erase it when the event's ProcessToken
+  // dies.
+  void ReviveProcessLocked(Process& p) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mtx_);
+
   // Reap deferred removals whose grace has elapsed. Caller must hold mtx_.
   void DrainRemovals() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mtx_);
 
@@ -293,7 +332,12 @@ class ProcessTree {
   absl::flat_hash_map<std::string, uint32_t> annotation_index_
       ABSL_GUARDED_BY(mtx_);
   // Pending removals: pids to erase from map_, each paired with the mach_time
-  // of the exit/exec event that scheduled it. An entry is reaped once
+  // of the exit/exec event that scheduled it. Entries are advisory, not
+  // authoritative: a priority_queue cannot have an entry extracted, so the
+  // decision to reap lives on the Process (pending_removal_/removal_ts_) and
+  // an entry that does not match it is discarded on pop. That is what lets a
+  // removal be cancelled (HandleExecDenied) and what keeps several entries for
+  // one pid from reaping it early. An entry is reaped once
   // removal_grace_ticks_ have elapsed past that timestamp (measured against
   // latest_ts_), so a reordered straggler cannot reference a process after it
   // is reaped. Held as a MIN-heap on the timestamp so DrainRemovals reaps only

@@ -90,17 +90,17 @@ using santa::Message;
 }
 
 // Single chokepoint for every ES auth response this client issues, overridden
-// so a denied exec can retire the target process from the process tree.
+// so a denied exec can be unwound in the process tree.
 //
 // The tree is informed of an exec at AUTH time, before Santa decides: the
 // tree-aware superclass runs InformFromESEvent from -handleContextMessage:,
 // and that handles AUTH_EXEC on the same path as NOTIFY_EXEC. So by the time
-// we answer, the target pidversion is already published in the tree with every
-// annotation it inherited. A DENY means that pidversion never comes into
-// existence -- there is no NOTIFY_EXEC and no NOTIFY_EXIT to follow -- so
-// nothing else would ever retire it and its annotations would be pinned in the
-// tree's annotation index for the life of santad, permanently answering
-// annotation_exists(). See ProcessTree::RetireProcess.
+// we answer, the tree has already published the target pidversion (with every
+// annotation it inherited) and has already retired the actor. A DENY makes
+// both of those wrong: the target never comes into existence and nothing else
+// would ever retire it, while the actor's execve(2) fails with EPERM and it
+// carries on running under its old image. ProcessTree::HandleExecDenied fixes
+// up both halves together; see its comment for what each costs if left alone.
 //
 // Every deny reaches here: -respondToMessage:withAuthResult:forcePreventCache:
 // (and thus -postAction:forMessage:withDecision:, including the early
@@ -110,7 +110,7 @@ using santa::Message;
 // on self -- which matters, because a fail-closed deadline DENY leaves exactly
 // the same phantom.
 //
-// Both conditions are load bearing. Retiring on an ALLOW would retire a
+// Both conditions are load bearing. Unwinding on an ALLOW would retire a
 // process that does go on to exist, which is the worse bug: a live annotated
 // process would stop answering. That covers SNTActionRespondHold, which
 // responds ALLOW (the target is suspended, not blocked), and the
@@ -123,8 +123,9 @@ using santa::Message;
   // The process tree is optional (see SNTEndpointSecurityTreeAwareClient).
   if (result == ES_AUTH_RESULT_DENY && msg->event_type == ES_EVENT_TYPE_AUTH_EXEC &&
       self.processTree) {
-    self.processTree->RetireProcess(msg->mach_time, santa::santad::process_tree::PidFromAuditToken(
-                                                        msg->event.exec.target->audit_token));
+    self.processTree->HandleExecDenied(
+        msg->mach_time, santa::santad::process_tree::PidFromAuditToken(msg->process->audit_token),
+        santa::santad::process_tree::PidFromAuditToken(msg->event.exec.target->audit_token));
   }
 
   return [super respondToMessage:msg withAuthResult:result cacheable:cacheable];

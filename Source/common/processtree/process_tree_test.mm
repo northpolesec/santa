@@ -982,60 +982,77 @@ using namespace santa::santad::process_tree;
   XCTAssertTrue(tree->AnnotationExists("MARK"));
 }
 
-- (void)testRetireProcess {
+- (void)testHandleExecDeniedRetiresTargetAndRevivesActor {
   std::vector<std::unique_ptr<Annotator>> annotators{};
   auto tree = std::make_shared<ProcessTreeTestPeer>(std::move(annotators),
                                                     /*removal_grace_ticks=*/10);
   auto init = tree->InsertInit();
   uint64_t event_id = 1;
 
-  const struct Pid child_pid = {.pid = 2, .pidversion = 1};
-  tree->HandleFork(event_id++, init, child_pid);
-  tree->AnnotateProcess(**tree->Get(child_pid),
+  const struct Pid actor_pid = {.pid = 2, .pidversion = 1};
+  tree->HandleFork(event_id++, init, actor_pid);
+  tree->AnnotateProcess(**tree->Get(actor_pid),
                         std::make_shared<IndexedTestAnnotator>(std::vector<std::string>{"MARK"}));
   XCTAssertTrue(tree->AnnotationExists("MARK"));
 
-  // Retiring drops the name at once, exactly as an exit does -- and, as with
-  // an exit, the node itself lingers in map_ for the removal grace so a
-  // straggling delivery of the same event can still resolve it.
-  tree->RetireProcess(event_id++, child_pid);
-  XCTAssertFalse(tree->AnnotationExists("MARK"));
-  XCTAssertTrue(tree->Get(child_pid).has_value());
-
-  // Idempotent. A second carrier makes the assertion meaningful: a second
-  // decrement would erase a name this other process is still holding (and
-  // wrap the unsigned count if it were the only one).
-  const struct Pid other_pid = {.pid = 3, .pidversion = 1};
-  tree->HandleFork(event_id++, init, other_pid);
-  tree->AnnotateProcess(**tree->Get(other_pid),
-                        std::make_shared<IndexedTestAnnotator>(std::vector<std::string>{"MARK"}));
-  tree->RetireProcess(event_id++, child_pid);
+  // The exec is folded in at AUTH time: the actor is retired and the target
+  // published, inheriting the name. One carrier either side of the exec.
+  const struct Pid target_pid = {.pid = 2, .pidversion = 2};
+  tree->HandleExec(event_id++, **tree->Get(actor_pid), target_pid,
+                   (struct Program){.executable = "/bin/blocked", .arguments = {}},
+                   (struct Cred){.uid = 0, .gid = 0});
   XCTAssertTrue(tree->AnnotationExists("MARK"));
 
-  // A pid the tree has never seen is a no-op, not a crash: the authorizer can
-  // deny an exec whose target the tree never recorded (e.g. the actor was
-  // unknown, so HandleExec bailed before the insert).
-  tree->RetireProcess(event_id++, (struct Pid){.pid = 999, .pidversion = 7});
+  // DENY: the target is retired (dropped from the index at once, as an exit
+  // does, while the node lingers in map_ for the grace) and the actor is
+  // revived, so the one surviving carrier is the actor.
+  tree->HandleExecDenied(event_id++, actor_pid, target_pid);
+  XCTAssertTrue(tree->AnnotationExists("MARK"));
+  XCTAssertTrue(tree->Get(target_pid).has_value());
+
+  // Idempotent: a repeat must not double-decrement the target (which would
+  // wrap the unsigned count) nor double-index the actor (which would leave it
+  // pinned after it finally exits).
+  tree->HandleExecDenied(event_id++, actor_pid, target_pid);
   XCTAssertTrue(tree->AnnotationExists("MARK"));
 
-  // Churn past the grace: the retired node really is reaped, so a denied exec
-  // does not leak a map_ entry either.
+  // Pids the tree has never seen are a no-op, not a crash: the authorizer can
+  // deny an exec the tree never recorded (e.g. the actor was unknown, so
+  // HandleExec bailed before the insert).
+  tree->HandleExecDenied(event_id++, (struct Pid){.pid = 998, .pidversion = 7},
+                         (struct Pid){.pid = 999, .pidversion = 7});
+  XCTAssertTrue(tree->AnnotationExists("MARK"));
+
+  // Churn past the grace. The phantom target is reaped; the actor -- still
+  // running, since its execve failed -- is not, and still carries the name.
   struct Pid churn_pid = {.pid = 10, .pidversion = 1};
   for (int i = 0; i < 20; i++) {
     tree->HandleFork(event_id++, init, churn_pid);
     churn_pid.pid++;
   }
-  XCTAssertFalse(tree->Get(child_pid).has_value());
+  XCTAssertFalse(tree->Get(target_pid).has_value());
+  XCTAssertTrue(tree->Get(actor_pid).has_value());
   XCTAssertTrue(tree->AnnotationExists("MARK"));
+
+  // And when the actor really does exit, it retires and is reaped normally --
+  // reviving it did not make it unreapable.
+  tree->HandleExit(event_id++, **tree->Get(actor_pid));
+  XCTAssertFalse(tree->AnnotationExists("MARK"));
+  for (int i = 0; i < 20; i++) {
+    tree->HandleFork(event_id++, init, churn_pid);
+    churn_pid.pid++;
+  }
+  XCTAssertFalse(tree->Get(actor_pid).has_value());
 }
 
 // Regression: a DENIED exec must not pin the annotations its target inherited.
 // Santa informs the tree at AUTH_EXEC -- before it decides -- so the target
 // pidversion is published and indexed even when the answer is DENY and that
 // process therefore never comes into existence. No NOTIFY_EXEC and no
-// NOTIFY_EXIT ever arrive for it, so without ProcessTree::RetireProcess
-// nothing would ever retire it and annotation_exists() would answer true for
-// the life of santad -- permanently allowlisting every rule gated on it.
+// NOTIFY_EXIT ever arrive for it, so without the target half of
+// HandleExecDenied nothing would ever retire it and annotation_exists() would
+// answer true for the life of santad -- permanently allowlisting every rule
+// gated on it.
 - (void)testDeniedExecDoesNotPinAnnotation {
   std::vector<std::unique_ptr<Annotator>> annotators{};
   auto tree = std::make_shared<ProcessTreeTestPeer>(std::move(annotators),
@@ -1065,9 +1082,9 @@ using namespace santa::santad::process_tree;
                    (struct Cred){.uid = 0, .gid = 0});
   XCTAssertTrue(tree->Get(denied_pid).has_value());
 
-  // Santa DENIES. 9000.2 never exists. This is the call under test; without it
-  // the phantom holds its +1 forever and every assertion below flips.
-  tree->RetireProcess(event_id++, denied_pid);
+  // Santa DENIES. 9000.2 never exists; 9000.1 goes on running. Without this
+  // call the phantom holds its +1 forever and every assertion below flips.
+  tree->HandleExecDenied(event_id++, forked_pid, denied_pid);
 
   // The exec having failed, the forking process runs on and later exits, then
   // so does the annotated tool. Nothing carrying the name is alive any more.
@@ -1083,6 +1100,179 @@ using namespace santa::santad::process_tree;
   }
   XCTAssertFalse(tree->Get(denied_pid).has_value());
   XCTAssertFalse(tree->AnnotationExists("claude-code"));
+}
+
+// Mirror regression: the annotated process attempts the blocked exec itself.
+// HandleExec retires the actor at AUTH time, so without the actor half of
+// HandleExecDenied annotation_exists() goes FALSE while claude-code is still
+// running -- a false negative in an authorization gate -- and the live process
+// is evicted from the tree once the grace elapses.
+- (void)testDeniedExecKeepsAnnotatedActorAlive {
+  std::vector<std::unique_ptr<Annotator>> annotators{};
+  auto tree = std::make_shared<ProcessTreeTestPeer>(std::move(annotators),
+                                                    /*removal_grace_ticks=*/10);
+  auto init = tree->InsertInit();
+  uint64_t event_id = 1;
+
+  const struct Pid tool_pid = {.pid = 4521, .pidversion = 18734};
+  tree->HandleFork(event_id++, init, tool_pid);
+  tree->AnnotateProcess(**tree->Get(tool_pid), std::make_shared<IndexedTestAnnotator>(
+                                                   std::vector<std::string>{"claude-code"}));
+  XCTAssertTrue(tree->AnnotationExists("claude-code"));
+
+  // The tool itself tries to exec a blocked binary.
+  const struct Pid denied_pid = {.pid = 4521, .pidversion = 18735};
+  tree->HandleExec(event_id++, **tree->Get(tool_pid), denied_pid,
+                   (struct Program){.executable = "/bin/blocked", .arguments = {}},
+                   (struct Cred){.uid = 0, .gid = 0});
+  tree->HandleExecDenied(event_id++, tool_pid, denied_pid);
+
+  // execve returned EPERM; the tool is running its old image. The gate must
+  // still be open, and must stay open past the grace -- re-indexing alone
+  // would not do that, since DrainRemovals unindexes again at the erase site.
+  XCTAssertTrue(tree->AnnotationExists("claude-code"));
+  struct Pid churn_pid = {.pid = 10, .pidversion = 1};
+  for (int i = 0; i < 20; i++) {
+    tree->HandleFork(event_id++, init, churn_pid);
+    churn_pid.pid++;
+  }
+  auto tool = tree->Get(tool_pid);
+  XCTAssertTrue(tool.has_value());
+  XCTAssertTrue(tree->AnnotationExists("claude-code"));
+  if (!tool) {
+    // Bail rather than dereference an empty optional: the rest of this test
+    // only makes sense if the tool survived.
+    return;
+  }
+
+  // A fork of the surviving tool still inherits the annotation, i.e. it was
+  // revived as a real carrier and not just patched into the index.
+  const struct Pid grandchild_pid = {.pid = 7777, .pidversion = 1};
+  tree->HandleFork(event_id++, *tool, grandchild_pid);
+  tree->HandleExit(event_id++, **tree->Get(tool_pid));
+  XCTAssertTrue(tree->AnnotationExists("claude-code"));
+  tree->HandleExit(event_id++, **tree->Get(grandchild_pid));
+  XCTAssertFalse(tree->AnnotationExists("claude-code"));
+}
+
+// A revived process that later genuinely exits must be reaped on ITS OWN
+// deadline, not on the stale deadline of the cancelled removal still sitting
+// in remove_at_ (a priority_queue cannot have an entry extracted). Hence
+// Process::removal_ts_: only the entry matching the most recent schedule
+// reaps.
+- (void)testRevivedActorReapedOnRealExitDeadline {
+  std::vector<std::unique_ptr<Annotator>> annotators{};
+  auto tree = std::make_shared<ProcessTreeTestPeer>(std::move(annotators),
+                                                    /*removal_grace_ticks=*/10);
+  auto init = tree->InsertInit();
+
+  const struct Pid actor_pid = {.pid = 2, .pidversion = 1};
+  const struct Pid target_pid = {.pid = 2, .pidversion = 2};
+  tree->HandleFork(1, init, actor_pid);
+  // Schedules actor@5 and publishes the target...
+  tree->HandleExec(5, **tree->Get(actor_pid), target_pid,
+                   (struct Program){.executable = "/bin/blocked", .arguments = {}},
+                   (struct Cred){.uid = 0, .gid = 0});
+  // ...denied, so actor@5 is cancelled (the entry stays in the queue) and
+  // target@5 is scheduled.
+  tree->HandleExecDenied(5, actor_pid, target_pid);
+  // The actor runs on and exits at 6: actor@6, which is now the only schedule
+  // that counts.
+  tree->HandleExit(6, **tree->Get(actor_pid));
+
+  // cutoff = 16 - 10 = 6. The stale actor@5 and the target@5 entries expire;
+  // actor@6 does not. The actor must survive this drain -- reaping it here
+  // would be reaping it on a deadline that was cancelled.
+  struct Pid churn_pid = {.pid = 10, .pidversion = 1};
+  tree->HandleFork(16, init, churn_pid);
+  XCTAssertTrue(tree->Get(actor_pid).has_value());
+  XCTAssertFalse(tree->Get(target_pid).has_value());
+
+  // cutoff = 17 - 10 = 7: actor@6 expires and the actor is reaped normally.
+  churn_pid.pid++;
+  tree->HandleFork(17, init, churn_pid);
+  XCTAssertFalse(tree->Get(actor_pid).has_value());
+}
+
+// The authorization deadline can outlast the removal grace, so DrainRemovals
+// may already have tombstoned the actor by the time the deny arrives -- it is
+// retained for the duration of message processing (the event's ProcessToken),
+// so the reap turns into a tombstone rather than an erase. Reviving must clear
+// tombstoned_ as well, or ReleaseProcess erases the live process the instant
+// that token dies.
+- (void)testRevivedActorSurvivesTombstoneAndRelease {
+  std::vector<std::unique_ptr<Annotator>> annotators{};
+  auto tree = std::make_shared<ProcessTreeTestPeer>(std::move(annotators),
+                                                    /*removal_grace_ticks=*/10);
+  auto init = tree->InsertInit();
+
+  const struct Pid actor_pid = {.pid = 2, .pidversion = 1};
+  const struct Pid target_pid = {.pid = 2, .pidversion = 2};
+  tree->HandleFork(1, init, actor_pid);
+  tree->AnnotateProcess(**tree->Get(actor_pid),
+                        std::make_shared<IndexedTestAnnotator>(std::vector<std::string>{"MARK"}));
+
+  // The event being authorized holds the actor and the target, as the
+  // tree-aware client's ProcessToken does for the whole of message handling.
+  PidList retained = tree->RetainProcess(PidList{actor_pid, target_pid});
+  XCTAssertEqual(retained.size(), 1u);
+
+  tree->HandleExec(5, **tree->Get(actor_pid), target_pid,
+                   (struct Program){.executable = "/bin/blocked", .arguments = {}},
+                   (struct Cred){.uid = 0, .gid = 0});
+
+  // The decision takes longer than the grace: the actor's removal comes due
+  // while it is still retained, so it is tombstoned rather than erased.
+  struct Pid churn_pid = {.pid = 10, .pidversion = 1};
+  for (int i = 0; i < 20; i++) {
+    tree->HandleFork(20 + i, init, churn_pid);
+    churn_pid.pid++;
+  }
+  XCTAssertTrue(tree->Get(actor_pid).has_value());
+
+  // Now the deny lands and the actor is revived...
+  tree->HandleExecDenied(50, actor_pid, target_pid);
+  XCTAssertTrue(tree->AnnotationExists("MARK"));
+
+  // ...and the event finishes, dropping the retain. A still-tombstoned
+  // process would be erased right here.
+  tree->ReleaseProcess(retained);
+  XCTAssertTrue(tree->Get(actor_pid).has_value());
+  XCTAssertTrue(tree->AnnotationExists("MARK"));
+}
+
+// One exec schedules the actor twice: the Authorizer sees it as AUTH_EXEC and
+// again as NOTIFY_EXEC, with different mach_times, and both are novel to the
+// dedup gate. When the exec is allowed, the actor must still be reaped -- the
+// removal_ts_ match must not leave the superseded entry as the only one that
+// ever matched.
+- (void)testAllowedExecWithBothDeliveriesStillReapsActor {
+  std::vector<std::unique_ptr<Annotator>> annotators{};
+  auto tree = std::make_shared<ProcessTreeTestPeer>(std::move(annotators),
+                                                    /*removal_grace_ticks=*/10);
+  auto init = tree->InsertInit();
+
+  const struct Pid actor_pid = {.pid = 2, .pidversion = 1};
+  const struct Pid target_pid = {.pid = 2, .pidversion = 2};
+  tree->HandleFork(1, init, actor_pid);
+
+  tree->HandleExec(5, **tree->Get(actor_pid), target_pid,
+                   (struct Program){.executable = "/bin/after", .arguments = {}},
+                   (struct Cred){.uid = 0, .gid = 0});
+  // Same exec, redelivered as NOTIFY_EXEC with a later stamp: novel to the
+  // dedup gate, loses the first-wins insert, schedules the actor a second
+  // time.
+  tree->HandleExec(6, **tree->Get(actor_pid), target_pid,
+                   (struct Program){.executable = "/bin/after", .arguments = {}},
+                   (struct Cred){.uid = 0, .gid = 0});
+
+  struct Pid churn_pid = {.pid = 10, .pidversion = 1};
+  for (int i = 0; i < 20; i++) {
+    tree->HandleFork(10 + i, init, churn_pid);
+    churn_pid.pid++;
+  }
+  XCTAssertFalse(tree->Get(actor_pid).has_value());
+  XCTAssertTrue(tree->Get(target_pid).has_value());
 }
 
 @end

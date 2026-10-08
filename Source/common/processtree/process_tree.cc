@@ -157,12 +157,15 @@ void ProcessTree::HandleExec(uint64_t timestamp, const Process& p,
     if (!StepLocked({timestamp, EventKind::kExec, p.pid_, new_pid})) {
       return;
     }
-    remove_at_.push({timestamp, p.pid_});
     // The pre-exec process is gone as of this event. Retire it from the index
     // now rather than when it is finally reaped, or the program it used to be
     // would keep answering annotation_exists() for the whole removal grace.
+    // At AUTH time this is provisional: if the decision is DENY the execve
+    // fails and the actor keeps running, so HandleExecDenied undoes both of
+    // these.
     if (auto old = GetLocked(p.pid_)) {
       UnindexProcessLocked(**old);
+      ScheduleRemovalLocked(timestamp, **old);
     }
     PropagateAnnotationsLocked(p, *new_proc, /*across_exec=*/true);
     if (map_.emplace(new_proc->pid_, new_proc).second) {
@@ -180,31 +183,37 @@ void ProcessTree::HandleExit(uint64_t timestamp, const Process& p) {
   if (!StepLocked({timestamp, EventKind::kExit, p.pid_, Pid{}})) {
     return;
   }
-  remove_at_.push({timestamp, p.pid_});
   // As in HandleExec: retire now, not at reap. The process is gone even though
   // it lingers in map_ for the removal grace.
   if (auto exiting = GetLocked(p.pid_)) {
     UnindexProcessLocked(**exiting);
+    ScheduleRemovalLocked(timestamp, **exiting);
   }
   DrainRemovals();
 }
 
-void ProcessTree::RetireProcess(uint64_t timestamp, const Pid target) {
+void ProcessTree::HandleExecDenied(uint64_t timestamp, const Pid actor,
+                                   const Pid target) {
   absl::MutexLock lock(mtx_);
-  auto proc = GetLocked(target);
-  if (!proc) {
-    return;
-  }
   // Deliberately NOT gated on StepLocked: this is a decision, not an ES event,
-  // so it has no EventKey of its own and keying it on the exec's would make
-  // the exec itself look like a duplicate afterwards. Both halves below are
+  // so it has no EventKey of its own, and keying it on the exec's would make
+  // the exec itself look like a duplicate afterwards. Every step below is
   // individually idempotent instead, which is what repeated calls need:
-  // UnindexProcessLocked is a no-op once Process::indexed_ is cleared, and a
-  // second remove_at_ entry for a pid that is already gone is dropped by
-  // DrainRemovals' own lookup.
-  UnindexProcessLocked(**proc);
-  remove_at_.push({timestamp, target});
-  // Reap after scheduling, as the Handle* paths do.
+  // Un/IndexProcessLocked are gated on Process::indexed_, a second remove_at_
+  // entry for a pid that is already gone is dropped by DrainRemovals' own
+  // lookup, and the flags are plain assignments.
+
+  // Retire the target first, then revive the actor. They always differ (an
+  // exec bumps the pidversion), but if a caller ever passed the same pid
+  // twice, ending alive is the safer of the two outcomes.
+  if (auto proc = GetLocked(target)) {
+    UnindexProcessLocked(**proc);
+    ScheduleRemovalLocked(timestamp, **proc);
+  }
+  if (auto proc = GetLocked(actor)) {
+    ReviveProcessLocked(**proc);
+  }
+  // Reap after applying, as the Handle* paths do.
   DrainRemovals();
 }
 
@@ -252,6 +261,28 @@ bool ProcessTree::StepLocked(const EventKey& key) {
   return true;
 }
 
+void ProcessTree::ScheduleRemovalLocked(uint64_t timestamp, Process& p) {
+  remove_at_.push({timestamp, p.pid_});
+  p.pending_removal_ = true;
+  // Last schedule wins. Not std::max: an out-of-order redelivery stamped in
+  // the past is still the most recent thing the tree was told, and whichever
+  // timestamp is recorded here is the one entry that will reap -- taking the
+  // max of the two would leave the recorded deadline matching no entry at all
+  // if the older timestamp were the one pushed last.
+  p.removal_ts_ = timestamp;
+}
+
+void ProcessTree::ReviveProcessLocked(Process& p) {
+  p.pending_removal_ = false;
+  p.removal_ts_ = 0;
+  // DrainRemovals may already have tombstoned the process while the decision
+  // was outstanding (the authorization deadline can outlast the grace). Clear
+  // it, or ReleaseProcess erases the process the moment the event's
+  // ProcessToken drops its reference.
+  p.tombstoned_ = false;
+  IndexProcessLocked(p);
+}
+
 void ProcessTree::DrainRemovals() {
   // Reap deferred removals once `grace` mach_time ticks have elapsed past the
   // scheduling event (measured against the newest timestamp seen). The grace
@@ -267,10 +298,25 @@ void ProcessTree::DrainRemovals() {
   // at the first that has not — every deeper entry is newer. This is O(K log R)
   // in the number reaped, not O(R) in the number pending.
   while (!remove_at_.empty() && remove_at_.top().first < cutoff) {
+    const uint64_t scheduled_at = remove_at_.top().first;
     const struct Pid pid = remove_at_.top().second;
     remove_at_.pop();
     auto target = GetLocked(pid);
     if (!target) {
+      continue;
+    }
+    // The queue is advisory; the Process holds the authoritative decision.
+    // Discard this entry unless the process is still slated for removal AND
+    // this is the entry that was recorded for it. The first test is how a
+    // cancelled removal is honoured (HandleExecDenied revived the actor of a
+    // denied exec, which is still running). The second stops an earlier,
+    // superseded entry from reaping on a stale deadline: one exec schedules
+    // the actor twice (AUTH_EXEC then NOTIFY_EXEC), and a process revived and
+    // later genuinely exited has an old entry still in the queue. Neither test
+    // can resurrect a process that really did exit -- the exit path sets both
+    // fields, so its own entry always matches.
+    if (!(*target)->pending_removal_ ||
+        (*target)->removal_ts_ != scheduled_at) {
       continue;
     }
     if ((*target)->refcnt_.load(std::memory_order_relaxed) > 0) {
