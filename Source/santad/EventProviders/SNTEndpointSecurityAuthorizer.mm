@@ -145,11 +145,14 @@ using santa::Message;
   // this call.
   //
   // The cost is a window between the response and the unwind in which a
-  // genuinely denied target is still indexed. It is sub-millisecond and
-  // self-correcting: if the denied actor resumes and execs again inside it,
-  // that exec schedules its own removal and the unwind's revive finds a
-  // removal_ts_ that is not this exec's and skips (see
-  // ProcessTree::HandleExecDenied).
+  // genuinely denied target is still indexed. It is sub-millisecond and safe
+  // on both halves. The actor half self-corrects: whatever the released actor
+  // does inside the window -- exit, or exec again -- re-stamps its
+  // removal_ts_, so the unwind's revive no longer matches and is skipped (see
+  // ProcessTree::HandleExecDenied). The target half is safe because a
+  // pidversion that never came into existence can never be referenced by any
+  // later event, which rests on {pid, pidversion} never being reused -- the
+  // same assumption map_'s first-wins emplace already makes.
   //
   // The root cause is upstream -- -processMessage:handler: settles the race
   // after the side effects rather than making the response itself the atomic

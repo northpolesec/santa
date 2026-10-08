@@ -118,12 +118,17 @@ class ProcessTree {
   // be observable half-applied.
   //
   // The actor is revived only if the removal still pending on it is the one
-  // HandleExec scheduled for THIS exec (same timestamp). The actor cannot have
-  // exited voluntarily -- it is blocked in the kernel inside execve(2) waiting
-  // for this very response -- but it can be killed from outside while it
-  // waits, and that exit may reach the tree, through another client, before
-  // this denial does. The timestamp match is what tells the two apart; see the
-  // definition.
+  // HandleExec scheduled for THIS exec, i.e. removal_ts_ equals `timestamp`.
+  // That match is the SOLE guarantee that reviving is correct. Do not relax it
+  // on the strength of the actor being blocked in execve(2) waiting for this
+  // response: the authorizer answers ES before calling here (deliberately --
+  // see SNTEndpointSecurityAuthorizer), so by the time this runs the actor has
+  // been released and may have done anything. It may have been killed while it
+  // waited, or exited voluntarily once resumed, or execed again -- and in
+  // every one of those cases something has re-stamped removal_ts_, the match
+  // fails, and the revive is correctly skipped. Reviving on anything weaker
+  // would put a dead process back in the index with its removal cancelled and
+  // nothing left to schedule it again.
   //
   // Each half is a no-op if its pid is not in the tree, and the whole call is
   // idempotent. Takes mtx_ itself, so it must not be called from anywhere

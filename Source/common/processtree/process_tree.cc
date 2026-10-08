@@ -221,17 +221,20 @@ void ProcessTree::HandleExecDenied(uint64_t timestamp, const Pid actor,
   }
   if (auto proc = GetLocked(actor)) {
     // Revive ONLY the removal this denial is cancelling. HandleExec scheduled
-    // the actor at exactly this timestamp, and the authorizer hands back the
+    // the actor at exactly this timestamp and the authorizer hands back the
     // same mach_time, so an exact match means nothing has happened to the
-    // actor since. Anything else means something has, and the actor really is
-    // gone: it can be SIGKILLed while blocked in the ES auth wait (^C in the
-    // spawning shell, a watchdog, a process-group teardown), and an AUTH_EXEC
-    // can be pending for seconds. Its NOTIFY_EXIT reaches the tree through a
-    // different client on a different queue and may well be processed before
-    // this denial, re-scheduling the actor at the exit's timestamp. Reviving
-    // then would put a dead process back in the index with its removal
-    // cancelled, and nothing would ever schedule it again -- StepLocked drops
-    // the duplicate exit -- which is the pinned-annotation bug all over again.
+    // actor since. Anything else means something has, and the actor is gone
+    // for a reason this denial does not undo. Three ways that happens, all
+    // real: it is killed while blocked in the ES auth wait (^C in the spawning
+    // shell, a watchdog, a process-group teardown -- an AUTH_EXEC can be
+    // pending for seconds) and its NOTIFY_EXIT, arriving through a different
+    // client on a different queue, is processed before this denial; or, since
+    // the authorizer answers ES before calling here, the released actor exits
+    // voluntarily; or it execs again. Each of those re-stamps removal_ts_, so
+    // the match fails. Reviving anyway would put a dead process back in the
+    // index with its removal cancelled and nothing left to schedule it again
+    // -- StepLocked drops the duplicate exit -- which is the pinned-annotation
+    // bug all over again.
     if ((*proc)->pending_removal_ && (*proc)->removal_ts_ == timestamp) {
       ReviveProcessLocked(**proc);
     }

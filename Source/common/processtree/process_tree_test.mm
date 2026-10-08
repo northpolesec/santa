@@ -1251,6 +1251,58 @@ using namespace santa::santad::process_tree;
   XCTAssertFalse(tree->AnnotationExists("MARK"));
 }
 
+// The authorizer answers ES before it unwinds (see
+// SNTEndpointSecurityAuthorizer), which leaves a window in which the released
+// actor can exec again before the denial reaches the tree. That is a pure tree
+// property, so it is modelled here rather than through a seam in the
+// authorizer: a late denial for the FIRST exec must not revive an actor the
+// SECOND exec has already legitimately retired, and must not disturb the
+// second exec's target.
+- (void)testLateDenialDoesNotUndoARaceWinningReExec {
+  std::vector<std::unique_ptr<Annotator>> annotators{};
+  auto tree = std::make_shared<ProcessTreeTestPeer>(std::move(annotators),
+                                                    /*removal_grace_ticks=*/10);
+  auto init = tree->InsertInit();
+
+  const struct Pid actor_pid = {.pid = 2, .pidversion = 1};
+  const struct Pid denied_pid = {.pid = 2, .pidversion = 2};
+  const struct Pid second_pid = {.pid = 2, .pidversion = 3};
+  tree->HandleFork(1, init, actor_pid);
+  tree->AnnotateProcess(**tree->Get(actor_pid),
+                        std::make_shared<IndexedTestAnnotator>(std::vector<std::string>{"MARK"}));
+
+  // AUTH_EXEC #1 at 100: the actor is retired and scheduled at 100.
+  tree->HandleExec(100, **tree->Get(actor_pid), denied_pid,
+                   (struct Program){.executable = "/bin/blocked", .arguments = {}},
+                   (struct Cred){.uid = 0, .gid = 0});
+
+  // The DENY response has gone out; the actor is running again and execs
+  // something else at 110, which re-schedules it at 110.
+  tree->HandleExec(110, **tree->Get(actor_pid), second_pid,
+                   (struct Program){.executable = "/bin/allowed", .arguments = {}},
+                   (struct Cred){.uid = 0, .gid = 0});
+
+  // Only now does the unwind for the FIRST exec land, still stamped 100.
+  tree->HandleExecDenied(100, actor_pid, denied_pid);
+
+  // The second exec's target is untouched and still carries the name.
+  XCTAssertTrue(tree->Get(second_pid).has_value());
+  XCTAssertTrue(tree->AnnotationExists("MARK"));
+
+  // Past the grace: the phantom first target is reaped, the actor is reaped on
+  // the SECOND exec's schedule (the late denial must not have cancelled it),
+  // and the live process is still there and still answering.
+  struct Pid churn_pid = {.pid = 10, .pidversion = 1};
+  for (int i = 0; i < 20; i++) {
+    tree->HandleFork(120 + i, init, churn_pid);
+    churn_pid.pid++;
+  }
+  XCTAssertFalse(tree->Get(denied_pid).has_value());
+  XCTAssertFalse(tree->Get(actor_pid).has_value());
+  XCTAssertTrue(tree->Get(second_pid).has_value());
+  XCTAssertTrue(tree->AnnotationExists("MARK"));
+}
+
 // The authorization deadline can outlast the removal grace, so DrainRemovals
 // may already have tombstoned the actor by the time the deny arrives -- it is
 // retained for the duration of message processing (the event's ProcessToken),
