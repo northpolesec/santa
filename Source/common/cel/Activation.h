@@ -132,8 +132,8 @@ class Activation : public ::google::api::expr::runtime::BaseActivation {
   mutable std::optional<PendingKill> pendingKill_;
   // Set during evaluation when add_annotation(), has_annotation() or
   // annotation_exists() is used. Also makes the result non-cacheable: the
-  // answer is per-process, and a cached decision would skip add_annotation()'s
-  // write on the next exec.
+  // answer is per-process or per-moment, and a cached decision would skip
+  // add_annotation()'s write on the next exec.
   mutable bool usedAnnotations_ = false;
   // Lazily-created implementations of the lazy functions, vended via
   // FindFunctionOverloads.

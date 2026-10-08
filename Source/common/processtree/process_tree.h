@@ -282,9 +282,14 @@ class ProcessTree {
   // Annotation names carried by at least one live process, each with the
   // number of processes carrying it. The count is of PROCESSES, not of
   // Annotator objects: PropagatesWholly lets one object be shared by a whole
-  // inherited subtree, and each process carrying it counts once. A name is
-  // erased when its last carrier retires, so a lookup answers
-  // AnnotationExists() without touching map_.
+  // inherited subtree, and each process carrying it counts once -- strictly,
+  // once per annotator TYPE on that process, since annotations_ is keyed by
+  // type and each entry is counted separately, so a process would be counted
+  // twice for a name two different annotator types both contributed. That is
+  // moot while CELAnnotator is the only contributor, but an author adding a
+  // second indexing annotator must keep the name spaces disjoint (or make
+  // this index dedup per process). A name is erased when its last carrier
+  // retires, so a lookup answers AnnotationExists() without touching map_.
   absl::flat_hash_map<std::string, uint32_t> annotation_index_
       ABSL_GUARDED_BY(mtx_);
   // Pending removals: pids to erase from map_, each paired with the mach_time

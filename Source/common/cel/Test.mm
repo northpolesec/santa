@@ -2615,14 +2615,15 @@ class ScopedHostZone {
   XCTAssertFalse(result.value().cacheable);
 }
 
-// Annotations are CELv2 only: neither function, and neither of the propagation
-// identifiers, exists for V1.
+// Annotations are CELv2 only: none of the three functions, and neither of the
+// propagation identifiers, exists for V1.
 - (void)testAnnotationsNotAvailableInV1 {
   auto sut = santa::cel::Evaluator<false>::Create();
   XCTAssertTrue(sut.ok());
 
   std::vector<std::string> exprs = {
       "has_annotation('MARK')",
+      "annotation_exists('MARK')",
       "add_annotation('MARK', ALLOWLIST)",
       "add_annotation('MARK', FORK_AND_EXEC, ALLOWLIST)",
   };

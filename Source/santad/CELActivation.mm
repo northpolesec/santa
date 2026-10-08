@@ -210,8 +210,9 @@ ActivationCallbackBlock CreateCELActivationBlock(
         f->set_team_id(santa::NSStringToUTF8String(teamID));
       }
 
-      // add_annotation() and has_annotation() are CELv2 only, so a V1
-      // activation gets empty hooks rather than two closures nothing can call.
+      // add_annotation(), has_annotation() and annotation_exists() are CELv2
+      // only, so a V1 activation gets empty hooks rather than a set of
+      // closures nothing can call.
       santa::cel::AnnotationHooks annotationHooks;
 
       if constexpr (IsV2) {
