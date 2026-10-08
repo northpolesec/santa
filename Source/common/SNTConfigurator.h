@@ -286,7 +286,7 @@
 ///
 ///  If eventLogType is set to protobuf, spoolDirectoryFileSizeThresholdKB sets the per-file size
 ///  limit for files saved in the spoolDirectory.
-///  Defaults to 250.
+///  Defaults to 1024.
 ///
 ///  @note: This property is KVO compliant, but should only be read once at santad startup.
 ///
@@ -351,7 +351,7 @@
 ///  export batch.
 ///  Note: All files in a batch are written as a single combined file at the destination.
 ///  See also: TelemetryExportBatchThresholdSizeMB
-///  Defaults to 50.
+///  Defaults to 100.
 ///
 ///  @note: This property is KVO compliant.
 ///
