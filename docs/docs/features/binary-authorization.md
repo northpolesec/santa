@@ -374,8 +374,8 @@ subsequent executions are faster. All other fields (`path`, `args`, `envs`,
 if used in rules for frequently-executed binaries. Expressions that call
 `today()`, `now()` or `policy_for_range()` are also **not cacheable**, since
 their result depends on when the execution happens, as are expressions that
-call `add_annotation()` or `has_annotation()`, since they act on a specific
-process.
+call `add_annotation()`, `has_annotation()` or `annotation_exists()`, since
+they act on a specific process or on which processes are running.
 
 :::
 
@@ -394,6 +394,7 @@ following helper functions are available. They require [Workshop](https://northp
 | `kill_on_expiry(policy)` | policy | Wraps the in-range policy of `policy_for_range()` so the processes the rule allowed are quit when the window closes. Accepts only policies that let a process start. See [Time Based Rules](/features/time-based-rules#kill-on-expiry). Requires Workshop and Santa 2026.8+ |
 | `add_annotation(names, propagation, policy)` | policy | Annotates the executing process with `names` (a string or a list of strings) and returns `policy` unchanged. `propagation` is how far the annotation follows the process's descendants: `NONE`, `FORK_ONLY`, `EXEC_ONLY` or `FORK_AND_EXEC`. The form without `propagation` uses `FORK_AND_EXEC`. Every `{session}` in a name is replaced with an ID for this execution of the process, so each run of a tool gets its own annotation. The ID is the process's PID and PID version, so `claude-code-{session}` becomes e.g. `claude-code-4521-18734`. Must produce the rule's result. Never cacheable. Requires Workshop and Santa 2026.9+ |
 | `has_annotation(name)` | `bool` | Whether the executing process carries the annotation `name`. Names match exactly and `{session}` is not expanded, so if a rule needs `has_annotation()`, attach both the unsuffixed and suffixed versions of the annotation, e.g. `add_annotation(['claude-code-{session}', 'claude-code'], ALLOWLIST)`. Never cacheable. Requires Workshop and Santa 2026.9+ |
+| `annotation_exists(name)` | `bool` | Whether **any** process currently running carries the annotation `name`, for rules that gate one program on another being alive, e.g. `annotation_exists('claude-code') ? ALLOWLIST : BLOCKLIST`. The executing process counts itself if it inherited the annotation, so "some other process has it" is `annotation_exists(name) && !has_annotation(name)`. The answer goes false as soon as the last process carrying the annotation exits. Names containing `{session}` are never visible here, since each run gets its own — attach the unsuffixed name alongside, as with `has_annotation()`. Never cacheable. Requires Workshop and Santa 2026.9+ |
 
 Some examples of valid CEL expressions:
 
@@ -419,6 +420,10 @@ policy_for_range(weekdays(), '09:00', '17:00', ALLOWLIST, BLOCKLIST)
 // If Claude Code runs as PID 4521 with PID version 18734, it and everything it
 // starts get both claude-code-4521-18734 and claude-code.
 add_annotation(['claude-code-{session}', 'claude-code'], ALLOWLIST)
+
+// Allow a helper only while the tool that owns it is running. Pair with the
+// rule above, which annotates the tool.
+annotation_exists('claude-code') ? ALLOWLIST : BLOCKLIST
 
 // Only allow Chrome from this team, block other apps.
 // Useful when attached to a TEAMID rule to allow a specific app.
