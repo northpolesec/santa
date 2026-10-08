@@ -10,6 +10,7 @@ cc_library(
     hdrs = ["annotator.h"],
     deps = [
         "//Source/common/processtree:process_tree_cc_proto",
+        "@abseil-cpp//absl/functional:function_ref",
     ],
 )
 
@@ -36,6 +37,7 @@ cc_library(
         "//Source/common/processtree:process_tree",
         "//Source/common/processtree:process_tree_cc_proto",
         "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/functional:function_ref",
         "@cel-cpp//internal:utf8",
     ],
 )

@@ -15,7 +15,9 @@
 #import <Foundation/Foundation.h>
 #import <XCTest/XCTest.h>
 
+#include <set>
 #include <string>
+#include <string_view>
 
 #include "Source/common/processtree/annotations/cel.h"
 #include "Source/common/processtree/process.h"
@@ -255,6 +257,52 @@ constexpr CELAnnotator::Entry kForkAndExec = {.fork = true, .exec = true};
 - (void)testNoAnnotationsExportsNothing {
   auto tool = [self exec:[self fork:self.initProc to:2 ver:2] ver:3 path:"/usr/bin/tool"];
   XCTAssertFalse(self.tree->ExportAnnotations(tool->pid_).has_value());
+}
+
+- (void)testForEachIndexedNameVisitsEveryName {
+  CELAnnotator annotator(CELAnnotator::EntryMap{
+      {"plain", kForkAndExec},
+      {"exec-only", kExecOnly},
+      {"stay-put", kNone},
+  });
+
+  std::set<std::string> visited;
+  annotator.ForEachIndexedName(
+      [&visited](std::string_view name) { visited.insert(std::string(name)); });
+
+  // Propagation does not matter: a name is indexed wherever it is carried.
+  XCTAssertTrue(visited == (std::set<std::string>{"plain", "exec-only", "stay-put"}));
+}
+
+- (void)testForEachIndexedNameSkipsSessionExpandedNames {
+  CELAnnotator annotator(CELAnnotator::EntryMap{
+      {"claude-code", kForkAndExec},
+      {"claude-code-20-2", {.fork = true, .exec = true, .session = true}},
+  });
+
+  std::set<std::string> visited;
+  annotator.ForEachIndexedName(
+      [&visited](std::string_view name) { visited.insert(std::string(name)); });
+
+  // A session-expanded name is unique to one run of one process, so no rule
+  // could ever name it in annotation_exists().
+  XCTAssertTrue(visited == (std::set<std::string>{"claude-code"}));
+}
+
+- (void)testSessionFlagIsPartOfEntryIdentity {
+  // Re-adding a name whose session flag changed must rewrite the annotation.
+  // If Entry::operator== ignored the flag, AddCELAnnotation would short-circuit
+  // and the index would keep counting the name under the stale flag.
+  auto proc = self.initProc;
+  AddCELAnnotation(*self.tree, proc->pid_, "mark", kForkAndExec);
+  auto first = *self.tree->GetAnnotation<CELAnnotator>(*proc);
+
+  AddCELAnnotation(*self.tree, proc->pid_, "mark",
+                   (CELAnnotator::Entry){.fork = true, .exec = true, .session = true});
+  auto second = *self.tree->GetAnnotation<CELAnnotator>(*proc);
+
+  XCTAssertNotEqual(first, second);
+  XCTAssertTrue(second->entries().at("mark").session);
 }
 
 @end
