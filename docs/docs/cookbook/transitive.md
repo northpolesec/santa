@@ -10,7 +10,7 @@ To find that binary, run `eslogger` while you build, and filter for the name
 of the output file:
 
 ```sh
-sudo eslogger close rename clone | grep <output_file_name>
+sudo eslogger close rename clone | grep -F 'OUTPUT_FILE_NAME'
 ```
 
 Each event names the process that wrote, renamed, or cloned the file.
