@@ -13,7 +13,9 @@ of the output file:
 sudo eslogger close rename clone | grep -F 'OUTPUT_FILE_NAME'
 ```
 
-Each event names the process that wrote, renamed, or cloned the file.
+A `rename` or `clone` event names the process that renamed or cloned the file.
+A `close` event names the process that closed the file. That process changed the
+file only if the event has `"modified": true`.
 
 ## Xcode
 
