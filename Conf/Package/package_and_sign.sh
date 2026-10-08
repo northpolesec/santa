@@ -81,6 +81,38 @@ function verify_slices {
   done
 }
 
+# A release must not carry get-task-allow (the debugger entitlements files add
+# it), and netd must carry the Developer ID capability values, which only
+# --define=SANTA_BUILD_TYPE=release selects. Neither rules_apple nor codesign
+# checks that key against the profile, so a wrong build signs fine and netd
+# fails to activate on the customer's machine.
+function verify_entitlements {
+  local artifact="${1}"
+  local want_id="${2}"
+
+  # Empty for a binary signed without entitlements, such as the CLIs.
+  local ents
+  ents=$(/usr/bin/codesign -d --entitlements - --xml "${artifact}" 2>/dev/null) ||
+    die "could not read the entitlements of ${artifact}"
+
+  # plutil fails when the key (or the whole plist) is absent, which is the
+  # normal case; do not let set -e turn that into a silent exit.
+  local allow
+  allow=$(/usr/bin/plutil -extract 'com\.apple\.security\.get-task-allow' raw -o - - <<<"${ents}" 2>/dev/null) || true
+  [[ "${allow}" != "true" ]] ||
+    die "${artifact} is signed with get-task-allow (a debugger build)"
+
+  if [[ "${want_id}" == "com.northpolesec.santa.netd" ]]; then
+    local ne want
+    ne=$(/usr/bin/plutil -extract 'com\.apple\.developer\.networking\.networkextension' json -o - - <<<"${ents}" 2>/dev/null) ||
+      die "${artifact} has no networkextension entitlement"
+    for want in content-filter-provider-systemextension dns-proxy-systemextension; do
+      /usr/bin/grep -q "\"${want}\"" <<<"${ne}" ||
+        die "${artifact} lacks ${want}; build with --define=SANTA_BUILD_TYPE=release"
+    done
+  fi
+}
+
 # RELEASE_ROOT is a required environment variable that points to the root
 # of a release tarball produced with the :release rule in Santa's
 # main BUILD file, or the root of an extracted release dir.
@@ -187,6 +219,9 @@ for ARTIFACT in "${INPUT_SANTACTL}" "${INPUT_SANTABS}" "${INPUT_SANTAMS}" "${INP
 
   echo "verifying every slice of ${BN}"
   verify_slices "${ARTIFACT}" "${WANT_ID}"
+
+  echo "verifying the entitlements of ${BN}"
+  verify_entitlements "${ARTIFACT}" "${WANT_ID}"
 done
 
 # Notarize all the bundles
@@ -303,6 +338,9 @@ if [ -n "${BUILD_LITE_PACKAGE}" ]; then
 
   echo "verifying every slice of the lite Santa.app"
   verify_slices "${LITE_APP}" "com.northpolesec.santa"
+
+  echo "verifying the entitlements of the lite Santa.app"
+  verify_entitlements "${LITE_APP}" "com.northpolesec.santa"
 
   # Notarize the lite app
   echo "zipping lite Santa.app"
