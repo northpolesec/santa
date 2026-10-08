@@ -6,6 +6,15 @@ rules for various compiler toolchains.
 For each toolchain it's important to note that the last binary that writes to
 the new binary is the one that should have a rule.
 
+To find that binary, run `eslogger` while you build, and filter for the name
+of the output file:
+
+```sh
+sudo eslogger close rename clone | grep <output_file_name>
+```
+
+Each event names the process that wrote, renamed, or cloned the file.
+
 ## Xcode
 
 To cover Xcode you will either need `ld`, `lipo`, or `codesign`, depending on

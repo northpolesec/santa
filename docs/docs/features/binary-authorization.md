@@ -269,6 +269,13 @@ scanned and transitive rules created as quickly as possible, there is a race
 condition in certain scenarios that will cause execution to fail, especially if
 a binary is executed _immediately_ after being created.
 
+Commands that build and run in one step, such as `go run`, `cargo run`, and
+`bazel run`, can hit this. Build and run in separate steps instead. To see
+whether a transitive rule exists, run
+`santactl fileinfo --key Rule /path/to/binary`. A transitive rule shows as
+`Allowed (Binary, Transitive)`. If the rule exists but the execution was
+blocked, Santa most likely created the rule after the execution.
+
 :::
 
 If transitive allowlisting is _not_ enabled, the rule will be treated as if it

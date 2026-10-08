@@ -84,3 +84,23 @@ santanetd (BETA)     | 2026.3 (build 187, commit 2149a1ce)
 
 If a newer version of the network extension is available, it will be noted in the
 output and installed on the next reboot or sleep/wake cycle.
+
+## Removal
+
+1. In Workshop, turn off the **Network Extension** setting on every tag that
+   has it. Santa then removes the content filter and DNS proxy configurations,
+   but the extension stays activated. While the setting is on, Santa tries to
+   install the extension again, and users can see approval prompts.
+2. To deactivate the extension on a host, run:
+
+   ```sh
+   sudo /Applications/Santa.app/Contents/MacOS/Santa --unload-network-extension
+   ```
+
+3. In your [system extension profile](profile-system-extension.md), remove
+   `com.northpolesec.santa.netd` from the allowed system extensions. If you
+   also listed it as non-removable, remove it from that list too. Keep
+   `com.northpolesec.santa.daemon`, which Santa needs to run.
+
+The Web Content Filter and DNS Proxy payloads only pre-approve the extension.
+You can remove them at any time.
