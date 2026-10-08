@@ -77,8 +77,8 @@ std::string MakeRawCDHash() {
 // process tree, so each only supplies what differs between calls: the target,
 // the evaluator and the expression.
 auto EvaluateAgainstTarget(const std::shared_ptr<ProcessTree>& tree,
-                          const std::shared_ptr<MockEndpointSecurityAPI>& mockESApi, Pid target,
-                          santa::cel::Evaluator<true>* evaluator, absl::string_view expr) {
+                           const std::shared_ptr<MockEndpointSecurityAPI>& mockESApi, Pid target,
+                           santa::cel::Evaluator<true>* evaluator, absl::string_view expr) {
   es_file_t procFile = MakeESFile("/bin/parent");
   es_process_t proc = MakeESProcess(&procFile, MakeAuditToken(1, 1), MakeAuditToken(1, 1));
   es_file_t targetFile = MakeESFile("/bin/target");
@@ -92,8 +92,8 @@ auto EvaluateAgainstTarget(const std::shared_ptr<ProcessTree>& tree,
       msg, /*signingID=*/nil, /*teamID=*/nil, /*isPlatformBinary=*/NO, /*signingTime=*/nil,
       /*secureSigningTime=*/nil, /*entitlements=*/nil, tree);
   std::unique_ptr<::google::api::expr::runtime::BaseActivation> base = block(/*useV2=*/true);
-  return evaluator->CompileAndEvaluate(
-      expr, *static_cast<santa::cel::Activation<true>*>(base.get()));
+  return evaluator->CompileAndEvaluate(expr,
+                                       *static_cast<santa::cel::Activation<true>*>(base.get()));
 }
 
 }  // namespace
@@ -261,8 +261,8 @@ auto EvaluateAgainstTarget(const std::shared_ptr<ProcessTree>& tree,
 
   {
     auto result = EvaluateAgainstTarget(tree, mockESApi, toolPid, ruleEvaluator.value().get(),
-                                       "add_annotation(['BAZEL-CALL', 'BAZEL-CALL-{session}'], "
-                                       "FORK_AND_EXEC, ALLOWLIST)");
+                                        "add_annotation(['BAZEL-CALL', 'BAZEL-CALL-{session}'], "
+                                        "FORK_AND_EXEC, ALLOWLIST)");
     XCTAssertTrue(result.ok());
     XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
     // Otherwise the next exec of the same binary would skip the stamp entirely.
@@ -281,9 +281,9 @@ auto EvaluateAgainstTarget(const std::shared_ptr<ProcessTree>& tree,
                    (Program){.executable = "/bin/child", .arguments = {}}, cred);
 
   {
-    auto result = EvaluateAgainstTarget(
-        tree, mockESApi, childPid, fallbackEvaluator.value().get(),
-        "has_annotation('BAZEL-CALL') ? ALLOWLIST_COMPILER : UNSPECIFIED");
+    auto result =
+        EvaluateAgainstTarget(tree, mockESApi, childPid, fallbackEvaluator.value().get(),
+                              "has_annotation('BAZEL-CALL') ? ALLOWLIST_COMPILER : UNSPECIFIED");
     XCTAssertTrue(result.ok());
     XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST_COMPILER);
     XCTAssertFalse(result.value().cacheable);
@@ -295,9 +295,9 @@ auto EvaluateAgainstTarget(const std::shared_ptr<ProcessTree>& tree,
   Pid strangerPid = {.pid = 40, .pidversion = 1};
   tree->HandleFork(5, init, strangerPid);
   {
-    auto result = EvaluateAgainstTarget(
-        tree, mockESApi, strangerPid, fallbackEvaluator.value().get(),
-        "has_annotation('BAZEL-CALL') ? ALLOWLIST_COMPILER : UNSPECIFIED");
+    auto result =
+        EvaluateAgainstTarget(tree, mockESApi, strangerPid, fallbackEvaluator.value().get(),
+                              "has_annotation('BAZEL-CALL') ? ALLOWLIST_COMPILER : UNSPECIFIED");
     XCTAssertTrue(result.ok());
     XCTAssertEqual(result.value().value, ReturnValue::UNSPECIFIED);
   }
