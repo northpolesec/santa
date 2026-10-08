@@ -89,13 +89,20 @@ struct FakeAnnotations {
   // Names some OTHER process in the tree carries, for annotation_exists().
   std::set<std::string> anywhere;
   std::vector<std::pair<std::string, santa::cel::AnnotationPropagation>> added;
+  // Names the add hook reported as session-expanded. Kept separate from
+  // `added` so the existing assertions on it still read the same.
+  std::set<std::string> sessionNames;
 
   santa::cel::AnnotationHooks Hooks() {
     return {
         .has = [this](const std::string& name) { return present.count(name) > 0; },
         .add =
-            [this](const std::string& name, santa::cel::AnnotationPropagation propagation) {
+            [this](const std::string& name, santa::cel::AnnotationPropagation propagation,
+                   bool session_expanded) {
               added.push_back({name, propagation});
+              if (session_expanded) {
+                sessionNames.insert(name);
+              }
               present.insert(name);
             },
         .session = [] { return std::string("123-4"); },
@@ -2368,6 +2375,10 @@ class ScopedHostZone {
     XCTAssertEqual(annotations.added[0].first, "claude-code-123-4");
     XCTAssertEqual(annotations.added[1].first, "claude-code");
     XCTAssertEqual(annotations.added[2].first, "123-4/123-4");
+    // Only the expanded names are flagged. The flag is what keeps a name that
+    // is unique per run out of the tree's annotation index.
+    XCTAssertTrue(annotations.sessionNames ==
+                  (std::set<std::string>{"claude-code-123-4", "123-4/123-4"}));
   }
 
   {
@@ -2385,6 +2396,7 @@ class ScopedHostZone {
   }
 
   annotations.added.clear();
+  annotations.sessionNames.clear();
 
   {
     // Without a session hook the placeholder is left as written.
@@ -2393,6 +2405,9 @@ class ScopedHostZone {
     XCTAssertTrue(evaluate("add_annotation('claude-code-{session}', ALLOWLIST)", hooks).ok());
     XCTAssertEqual(annotations.added.size(), 1u);
     XCTAssertEqual(annotations.added[0].first, "claude-code-{session}");
+    // Left as written, so it is a literal name, not unique per run: not
+    // flagged, and correctly indexable.
+    XCTAssertTrue(annotations.sessionNames.empty());
   }
 }
 

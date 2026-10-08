@@ -125,12 +125,16 @@ inline constexpr std::pair<absl::string_view, AnnotationPropagation>
 
 // How the CEL layer reaches the process tree. Supplied by santad (see
 // CreateCELActivationBlock); empty hooks mean there is no tree, in which case
-// has_annotation() is false and add_annotation() only passes its policy
-// through.
+// has_annotation() and annotation_exists() are false and add_annotation()
+// only passes its policy through.
 struct AnnotationHooks {
   std::function<bool(const std::string& name)> has;
-  std::function<void(const std::string& name,
-                     AnnotationPropagation propagation)>
+  // `session_expanded` is true when the name was produced by substituting
+  // kSessionPlaceholder, which makes it unique to one run of one process.
+  // Such a name is kept out of the tree's annotation index: no rule can write
+  // the expanded form, so annotation_exists() could never answer from it.
+  std::function<void(const std::string& name, AnnotationPropagation propagation,
+                     bool session_expanded)>
       add;
   // The value kSessionPlaceholder expands to in an add_annotation() name. If
   // unset, the placeholder is left as written.
@@ -217,8 +221,8 @@ class AddAnnotationFunction : public ::google::api::expr::runtime::CelFunction {
   StagedAnnotations* staged_;
 };
 
-// Register the add_annotation() and has_annotation() decls with the type
-// checker at compile time. Only available in CELv2.
+// Register the add_annotation(), has_annotation() and annotation_exists()
+// decls with the type checker at compile time. Only available in CELv2.
 absl::Status AddAnnotationCompilerLibrary(::cel::CompilerBuilder& builder);
 
 // Register the annotation functions at runtime. Both are lazy; the Activation

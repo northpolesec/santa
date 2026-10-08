@@ -344,11 +344,15 @@ void Activation<IsV2>::FlushStagedAnnotations(bool commit) const {
   if (commit && annotations_.add) {
     std::optional<std::string> session;
     for (auto& [name, propagation] : stagedAnnotations_) {
+      // This is the only place the placeholder is substituted, so it is the
+      // only place that can tell the tree the name is per-run.
+      bool sessionExpanded = false;
       if (annotations_.session && absl::StrContains(name, kSessionPlaceholder)) {
         if (!session) session = annotations_.session();
         absl::StrReplaceAll({{kSessionPlaceholder, *session}}, &name);
+        sessionExpanded = true;
       }
-      annotations_.add(name, propagation);
+      annotations_.add(name, propagation, sessionExpanded);
     }
   }
   stagedAnnotations_.clear();

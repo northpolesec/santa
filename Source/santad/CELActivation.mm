@@ -39,11 +39,12 @@ namespace {
 using santa::santad::process_tree::CELAnnotator;
 using santa::santad::process_tree::ProcessTree;
 
-CELAnnotator::Entry EntryFor(santa::cel::AnnotationPropagation propagation) {
+CELAnnotator::Entry EntryFor(santa::cel::AnnotationPropagation propagation, bool sessionExpanded) {
   using P = santa::cel::AnnotationPropagation;
   return {
       .fork = propagation == P::kForkOnly || propagation == P::kForkAndExec,
       .exec = propagation == P::kExecOnly || propagation == P::kForkAndExec,
+      .session = sessionExpanded,
   };
 }
 
@@ -72,11 +73,12 @@ santa::cel::AnnotationHooks AnnotationHooksFor(std::shared_ptr<ProcessTree> proc
           },
       .add =
           [processTree, esMsg](const std::string& name,
-                               santa::cel::AnnotationPropagation propagation) {
+                               santa::cel::AnnotationPropagation propagation,
+                               bool sessionExpanded) {
             AddCELAnnotation(*processTree,
                              santa::santad::process_tree::PidFromAuditToken(
                                  esMsg->event.exec.target->audit_token),
-                             name, EntryFor(propagation));
+                             name, EntryFor(propagation, sessionExpanded));
           },
       // pidversion changes on exec, so this names this exec of the target and
       // matches the pid and pidversion its telemetry carries.
