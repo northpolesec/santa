@@ -31,6 +31,9 @@
 #include "Source/common/es/Client.h"
 #include "Source/common/es/Message.h"
 #include "Source/common/es/MockEndpointSecurityAPI.h"
+#include "Source/common/processtree/process_tree.h"
+#include "Source/common/processtree/process_tree_macos.h"
+#include "Source/common/processtree/process_tree_test_helpers.h"
 #include "Source/santad/EventProviders/AuthResultCache.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityAuthorizer.h"
 #include "Source/santad/Metrics.h"
@@ -41,6 +44,9 @@
 using santa::AuthResultCache;
 using santa::EventDisposition;
 using santa::Message;
+using santa::santad::process_tree::Annotator;
+using santa::santad::process_tree::PidFromAuditToken;
+using santa::santad::process_tree::ProcessTreeTestPeer;
 
 class MockAuthResultCache : public AuthResultCache {
  public:
@@ -506,6 +512,97 @@ class MockAuthResultCache : public AuthResultCache {
 
   [mockCompilerController stopMocking];
   [mockAuthClient stopMocking];
+}
+
+// The process tree is informed of an exec at AUTH time -- the tree-aware
+// superclass calls InformFromESEvent from -handleContextMessage:, which
+// handles AUTH_EXEC on the same path as NOTIFY_EXEC -- so the target
+// pidversion is already published when the authorizer answers. A DENY means
+// that process never comes into existence and no NOTIFY_EXEC/NOTIFY_EXIT will
+// ever arrive to retire it, so the authorizer must retire it itself or its
+// inherited annotations stay pinned in the tree's annotation index forever.
+// An ALLOW must NOT retire: that process does exist, and retiring a live
+// process would make it stop answering annotation_exists().
+- (void)testExecDenialRetiresTargetFromProcessTree {
+  es_file_t file = MakeESFile("foo");
+  es_process_t proc = MakeESProcess(&file, MakeAuditToken(12, 23), MakeAuditToken(1, 1));
+  es_file_t execFile = MakeESFile("bar");
+  es_process_t execProc = MakeESProcess(&execFile, MakeAuditToken(12, 24), MakeAuditToken(12, 23));
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_EXEC, &proc, ActionType::Auth);
+  esMsg.event.exec.target = &execProc;
+  // The tree reaps a scheduled removal once the grace has elapsed past the
+  // scheduling timestamp, measured against the newest event timestamp it has
+  // seen. Stamping the message at 1 and the insert below at 100, with a grace
+  // of 1 tick, makes the retirement observable synchronously.
+  esMsg.mach_time = 1;
+
+  const struct santa::santad::process_tree::Pid targetPid = PidFromAuditToken(execProc.audit_token);
+
+  // Builds a tree already containing the exec target, as it would after the
+  // AUTH_EXEC was folded in.
+  auto makeTree = [&] {
+    std::vector<std::unique_ptr<Annotator>> annotators{};
+    auto tree = std::make_shared<ProcessTreeTestPeer>(std::move(annotators),
+                                                      /*removal_grace_ticks=*/1);
+    auto init = tree->InsertInit();
+    tree->HandleFork(100, init, targetPid);
+    return tree;
+  };
+
+  // Denied: the target is retired and reaped.
+  {
+    auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+    mockESApi->SetExpectationsESNewClient();
+    mockESApi->SetExpectationsRetainReleaseMessage();
+    EXPECT_CALL(*mockESApi, RespondAuthResult(testing::_, testing::_, ES_AUTH_RESULT_DENY, false))
+        .WillOnce(testing::Return(true));
+
+    auto tree = makeTree();
+    SNTEndpointSecurityAuthorizer* authClient =
+        [[SNTEndpointSecurityAuthorizer alloc] initWithESAPI:mockESApi
+                                                     metrics:nullptr
+                                              execController:nil
+                                          compilerController:nil
+                                             authResultCache:nullptr
+                                                   ttyWriter:nullptr
+                                                 processTree:tree];
+
+    {
+      Message msg(mockESApi, &esMsg);
+      XCTAssertTrue(tree->Get(targetPid).has_value());
+      [authClient respondToMessage:msg withAuthResult:ES_AUTH_RESULT_DENY cacheable:false];
+      XCTAssertFalse(tree->Get(targetPid).has_value());
+    }
+
+    XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+  }
+
+  // Allowed: the tree is left alone.
+  {
+    auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+    mockESApi->SetExpectationsESNewClient();
+    mockESApi->SetExpectationsRetainReleaseMessage();
+    EXPECT_CALL(*mockESApi, RespondAuthResult(testing::_, testing::_, ES_AUTH_RESULT_ALLOW, true))
+        .WillOnce(testing::Return(true));
+
+    auto tree = makeTree();
+    SNTEndpointSecurityAuthorizer* authClient =
+        [[SNTEndpointSecurityAuthorizer alloc] initWithESAPI:mockESApi
+                                                     metrics:nullptr
+                                              execController:nil
+                                          compilerController:nil
+                                             authResultCache:nullptr
+                                                   ttyWriter:nullptr
+                                                 processTree:tree];
+
+    {
+      Message msg(mockESApi, &esMsg);
+      [authClient respondToMessage:msg withAuthResult:ES_AUTH_RESULT_ALLOW cacheable:true];
+      XCTAssertTrue(tree->Get(targetPid).has_value());
+    }
+
+    XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+  }
 }
 
 @end

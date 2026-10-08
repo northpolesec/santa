@@ -26,6 +26,8 @@
 #include "Source/common/es/ESMetricsObserver.h"
 #include "Source/common/es/EnrichedTypes.h"
 #include "Source/common/es/Message.h"
+#include "Source/common/processtree/process_tree.h"
+#include "Source/common/processtree/process_tree_macos.h"
 #include "Source/santad/EventProviders/AuthResultCache.h"
 
 using santa::AuthResultCache;
@@ -85,6 +87,47 @@ using santa::Message;
     [self.execController forgetSandboxedSeatbeltProc:esMsg->process->audit_token];
   }
   return addedOnly;
+}
+
+// Single chokepoint for every ES auth response this client issues, overridden
+// so a denied exec can retire the target process from the process tree.
+//
+// The tree is informed of an exec at AUTH time, before Santa decides: the
+// tree-aware superclass runs InformFromESEvent from -handleContextMessage:,
+// and that handles AUTH_EXEC on the same path as NOTIFY_EXEC. So by the time
+// we answer, the target pidversion is already published in the tree with every
+// annotation it inherited. A DENY means that pidversion never comes into
+// existence -- there is no NOTIFY_EXEC and no NOTIFY_EXIT to follow -- so
+// nothing else would ever retire it and its annotations would be pinned in the
+// tree's annotation index for the life of santad, permanently answering
+// annotation_exists(). See ProcessTree::RetireProcess.
+//
+// Every deny reaches here: -respondToMessage:withAuthResult:forcePreventCache:
+// (and thus -postAction:forMessage:withDecision:, including the early
+// SNTActionRespondDeny in -handleMessage:recordEventMetrics:) calls it, the
+// cached-decision and SNTActionRespondHold denials in -processMessage: call it
+// directly, and the superclass's deadline auto-responder calls it dynamically
+// on self -- which matters, because a fail-closed deadline DENY leaves exactly
+// the same phantom.
+//
+// Both conditions are load bearing. Retiring on an ALLOW would retire a
+// process that does go on to exist, which is the worse bug: a live annotated
+// process would stop answering. That covers SNTActionRespondHold, which
+// responds ALLOW (the target is suspended, not blocked), and the
+// SNTActionHoldAllowed/SNTActionHoldDenied actions, which issue no ES response
+// at all and so never reach here. The event-type check excludes the
+// AUTH_PROC_SUSPEND_RESUME denials, which have no exec target.
+- (bool)respondToMessage:(const santa::Message&)msg
+          withAuthResult:(es_auth_result_t)result
+               cacheable:(bool)cacheable {
+  // The process tree is optional (see SNTEndpointSecurityTreeAwareClient).
+  if (result == ES_AUTH_RESULT_DENY && msg->event_type == ES_EVENT_TYPE_AUTH_EXEC &&
+      self.processTree) {
+    self.processTree->RetireProcess(msg->mach_time, santa::santad::process_tree::PidFromAuditToken(
+                                                        msg->event.exec.target->audit_token));
+  }
+
+  return [super respondToMessage:msg withAuthResult:result cacheable:cacheable];
 }
 
 - (bool)respondToMessage:(const santa::Message&)msg

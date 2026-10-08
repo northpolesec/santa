@@ -895,8 +895,7 @@ using namespace santa::santad::process_tree;
   XCTAssertFalse(tree->AnnotationExists("B"));
 
   tree->UpdateAnnotation<IndexedTestAnnotator>(
-      init->pid_,
-      [](const IndexedTestAnnotator*) -> std::shared_ptr<const IndexedTestAnnotator> {
+      init->pid_, [](const IndexedTestAnnotator*) -> std::shared_ptr<const IndexedTestAnnotator> {
         return std::make_shared<const IndexedTestAnnotator>(std::vector<std::string>{"B"});
       });
   XCTAssertFalse(tree->AnnotationExists("A"));
@@ -904,8 +903,7 @@ using namespace santa::santad::process_tree;
 
   // Returning nullptr leaves the annotation, and the index, alone.
   tree->UpdateAnnotation<IndexedTestAnnotator>(
-      init->pid_,
-      [](const IndexedTestAnnotator*) -> std::shared_ptr<const IndexedTestAnnotator> {
+      init->pid_, [](const IndexedTestAnnotator*) -> std::shared_ptr<const IndexedTestAnnotator> {
         return nullptr;
       });
   XCTAssertTrue(tree->AnnotationExists("B"));
@@ -982,6 +980,109 @@ using namespace santa::santad::process_tree;
 
   XCTAssertFalse(tree->Get(first_pid).has_value());
   XCTAssertTrue(tree->AnnotationExists("MARK"));
+}
+
+- (void)testRetireProcess {
+  std::vector<std::unique_ptr<Annotator>> annotators{};
+  auto tree = std::make_shared<ProcessTreeTestPeer>(std::move(annotators),
+                                                    /*removal_grace_ticks=*/10);
+  auto init = tree->InsertInit();
+  uint64_t event_id = 1;
+
+  const struct Pid child_pid = {.pid = 2, .pidversion = 1};
+  tree->HandleFork(event_id++, init, child_pid);
+  tree->AnnotateProcess(**tree->Get(child_pid),
+                        std::make_shared<IndexedTestAnnotator>(std::vector<std::string>{"MARK"}));
+  XCTAssertTrue(tree->AnnotationExists("MARK"));
+
+  // Retiring drops the name at once, exactly as an exit does -- and, as with
+  // an exit, the node itself lingers in map_ for the removal grace so a
+  // straggling delivery of the same event can still resolve it.
+  tree->RetireProcess(event_id++, child_pid);
+  XCTAssertFalse(tree->AnnotationExists("MARK"));
+  XCTAssertTrue(tree->Get(child_pid).has_value());
+
+  // Idempotent. A second carrier makes the assertion meaningful: a second
+  // decrement would erase a name this other process is still holding (and
+  // wrap the unsigned count if it were the only one).
+  const struct Pid other_pid = {.pid = 3, .pidversion = 1};
+  tree->HandleFork(event_id++, init, other_pid);
+  tree->AnnotateProcess(**tree->Get(other_pid),
+                        std::make_shared<IndexedTestAnnotator>(std::vector<std::string>{"MARK"}));
+  tree->RetireProcess(event_id++, child_pid);
+  XCTAssertTrue(tree->AnnotationExists("MARK"));
+
+  // A pid the tree has never seen is a no-op, not a crash: the authorizer can
+  // deny an exec whose target the tree never recorded (e.g. the actor was
+  // unknown, so HandleExec bailed before the insert).
+  tree->RetireProcess(event_id++, (struct Pid){.pid = 999, .pidversion = 7});
+  XCTAssertTrue(tree->AnnotationExists("MARK"));
+
+  // Churn past the grace: the retired node really is reaped, so a denied exec
+  // does not leak a map_ entry either.
+  struct Pid churn_pid = {.pid = 10, .pidversion = 1};
+  for (int i = 0; i < 20; i++) {
+    tree->HandleFork(event_id++, init, churn_pid);
+    churn_pid.pid++;
+  }
+  XCTAssertFalse(tree->Get(child_pid).has_value());
+  XCTAssertTrue(tree->AnnotationExists("MARK"));
+}
+
+// Regression: a DENIED exec must not pin the annotations its target inherited.
+// Santa informs the tree at AUTH_EXEC -- before it decides -- so the target
+// pidversion is published and indexed even when the answer is DENY and that
+// process therefore never comes into existence. No NOTIFY_EXEC and no
+// NOTIFY_EXIT ever arrive for it, so without ProcessTree::RetireProcess
+// nothing would ever retire it and annotation_exists() would answer true for
+// the life of santad -- permanently allowlisting every rule gated on it.
+- (void)testDeniedExecDoesNotPinAnnotation {
+  std::vector<std::unique_ptr<Annotator>> annotators{};
+  auto tree = std::make_shared<ProcessTreeTestPeer>(std::move(annotators),
+                                                    /*removal_grace_ticks=*/10);
+  auto init = tree->InsertInit();
+  uint64_t event_id = 1;
+
+  // A tool is running and a rule stamps it with a fork-and-exec annotation.
+  const struct Pid tool_pid = {.pid = 4521, .pidversion = 18734};
+  tree->HandleFork(event_id++, init, tool_pid);
+  auto tool = *tree->Get(tool_pid);
+  tree->AnnotateProcess(
+      *tool, std::make_shared<IndexedTestAnnotator>(std::vector<std::string>{"claude-code"}));
+  XCTAssertTrue(tree->AnnotationExists("claude-code"));
+
+  // Something under it forks; the child inherits the name.
+  const struct Pid forked_pid = {.pid = 9000, .pidversion = 1};
+  tree->HandleFork(event_id++, tool, forked_pid);
+  auto forked = *tree->Get(forked_pid);
+  XCTAssertTrue(tree->AnnotationExists("claude-code"));
+
+  // The child tries to exec a blocked binary. The tree is told at AUTH time,
+  // so the target is published -- inheriting the name -- before any decision.
+  const struct Pid denied_pid = {.pid = 9000, .pidversion = 2};
+  tree->HandleExec(event_id++, *forked, denied_pid,
+                   (struct Program){.executable = "/bin/blocked", .arguments = {}},
+                   (struct Cred){.uid = 0, .gid = 0});
+  XCTAssertTrue(tree->Get(denied_pid).has_value());
+
+  // Santa DENIES. 9000.2 never exists. This is the call under test; without it
+  // the phantom holds its +1 forever and every assertion below flips.
+  tree->RetireProcess(event_id++, denied_pid);
+
+  // The exec having failed, the forking process runs on and later exits, then
+  // so does the annotated tool. Nothing carrying the name is alive any more.
+  tree->HandleExit(event_id++, *forked);
+  tree->HandleExit(event_id++, *tool);
+  XCTAssertFalse(tree->AnnotationExists("claude-code"));
+
+  // ...and it stays gone once everything is reaped.
+  struct Pid churn_pid = {.pid = 10, .pidversion = 1};
+  for (int i = 0; i < 20; i++) {
+    tree->HandleFork(event_id++, init, churn_pid);
+    churn_pid.pid++;
+  }
+  XCTAssertFalse(tree->Get(denied_pid).has_value());
+  XCTAssertFalse(tree->AnnotationExists("claude-code"));
 }
 
 @end

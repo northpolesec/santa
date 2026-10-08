@@ -189,6 +189,25 @@ void ProcessTree::HandleExit(uint64_t timestamp, const Process& p) {
   DrainRemovals();
 }
 
+void ProcessTree::RetireProcess(uint64_t timestamp, const Pid target) {
+  absl::MutexLock lock(mtx_);
+  auto proc = GetLocked(target);
+  if (!proc) {
+    return;
+  }
+  // Deliberately NOT gated on StepLocked: this is a decision, not an ES event,
+  // so it has no EventKey of its own and keying it on the exec's would make
+  // the exec itself look like a duplicate afterwards. Both halves below are
+  // individually idempotent instead, which is what repeated calls need:
+  // UnindexProcessLocked is a no-op once Process::indexed_ is cleared, and a
+  // second remove_at_ entry for a pid that is already gone is dropped by
+  // DrainRemovals' own lookup.
+  UnindexProcessLocked(**proc);
+  remove_at_.push({timestamp, target});
+  // Reap after scheduling, as the Handle* paths do.
+  DrainRemovals();
+}
+
 ProcessTree::ExecActor ProcessTree::GetExecActor(uint64_t timestamp,
                                                  const Pid actor,
                                                  const Pid target) const {

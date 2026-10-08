@@ -81,6 +81,31 @@ class ProcessTree {
   // Inform the tree of a process exit.
   void HandleExit(uint64_t timestamp, const Process& p);
 
+  // Retire a process the authorizer has decided will never come into
+  // existence, dropping it from the annotation index and scheduling it for
+  // removal from the tree.
+  //
+  // This exists because the tree learns of an exec at AUTH time, BEFORE the
+  // decision: the tree-aware client informs the tree from its context handler,
+  // which runs HandleExec for ES_EVENT_TYPE_AUTH_EXEC as well as for
+  // ES_EVENT_TYPE_NOTIFY_EXEC (see InformFromESEvent). So by the time Santa
+  // answers an AUTH_EXEC the target pidversion is already published, carrying
+  // everything it inherited. If the answer is DENY that pidversion never
+  // exists, no NOTIFY_EXEC or NOTIFY_EXIT will ever arrive for it, and nothing
+  // else would ever retire it -- the node would sit in map_ forever and pin
+  // every annotation name it inherited in annotation_index_, so
+  // AnnotationExists() would answer true for the life of the process. Each
+  // denied exec inside an annotated subtree would add another.
+  //
+  // Removal is deferred through remove_at_ exactly as HandleExit's is, rather
+  // than erasing outright, so a straggling delivery of the same exec to
+  // another client cannot reference a node that has already been reaped.
+  //
+  // A no-op if `target` is not in the tree, and idempotent if called more than
+  // once for the same pid. Takes mtx_ itself, so it must not be called from
+  // anywhere already holding it.
+  void RetireProcess(uint64_t timestamp, struct Pid target);
+
   // Result of GetExecActor. `proc` is the execing (actor) process; it is
   // populated only when `already_seen` is false (and may still be empty then if
   // the actor is unknown to the tree), so callers must check `already_seen`
