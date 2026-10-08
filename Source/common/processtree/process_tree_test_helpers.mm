@@ -38,6 +38,7 @@ std::shared_ptr<const Process> ProcessTreeTestPeer::InsertInit() {
       initpid, (Cred){.uid = 0, .gid = 0},
       std::make_shared<Program>((Program){.executable = "/init", .arguments = {"/init"}}), nullptr);
   map_.emplace(initpid, proc);
+  IndexProcessLocked(*proc);
   return proc;
 }
 

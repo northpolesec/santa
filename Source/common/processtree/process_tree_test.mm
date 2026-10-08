@@ -24,12 +24,16 @@
 #include <condition_variable>
 #include <memory>
 #include <mutex>
+#include <set>
 #include <string>
+#include <string_view>
 #include <thread>
+#include <vector>
 
 #include "Source/common/processtree/annotations/annotator.h"
 #include "Source/common/processtree/process.h"
 #include "Source/common/processtree/process_tree_test_helpers.h"
+#include "absl/functional/function_ref.h"
 #include "absl/synchronization/mutex.h"
 
 namespace ptpb = ::santa::pb::v1::process_tree;
@@ -69,6 +73,35 @@ void TestAnnotator::AnnotateExec(ProcessTree& tree, const Process& orig_process,
 std::optional<::ptpb::Annotations> TestAnnotator::Proto() const {
   return std::nullopt;
 }
+
+// An annotator that contributes names to the tree's annotation index and
+// propagates to every descendant. Lets the index be exercised without pulling
+// the CEL annotator (and its dependencies) into this test.
+class IndexedTestAnnotator : public Annotator {
+ public:
+  explicit IndexedTestAnnotator(std::vector<std::string> names) : names_(std::move(names)) {}
+
+  void AnnotateFork(ProcessTree&, const Process&, const Process&) override {}
+  void AnnotateExec(ProcessTree&, const Process&, const Process&) override {}
+
+  // Inheritance is driven by the tree under its write lock, as the CEL
+  // annotator's is. A fresh object per descendant (rather than
+  // PropagatesWholly sharing) keeps each carrier independently countable.
+  std::shared_ptr<const Annotator> Propagate(bool) const override {
+    return std::make_shared<const IndexedTestAnnotator>(names_);
+  }
+
+  void ForEachIndexedName(absl::FunctionRef<void(std::string_view)> f) const override {
+    for (const std::string& name : names_) {
+      f(name);
+    }
+  }
+
+  std::optional<::ptpb::Annotations> Proto() const override { return std::nullopt; }
+
+ private:
+  std::vector<std::string> names_;
+};
 
 // Counts AnnotateExec invocations through a shared counter. Annotators run only
 // after a novel StepLocked, so the count reflects how many times an exec was
@@ -762,6 +795,161 @@ using namespace santa::santad::process_tree;
   reader.join();
   XCTAssertTrue(readerFinished.load());
   XCTAssertTrue(readerSawChild.load());  // never saw "absent"
+}
+
+- (void)testAnnotationIndexTracksLiveCarriers {
+  std::vector<std::unique_ptr<Annotator>> annotators{};
+  auto tree = std::make_shared<ProcessTreeTestPeer>(std::move(annotators),
+                                                    /*removal_grace_ticks=*/10);
+  auto init = tree->InsertInit();
+  uint64_t event_id = 1;
+
+  XCTAssertFalse(tree->AnnotationExists("MARK"));
+
+  const struct Pid child_pid = {.pid = 2, .pidversion = 1};
+  tree->HandleFork(event_id++, init, child_pid);
+  auto child = *tree->Get(child_pid);
+  tree->AnnotateProcess(*child,
+                        std::make_shared<IndexedTestAnnotator>(std::vector<std::string>{"MARK"}));
+  XCTAssertTrue(tree->AnnotationExists("MARK"));
+
+  // A fork of the carrier inherits the annotation: two carriers now.
+  const struct Pid grandchild_pid = {.pid = 3, .pidversion = 1};
+  tree->HandleFork(event_id++, child, grandchild_pid);
+  auto grandchild = *tree->Get(grandchild_pid);
+  XCTAssertTrue(tree->AnnotationExists("MARK"));
+
+  // One carrier exiting is not enough.
+  tree->HandleExit(event_id++, *child);
+  XCTAssertTrue(tree->AnnotationExists("MARK"));
+
+  // The last carrier exiting drops the name immediately -- not when the
+  // process is eventually reaped. A dead process must not keep authorizing
+  // execs through the removal grace.
+  tree->HandleExit(event_id++, *grandchild);
+  XCTAssertFalse(tree->AnnotationExists("MARK"));
+  XCTAssertTrue(tree->Get(grandchild_pid).has_value());
+}
+
+- (void)testAnnotationIndexFollowsExec {
+  std::vector<std::unique_ptr<Annotator>> annotators{};
+  auto tree = std::make_shared<ProcessTreeTestPeer>(std::move(annotators),
+                                                    /*removal_grace_ticks=*/10);
+  auto init = tree->InsertInit();
+  uint64_t event_id = 1;
+
+  const struct Pid pre_exec = {.pid = 2, .pidversion = 1};
+  tree->HandleFork(event_id++, init, pre_exec);
+  tree->AnnotateProcess(**tree->Get(pre_exec),
+                        std::make_shared<IndexedTestAnnotator>(std::vector<std::string>{"MARK"}));
+  XCTAssertTrue(tree->AnnotationExists("MARK"));
+
+  const struct Pid post_exec = {.pid = 2, .pidversion = 2};
+  tree->HandleExec(event_id++, **tree->Get(pre_exec), post_exec,
+                   (struct Program){.executable = "/bin/after", .arguments = {}},
+                   (struct Cred){.uid = 0, .gid = 0});
+
+  // The pre-exec process was retired and the post-exec one inherited the name,
+  // so the count is 1 either side of the exec, not 2.
+  XCTAssertTrue(tree->AnnotationExists("MARK"));
+  tree->HandleExit(event_id++, **tree->Get(post_exec));
+  XCTAssertFalse(tree->AnnotationExists("MARK"));
+}
+
+- (void)testAnnotationIndexDoesNotDriftOnDuplicateDelivery {
+  std::vector<std::unique_ptr<Annotator>> annotators{};
+  auto tree = std::make_shared<ProcessTreeTestPeer>(std::move(annotators),
+                                                    /*removal_grace_ticks=*/10);
+  auto init = tree->InsertInit();
+
+  tree->AnnotateProcess(*init,
+                        std::make_shared<IndexedTestAnnotator>(std::vector<std::string>{"MARK"}));
+
+  // The same fork delivered twice (every tree-aware client informs the tree).
+  // The second is an exact duplicate, which the dedup gate rejects outright.
+  const struct Pid child_pid = {.pid = 2, .pidversion = 1};
+  tree->HandleFork(1, init, child_pid);
+  tree->HandleFork(1, init, child_pid);
+  // A third delivery carrying a DIFFERENT timestamp is novel to the dedup gate
+  // and gets all the way to the insert, where it loses the first-wins emplace.
+  // This is the case the "index only the winner" guard exists for.
+  tree->HandleFork(2, init, child_pid);
+  auto child = *tree->Get(child_pid);
+
+  // The same exit delivered twice.
+  tree->HandleExit(3, *child);
+  tree->HandleExit(3, *child);
+  tree->HandleExit(4, *init);
+
+  // Two carriers, each retired once however many times the events arrived.
+  XCTAssertFalse(tree->AnnotationExists("MARK"));
+}
+
+- (void)testAnnotationIndexFollowsUpdateAnnotation {
+  std::vector<std::unique_ptr<Annotator>> annotators{};
+  auto tree = std::make_shared<ProcessTreeTestPeer>(std::move(annotators));
+  auto init = tree->InsertInit();
+
+  tree->AnnotateProcess(*init,
+                        std::make_shared<IndexedTestAnnotator>(std::vector<std::string>{"A"}));
+  XCTAssertTrue(tree->AnnotationExists("A"));
+  XCTAssertFalse(tree->AnnotationExists("B"));
+
+  tree->UpdateAnnotation<IndexedTestAnnotator>(
+      init->pid_,
+      [](const IndexedTestAnnotator*) -> std::shared_ptr<const IndexedTestAnnotator> {
+        return std::make_shared<const IndexedTestAnnotator>(std::vector<std::string>{"B"});
+      });
+  XCTAssertFalse(tree->AnnotationExists("A"));
+  XCTAssertTrue(tree->AnnotationExists("B"));
+
+  // Returning nullptr leaves the annotation, and the index, alone.
+  tree->UpdateAnnotation<IndexedTestAnnotator>(
+      init->pid_,
+      [](const IndexedTestAnnotator*) -> std::shared_ptr<const IndexedTestAnnotator> {
+        return nullptr;
+      });
+  XCTAssertTrue(tree->AnnotationExists("B"));
+}
+
+- (void)testAnnotationIndexIgnoresRetiredProcesses {
+  std::vector<std::unique_ptr<Annotator>> annotators{};
+  auto tree = std::make_shared<ProcessTreeTestPeer>(std::move(annotators),
+                                                    /*removal_grace_ticks=*/10);
+  auto init = tree->InsertInit();
+  uint64_t event_id = 1;
+
+  const struct Pid child_pid = {.pid = 2, .pidversion = 1};
+  tree->HandleFork(event_id++, init, child_pid);
+  auto child = *tree->Get(child_pid);
+  tree->AnnotateProcess(*child,
+                        std::make_shared<IndexedTestAnnotator>(std::vector<std::string>{"MARK"}));
+  tree->HandleExit(event_id++, *child);
+  XCTAssertFalse(tree->AnnotationExists("MARK"));
+
+  // Annotating a retired process must not put anything in the index, even
+  // though the process is still in map_ for the removal grace. Use a second
+  // process that was never annotated, so the annotation really is inserted
+  // and it is the retired check -- not the first-wins emplace -- being tested.
+  const struct Pid late_pid = {.pid = 3, .pidversion = 1};
+  tree->HandleFork(event_id++, init, late_pid);
+  auto late = *tree->Get(late_pid);
+  tree->HandleExit(event_id++, *late);
+  tree->AnnotateProcess(*late,
+                        std::make_shared<IndexedTestAnnotator>(std::vector<std::string>{"LATE"}));
+  XCTAssertFalse(tree->AnnotationExists("MARK"));
+  XCTAssertFalse(tree->AnnotationExists("LATE"));
+
+  // Churn past the grace so the retired process is actually reaped. The reap
+  // must not decrement a second time (which would wrap the unsigned count and
+  // make the name exist forever).
+  struct Pid churn_pid = {.pid = 10, .pidversion = 1};
+  for (int i = 0; i < 20; i++) {
+    tree->HandleFork(event_id++, init, churn_pid);
+    churn_pid.pid++;
+  }
+  XCTAssertFalse(tree->Get(child_pid).has_value());
+  XCTAssertFalse(tree->AnnotationExists("MARK"));
 }
 
 @end

@@ -21,6 +21,8 @@
 #include <functional>
 #include <memory>
 #include <queue>
+#include <string>
+#include <string_view>
 #include <typeinfo>
 #include <vector>
 
@@ -153,6 +155,16 @@ class ProcessTree {
   std::optional<::santa::pb::v1::process_tree::Annotations> ExportAnnotations(
       struct Pid p);
 
+  // True if any live process in the tree carries the named annotation. Backs
+  // the CEL annotation_exists(). O(1): the alternative is an O(tree) scan on
+  // the authorization path, once per exec.
+  //
+  // "Live" means still running: a process is counted from the insert that
+  // publishes it until the exit (or the exec that replaces it) is processed,
+  // NOT until it is finally reaped, so a dead process cannot keep answering
+  // true through the removal grace.
+  bool AnnotationExists(std::string_view name) const;
+
   // Atomically get the slice of Processes going from the given process "up"
   // to the root. The root process has no parent. N.B. There may be more than
   // one root process. E.g. on Linux, both init (PID 1) and kthread (PID 2)
@@ -212,6 +224,23 @@ class ProcessTree {
                                   bool across_exec)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(mtx_);
 
+  // Count `p`'s annotation names into annotation_index_, once. No-op if `p` is
+  // already indexed. Call only when the map_ insert that publishes `p`
+  // actually happened: the inserts are first-wins, and indexing the loser of
+  // that race would double-count names the winner already contributes.
+  void IndexProcessLocked(Process& p) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mtx_);
+
+  // Drop `p`'s contribution, erasing any name whose count reaches zero. No-op
+  // if `p` is not indexed.
+  void UnindexProcessLocked(Process& p) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mtx_);
+
+  // Add/remove the names of one annotation, for the paths that add or replace
+  // a single annotation on an already-indexed process.
+  void IndexAnnotationLocked(const Annotator& a)
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mtx_);
+  void UnindexAnnotationLocked(const Annotator& a)
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mtx_);
+
   // Reap deferred removals whose grace has elapsed. Caller must hold mtx_.
   void DrainRemovals() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mtx_);
 
@@ -224,6 +253,14 @@ class ProcessTree {
 
   mutable absl::Mutex mtx_;
   absl::flat_hash_map<const struct Pid, std::shared_ptr<Process>> map_
+      ABSL_GUARDED_BY(mtx_);
+  // Annotation names carried by at least one live process, each with the
+  // number of processes carrying it. The count is of PROCESSES, not of
+  // Annotator objects: PropagatesWholly lets one object be shared by a whole
+  // inherited subtree, and each process carrying it counts once. A name is
+  // erased when its last carrier retires, so a lookup answers
+  // AnnotationExists() without touching map_.
+  absl::flat_hash_map<std::string, uint32_t> annotation_index_
       ABSL_GUARDED_BY(mtx_);
   // Pending removals: pids to erase from map_, each paired with the mach_time
   // of the exit/exec event that scheduled it. An entry is reaped once
@@ -316,16 +353,29 @@ void ProcessTree::UpdateAnnotation(
     return;
   }
 
-  auto& annotations = it->second->annotations_;
+  Process& proc = *it->second;
+  auto& annotations = proc.annotations_;
   const std::type_index key(typeid(T));
   const T* current = nullptr;
   if (auto found = annotations.find(key); found != annotations.end()) {
     current = dynamic_cast<const T*>(found->second.get());
   }
 
-  if (std::shared_ptr<const T> next = update(current); next != nullptr) {
-    annotations.insert_or_assign(key, std::move(next));
+  std::shared_ptr<const T> next = update(current);
+  if (next == nullptr) {
+    return;
   }
+
+  // The replacement may carry a different set of names, so swap the old set's
+  // contribution for the new one's. Only for a process that is counted at all:
+  // one already retired must not re-enter the index.
+  if (proc.indexed_) {
+    if (current) {
+      UnindexAnnotationLocked(*current);
+    }
+    IndexAnnotationLocked(*next);
+  }
+  annotations.insert_or_assign(key, std::move(next));
 }
 
 // Create a new tree, ensuring the provided annotations are valid and that

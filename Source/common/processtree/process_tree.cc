@@ -24,6 +24,8 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <string>
+#include <string_view>
 #include <typeindex>
 #include <utility>
 #include <vector>
@@ -33,6 +35,7 @@
 #include "Source/common/processtree/process_tree.pb.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
+#include "absl/container/inlined_vector.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/synchronization/mutex.h"
@@ -69,7 +72,9 @@ void ProcessTree::BackfillInsertChildren(
       // has run yet), but keep the invariant in one place rather than three.
       PropagateAnnotationsLocked(*parent, *proc, /*across_exec=*/false);
     }
-    map_.emplace(backfilled_proc.pid, proc);
+    if (map_.emplace(backfilled_proc.pid, proc).second) {
+      IndexProcessLocked(*proc);
+    }
   }
 
   // The only case where we should not have a parent is the root processes
@@ -114,7 +119,11 @@ void ProcessTree::HandleFork(uint64_t timestamp,
     // this event as a duplicate must never see the child without the
     // annotations it inherits. See Annotator::Propagate.
     PropagateAnnotationsLocked(*parent, *child, /*across_exec=*/false);
-    map_.emplace(new_pid, child);
+    // Index only the winner of the first-wins insert: a loser's names are
+    // already contributed by the entry that won.
+    if (map_.emplace(new_pid, child).second) {
+      IndexProcessLocked(*child);
+    }
     // Reap AFTER applying, so a late event can never reap the actor it needs.
     DrainRemovals();
   }
@@ -149,8 +158,16 @@ void ProcessTree::HandleExec(uint64_t timestamp, const Process& p,
       return;
     }
     remove_at_.push({timestamp, p.pid_});
+    // The pre-exec process is gone as of this event. Retire it from the index
+    // now rather than when it is finally reaped, or the program it used to be
+    // would keep answering annotation_exists() for the whole removal grace.
+    if (auto old = GetLocked(p.pid_)) {
+      UnindexProcessLocked(**old);
+    }
     PropagateAnnotationsLocked(p, *new_proc, /*across_exec=*/true);
-    map_.emplace(new_proc->pid_, new_proc);
+    if (map_.emplace(new_proc->pid_, new_proc).second) {
+      IndexProcessLocked(*new_proc);
+    }
     DrainRemovals();
   }
   for (const auto& annotator : annotators_) {
@@ -164,6 +181,11 @@ void ProcessTree::HandleExit(uint64_t timestamp, const Process& p) {
     return;
   }
   remove_at_.push({timestamp, p.pid_});
+  // As in HandleExec: retire now, not at reap. The process is gone even though
+  // it lingers in map_ for the removal grace.
+  if (auto exiting = GetLocked(p.pid_)) {
+    UnindexProcessLocked(**exiting);
+  }
   DrainRemovals();
 }
 
@@ -228,10 +250,17 @@ void ProcessTree::DrainRemovals() {
   while (!remove_at_.empty() && remove_at_.top().first < cutoff) {
     const struct Pid pid = remove_at_.top().second;
     remove_at_.pop();
-    if (auto target = GetLocked(pid);
-        target && (*target)->refcnt_.load(std::memory_order_relaxed) > 0) {
+    auto target = GetLocked(pid);
+    if (!target) {
+      continue;
+    }
+    if ((*target)->refcnt_.load(std::memory_order_relaxed) > 0) {
       (*target)->tombstoned_ = true;
     } else {
+      // Belt and braces: whatever scheduled this removal already retired the
+      // process. Unindexing here too makes "nothing outside map_ is in the
+      // index" hold unconditionally, and the indexed_ flag makes it free.
+      UnindexProcessLocked(**target);
       map_.erase(pid);
     }
   }
@@ -284,6 +313,7 @@ void ProcessTree::ReleaseProcess(const PidList& pids) {
     auto proc = GetLocked(p);
     if (proc && (*proc)->refcnt_.load(std::memory_order_relaxed) == 0 &&
         (*proc)->tombstoned_) {
+      UnindexProcessLocked(**proc);
       map_.erase(p);
     }
   }
@@ -294,6 +324,71 @@ void ProcessTree::ReleaseProcess(const PidList& pids) {
 Annotation get/set
 ---
 */
+
+void ProcessTree::IndexProcessLocked(Process& p) {
+  if (p.indexed_) {
+    return;
+  }
+  p.indexed_ = true;
+  for (const auto& [_, annotation] : p.annotations_) {
+    IndexAnnotationLocked(*annotation);
+  }
+}
+
+void ProcessTree::UnindexProcessLocked(Process& p) {
+  if (!p.indexed_) {
+    return;
+  }
+  p.indexed_ = false;
+  for (const auto& [_, annotation] : p.annotations_) {
+    UnindexAnnotationLocked(*annotation);
+  }
+}
+
+void ProcessTree::IndexAnnotationLocked(const Annotator& a) {
+  // ForEachIndexedName's callback is a type-erased absl::FunctionRef, so the
+  // thread-safety analyzer cannot see that it only ever runs here,
+  // synchronously, with mtx_ already held. Collect the names into a plain
+  // local first -- untouched by the analysis -- so the actual
+  // annotation_index_ mutation below happens directly in this function's
+  // body, where the ABSL_EXCLUSIVE_LOCKS_REQUIRED on the declaration covers it.
+  absl::InlinedVector<std::string_view, 4> names;
+  a.ForEachIndexedName(
+      [&names](std::string_view name) { names.push_back(name); });
+
+  for (std::string_view name : names) {
+    // The common case is a name already present (every descendant inheriting
+    // it), so look up by view first and only allocate a key on a real insert.
+    if (auto it = annotation_index_.find(name); it != annotation_index_.end()) {
+      it->second++;
+    } else {
+      annotation_index_.emplace(std::string(name), 1);
+    }
+  }
+}
+
+void ProcessTree::UnindexAnnotationLocked(const Annotator& a) {
+  // See IndexAnnotationLocked for why the names are collected before
+  // annotation_index_ is touched.
+  absl::InlinedVector<std::string_view, 4> names;
+  a.ForEachIndexedName(
+      [&names](std::string_view name) { names.push_back(name); });
+
+  for (std::string_view name : names) {
+    auto it = annotation_index_.find(name);
+    if (it == annotation_index_.end()) {
+      continue;
+    }
+    if (--it->second == 0) {
+      annotation_index_.erase(it);
+    }
+  }
+}
+
+bool ProcessTree::AnnotationExists(std::string_view name) const {
+  absl::ReaderMutexLock lock(mtx_);
+  return annotation_index_.contains(name);
+}
 
 void ProcessTree::PropagateAnnotationsLocked(const Process& from, Process& to,
                                              bool across_exec) {
@@ -322,7 +417,13 @@ void ProcessTree::AnnotateProcess(const Process& p,
     return;
   }
   const Annotator& x = *a;
-  it->second->annotations_.emplace(std::type_index(typeid(x)), std::move(a));
+  // emplace is first-wins; count the names only if this annotation is the one
+  // that landed, and only while the process is itself counted.
+  auto [entry, inserted] = it->second->annotations_.emplace(
+      std::type_index(typeid(x)), std::move(a));
+  if (inserted && it->second->indexed_) {
+    IndexAnnotationLocked(*entry->second);
+  }
 }
 
 std::optional<::santa::pb::v1::process_tree::Annotations>

@@ -136,7 +136,8 @@ class Process {
         annotations_(),
         parent_(std::move(parent)),
         refcnt_(0),
-        tombstoned_(false) {}
+        tombstoned_(false),
+        indexed_(false) {}
   Process(const Process&) = delete;
   Process& operator=(const Process&) = delete;
   Process(Process&&) = delete;
@@ -160,6 +161,10 @@ class Process {
   // If the process is tombstoned, the event removing it from the tree has been
   // processed, but refcnt>0 keeps it alive.
   bool tombstoned_;
+  // True while this process's annotation names are counted in the tree's
+  // annotation index. Makes index/unindex idempotent, so a duplicate event
+  // delivery running the same path twice cannot drift the counts.
+  bool indexed_;
 };
 
 }  // namespace santa::santad::process_tree
