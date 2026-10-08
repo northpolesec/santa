@@ -534,12 +534,13 @@ class MockAuthResultCache : public AuthResultCache {
   es_process_t execProc = MakeESProcess(&execFile, MakeAuditToken(12, 24), MakeAuditToken(12, 23));
   es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_EXEC, &proc, ActionType::Auth);
   esMsg.event.exec.target = &execProc;
-  // The tree reaps a scheduled removal once the grace has elapsed past the
-  // scheduling timestamp, measured against the newest event timestamp seen.
-  // Stamping the message at 1, with a grace of 1 tick, makes the target's
-  // retirement observable the moment it is scheduled; the churn fork at 200
-  // below then carries the cutoff past the actor's own pending removal.
-  esMsg.mach_time = 1;
+  // The message's mach_time is what the tree was given when the AUTH_EXEC was
+  // folded in, and the authorizer hands the same value back when it answers,
+  // so makeTree below stamps its HandleExec with it too. Reaping is driven by
+  // the newest timestamp seen, so the churn fork at 200 is what carries the
+  // cutoff past the pending removals and makes the outcome observable.
+  const uint64_t execMachTime = 101;
+  esMsg.mach_time = execMachTime;
 
   const struct Pid actorPid = PidFromAuditToken(proc.audit_token);
   const struct Pid targetPid = PidFromAuditToken(execProc.audit_token);
@@ -552,7 +553,7 @@ class MockAuthResultCache : public AuthResultCache {
                                                       /*removal_grace_ticks=*/1);
     auto init = tree->InsertInit();
     tree->HandleFork(100, init, actorPid);
-    tree->HandleExec(101, **tree->Get(actorPid), targetPid,
+    tree->HandleExec(execMachTime, **tree->Get(actorPid), targetPid,
                      (struct Program){.executable = "/bar", .arguments = {}},
                      (struct Cred){.uid = 0, .gid = 0});
     return tree;
@@ -587,10 +588,10 @@ class MockAuthResultCache : public AuthResultCache {
       Message msg(mockESApi, &esMsg);
       XCTAssertTrue(tree->Get(targetPid).has_value());
       [authClient respondToMessage:msg withAuthResult:ES_AUTH_RESULT_DENY cacheable:false];
-      XCTAssertFalse(tree->Get(targetPid).has_value());
     }
 
     churnPastGrace(tree);
+    XCTAssertFalse(tree->Get(targetPid).has_value());
     XCTAssertTrue(tree->Get(actorPid).has_value());
 
     XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
@@ -622,6 +623,44 @@ class MockAuthResultCache : public AuthResultCache {
     }
 
     churnPastGrace(tree);
+    XCTAssertFalse(tree->Get(actorPid).has_value());
+
+    XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+  }
+
+  // Denied, but the response did not land: the deadline auto-responder lost
+  // the double-response race (the handler had already answered ALLOW and ES
+  // rejected the duplicate), so RespondAuthResult returns false. The exec in
+  // fact succeeded, so the tree must be left exactly as the allowed case
+  // leaves it -- target alive, actor reaped on HandleExec's schedule. Acting
+  // on a phantom denial here would retire the live target and resurrect the
+  // dead actor.
+  {
+    auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+    mockESApi->SetExpectationsESNewClient();
+    mockESApi->SetExpectationsRetainReleaseMessage();
+    EXPECT_CALL(*mockESApi, RespondAuthResult(testing::_, testing::_, ES_AUTH_RESULT_DENY, false))
+        .WillOnce(testing::Return(false));
+
+    auto tree = makeTree();
+    SNTEndpointSecurityAuthorizer* authClient =
+        [[SNTEndpointSecurityAuthorizer alloc] initWithESAPI:mockESApi
+                                                     metrics:nullptr
+                                              execController:nil
+                                          compilerController:nil
+                                             authResultCache:nullptr
+                                                   ttyWriter:nullptr
+                                                 processTree:tree];
+
+    {
+      Message msg(mockESApi, &esMsg);
+      XCTAssertFalse([authClient respondToMessage:msg
+                                   withAuthResult:ES_AUTH_RESULT_DENY
+                                        cacheable:false]);
+    }
+
+    churnPastGrace(tree);
+    XCTAssertTrue(tree->Get(targetPid).has_value());
     XCTAssertFalse(tree->Get(actorPid).has_value());
 
     XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());

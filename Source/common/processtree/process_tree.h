@@ -117,10 +117,13 @@ class ProcessTree {
   // Both halves happen in one write-lock hold: they are one event and must not
   // be observable half-applied.
   //
-  // Reviving the actor is safe because the actor is necessarily still alive at
-  // this point: it is blocked in the kernel inside execve(2) waiting for this
-  // very response, so it cannot have exited, and this runs before the response
-  // is delivered.
+  // The actor is revived only if the removal still pending on it is the one
+  // HandleExec scheduled for THIS exec (same timestamp). The actor cannot have
+  // exited voluntarily -- it is blocked in the kernel inside execve(2) waiting
+  // for this very response -- but it can be killed from outside while it
+  // waits, and that exit may reach the tree, through another client, before
+  // this denial does. The timestamp match is what tells the two apart; see the
+  // definition.
   //
   // Each half is a no-op if its pid is not in the tree, and the whole call is
   // idempotent. Takes mtx_ itself, so it must not be called from anywhere

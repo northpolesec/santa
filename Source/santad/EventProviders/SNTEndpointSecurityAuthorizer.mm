@@ -110,25 +110,61 @@ using santa::Message;
 // on self -- which matters, because a fail-closed deadline DENY leaves exactly
 // the same phantom.
 //
-// Both conditions are load bearing. Unwinding on an ALLOW would retire a
+// All three conditions are load bearing. Unwinding on an ALLOW would retire a
 // process that does go on to exist, which is the worse bug: a live annotated
 // process would stop answering. That covers SNTActionRespondHold, which
 // responds ALLOW (the target is suspended, not blocked), and the
 // SNTActionHoldAllowed/SNTActionHoldDenied actions, which issue no ES response
 // at all and so never reach here. The event-type check excludes the
-// AUTH_PROC_SUSPEND_RESUME denials, which have no exec target.
+// AUTH_PROC_SUSPEND_RESUME denials, which have no exec target. And the unwind
+// happens only if our response is the one the kernel actually took -- see
+// below, it is not obvious from the code.
 - (bool)respondToMessage:(const santa::Message&)msg
           withAuthResult:(es_auth_result_t)result
                cacheable:(bool)cacheable {
+  // Respond FIRST, then unwind, and only if the response landed.
+  //
+  // Two responses can be issued for one message. -processMessage:handler: in
+  // the superclass dispatches the handler and the deadline auto-responder to
+  // the same CONCURRENT _authQueue; the handler responds inside
+  // messageHandler() but claims processingSema only after it returns, while
+  // the deadline block claims the semaphore before responding. So if the
+  // processing budget expires while messageHandler is still unwinding its own
+  // stack after an ALLOW, the deadline block wins the semaphore and issues a
+  // fail-closed DENY for an exec the kernel has already allowed. Unwinding
+  // before responding would act on that phantom denial: the live target
+  // retired, the now-gone actor revived -- a permanent inversion of exactly
+  // what this method exists to prevent.
+  //
+  // es_respond_auth_result() rejects the second response with
+  // ES_RESPOND_RESULT_ERR_DUPLICATE_RESPONSE, and
+  // EndpointSecurityAPI::RespondAuthResult turns that into false, so the loser
+  // of the race is reliably identifiable and mutates nothing. Reading the
+  // message after responding is safe: santa::Message holds an
+  // es_retain_message for its whole lifetime and the caller's Message outlives
+  // this call.
+  //
+  // The cost is a window between the response and the unwind in which a
+  // genuinely denied target is still indexed. It is sub-millisecond and
+  // self-correcting: if the denied actor resumes and execs again inside it,
+  // that exec schedules its own removal and the unwind's revive finds a
+  // removal_ts_ that is not this exec's and skips (see
+  // ProcessTree::HandleExecDenied).
+  //
+  // The root cause is upstream -- -processMessage:handler: settles the race
+  // after the side effects rather than making the response itself the atomic
+  // claim. This only keeps OUR side effect on the right side of it.
+  const bool responded = [super respondToMessage:msg withAuthResult:result cacheable:cacheable];
+
   // The process tree is optional (see SNTEndpointSecurityTreeAwareClient).
-  if (result == ES_AUTH_RESULT_DENY && msg->event_type == ES_EVENT_TYPE_AUTH_EXEC &&
+  if (responded && result == ES_AUTH_RESULT_DENY && msg->event_type == ES_EVENT_TYPE_AUTH_EXEC &&
       self.processTree) {
     self.processTree->HandleExecDenied(
         msg->mach_time, santa::santad::process_tree::PidFromAuditToken(msg->process->audit_token),
         santa::santad::process_tree::PidFromAuditToken(msg->event.exec.target->audit_token));
   }
 
-  return [super respondToMessage:msg withAuthResult:result cacheable:cacheable];
+  return responded;
 }
 
 - (bool)respondToMessage:(const santa::Message&)msg

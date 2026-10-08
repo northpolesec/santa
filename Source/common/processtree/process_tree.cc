@@ -206,12 +206,35 @@ void ProcessTree::HandleExecDenied(uint64_t timestamp, const Pid actor,
   // Retire the target first, then revive the actor. They always differ (an
   // exec bumps the pidversion), but if a caller ever passed the same pid
   // twice, ending alive is the safer of the two outcomes.
+  //
+  // The target is scheduled on the AUTH_EXEC's timestamp, not on "now", so
+  // after a long-pending decision latest_ts_ has already moved past it and
+  // the DrainRemovals below is due to reap it in this same call -- the grace
+  // is effectively zero for a phantom. That is fine, and deliberate: the
+  // message being answered still holds a ProcessToken on the target, so the
+  // reap turns into a tombstone and the node survives until this event
+  // finishes processing. Nothing else can be referencing a pidversion that
+  // never came into existence.
   if (auto proc = GetLocked(target)) {
     UnindexProcessLocked(**proc);
     ScheduleRemovalLocked(timestamp, **proc);
   }
   if (auto proc = GetLocked(actor)) {
-    ReviveProcessLocked(**proc);
+    // Revive ONLY the removal this denial is cancelling. HandleExec scheduled
+    // the actor at exactly this timestamp, and the authorizer hands back the
+    // same mach_time, so an exact match means nothing has happened to the
+    // actor since. Anything else means something has, and the actor really is
+    // gone: it can be SIGKILLed while blocked in the ES auth wait (^C in the
+    // spawning shell, a watchdog, a process-group teardown), and an AUTH_EXEC
+    // can be pending for seconds. Its NOTIFY_EXIT reaches the tree through a
+    // different client on a different queue and may well be processed before
+    // this denial, re-scheduling the actor at the exit's timestamp. Reviving
+    // then would put a dead process back in the index with its removal
+    // cancelled, and nothing would ever schedule it again -- StepLocked drops
+    // the duplicate exit -- which is the pinned-annotation bug all over again.
+    if ((*proc)->pending_removal_ && (*proc)->removal_ts_ == timestamp) {
+      ReviveProcessLocked(**proc);
+    }
   }
   // Reap after applying, as the Handle* paths do.
   DrainRemovals();
@@ -349,8 +372,9 @@ PidList ProcessTree::RetainProcess(const PidList& pids) {
 
 void ProcessTree::ReleaseProcess(const PidList& pids) {
   // Fast path under the reader lock: the decrement is atomic, and tombstoned_
-  // is stable here (written only in DrainRemovals under the exclusive lock).
-  // Only the rare erase of a tombstoned process needs the exclusive lock.
+  // is stable here -- its only writers, DrainRemovals (sets) and
+  // ReviveProcessLocked (clears), both hold the exclusive lock. Only the rare
+  // erase of a tombstoned process needs the exclusive lock.
   PidList to_erase;
   {
     absl::ReaderMutexLock lock(mtx_);
