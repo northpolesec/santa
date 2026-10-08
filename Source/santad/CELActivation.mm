@@ -48,9 +48,10 @@ CELAnnotator::Entry EntryFor(santa::cel::AnnotationPropagation propagation, bool
   };
 }
 
-// Annotations are read from and written to the process being executed: at
-// AUTH_EXEC the tree has already applied the exec, so the target carries
-// whatever its parent propagated to it.
+// has and add act on the process being executed: at AUTH_EXEC the tree has
+// already applied the exec, so the target carries whatever its parent
+// propagated to it. exists asks about the whole tree instead, so it resolves
+// no target.
 //
 // The target is resolved inside each hook, not here. An activation is built for
 // every CEL evaluation, but the hooks only run for a rule that actually calls
@@ -88,6 +89,10 @@ santa::cel::AnnotationHooks AnnotationHooksFor(std::shared_ptr<ProcessTree> proc
                 esMsg->event.exec.target->audit_token);
             return absl::StrCat(pid.pid, "-", pid.pidversion);
           },
+      // No audit token: unlike has/add this is a whole-tree question, so it
+      // needs no target and costs one reader-lock hash lookup.
+      .exists =
+          [processTree](const std::string& name) { return processTree->AnnotationExists(name); },
   };
 }
 

@@ -43,6 +43,7 @@ using santa::santad::process_tree::CELAnnotator;
 using santa::santad::process_tree::CodeSigningInfo;
 using santa::santad::process_tree::Cred;
 using santa::santad::process_tree::Pid;
+using santa::santad::process_tree::ProcessTree;
 using santa::santad::process_tree::ProcessTreeTestPeer;
 using santa::santad::process_tree::Program;
 
@@ -67,6 +68,32 @@ std::string MakeRawCDHash() {
     raw[i] = static_cast<char>(0xA0 + i);
   }
   return raw;
+}
+
+// Builds an AUTH_EXEC activation targeting `target` in `tree` and evaluates
+// `expr` against it with `evaluator`. The target is what the annotation hooks
+// resolve against (see AnnotationHooksFor); shared by every test that drives
+// add_annotation(), has_annotation() or annotation_exists() against a real
+// process tree, so each only supplies what differs between calls: the target,
+// the evaluator and the expression.
+auto EvaluateAgainstTarget(const std::shared_ptr<ProcessTree>& tree,
+                          const std::shared_ptr<MockEndpointSecurityAPI>& mockESApi, Pid target,
+                          santa::cel::Evaluator<true>* evaluator, absl::string_view expr) {
+  es_file_t procFile = MakeESFile("/bin/parent");
+  es_process_t proc = MakeESProcess(&procFile, MakeAuditToken(1, 1), MakeAuditToken(1, 1));
+  es_file_t targetFile = MakeESFile("/bin/target");
+  es_process_t targetProc = MakeESProcess(
+      &targetFile, MakeAuditToken(target.pid, (int)target.pidversion), MakeAuditToken(1, 1));
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_EXEC, &proc);
+  esMsg.event.exec.target = &targetProc;
+
+  Message msg(mockESApi, &esMsg);
+  ActivationCallbackBlock block = santa::CreateCELActivationBlock(
+      msg, /*signingID=*/nil, /*teamID=*/nil, /*isPlatformBinary=*/NO, /*signingTime=*/nil,
+      /*secureSigningTime=*/nil, /*entitlements=*/nil, tree);
+  std::unique_ptr<::google::api::expr::runtime::BaseActivation> base = block(/*useV2=*/true);
+  return evaluator->CompileAndEvaluate(
+      expr, *static_cast<santa::cel::Activation<true>*>(base.get()));
 }
 
 }  // namespace
@@ -221,26 +248,6 @@ std::string MakeRawCDHash() {
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   mockESApi->SetExpectationsRetainReleaseMessage();
 
-  // An AUTH_EXEC activation for the process at `target`, which is what the
-  // annotation hooks resolve against.
-  auto evaluate = [&](Pid target, santa::cel::Evaluator<true>* evaluator, absl::string_view expr) {
-    es_file_t procFile = MakeESFile("/bin/parent");
-    es_process_t proc = MakeESProcess(&procFile, MakeAuditToken(1, 1), MakeAuditToken(1, 1));
-    es_file_t targetFile = MakeESFile("/bin/target");
-    es_process_t targetProc = MakeESProcess(
-        &targetFile, MakeAuditToken(target.pid, (int)target.pidversion), MakeAuditToken(1, 1));
-    es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_EXEC, &proc);
-    esMsg.event.exec.target = &targetProc;
-
-    Message msg(mockESApi, &esMsg);
-    ActivationCallbackBlock block = santa::CreateCELActivationBlock(
-        msg, /*signingID=*/nil, /*teamID=*/nil, /*isPlatformBinary=*/NO, /*signingTime=*/nil,
-        /*secureSigningTime=*/nil, /*entitlements=*/nil, tree);
-    std::unique_ptr<::google::api::expr::runtime::BaseActivation> base = block(/*useV2=*/true);
-    return evaluator->CompileAndEvaluate(expr,
-                                         *static_cast<santa::cel::Activation<true>*>(base.get()));
-  };
-
   auto ruleEvaluator = santa::cel::Evaluator<true>::Create();
   XCTAssertTrue(ruleEvaluator.ok());
   auto fallbackEvaluator = santa::cel::Evaluator<true>::Create(/*allowUnspecified=*/true);
@@ -253,9 +260,9 @@ std::string MakeRawCDHash() {
                    (Program){.executable = "/bin/tool", .arguments = {}}, cred);
 
   {
-    auto result = evaluate(toolPid, ruleEvaluator.value().get(),
-                           "add_annotation(['BAZEL-CALL', 'BAZEL-CALL-{session}'], "
-                           "FORK_AND_EXEC, ALLOWLIST)");
+    auto result = EvaluateAgainstTarget(tree, mockESApi, toolPid, ruleEvaluator.value().get(),
+                                       "add_annotation(['BAZEL-CALL', 'BAZEL-CALL-{session}'], "
+                                       "FORK_AND_EXEC, ALLOWLIST)");
     XCTAssertTrue(result.ok());
     XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
     // Otherwise the next exec of the same binary would skip the stamp entirely.
@@ -274,8 +281,9 @@ std::string MakeRawCDHash() {
                    (Program){.executable = "/bin/child", .arguments = {}}, cred);
 
   {
-    auto result = evaluate(childPid, fallbackEvaluator.value().get(),
-                           "has_annotation('BAZEL-CALL') ? ALLOWLIST_COMPILER : UNSPECIFIED");
+    auto result = EvaluateAgainstTarget(
+        tree, mockESApi, childPid, fallbackEvaluator.value().get(),
+        "has_annotation('BAZEL-CALL') ? ALLOWLIST_COMPILER : UNSPECIFIED");
     XCTAssertTrue(result.ok());
     XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST_COMPILER);
     XCTAssertFalse(result.value().cacheable);
@@ -287,8 +295,97 @@ std::string MakeRawCDHash() {
   Pid strangerPid = {.pid = 40, .pidversion = 1};
   tree->HandleFork(5, init, strangerPid);
   {
-    auto result = evaluate(strangerPid, fallbackEvaluator.value().get(),
-                           "has_annotation('BAZEL-CALL') ? ALLOWLIST_COMPILER : UNSPECIFIED");
+    auto result = EvaluateAgainstTarget(
+        tree, mockESApi, strangerPid, fallbackEvaluator.value().get(),
+        "has_annotation('BAZEL-CALL') ? ALLOWLIST_COMPILER : UNSPECIFIED");
+    XCTAssertTrue(result.ok());
+    XCTAssertEqual(result.value().value, ReturnValue::UNSPECIFIED);
+  }
+}
+
+// annotation_exists() end to end against a real process tree: an unrelated
+// process is allowed only while an annotated process is alive, which is the
+// "gate this tool on that tool running" case the function exists for.
+- (void)testAnnotationExistsAcrossTheProcessTree {
+  using ReturnValue = santa::cel::CELProtoTraits<true>::ReturnValue;
+
+  auto tree = std::make_shared<ProcessTreeTestPeer>(
+      std::vector<std::unique_ptr<santa::santad::process_tree::Annotator>>{});
+  auto init = tree->InsertInit();
+
+  const Cred cred = {.uid = 0, .gid = 0};
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+
+  auto ruleEvaluator = santa::cel::Evaluator<true>::Create();
+  XCTAssertTrue(ruleEvaluator.ok());
+  auto fallbackEvaluator = santa::cel::Evaluator<true>::Create(/*allowUnspecified=*/true);
+  XCTAssertTrue(fallbackEvaluator.ok());
+
+  // An unrelated process, which never carries the annotation itself.
+  Pid strangerPid = {.pid = 40, .pidversion = 1};
+  tree->HandleFork(1, init, strangerPid);
+
+  constexpr absl::string_view kGate =
+      "annotation_exists('claude-code') ? ALLOWLIST_COMPILER : UNSPECIFIED";
+
+  {
+    // Nothing is running under the annotation yet.
+    auto result =
+        EvaluateAgainstTarget(tree, mockESApi, strangerPid, fallbackEvaluator.value().get(), kGate);
+    XCTAssertTrue(result.ok());
+    XCTAssertEqual(result.value().value, ReturnValue::UNSPECIFIED);
+  }
+
+  // The tool: init forks to 20.1, which execs to 20.2, and a rule annotates it.
+  Pid toolPid = {.pid = 20, .pidversion = 2};
+  tree->HandleFork(2, init, (Pid){.pid = 20, .pidversion = 1});
+  tree->HandleExec(3, **tree->Get((Pid){.pid = 20, .pidversion = 1}), toolPid,
+                   (Program){.executable = "/bin/tool", .arguments = {}}, cred);
+  {
+    auto result = EvaluateAgainstTarget(
+        tree, mockESApi, toolPid, ruleEvaluator.value().get(),
+        "add_annotation(['claude-code', 'claude-code-{session}'], ALLOWLIST)");
+    XCTAssertTrue(result.ok());
+    XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
+  }
+
+  {
+    // Now the gate opens for the unrelated process, and the answer is never
+    // cached: it changes the moment the tool exits.
+    auto result =
+        EvaluateAgainstTarget(tree, mockESApi, strangerPid, fallbackEvaluator.value().get(), kGate);
+    XCTAssertTrue(result.ok());
+    XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST_COMPILER);
+    XCTAssertFalse(result.value().cacheable);
+  }
+
+  {
+    // The session-expanded name is stored on the process but is NOT indexed,
+    // so it can never open a gate.
+    auto annotation = tree->GetAnnotation<CELAnnotator>(**tree->Get(toolPid));
+    XCTAssertTrue(annotation.has_value() && (*annotation)->Has("claude-code-20-2"));
+
+    auto result = EvaluateAgainstTarget(
+        tree, mockESApi, strangerPid, fallbackEvaluator.value().get(),
+        "annotation_exists('claude-code-20-2') ? ALLOWLIST_COMPILER : UNSPECIFIED");
+    XCTAssertTrue(result.ok());
+    XCTAssertEqual(result.value().value, ReturnValue::UNSPECIFIED);
+  }
+
+  {
+    // The executing process counts itself, so the tool's own exec sees it.
+    auto result =
+        EvaluateAgainstTarget(tree, mockESApi, toolPid, fallbackEvaluator.value().get(), kGate);
+    XCTAssertTrue(result.ok());
+    XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST_COMPILER);
+  }
+
+  // The tool exits. The gate shuts immediately, not when the tree reaps it.
+  tree->HandleExit(4, **tree->Get(toolPid));
+  {
+    auto result =
+        EvaluateAgainstTarget(tree, mockESApi, strangerPid, fallbackEvaluator.value().get(), kGate);
     XCTAssertTrue(result.ok());
     XCTAssertEqual(result.value().value, ReturnValue::UNSPECIFIED);
   }
