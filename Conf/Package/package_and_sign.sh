@@ -19,7 +19,7 @@ function die {
 readonly EXPECTED_ARCHS="x86_64 arm64"
 
 # Verify the architectures of a signed artifact, then the signature, embedded
-# Info.plist and signing identity of every slice of it.
+# Info.plist, signing identity and entitlements of every slice of it.
 #
 # `codesign --verify` without --arch only checks the slice matching the host, so
 # a broken slice in a universal binary passes locally and is first caught by
@@ -78,37 +78,41 @@ function verify_slices {
     id=$(/usr/bin/sed -n 's/^Identifier=//p' <<<"${details}")
     [[ "${id}" == "${want_id}" ]] ||
       die "the ${arch} slice of ${binary} is signed as \"${id}\", expected \"${want_id}\""
+
+    verify_entitlements "${artifact}" "${want_id}" "${arch}"
   done
 }
 
-# A release must not carry get-task-allow (the debugger entitlements files add
-# it), and netd must carry the Developer ID capability values, which only
+# Verify the entitlements of one slice of a signed artifact. A release must not
+# carry get-task-allow (the debugger entitlements files add it), and netd must
+# carry the Developer ID capability values, which only
 # --define=SANTA_BUILD_TYPE=release selects. Neither rules_apple nor codesign
 # checks that key against the profile, so a wrong build signs fine and netd
 # fails to activate on the customer's machine.
 function verify_entitlements {
   local artifact="${1}"
   local want_id="${2}"
+  local arch="${3}"
 
   # Empty for a binary signed without entitlements, such as the CLIs.
   local ents
-  ents=$(/usr/bin/codesign -d --entitlements - --xml "${artifact}" 2>/dev/null) ||
-    die "could not read the entitlements of ${artifact}"
+  ents=$(/usr/bin/codesign -d --arch "${arch}" --entitlements - --xml "${artifact}" 2>/dev/null) ||
+    die "could not read the entitlements of the ${arch} slice of ${artifact}"
 
   # plutil fails when the key (or the whole plist) is absent, which is the
   # normal case; do not let set -e turn that into a silent exit.
   local allow
   allow=$(/usr/bin/plutil -extract 'com\.apple\.security\.get-task-allow' raw -o - - <<<"${ents}" 2>/dev/null) || true
   [[ "${allow}" != "true" ]] ||
-    die "${artifact} is signed with get-task-allow (a debugger build)"
+    die "the ${arch} slice of ${artifact} is signed with get-task-allow (a debugger build)"
 
   if [[ "${want_id}" == "com.northpolesec.santa.netd" ]]; then
     local ne want
     ne=$(/usr/bin/plutil -extract 'com\.apple\.developer\.networking\.networkextension' json -o - - <<<"${ents}" 2>/dev/null) ||
-      die "${artifact} has no networkextension entitlement"
+      die "the ${arch} slice of ${artifact} has no networkextension entitlement"
     for want in content-filter-provider-systemextension dns-proxy-systemextension; do
       /usr/bin/grep -q "\"${want}\"" <<<"${ne}" ||
-        die "${artifact} lacks ${want}; build with --define=SANTA_BUILD_TYPE=release"
+        die "the ${arch} slice of ${artifact} lacks ${want}; build with --define=SANTA_BUILD_TYPE=release"
     done
   fi
 }
@@ -219,9 +223,6 @@ for ARTIFACT in "${INPUT_SANTACTL}" "${INPUT_SANTABS}" "${INPUT_SANTAMS}" "${INP
 
   echo "verifying every slice of ${BN}"
   verify_slices "${ARTIFACT}" "${WANT_ID}"
-
-  echo "verifying the entitlements of ${BN}"
-  verify_entitlements "${ARTIFACT}" "${WANT_ID}"
 done
 
 # Notarize all the bundles
@@ -338,9 +339,6 @@ if [ -n "${BUILD_LITE_PACKAGE}" ]; then
 
   echo "verifying every slice of the lite Santa.app"
   verify_slices "${LITE_APP}" "com.northpolesec.santa"
-
-  echo "verifying the entitlements of the lite Santa.app"
-  verify_entitlements "${LITE_APP}" "com.northpolesec.santa"
 
   # Notarize the lite app
   echo "zipping lite Santa.app"
