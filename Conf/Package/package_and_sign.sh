@@ -107,11 +107,24 @@ function verify_entitlements {
     die "the ${arch} slice of ${artifact} is signed with get-task-allow (a debugger build)"
 
   if [[ "${want_id}" == "com.northpolesec.santa.netd" ]]; then
-    local ne want
-    ne=$(/usr/bin/plutil -extract 'com\.apple\.developer\.networking\.networkextension' json -o - - <<<"${ents}" 2>/dev/null) ||
-      die "the ${arch} slice of ${artifact} has no networkextension entitlement"
+    # The entitlement is an array of strings. Read it element by element so the
+    # check is on the values, not on a textual rendering where a dictionary key
+    # or a longer value could match.
+    local key='com\.apple\.developer\.networking\.networkextension'
+    [[ "$(/usr/bin/plutil -type "${key}" - <<<"${ents}" 2>/dev/null)" == "array" ]] ||
+      die "the ${arch} slice of ${artifact} has no networkextension entitlement array"
+
+    local count i values=""
+    count=$(/usr/bin/plutil -extract "${key}" raw -o - - <<<"${ents}" 2>/dev/null) ||
+      die "could not read the networkextension entitlement of the ${arch} slice of ${artifact}"
+    for ((i = 0; i < count; i++)); do
+      values+="$(/usr/bin/plutil -extract "${key}.${i}" raw -o - - <<<"${ents}" 2>/dev/null)"$'\n' ||
+        die "could not read the networkextension entitlement of the ${arch} slice of ${artifact}"
+    done
+
+    local want
     for want in content-filter-provider-systemextension dns-proxy-systemextension; do
-      /usr/bin/grep -q "\"${want}\"" <<<"${ne}" ||
+      /usr/bin/grep -qx "${want}" <<<"${values}" ||
         die "the ${arch} slice of ${artifact} lacks ${want}; build with --define=SANTA_BUILD_TYPE=release"
     done
   fi
