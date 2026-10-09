@@ -19,7 +19,7 @@ function die {
 readonly EXPECTED_ARCHS="x86_64 arm64"
 
 # Verify the architectures of a signed artifact, then the signature, embedded
-# Info.plist and signing identity of every slice of it.
+# Info.plist, signing identity and entitlements of every slice of it.
 #
 # `codesign --verify` without --arch only checks the slice matching the host, so
 # a broken slice in a universal binary passes locally and is first caught by
@@ -78,7 +78,75 @@ function verify_slices {
     id=$(/usr/bin/sed -n 's/^Identifier=//p' <<<"${details}")
     [[ "${id}" == "${want_id}" ]] ||
       die "the ${arch} slice of ${binary} is signed as \"${id}\", expected \"${want_id}\""
+
+    verify_entitlements "${artifact}" "${want_id}" "${arch}"
   done
+}
+
+# Print the strings of the array at an entitlements keypath, one per line.
+# Fails if the key is missing or not an array, so a dictionary keyed by the
+# wanted values cannot pass as a match.
+function entitlement_strings {
+  local ents="${1}"
+  local key="${2}"
+  local count i
+  [[ "$(/usr/bin/plutil -type "${key}" - <<<"${ents}" 2>/dev/null)" == "array" ]] || return 1
+  count=$(/usr/bin/plutil -extract "${key}" raw -o - - <<<"${ents}" 2>/dev/null) || return 1
+  for ((i = 0; i < count; i++)); do
+    /usr/bin/plutil -extract "${key}.${i}" raw -o - - <<<"${ents}" 2>/dev/null || return 1
+  done
+}
+
+# Verify the entitlements of one slice of a signed artifact. A release must not
+# carry get-task-allow (the debugger entitlements files add it), and netd must
+# carry the Developer ID capability values, which only
+# --define=SANTA_BUILD_TYPE=release selects. Neither rules_apple nor codesign
+# checks that key against the profile, so a wrong build signs fine and netd
+# fails to activate on the customer's machine.
+function verify_entitlements {
+  local artifact="${1}"
+  local want_id="${2}"
+  local arch="${3}"
+
+  # Empty for a binary signed without entitlements, such as the CLIs.
+  local ents
+  ents=$(/usr/bin/codesign -d --arch "${arch}" --entitlements - --xml "${artifact}" 2>/dev/null) ||
+    die "could not read the entitlements of the ${arch} slice of ${artifact}"
+
+  # plutil fails when the key (or the whole plist) is absent, which is the
+  # normal case; do not let set -e turn that into a silent exit.
+  local allow
+  allow=$(/usr/bin/plutil -extract 'com\.apple\.security\.get-task-allow' raw -o - - <<<"${ents}" 2>/dev/null) || true
+  [[ "${allow}" != "true" ]] ||
+    die "the ${arch} slice of ${artifact} is signed with get-task-allow (a debugger build)"
+
+  if [[ "${want_id}" == "com.northpolesec.santa.netd" ]]; then
+    local values want
+    values=$(entitlement_strings "${ents}" 'com\.apple\.developer\.networking\.networkextension') ||
+      die "the ${arch} slice of ${artifact} has no networkextension entitlement array"
+    for want in content-filter-provider-systemextension dns-proxy-systemextension; do
+      /usr/bin/grep -qx "${want}" <<<"${values}" ||
+        die "the ${arch} slice of ${artifact} lacks ${want}; build with --define=SANTA_BUILD_TYPE=release"
+    done
+
+    # The network extension validator refuses to activate netd unless
+    # NEMachServiceName starts with one of its app groups. Compare literally: a
+    # profile wildcard such as "TEAMID.*" signed verbatim prefixes nothing, and
+    # that is what rules_apple 5 signs when the entitlements come from the
+    # profile.
+    local mach groups group found=""
+    mach=$(/usr/bin/plutil -extract NetworkExtension.NEMachServiceName raw -o - "${artifact}/Contents/Info.plist") ||
+      die "could not read NEMachServiceName from ${artifact}"
+    groups=$(entitlement_strings "${ents}" 'com\.apple\.security\.application-groups') ||
+      die "the ${arch} slice of ${artifact} has no app groups array"
+    while read -r group; do
+      if [[ -n "${group}" && "${mach}" == "${group}"* ]]; then
+        found=1
+      fi
+    done <<<"${groups}"
+    [[ -n "${found}" ]] ||
+      die "the ${arch} slice of ${artifact} has no app group that prefixes NEMachServiceName ${mach}"
+  fi
 }
 
 # RELEASE_ROOT is a required environment variable that points to the root
