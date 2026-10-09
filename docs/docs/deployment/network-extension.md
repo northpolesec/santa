@@ -88,19 +88,24 @@ output and installed on the next reboot or sleep/wake cycle.
 ## Removal
 
 1. In Workshop, turn off the **Network Extension** setting on every tag that
-   has it. Santa then removes the content filter and DNS proxy configurations,
-   but the extension stays activated. While the setting is on, Santa tries to
-   install the extension again, and users can see approval prompts.
-2. To deactivate the extension on a host, run:
+   has it. The extension then stops filtering and allows all traffic, but the
+   extension and its content filter and DNS proxy configurations stay
+   installed. While the setting is on, Santa tries to install the extension
+   again on boot and wake, and users can see approval prompts.
+2. If your [system extension profile](profile-system-extension.md) lists
+   `com.northpolesec.santa.netd` in `NonRemovableSystemExtensions`, remove it
+   from that list. macOS rejects the deactivation in the next step until you do.
+3. To remove the content filter and DNS proxy configurations and deactivate the
+   extension on a host, run:
 
    ```sh
    sudo /Applications/Santa.app/Contents/MacOS/Santa --unload-network-extension
    ```
 
-3. In your [system extension profile](profile-system-extension.md), remove
-   `com.northpolesec.santa.netd` from the allowed system extensions. If you
-   also listed it as non-removable, remove it from that list too. Keep
-   `com.northpolesec.santa.daemon`, which Santa needs to run.
+4. In your system extension profile, remove `com.northpolesec.santa.netd` from
+   the allowed system extensions, and from `NonRemovableFromUISystemExtensions`
+   if you listed it there. Keep `com.northpolesec.santa.daemon`, which Santa
+   needs to run.
 
 The Web Content Filter and DNS Proxy payloads only pre-approve the extension.
-You can remove them at any time.
+You can remove them after step 1.

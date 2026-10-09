@@ -1150,7 +1150,8 @@ thousand static rules working correctly, but we don't recommend using StaticRule
       description: `If set, this is the Common Name of a certificate in the System keychain to be used for sync
         authentication. The corresponding private key must also be in the keychain.
         Matching is case sensitive. If several certificates match, the one with the latest valid-from
-        date whose private key Santa can use is chosen`,
+        date is chosen. In Santa 2026.9 and later, if Santa cannot use that certificate's private key,
+        it tries the next match. Ignored if ClientAuthCertificateFile is set`,
       type: "string",
     },
     {
@@ -1158,7 +1159,8 @@ thousand static rules working correctly, but we don't recommend using StaticRule
       description: `If set, this is the Issuer Name of a certificate in the System keychain to be used for sync
         authentication. The corresponding private key must also be in the keychain.
         Matching is case sensitive. If several certificates match, the one with the latest valid-from
-        date whose private key Santa can use is chosen`,
+        date is chosen. In Santa 2026.9 and later, if Santa cannot use that certificate's private key,
+        it tries the next match. Ignored if ClientAuthCertificateFile or ClientAuthCertificateCN is set`,
       type: "string",
     },
     {
