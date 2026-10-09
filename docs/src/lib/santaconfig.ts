@@ -527,7 +527,7 @@ changes in the release notes of any future release that changes them.`,
     {
       key: "SpoolDirectorySizeThresholdMB",
       description: `If \`EventLogType\` is set to \`protobuf\`, SpoolDirectorySizeThresholdMB defines the total combined size
-        limit of all files in the spool directory. Once the threshold is met, no more events will be saved`,
+        limit of all files in the spool directory. Once the threshold is met, the oldest files are deleted to make room for new events`,
       type: "integer",
       defaultValue: 250,
       enableIf: (data) => data.EventLogType == "protobuf",
