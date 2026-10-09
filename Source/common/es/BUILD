@@ -78,6 +78,35 @@ objc_library(
 )
 
 objc_library(
+    name = "ESCacheFlusher",
+    srcs = ["ESCacheFlusher.mm"],
+    hdrs = ["ESCacheFlusher.h"],
+    deps = [
+        ":SNTEndpointSecurityClientBase",
+        "//Source/common:SNTLogging",
+    ],
+)
+
+santa_unit_test(
+    name = "ESCacheFlusherTest",
+    srcs = ["ESCacheFlusherTest.mm"],
+    sdk_dylibs = [
+        "EndpointSecurity",
+    ],
+    sdk_frameworks = [
+        "OSLog",
+    ],
+    deps = [
+        ":ESCacheFlusher",
+        ":MockEndpointSecurityAPI",
+        ":SNTEndpointSecurityClient",
+        "//Source/common:SNTLogging",
+        "//Source/common:TestUtils",
+        "@googletest//:gtest",
+    ],
+)
+
+objc_library(
     name = "MockEndpointSecurityAPI",
     testonly = 1,
     hdrs = ["MockEndpointSecurityAPI.h"],

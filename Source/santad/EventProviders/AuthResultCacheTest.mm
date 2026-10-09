@@ -15,7 +15,6 @@
 
 #include <EndpointSecurity/EndpointSecurity.h>
 #import <Foundation/Foundation.h>
-#import <OCMock/OCMock.h>
 #import <XCTest/XCTest.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -30,11 +29,14 @@
 #import "Source/common/SNTCommonEnums.h"
 #include "Source/common/SantaVnode.h"
 #include "Source/common/TestUtils.h"
+#include "Source/common/es/ESCacheFlusher.h"
 #include "Source/common/es/MockEndpointSecurityAPI.h"
-#import "Source/common/es/SNTEndpointSecurityClientBase.h"
+#import "Source/common/es/SNTEndpointSecurityClient.h"
 #include "Source/santad/EventProviders/AuthResultCache.h"
 
 using santa::AuthResultCache;
+using santa::ESCacheClearStrategy;
+using santa::ESCacheFlusher;
 using santa::FlushCacheMode;
 using santa::FlushCacheReason;
 
@@ -87,15 +89,15 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
 @implementation AuthResultCacheTest
 
 - (void)testEmptyCacheExpectedNumberOfCacheCounts {
-  auto esapi = std::make_shared<MockEndpointSecurityAPI>();
-  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(esapi, nil);
+  auto flusher = std::make_shared<ESCacheFlusher>(ESCacheClearStrategy::kEveryClient);
+  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(flusher, nil);
 
   AssertCacheCounts(cache, 0, 0);
 }
 
 - (void)testBasicOperation {
-  auto esapi = std::make_shared<MockEndpointSecurityAPI>();
-  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(esapi, nil);
+  auto flusher = std::make_shared<ESCacheFlusher>(ESCacheClearStrategy::kEveryClient);
+  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(flusher, nil);
 
   santa::ExecTarget rootTarget = MakeTarget(RootDevno(), 111);
   santa::ExecTarget nonrootTarget = MakeTarget(RootDevno() + 123, 222);
@@ -131,10 +133,10 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
 }
 
 - (void)testDenyOnceLeavesNoEntry {
-  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  auto flusher = std::make_shared<ESCacheFlusher>(ESCacheClearStrategy::kEveryClient);
   // A long deny interval so that a retained deny could not expire on its own
   // during the test.
-  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(mockESApi, nil, 600000);
+  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(flusher, nil, 600000);
 
   santa::ExecTarget rootTarget = MakeTarget(RootDevno(), 111);
 
@@ -154,8 +156,8 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
 }
 
 - (void)testDenyIsStillRetained {
-  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
-  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(mockESApi, nil, 600000);
+  auto flusher = std::make_shared<ESCacheFlusher>(ESCacheClearStrategy::kEveryClient);
+  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(flusher, nil, 600000);
 
   santa::ExecTarget rootTarget = MakeTarget(RootDevno(), 111);
 
@@ -167,12 +169,29 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
 }
 
 - (void)testFlushCache {
-  id<SNTEndpointSecurityClientBase> client =
-      OCMProtocolMock(@protocol(SNTEndpointSecurityClientBase));
+  auto flusher = std::make_shared<ESCacheFlusher>(ESCacheClearStrategy::kEveryClient);
+  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(flusher, nil);
 
-  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
-  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(mockESApi, nil);
-  cache->SetESClient(client);
+  auto clientAPI = std::make_shared<MockEndpointSecurityAPI>();
+  SNTEndpointSecurityClient* client =
+      [[SNTEndpointSecurityClient alloc] initWithESAPI:clientAPI
+                                               metrics:nullptr
+                                             processor:santa::Processor::kUnknown];
+  auto lastAPI = std::make_shared<MockEndpointSecurityAPI>();
+  SNTEndpointSecurityClient* lastClient =
+      [[SNTEndpointSecurityClient alloc] initWithESAPI:lastAPI
+                                               metrics:nullptr
+                                             processor:santa::Processor::kUnknown];
+
+  // Only the full flush requests central invalidation
+  EXPECT_CALL(*clientAPI, ClearCache).WillOnce(testing::Return(true));
+  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+  EXPECT_CALL(*lastAPI, ClearCache).WillOnce([sema] {
+    dispatch_semaphore_signal(sema);
+    return true;
+  });
+
+  flusher->AddClient(client);
 
   santa::ExecTarget rootTarget = MakeTarget(RootDevno(), 111);
   santa::ExecTarget nonrootTarget = MakeTarget(RootDevno() + 123, 111);
@@ -192,30 +211,25 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
 
   AssertCacheCounts(cache, 1, 1);
 
-  // Flush all caches
-  // The call to ClearCache is asynchronous. Use a semaphore to
-  // be notified when the mock is called.
-  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-  OCMStub([client clearCache])
-      .andDo(^(NSInvocation* invocation) {
-        dispatch_semaphore_signal(sema);
-      })
-      .andReturn(true);
+  // Registered after the non-root flush and cleared last, so once it is cleared
+  // any invalidation requested by the non-root flush has also run.
+  flusher->AddClient(lastClient);
 
+  // Flush all caches. Local caches clear synchronously, and the ES caches are
+  // invalidated asynchronously.
   cache->FlushCache(FlushCacheMode::kAllCaches, FlushCacheReason::kClientModeChanged);
 
-  XCTAssertEqual(0,
-                 dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC)),
-                 "ClearCache wasn't called within expected time window");
-
-  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
-
   AssertCacheCounts(cache, 0, 0);
+
+  XCTAssertSemaTrue(sema, 5, "ClearCache wasn't called within expected time window");
+
+  XCTBubbleMockVerifyAndClearExpectations(clientAPI.get());
+  XCTBubbleMockVerifyAndClearExpectations(lastAPI.get());
 }
 
 - (void)testCacheStateMachine {
-  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
-  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(mockESApi, nil);
+  auto flusher = std::make_shared<ESCacheFlusher>(ESCacheClearStrategy::kEveryClient);
+  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(flusher, nil);
 
   santa::ExecTarget rootTarget = MakeTarget(RootDevno(), 111);
 
@@ -301,8 +315,8 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
 }
 
 - (void)testAllowNoCacheWithDecision {
-  auto esapi = std::make_shared<MockEndpointSecurityAPI>();
-  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(esapi, nil);
+  auto flusher = std::make_shared<ESCacheFlusher>(ESCacheClearStrategy::kEveryClient);
+  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(flusher, nil);
 
   santa::ExecTarget rootTarget = MakeTarget(RootDevno(), 111);
 
@@ -337,8 +351,8 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
 }
 
 - (void)testCompilerNoCacheIsNarrowedAndNeverTerminal {
-  auto esapi = std::make_shared<MockEndpointSecurityAPI>();
-  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(esapi, nil);
+  auto flusher = std::make_shared<ESCacheFlusher>(ESCacheClearStrategy::kEveryClient);
+  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(flusher, nil);
 
   santa::ExecTarget rootTarget = MakeTarget(RootDevno(), 222);
 
@@ -369,10 +383,10 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
 }
 
 - (void)testCacheExpiry {
-  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  auto flusher = std::make_shared<ESCacheFlusher>(ESCacheClearStrategy::kEveryClient);
   // Create a cache with a lowered cache expiry value
   uint64_t expiryMS = 250;
-  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(mockESApi, nil, expiryMS);
+  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(flusher, nil, expiryMS);
 
   santa::ExecTarget rootTarget = MakeTarget(RootDevno(), 111);
 
@@ -395,8 +409,8 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
 }
 
 - (void)testSlicesAreIndependentEntries {
-  auto esapi = std::make_shared<MockEndpointSecurityAPI>();
-  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(esapi, nil);
+  auto flusher = std::make_shared<ESCacheFlusher>(ESCacheClearStrategy::kEveryClient);
+  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(flusher, nil);
 
   santa::ExecTarget arm = MakeTarget(RootDevno(), 111, CPU_TYPE_ARM64);
   santa::ExecTarget x86 = MakeTarget(RootDevno(), 111, CPU_TYPE_X86_64);
@@ -414,8 +428,8 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
 }
 
 - (void)testCheckCacheForVnodeFindsAnySlice {
-  auto esapi = std::make_shared<MockEndpointSecurityAPI>();
-  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(esapi, nil);
+  auto flusher = std::make_shared<ESCacheFlusher>(ESCacheClearStrategy::kEveryClient);
+  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(flusher, nil);
 
   santa::ExecTarget arm = MakeTarget(RootDevno(), 222, CPU_TYPE_ARM64);
   cache->AddToCache(arm, SNTActionRequestBinary);
@@ -430,8 +444,8 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
 // Pins the storage half of identity verification: each `set` arm in AddToCache
 // must carry the target's identity into the stored value.
 - (void)testIdentityIsStoredByEveryTransition {
-  auto esapi = std::make_shared<MockEndpointSecurityAPI>();
-  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(esapi, nil);
+  auto flusher = std::make_shared<ESCacheFlusher>(ESCacheClearStrategy::kEveryClient);
+  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(flusher, nil);
 
   santa::ExecTarget target = MakeTarget(RootDevno(), 111, CPU_TYPE_ARM64, 0xBB, 4242);
 
@@ -457,8 +471,8 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
 // differs from the incoming target still satisfies the CAS precondition. The CAS
 // is identity-agnostic; identity is enforced on the read side, in CheckCache.
 - (void)testDifferingIdentityDoesNotBlockTheCASTransition {
-  auto esapi = std::make_shared<MockEndpointSecurityAPI>();
-  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(esapi, nil);
+  auto flusher = std::make_shared<ESCacheFlusher>(ESCacheClearStrategy::kEveryClient);
+  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(flusher, nil);
 
   santa::ExecTarget a = MakeTarget(RootDevno(), 333, CPU_TYPE_ARM64, 0x11, 100);
   santa::ExecTarget aPrime = MakeTarget(RootDevno(), 333, CPU_TYPE_ARM64, 0x22, 200);
@@ -482,8 +496,8 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
 }
 
 - (void)testIdentityMismatchIsMissAndRemoves {
-  auto esapi = std::make_shared<MockEndpointSecurityAPI>();
-  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(esapi, nil);
+  auto flusher = std::make_shared<ESCacheFlusher>(ESCacheClearStrategy::kEveryClient);
+  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(flusher, nil);
 
   santa::ExecTarget original = MakeTarget(RootDevno(), 333);
   cache->AddToCache(original, SNTActionRequestBinary);
@@ -500,8 +514,8 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
 }
 
 - (void)testCdhashMismatchIsMiss {
-  auto esapi = std::make_shared<MockEndpointSecurityAPI>();
-  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(esapi, nil);
+  auto flusher = std::make_shared<ESCacheFlusher>(ESCacheClearStrategy::kEveryClient);
+  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(flusher, nil);
 
   santa::ExecTarget original = MakeTarget(RootDevno(), 444, CPU_TYPE_ARM64, 0xAA);
   cache->AddToCache(original, SNTActionRequestBinary);
@@ -512,8 +526,8 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
 }
 
 - (void)testSizeMismatchIsMiss {
-  auto esapi = std::make_shared<MockEndpointSecurityAPI>();
-  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(esapi, nil);
+  auto flusher = std::make_shared<ESCacheFlusher>(ESCacheClearStrategy::kEveryClient);
+  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(flusher, nil);
 
   santa::ExecTarget original = MakeTarget(RootDevno(), 666);
   cache->AddToCache(original, SNTActionRequestBinary);
@@ -525,8 +539,8 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
 }
 
 - (void)testIdentityMismatchOnInFlightMarkerRemovesIt {
-  auto esapi = std::make_shared<MockEndpointSecurityAPI>();
-  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(esapi, nil);
+  auto flusher = std::make_shared<ESCacheFlusher>(ESCacheClearStrategy::kEveryClient);
+  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(flusher, nil);
 
   santa::ExecTarget original = MakeTarget(RootDevno(), 555);
   cache->AddToCache(original, SNTActionRequestBinary);
@@ -547,8 +561,8 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
 // structural today (the check sits above every state-specific branch); this
 // guards a future reordering.
 - (void)testIdentityMismatchUnderHoldIsMissAndRemoves {
-  auto esapi = std::make_shared<MockEndpointSecurityAPI>();
-  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(esapi, nil);
+  auto flusher = std::make_shared<ESCacheFlusher>(ESCacheClearStrategy::kEveryClient);
+  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(flusher, nil);
 
   santa::ExecTarget original = MakeTarget(RootDevno(), 777);
   XCTAssertTrue(cache->AddToCache(original, SNTActionRequestBinary));
@@ -565,10 +579,10 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
 // before the deny-expiry logic. A mismatched deny is a miss regardless of its
 // TTL, so a deny cached for old content is never attributed to new content.
 - (void)testIdentityMismatchUnderDenyPreemptsExpiry {
-  auto esapi = std::make_shared<MockEndpointSecurityAPI>();
+  auto flusher = std::make_shared<ESCacheFlusher>(ESCacheClearStrategy::kEveryClient);
   // A long deny TTL: the entry is nowhere near expiry, so a miss here can only
   // come from identity verification running ahead of the expiry check.
-  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(esapi, nil, 600000);
+  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(flusher, nil, 600000);
 
   santa::ExecTarget original = MakeTarget(RootDevno(), 888);
   XCTAssertTrue(cache->AddToCache(original, SNTActionRequestBinary));
@@ -656,8 +670,8 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
 - (void)testUnconfirmedDecisionIsNotStoredForReuse {
   // The SNTCachedDecision from a no-cache allow is kept so the next execution
   // can skip recomputing it -- unless its identity was never confirmed.
-  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
-  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(mockESApi, nil);
+  auto flusher = std::make_shared<ESCacheFlusher>(ESCacheClearStrategy::kEveryClient);
+  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(flusher, nil);
 
   santa::ExecTarget target = MakeTarget(RootDevno(), 456);
 
@@ -677,8 +691,8 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
 
 - (void)testConfirmedDecisionIsStillStoredForReuse {
   // Regression guard for the above: a confirmed decision must still be kept.
-  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
-  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(mockESApi, nil);
+  auto flusher = std::make_shared<ESCacheFlusher>(ESCacheClearStrategy::kEveryClient);
+  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(flusher, nil);
 
   santa::ExecTarget target = MakeTarget(RootDevno(), 457);
 
