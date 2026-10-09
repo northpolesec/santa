@@ -1103,18 +1103,38 @@ NSString* WatchItems::DataSourceName(DataSource data_source) {
   };
 }
 
+// A newly registered callback is sent the current state as its initial
+// update. The update is queued under lock_, the same as the updates queued by
+// UpdateCurrentState, so it precedes the delta of any later change.
 void WatchItems::RegisterDataWatchItemsUpdatedCallback(DataWatchItemsUpdatedBlock callback) {
   absl::MutexLock lock(lock_);
-  if (!data_watch_items_updated_callback_) {
-    data_watch_items_updated_callback_ = std::move(callback);
+  if (data_watch_items_updated_callback_) {
+    return;
   }
+  data_watch_items_updated_callback_ = std::move(callback);
+
+  DataWatchItemsUpdatedBlock initial_callback = data_watch_items_updated_callback_;
+  size_t count = data_watch_items_.Count();
+  DataWatchItems empty;
+  SetPairPathAndType all_paths = data_watch_items_ - empty;
+  SetPairPathAndType all_ancestor_paths = data_watch_items_.AncestorPathsDifference(empty);
+  dispatch_async(q_, ^{
+    initial_callback(count, all_paths, {}, all_ancestor_paths, {});
+  });
 }
 
 void WatchItems::RegisterProcWatchItemsUpdatedCallback(ProcWatchItemsUpdatedBlock callback) {
   absl::MutexLock lock(lock_);
-  if (!proc_watch_items_updated_callback_) {
-    proc_watch_items_updated_callback_ = std::move(callback);
+  if (proc_watch_items_updated_callback_) {
+    return;
   }
+  proc_watch_items_updated_callback_ = std::move(callback);
+
+  ProcWatchItemsUpdatedBlock initial_callback = proc_watch_items_updated_callback_;
+  size_t count = proc_watch_items_.Count();
+  dispatch_async(q_, ^{
+    initial_callback(count);
+  });
 }
 
 void WatchItems::UpdateCurrentState(DataWatchItems new_data_watch_items,

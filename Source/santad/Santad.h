@@ -19,6 +19,7 @@
 #import "Source/common/MOLXPCConnection.h"
 #include "Source/common/PrefixTree.h"
 #include "Source/common/Unit.h"
+#include "Source/common/es/ESCacheFlusher.h"
 #include "Source/common/es/EndpointSecurityAPI.h"
 #include "Source/common/es/Enricher.h"
 #include "Source/common/faa/WatchItems.h"
@@ -36,6 +37,7 @@
 
 void SantadMain(
     std::shared_ptr<santa::EndpointSecurityAPI> esapi,
+    std::shared_ptr<santa::ESCacheFlusher> es_cache_flusher,
     std::shared_ptr<santa::Logger> logger,
     std::shared_ptr<santa::Metrics> metrics,
     std::shared_ptr<santa::WatchItems> watch_items,

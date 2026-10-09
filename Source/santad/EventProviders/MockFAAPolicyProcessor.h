@@ -78,6 +78,16 @@ class MockFAAPolicyProcessor : public FAAPolicyProcessor {
             });
   }
 
+  /// Runs before the real exit handling, when set.
+  void (^notifyExitHook)(const audit_token_t& tok) = nil;
+
+  void NotifyExit(const audit_token_t& tok, FAAClientType client_type) override {
+    if (notifyExitHook) {
+      notifyExitHook(tok);
+    }
+    FAAPolicyProcessor::NotifyExit(tok, client_type);
+  }
+
   //
   // Wrappers for calling into private methods
   //

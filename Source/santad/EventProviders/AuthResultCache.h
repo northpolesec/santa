@@ -19,7 +19,6 @@
 #include <EndpointSecurity/EndpointSecurity.h>
 #import <Foundation/Foundation.h>
 #include <Kernel/kern/cs_blobs.h>
-#include <dispatch/dispatch.h>
 #include <mach/machine.h>
 #include <sys/stat.h>
 #include <array>
@@ -29,8 +28,7 @@
 #import "Source/common/SNTMetricSet.h"
 #include "Source/common/SantaCache.h"
 #import "Source/common/SantaVnode.h"
-#include "Source/common/es/EndpointSecurityAPI.h"
-#import "Source/common/es/SNTEndpointSecurityClientBase.h"
+#include "Source/common/es/ESCacheFlusher.h"
 
 @class SNTCachedDecision;
 
@@ -132,12 +130,12 @@ class AuthResultCache {
   // previously denied binary is allowed, it can be re-executed by the user in a
   // timely manner. But the value should be high enough to allow the cache to be
   // effective in the event the binary is executed in rapid succession.
-  static std::unique_ptr<AuthResultCache> Create(std::shared_ptr<santa::EndpointSecurityAPI> esapi,
-                                                 SNTMetricSet* metric_set,
-                                                 uint64_t cache_deny_time_ms = 1500);
+  static std::unique_ptr<AuthResultCache> Create(
+      std::shared_ptr<santa::ESCacheFlusher> es_cache_flusher, SNTMetricSet* metric_set,
+      uint64_t cache_deny_time_ms = 1500);
 
-  AuthResultCache(std::shared_ptr<santa::EndpointSecurityAPI> esapi, SNTMetricCounter* flush_count,
-                  uint64_t cache_deny_time_ms = 1500);
+  AuthResultCache(std::shared_ptr<santa::ESCacheFlusher> es_cache_flusher,
+                  SNTMetricCounter* flush_count, uint64_t cache_deny_time_ms = 1500);
   virtual ~AuthResultCache();
 
   AuthResultCache(AuthResultCache&& other) = delete;
@@ -153,11 +151,13 @@ class AuthResultCache {
   // locks. Never call on the hot path.
   virtual CachedAuthResult CheckCacheForVnode(SantaVnode vnode);
 
+  // Clears the local caches synchronously. kAllCaches also requests an
+  // asynchronous ES cache clear through the shared ESCacheFlusher, so callers
+  // do not need to clear the ES cache themselves. kNonRootOnly does not clear
+  // the ES cache.
   virtual void FlushCache(FlushCacheMode mode, FlushCacheReason reason);
 
   virtual NSArray<NSNumber*>* CacheCounts();
-
-  virtual void SetESClient(id<SNTEndpointSecurityClientBase> client);
 
  private:
   virtual SantaCache<AuthResultKey, CachedAuthResult>* CacheForVnodeID(SantaVnode vnode_id);
@@ -165,12 +165,10 @@ class AuthResultCache {
   SantaCache<AuthResultKey, CachedAuthResult>* root_cache_;
   SantaCache<AuthResultKey, CachedAuthResult>* nonroot_cache_;
 
-  std::shared_ptr<santa::EndpointSecurityAPI> esapi_;
+  std::shared_ptr<santa::ESCacheFlusher> es_cache_flusher_;
   SNTMetricCounter* flush_count_;
   uint64_t root_devno_;
   uint64_t cache_deny_time_ns_;
-  dispatch_queue_t q_;
-  __weak id<SNTEndpointSecurityClientBase> es_client_;
 };
 
 }  // namespace santa

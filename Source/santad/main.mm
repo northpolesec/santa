@@ -136,10 +136,11 @@ int main(int argc, char* argv[]) {
                            santa::ProdSuspendResumeBlock());
 
     // This doesn't return
-    SantadMain(deps->ESAPI(), deps->Logger(), deps->Metrics(), deps->WatchItems(), deps->Enricher(),
-               deps->AuthResultCache(), deps->ControlConnection(), deps->CompilerController(),
-               deps->NotifierQueue(), deps->SyncdQueue(), deps->NetworkExtensionQueue(),
-               deps->ExecController(), deps->PrefixTree(), deps->TTYWriter(), deps->ProcessTree(),
+    SantadMain(deps->ESAPI(), deps->ESCacheFlusher(), deps->Logger(), deps->Metrics(),
+               deps->WatchItems(), deps->Enricher(), deps->AuthResultCache(),
+               deps->ControlConnection(), deps->CompilerController(), deps->NotifierQueue(),
+               deps->SyncdQueue(), deps->NetworkExtensionQueue(), deps->ExecController(),
+               deps->PrefixTree(), deps->TTYWriter(), deps->ProcessTree(),
                deps->EntitlementsFilter(), deps->SandboxExpectations());
   }
 

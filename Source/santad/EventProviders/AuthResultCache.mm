@@ -21,10 +21,6 @@
 #import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTLogging.h"
 #include "Source/common/SystemResources.h"
-#include "Source/common/es/Client.h"
-
-using santa::Client;
-using santa::EndpointSecurityAPI;
 
 static NSString* const kFlushCacheReasonClientModeChanged = @"ClientModeChanged";
 static NSString* const kFlushCacheReasonPathRegexChanged = @"PathRegexChanged";
@@ -81,20 +77,21 @@ NSString* const FlushCacheReasonToString(FlushCacheReason reason) {
   }
 }
 
-std::unique_ptr<AuthResultCache> AuthResultCache::Create(std::shared_ptr<EndpointSecurityAPI> esapi,
-                                                         SNTMetricSet* metric_set,
-                                                         uint64_t cache_deny_time_ms) {
+std::unique_ptr<AuthResultCache> AuthResultCache::Create(
+    std::shared_ptr<ESCacheFlusher> es_cache_flusher, SNTMetricSet* metric_set,
+    uint64_t cache_deny_time_ms) {
   SNTMetricCounter* flush_count =
       [metric_set counterWithName:@"/santa/flush_count"
                        fieldNames:@[ @"Reason" ]
                          helpText:@"Count of times the auth result cache is flushed by reason"];
 
-  return std::make_unique<AuthResultCache>(esapi, flush_count, cache_deny_time_ms);
+  return std::make_unique<AuthResultCache>(std::move(es_cache_flusher), flush_count,
+                                           cache_deny_time_ms);
 }
 
-AuthResultCache::AuthResultCache(std::shared_ptr<EndpointSecurityAPI> esapi,
+AuthResultCache::AuthResultCache(std::shared_ptr<ESCacheFlusher> es_cache_flusher,
                                  SNTMetricCounter* flush_count, uint64_t cache_deny_time_ms)
-    : esapi_(esapi),
+    : es_cache_flusher_(std::move(es_cache_flusher)),
       flush_count_(flush_count),
       cache_deny_time_ns_(cache_deny_time_ms * NSEC_PER_MSEC) {
   root_cache_ = new SantaCache<AuthResultKey, CachedAuthResult>();
@@ -104,11 +101,6 @@ AuthResultCache::AuthResultCache(std::shared_ptr<EndpointSecurityAPI> esapi,
   if (stat("/", &sb) == 0) {
     root_devno_ = sb.st_dev;
   }
-
-  q_ = dispatch_queue_create(
-      "com.northpolesec.santa.daemon.auth_result_cache.q",
-      dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL,
-                                              QOS_CLASS_USER_INTERACTIVE, 0));
 }
 
 AuthResultCache::~AuthResultCache() {
@@ -254,18 +246,9 @@ void AuthResultCache::FlushCache(FlushCacheMode mode, FlushCacheReason reason) {
   if (mode == FlushCacheMode::kAllCaches) {
     root_cache_->clear();
 
-    // Clear the ES cache when all local caches are flushed. Assume the ES cache
-    // doesn't need to be cleared when only flushing the non-root cache.
-    //
-    // Calling into ES should be done asynchronously since it could otherwise
-    // potentially deadlock.
-    auto shared_esapi = esapi_->shared_from_this();
-    id<SNTEndpointSecurityClientBase> client = es_client_;
-    if (client) {
-      dispatch_async(q_, ^{
-        [client clearCache];
-      });
-    }
+    // Clear the ES caches when all local caches are flushed. Assume the ES
+    // caches don't need to be cleared when only flushing the non-root cache.
+    es_cache_flusher_->Flush();
   }
 
   [flush_count_ incrementForFieldValues:@[ FlushCacheReasonToString(reason) ]];
@@ -273,10 +256,6 @@ void AuthResultCache::FlushCache(FlushCacheMode mode, FlushCacheReason reason) {
 
 NSArray<NSNumber*>* AuthResultCache::CacheCounts() {
   return @[ @(root_cache_->count()), @(nonroot_cache_->count()) ];
-}
-
-void AuthResultCache::SetESClient(id<SNTEndpointSecurityClientBase> client) {
-  es_client_ = client;
 }
 
 }  // namespace santa

@@ -175,7 +175,8 @@ static const std::vector<std::string> kBlockedArgs = {"clang", "--link"};
   _mockESApi->SetExpectationsRetainReleaseMessage();
 
   // The real cache. This is the component under test alongside the controller.
-  _authResultCache = AuthResultCache::Create(_mockESApi, nil);
+  _authResultCache = AuthResultCache::Create(
+      std::make_shared<santa::ESCacheFlusher>(santa::ESCacheClearStrategy::kEveryClient), nil);
 
   self.authorizer =
       [[SNTEndpointSecurityAuthorizer alloc] initWithESAPI:_mockESApi

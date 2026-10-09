@@ -203,7 +203,7 @@ class FAAPolicyProcessor {
                                                                 FAAClientType client_type);
 
   /// Used by callers to inform when a process has exited and will no longer process events.
-  void NotifyExit(const audit_token_t& tok, FAAClientType client_type);
+  virtual void NotifyExit(const audit_token_t& tok, FAAClientType client_type);
 
   DecisionAndOptions ProcessTargetAndPolicy(const Message& msg,
                                             const TargetPolicyPair& target_policy_pair,

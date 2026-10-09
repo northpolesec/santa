@@ -310,21 +310,25 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator* configurator,
     exit(EXIT_FAILURE);
   }
 
-  std::shared_ptr<::AuthResultCache> auth_result_cache = AuthResultCache::Create(esapi, metric_set);
+  std::shared_ptr<santa::ESCacheFlusher> es_cache_flusher = santa::ESCacheFlusher::Create();
+  std::shared_ptr<::AuthResultCache> auth_result_cache =
+      AuthResultCache::Create(es_cache_flusher, metric_set);
   if (!auth_result_cache) {
     LOGE(@"Failed to create auth result cache");
     exit(EXIT_FAILURE);
   }
 
   return std::make_unique<SantadDeps>(
-      esapi, logger, std::move(metrics), std::move(watch_items), std::move(auth_result_cache),
-      control_connection, compiler_controller, notifier_queue, syncd_queue, netext_queue,
-      exec_controller, timed_rule_kills, prefix_tree, std::move(tty_writer),
-      std::move(process_tree), std::move(entitlements_filter), std::move(sandbox_expectations));
+      esapi, std::move(es_cache_flusher), logger, std::move(metrics), std::move(watch_items),
+      std::move(auth_result_cache), control_connection, compiler_controller, notifier_queue,
+      syncd_queue, netext_queue, exec_controller, timed_rule_kills, prefix_tree,
+      std::move(tty_writer), std::move(process_tree), std::move(entitlements_filter),
+      std::move(sandbox_expectations));
 }
 
 SantadDeps::SantadDeps(
-    std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<::Logger> logger,
+    std::shared_ptr<EndpointSecurityAPI> esapi,
+    std::shared_ptr<santa::ESCacheFlusher> es_cache_flusher, std::shared_ptr<::Logger> logger,
     std::shared_ptr<::Metrics> metrics, std::shared_ptr<::WatchItems> watch_items,
     std::shared_ptr<santa::AuthResultCache> auth_result_cache, MOLXPCConnection* control_connection,
     SNTCompilerController* compiler_controller, SNTNotificationQueue* notifier_queue,
@@ -335,6 +339,7 @@ SantadDeps::SantadDeps(
     std::shared_ptr<santa::EntitlementsFilter> entitlements_filter,
     std::shared_ptr<santa::SandboxExpectations> sandbox_expectations)
     : esapi_(std::move(esapi)),
+      es_cache_flusher_(std::move(es_cache_flusher)),
       logger_(std::move(logger)),
       metrics_(std::move(metrics)),
       watch_items_(std::move(watch_items)),
@@ -362,6 +367,10 @@ std::shared_ptr<Enricher> SantadDeps::Enricher() {
 }
 std::shared_ptr<EndpointSecurityAPI> SantadDeps::ESAPI() {
   return esapi_;
+}
+
+std::shared_ptr<santa::ESCacheFlusher> SantadDeps::ESCacheFlusher() {
+  return es_cache_flusher_;
 }
 
 std::shared_ptr<Logger> SantadDeps::Logger() {
