@@ -83,6 +83,20 @@ function verify_slices {
   done
 }
 
+# Print the strings of the array at an entitlements keypath, one per line.
+# Fails if the key is missing or not an array, so a dictionary keyed by the
+# wanted values cannot pass as a match.
+function entitlement_strings {
+  local ents="${1}"
+  local key="${2}"
+  local count i
+  [[ "$(/usr/bin/plutil -type "${key}" - <<<"${ents}" 2>/dev/null)" == "array" ]] || return 1
+  count=$(/usr/bin/plutil -extract "${key}" raw -o - - <<<"${ents}" 2>/dev/null) || return 1
+  for ((i = 0; i < count; i++)); do
+    /usr/bin/plutil -extract "${key}.${i}" raw -o - - <<<"${ents}" 2>/dev/null || return 1
+  done
+}
+
 # Verify the entitlements of one slice of a signed artifact. A release must not
 # carry get-task-allow (the debugger entitlements files add it), and netd must
 # carry the Developer ID capability values, which only
@@ -107,26 +121,31 @@ function verify_entitlements {
     die "the ${arch} slice of ${artifact} is signed with get-task-allow (a debugger build)"
 
   if [[ "${want_id}" == "com.northpolesec.santa.netd" ]]; then
-    # The entitlement is an array of strings. Read it element by element so the
-    # check is on the values, not on a textual rendering where a dictionary key
-    # or a longer value could match.
-    local key='com\.apple\.developer\.networking\.networkextension'
-    [[ "$(/usr/bin/plutil -type "${key}" - <<<"${ents}" 2>/dev/null)" == "array" ]] ||
+    local values want
+    values=$(entitlement_strings "${ents}" 'com\.apple\.developer\.networking\.networkextension') ||
       die "the ${arch} slice of ${artifact} has no networkextension entitlement array"
-
-    local count i values=""
-    count=$(/usr/bin/plutil -extract "${key}" raw -o - - <<<"${ents}" 2>/dev/null) ||
-      die "could not read the networkextension entitlement of the ${arch} slice of ${artifact}"
-    for ((i = 0; i < count; i++)); do
-      values+="$(/usr/bin/plutil -extract "${key}.${i}" raw -o - - <<<"${ents}" 2>/dev/null)"$'\n' ||
-        die "could not read the networkextension entitlement of the ${arch} slice of ${artifact}"
-    done
-
-    local want
     for want in content-filter-provider-systemextension dns-proxy-systemextension; do
       /usr/bin/grep -qx "${want}" <<<"${values}" ||
         die "the ${arch} slice of ${artifact} lacks ${want}; build with --define=SANTA_BUILD_TYPE=release"
     done
+
+    # The network extension validator refuses to activate netd unless
+    # NEMachServiceName starts with one of its app groups. Compare literally: a
+    # profile wildcard such as "TEAMID.*" signed verbatim prefixes nothing, and
+    # that is what rules_apple 5 signs when the entitlements come from the
+    # profile.
+    local mach groups group found=""
+    mach=$(/usr/bin/plutil -extract NetworkExtension.NEMachServiceName raw -o - "${artifact}/Contents/Info.plist") ||
+      die "could not read NEMachServiceName from ${artifact}"
+    groups=$(entitlement_strings "${ents}" 'com\.apple\.security\.application-groups') ||
+      die "the ${arch} slice of ${artifact} has no app groups array"
+    while read -r group; do
+      if [[ -n "${group}" && "${mach}" == "${group}"* ]]; then
+        found=1
+      fi
+    done <<<"${groups}"
+    [[ -n "${found}" ]] ||
+      die "the ${arch} slice of ${artifact} has no app group that prefixes NEMachServiceName ${mach}"
   fi
 }
 
