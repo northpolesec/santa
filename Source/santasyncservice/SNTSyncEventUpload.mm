@@ -383,6 +383,7 @@ typename santa::ProtoTraits<IsV2>::EventT* MessageForExecutionEvent(
     for (NSString* annotation in event.annotations) {
       e->add_annotations(NSStringToUTF8String(annotation));
     }
+    e->set_file_bundle_category(NSStringToUTF8String(event.fileBundleCategory));
   }
 
   if (event.identityUnverified) {

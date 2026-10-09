@@ -90,6 +90,7 @@ extern NSString* const kFileBundleExecutableRelPath;
 extern NSString* const kFileBundleName;
 extern NSString* const kFileBundleVersion;
 extern NSString* const kFileBundleShortVersionString;
+extern NSString* const kFileBundleCategory;
 extern NSString* const kFileBundleHash;
 extern NSString* const kFileBundleHashMilliseconds;
 extern NSString* const kFileBundleBinaryCount;

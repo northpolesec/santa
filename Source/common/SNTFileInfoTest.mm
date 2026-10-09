@@ -519,6 +519,7 @@ static es_file_t MakeESFile(NSString* path, const struct stat* sb) {
   XCTAssertEqualObjects([sut bundleName], @"BundleExample");
   XCTAssertEqualObjects([sut bundleVersion], @"1");
   XCTAssertEqualObjects([sut bundleShortVersionString], @"1.0");
+  XCTAssertEqualObjects([sut bundleCategory], @"public.app-category.developer-tools");
   XCTAssertEqualObjects([sut bundlePath], path);
 }
 
@@ -814,6 +815,30 @@ static es_file_t MakeESFile(NSString* path, const struct stat* sb) {
   // it should be available..
   sut = [[SNTFileInfo alloc] initWithPath:@"/usr/bin/csreq"];
   XCTAssertNotNil([sut infoPlist]);
+}
+
+- (void)testBundleCategoryIgnoresEmbeddedInfoPlist {
+  NSString* bundlePath = [[self scratchDir] stringByAppendingPathComponent:@"Category.app"];
+  NSString* plistPath = [bundlePath stringByAppendingPathComponent:@"Contents/Info.plist"];
+  NSString* execPath = [bundlePath stringByAppendingPathComponent:@"Contents/MacOS/exe"];
+  [self writeInfoPlistAtPath:plistPath identifier:@"com.northpolesec.santa.Category"];
+  NSMutableDictionary* plist = [NSMutableDictionary dictionaryWithContentsOfFile:plistPath];
+  plist[@"LSApplicationCategoryType"] = @"public.app-category.utilities";
+  XCTAssertTrue([plist writeToFile:plistPath atomically:YES]);
+
+  NSFileManager* fm = [NSFileManager defaultManager];
+  XCTAssertTrue([fm createDirectoryAtPath:[execPath stringByDeletingLastPathComponent]
+              withIntermediateDirectories:YES
+                               attributes:nil
+                                    error:NULL]);
+  NSString* embedded = [[NSBundle bundleForClass:[self class]] pathForResource:@"32bitplist"
+                                                                        ofType:@""];
+  XCTAssertTrue([fm copyItemAtPath:embedded toPath:execPath error:NULL]);
+
+  SNTFileInfo* sut = [[SNTFileInfo alloc] initWithPath:execPath];
+  // The embedded plist wins for infoPlist, but does not describe the bundle.
+  XCTAssertEqualObjects([sut infoPlist][@"CFBundleIdentifier"], @"com.google.i386plist");
+  XCTAssertEqualObjects([sut bundleCategory], @"public.app-category.utilities");
 }
 
 - (void)testCodesignStatus {

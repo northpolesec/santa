@@ -1091,6 +1091,7 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
   if ([binInfo bundleVersion]) {
     se.fileBundleVersion = [binInfo bundleVersion];
   }
+  se.fileBundleCategory = [binInfo bundleCategory];
 
   // User data
   std::optional<std::string> user =

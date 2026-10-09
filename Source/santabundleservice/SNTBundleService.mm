@@ -95,6 +95,7 @@
     event.fileBundleName = b.bundleName;
     event.fileBundleVersion = b.bundleVersion;
     event.fileBundleVersionString = b.bundleShortVersionString;
+    event.fileBundleCategory = b.bundleCategory;
 
     // For most apps this should be "Contents/MacOS/AppName"
     if (b.bundle.executablePath.length > b.bundlePath.length) {
@@ -153,6 +154,7 @@
             se.fileBundleName = b.bundleName;
             se.fileBundleVersion = b.bundleVersion;
             se.fileBundleVersionString = b.bundleShortVersionString;
+            se.fileBundleCategory = b.bundleCategory;
 
             if (b.bundle.executablePath.length > b.bundlePath.length) {
               se.fileBundleExecutableRelPath =
@@ -346,6 +348,7 @@
       se.fileBundleName = event.fileBundleName;
       se.fileBundleVersion = event.fileBundleVersion;
       se.fileBundleVersionString = event.fileBundleVersionString;
+      se.fileBundleCategory = event.fileBundleCategory;
 
       // stateQueue, not the main queue: this only needs mutual exclusion for the dictionary
       // write and the two counters, which is no reason to involve the UI thread.
