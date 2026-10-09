@@ -47,6 +47,10 @@ typedef NS_ENUM(NSInteger, SNTNetworkFlowDefaultAction) {
 /// network-flow rules.
 @property(readonly, copy) NSArray<SNTNetworkFlowRule*>* networkFlowRules;
 
+/// DNS names santanetd forwards before any DNS rule: each name, its children, and its exact
+/// ancestors. Lowercase, no trailing dot. Part of -isEqual:/-hash, so a change is pushed.
+@property(copy) NSArray<NSString*>* protectedDNSNames;
+
 /// Defaults flowDefaultAction to Unspecified and dnsUpstreamTimeoutSecs to 30s.
 - (instancetype)initWithEnable:(BOOL)enable;
 
@@ -69,11 +73,11 @@ typedef NS_ENUM(NSInteger, SNTNetworkFlowDefaultAction) {
         dnsUpstreamTimeoutSecs:(NSTimeInterval)dnsUpstreamTimeoutSecs
               networkFlowRules:(NSArray<SNTNetworkFlowRule*>*)networkFlowRules;
 
-/// Returns a copy carrying the receiver's scalar settings, with networkFlowRules set to the given
-/// array (any networkFlowRules on the receiver are not carried over). Because networkFlowRules is
-/// excluded from -isEqual:/-hash, the result compares equal to the receiver — so a rules-bearing
-/// copy can stand in for the scalar receiver as cached last-pushed state without perturbing the
-/// settings delta.
+/// Returns a copy carrying the receiver's scalar settings and protectedDNSNames, with
+/// networkFlowRules set to the given array (any networkFlowRules on the receiver are not carried
+/// over). Because networkFlowRules is excluded from -isEqual:/-hash, the result compares equal to
+/// the receiver — so a rules-bearing copy can stand in for the scalar receiver as cached
+/// last-pushed state without perturbing the settings delta.
 - (instancetype)settingsByAttachingNetworkFlowRules:(NSArray<SNTNetworkFlowRule*>*)networkFlowRules;
 
 @end

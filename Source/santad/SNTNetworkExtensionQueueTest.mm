@@ -182,11 +182,10 @@
 
 - (void)testReconcileRulesOnlyChangePushesRules {
   self.sut.lastPushedNetworkFlowRulesHash = @"h1";
-  self.sut.lastPushedSettings =
-      [[SNTNetworkExtensionSettings alloc] initWithEnable:YES
-                                        flowDefaultAction:SNTNetworkFlowDefaultActionDeny];
-  [self stubConfiguratorEnable:YES action:SNTNetworkFlowDefaultActionDeny];  // settings unchanged
-  [self stubRuleTableHash:@"h2" rules:@[ [self rule:1] ]];                   // rules changed
+  [self stubConfiguratorEnable:YES action:SNTNetworkFlowDefaultActionDeny];
+  // Settings unchanged: last pushed is what generateSettings returns, protected names included.
+  self.sut.lastPushedSettings = [self.sut generateSettingsForProtocolVersion:@"1.0"];
+  [self stubRuleTableHash:@"h2" rules:@[ [self rule:1] ]];  // rules changed
 
   OCMExpect([self.mockProxy
       updateNetworkExtensionSettings:[OCMArg checkWithBlock:^BOOL(SNTNetworkExtensionSettings* c) {
@@ -201,10 +200,9 @@
 
 - (void)testReconcileNoChangeDoesNotPush {
   self.sut.lastPushedNetworkFlowRulesHash = @"h1";
-  self.sut.lastPushedSettings =
-      [[SNTNetworkExtensionSettings alloc] initWithEnable:YES
-                                        flowDefaultAction:SNTNetworkFlowDefaultActionDeny];
   [self stubConfiguratorEnable:YES action:SNTNetworkFlowDefaultActionDeny];
+  // Settings unchanged: last pushed is what generateSettings returns, protected names included.
+  self.sut.lastPushedSettings = [self.sut generateSettingsForProtocolVersion:@"1.0"];
   [self stubRuleTableHash:@"h1" rules:@[ [self rule:1] ]];
 
   OCMReject([self.mockProxy updateNetworkExtensionSettings:OCMOCK_ANY reply:OCMOCK_ANY]);
@@ -325,6 +323,24 @@
   XCTAssertFalse(settings.enable);  // sync (enable/action) ignored below protocol v1
   // The MDM timeout is local config, not a sync setting, so it applies regardless of version.
   XCTAssertEqualWithAccuracy(settings.dnsUpstreamTimeoutSecs, 7.5, 0.0001);
+}
+
+- (void)testGenerateSettingsProtectsSyncHostAndNPSNames {
+  // OCMock uses the first matching stub, so one stub reads syncURL.
+  __block NSURL* syncURL = [NSURL URLWithString:@"https://Sync.Example.com./santa/"];
+  OCMStub([self.mockConfigurator syncBaseURL]).andDo(^(NSInvocation* invocation) {
+    NSURL* url = syncURL;
+    [invocation setReturnValue:&url];
+  });
+  NSArray* nps = @[ @"workshop.cloud", @"north-pole.tech", @"push.northpole.security" ];
+  XCTAssertEqualObjects([self.sut generateSettingsForProtocolVersion:@"1.0"].protectedDNSNames,
+                        [@[ @"sync.example.com" ] arrayByAddingObjectsFromArray:nps]);
+  // No host, or an IP host, leaves only the NPS names.
+  for (NSString* s in @[ @"", @"https://10.0.0.1/santa/", @"https://[::1]/santa/" ]) {
+    syncURL = s.length ? [NSURL URLWithString:s] : nil;
+    XCTAssertEqualObjects([self.sut generateSettingsForProtocolVersion:@"1.0"].protectedDNSNames,
+                          nps, @"%@", s);
+  }
 }
 
 // Make shouldInstallNetworkExtension report YES (sync v2 + enabled NE settings).
@@ -625,6 +641,29 @@
                            [msg containsString:@"example.com"] && [msg containsString:@":443"] &&
                            [msg containsString:@"https://example.com/why"];
                   })))
+      .Times(1);
+
+  [self.sut handleNetworkFlowDecisions:@[ [self decisionForCacheMissWithEvent:event] ]];
+
+  XCTBubbleMockVerifyAndClearExpectations(self.mockTTYWriter.get());
+}
+
+- (void)testHandleNetworkFlowDecisionsDNSLoudDenyWritesDNSWordedTTY {
+  [self stubNetworkExtensionEnabled];
+
+  SNTStoredNetworkFlowEvent* event = [self loudDenyEventWithUIKey:@"k"];
+  event.ttyPath = @"/dev/ttys003";
+  event.dnsQuestion = YES;
+  event.hostname = @"blocked.example";
+  event.remotePort = 53;  // the resolver's port
+
+  EXPECT_CALL(*self.mockTTYWriter,
+              WriteWithoutSignal(testing::_, testing::Truly([](NSString* msg) {
+                                   return [msg containsString:@"from resolving a network name"] &&
+                                          [msg containsString:@"Name:"] &&
+                                          [msg containsString:@"blocked.example"] &&
+                                          ![msg containsString:@":53"];
+                                 })))
       .Times(1);
 
   [self.sut handleNetworkFlowDecisions:@[ [self decisionForCacheMissWithEvent:event] ]];

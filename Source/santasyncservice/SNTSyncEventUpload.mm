@@ -471,6 +471,9 @@ typename santa::ProtoTraits<IsV2>::FileAccessEventT* MessageForFileAccessEvent(
   }
   e->set_total_competing_rule_count(event.totalCompetingRuleCount);
   e->set_flow_time([event.flowTime timeIntervalSince1970]);
+  if (event.dnsQuestion) {
+    e->mutable_dns_question()->set_qtype(event.dnsQtype);
+  }
 
   // process_chain: originating process first, then each parent.
   for (SNTStoredProcess* p = event.process; p != nil; p = p.parent) {

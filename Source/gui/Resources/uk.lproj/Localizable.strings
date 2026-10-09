@@ -103,6 +103,9 @@
 /* No comment provided by engineer. */
 "Dismiss & Silence" = "Звільнити і замовкнути";
 
+/* Label for the name a blocked DNS lookup asked for */
+"DNS lookup" = "DNS-запит";
+
 /* No comment provided by engineer. */
 "Drop for application info" = "Перетягніть для інформації про додаток";
 
@@ -297,6 +300,9 @@
 
 /* The default message to show the user when a network flow is blocked */
 "The following application has been blocked<br />from reaching a network destination" = "Наступній програмі заблоковано доступ<br />до мережевого ресурсу";
+
+/* The default message to show the user when a DNS lookup is blocked */
+"The following application has been blocked<br />from resolving a network name" = "Наступній програмі заблоковано<br />розпізнавання мережевого імені";
 
 /* The default message to show the user when an unknown application is blocked */
 "The following application has been blocked from executing<br />because its trustworthiness cannot be determined" = "Наступна програма була заблокована для виконання,<br />оскільки не може бути визначена її достовірність";

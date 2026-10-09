@@ -132,29 +132,32 @@ static constexpr std::string_view kIgnoredCompilerProcessPathPrefix = "/dev/";
         return NO;
       }
 
-      // Note: For RENAME events, we first attempt to process the `source`, but if that doesn't
-      // exist (e.g. the rename operation completed) we fall back to the `destination`.
       if (strncmp(kIgnoredCompilerProcessPathPrefix.data(), esMsg->event.rename.source->path.data,
                   kIgnoredCompilerProcessPathPrefix.length()) == 0) {
         return NO;
       }
 
-      targetFile = [[SNTFileInfo alloc] initWithEndpointSecurityFile:esMsg->event.rename.source
-                                                               error:&error];
-      if (!targetFile) {
-        LOGD(@"Unable to locate source file for rename event while creating transitive. Falling "
-             @"back to destination. Path: %s, Error: %@",
-             esMsg->event.rename.source->path.data, error);
-        if (esMsg->event.rename.destination_type == ES_DESTINATION_TYPE_EXISTING_FILE) {
-          targetPath = @(esMsg->event.rename.destination.existing_file->path.data);
-          targetFile = [[SNTFileInfo alloc]
-              initWithEndpointSecurityFile:esMsg->event.rename.destination.existing_file
-                                     error:&error];
-        } else {
-          targetPath = [NSString
-              stringWithFormat:@"%s/%s", esMsg->event.rename.destination.new_path.dir->path.data,
-                               esMsg->event.rename.destination.new_path.filename.data];
-          targetFile = [[SNTFileInfo alloc] initWithPath:targetPath error:&error];
+      {
+        // The event can be handled before or after the rename completes, so the `source` vnode
+        // may be at either path. Verify each against the source's stat. `existing_file` is the
+        // file being replaced, not the renamed one.
+        const struct stat* renamedStat = &esMsg->event.rename.source->stat;
+        NSString* destPath =
+            esMsg->event.rename.destination_type == ES_DESTINATION_TYPE_EXISTING_FILE
+                ? @(esMsg->event.rename.destination.existing_file->path.data)
+                : [NSString
+                      stringWithFormat:@"%s/%s",
+                                       esMsg->event.rename.destination.new_path.dir->path.data,
+                                       esMsg->event.rename.destination.new_path.filename.data];
+
+        for (NSString* path in @[ @(esMsg->event.rename.source->path.data), destPath ]) {
+          targetPath = path;
+          targetFile = [[SNTFileInfo alloc] initWithResolvedPath:path
+                                                            stat:renamedStat
+                                                           error:&error];
+          if (targetFile && targetFile.identityVerification != SNTFileInfoIdentityMismatch) {
+            break;
+          }
         }
       }
 
@@ -179,7 +182,15 @@ static constexpr std::string_view kIgnoredCompilerProcessPathPrefix = "/dev/";
              esMsg->event.clone.source->path.data, error);
         targetPath = [NSString stringWithFormat:@"%s/%s", esMsg->event.clone.target_dir->path.data,
                                                 esMsg->event.clone.target_name.data];
-        targetFile = [[SNTFileInfo alloc] initWithPath:targetPath error:&error];
+        targetFile = [[SNTFileInfo alloc] initWithResolvedPath:targetPath error:&error];
+        // The event carries no stat for the new file. A clone starts out the same size as its
+        // source, so require that.
+        if (targetFile &&
+            targetFile.fileSize != (NSUInteger)esMsg->event.clone.source->stat.st_size) {
+          LOGW(@"Not creating transitive rule for %@: size does not match the clone source",
+               targetPath);
+          return NO;
+        }
       }
 
       break;
@@ -193,9 +204,9 @@ static constexpr std::string_view kIgnoredCompilerProcessPathPrefix = "/dev/";
   if (targetFile) {
     if (targetFile.identityVerification == SNTFileInfoIdentityMismatch) {
       // A transitive rule names a file by content hash and persists, so it must
-      // not be written from an unconfirmed read. Checked explicitly rather than
-      // left to the fallbacks above: those fire only when no SNTFileInfo could
-      // be built at all, and an unconfirmed read still produces one.
+      // not be written from an unconfirmed read. An unconfirmed read still
+      // produces an SNTFileInfo, so one reaches here whenever no candidate path
+      // above could be confirmed.
       LOGW(@"Not creating transitive rule for %@: identity could not be confirmed",
            targetFile.path);
       return NO;

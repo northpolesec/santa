@@ -2,6 +2,8 @@
 sidebar_position: 3
 ---
 
+import AddedBadge from "@site/src/components/AddedBadge/AddedBadge";
+
 # File-Access Authorization
 
 File Access Authorization is a feature that lets Santa control which processes
@@ -204,7 +206,7 @@ directories. Neither matches the paths inside those directories; set
 slashes and nothing else, is kept as configured and logged with a warning. Such
 a path is not expected to match any file access.
 
-#### Parent Directories
+#### Parent Directories <AddedBadge added={"2026.9"} /> {#parent-directories}
 
 Renaming or cloning a directory also moves or clones every path beneath it. The
 `ParentDirectoryProtection` rule option sets how a rule treats these operations

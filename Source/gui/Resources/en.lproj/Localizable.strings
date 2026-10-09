@@ -103,6 +103,9 @@
 /* No comment provided by engineer. */
 "Dismiss & Silence" = "Dismiss & Silence";
 
+/* Label for the name a blocked DNS lookup asked for */
+"DNS lookup" = "DNS lookup";
+
 /* No comment provided by engineer. */
 "Drop for application info" = "Drop for application info";
 
@@ -273,6 +276,9 @@
 
 /* The default message to show the user when a network flow is blocked */
 "The following application has been blocked<br />from reaching a network destination" = "The following application has been blocked<br />from reaching a network destination";
+
+/* The default message to show the user when a DNS lookup is blocked */
+"The following application has been blocked<br />from resolving a network name" = "The following application has been blocked<br />from resolving a network name";
 
 /* The default message to show the user when an unknown application is blocked */
 "The following application has been blocked from executing<br />because its trustworthiness cannot be determined" = "The following application has been blocked from executing<br />because its trustworthiness cannot be determined";

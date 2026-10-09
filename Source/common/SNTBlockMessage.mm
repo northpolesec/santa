@@ -192,13 +192,18 @@ static id EncodedValueOrNull(id value) {
   return [SNTBlockMessage formatMessage:customMsg withFallback:defaultBannedMessage];
 }
 
-+ (NSAttributedString*)attributedBlockMessageForNetworkFlowEventWithCustomMessage:
-    (NSString*)customMsg {
++ (NSAttributedString*)attributedBlockMessageForNetworkFlowEvent:(SNTStoredNetworkFlowEvent*)event
+                                                   customMessage:(NSString*)customMessage {
   NSString* defaultBlockedMessage = NSLocalizedString(
       @"The following application has been blocked<br />from reaching a network destination",
       @"The default message to show the user when a network flow is blocked");
+  NSString* defaultDNSBlockedMessage = NSLocalizedString(
+      @"The following application has been blocked<br />from resolving a network name",
+      @"The default message to show the user when a DNS lookup is blocked");
 
-  return [SNTBlockMessage formatMessage:customMsg withFallback:defaultBlockedMessage];
+  return [SNTBlockMessage
+      formatMessage:customMessage
+       withFallback:event.dnsQuestion ? defaultDNSBlockedMessage : defaultBlockedMessage];
 }
 
 + (NSString*)blockReasonForEvent:(SNTStoredExecutionEvent*)event {

@@ -41,6 +41,8 @@
   ENCODE_BOXABLE(coder, direction);
   ENCODE(coder, hostname);
   ENCODE(coder, flowTime);
+  ENCODE_BOXABLE(coder, dnsQuestion);
+  ENCODE_BOXABLE(coder, dnsQtype);
   ENCODE_BOXABLE(coder, decision);
   ENCODE_BOXABLE(coder, decisionTier);
   ENCODE_BOXABLE(coder, ruleId);
@@ -69,6 +71,8 @@
     DECODE_SELECTOR(decoder, direction, NSNumber, intValue);
     DECODE(decoder, hostname, NSString);
     DECODE(decoder, flowTime, NSDate);
+    DECODE_SELECTOR(decoder, dnsQuestion, NSNumber, boolValue);
+    DECODE_SELECTOR(decoder, dnsQtype, NSNumber, unsignedShortValue);
     DECODE_SELECTOR(decoder, decision, NSNumber, intValue);
     DECODE_SELECTOR(decoder, decisionTier, NSNumber, intValue);
     DECODE_SELECTOR(decoder, ruleId, NSNumber, longLongValue);

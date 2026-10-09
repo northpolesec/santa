@@ -103,6 +103,9 @@
 /* No comment provided by engineer. */
 "Dismiss & Silence" = "閉じて通知を停止";
 
+/* Label for the name a blocked DNS lookup asked for */
+"DNS lookup" = "DNS ルックアップ";
+
 /* No comment provided by engineer. */
 "Drop for application info" = "アプリ情報のためにドロップ";
 
@@ -297,6 +300,9 @@
 
 /* The default message to show the user when a network flow is blocked */
 "The following application has been blocked<br />from reaching a network destination" = "次のアプリケーションによる<br />ネットワーク宛先への接続がブロックされました";
+
+/* The default message to show the user when a DNS lookup is blocked */
+"The following application has been blocked<br />from resolving a network name" = "次のアプリケーションによる<br />ネットワーク名の解決がブロックされました";
 
 /* The default message to show the user when an unknown application is blocked */
 "The following application has been blocked from executing<br />because its trustworthiness cannot be determined" = "次のアプリケーションは信頼性を判断できないため、<br />実行がブロックされました";

@@ -1360,8 +1360,11 @@
   block.process.parent.filePath = @"/sbin/launchd";
   block.process.parent.pid = @(1);
 
+  // An audited DNS question.
   SNTStoredNetworkFlowEvent* audit = [[SNTStoredNetworkFlowEvent alloc] init];
   audit.decision = SNTNetworkFlowDecisionAudit;
+  audit.dnsQuestion = YES;
+  audit.dnsQtype = 65;
 
   NSArray* events = @[ exec, allow, block, audit ];
 
@@ -1424,6 +1427,10 @@
             XCTAssertNil(f[@"customMsg"]);
             XCTAssertNil(f[@"customUrl"]);
             XCTAssertNil(f[@"ttyPath"]);
+
+            // dns_question is set only for a DNS question decision.
+            XCTAssertNil(f[@"dnsQuestion"]);
+            XCTAssertEqualObjects(flows[2][@"dnsQuestion"][@"qtype"], @(65));
 
             return YES;
           }];
@@ -1788,6 +1795,117 @@
 
   XCTAssertFalse([sut sync]);
   XCTAssertEqual(self.syncState.rulesProcessed, 0);
+}
+
+- (void)testRuleDownloadSkipsInvalidDNSRule {
+  if (!self.syncState.isSyncV2) return;  // network flow rules are v2-only
+
+  SNTSyncRuleDownload* sut = [[SNTSyncRuleDownload alloc] initWithState:self.syncState];
+
+  NSDictionary* (^dnsRule)(NSString*, NSString*, NSString*, NSDictionary*) =
+      ^NSDictionary*(NSString* name, NSString* ruleId, NSString* action, NSDictionary* questions) {
+        return @{
+          @"add" : @{
+            @"name" : name,
+            @"rule_id" : ruleId,
+            @"action" : action,
+            @"direction" : @"NETWORK_FLOW_DIRECTION_ANY",
+            @"remotes" : @[ @{@"dns_questions" : questions} ],
+          }
+        };
+      };
+  // Page 1 has valid execution and DNS rules plus a bad connection rule.
+  NSDictionary* page1 = @{
+    @"rules" : @[ @{
+      @"identifier" : @"platform:com.example.first",
+      @"rule_type" : @"SIGNINGID",
+      @"policy" : @"ALLOWLIST"
+    } ],
+    @"network_flow_rules" : @[
+      dnsRule(@"dns-allow-corp", @"1", @"ACTION_ALLOW", @{@"suffixes" : @[ @"corp.example" ]}),
+      @{
+        @"add" : @{
+          @"name" : @"",
+          @"rule_id" : @"3",
+          @"action" : @"ACTION_DENY",
+          @"direction" : @"NETWORK_FLOW_DIRECTION_OUTGOING",
+          @"remotes" : @[ @{@"hostnames" : @{@"values" : @[ @"x.example" ]}} ],
+        }
+      },
+    ],
+    @"cursor" : @"page2",
+  };
+  // Page 2 has another execution rule, then an invalid DNS rule followed by a valid one.
+  NSDictionary* example = @{@"suffixes" : @[ @"example" ]};
+  NSDictionary* page2 = @{
+    @"rules" : @[ @{
+      @"identifier" : @"platform:com.example.second",
+      @"rule_type" : @"SIGNINGID",
+      @"policy" : @"BLOCKLIST"
+    } ],
+    @"network_flow_rules" : @[
+      dnsRule(@"", @"2", @"ACTION_SILENT_DENY", example),
+      dnsRule(@"dns-deny-example", @"4", @"ACTION_SILENT_DENY", example),
+    ],
+  };
+
+  [self stubRequestBody:[self dataFromDict:page1]
+               response:nil
+                  error:nil
+          validateBlock:^BOOL(NSURLRequest* req) {
+            return [self dictFromRequest:req][@"cursor"] == nil;
+          }];
+  [self stubRequestBody:[self dataFromDict:page2]
+               response:nil
+                  error:nil
+          validateBlock:^BOOL(NSURLRequest* req) {
+            return [[self dictFromRequest:req][@"cursor"] isEqual:@"page2"];
+          }];
+
+  __block int dbAdds = 0;
+  __block NSArray* addedExecutionRules;
+  __block NSArray* addedNetworkRules;
+  OCMStub([self.daemonConnRop
+              databaseRuleAddExecutionRules:OCMOCK_ANY
+                            fileAccessRules:OCMOCK_ANY
+                           networkFlowRules:OCMOCK_ANY
+                                    signals:OCMOCK_ANY
+                                ruleCleanup:SNTRuleCleanupNone
+                                     source:SNTRuleAddSourceSyncService
+                                      reply:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(YES),
+                                                                         [NSNull null], nil])])
+      .andDo(^(NSInvocation* inv) {
+        __unsafe_unretained NSArray* arg;
+        [inv getArgument:&arg atIndex:2];
+        addedExecutionRules = arg;
+        [inv getArgument:&arg atIndex:4];
+        addedNetworkRules = arg;
+        dbAdds++;
+      });
+  __block int syncRecords = 0;
+  OCMStub([self.daemonConnRop updateSyncSettings:[OCMArg any] reply:([OCMArg invokeBlock])])
+      .andDo(^(NSInvocation* inv) {
+        syncRecords++;
+      });
+
+  XCTAssertTrue([sut sync]);
+  XCTAssertEqual(dbAdds, 1);
+  XCTAssertEqual(syncRecords, 1);
+  XCTAssertEqualObjects(addedExecutionRules, (@[
+                          [[SNTRule alloc] initWithIdentifier:@"platform:com.example.first"
+                                                        state:SNTRuleStateAllow
+                                                         type:SNTRuleTypeSigningID],
+                          [[SNTRule alloc] initWithIdentifier:@"platform:com.example.second"
+                                                        state:SNTRuleStateBlock
+                                                         type:SNTRuleTypeSigningID]
+                        ]));
+  XCTAssertEqualObjects([addedNetworkRules valueForKey:@"ruleName"],
+                        (@[ @"dns-allow-corp", @"dns-deny-example" ]));
+  XCTAssertEqualObjects([addedNetworkRules valueForKey:@"ruleId"], (@[ @1, @4 ]));
+  XCTAssertEqual(self.syncState.rulesReceived, 2);
+  XCTAssertEqual(self.syncState.rulesProcessed, 2);
+  XCTAssertEqual(self.syncState.networkFlowRulesReceived, 4);
+  XCTAssertEqual(self.syncState.networkFlowRulesProcessed, 2);
 }
 
 - (void)testRuleDownloadCel {
