@@ -16,6 +16,9 @@
 #import <Foundation/Foundation.h>
 #include <dispatch/dispatch.h>
 #include <mach/task.h>
+#include <sys/resource.h>
+
+#include <algorithm>
 #include <memory>
 
 #import "Source/common/SNTConfigurator.h"
@@ -31,6 +34,9 @@ using santa::SantadDeps;
 
 // Number of seconds to wait between checks.
 const int kWatchdogTimeInterval = 30;
+
+// Minimum soft RLIMIT_NOFILE. A telemetry export holds every spool file in its batch open at once.
+const rlim_t kMinOpenFileLimit = 2560;
 
 extern "C" uint64_t watchdogCPUEvents;
 extern "C" uint64_t watchdogRAMEvents;
@@ -101,6 +107,24 @@ void InstallServices() {
   [task waitUntilExit];
 }
 
+// launchd starts santad with a soft RLIMIT_NOFILE of 256. Foundation raises it the first time an
+// NSTask is allocated, but santad does not rely on that side effect.
+void RaiseOpenFileLimit() {
+  struct rlimit rl;
+  if (getrlimit(RLIMIT_NOFILE, &rl) != 0) {
+    LOGW(@"Failed to get RLIMIT_NOFILE: %d", errno);
+    return;
+  }
+  rlim_t want = std::min(kMinOpenFileLimit, rl.rlim_max);
+  if (rl.rlim_cur >= want) {
+    return;
+  }
+  rl.rlim_cur = want;
+  if (setrlimit(RLIMIT_NOFILE, &rl) != 0) {
+    LOGW(@"Failed to raise RLIMIT_NOFILE to %llu: %d", (unsigned long long)want, errno);
+  }
+}
+
 int main(int argc, char* argv[]) {
   @autoreleasepool {
     NSString* product_version = [SNTSystemInfo santaProductVersion];
@@ -113,6 +137,7 @@ int main(int argc, char* argv[]) {
     }
 
     InstallServices();
+    RaiseOpenFileLimit();
 
     dispatch_queue_t watchdog_queue = dispatch_queue_create(
         "com.northpolesec.santa.daemon.watchdog", DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL);
