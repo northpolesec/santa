@@ -16,6 +16,7 @@
 
 #import <Foundation/Foundation.h>
 
+#include <arpa/inet.h>
 #include <utility>
 
 #import "Source/common/MOLXPCConnection.h"
@@ -46,13 +47,29 @@
 #import "src/santanetd/SNDNetworkFlowDecision.h"
 #import "src/santanetd/SNDProcessFlows.h"
 
-// 1.1 adds reportNetworkFlowDecisions:. santanetd emits flow decisions only when
-// the daemon advertises >= 1.1 (older/downgraded daemons keep the gate closed).
-NSString* const kSantaNetworkExtensionProtocolVersion = @"1.1";
+// 1.1 adds reportNetworkFlowDecisions:. 1.2 adds DNS question decisions. santanetd
+// sends each kind only to a daemon that advertises that version or later.
+NSString* const kSantaNetworkExtensionProtocolVersion = @"1.2";
 
 // Suppress repeat loud-deny dialogs for the same uiDedupeKey for this long. Short relative to
 // the event-upload backoff: it only collapses prompt bursts for one (process, rule, destination).
 static const NSTimeInterval kNetworkFlowDialogDedupeInterval = 60;
+
+// Names santanetd forwards before any DNS rule: the sync host and the NPS management names.
+// Lowercase, no trailing dot. An IP host is left out: it is never resolved.
+static NSArray<NSString*>* ProtectedDNSNames(NSURL* syncBaseURL) {
+  NSMutableArray<NSString*>* names = [NSMutableArray array];
+  NSString* host = syncBaseURL.host.lowercaseString;
+  if ([host hasSuffix:@"."]) host = [host substringToIndex:host.length - 1];
+  struct in6_addr addr;
+  if (host.length > 0 && inet_pton(AF_INET, host.UTF8String, &addr) != 1 &&
+      inet_pton(AF_INET6, host.UTF8String, &addr) != 1) {
+    [names addObject:host];
+  }
+  [names
+      addObjectsFromArray:@[ @"workshop.cloud", @"north-pole.tech", @"push.northpole.security" ]];
+  return names;
+}
 
 @interface SNTNetworkExtensionQueue () {
   std::shared_ptr<santa::Logger> _logger;
@@ -271,17 +288,20 @@ static const NSTimeInterval kNetworkFlowDialogDedupeInterval = 60;
     // may be absent at the loginwindow) and its de-dup. ttyPath is nil for audit-token-resolved
     // processes (no ES exec seen) -> no write. WriteWithoutSignal (no SIGWINCH) matches FAA.
     if (loudDeny && event.ttyPath.length > 0 && _ttyWriter) {
-      NSAttributedString* attrStr = [SNTBlockMessage
-          attributedBlockMessageForNetworkFlowEventWithCustomMessage:event.customMsg];
+      NSAttributedString* attrStr =
+          [SNTBlockMessage attributedBlockMessageForNetworkFlowEvent:event
+                                                       customMessage:event.customMsg];
 
       NSMutableString* blockMsg = [NSMutableString stringWithCapacity:1024];
       // \033[1m / \033[0m begin/end bold.
       [blockMsg appendFormat:@"\n\033[1mSanta\033[0m\n\n%@\n\n", attrStr.string];
-      [blockMsg appendFormat:@"\033[1mRemote:\033[0m %@%@\n"
+      // A DNS question has no destination yet: print the name, not the resolver's port.
+      [blockMsg appendFormat:@"\033[1m%@\033[0m %@%@\n"
                              @"\033[1mRule:  \033[0m %@\n"
                              @"\033[1mPath:  \033[0m %@\n\n",
+                             event.dnsQuestion ? @"Name:  " : @"Remote:",
                              event.hostname.length ? event.hostname : event.remoteAddress,
-                             event.remotePort
+                             event.remotePort && !event.dnsQuestion
                                  ? [NSString stringWithFormat:@":%hu", event.remotePort]
                                  : @"",
                              event.ruleName, event.process.filePath];
@@ -533,9 +553,12 @@ static const NSTimeInterval kNetworkFlowDialogDedupeInterval = 60;
     flowDefaultAction = syncSettings.flowDefaultAction;
   }
 
-  return [[SNTNetworkExtensionSettings alloc] initWithEnable:enable
-                                           flowDefaultAction:flowDefaultAction
-                                      dnsUpstreamTimeoutSecs:config.dnsUpstreamTimeoutSecs];
+  SNTNetworkExtensionSettings* settings =
+      [[SNTNetworkExtensionSettings alloc] initWithEnable:enable
+                                        flowDefaultAction:flowDefaultAction
+                                   dnsUpstreamTimeoutSecs:config.dnsUpstreamTimeoutSecs];
+  settings.protectedDNSNames = ProtectedDNSNames(config.syncBaseURL);
+  return settings;
 }
 
 @end
