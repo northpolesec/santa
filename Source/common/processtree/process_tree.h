@@ -21,6 +21,8 @@
 #include <functional>
 #include <memory>
 #include <queue>
+#include <string>
+#include <string_view>
 #include <typeinfo>
 #include <vector>
 
@@ -78,6 +80,61 @@ class ProcessTree {
 
   // Inform the tree of a process exit.
   void HandleExit(uint64_t timestamp, const Process& p);
+
+  // Undo the tree effects of an exec that Santa decided to DENY. Unlike the
+  // Handle* methods above this is driven by the authorization decision, not by
+  // an ES event; `timestamp` is the mach_time of the AUTH_EXEC being answered,
+  // and `actor`/`target` are the same two pids HandleExec was given.
+  //
+  // It exists because the tree learns of an exec at AUTH time, BEFORE the
+  // decision: the tree-aware client informs the tree from its context handler,
+  // which runs HandleExec for ES_EVENT_TYPE_AUTH_EXEC as well as for
+  // ES_EVENT_TYPE_NOTIFY_EXEC (see InformFromESEvent). So by the time Santa
+  // answers, HandleExec has already published `target` and already retired
+  // `actor`. A DENY makes both of those wrong, in opposite directions:
+  //
+  //  - `target` never comes into existence. No NOTIFY_EXEC or NOTIFY_EXIT will
+  //    ever arrive for it, so nothing else would ever retire it: the node
+  //    would sit in map_ forever and pin every annotation name it inherited in
+  //    annotation_index_, making AnnotationExists() answer true for the life
+  //    of the process. Each denied exec inside an annotated subtree adds
+  //    another. So the target is retired here, deferred through remove_at_
+  //    exactly as HandleExit's removal is, rather than erased outright, so a
+  //    straggling delivery of the same exec to another client cannot reference
+  //    a node that has already been reaped.
+  //
+  //  - `actor` is still running. A denied execve(2) returns EPERM and the
+  //    process carries on with its old image, so retiring it was premature:
+  //    its annotations stop counting and, once the grace elapses, it is
+  //    evicted from map_ entirely. If the annotated process is the one that
+  //    attempted the blocked exec, AnnotationExists() goes FALSE while it is
+  //    still alive -- a false negative in an authorization gate -- and the
+  //    live process disappears from the tree. So the actor is revived:
+  //    re-indexed, un-tombstoned, and its pending removal cancelled. Simply
+  //    re-indexing would not do, because DrainRemovals unindexes again at the
+  //    erase site; the removal itself has to be called off.
+  //
+  // Both halves happen in one write-lock hold: they are one event and must not
+  // be observable half-applied.
+  //
+  // The actor is revived only if the removal still pending on it is the one
+  // HandleExec scheduled for THIS exec, i.e. removal_ts_ equals `timestamp`.
+  // That match is the SOLE guarantee that reviving is correct. Do not relax it
+  // on the strength of the actor being blocked in execve(2) waiting for this
+  // response: the authorizer answers ES before calling here (deliberately --
+  // see SNTEndpointSecurityAuthorizer), so by the time this runs the actor has
+  // been released and may have done anything. It may have been killed while it
+  // waited, or exited voluntarily once resumed, or execed again -- and in
+  // every one of those cases something has re-stamped removal_ts_, the match
+  // fails, and the revive is correctly skipped. Reviving on anything weaker
+  // would put a dead process back in the index with its removal cancelled and
+  // nothing left to schedule it again.
+  //
+  // Each half is a no-op if its pid is not in the tree, and the whole call is
+  // idempotent. Takes mtx_ itself, so it must not be called from anywhere
+  // already holding it.
+  void HandleExecDenied(uint64_t timestamp, struct Pid actor,
+                        struct Pid target);
 
   // Result of GetExecActor. `proc` is the execing (actor) process; it is
   // populated only when `already_seen` is false (and may still be empty then if
@@ -153,6 +210,16 @@ class ProcessTree {
   std::optional<::santa::pb::v1::process_tree::Annotations> ExportAnnotations(
       struct Pid p);
 
+  // True if any live process in the tree carries the named annotation. Backs
+  // the CEL annotation_exists(). O(1): the alternative is an O(tree) scan on
+  // the authorization path, once per exec.
+  //
+  // "Live" means still running: a process is counted from the insert that
+  // publishes it until the exit (or the exec that replaces it) is processed,
+  // NOT until it is finally reaped, so a dead process cannot keep answering
+  // true through the removal grace.
+  bool AnnotationExists(std::string_view name) const;
+
   // Atomically get the slice of Processes going from the given process "up"
   // to the root. The root process has no parent. N.B. There may be more than
   // one root process. E.g. on Linux, both init (PID 1) and kthread (PID 2)
@@ -212,6 +279,40 @@ class ProcessTree {
                                   bool across_exec)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(mtx_);
 
+  // Count `p`'s annotation names into annotation_index_, once. No-op if `p` is
+  // already indexed. Call only when the map_ insert that publishes `p`
+  // actually happened: the inserts are first-wins, and indexing the loser of
+  // that race would double-count names the winner already contributes.
+  void IndexProcessLocked(Process& p) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mtx_);
+
+  // Drop `p`'s contribution, erasing any name whose count reaches zero. No-op
+  // if `p` is not indexed.
+  void UnindexProcessLocked(Process& p) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mtx_);
+
+  // Add/remove the names of one annotation, for the paths that add or replace
+  // a single annotation on an already-indexed process.
+  void IndexAnnotationLocked(const Annotator& a)
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mtx_);
+  void UnindexAnnotationLocked(const Annotator& a)
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mtx_);
+
+  // Queue `p` for removal at `timestamp` and record the schedule on the
+  // process, so DrainRemovals can tell a live entry from a cancelled or
+  // superseded one. Only processes in map_ may be scheduled: an entry nothing
+  // recorded could otherwise reap a node re-inserted under the same pid by a
+  // lagging client.
+  void ScheduleRemovalLocked(uint64_t timestamp, Process& p)
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mtx_);
+
+  // Cancel `p`'s pending removal and put it back in the annotation index. The
+  // inverse of "unindex + ScheduleRemovalLocked", for the one case where the
+  // tree is told a process is gone and then learns it is not: the actor of a
+  // denied exec. Clears tombstoned_ too, since DrainRemovals may already have
+  // tombstoned the process while the decision was outstanding and
+  // ReleaseProcess would otherwise erase it when the event's ProcessToken
+  // dies.
+  void ReviveProcessLocked(Process& p) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mtx_);
+
   // Reap deferred removals whose grace has elapsed. Caller must hold mtx_.
   void DrainRemovals() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mtx_);
 
@@ -225,8 +326,26 @@ class ProcessTree {
   mutable absl::Mutex mtx_;
   absl::flat_hash_map<const struct Pid, std::shared_ptr<Process>> map_
       ABSL_GUARDED_BY(mtx_);
+  // Annotation names carried by at least one live process, each with the
+  // number of processes carrying it. The count is of PROCESSES, not of
+  // Annotator objects: PropagatesWholly lets one object be shared by a whole
+  // inherited subtree, and each process carrying it counts once -- strictly,
+  // once per annotator TYPE on that process, since annotations_ is keyed by
+  // type and each entry is counted separately, so a process would be counted
+  // twice for a name two different annotator types both contributed. That is
+  // moot while CELAnnotator is the only contributor, but an author adding a
+  // second indexing annotator must keep the name spaces disjoint (or make
+  // this index dedup per process). A name is erased when its last carrier
+  // retires, so a lookup answers AnnotationExists() without touching map_.
+  absl::flat_hash_map<std::string, uint32_t> annotation_index_
+      ABSL_GUARDED_BY(mtx_);
   // Pending removals: pids to erase from map_, each paired with the mach_time
-  // of the exit/exec event that scheduled it. An entry is reaped once
+  // of the exit/exec event that scheduled it. Entries are advisory, not
+  // authoritative: a priority_queue cannot have an entry extracted, so the
+  // decision to reap lives on the Process (pending_removal_/removal_ts_) and
+  // an entry that does not match it is discarded on pop. That is what lets a
+  // removal be cancelled (HandleExecDenied) and what keeps several entries for
+  // one pid from reaping it early. An entry is reaped once
   // removal_grace_ticks_ have elapsed past that timestamp (measured against
   // latest_ts_), so a reordered straggler cannot reference a process after it
   // is reaped. Held as a MIN-heap on the timestamp so DrainRemovals reaps only
@@ -316,16 +435,33 @@ void ProcessTree::UpdateAnnotation(
     return;
   }
 
-  auto& annotations = it->second->annotations_;
+  Process& proc = *it->second;
+  auto& annotations = proc.annotations_;
   const std::type_index key(typeid(T));
-  const T* current = nullptr;
-  if (auto found = annotations.find(key); found != annotations.end()) {
-    current = dynamic_cast<const T*>(found->second.get());
+  auto found = annotations.find(key);
+  const T* current = found != annotations.end()
+                         ? dynamic_cast<const T*>(found->second.get())
+                         : nullptr;
+
+  std::shared_ptr<const T> next = update(current);
+  if (next == nullptr) {
+    return;
   }
 
-  if (std::shared_ptr<const T> next = update(current); next != nullptr) {
-    annotations.insert_or_assign(key, std::move(next));
+  // The replacement may carry a different set of names, so swap the old set's
+  // contribution for the new one's. Only for a process that is counted at all:
+  // one already retired must not re-enter the index. Unindex the STORED
+  // annotation (found->second), not `current`: if the dynamic_cast above ever
+  // returned nullptr while the map entry existed, unindexing `current` would
+  // silently skip the decrement while insert_or_assign below still replaces
+  // the entry -- leaking an increment with no matching decrement.
+  if (proc.indexed_) {
+    if (found != annotations.end()) {
+      UnindexAnnotationLocked(*found->second);
+    }
+    IndexAnnotationLocked(*next);
   }
+  annotations.insert_or_assign(key, std::move(next));
 }
 
 // Create a new tree, ensuring the provided annotations are valid and that

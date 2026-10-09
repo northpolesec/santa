@@ -58,6 +58,18 @@ std::shared_ptr<const Annotator> CELAnnotator::Propagate(
   return std::make_shared<const CELAnnotator>(std::move(surviving));
 }
 
+void CELAnnotator::ForEachIndexedName(
+    absl::FunctionRef<void(std::string_view)> f) const {
+  for (const auto& [name, entry] : entries_) {
+    // A session-expanded name is unique to one run of one process, so indexing
+    // it would only grow the index with entries no rule can ever look up.
+    if (entry.session) {
+      continue;
+    }
+    f(name);
+  }
+}
+
 std::optional<ptpb::Annotations> CELAnnotator::Proto() const {
   if (entries_.empty()) {
     return std::nullopt;

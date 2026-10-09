@@ -31,6 +31,10 @@
 #include "Source/common/es/Client.h"
 #include "Source/common/es/Message.h"
 #include "Source/common/es/MockEndpointSecurityAPI.h"
+#include "Source/common/processtree/process.h"
+#include "Source/common/processtree/process_tree.h"
+#include "Source/common/processtree/process_tree_macos.h"
+#include "Source/common/processtree/process_tree_test_helpers.h"
 #include "Source/santad/EventProviders/AuthResultCache.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityAuthorizer.h"
 #include "Source/santad/Metrics.h"
@@ -41,6 +45,12 @@
 using santa::AuthResultCache;
 using santa::EventDisposition;
 using santa::Message;
+using santa::santad::process_tree::Annotator;
+using santa::santad::process_tree::Cred;
+using santa::santad::process_tree::Pid;
+using santa::santad::process_tree::PidFromAuditToken;
+using santa::santad::process_tree::ProcessTreeTestPeer;
+using santa::santad::process_tree::Program;
 
 class MockAuthResultCache : public AuthResultCache {
  public:
@@ -506,6 +516,155 @@ class MockAuthResultCache : public AuthResultCache {
 
   [mockCompilerController stopMocking];
   [mockAuthClient stopMocking];
+}
+
+// The process tree is informed of an exec at AUTH time -- the tree-aware
+// superclass calls InformFromESEvent from -handleContextMessage:, which
+// handles AUTH_EXEC on the same path as NOTIFY_EXEC -- so by the time the
+// authorizer answers, the target pidversion has been published and the actor
+// retired. A DENY makes both wrong and the authorizer must unwind them: the
+// target never comes into existence (nothing else would ever retire it, and
+// its inherited annotations would stay pinned in the annotation index), while
+// the actor's execve fails with EPERM and it goes on running (retiring it
+// evicts a live process from the tree). An ALLOW must leave both alone.
+- (void)testExecDenialUnwindsTheExecInTheProcessTree {
+  es_file_t file = MakeESFile("foo");
+  es_process_t proc = MakeESProcess(&file, MakeAuditToken(12, 23), MakeAuditToken(1, 1));
+  es_file_t execFile = MakeESFile("bar");
+  es_process_t execProc = MakeESProcess(&execFile, MakeAuditToken(12, 24), MakeAuditToken(12, 23));
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_EXEC, &proc, ActionType::Auth);
+  esMsg.event.exec.target = &execProc;
+  // The message's mach_time is what the tree was given when the AUTH_EXEC was
+  // folded in, and the authorizer hands the same value back when it answers,
+  // so makeTree below stamps its HandleExec with it too. Reaping is driven by
+  // the newest timestamp seen, so the churn fork at 200 is what carries the
+  // cutoff past the pending removals and makes the outcome observable.
+  const uint64_t execMachTime = 101;
+  esMsg.mach_time = execMachTime;
+
+  const struct Pid actorPid = PidFromAuditToken(proc.audit_token);
+  const struct Pid targetPid = PidFromAuditToken(execProc.audit_token);
+
+  // Builds a tree in the state the AUTH_EXEC leaves it in: the actor forked,
+  // then HandleExec run, which retires the actor and publishes the target.
+  auto makeTree = [&] {
+    std::vector<std::unique_ptr<Annotator>> annotators{};
+    auto tree = std::make_shared<ProcessTreeTestPeer>(std::move(annotators),
+                                                      /*removal_grace_ticks=*/1);
+    auto init = tree->InsertInit();
+    tree->HandleFork(100, init, actorPid);
+    tree->HandleExec(execMachTime, **tree->Get(actorPid), targetPid,
+                     (struct Program){.executable = "/bar", .arguments = {}},
+                     (struct Cred){.uid = 0, .gid = 0});
+    return tree;
+  };
+
+  // Drives the tree's clock past the actor's pending removal so whether it was
+  // cancelled becomes observable.
+  auto churnPastGrace = [](const std::shared_ptr<ProcessTreeTestPeer>& tree) {
+    tree->HandleFork(200, *tree->Get((struct Pid){.pid = 1, .pidversion = 1}),
+                     (struct Pid){.pid = 999, .pidversion = 1});
+  };
+
+  // Denied: the target is retired and reaped, the actor survives.
+  {
+    auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+    mockESApi->SetExpectationsESNewClient();
+    mockESApi->SetExpectationsRetainReleaseMessage();
+    EXPECT_CALL(*mockESApi, RespondAuthResult(testing::_, testing::_, ES_AUTH_RESULT_DENY, false))
+        .WillOnce(testing::Return(true));
+
+    auto tree = makeTree();
+    SNTEndpointSecurityAuthorizer* authClient =
+        [[SNTEndpointSecurityAuthorizer alloc] initWithESAPI:mockESApi
+                                                     metrics:nullptr
+                                              execController:nil
+                                          compilerController:nil
+                                             authResultCache:nullptr
+                                                   ttyWriter:nullptr
+                                                 processTree:tree];
+
+    {
+      Message msg(mockESApi, &esMsg);
+      XCTAssertTrue(tree->Get(targetPid).has_value());
+      [authClient respondToMessage:msg withAuthResult:ES_AUTH_RESULT_DENY cacheable:false];
+    }
+
+    churnPastGrace(tree);
+    XCTAssertFalse(tree->Get(targetPid).has_value());
+    XCTAssertTrue(tree->Get(actorPid).has_value());
+
+    XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+  }
+
+  // Allowed: the tree is left alone -- the target stays and the actor is
+  // reaped on the schedule HandleExec gave it.
+  {
+    auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+    mockESApi->SetExpectationsESNewClient();
+    mockESApi->SetExpectationsRetainReleaseMessage();
+    EXPECT_CALL(*mockESApi, RespondAuthResult(testing::_, testing::_, ES_AUTH_RESULT_ALLOW, true))
+        .WillOnce(testing::Return(true));
+
+    auto tree = makeTree();
+    SNTEndpointSecurityAuthorizer* authClient =
+        [[SNTEndpointSecurityAuthorizer alloc] initWithESAPI:mockESApi
+                                                     metrics:nullptr
+                                              execController:nil
+                                          compilerController:nil
+                                             authResultCache:nullptr
+                                                   ttyWriter:nullptr
+                                                 processTree:tree];
+
+    {
+      Message msg(mockESApi, &esMsg);
+      [authClient respondToMessage:msg withAuthResult:ES_AUTH_RESULT_ALLOW cacheable:true];
+      XCTAssertTrue(tree->Get(targetPid).has_value());
+    }
+
+    churnPastGrace(tree);
+    XCTAssertFalse(tree->Get(actorPid).has_value());
+
+    XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+  }
+
+  // Denied, but the response did not land: the deadline auto-responder lost
+  // the double-response race (the handler had already answered ALLOW and ES
+  // rejected the duplicate), so RespondAuthResult returns false. The exec in
+  // fact succeeded, so the tree must be left exactly as the allowed case
+  // leaves it -- target alive, actor reaped on HandleExec's schedule. Acting
+  // on a phantom denial here would retire the live target and resurrect the
+  // dead actor.
+  {
+    auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+    mockESApi->SetExpectationsESNewClient();
+    mockESApi->SetExpectationsRetainReleaseMessage();
+    EXPECT_CALL(*mockESApi, RespondAuthResult(testing::_, testing::_, ES_AUTH_RESULT_DENY, false))
+        .WillOnce(testing::Return(false));
+
+    auto tree = makeTree();
+    SNTEndpointSecurityAuthorizer* authClient =
+        [[SNTEndpointSecurityAuthorizer alloc] initWithESAPI:mockESApi
+                                                     metrics:nullptr
+                                              execController:nil
+                                          compilerController:nil
+                                             authResultCache:nullptr
+                                                   ttyWriter:nullptr
+                                                 processTree:tree];
+
+    {
+      Message msg(mockESApi, &esMsg);
+      XCTAssertFalse([authClient respondToMessage:msg
+                                   withAuthResult:ES_AUTH_RESULT_DENY
+                                        cacheable:false]);
+    }
+
+    churnPastGrace(tree);
+    XCTAssertTrue(tree->Get(targetPid).has_value());
+    XCTAssertFalse(tree->Get(actorPid).has_value());
+
+    XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+  }
 }
 
 @end

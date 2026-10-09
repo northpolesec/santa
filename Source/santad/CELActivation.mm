@@ -39,17 +39,19 @@ namespace {
 using santa::santad::process_tree::CELAnnotator;
 using santa::santad::process_tree::ProcessTree;
 
-CELAnnotator::Entry EntryFor(santa::cel::AnnotationPropagation propagation) {
+CELAnnotator::Entry EntryFor(santa::cel::AnnotationPropagation propagation, bool sessionExpanded) {
   using P = santa::cel::AnnotationPropagation;
   return {
       .fork = propagation == P::kForkOnly || propagation == P::kForkAndExec,
       .exec = propagation == P::kExecOnly || propagation == P::kForkAndExec,
+      .session = sessionExpanded,
   };
 }
 
-// Annotations are read from and written to the process being executed: at
-// AUTH_EXEC the tree has already applied the exec, so the target carries
-// whatever its parent propagated to it.
+// has and add act on the process being executed: at AUTH_EXEC the tree has
+// already applied the exec, so the target carries whatever its parent
+// propagated to it. exists asks about the whole tree instead, so it resolves
+// no target.
 //
 // The target is resolved inside each hook, not here. An activation is built for
 // every CEL evaluation, but the hooks only run for a rule that actually calls
@@ -72,11 +74,12 @@ santa::cel::AnnotationHooks AnnotationHooksFor(std::shared_ptr<ProcessTree> proc
           },
       .add =
           [processTree, esMsg](const std::string& name,
-                               santa::cel::AnnotationPropagation propagation) {
+                               santa::cel::AnnotationPropagation propagation,
+                               bool sessionExpanded) {
             AddCELAnnotation(*processTree,
                              santa::santad::process_tree::PidFromAuditToken(
                                  esMsg->event.exec.target->audit_token),
-                             name, EntryFor(propagation));
+                             name, EntryFor(propagation, sessionExpanded));
           },
       // pidversion changes on exec, so this names this exec of the target and
       // matches the pid and pidversion its telemetry carries.
@@ -86,6 +89,10 @@ santa::cel::AnnotationHooks AnnotationHooksFor(std::shared_ptr<ProcessTree> proc
                 esMsg->event.exec.target->audit_token);
             return absl::StrCat(pid.pid, "-", pid.pidversion);
           },
+      // No audit token: unlike has/add this is a whole-tree question, so it
+      // needs no target and costs one reader-lock hash lookup.
+      .exists =
+          [processTree](const std::string& name) { return processTree->AnnotationExists(name); },
   };
 }
 
@@ -203,8 +210,9 @@ ActivationCallbackBlock CreateCELActivationBlock(
         f->set_team_id(santa::NSStringToUTF8String(teamID));
       }
 
-      // add_annotation() and has_annotation() are CELv2 only, so a V1
-      // activation gets empty hooks rather than two closures nothing can call.
+      // add_annotation(), has_annotation() and annotation_exists() are CELv2
+      // only, so a V1 activation gets empty hooks rather than a set of
+      // closures nothing can call.
       santa::cel::AnnotationHooks annotationHooks;
 
       if constexpr (IsV2) {
