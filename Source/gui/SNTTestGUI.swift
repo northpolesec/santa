@@ -513,6 +513,8 @@ struct NetworkFlowView: View {
   @State private var hostname: String = "evil.example.com"
   @State private var remoteAddress: String = "93.184.216.34"
   @State private var remotePort: String = "443"
+  @State private var dnsQuestion: Bool = false
+  @State private var dnsQtype: String = "65"
   @State private var ruleName: String = "block-evil-example"
   @State private var ruleId: String = "42"
   @State private var decisionTier: SNTNetworkFlowTier = .domain
@@ -546,6 +548,8 @@ struct NetworkFlowView: View {
           TextField(text: $hostname, label: { Text(verbatim: "Hostname") })
           TextField(text: $remoteAddress, label: { Text(verbatim: "Remote Address") })
           TextField(text: $remotePort, label: { Text(verbatim: "Remote Port") })
+          Toggle(isOn: $dnsQuestion) { Text(verbatim: "DNS question") }
+          TextField(text: $dnsQtype, label: { Text(verbatim: "DNS QTYPE") })
           TextField(text: $ruleName, label: { Text(verbatim: "Rule Name") })
           TextField(text: $ruleId, label: { Text(verbatim: "Rule ID") })
           HStack {
@@ -637,6 +641,8 @@ struct NetworkFlowView: View {
         event.ruleName = ruleName
         event.ruleId = Int64(ruleId) ?? 0
         event.decisionTier = decisionTier
+        event.dnsQuestion = dnsQuestion
+        event.dnsQtype = UInt16(dnsQtype) ?? 0
         event.customMsg = customMsg.isEmpty ? nil : customMsg
         event.customURL = customURL.isEmpty ? nil : customURL
         event.eventDetailButtonText = eventDetailButtonText.isEmpty ? nil : eventDetailButtonText

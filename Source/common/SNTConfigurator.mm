@@ -1675,7 +1675,7 @@ static SNTConfigurator* sharedConfigurator = nil;
 - (NSUInteger)spoolDirectoryFileSizeThresholdKB {
   return self.configState[kSpoolDirectoryFileSizeThresholdKB]
              ? [self.configState[kSpoolDirectoryFileSizeThresholdKB] unsignedIntegerValue]
-             : 250;
+             : 1024;
 }
 
 - (NSUInteger)spoolDirectorySizeThresholdMB {
@@ -1750,7 +1750,7 @@ static SNTConfigurator* sharedConfigurator = nil;
 - (uint32_t)telemetryExportMaxFilesPerBatch {
   return self.configState[kTelemetryExportMaxFilesPerBatch]
              ? [self.configState[kTelemetryExportMaxFilesPerBatch] unsignedIntValue]
-             : 50;
+             : 100;
 }
 
 - (BOOL)enableMachineIDDecoration {

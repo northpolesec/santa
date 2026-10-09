@@ -97,10 +97,13 @@ NSTimeInterval NormalizeDNSUpstreamTimeout(NSTimeInterval v) {
 
 - (instancetype)settingsByAttachingNetworkFlowRules:
     (NSArray<SNTNetworkFlowRule*>*)networkFlowRules {
-  return [[SNTNetworkExtensionSettings alloc] initWithEnable:self.enable
-                                           flowDefaultAction:self.flowDefaultAction
-                                      dnsUpstreamTimeoutSecs:self.dnsUpstreamTimeoutSecs
-                                            networkFlowRules:networkFlowRules];
+  SNTNetworkExtensionSettings* s =
+      [[SNTNetworkExtensionSettings alloc] initWithEnable:self.enable
+                                        flowDefaultAction:self.flowDefaultAction
+                                   dnsUpstreamTimeoutSecs:self.dnsUpstreamTimeoutSecs
+                                         networkFlowRules:networkFlowRules];
+  s.protectedDNSNames = self.protectedDNSNames;
+  return s;
 }
 
 - (BOOL)isEqual:(id)other {
@@ -116,7 +119,9 @@ NSTimeInterval NormalizeDNSUpstreamTimeout(NSTimeInterval v) {
   // via a cached hash (scalars compared by value here; rules by hash). Including rules here would
   // defeat that fast-path and force materializing/deep-comparing the full ruleset every reconcile.
   return self.enable == o.enable && self.flowDefaultAction == o.flowDefaultAction &&
-         self.dnsUpstreamTimeoutSecs == o.dnsUpstreamTimeoutSecs;
+         self.dnsUpstreamTimeoutSecs == o.dnsUpstreamTimeoutSecs &&
+         (self.protectedDNSNames == o.protectedDNSNames ||
+          [self.protectedDNSNames isEqualToArray:o.protectedDNSNames]);
 }
 
 - (NSUInteger)hash {
@@ -125,6 +130,7 @@ NSTimeInterval NormalizeDNSUpstreamTimeout(NSTimeInterval v) {
   result = prime * result + self.enable;
   result = prime * result + self.flowDefaultAction;
   result = prime * result + (NSUInteger)self.dnsUpstreamTimeoutSecs;
+  result = prime * result + self.protectedDNSNames.hash;
   return result;
 }
 
@@ -137,6 +143,7 @@ NSTimeInterval NormalizeDNSUpstreamTimeout(NSTimeInterval v) {
   ENCODE_BOXABLE(coder, flowDefaultAction);
   ENCODE_BOXABLE(coder, dnsUpstreamTimeoutSecs);
   ENCODE(coder, networkFlowRules);
+  ENCODE(coder, protectedDNSNames);
 }
 
 - (instancetype)initWithCoder:(NSCoder*)decoder {
@@ -146,6 +153,7 @@ NSTimeInterval NormalizeDNSUpstreamTimeout(NSTimeInterval v) {
     DECODE_SELECTOR(decoder, flowDefaultAction, NSNumber, integerValue);
     DECODE_SELECTOR(decoder, dnsUpstreamTimeoutSecs, NSNumber, doubleValue);
     DECODE_ARRAY(decoder, networkFlowRules, SNTNetworkFlowRule);
+    DECODE_ARRAY(decoder, protectedDNSNames, NSString);
     // Missing key decodes to 0 -> NormalizeDNSUpstreamTimeout turns it into the default.
     _dnsUpstreamTimeoutSecs = NormalizeDNSUpstreamTimeout(_dnsUpstreamTimeoutSecs);
   }
