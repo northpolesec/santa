@@ -113,3 +113,42 @@ Additionally, reviewing Santa's [logs](#checking-santa-daemon-logs) and
 [telemetry](../features/telemetry.mdx) is helpful for understanding Santa's
 operation. The documentation on [binary authorization](../features/binary-authorization.md)
 explains precedence and decision-making.
+
+## Invalid Code Signatures
+
+If macOS reports that a binary's code signature is invalid, Santa can only
+match the binary with a `BINARY` rule. Santa ignores `CDHASH`, `SIGNINGID`,
+`CERTIFICATE`, and `TEAMID` rules for that execution. The same is true for
+unsigned binaries.
+
+This often happens while a large app updates itself. A helper process starts
+while the app bundle on disk is only partly written. On Apple silicon, the
+kernel kills an arm64 process with an invalid signature, and a Santa rule cannot
+prevent it. The app usually starts the process again a few seconds later, and it
+runs.
+
+Santa 2026.8 and later does not show a block dialog or terminal message when it
+blocks a process that the kernel will kill for an invalid signature. Santa still
+logs the event, and its `explain` field contains
+`Kernel will kill the process for code signature invalidity; suppressing block UI`.
+
+## Sync Client Certificates
+
+Santa uses only the first of these keys that is set to choose a client
+certificate for sync. If that key finds no certificate, Santa does not try the
+next one.
+
+1. The PKCS#12 file in
+   [`ClientAuthCertificateFile`](/configuration/keys#ClientAuthCertificateFile).
+2. A keychain certificate with the Common Name in
+   [`ClientAuthCertificateCN`](/configuration/keys#ClientAuthCertificateCN).
+3. A keychain certificate with the Issuer Common Name in
+   [`ClientAuthCertificateIssuerCN`](/configuration/keys#ClientAuthCertificateIssuerCN).
+4. If none of these keys are set, a keychain certificate issued by a CA that
+   the sync server names during the TLS handshake.
+
+Matching is case sensitive. If several keychain certificates match, Santa uses
+the one with the latest valid-from date. In Santa 2026.9 and later, if Santa
+cannot use a certificate's private key, it tries the next certificate that
+matches the same setting. Earlier versions use the newest certificate even if
+its private key is not usable, and the TLS handshake can fail.
