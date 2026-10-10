@@ -26,12 +26,20 @@
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTRuleIdentifiers.h"
+#import "Source/common/SNTRuleTimeWindow.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
 #import "Source/common/SNTXPCBundleServiceInterface.h"
 #import "Source/common/SNTXPCControlInterface.h"
 #import "Source/common/SigningIDHelpers.h"
 #import "Source/santactl/SNTCommand.h"
 #import "Source/santactl/SNTCommandController.h"
+
+#include "absl/time/time.h"
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#include "parser/parser.h"
+#pragma clang diagnostic pop
 
 // file info keys
 static NSString* const kPath = @"Path";
@@ -48,6 +56,7 @@ static NSString* const kCodeSigned = @"Code-signed";
 static NSString* const kValidation = @"Validation";
 static NSString* const kAssessment = @"Security Assessment";
 static NSString* const kRule = @"Rule";
+static NSString* const kTimeWindow = @"Time Window";
 static NSString* const kDecision = @"Expected Decision";
 static NSString* const kSigningChain = @"Signing Chain";
 static NSString* const kUniversalSigningChain = @"Universal Signing Chain";
@@ -78,6 +87,85 @@ static NSString* const kBundleHashes = @"Bundle Hashes";
 
 // Message displayed when daemon communication fails
 static NSString* const kCommunicationErrorMsg = @"Could not communicate with daemon";
+
+static NSString* LiteralString(const cel::expr::Expr& expr) {
+  if (!expr.has_const_expr() || !expr.const_expr().has_string_value()) return nil;
+  return @(expr.const_expr().string_value().c_str());
+}
+
+static NSString* LiteralArgument(const cel::expr::Expr& expr, const char* function) {
+  if (!expr.has_call_expr()) return nil;
+  const auto& call = expr.call_expr();
+  if (call.has_target() || call.function() != function || call.args_size() != 1) return nil;
+  return LiteralString(call.args(0));
+}
+
+// Read the window's literal arguments without evaluating the rule or consulting the clock.
+// A computed bound (e.g. now() + duration("8h")) cannot describe a fixed window here.
+static NSString* TimeWindowDescription(SNTRule* rule, NSISO8601DateFormatter* dateFormatter) {
+  // policy_for_range() is only available in CELv2.
+  if (rule.state != SNTRuleStateCELv2 || !rule.celExpr.length) return nil;
+  auto parsed = google::api::expr::parser::Parse(rule.celExpr.UTF8String);
+  if (!parsed.ok() || !parsed->expr().has_call_expr()) return nil;
+  const auto& call = parsed->expr().call_expr();
+  if (call.has_target() || call.function() != "policy_for_range") return nil;
+
+  switch (call.args_size()) {
+    case 5:
+    case 6: {
+      NSMutableArray<NSNumber*>* days = [NSMutableArray array];
+      const auto& dayExpr = call.args(0);
+      if (dayExpr.has_call_expr() && !dayExpr.call_expr().has_target() &&
+          dayExpr.call_expr().function() == "weekdays" && dayExpr.call_expr().args_size() == 0) {
+        [days addObjectsFromArray:@[ @1, @2, @3, @4, @5 ]];
+      } else if (dayExpr.has_list_expr()) {
+        for (const auto& day : dayExpr.list_expr().elements()) {
+          if (!day.has_const_expr() || !day.const_expr().has_int64_value()) return nil;
+          int64_t value = day.const_expr().int64_value();
+          if (value < 0 || value > 6) return nil;
+          [days addObject:@(value)];
+        }
+      } else {
+        return nil;
+      }
+
+      SNTRuleTimeWindow* window = [[SNTRuleTimeWindow alloc] init];
+      window.days = days;
+      window.startOfDay = LiteralString(call.args(1));
+      window.endOfDay = LiteralString(call.args(2));
+      window.zoneName = call.args_size() == 6 ? LiteralString(call.args(3)) : @"local";
+      if (!window.startOfDay || !window.endOfDay || !window.zoneName) return nil;
+      return [window displayString];
+    }
+    case 4: {
+      NSString* start = LiteralArgument(call.args(0), "timestamp");
+      NSString* end = LiteralArgument(call.args(1), "timestamp");
+      absl::Time startTime, endTime;
+      if (!start || !end ||
+          !absl::ParseTime(absl::RFC3339_full, start.UTF8String, &startTime, nullptr) ||
+          !absl::ParseTime(absl::RFC3339_full, end.UTF8String, &endTime, nullptr))
+        return nil;
+      NSDate* startDate = [NSDate dateWithTimeIntervalSince1970:absl::ToUnixSeconds(startTime)];
+      NSDate* endDate = [NSDate dateWithTimeIntervalSince1970:absl::ToUnixSeconds(endTime)];
+      return [NSString stringWithFormat:@"%@ to %@", [dateFormatter stringFromDate:startDate],
+                                        [dateFormatter stringFromDate:endDate]];
+    }
+    case 2: {
+      NSString* literal = LiteralArgument(call.args(0), "duration");
+      absl::Duration duration;
+      if (!literal || !absl::ParseDuration(literal.UTF8String, &duration) ||
+          duration <= absl::ZeroDuration() || duration == absl::InfiniteDuration())
+        return nil;
+      NSDateComponentsFormatter* formatter = [[NSDateComponentsFormatter alloc] init];
+      formatter.unitsStyle = NSDateComponentsFormatterUnitsStyleFull;
+      formatter.allowedUnits =
+          NSCalendarUnitDay | NSCalendarUnitHour | NSCalendarUnitMinute | NSCalendarUnitSecond;
+      NSString* display = [formatter stringFromTimeInterval:absl::ToDoubleSeconds(duration)];
+      return display.length ? [display stringByAppendingString:@" from launch"] : nil;
+    }
+    default: return nil;
+  }
+}
 
 // Used by longHelpText to display a list of valid keys passed in as an array.
 NSString* formattedStringForKeyArray(NSArray<NSString*>* array) {
@@ -145,6 +233,7 @@ typedef id (^SNTAttributeBlock)(SNTCommandFileInfo*, SNTFileInfo*);
 @property(readonly, copy, nonatomic) SNTAttributeBlock validation;
 @property(readonly, copy, nonatomic) SNTAttributeBlock assessment;
 @property(readonly, copy, nonatomic) SNTAttributeBlock rule;
+@property(readonly, copy, nonatomic) SNTAttributeBlock timeWindow;
 @property(readonly, copy, nonatomic) SNTAttributeBlock decision;
 @property(readonly, copy, nonatomic) SNTAttributeBlock signingChain;
 @property(readonly, copy, nonatomic) SNTAttributeBlock universalSigningChain;
@@ -256,6 +345,7 @@ REGISTER_COMMAND_NAME(@"fileinfo")
     kSecureSigningTime,
     kSigningTime,
     kRule,
+    kTimeWindow,
     kDecision,
     kEntitlements,
     kSigningChain,
@@ -291,6 +381,7 @@ REGISTER_COMMAND_NAME(@"fileinfo")
       kValidation : self.validation,
       kAssessment : self.assessment,
       kRule : self.rule,
+      kTimeWindow : self.timeWindow,
       kDecision : self.decision,
       kSigningChain : self.signingChain,
       kUniversalSigningChain : self.universalSigningChain,
@@ -481,59 +572,75 @@ static void ResumeDaemonConnection(SNTCommandFileInfo* cmd) {
   });
 }
 
+- (SNTRule*)ruleForFileInfo:(SNTFileInfo*)fileInfo signingStatus:(SNTSigningStatus*)signingStatus {
+  // If we previously were unable to connect, don't try again.
+  if (self.daemonUnavailable) return nil;
+  ResumeDaemonConnection(self);
+  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+
+  NSError* err;
+  MOLCodesignChecker* csc = [fileInfo codesignCheckerWithError:&err];
+  *signingStatus = SigningStatus(csc, err);
+
+  struct RuleIdentifiers identifiers = {
+      .cdhash = csc.cdhash,
+      .binarySHA256 = fileInfo.SHA256,
+      .signingID = FormatSigningID(csc),
+      .certificateSHA256 = err ? nil : csc.leafCertificate.SHA256,
+      .teamID = csc.teamID,
+  };
+
+  // If the binary is signed with a dev cert, see if a rule would've
+  // matched if it were prod signed.
+  SNTRuleIdentifiers* lookupIdentifiers =
+      *signingStatus == SNTSigningStatusDevelopment
+          ? [[SNTRuleIdentifiers alloc] initWithRuleIdentifiers:identifiers]
+          : [[SNTRuleIdentifiers alloc] initWithRuleIdentifiers:identifiers
+                                               andSigningStatus:*signingStatus];
+
+  __block SNTRule* rule;
+  id<SNTDaemonControlXPC> rop = [self.daemonConn remoteObjectProxy];
+  [rop databaseRuleForIdentifiers:lookupIdentifiers
+                            reply:^(SNTRule* r) {
+                              rule = r;
+                              dispatch_semaphore_signal(sema);
+                            }];
+
+  if (dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC))) {
+    self.daemonUnavailable = YES;
+    return nil;
+  }
+  return rule;
+}
+
 - (SNTAttributeBlock)rule {
   return ^id(SNTCommandFileInfo* cmd, SNTFileInfo* fileInfo) {
-    // If we previously were unable to connect, don't try again.
+    SNTSigningStatus signingStatus;
+    SNTRule* rule = [cmd ruleForFileInfo:fileInfo signingStatus:&signingStatus];
     if (cmd.daemonUnavailable) return kCommunicationErrorMsg;
-    ResumeDaemonConnection(cmd);
-    dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-
-    NSError* err;
-    MOLCodesignChecker* csc = [fileInfo codesignCheckerWithError:&err];
-    SNTSigningStatus signingStatus = SigningStatus(csc, err);
-
-    struct RuleIdentifiers identifiers = {
-        .cdhash = csc.cdhash,
-        .binarySHA256 = fileInfo.SHA256,
-        .signingID = FormatSigningID(csc),
-        .certificateSHA256 = err ? nil : csc.leafCertificate.SHA256,
-        .teamID = csc.teamID,
-    };
-
-    // If the binary is signed with a dev cert, see if a rule would've
-    // matched if it were prod signed.
-    SNTRuleIdentifiers* lookupIdentifiers =
-        signingStatus == SNTSigningStatusDevelopment
-            ? [[SNTRuleIdentifiers alloc] initWithRuleIdentifiers:identifiers]
-            : [[SNTRuleIdentifiers alloc] initWithRuleIdentifiers:identifiers
-                                                 andSigningStatus:signingStatus];
-
-    __block NSString* output =
-        csc.platformBinary
-            ? (cmd.prettyOutput ? @"\033[32mPlatform Binary\033[0m" : @"Platform Binary")
-            : @"None";
-    id<SNTDaemonControlXPC> rop = [cmd.daemonConn remoteObjectProxy];
-    [rop databaseRuleForIdentifiers:lookupIdentifiers
-                              reply:^(SNTRule* r) {
-                                if (signingStatus == SNTSigningStatusDevelopment &&
-                                    (r.type == SNTRuleTypeSigningID ||
-                                     r.type == SNTRuleTypeTeamID)) {
-                                  output = [NSString
-                                      stringWithFormat:@"None (%@ rule ignored because code signed "
-                                                       @"with a development certificate.)",
-                                                       r.type == SNTRuleTypeTeamID ? @"TeamID"
-                                                                                   : @"SigningID"];
-                                } else {
-                                  if (r) output = [r stringifyWithColor:cmd.prettyOutput];
-                                }
-                                dispatch_semaphore_signal(sema);
-                              }];
-
-    if (dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC))) {
-      cmd.daemonUnavailable = YES;
-      return kCommunicationErrorMsg;
+    if (signingStatus == SNTSigningStatusDevelopment &&
+        (rule.type == SNTRuleTypeSigningID || rule.type == SNTRuleTypeTeamID)) {
+      return [NSString stringWithFormat:@"None (%@ rule ignored because code signed "
+                                        @"with a development certificate.)",
+                                        rule.type == SNTRuleTypeTeamID ? @"TeamID" : @"SigningID"];
     }
-    return output;
+    if (rule) return [rule stringifyWithColor:cmd.prettyOutput];
+    MOLCodesignChecker* csc = [fileInfo codesignCheckerWithError:NULL];
+    return csc.platformBinary
+               ? (cmd.prettyOutput ? @"\033[32mPlatform Binary\033[0m" : @"Platform Binary")
+               : @"None";
+  };
+}
+
+- (SNTAttributeBlock)timeWindow {
+  return ^id(SNTCommandFileInfo* cmd, SNTFileInfo* fileInfo) {
+    SNTSigningStatus signingStatus;
+    SNTRule* rule = [cmd ruleForFileInfo:fileInfo signingStatus:&signingStatus];
+    if (!rule || (signingStatus == SNTSigningStatusDevelopment &&
+                  (rule.type == SNTRuleTypeSigningID || rule.type == SNTRuleTypeTeamID))) {
+      return nil;
+    }
+    return TimeWindowDescription(rule, cmd.dateFormatter);
   };
 }
 
