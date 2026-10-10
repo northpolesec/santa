@@ -603,6 +603,15 @@ void HandleV2Responses(const ::pbv2::PreflightResponse& resp, SNTSyncState* sync
         StringToNSString(resp.banned_network_mount_block_message());
   }
 
+  if (resp.has_banned_removable_media_block_message()) {
+    syncState.bannedUSBBlockMessage = StringToNSString(resp.banned_removable_media_block_message());
+  }
+
+  if (resp.has_remount_removable_media_block_message()) {
+    syncState.remountUSBBlockMessage =
+        StringToNSString(resp.remount_removable_media_block_message());
+  }
+
   if (resp.has_network_extension()) {
     auto& ne = resp.network_extension();
     SNTNetworkFlowDefaultAction flowDefaultAction =

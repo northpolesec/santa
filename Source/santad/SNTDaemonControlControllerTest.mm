@@ -52,6 +52,8 @@ static NSString* const kBinarySHA256 =
 @interface SNTConfigBundle (Testing)
 @property NSNumber* clientMode;
 @property NSNumber* executableIntegrityPolicy;
+@property NSString* bannedUSBBlockMessage;
+@property NSString* remountUSBBlockMessage;
 @end
 
 @interface SNTDaemonControlController (Testing)
@@ -486,6 +488,48 @@ static NSString* const kBinarySHA256 =
   id cfg = [self mockConfiguratorForSyncSettings];
   OCMReject([cfg setSyncServerExecutableIntegrityPolicy:SNTExecutableIntegrityPolicyUnknown])
       .ignoringNonObjectArgs();
+  // The bundle still carries another key, so the batch demonstrably ran.
+  OCMExpect([cfg setSyncServerClientMode:SNTClientModeLockdown]);
+
+  SNTConfigBundle* bundle = [[SNTConfigBundle alloc] init];
+  bundle.clientMode = @(SNTClientModeLockdown);
+
+  __block BOOL replied = NO;
+  [self.sut updateSyncSettings:bundle
+                         reply:^{
+                           replied = YES;
+                         }];
+
+  XCTAssertTrue(replied);
+  OCMVerifyAll(cfg);
+  [cfg stopMocking];
+}
+
+- (void)testUpdateSyncSettingsAppliesUSBBlockMessages {
+  id cfg = [self mockConfiguratorForSyncSettings];
+  OCMExpect([cfg setSyncServerBannedUSBBlockMessage:@"USB storage is blocked"]);
+  // An empty message is passed through so the configurator can remove the synced value.
+  OCMExpect([cfg setSyncServerRemountUSBBlockMessage:@""]);
+
+  SNTConfigBundle* bundle = [[SNTConfigBundle alloc] init];
+  bundle.bannedUSBBlockMessage = @"USB storage is blocked";
+  bundle.remountUSBBlockMessage = @"";
+
+  __block BOOL replied = NO;
+  [self.sut updateSyncSettings:bundle
+                         reply:^{
+                           replied = YES;
+                         }];
+
+  XCTAssertTrue(replied);
+  OCMVerifyAll(cfg);
+  [cfg stopMocking];
+}
+
+- (void)testUpdateSyncSettingsWithoutUSBBlockMessagesLeavesThemAlone {
+  id cfg = [self mockConfiguratorForSyncSettings];
+  OCMReject([cfg setSyncServerBannedUSBBlockMessage:[OCMArg any]]);
+  OCMReject([cfg setSyncServerRemountUSBBlockMessage:[OCMArg any]]);
   // The bundle still carries another key, so the batch demonstrably ran.
   OCMExpect([cfg setSyncServerClientMode:SNTClientModeLockdown]);
 

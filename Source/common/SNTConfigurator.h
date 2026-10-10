@@ -641,18 +641,30 @@
 @property(nullable, readonly, nonatomic) NSString* bannedBlockMessage;
 
 ///
-/// This is the message shown to the user when a USB storage device's mount is denied
-/// from the BlockUSBMount configuration setting. If not configured, a reasonable
-/// default is provided.
+/// This is the message shown to the user when a USB storage device's mount is denied.
+/// A value from a sync server takes precedence over the configuration profile. If
+/// neither is set, a reasonable default is provided.
 ///
 @property(nullable, readonly, nonatomic) NSString* bannedUSBBlockMessage;
 
 ///
+///  Set the message to be shown when a USB storage device's mount is denied, as received
+///  from a sync server. A nil, empty, or whitespace-only message removes the synced value.
+///
+- (void)setSyncServerBannedUSBBlockMessage:(nullable NSString*)msg;
+
+///
 /// This is the message shown to the user when a USB storage device's mount is forcibly
-/// remounted to a different set of permissions from the BlockUSB and RemountUSBMode
-/// configuration settings. If not configured, a reasonable default is provided.
+/// remounted with reduced permissions. A value from a sync server takes precedence over
+/// the configuration profile. If neither is set, a reasonable default is provided.
 ///
 @property(nullable, readonly, nonatomic) NSString* remountUSBBlockMessage;
+
+///
+///  Set the message to be shown when a USB storage device is remounted, as received from a
+///  sync server. A nil, empty, or whitespace-only message removes the synced value.
+///
+- (void)setSyncServerRemountUSBBlockMessage:(nullable NSString*)msg;
 
 ///
 /// This is the message shown to the user when a network share mount is denied

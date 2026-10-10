@@ -38,6 +38,8 @@
 @property NSNumber* blockNetworkMount;
 @property NSString* bannedNetworkMountBlockMessage;
 @property NSArray<NSString*>* allowedNetworkMountHosts;
+@property NSString* bannedUSBBlockMessage;
+@property NSString* remountUSBBlockMessage;
 @property NSNumber* enableBundles;
 @property NSNumber* enableTransitiveRules;
 @property NSNumber* enableAllEventUpload;
@@ -87,6 +89,8 @@
   XCTAssertNil(bundle.blockNetworkMount);
   XCTAssertNil(bundle.bannedNetworkMountBlockMessage);
   XCTAssertNil(bundle.allowedNetworkMountHosts);
+  XCTAssertNil(bundle.bannedUSBBlockMessage);
+  XCTAssertNil(bundle.remountUSBBlockMessage);
   XCTAssertNil(bundle.enableBundles);
   XCTAssertNil(bundle.enableTransitiveRules);
   XCTAssertNil(bundle.enableAllEventUpload);
@@ -177,6 +181,12 @@
   XCTAssertEqualObjects(bundle.bannedNetworkMountBlockMessage,
                         syncState.bannedNetworkMountBlockMessage);
   XCTAssertEqualObjects(bundle.allowedNetworkMountHosts, syncState.allowedNetworkMountHosts);
+
+  syncState.bannedUSBBlockMessage = @"USB storage is blocked";
+  syncState.remountUSBBlockMessage = @"";
+  bundle = PostflightConfigBundle(syncState);
+  XCTAssertEqualObjects(bundle.bannedUSBBlockMessage, @"USB storage is blocked");
+  XCTAssertEqualObjects(bundle.remountUSBBlockMessage, @"");
 
   syncState.networkExtensionSettings =
       [[SNTSyncNetworkExtensionSettings alloc] initWithEnable:YES

@@ -35,6 +35,8 @@
 @property NSNumber* blockNetworkMount;
 @property NSString* bannedNetworkMountBlockMessage;
 @property NSArray<NSString*>* allowedNetworkMountHosts;
+@property NSString* bannedUSBBlockMessage;
+@property NSString* remountUSBBlockMessage;
 @property NSNumber* enableBundles;
 @property NSNumber* enableTransitiveRules;
 @property NSNumber* enableAllEventUpload;
@@ -320,6 +322,14 @@
     XCTFail(@"This shouldn't be called");
   }];
 
+  [bundle bannedUSBBlockMessage:^(NSString* val) {
+    XCTFail(@"This shouldn't be called");
+  }];
+
+  [bundle remountUSBBlockMessage:^(NSString* val) {
+    XCTFail(@"This shouldn't be called");
+  }];
+
   [bundle enableBundles:^(BOOL val) {
     XCTFail(@"This shouldn't be called");
   }];
@@ -520,6 +530,35 @@
     unsetFired = YES;
   }];
   XCTAssertFalse(unsetFired);
+}
+
+- (void)testUSBBlockMessagesRoundTrip {
+  SNTConfigBundle* set = [[SNTConfigBundle alloc] init];
+  set.bannedUSBBlockMessage = @"USB storage is blocked";
+  // An empty message is carried rather than dropped: it tells the daemon to
+  // remove the synced value.
+  set.remountUSBBlockMessage = @"";
+
+  NSError* error = nil;
+  NSData* data = [NSKeyedArchiver archivedDataWithRootObject:set
+                                       requiringSecureCoding:YES
+                                                       error:&error];
+  XCTAssertNil(error);
+  SNTConfigBundle* decoded = [NSKeyedUnarchiver unarchivedObjectOfClass:[SNTConfigBundle class]
+                                                               fromData:data
+                                                                  error:&error];
+  XCTAssertNil(error);
+
+  __block NSString* banned = nil;
+  __block NSString* remount = nil;
+  [decoded bannedUSBBlockMessage:^(NSString* val) {
+    banned = val;
+  }];
+  [decoded remountUSBBlockMessage:^(NSString* val) {
+    remount = val;
+  }];
+  XCTAssertEqualObjects(banned, @"USB storage is blocked");
+  XCTAssertEqualObjects(remount, @"");
 }
 
 @end
