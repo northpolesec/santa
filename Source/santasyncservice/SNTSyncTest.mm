@@ -484,6 +484,8 @@
 
   XCTAssertTrue([sut sync]);
   XCTAssertNil(self.syncState.removableMediaAction);
+  XCTAssertNil(self.syncState.bannedUSBBlockMessage);
+  XCTAssertNil(self.syncState.remountUSBBlockMessage);
 }
 
 - (void)testPreflightOverrideFileAccessAction {
@@ -510,6 +512,29 @@
 
   XCTAssertTrue([sut sync]);
   XCTAssertNil(self.syncState.overrideFileAccessAction);
+}
+
+- (void)testPreflightUSBBlockMessages {
+  [self setupDefaultDaemonConnResponses];
+  SNTSyncPreflight* sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
+
+  NSData* respData =
+      [@"{\"client_mode\": \"LOCKDOWN\", \"batch_size\": 100, "
+       @"\"banned_removable_media_block_message\": \"USB storage is blocked\", "
+       @"\"remount_removable_media_block_message\": \"\"}" dataUsingEncoding:NSUTF8StringEncoding];
+
+  [self stubRequestBody:respData response:nil error:nil validateBlock:nil];
+
+  XCTAssertTrue([sut sync]);
+  if (self.syncState.isSyncV2) {
+    XCTAssertEqualObjects(self.syncState.bannedUSBBlockMessage, @"USB storage is blocked");
+    // An empty message is kept: it removes the message synced earlier.
+    XCTAssertEqualObjects(self.syncState.remountUSBBlockMessage, @"");
+  } else {
+    // Sync v1 has no such fields, so the keys are ignored.
+    XCTAssertNil(self.syncState.bannedUSBBlockMessage);
+    XCTAssertNil(self.syncState.remountUSBBlockMessage);
+  }
 }
 
 - (void)testPreflightNetworkExtension {

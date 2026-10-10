@@ -744,6 +744,14 @@ static NSString* TAMUsernameForUID(uid_t uid) {
       [configurator setSyncServerAllowedNetworkMountHosts:val];
     }];
 
+    [result bannedUSBBlockMessage:^(NSString* val) {
+      [configurator setSyncServerBannedUSBBlockMessage:val];
+    }];
+
+    [result remountUSBBlockMessage:^(NSString* val) {
+      [configurator setSyncServerRemountUSBBlockMessage:val];
+    }];
+
     [result enableBundles:^(BOOL val) {
       [configurator setEnableBundles:val];
     }];

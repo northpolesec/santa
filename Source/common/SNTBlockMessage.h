@@ -50,7 +50,14 @@ NS_ASSUME_NONNULL_BEGIN
                            (nullable SNTStoredFileAccessEvent*)event
                                                   customMessage:(nullable NSString*)customMessage;
 
-+ (NSAttributedString*)attributedBlockMessageForDeviceEvent:(nullable SNTDeviceEvent*)event;
+///
+///  Uses the remount message if the event carries remount arguments, otherwise the banned
+///  message, formatted using +[SNTBlockMessage formatMessage]. A nil or empty message
+///  falls back to the default text.
+///
++ (NSAttributedString*)attributedBlockMessageForDeviceEvent:(nullable SNTDeviceEvent*)event
+                                              bannedMessage:(nullable NSString*)bannedMessage
+                                             remountMessage:(nullable NSString*)remountMessage;
 
 + (NSAttributedString*)attributedBlockMessageForNetworkMountEventWithCustomMessage:
     (nullable NSString*)customMsg;

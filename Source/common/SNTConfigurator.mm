@@ -57,6 +57,13 @@ static NSArray<NSString*>* EnsureArrayOfStrings(id obj) {
   return obj;
 }
 
+// Returns nil for a nil, empty, or whitespace-only message. A sync server sends
+// an empty message to remove one it synced earlier.
+static NSString* SyncMessageOrNil(NSString* msg) {
+  NSCharacterSet* whitespace = [NSCharacterSet whitespaceAndNewlineCharacterSet];
+  return [msg stringByTrimmingCharactersInSet:whitespace].length ? msg : nil;
+}
+
 static SNTRemovableMediaAction ActionFromString(NSString* action) {
   if (!action) return SNTRemovableMediaActionAllow;
   if ([action caseInsensitiveCompare:@"Allow"] == NSOrderedSame) {
@@ -359,6 +366,8 @@ static NSString* const kPushTokenChainKey = @"PushTokenChain";
       kBlockNetworkMountKey : number,
       kBannedNetworkMountBlockMessage : string,
       kAllowedNetworkMountHosts : array,
+      kBannedUSBBlockMessage : string,
+      kRemountUSBBlockMessage : string,
       kFullSyncLastSuccess : date,
       kRuleSyncLastSuccess : date,
       kSyncCleanRequiredDeprecated : number,
@@ -899,11 +908,11 @@ static SNTConfigurator* sharedConfigurator = nil;
 }
 
 + (NSSet*)keyPathsForValuesAffectingBannedUSBBlockMessage {
-  return [self configStateSet];
+  return [self syncAndConfigStateSet];
 }
 
 + (NSSet*)keyPathsForValuesAffectingRemountUSBBlockMessage {
-  return [self configStateSet];
+  return [self syncAndConfigStateSet];
 }
 
 + (NSSet*)keyPathsForValuesAffectingUsbBlockMessage {
@@ -1435,11 +1444,19 @@ static SNTConfigurator* sharedConfigurator = nil;
 }
 
 - (NSString*)bannedUSBBlockMessage {
-  return self.configState[kBannedUSBBlockMessage];
+  return self.syncState[kBannedUSBBlockMessage] ?: self.configState[kBannedUSBBlockMessage];
+}
+
+- (void)setSyncServerBannedUSBBlockMessage:(NSString*)msg {
+  [self updateSyncStateForKey:kBannedUSBBlockMessage value:SyncMessageOrNil(msg)];
 }
 
 - (NSString*)remountUSBBlockMessage {
-  return self.configState[kRemountUSBBlockMessage];
+  return self.syncState[kRemountUSBBlockMessage] ?: self.configState[kRemountUSBBlockMessage];
+}
+
+- (void)setSyncServerRemountUSBBlockMessage:(NSString*)msg {
+  [self updateSyncStateForKey:kRemountUSBBlockMessage value:SyncMessageOrNil(msg)];
 }
 
 - (NSString*)modeNotificationMonitor {
