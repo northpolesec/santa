@@ -76,6 +76,10 @@ using santa::Unit;
 
 static const size_t kMaxAllowedPathLength = MAXPATHLEN - 1;  // -1 to account for null terminator
 
+// Only a binary born this recently is held for a transitive rule: compiler
+// output is brand new, and this is generous relative to a build's final link.
+static const time_t kTransitiveHoldMaxFileAgeSeconds = 60;
+
 @interface SNTExecutionController ()
 @property SNTEventTable* eventTable;
 @property SNTNotificationQueue* notifierQueue;
@@ -85,6 +89,7 @@ static const size_t kMaxAllowedPathLength = MAXPATHLEN - 1;  // -1 to account fo
 @property SNTTimedRuleKills* timedRuleKills;
 @property SNTMetricCounter* events;
 @property SNTMetricCounter* unverifiedExecutions;
+@property SNTMetricCounter* transitiveRuleHolds;
 @property santa::ProcessControlBlock processControlBlock;
 
 @property dispatch_queue_t eventQueue;
@@ -164,6 +169,7 @@ static bool SameBinary(const es_process_t* a, NSString* aSHA256, const es_proces
   LogExecutionBlock _logger;
   std::shared_ptr<TTYWriter> _ttyWriter;
   std::unique_ptr<SantaCache<std::pair<pid_t, int>, bool>> _procSignalCache;
+  std::shared_ptr<santa::PendingExecCoordinator> _pendingExecCoordinator;
 
   // Cache of user authorization approvals: key (see AuthApprovalCacheKey) ->
   // timestamp (nanoseconds since boot).
@@ -189,19 +195,20 @@ static bool SameBinary(const es_process_t* a, NSString* aSHA256, const es_proces
 
 #pragma mark Initializers
 
-- (instancetype)initWithRuleTable:(SNTRuleTable*)ruleTable
-                       eventTable:(SNTEventTable*)eventTable
-                    notifierQueue:(SNTNotificationQueue*)notifierQueue
-                       syncdQueue:(SNTSyncdQueue*)syncdQueue
-                           logger:(LogExecutionBlock)logger
-                        ttyWriter:(std::shared_ptr<TTYWriter>)ttyWriter
-                  policyProcessor:(SNTPolicyProcessor*)policyProcessor
-              processControlBlock:(santa::ProcessControlBlock)processControlBlock
-                      processTree:
-                          (std::shared_ptr<santa::santad::process_tree::ProcessTree>)processTree
-              sandboxExpectations:(std::shared_ptr<santa::SandboxExpectations>)sandboxExpectations
-                   timedRuleKills:(SNTTimedRuleKills*)timedRuleKills
-                  believableClock:(SNTBelievableClock*)believableClock {
+- (instancetype)
+         initWithRuleTable:(SNTRuleTable*)ruleTable
+                eventTable:(SNTEventTable*)eventTable
+             notifierQueue:(SNTNotificationQueue*)notifierQueue
+                syncdQueue:(SNTSyncdQueue*)syncdQueue
+                    logger:(LogExecutionBlock)logger
+                 ttyWriter:(std::shared_ptr<TTYWriter>)ttyWriter
+           policyProcessor:(SNTPolicyProcessor*)policyProcessor
+       processControlBlock:(santa::ProcessControlBlock)processControlBlock
+               processTree:(std::shared_ptr<santa::santad::process_tree::ProcessTree>)processTree
+       sandboxExpectations:(std::shared_ptr<santa::SandboxExpectations>)sandboxExpectations
+            timedRuleKills:(SNTTimedRuleKills*)timedRuleKills
+           believableClock:(SNTBelievableClock*)believableClock
+    pendingExecCoordinator:(std::shared_ptr<santa::PendingExecCoordinator>)pendingExecCoordinator {
   self = [super init];
   if (self) {
     _ruleTable = ruleTable;
@@ -218,6 +225,7 @@ static bool SameBinary(const es_process_t* a, NSString* aSHA256, const es_proces
     _processTree = std::move(processTree);
     _sandboxExpectations = std::move(sandboxExpectations);
     _timedRuleKills = timedRuleKills;
+    _pendingExecCoordinator = std::move(pendingExecCoordinator);
 
     // Built once: a time window must be judged against the believable clock, or
     // a system clock moved backwards would re-open one that has closed.
@@ -248,6 +256,10 @@ static bool SameBinary(const es_process_t* a, NSString* aSHA256, const es_proces
                         fieldNames:@[ @"reason", @"decision" ]
                           helpText:@"Executions Santa could not confirm are of the file it "
                                    @"evaluated, per reason and decision"];
+    _transitiveRuleHolds =
+        [metricSet counterWithName:@"/santa/transitive_rule_holds"
+                        fieldNames:@[ @"result" ]
+                          helpText:@"Executions held waiting for a transitive rule, per result"];
   }
   return self;
 }
@@ -488,6 +500,33 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
   return decision == SNTEventStateAllowCompilerBinary ||
          decision == SNTEventStateAllowCompilerSigningID ||
          decision == SNTEventStateAllowCompilerCDHash;
+}
+
+// How long to hold this execution waiting for a transitive rule, or 0 not to
+// hold it. A compiler's output gets its rule when the compiler's NOTIFY_CLOSE,
+// NOTIFY_RENAME, or NOTIFY_CLONE is processed, which can be after the output is
+// executed. Only a fresh binary blocked because no rule matched, while a
+// compiler is active, is held. The hold decides only when the block takes
+// effect: the execution resumes only once a rule allows exactly the content
+// evaluated here.
+- (uint32_t)transitiveRuleHoldMillisecondsForDecision:(SNTCachedDecision*)cd
+                                           targetProc:(const es_process_t*)targetProc {
+  // A hold waits for a rule naming the content evaluated here, so only an
+  // execution whose identity was confirmed is held.
+  if (cd.decision != SNTEventStateBlockUnknown || cd.holdAndAsk || cd.identityMismatched ||
+      cd.sha256.length == 0 || !_pendingExecCoordinator ||
+      !_pendingExecCoordinator->CompilerActiveRecently()) {
+    return 0;
+  }
+
+  time_t born = targetProc->executable->stat.st_birthtimespec.tv_sec;
+  time_t now = time(NULL);
+  if (born == 0 || now < born || now - born > kTransitiveHoldMaxFileAgeSeconds) {
+    return 0;
+  }
+
+  SNTConfigurator* config = [SNTConfigurator configurator];
+  return config.enableTransitiveRules ? config.compilerTransitiveWaitMilliseconds : 0;
 }
 
 - (void)validateExecEvent:(const Message&)esMsg
@@ -759,6 +798,12 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
                          ? (cd.cacheable ? SNTActionRespondAllow : SNTActionRespondAllowNoCache)
                          : SNTActionRespondDeny;
 
+  // Marked before the decision is first cached, so that no reader of the cache
+  // sees a held execution unmarked.
+  uint32_t transitiveHoldMs = [self transitiveRuleHoldMillisecondsForDecision:cd
+                                                                   targetProc:targetProc];
+  cd.heldForTransitiveRule = transitiveHoldMs > 0;
+
   // Save decision details for logging the execution later.  For transitive rules, we also use
   // the shasum stored in the decision details to update the rule's timestamp whenever an
   // ACTION_NOTIFY_EXEC message related to the transitive rule is received.
@@ -777,7 +822,8 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
     action = cd.cacheable ? SNTActionRespondAllowCompiler : SNTActionRespondAllowCompilerNoCache;
   }
 
-  pid_t newProcPid = audit_token_to_pid(targetProc->audit_token);
+  const audit_token_t newProcToken = targetProc->audit_token;
+  pid_t newProcPid = audit_token_to_pid(newProcToken);
   BOOL stoppedProc = false;
   std::pair<pid_t, int> pidAndVersion =
       std::make_pair(newProcPid, audit_token_to_pidversion(targetProc->audit_token));
@@ -814,8 +860,16 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
     // If the user authorizes execution we resume the process. Any attempts to resume the paused
     // binary outside of the auth flow will be blocked.
     _procSignalCache->set(pidAndVersion, true);
-    stoppedProc = self.processControlBlock(newProcPid, ProcessControl::Suspend);
+    stoppedProc = self.processControlBlock(newProcToken, ProcessControl::Suspend);
     postAction(SNTActionRespondHold, cd);
+  } else if (cd.heldForTransitiveRule && [self holdForTransitiveRule:cd
+                                                           timeoutMs:transitiveHoldMs
+                                                             binInfo:binInfo
+                                                               esMsg:esMsg
+                                                         configState:configState
+                                                          postAction:postAction]) {
+    // The hold's resolution responds, counts, logs, and reports the execution.
+    return;
   } else {
     // Respond with the decision.
     postAction(action, cd);
@@ -894,27 +948,31 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
               _ttyWriter->Write(targetProc, @"Authorized, allowing execution\n---\n\n");
             }
 
-            // Allow the binary to begin running.
-            self.processControlBlock(newProcPid, ProcessControl::Resume);
+            // Allow the binary to begin running. A hold that could not stop the
+            // process already killed it.
+            if (stoppedProc) {
+              self.processControlBlock(newProcToken, ProcessControl::Resume);
+            }
 
-            // The execution is allowed, so record it whatever the suspend or
-            // resume reported: a hold that could not stop the process left it
-            // running, a resume that failed left it stopped, and SIGKILL takes a
-            // stopped process at the deadline.
+            // The execution is allowed, so record it whatever the resume
+            // reported: a resume that failed left it stopped, and SIGKILL takes
+            // a stopped process at the deadline. The record names the process
+            // by audit token, so it never reaches a process that reused the pid.
             [self recordTimedRuleKillForDecision:cd process:targetProc->audit_token];
           } else {
             // Decision stays as-is; only the extra field says why.
             cd.decisionExtra = DecisionExtra(cd.authorizationMethod,
                                              authenticated ? @"Approved After Expiry" : @"Denied");
 
-            // Nothing approved this execution in time, so kill the stopped process.
+            // Nothing approved this execution in time, so kill the stopped
+            // process. One the hold could not stop was killed then.
             if (stoppedProc) {
               _ttyWriter->Write(
                   targetProc,
                   authenticated ? @"Authorized after the window closed, denying execution\n---\n\n"
                                 : @"Authorization not given, denying execution\n---\n\n");
+              self.processControlBlock(newProcToken, ProcessControl::Kill);
             }
-            self.processControlBlock(newProcPid, ProcessControl::Kill);
           }
 
           // Clear holdAndAsk and update cache so it's recorded as a final decision
@@ -938,6 +996,92 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
                              replyBlock:replyBlock];
     }
   }
+}
+
+// Suspends the target and waits for a transitive rule for the content that was
+// evaluated: it resumes if one is created within `timeoutMs` and is killed
+// otherwise. Returns NO, holding nothing, if the target could not be suspended.
+- (BOOL)holdForTransitiveRule:(SNTCachedDecision*)cd
+                    timeoutMs:(uint32_t)timeoutMs
+                      binInfo:(SNTFileInfo*)binInfo
+                        esMsg:(const Message&)esMsg
+                  configState:(SNTConfigState*)configState
+                   postAction:(bool (^)(SNTAction, SNTCachedDecision*))postAction {
+  const audit_token_t token = esMsg->event.exec.target->audit_token;
+  pid_t pid = audit_token_to_pid(token);
+  std::pair<pid_t, int> pidAndVersion = std::make_pair(pid, audit_token_to_pidversion(token));
+
+  _procSignalCache->set(pidAndVersion, true);
+  if (!self.processControlBlock(token, ProcessControl::Suspend)) {
+    // ProcessControl killed the target it could not stop. Deny it like any
+    // other block, which logs its NOTIFY_EXEC as usual.
+    _procSignalCache->remove(pidAndVersion);
+    cd.heldForTransitiveRule = NO;
+    return NO;
+  }
+
+  // Respond before arming the wait. Every resolution runs asynchronously, so
+  // the Hold entry is in AuthResultCache before the HoldAllowed or HoldDenied
+  // that removes it.
+  postAction(SNTActionRespondHold, cd);
+
+  __block Message esMsgCopy(esMsg);
+  _pendingExecCoordinator->Wait(
+      santa::NSStringToUTF8String(cd.sha256), timeoutMs, ^(bool ruleCreated) {
+        // Runs exactly once, on the coordinator's queue. Nothing on the synchronous
+        // path touches `cd` once the wait is armed. It is still the decision cached
+        // for the vnode unless a later execution replaced it, which is left alone.
+        //
+        // A rule created for this content allows it only if it still governs it: it
+        // may have been removed since, or a rule of higher precedence may match.
+        BOOL allowed = ruleCreated && [self.policyProcessor transitiveRuleAllowsDecision:cd];
+        NSString* result;
+        if (allowed) {
+          result = @"Allowed";
+          cd.decision = SNTEventStateAllowTransitive;
+          cd.decisionExtra = @"Transitive rule created during exec hold";
+        } else {
+          result = ruleCreated ? @"RuleDoesNotApply" : @"TimedOut";
+          cd.decisionExtra = ruleCreated
+                                 ? @"Transitive rule created during exec hold does not apply"
+                                 : @"No transitive rule created before timeout";
+        }
+
+        // Readers of the cache, the logger among them, look the decision up by
+        // vnode, and the cache may have dropped it during the hold. Restored
+        // before the process runs, and only if absent, so a later execution's
+        // decision is left alone.
+        [[SNTDecisionCache sharedCache] cacheDecisionIfNotSet:cd];
+
+        // Resumes by other processes stay denied until the outcome is applied:
+        // allowed again just before a resume, and only after a kill, so the
+        // process never runs unless it is allowed.
+        if (allowed) {
+          self->_procSignalCache->remove(pidAndVersion);
+          self.processControlBlock(token, ProcessControl::Resume);
+        } else {
+          self.processControlBlock(token, ProcessControl::Kill);
+          self->_procSignalCache->remove(pidAndVersion);
+        }
+        [self.transitiveRuleHolds incrementForFieldValues:@[ result ]];
+
+        // A hold that is not allowed is reported like any other block. Reported
+        // before the logger consumes the message the target process is read from.
+        [self countAndReportDecision:cd
+                             allowed:allowed
+                    unverifiedReason:nil
+                             binInfo:binInfo
+                          targetProc:esMsgCopy->event.exec.target
+                               esMsg:esMsgCopy
+                         configState:configState];
+        // The Recorder skips this execution's NOTIFY_EXEC (heldForTransitiveRule).
+        self->_logger(std::move(esMsgCopy));
+
+        // Last: removing the Hold entry lets other executions of the file be
+        // evaluated, and one could replace the decision the logger reads.
+        postAction(allowed ? SNTActionHoldAllowed : SNTActionHoldDenied, cd);
+      });
+  return YES;
 }
 
 // Decision for an execution Santa could not confirm is the loaded image (a confirmed mismatch
@@ -997,6 +1141,25 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
     cd.sha256 = binInfo.SHA256;
   }
 
+  [self countAndReportDecision:cd
+                       allowed:ACTION_IS_ALLOW(action)
+              unverifiedReason:unverifiedReason
+                       binInfo:binInfo
+                    targetProc:targetProc
+                         esMsg:esMsg
+                   configState:configState];
+}
+
+// Counts an execution that has been responded to and, when its event is stored,
+// stores it and reports it if it was blocked. Not for a Touch ID hold, whose
+// report needs a reply block for its prompt.
+- (void)countAndReportDecision:(SNTCachedDecision*)cd
+                       allowed:(BOOL)allowed
+              unverifiedReason:(const NSString*)unverifiedReason
+                       binInfo:(SNTFileInfo*)binInfo
+                    targetProc:(const es_process_t*)targetProc
+                         esMsg:(const Message&)esMsg
+                   configState:(SNTConfigState*)configState {
   [self incrementEventCounters:cd.decision unverifiedReason:unverifiedReason];
 
   SNTConfigurator* config = [SNTConfigurator configurator];
@@ -1016,7 +1179,7 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
     });
   }
 
-  if (!ACTION_IS_ALLOW(action)) {
+  if (!allowed) {
     [self reportBlockedExecutionEvent:se
                              decision:cd
                               binInfo:binInfo

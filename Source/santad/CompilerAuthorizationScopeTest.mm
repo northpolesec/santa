@@ -157,18 +157,19 @@ static const std::vector<std::string> kBlockedArgs = {"clang", "--link"};
                                  entitlementsFilter:entitlementsFilter];
 
   self.execController = [[SNTExecutionController alloc]
-        initWithRuleTable:self.mockRuleDatabase
-               eventTable:self.mockEventDatabase
-            notifierQueue:nil
-               syncdQueue:nil
-                   logger:nullptr
-                ttyWriter:santa::TTYWriter::Create(true)
-          policyProcessor:policyProcessor
-      processControlBlock:santa::ProdSuspendResumeBlock()
-              processTree:nullptr
-      sandboxExpectations:std::make_shared<santa::SandboxExpectations>()
-           timedRuleKills:nil
-          believableClock:nil];
+           initWithRuleTable:self.mockRuleDatabase
+                  eventTable:self.mockEventDatabase
+               notifierQueue:nil
+                  syncdQueue:nil
+                      logger:nullptr
+                   ttyWriter:santa::TTYWriter::Create(true)
+             policyProcessor:policyProcessor
+         processControlBlock:santa::ProdSuspendResumeBlock()
+                 processTree:nullptr
+         sandboxExpectations:std::make_shared<santa::SandboxExpectations>()
+              timedRuleKills:nil
+             believableClock:nil
+      pendingExecCoordinator:nullptr];
 
   _mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   _mockESApi->SetExpectationsESNewClient();

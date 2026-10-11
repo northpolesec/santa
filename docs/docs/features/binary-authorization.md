@@ -264,14 +264,15 @@ will usually allow developers to work as normal.
 
 :::note
 
-While Santa tries to ensure all files created by allowlisted compilers are
-scanned and transitive rules created as quickly as possible, there is a race
-condition in certain scenarios that will cause execution to fail, especially if
-a binary is executed _immediately_ after being created.
-
 Commands that build and run in one step, such as `go run`, `cargo run`, and
-`bazel run`, can hit this. Build and run in separate steps instead. To see
-whether a transitive rule exists, run
+`bazel run`, often execute a binary _immediately_ after a compiler creates it,
+before Santa has created its transitive rule. Starting with Santa 2026.9, Santa
+holds such an execution until the rule is created, for up to
+[CompilerTransitiveWaitMilliseconds](https://northpole.dev/configuration/keys#CompilerTransitiveWaitMilliseconds).
+If no rule allows the binary in time, the execution is killed.
+
+If these executions are still blocked, build and run in separate steps
+instead. To see whether a transitive rule exists, run
 `santactl fileinfo --key Rule /path/to/binary`. A transitive rule shows as
 `Allowed (Binary, Transitive)`. If the rule exists but the execution was
 blocked, Santa most likely created the rule after the execution.

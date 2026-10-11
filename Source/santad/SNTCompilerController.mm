@@ -57,10 +57,20 @@ static constexpr std::string_view kIgnoredCompilerProcessPathPrefix = "/dev/";
 // security issue, and is self-healing.
 @interface SNTCompilerController () {
   std::atomic<int32_t> _compilerPIDs[PID_MAX];
+  std::shared_ptr<santa::PendingExecCoordinator> _pendingExecCoordinator;
 }
 @end
 
 @implementation SNTCompilerController
+
+- (instancetype)initWithPendingExecCoordinator:
+    (std::shared_ptr<santa::PendingExecCoordinator>)coordinator {
+  self = [super init];
+  if (self) {
+    _pendingExecCoordinator = std::move(coordinator);
+  }
+  return self;
+}
 
 - (BOOL)isCompiler:(const audit_token_t&)tok {
   pid_t pid = audit_token_to_pid(tok);
@@ -85,7 +95,13 @@ static constexpr std::string_view kIgnoredCompilerProcessPathPrefix = "/dev/";
     LOGE(@"Unable to watch compiler pid=%d >= PID_MAX(%d)", pid, PID_MAX);
   } else {
     int32_t val = isCompiler ? audit_token_to_pidversion(tok) : 0;
-    self->_compilerPIDs[pid].store(val, std::memory_order_relaxed);
+    int32_t prev = self->_compilerPIDs[pid].exchange(val, std::memory_order_relaxed);
+    // Every process exit clears its slot, so only a mark, or a clear of a slot
+    // that held one, is compiler activity. The exchange makes the count track
+    // the number of marked slots exactly.
+    if (_pendingExecCoordinator && (val != 0 || prev != 0)) {
+      _pendingExecCoordinator->UpdateCompilerMarks((val != 0) - (prev != 0));
+    }
     if (isCompiler) {
       LOGD(@"Watching compiler pid=%d pidver=%d", pid, val);
     }
@@ -95,15 +111,28 @@ static constexpr std::string_view kIgnoredCompilerProcessPathPrefix = "/dev/";
 // Adds a fake cached decision to SNTDecisionCache for pending files. If the file
 // is executed before we can create a transitive rule for it, then we can at
 // least log the pending decision info.
-- (void)saveFakeDecision:(SNTFileInfo*)fileInfo {
+//
+// An execution of the file held for this rule keeps its cached decision, which
+// is what keeps that execution logged exactly once. Returns the fake decision
+// cached, or nil if none was.
+- (SNTCachedDecision*)saveFakeDecision:(SNTFileInfo*)fileInfo {
+  SNTDecisionCache* cache = [SNTDecisionCache sharedCache];
+  SNTCachedDecision* existing = [cache cachedDecisionForVnode:fileInfo.vnode];
+  if (existing.heldForTransitiveRule) {
+    return nil;
+  }
+
   SNTCachedDecision* cd = [[SNTCachedDecision alloc] initWithVnode:fileInfo.vnode];
   cd.decision = SNTEventStateAllowPendingTransitive;
   cd.sha256 = @"pending";
-  [[SNTDecisionCache sharedCache] cacheDecision:cd];
+  return [cache cacheDecision:cd replacingDecision:existing] ? cd : nil;
 }
 
-- (void)removeFakeDecision:(SNTFileInfo*)fileInfo {
-  [[SNTDecisionCache sharedCache] forgetCachedDecisionForVnode:fileInfo.vnode];
+// Removes the fake decision unless something has replaced it since.
+- (void)removeFakeDecision:(SNTCachedDecision*)fakeDecision {
+  if (fakeDecision) {
+    [[SNTDecisionCache sharedCache] forgetCachedDecision:fakeDecision];
+  }
 }
 
 - (BOOL)handleEvent:(const Message&)esMsg withLogger:(std::shared_ptr<Logger>)logger {
@@ -227,7 +256,7 @@ static constexpr std::string_view kIgnoredCompilerProcessPathPrefix = "/dev/";
 - (void)createTransitiveRule:(const Message&)esMsg
                       target:(SNTFileInfo*)targetFile
                       logger:(std::shared_ptr<Logger>)logger {
-  [self saveFakeDecision:targetFile];
+  SNTCachedDecision* fakeDecision = [self saveFakeDecision:targetFile];
 
   // Check if this file is an executable.
   if (targetFile.isExecutable) {
@@ -261,12 +290,16 @@ static constexpr std::string_view kIgnoredCompilerProcessPathPrefix = "/dev/";
         } else {
           logger->LogAllowlist(esMsg, santa::NSStringToUTF8StringView(targetFile.SHA256),
                                santa::NSStringToUTF8StringView(targetFile.path));
+          if (_pendingExecCoordinator) {
+            _pendingExecCoordinator->NotifyRuleCreated(
+                santa::NSStringToUTF8String(targetFile.SHA256));
+          }
         }
       }
     }
   }
 
-  [self removeFakeDecision:targetFile];
+  [self removeFakeDecision:fakeDecision];
 }
 
 @end

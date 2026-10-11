@@ -32,9 +32,17 @@ inline constexpr off_t kMaxSyncRehydrateBytes = 32 * 1024 * 1024;
 + (instancetype)sharedCache;
 
 - (bool)cacheDecision:(SNTCachedDecision*)cd;
+// Caches `cd` only if no decision is cached for its vnode. Returns whether `cd`
+// was cached.
+- (bool)cacheDecisionIfNotSet:(SNTCachedDecision*)cd;
+// Caches `cd` only if the decision cached for its vnode is still `previous`
+// (nil: none is cached). Returns whether `cd` was cached.
+- (bool)cacheDecision:(SNTCachedDecision*)cd replacingDecision:(SNTCachedDecision*)previous;
 - (SNTCachedDecision*)cachedDecisionForFile:(const struct stat&)statInfo;
 - (SNTCachedDecision*)cachedDecisionForVnode:(SantaVnode)vnode;
 - (void)forgetCachedDecisionForVnode:(SantaVnode)vnode;
+// Forgets `cd` only if it is still the decision cached for its vnode.
+- (void)forgetCachedDecision:(SNTCachedDecision*)cd;
 - (SNTCachedDecision*)resetTimestampForCachedDecision:(const struct stat&)statInfo;
 // Must be called exactly once, during daemon initialization, before any
 // rehydrate or backfill caller can run. Subsequent calls trip an assert —

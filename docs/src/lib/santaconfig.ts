@@ -1059,6 +1059,18 @@ mount flags that are a superset of \`RemovableMediaRemountFlags\` or \`Encrypted
       defaultValue: false,
     },
     {
+      key: "CompilerTransitiveWaitMilliseconds",
+      description: `The maximum time, in milliseconds, that Santa holds the execution of a binary that a compiler may
+        have just written, waiting for its transitive rule to be created. The hold applies only when
+        \`EnableTransitiveRules\` is true, a compiler ran recently, the binary was created in the last minute, and
+        the binary would otherwise be blocked because no rule matched it. The execution continues as soon as a
+        transitive rule for its exact contents is created, and is killed if no rule allows it in time. Set to 0 to
+        disable the hold. Values above 10000 are reduced to 10000.`,
+      type: "integer",
+      defaultValue: 2000,
+      versionAdded: "2026.9",
+    },
+    {
       key: "StaticRules",
       // TODO: Remove once the config generator can support StaticRules.
       enableIf: (data) => false,

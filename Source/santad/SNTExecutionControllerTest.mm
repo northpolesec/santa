@@ -46,6 +46,7 @@
 #import "Source/santad/DataLayer/SNTEventTable.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
 #include "Source/santad/EntitlementsFilter.h"
+#include "Source/santad/PendingExecCoordinator.h"
 #include "Source/santad/ProcessControl.h"
 #import "Source/santad/SNTDecisionCache.h"
 #import "Source/santad/SNTExecutionController.h"
@@ -116,6 +117,10 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
 @property id mockEventDatabase;
 
 @property SNTExecutionController* sut;
+// What the policy processor answers when a held execution's rule is created.
+@property BOOL transitiveRuleApplies;
+// Order of a hold's decision-cache restore and its log, by the hold helper.
+@property NSMutableArray<NSString*>* holdResolutionOrder;
 @end
 
 @implementation SNTExecutionControllerTest {
@@ -125,6 +130,7 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
 - (void)setUp {
   [super setUp];
 
+  self.transitiveRuleApplies = YES;
   self.mockDecisionCache = OCMStrictClassMock([SNTDecisionCache class]);
   OCMStub([self.mockDecisionCache sharedCache]).andReturn(self.mockDecisionCache);
   OCMStub([self.mockDecisionCache cacheDecision:OCMOCK_ANY]).andReturn(YES);
@@ -170,7 +176,8 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
                                                    processTree:nullptr
                                            sandboxExpectations:_sandboxExpectations
                                                 timedRuleKills:nil
-                                               believableClock:nil];
+                                               believableClock:nil
+                                        pendingExecCoordinator:nullptr];
 }
 
 - (void)tearDown {
@@ -389,7 +396,8 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
                                                processTree:tree
                                        sandboxExpectations:_sandboxExpectations
                                             timedRuleKills:nil
-                                           believableClock:nil];
+                                           believableClock:nil
+                                    pendingExecCoordinator:nullptr];
 }
 
 - (void)stubRule:(SNTRule*)rule forIdentifiers:(struct RuleIdentifiers)wantIdentifiers {
@@ -1084,6 +1092,14 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   [self checkMetricCounters:kAllowUnknown expected:@1];
 }
 
+// The target of a held execution. Distinct from the instigator's token, so a
+// hold that signals any other process is caught.
+static const audit_token_t kHeldTarget = santa::MakeStubAuditToken(4120, 7);
+
+static bool IsHeldTarget(const audit_token_t& token) {
+  return santa::ProcessID::FromToken(token) == santa::ProcessID::FromToken(kHeldTarget);
+}
+
 - (void)validateHoldAndAskWithApproval:(BOOL)approved
                        initialDecision:(SNTEventState)initialState
                       expectedDecision:(SNTEventState)expectedState
@@ -1117,10 +1133,13 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   // Set initial to opposite of expected to verify it changes
   __block santa::ProcessControl capturedControl =
       approved ? santa::ProcessControl::Kill : santa::ProcessControl::Resume;
-  santa::ProcessControlBlock processControl = ^bool(pid_t pid, santa::ProcessControl control) {
-    capturedControl = control;
-    return true;
-  };
+  __block bool signaledOtherProcess = false;
+  santa::ProcessControlBlock processControl =
+      ^bool(audit_token_t token, santa::ProcessControl control) {
+        capturedControl = control;
+        signaledOtherProcess |= !IsHeldTarget(token);
+        return true;
+      };
 
   // Create mock policy processor with holdAndAsk decision
   id mockPolicyProcessor = OCMClassMock([SNTPolicyProcessor class]);
@@ -1133,6 +1152,7 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   es_process_t proc = MakeESProcess(&file);
   es_file_t fileExec = MakeESFile("bar", {.st_dev = 12, .st_ino = 34});
   es_process_t procExec = MakeESProcess(&fileExec);
+  procExec.audit_token = kHeldTarget;
   procExec.is_platform_binary = false;
   procExec.codesigning_flags = CS_SIGNED | CS_VALID;
   es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_EXEC, &proc);
@@ -1150,18 +1170,19 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   std::shared_ptr<santa::santad::process_tree::ProcessTree> processTree;
 
   SNTExecutionController* controller = [[SNTExecutionController alloc]
-        initWithRuleTable:self.mockRuleDatabase
-               eventTable:self.mockEventDatabase
-            notifierQueue:mockNotifierQueue
-               syncdQueue:nil
-                   logger:loggerBlock
-                ttyWriter:santa::TTYWriter::Create(true)
-          policyProcessor:mockPolicyProcessor
-      processControlBlock:processControl
-              processTree:processTree
-      sandboxExpectations:std::make_shared<santa::SandboxExpectations>()
-           timedRuleKills:nil
-          believableClock:nil];
+           initWithRuleTable:self.mockRuleDatabase
+                  eventTable:self.mockEventDatabase
+               notifierQueue:mockNotifierQueue
+                  syncdQueue:nil
+                      logger:loggerBlock
+                   ttyWriter:santa::TTYWriter::Create(true)
+             policyProcessor:mockPolicyProcessor
+         processControlBlock:processControl
+                 processTree:processTree
+         sandboxExpectations:std::make_shared<santa::SandboxExpectations>()
+              timedRuleKills:nil
+             believableClock:nil
+      pendingExecCoordinator:nullptr];
 
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   mockESApi->SetExpectationsRetainReleaseMessage();
@@ -1185,6 +1206,7 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   XCTAssertFalse(holdAndAskDecision.holdAndAsk);
   XCTAssertTrue(loggerCalled);
   XCTAssertEqual(capturedControl, expectedControl);
+  XCTAssertFalse(signaledOtherProcess);
   XCTAssertEqual(resultAction, expectedAction);
 
   XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
@@ -1208,6 +1230,538 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
                          expectedExtra:@"TouchID Denied"
                         expectedAction:SNTActionHoldDenied
                        expectedControl:santa::ProcessControl::Kill];
+}
+
+#pragma mark Transitive-rule hold
+
+// A process control block that records each operation and reports
+// `suspendSucceeds` for Suspend (ProdSuspendResumeBlock kills a target it could
+// not suspend and reports failure).
+static santa::ProcessControlBlock RecordingProcessControl(NSMutableArray<NSNumber*>* recorded,
+                                                          bool suspendSucceeds) {
+  return ^bool(audit_token_t token, santa::ProcessControl control) {
+    @synchronized(recorded) {
+      [recorded addObject:@((int)control)];
+    }
+    return control != santa::ProcessControl::Suspend || suspendSucceeds;
+  };
+}
+
+static bool Recorded(NSMutableArray<NSNumber*>* recorded, santa::ProcessControl control) {
+  @synchronized(recorded) {
+    return [recorded containsObject:@((int)control)];
+  }
+}
+
+// The decision a lockdown host reaches for a binary no rule matches, for content
+// with SHA-256 "a".
+static SNTCachedDecision* HoldableDecision() {
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+  cd.decision = SNTEventStateBlockUnknown;
+  cd.decisionClientMode = SNTClientModeLockdown;
+  cd.sha256 = @"a";
+  return cd;
+}
+
+static std::shared_ptr<santa::PendingExecCoordinator> ActiveCoordinator() {
+  auto coord = std::make_shared<santa::PendingExecCoordinator>();
+  coord->UpdateCompilerMarks(1);
+  return coord;
+}
+
+// Drives one AUTH_EXEC of a binary born just now, for which the policy processor
+// returns `decision`, through a controller using `coord`. Records each posted
+// action in `actions` and each logged execution in `logged`. Runs `whileHeld`
+// once the exec has been validated, then waits for a final action (HoldAllowed,
+// HoldDenied, or Deny). Returns whether one was posted.
+//
+// The message lives on this method's stack, so this does not return while a
+// hold could still read it.
+- (BOOL)runTransitiveHoldWithCoordinator:(std::shared_ptr<santa::PendingExecCoordinator>)coord
+                                  waitMs:(uint32_t)waitMs
+                                decision:(SNTCachedDecision*)decision
+                          processControl:(santa::ProcessControlBlock)processControl
+                           notifierQueue:(id)notifierQueue
+                                 actions:(NSMutableArray<NSNumber*>*)actions
+                                  logged:(NSMutableArray<NSNumber*>*)logged
+                               whileHeld:(void (^)(void))whileHeld {
+  OCMStub([self.mockConfigurator clientMode]).andReturn(SNTClientModeLockdown);
+  OCMStub([self.mockConfigurator enableTransitiveRules]).andReturn(YES);
+  OCMStub([self.mockConfigurator compilerTransitiveWaitMilliseconds]).andReturn(waitMs);
+
+  id mockPolicyProcessor = OCMClassMock([SNTPolicyProcessor class]);
+
+  es_file_t file = MakeESFile("foo");
+  es_process_t proc = MakeESProcess(&file);
+  es_file_t fileExec = MakeESFile("bar", {.st_dev = 12, .st_ino = 34});
+  fileExec.stat.st_birthtimespec = {.tv_sec = time(NULL), .tv_nsec = 0};
+  es_process_t procExec = MakeESProcess(&fileExec);
+  procExec.audit_token = kHeldTarget;
+  procExec.is_platform_binary = false;
+  procExec.codesigning_flags = CS_SIGNED | CS_VALID;
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_EXEC, &proc);
+  esMsg.event.exec.target = &procExec;
+
+  __block bool signaledOtherProcess = false;
+  santa::ProcessControlBlock targetProcessControl =
+      ^bool(audit_token_t token, santa::ProcessControl control) {
+        signaledOtherProcess |= !IsHeldTarget(token);
+        return processControl(token, control);
+      };
+
+  OCMStub([mockPolicyProcessor decisionForFileInfo:OCMOCK_ANY
+                                     targetProcess:&procExec
+                                      imageCPUType:0
+                                       configState:OCMOCK_ANY
+                                activationCallback:OCMOCK_ANY
+                                    cachedDecision:OCMOCK_ANY])
+      .ignoringNonObjectArgs()
+      .andReturn(decision);
+  OCMStub([mockPolicyProcessor transitiveRuleAllowsDecision:decision])
+      .andReturn(self.transitiveRuleApplies);
+
+  NSMutableArray<NSString*>* order = [NSMutableArray array];
+  self.holdResolutionOrder = order;
+  OCMStub([self.mockDecisionCache cacheDecisionIfNotSet:decision])
+      .andDo(^(NSInvocation* invocation) {
+        @synchronized(order) {
+          [order addObject:@"restore"];
+        }
+      });
+
+  SNTExecutionController* controller = [[SNTExecutionController alloc]
+           initWithRuleTable:self.mockRuleDatabase
+                  eventTable:self.mockEventDatabase
+               notifierQueue:notifierQueue
+                  syncdQueue:nil
+                      logger:^(Message msg) {
+                        @synchronized(logged) {
+                          [logged addObject:@YES];
+                        }
+                        @synchronized(order) {
+                          [order addObject:@"log"];
+                        }
+                      }
+                   ttyWriter:santa::TTYWriter::Create(true)
+             policyProcessor:mockPolicyProcessor
+         processControlBlock:targetProcessControl
+                 processTree:nullptr
+         sandboxExpectations:std::make_shared<santa::SandboxExpectations>()
+              timedRuleKills:nil
+             believableClock:nil
+      pendingExecCoordinator:coord];
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+
+  dispatch_semaphore_t terminal = dispatch_semaphore_create(0);
+  {
+    Message msg(mockESApi, &esMsg);
+    [controller validateExecEvent:msg
+                   cachedDecision:nil
+                       postAction:^bool(SNTAction action, SNTCachedDecision* cd) {
+                         @synchronized(actions) {
+                           [actions addObject:@(action)];
+                         }
+                         if (action == SNTActionHoldAllowed || action == SNTActionHoldDenied ||
+                             action == SNTActionRespondDeny) {
+                           dispatch_semaphore_signal(terminal);
+                         }
+                         return true;
+                       }];
+  }
+  if (whileHeld) {
+    whileHeld();
+  }
+  BOOL resolved =
+      dispatch_semaphore_wait(terminal, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC)) == 0;
+  // Every signal precedes the final action the semaphore waited for.
+  XCTAssertFalse(signaledOtherProcess);
+
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+  [mockPolicyProcessor stopMocking];
+  return resolved;
+}
+
+- (BOOL)runTransitiveHoldWithCoordinator:(std::shared_ptr<santa::PendingExecCoordinator>)coord
+                                  waitMs:(uint32_t)waitMs
+                                decision:(SNTCachedDecision*)decision
+                          processControl:(santa::ProcessControlBlock)processControl
+                                 actions:(NSMutableArray<NSNumber*>*)actions
+                                  logged:(NSMutableArray<NSNumber*>*)logged
+                               whileHeld:(void (^)(void))whileHeld {
+  return [self runTransitiveHoldWithCoordinator:coord
+                                         waitMs:waitMs
+                                       decision:decision
+                                 processControl:processControl
+                                  notifierQueue:nil
+                                        actions:actions
+                                         logged:logged
+                                      whileHeld:whileHeld];
+}
+
+// A held execution resumes as AllowTransitive once a rule for its content is
+// created, and is logged exactly once, by the hold.
+- (void)testTransitiveHoldResumesWhenRuleArrives {
+  auto coord = ActiveCoordinator();
+  NSMutableArray<NSNumber*>* control = [NSMutableArray array];
+  NSMutableArray<NSNumber*>* actions = [NSMutableArray array];
+  NSMutableArray<NSNumber*>* logged = [NSMutableArray array];
+  SNTCachedDecision* cd = HoldableDecision();
+
+  XCTAssertTrue([self
+      runTransitiveHoldWithCoordinator:coord
+                                waitMs:5000
+                              decision:cd
+                        processControl:RecordingProcessControl(control, true)
+                               actions:actions
+                                logged:logged
+                             whileHeld:^{
+                               @synchronized(actions) {
+                                 XCTAssertEqualObjects(actions, @[ @(SNTActionRespondHold) ]);
+                               }
+                               XCTAssertTrue(Recorded(control, santa::ProcessControl::Suspend));
+                               XCTAssertTrue(cd.heldForTransitiveRule);
+                               XCTAssertEqual(logged.count, 0UL);
+                               coord->NotifyRuleCreated("a");
+                             }]);
+
+  XCTAssertTrue(Recorded(control, santa::ProcessControl::Resume));
+  XCTAssertFalse(Recorded(control, santa::ProcessControl::Kill));
+  XCTAssertEqualObjects(actions, (@[ @(SNTActionRespondHold), @(SNTActionHoldAllowed) ]));
+  XCTAssertEqual(cd.decision, SNTEventStateAllowTransitive);
+  XCTAssertEqualObjects(cd.decisionExtra, @"Transitive rule created during exec hold");
+  XCTAssertEqual(logged.count, 1UL);
+  // Still set, so a NOTIFY_EXEC processed after the resolution is not logged too.
+  XCTAssertTrue(cd.heldForTransitiveRule);
+  [self checkMetricCounters:kAllowTransitive expected:@1];
+}
+
+// Process control that records each call in holdResolutionOrder, alongside the
+// hold's cache restore and log.
+- (santa::ProcessControlBlock)processControlRecordingResolutionOrder {
+  return ^bool(audit_token_t token, santa::ProcessControl control) {
+    NSMutableArray<NSString*>* order = self.holdResolutionOrder;
+    @synchronized(order) {
+      [order addObject:control == santa::ProcessControl::Suspend  ? @"suspend"
+                       : control == santa::ProcessControl::Resume ? @"resume"
+                                                                  : @"kill"];
+    }
+    return true;
+  };
+}
+
+// Readers of the cache, the logger among them, look the decision up by vnode, so
+// a hold puts its decision back, if nothing else is cached for the file, before
+// the process runs and before it logs.
+- (void)testTransitiveHoldRestoresDecisionBeforeResumingAndLogging {
+  auto coord = ActiveCoordinator();
+  NSMutableArray<NSNumber*>* actions = [NSMutableArray array];
+  NSMutableArray<NSNumber*>* logged = [NSMutableArray array];
+
+  XCTAssertTrue([self runTransitiveHoldWithCoordinator:coord
+                                                waitMs:5000
+                                              decision:HoldableDecision()
+                                        processControl:[self processControlRecordingResolutionOrder]
+                                               actions:actions
+                                                logged:logged
+                                             whileHeld:^{
+                                               coord->NotifyRuleCreated("a");
+                                             }]);
+
+  XCTAssertEqualObjects(self.holdResolutionOrder, (@[ @"suspend", @"restore", @"resume", @"log" ]));
+}
+
+// A hold that times out also puts its decision back before it kills and logs.
+- (void)testTransitiveHoldTimeoutRestoresDecisionBeforeKillingAndLogging {
+  NSMutableArray<NSNumber*>* actions = [NSMutableArray array];
+  NSMutableArray<NSNumber*>* logged = [NSMutableArray array];
+
+  XCTAssertTrue([self runTransitiveHoldWithCoordinator:ActiveCoordinator()
+                                                waitMs:100
+                                              decision:HoldableDecision()
+                                        processControl:[self processControlRecordingResolutionOrder]
+                                               actions:actions
+                                                logged:logged
+                                             whileHeld:nil]);
+
+  XCTAssertEqualObjects(self.holdResolutionOrder, (@[ @"suspend", @"restore", @"kill", @"log" ]));
+}
+
+// A rule created just before the hold is armed still resumes it. The response
+// is a hold first even though the wait resolves at once.
+- (void)testTransitiveHoldResumesWhenRuleAlreadyCreated {
+  auto coord = ActiveCoordinator();
+  coord->NotifyRuleCreated("a");
+  NSMutableArray<NSNumber*>* control = [NSMutableArray array];
+  NSMutableArray<NSNumber*>* actions = [NSMutableArray array];
+  NSMutableArray<NSNumber*>* logged = [NSMutableArray array];
+  SNTCachedDecision* cd = HoldableDecision();
+
+  XCTAssertTrue([self runTransitiveHoldWithCoordinator:coord
+                                                waitMs:5000
+                                              decision:cd
+                                        processControl:RecordingProcessControl(control, true)
+                                               actions:actions
+                                                logged:logged
+                                             whileHeld:nil]);
+
+  XCTAssertEqualObjects(actions, (@[ @(SNTActionRespondHold), @(SNTActionHoldAllowed) ]));
+  XCTAssertTrue(Recorded(control, santa::ProcessControl::Resume));
+  XCTAssertEqual(cd.decision, SNTEventStateAllowTransitive);
+}
+
+// A rule for other content never resumes the hold, which times out and kills.
+- (void)testTransitiveHoldIgnoresRuleForOtherContent {
+  auto coord = ActiveCoordinator();
+  NSMutableArray<NSNumber*>* control = [NSMutableArray array];
+  NSMutableArray<NSNumber*>* actions = [NSMutableArray array];
+  NSMutableArray<NSNumber*>* logged = [NSMutableArray array];
+  SNTCachedDecision* cd = HoldableDecision();
+
+  XCTAssertTrue([self runTransitiveHoldWithCoordinator:coord
+                                                waitMs:100
+                                              decision:cd
+                                        processControl:RecordingProcessControl(control, true)
+                                               actions:actions
+                                                logged:logged
+                                             whileHeld:^{
+                                               coord->NotifyRuleCreated("b");
+                                             }]);
+
+  XCTAssertFalse(Recorded(control, santa::ProcessControl::Resume));
+  XCTAssertTrue(Recorded(control, santa::ProcessControl::Kill));
+  XCTAssertEqualObjects(actions, (@[ @(SNTActionRespondHold), @(SNTActionHoldDenied) ]));
+  XCTAssertEqual(cd.decision, SNTEventStateBlockUnknown);
+}
+
+// A rule for this content that no longer governs it when the hold resolves (it
+// was removed, or a rule of higher precedence matches) does not resume it.
+- (void)testTransitiveHoldKillsWhenCreatedRuleDoesNotApply {
+  self.transitiveRuleApplies = NO;
+  auto coord = ActiveCoordinator();
+  NSMutableArray<NSNumber*>* control = [NSMutableArray array];
+  NSMutableArray<NSNumber*>* actions = [NSMutableArray array];
+  NSMutableArray<NSNumber*>* logged = [NSMutableArray array];
+  SNTCachedDecision* cd = HoldableDecision();
+
+  XCTAssertTrue([self runTransitiveHoldWithCoordinator:coord
+                                                waitMs:5000
+                                              decision:cd
+                                        processControl:RecordingProcessControl(control, true)
+                                               actions:actions
+                                                logged:logged
+                                             whileHeld:^{
+                                               coord->NotifyRuleCreated("a");
+                                             }]);
+
+  XCTAssertFalse(Recorded(control, santa::ProcessControl::Resume));
+  XCTAssertTrue(Recorded(control, santa::ProcessControl::Kill));
+  XCTAssertEqualObjects(actions, (@[ @(SNTActionRespondHold), @(SNTActionHoldDenied) ]));
+  XCTAssertEqual(cd.decision, SNTEventStateBlockUnknown);
+  XCTAssertEqualObjects(cd.decisionExtra,
+                        @"Transitive rule created during exec hold does not apply");
+  XCTAssertEqual(logged.count, 1UL);
+}
+
+// A hold no rule resolves is killed, and stored and reported like any other
+// lockdown block, with a GUI notification that has no reply.
+- (void)testTransitiveHoldTimeoutKillsAndReportsBlock {
+  NSMutableArray<NSNumber*>* control = [NSMutableArray array];
+  NSMutableArray<NSNumber*>* actions = [NSMutableArray array];
+  NSMutableArray<NSNumber*>* logged = [NSMutableArray array];
+  SNTCachedDecision* cd = HoldableDecision();
+
+  id mockNotifierQueue = OCMClassMock([SNTNotificationQueue class]);
+  OCMExpect([mockNotifierQueue addEvent:OCMOCK_ANY
+                      withCustomMessage:OCMOCK_ANY
+                              customURL:OCMOCK_ANY
+                  eventDetailButtonText:OCMOCK_ANY
+                            configState:OCMOCK_ANY
+                               andReply:[OCMArg isNil]]);
+  OCMExpect([self.mockEventDatabase addStoredEvent:OCMOCK_ANY]);
+
+  XCTAssertTrue([self runTransitiveHoldWithCoordinator:ActiveCoordinator()
+                                                waitMs:50
+                                              decision:cd
+                                        processControl:RecordingProcessControl(control, true)
+                                         notifierQueue:mockNotifierQueue
+                                               actions:actions
+                                                logged:logged
+                                             whileHeld:nil]);
+
+  XCTAssertTrue(Recorded(control, santa::ProcessControl::Kill));
+  XCTAssertFalse(Recorded(control, santa::ProcessControl::Resume));
+  XCTAssertEqualObjects(actions, (@[ @(SNTActionRespondHold), @(SNTActionHoldDenied) ]));
+  XCTAssertEqualObjects(cd.decisionExtra, @"No transitive rule created before timeout");
+  XCTAssertEqual(logged.count, 1UL);
+  [self checkMetricCounters:kBlockUnknown expected:@1];
+
+  OCMVerifyAll(mockNotifierQueue);
+  OCMVerifyAllWithDelay(self.mockEventDatabase, 5);
+  [mockNotifierQueue stopMocking];
+}
+
+// A resumed hold is an allow, so it is not reported as a block.
+- (void)testTransitiveHoldResumeDoesNotReportBlock {
+  auto coord = ActiveCoordinator();
+  coord->NotifyRuleCreated("a");
+  NSMutableArray<NSNumber*>* control = [NSMutableArray array];
+  NSMutableArray<NSNumber*>* actions = [NSMutableArray array];
+  NSMutableArray<NSNumber*>* logged = [NSMutableArray array];
+
+  // Recorded rather than rejected, so an erroneous call cannot raise on the
+  // coordinator's queue. It would be made before the final action is posted.
+  __block BOOL notified = NO;
+  id mockNotifierQueue = OCMClassMock([SNTNotificationQueue class]);
+  OCMStub([mockNotifierQueue addEvent:OCMOCK_ANY
+                    withCustomMessage:OCMOCK_ANY
+                            customURL:OCMOCK_ANY
+                eventDetailButtonText:OCMOCK_ANY
+                          configState:OCMOCK_ANY
+                             andReply:OCMOCK_ANY])
+      .andDo(^(NSInvocation* invocation) {
+        notified = YES;
+      });
+
+  XCTAssertTrue([self runTransitiveHoldWithCoordinator:coord
+                                                waitMs:5000
+                                              decision:HoldableDecision()
+                                        processControl:RecordingProcessControl(control, true)
+                                         notifierQueue:mockNotifierQueue
+                                               actions:actions
+                                                logged:logged
+                                             whileHeld:nil]);
+
+  XCTAssertEqual([[actions lastObject] integerValue], SNTActionHoldAllowed);
+  XCTAssertFalse(notified);
+  [mockNotifierQueue stopMocking];
+}
+
+// Without recent compiler activity the unknown binary is denied at once.
+- (void)testNoTransitiveHoldWithoutCompilerActivity {
+  NSMutableArray<NSNumber*>* control = [NSMutableArray array];
+  NSMutableArray<NSNumber*>* actions = [NSMutableArray array];
+  NSMutableArray<NSNumber*>* logged = [NSMutableArray array];
+  SNTCachedDecision* cd = HoldableDecision();
+
+  XCTAssertTrue([self
+      runTransitiveHoldWithCoordinator:std::make_shared<santa::PendingExecCoordinator>()
+                                waitMs:5000
+                              decision:cd
+                        processControl:RecordingProcessControl(control, true)
+                               actions:actions
+                                logged:logged
+                             whileHeld:nil]);
+
+  XCTAssertEqualObjects(actions, @[ @(SNTActionRespondDeny) ]);
+  XCTAssertEqual(control.count, 0UL);
+  XCTAssertFalse(cd.heldForTransitiveRule);
+}
+
+// An execution whose identity was not confirmed is not held: it is denied at
+// once.
+- (void)testNoTransitiveHoldForUnconfirmedIdentity {
+  NSMutableArray<NSNumber*>* control = [NSMutableArray array];
+  NSMutableArray<NSNumber*>* actions = [NSMutableArray array];
+  NSMutableArray<NSNumber*>* logged = [NSMutableArray array];
+  SNTCachedDecision* cd = HoldableDecision();
+  cd.identityMismatched = YES;
+
+  XCTAssertTrue([self runTransitiveHoldWithCoordinator:ActiveCoordinator()
+                                                waitMs:5000
+                                              decision:cd
+                                        processControl:RecordingProcessControl(control, true)
+                                               actions:actions
+                                                logged:logged
+                                             whileHeld:nil]);
+
+  XCTAssertEqualObjects(actions, @[ @(SNTActionRespondDeny) ]);
+  XCTAssertEqual(control.count, 0UL);
+  XCTAssertFalse(cd.heldForTransitiveRule);
+}
+
+// A zero wait disables the hold.
+- (void)testNoTransitiveHoldWhenWaitIsZero {
+  NSMutableArray<NSNumber*>* control = [NSMutableArray array];
+  NSMutableArray<NSNumber*>* actions = [NSMutableArray array];
+  NSMutableArray<NSNumber*>* logged = [NSMutableArray array];
+
+  XCTAssertTrue([self runTransitiveHoldWithCoordinator:ActiveCoordinator()
+                                                waitMs:0
+                                              decision:HoldableDecision()
+                                        processControl:RecordingProcessControl(control, true)
+                                               actions:actions
+                                                logged:logged
+                                             whileHeld:nil]);
+
+  XCTAssertEqualObjects(actions, @[ @(SNTActionRespondDeny) ]);
+  XCTAssertEqual(control.count, 0UL);
+}
+
+// If the target cannot be suspended, nothing is held: the execution is denied
+// and reported like any other block, and its NOTIFY_EXEC is left to the Recorder.
+- (void)testTransitiveHoldFailedSuspendDenies {
+  NSMutableArray<NSNumber*>* control = [NSMutableArray array];
+  NSMutableArray<NSNumber*>* actions = [NSMutableArray array];
+  NSMutableArray<NSNumber*>* logged = [NSMutableArray array];
+  SNTCachedDecision* cd = HoldableDecision();
+
+  id mockNotifierQueue = OCMClassMock([SNTNotificationQueue class]);
+  OCMExpect([mockNotifierQueue addEvent:OCMOCK_ANY
+                      withCustomMessage:OCMOCK_ANY
+                              customURL:OCMOCK_ANY
+                  eventDetailButtonText:OCMOCK_ANY
+                            configState:OCMOCK_ANY
+                               andReply:OCMOCK_ANY]);
+
+  XCTAssertTrue([self runTransitiveHoldWithCoordinator:ActiveCoordinator()
+                                                waitMs:60000
+                                              decision:cd
+                                        processControl:RecordingProcessControl(control, false)
+                                         notifierQueue:mockNotifierQueue
+                                               actions:actions
+                                                logged:logged
+                                             whileHeld:nil]);
+
+  XCTAssertEqualObjects(actions, @[ @(SNTActionRespondDeny) ]);
+  XCTAssertEqualObjects(control, @[ @((int)santa::ProcessControl::Suspend) ]);
+  XCTAssertFalse(cd.heldForTransitiveRule);
+  XCTAssertEqual(logged.count, 0UL);
+  OCMVerifyAll(mockNotifierQueue);
+  [mockNotifierQueue stopMocking];
+}
+
+// The decision is marked held before it is first cached, so the Recorder never
+// sees the held execution's decision unmarked.
+- (void)testTransitiveHoldMarksDecisionBeforeCaching {
+  NSMutableArray<NSNumber*>* markedAtCache = [NSMutableArray array];
+  self.mockDecisionCache = OCMStrictClassMock([SNTDecisionCache class]);
+  OCMStub([self.mockDecisionCache sharedCache]).andReturn(self.mockDecisionCache);
+  OCMStub([self.mockDecisionCache cacheDecision:OCMOCK_ANY]).andDo(^(NSInvocation* invocation) {
+    __unsafe_unretained SNTCachedDecision* cached;
+    [invocation getArgument:&cached atIndex:2];
+    @synchronized(markedAtCache) {
+      [markedAtCache addObject:@(cached.heldForTransitiveRule)];
+    }
+  });
+
+  NSMutableArray<NSNumber*>* control = [NSMutableArray array];
+  NSMutableArray<NSNumber*>* actions = [NSMutableArray array];
+  NSMutableArray<NSNumber*>* logged = [NSMutableArray array];
+  XCTAssertTrue([self runTransitiveHoldWithCoordinator:ActiveCoordinator()
+                                                waitMs:50
+                                              decision:HoldableDecision()
+                                        processControl:RecordingProcessControl(control, true)
+                                               actions:actions
+                                                logged:logged
+                                             whileHeld:nil]);
+
+  XCTAssertEqualObjects(actions, (@[ @(SNTActionRespondHold), @(SNTActionHoldDenied) ]));
+  @synchronized(markedAtCache) {
+    XCTAssertGreaterThan(markedAtCache.count, 0UL);
+    XCTAssertFalse([markedAtCache containsObject:@NO]);
+  }
 }
 
 // When the kernel kills the process for code signature invalidity, a block must
@@ -1260,24 +1814,26 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
 
   LogExecutionBlock loggerBlock = ^(Message esMsg) {
   };
-  santa::ProcessControlBlock processControl = ^bool(pid_t pid, santa::ProcessControl control) {
-    return true;
-  };
+  santa::ProcessControlBlock processControl =
+      ^bool(audit_token_t token, santa::ProcessControl control) {
+        return true;
+      };
 
   std::shared_ptr<santa::santad::process_tree::ProcessTree> processTree;
   SNTExecutionController* controller = [[SNTExecutionController alloc]
-        initWithRuleTable:self.mockRuleDatabase
-               eventTable:self.mockEventDatabase
-            notifierQueue:mockNotifierQueue
-               syncdQueue:nil
-                   logger:loggerBlock
-                ttyWriter:santa::TTYWriter::Create(true)
-          policyProcessor:mockPolicyProcessor
-      processControlBlock:processControl
-              processTree:processTree
-      sandboxExpectations:std::make_shared<santa::SandboxExpectations>()
-           timedRuleKills:nil
-          believableClock:nil];
+           initWithRuleTable:self.mockRuleDatabase
+                  eventTable:self.mockEventDatabase
+               notifierQueue:mockNotifierQueue
+                  syncdQueue:nil
+                      logger:loggerBlock
+                   ttyWriter:santa::TTYWriter::Create(true)
+             policyProcessor:mockPolicyProcessor
+         processControlBlock:processControl
+                 processTree:processTree
+         sandboxExpectations:std::make_shared<santa::SandboxExpectations>()
+              timedRuleKills:nil
+             believableClock:nil
+      pendingExecCoordinator:nullptr];
 
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   mockESApi->SetExpectationsRetainReleaseMessage();
@@ -1361,9 +1917,10 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   LogExecutionBlock loggerBlock = ^(Message esMsg) {
   };
 
-  santa::ProcessControlBlock processControl = ^bool(pid_t pid, santa::ProcessControl control) {
-    return true;
-  };
+  santa::ProcessControlBlock processControl =
+      ^bool(audit_token_t token, santa::ProcessControl control) {
+        return true;
+      };
 
   // Create mock policy processor that returns a new decision each time
   id mockPolicyProcessor = OCMClassMock([SNTPolicyProcessor class]);
@@ -1392,18 +1949,19 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   std::shared_ptr<santa::santad::process_tree::ProcessTree> processTree;
 
   SNTExecutionController* controller = [[SNTExecutionController alloc]
-        initWithRuleTable:self.mockRuleDatabase
-               eventTable:self.mockEventDatabase
-            notifierQueue:mockNotifierQueue
-               syncdQueue:nil
-                   logger:loggerBlock
-                ttyWriter:santa::TTYWriter::Create(true)
-          policyProcessor:mockPolicyProcessor
-      processControlBlock:processControl
-              processTree:processTree
-      sandboxExpectations:std::make_shared<santa::SandboxExpectations>()
-           timedRuleKills:nil
-          believableClock:nil];
+           initWithRuleTable:self.mockRuleDatabase
+                  eventTable:self.mockEventDatabase
+               notifierQueue:mockNotifierQueue
+                  syncdQueue:nil
+                      logger:loggerBlock
+                   ttyWriter:santa::TTYWriter::Create(true)
+             policyProcessor:mockPolicyProcessor
+         processControlBlock:processControl
+                 processTree:processTree
+         sandboxExpectations:std::make_shared<santa::SandboxExpectations>()
+              timedRuleKills:nil
+             believableClock:nil
+      pendingExecCoordinator:nullptr];
 
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   mockESApi->SetExpectationsRetainReleaseMessage();
@@ -1512,9 +2070,10 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   LogExecutionBlock loggerBlock = ^(Message esMsg) {
   };
 
-  santa::ProcessControlBlock processControl = ^bool(pid_t pid, santa::ProcessControl control) {
-    return true;
-  };
+  santa::ProcessControlBlock processControl =
+      ^bool(audit_token_t token, santa::ProcessControl control) {
+        return true;
+      };
 
   // Create mock policy processor that returns a new decision each time
   id mockPolicyProcessor = OCMClassMock([SNTPolicyProcessor class]);
@@ -1543,18 +2102,19 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   std::shared_ptr<santa::santad::process_tree::ProcessTree> processTree;
 
   SNTExecutionController* controller = [[SNTExecutionController alloc]
-        initWithRuleTable:self.mockRuleDatabase
-               eventTable:self.mockEventDatabase
-            notifierQueue:mockNotifierQueue
-               syncdQueue:nil
-                   logger:loggerBlock
-                ttyWriter:santa::TTYWriter::Create(true)
-          policyProcessor:mockPolicyProcessor
-      processControlBlock:processControl
-              processTree:processTree
-      sandboxExpectations:std::make_shared<santa::SandboxExpectations>()
-           timedRuleKills:nil
-          believableClock:nil];
+           initWithRuleTable:self.mockRuleDatabase
+                  eventTable:self.mockEventDatabase
+               notifierQueue:mockNotifierQueue
+                  syncdQueue:nil
+                      logger:loggerBlock
+                   ttyWriter:santa::TTYWriter::Create(true)
+             policyProcessor:mockPolicyProcessor
+         processControlBlock:processControl
+                 processTree:processTree
+         sandboxExpectations:std::make_shared<santa::SandboxExpectations>()
+              timedRuleKills:nil
+             believableClock:nil
+      pendingExecCoordinator:nullptr];
 
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   mockESApi->SetExpectationsRetainReleaseMessage();
@@ -1773,7 +2333,7 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
           }
           ttyWriter:santa::TTYWriter::Create(true)
           policyProcessor:mockPolicyProcessor
-          processControlBlock:^bool(pid_t pid, santa::ProcessControl control) {
+          processControlBlock:^bool(audit_token_t token, santa::ProcessControl control) {
             switch (control) {
               case santa::ProcessControl::Suspend: return suspendSucceeds;
               case santa::ProcessControl::Resume: return resumeSucceeds;
@@ -1783,7 +2343,8 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
           processTree:nullptr
           sandboxExpectations:std::make_shared<santa::SandboxExpectations>()
           timedRuleKills:mockTimedRuleKills
-          believableClock:nil];
+          believableClock:nil
+          pendingExecCoordinator:nullptr];
 
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
   mockESApi->SetExpectationsRetainReleaseMessage();
@@ -1904,18 +2465,19 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
 // Test that flushAuthApprovalCache clears the cache
 - (void)testFlushTouchIDApprovalCache {
   SNTExecutionController* controller = [[SNTExecutionController alloc]
-        initWithRuleTable:self.mockRuleDatabase
-               eventTable:self.mockEventDatabase
-            notifierQueue:nil
-               syncdQueue:nil
-                   logger:nullptr
-                ttyWriter:santa::TTYWriter::Create(true)
-          policyProcessor:nil
-      processControlBlock:santa::ProdSuspendResumeBlock()
-              processTree:nullptr
-      sandboxExpectations:std::make_shared<santa::SandboxExpectations>()
-           timedRuleKills:nil
-          believableClock:nil];
+           initWithRuleTable:self.mockRuleDatabase
+                  eventTable:self.mockEventDatabase
+               notifierQueue:nil
+                  syncdQueue:nil
+                      logger:nullptr
+                   ttyWriter:santa::TTYWriter::Create(true)
+             policyProcessor:nil
+         processControlBlock:santa::ProdSuspendResumeBlock()
+                 processTree:nullptr
+         sandboxExpectations:std::make_shared<santa::SandboxExpectations>()
+              timedRuleKills:nil
+             believableClock:nil
+      pendingExecCoordinator:nullptr];
 
   // Just verify that flush doesn't crash - the cache internals are private
   XCTAssertNoThrow([controller flushAuthApprovalCache]);
@@ -3539,7 +4101,8 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
                                                processTree:nullptr
                                        sandboxExpectations:_sandboxExpectations
                                             timedRuleKills:nil
-                                           believableClock:nil];
+                                           believableClock:nil
+                                    pendingExecCoordinator:nullptr];
 }
 
 // Monitor, no rule: flows through to the mode's unknown decision.
@@ -4253,12 +4816,13 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   [self stubUnrescuableMismatch];
 
   NSMutableArray<NSNumber*>* controls = [NSMutableArray array];
-  SNTExecutionController* controller = [self
-      makeHoldableControllerWithNotifierQueue:OCMClassMock([SNTNotificationQueue class])
-                               processControl:^bool(pid_t pid, santa::ProcessControl control) {
-                                 [controls addObject:@((int)control)];
-                                 return true;
-                               }];
+  SNTExecutionController* controller =
+      [self makeHoldableControllerWithNotifierQueue:OCMClassMock([SNTNotificationQueue class])
+                                     processControl:^bool(audit_token_t token,
+                                                          santa::ProcessControl control) {
+                                       [controls addObject:@((int)control)];
+                                       return true;
+                                     }];
 
   SNTCachedDecision* cd = [self postedDecisionForExecEvent:SNTActionRespondHold
                                                 controller:controller
@@ -4340,6 +4904,20 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
     makeCELTouchIDControllerWithCooldownMinutes:(NSUInteger)cooldownMinutes
                                       replySink:(void (^)(NotificationReplyBlock))replySink
                                   notifierQueue:(id __strong*)outQueue {
+  return [self makeCELTouchIDControllerWithCooldownMinutes:cooldownMinutes
+                                                 replySink:replySink
+                                             notifierQueue:outQueue
+                                            processControl:^bool(audit_token_t token,
+                                                                 santa::ProcessControl control) {
+                                              return true;
+                                            }];
+}
+
+- (SNTExecutionController*)
+    makeCELTouchIDControllerWithCooldownMinutes:(NSUInteger)cooldownMinutes
+                                      replySink:(void (^)(NotificationReplyBlock))replySink
+                                  notifierQueue:(id __strong*)outQueue
+                                 processControl:(santa::ProcessControlBlock)processControl {
   OCMStub([self.mockConfigurator clientMode]).andReturn(SNTClientModeMonitor);
   [self stubExecutableIntegrityPolicy:SNTExecutableIntegrityPolicyReport];
 
@@ -4364,11 +4942,66 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
       });
   *outQueue = mockNotifierQueue;
 
-  return [self
-      makeHoldableControllerWithNotifierQueue:mockNotifierQueue
-                               processControl:^bool(pid_t pid, santa::ProcessControl control) {
-                                 return true;
-                               }];
+  return [self makeHoldableControllerWithNotifierQueue:mockNotifierQueue
+                                        processControl:processControl];
+}
+
+// Runs a TouchID hold whose suspend fails, then answers the prompt with
+// `approve`, returning the process controls the controller used.
+- (NSMutableArray<NSNumber*>*)runTouchIDHoldWithFailedSuspendAndApprove:(BOOL)approve {
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
+
+  NSMutableArray<NSNumber*>* control = [NSMutableArray array];
+  __block NotificationReplyBlock capturedReplyBlock = nil;
+  id mockNotifierQueue = nil;
+  SNTExecutionController* controller =
+      [self makeCELTouchIDControllerWithCooldownMinutes:0
+                                              replySink:^(NotificationReplyBlock block) {
+                                                capturedReplyBlock = block;
+                                              }
+                                          notifierQueue:&mockNotifierQueue
+                                         processControl:RecordingProcessControl(control, false)];
+
+  es_file_t file = MakeESFile("foo");
+  es_process_t proc = MakeESProcess(&file);
+  es_file_t fileExec = MakeESFile("bar", {.st_dev = 12, .st_ino = 34});
+  es_process_t procExec = MakeESProcess(&fileExec);
+  procExec.is_platform_binary = false;
+  procExec.codesigning_flags = CS_SIGNED | CS_VALID;
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_EXEC, &proc);
+  esMsg.event.exec.target = &procExec;
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  EXPECT_CALL(*mockESApi, ExecArgs).WillRepeatedly(testing::Return(std::vector<std::string>{}));
+
+  SNTCachedDecision* held = nil;
+  NSArray<NSNumber*>* actions = [self runExecMessage:&esMsg
+                                        onController:controller
+                                           mockESApi:mockESApi
+                                            decision:&held];
+  XCTAssertEqualObjects(actions.firstObject, @(SNTActionRespondHold));
+  XCTAssertTrue(held.holdAndAsk);
+
+  // The prompt is still shown: approving it records the approval for later runs.
+  XCTAssertNotNil(capturedReplyBlock, @"the prompt was never shown");
+  capturedReplyBlock(approve);
+
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+  [mockNotifierQueue stopMocking];
+  return control;
+}
+
+// A hold that could not stop the process killed it, and the pid may since
+// belong to another process, so approving the prompt resumes nothing.
+- (void)testTouchIDApprovalAfterFailedSuspendSignalsNothing {
+  NSMutableArray<NSNumber*>* control = [self runTouchIDHoldWithFailedSuspendAndApprove:YES];
+  XCTAssertEqualObjects(control, @[ @((int)santa::ProcessControl::Suspend) ]);
+}
+
+// Likewise, denying the prompt kills nothing.
+- (void)testTouchIDDenialAfterFailedSuspendSignalsNothing {
+  NSMutableArray<NSNumber*>* control = [self runTouchIDHoldWithFailedSuspendAndApprove:NO];
+  XCTAssertEqualObjects(control, @[ @((int)santa::ProcessControl::Suspend) ]);
 }
 
 // Runs one execution of `esMsg` through `controller`, returning the posted
