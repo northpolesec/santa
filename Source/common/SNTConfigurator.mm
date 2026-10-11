@@ -36,6 +36,36 @@
 #import "Source/common/faa/WatchItems.h"
 #import "Source/common/ne/SNTSyncNetworkExtensionSettings.h"
 
+// Parses a Unix-style octal mode string (e.g. "0640"). Returns 0 when `rawMode` is empty/nil or
+// isn't a short run of octal digits. Shared with `validateConfiguration` so `santactl doctor`
+// rejects exactly what santad would ignore.
+static mode_t ParseOctalMode(NSString* rawMode) {
+  if (!rawMode.length) {
+    return 0;
+  }
+
+  // Deliberately stricter than strtoul(3), which would accept leading whitespace, a sign, and a
+  // trailing suffix. A mode is a short run of octal digits and nothing else.
+  const char* digits = [rawMode UTF8String];
+  mode_t parsed = 0;
+  for (const char* c = digits; *c != '\0'; c++) {
+    if (*c < '0' || *c > '7' || (c - digits) >= 4) {
+      return 0;
+    }
+    parsed = (mode_t)(parsed << 3) | (mode_t)(*c - '0');
+  }
+
+  return parsed;
+}
+
+// Drops setuid/setgid/sticky and always keeps owner read/write so santad can't lock itself out of
+// its own logs. Group and world write are cleared too: the point of a wider mode is to let another
+// account *read* telemetry, and a writable spool directory would let that account plant a symlink
+// for santad's root-owned chmod to follow.
+static mode_t SanitizeTelemetryFileMode(mode_t mode) {
+  return (mode & ACCESSPERMS & ~(mode_t)(S_IWGRP | S_IWOTH)) | S_IRUSR | S_IWUSR;
+}
+
 // Trusted operators authorized to issue account JWTs for sync v2 features.
 static const std::set<std::string> kTrustedNKeys = {
     "ODMPJXU2TN4ECFQMZZN4AQYXX3XPS5BQSGOZX2F3OGGKNRGGAV6HNOKF",
@@ -230,6 +260,7 @@ static NSString* const kSpoolDirectory = @"SpoolDirectory";
 static NSString* const kSpoolDirectoryFileSizeThresholdKB = @"SpoolDirectoryFileSizeThresholdKB";
 static NSString* const kSpoolDirectorySizeThresholdMB = @"SpoolDirectorySizeThresholdMB";
 static NSString* const kSpoolDirectoryEventMaxFlushTimeSec = @"SpoolDirectoryEventMaxFlushTimeSec";
+static NSString* const kTelemetryFileMode = @"TelemetryFileMode";
 
 static NSString* const kFileAccessPolicy = @"FileAccessPolicy";
 static NSString* const kFileAccessPolicyPlist = @"FileAccessPolicyPlist";
@@ -452,6 +483,7 @@ static NSString* const kPushTokenChainKey = @"PushTokenChain";
       kSpoolDirectoryFileSizeThresholdKB : number,
       kSpoolDirectorySizeThresholdMB : number,
       kSpoolDirectoryEventMaxFlushTimeSec : number,
+      kTelemetryFileMode : string,
       kFileAccessPolicy : dictionary,
       kFileAccessPolicyPlist : string,
       kFileAccessBlockMessage : string,
@@ -795,6 +827,10 @@ static SNTConfigurator* sharedConfigurator = nil;
 }
 
 + (NSSet*)keyPathsForValuesAffectingSpoolDirectoryEventMaxFlushTimeSec {
+  return [self configStateSet];
+}
+
++ (NSSet*)keyPathsForValuesAffectingTelemetryFileMode {
   return [self configStateSet];
 }
 
@@ -1688,6 +1724,27 @@ static SNTConfigurator* sharedConfigurator = nil;
   return self.configState[kSpoolDirectoryEventMaxFlushTimeSec]
              ? [self.configState[kSpoolDirectoryEventMaxFlushTimeSec] floatValue]
              : 15.0;
+}
+
+- (mode_t)telemetryFileMode {
+  NSString* rawMode = self.configState[kTelemetryFileMode];
+  if (!rawMode.length) {
+    return 0;
+  }
+
+  mode_t parsed = ParseOctalMode(rawMode);
+  if (parsed == 0) {
+    LOGW(@"%@ (\"%@\") is not a valid octal mode. Ignoring.", kTelemetryFileMode, rawMode);
+    return 0;
+  }
+
+  mode_t sanitized = SanitizeTelemetryFileMode(parsed);
+  if (sanitized != parsed) {
+    LOGW(@"%@ (\"%@\") is not a permissible mode. Using 0%o instead.", kTelemetryFileMode, rawMode,
+         sanitized);
+  }
+
+  return sanitized;
 }
 
 - (NSDictionary*)fileAccessPolicy {
@@ -2685,6 +2742,15 @@ static BOOL HoldsSyncedSettings(NSDictionary* syncState) {
       [errors addObject:[NSString
                             stringWithFormat:@"The regular expression for key %@ does not compile",
                                              key]];
+    }
+
+    // If the key is TelemetryFileMode, check it is actually an octal mode. Without this it would
+    // pass as a well-typed string and then be silently ignored by santad.
+    if ([key isEqualToString:kTelemetryFileMode] && ParseOctalMode((NSString*)value) == 0) {
+      [errors
+          addObject:[NSString stringWithFormat:
+                                  @"The key %@ (\"%@\") is not a valid octal mode, e.g. \"0640\"",
+                                  key, value]];
     }
 
     // If the key is StaticRules, validate the passed in rules.

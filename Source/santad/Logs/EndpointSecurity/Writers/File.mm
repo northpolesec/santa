@@ -15,15 +15,21 @@
 
 #include "Source/santad/Logs/EndpointSecurity/Writers/File.h"
 
+#include <errno.h>
+#include <string.h>
+#include <sys/stat.h>
+
 #include <algorithm>
 #include <memory>
 
 #include "Source/common/BranchPrediction.h"
+#include "Source/common/SNTLogging.h"
 
 namespace santa {
 
 std::shared_ptr<File> File::Create(NSString* path, uint64_t flush_timeout_ms,
-                                   size_t batch_size_bytes, size_t max_expected_write_size_bytes) {
+                                   size_t batch_size_bytes, size_t max_expected_write_size_bytes,
+                                   mode_t file_mode) {
   dispatch_queue_t q = dispatch_queue_create("com.northpolesec.santa.daemon.file_event_log",
                                              DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL);
   dispatch_source_t timer_source = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, q);
@@ -32,7 +38,7 @@ std::shared_ptr<File> File::Create(NSString* path, uint64_t flush_timeout_ms,
                             NSEC_PER_MSEC * flush_timeout_ms, 0);
 
   auto ret_writer = std::make_shared<File>(path, batch_size_bytes, max_expected_write_size_bytes, q,
-                                           timer_source);
+                                           timer_source, file_mode);
   ret_writer->WatchLogFile();
 
   std::weak_ptr<File> weak_writer(ret_writer);
@@ -50,13 +56,14 @@ std::shared_ptr<File> File::Create(NSString* path, uint64_t flush_timeout_ms,
 }
 
 File::File(NSString* path, size_t batch_size_bytes, size_t max_expected_write_size_bytes,
-           dispatch_queue_t q, dispatch_source_t timer_source)
+           dispatch_queue_t q, dispatch_source_t timer_source, mode_t file_mode)
     : buffer_(batch_size_bytes + max_expected_write_size_bytes),
       batch_size_bytes_(batch_size_bytes),
       q_(q),
       timer_source_(timer_source),
       watch_source_(nullptr) {
   path_ = path;
+  file_mode_ = file_mode;
   OpenFileHandleSerialized();
 }
 
@@ -88,10 +95,21 @@ File::~File() {
 void File::OpenFileHandleSerialized() {
   NSFileManager* fm = [NSFileManager defaultManager];
   if (![fm fileExistsAtPath:path_]) {
-    [fm createFileAtPath:path_ contents:nil attributes:nil];
+    [fm createFileAtPath:path_
+                contents:nil
+              attributes:file_mode_
+                             ? @{NSFilePosixPermissions : @(file_mode_)}
+                             : nil];
   }
   file_handle_ = [NSFileHandle fileHandleForWritingAtPath:path_];
   [file_handle_ seekToEndOfFile];
+
+  // Apply the mode on every open rather than only on creation. `WatchLogFile` calls back in here
+  // each time the log is rotated out from under us, and the replacement file was created by
+  // newsyslog using the mode from its own config - not ours.
+  if (file_mode_ && file_handle_ && fchmod(file_handle_.fileDescriptor, file_mode_) != 0) {
+    LOGW(@"Unable to set mode 0%o on %@: %d: %s", file_mode_, path_, errno, strerror(errno));
+  }
 }
 
 void File::Write(std::vector<uint8_t>&& bytes) {

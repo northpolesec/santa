@@ -14,6 +14,7 @@
 /// limitations under the License.
 
 #import <Foundation/Foundation.h>
+#include <sys/types.h>
 
 #import "Source/common/SNTCommonEnums.h"
 
@@ -309,6 +310,20 @@
 ///  @note: This property is KVO compliant, but should only be read once at santad startup.
 ///
 @property(readonly, nonatomic) float spoolDirectoryEventMaxFlushTimeSec;
+
+///
+///  Unix-style octal permissions applied to the telemetry Santa writes: the log file at
+///  eventLogPath, the spool files under spoolDirectory, and the spool directories themselves.
+///  Parsed from a string, e.g. "0640", and sanitized: write access stays santad's alone (see the
+///  implementation).
+///
+///  Returns 0 when unset or unparseable, in which case Santa keeps its built-in defaults (0400
+///  spool files, 0700 spool directories, and whatever mode the event log file already has).
+///  See the telemetry documentation for the interaction with newsyslog rotation.
+///
+///  @note: This property is KVO compliant, but should only be read once at santad startup.
+///
+@property(readonly, nonatomic) mode_t telemetryFileMode;
 
 ///
 ///  If true, Santa will attempt to periodically export telemetry to configured location.

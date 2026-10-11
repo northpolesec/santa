@@ -17,6 +17,7 @@
 #define SANTA_SANTAD_LOGS_ENDPOINTSECURITY_LOGGER_H
 
 #import <Foundation/Foundation.h>
+#include <sys/types.h>
 
 #include <atomic>
 #include <memory>
@@ -71,7 +72,7 @@ class Logger : public Timer<Logger> {
       size_t spool_file_size_threshold, uint64_t spool_flush_timeout_ms,
       uint32_t telemetry_export_seconds, uint32_t telemetry_export_timeout_seconds,
       uint32_t telemetry_export_batch_threshold_size_mb,
-      uint32_t telemetry_export_max_files_per_batch);
+      uint32_t telemetry_export_max_files_per_batch, mode_t telemetry_file_mode = 0);
 
   Logger(std::unique_ptr<santa::SleighLauncher> sleigh_launcher,
          GetExportConfigBlock getExportConfigBlock, TelemetryEvent telemetry_mask,

@@ -78,12 +78,18 @@ int Unlink(const char* pathname) { return unlink(pathname); }
 
 int MkDir(const char* path, mode_t mode) { return mkdir(path, mode); }
 
-absl::Status MkDir(const std::string& path) {
+int LChmod(const char* path, mode_t mode) {
+  return fchmodat(AT_FDCWD, path, mode, AT_SYMLINK_NOFOLLOW);
+}
+
+int FChmod(int fd, mode_t mode) { return fchmod(fd, mode); }
+
+absl::Status MkDir(const std::string& path, mode_t mode) {
   if (!IsAbsolutePath(path)) {
     return absl::InvalidArgumentError(
         absl::StrCat(path, " is not an absolute path."));
   }
-  if (fsspool::MkDir(path.c_str(), 0700) < 0) {
+  if (fsspool::MkDir(path.c_str(), mode) < 0) {
     if (errno == EEXIST && IsDirectory(path)) {
       return absl::OkStatus();
     }

@@ -188,6 +188,67 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
                               }];
 }
 
+- (void)testTelemetryFileMode {
+  SNTConfigurator* sut = [[SNTConfigurator alloc] init];
+
+  // Unset means unconfigured, so writers keep their built-in defaults.
+  XCTAssertEqual(sut.telemetryFileMode, 0);
+  sut.configState[@"TelemetryFileMode"] = @"";
+  XCTAssertEqual(sut.telemetryFileMode, 0);
+
+  // Ordinary octal values, with or without the leading zero.
+  sut.configState[@"TelemetryFileMode"] = @"0640";
+  XCTAssertEqual(sut.telemetryFileMode, 0640);
+  sut.configState[@"TelemetryFileMode"] = @"640";
+  XCTAssertEqual(sut.telemetryFileMode, 0640);
+  sut.configState[@"TelemetryFileMode"] = @"0644";
+  XCTAssertEqual(sut.telemetryFileMode, 0644);
+  sut.configState[@"TelemetryFileMode"] = @"0600";
+  XCTAssertEqual(sut.telemetryFileMode, 0600);
+
+  // Owner read/write is always granted, so santad can't lock itself out of its own telemetry.
+  sut.configState[@"TelemetryFileMode"] = @"0044";
+  XCTAssertEqual(sut.telemetryFileMode, 0644);
+  sut.configState[@"TelemetryFileMode"] = @"0400";
+  XCTAssertEqual(sut.telemetryFileMode, 0600);
+
+  // Group and world write are cleared: a wider mode is for letting another account read
+  // telemetry, and a writable spool would be a symlink-planting surface for santad's chmod.
+  sut.configState[@"TelemetryFileMode"] = @"0660";
+  XCTAssertEqual(sut.telemetryFileMode, 0640);
+  sut.configState[@"TelemetryFileMode"] = @"0666";
+  XCTAssertEqual(sut.telemetryFileMode, 0644);
+  sut.configState[@"TelemetryFileMode"] = @"0777";
+  XCTAssertEqual(sut.telemetryFileMode, 0755);
+
+  // Setuid/setgid/sticky are dropped.
+  sut.configState[@"TelemetryFileMode"] = @"4640";
+  XCTAssertEqual(sut.telemetryFileMode, 0640);
+  sut.configState[@"TelemetryFileMode"] = @"2640";
+  XCTAssertEqual(sut.telemetryFileMode, 0640);
+  sut.configState[@"TelemetryFileMode"] = @"1640";
+  XCTAssertEqual(sut.telemetryFileMode, 0640);
+
+  // Anything that isn't a short run of octal digits is ignored rather than guessed at.
+  for (NSString* invalid in @[
+         @"0648",   // 8 is not an octal digit
+         @"0x1a0",  // hex
+         @"06400",  // too many digits
+         @" 0640",  // leading space
+         @"0640 ",  // trailing space
+         @"-0640",  // signed
+         @"rw-r-----",
+         @"garbage",
+       ]) {
+    sut.configState[@"TelemetryFileMode"] = invalid;
+    XCTAssertEqual(sut.telemetryFileMode, 0, @"%@ should have been rejected", invalid);
+  }
+
+  // A non-string is dropped by type enforcement before the getter ever sees it.
+  sut.configState[@"TelemetryFileMode"] = nil;
+  XCTAssertEqual(sut.telemetryFileMode, 0);
+}
+
 - (void)testSyncBaseURLRejectsNonLocalhostHTTP {
   SNTConfigurator* sut = [[SNTConfigurator alloc] init];
 

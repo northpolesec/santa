@@ -171,6 +171,62 @@ bool WaitForBufferSize(std::shared_ptr<FilePeer> file, size_t expectedSize) {
   XCTAssertNotEqual(wantSBAfterDelete.st_ino, wantSBAfterRename.st_ino);
 }
 
+- (void)testFileModeAppliedOnCreate {
+  auto file = std::make_shared<FilePeer>(self.logPath, 100, 500, self.q, self.timer, 0640);
+
+  struct stat sb;
+  XCTAssertEqual(fstat(file->FileHandle().fileDescriptor, &sb), 0);
+  XCTAssertEqual(sb.st_mode & ACCESSPERMS, 0640);
+}
+
+- (void)testFileModeAppliedToExistingFile {
+  // A log file left behind by an earlier Santa, before a mode was configured.
+  XCTAssertTrue([self.fileManager createFileAtPath:self.logPath
+                                          contents:nil
+                                        attributes:@{NSFilePosixPermissions : @0600}]);
+
+  auto file = std::make_shared<FilePeer>(self.logPath, 100, 500, self.q, self.timer, 0640);
+
+  struct stat sb;
+  XCTAssertEqual(fstat(file->FileHandle().fileDescriptor, &sb), 0);
+  XCTAssertEqual(sb.st_mode & ACCESSPERMS, 0640);
+}
+
+- (void)testFileModeUnsetLeavesExistingFileAlone {
+  XCTAssertTrue([self.fileManager createFileAtPath:self.logPath
+                                          contents:nil
+                                        attributes:@{NSFilePosixPermissions : @0666}]);
+
+  auto file = std::make_shared<FilePeer>(self.logPath, 100, 500, self.q, self.timer);
+
+  struct stat sb;
+  XCTAssertEqual(fstat(file->FileHandle().fileDescriptor, &sb), 0);
+  XCTAssertEqual(sb.st_mode & ACCESSPERMS, 0666);
+}
+
+- (void)testFileModeReappliedAfterRotation {
+  auto file = std::make_shared<FilePeer>(self.logPath, 100, 500, self.q, self.timer, 0640);
+  file->WatchLogFile();
+
+  struct stat sb;
+  XCTAssertEqual(stat([self.logPath UTF8String], &sb), 0);
+  XCTAssertEqual(sb.st_mode & ACCESSPERMS, 0640);
+  ino_t origIno = sb.st_ino;
+
+  // Stand in for a newsyslog rotation: the live log is renamed away and the writer reopens.
+  XCTAssertTrue([self.fileManager moveItemAtPath:self.logPath toPath:self.logRenamePath error:nil]);
+  XCTAssertTrue(WaitForNewLogFile(self.fileManager, self.logPath),
+                "New log file not created within expected time after rename");
+
+  XCTAssertEqual(stat([self.logPath UTF8String], &sb), 0);
+  XCTAssertNotEqual(sb.st_ino, origIno);
+  XCTAssertEqual(sb.st_mode & ACCESSPERMS, 0640);
+
+  // The rotated-away copy keeps the mode it was written with, so archives are covered too.
+  XCTAssertEqual(stat([self.logRenamePath UTF8String], &sb), 0);
+  XCTAssertEqual(sb.st_mode & ACCESSPERMS, 0640);
+}
+
 - (void)testWrite {
   // Start with empty file. Perform two writes. The first will only go into the
   // internal buffer. The second will meet/exceed capacity and flush to disk

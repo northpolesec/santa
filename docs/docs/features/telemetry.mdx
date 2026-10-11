@@ -376,6 +376,37 @@ Applies when using the `protobuf` or `json` log types.
 - `SpoolDirectorySizeThresholdMB`: Total spool directory size limit (default: 250MB)
 - `SpoolDirectoryEventMaxFlushTimeSec`: Maximum buffer time before flush (default: 15 sec)
 
+### File Permissions
+
+- `TelemetryFileMode`: Unix-style octal permissions, as a string (e.g. `"0640"`), applied
+  to the telemetry Santa writes: the log file at `EventLogPath`, the spool files under
+  `SpoolDirectory`, and the spool directories themselves. Use it to let a non-root log
+  shipper read Santa's telemetry without making it world-readable.
+
+  The setuid/setgid/sticky bits are dropped, group and world write are cleared, and owner
+  read/write is always granted. Directories additionally get execute permission wherever
+  read was granted (`0640` files means `0750` directories), so a group-readable spool stays
+  traversable. Write access is reserved to santad: granting it more widely would let another
+  account plant a symlink in the spool for santad's root-owned `chmod` to follow, and reading
+  telemetry is all a log shipper needs.
+
+  When unset, Santa keeps its built-in defaults: `0400` spool files, `0700` spool
+  directories, and whatever mode the event log file already has.
+
+  This key is read once at santad startup, so restart santad after changing it. On restart
+  Santa also re-applies the mode to the spool directories and to any spool files still
+  waiting to be exported, so files written under the old mode don't stay unreadable.
+
+  :::note
+
+  Rotated copies of the event log inherit the mode of the file they were rotated from, so
+  archives are covered. But newsyslog creates each *new* event log file using the mode in
+  `/etc/newsyslog.d/com.northpolesec.santa.newsyslog.conf`, which ships as `644`. Santa
+  re-applies `TelemetryFileMode` when it reopens the log after a rotation; update the mode
+  column in that file to match if you want the window in between closed too.
+
+  :::
+
 ### File Change Monitoring
 
 - `FileChangesRegex`: Regex pattern for paths to monitor for file changes

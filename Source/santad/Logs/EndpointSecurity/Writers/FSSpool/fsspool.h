@@ -61,6 +61,20 @@ concept BatcherInterface =
       { batcher.CompleteBatch(fd) } -> std::same_as<absl::StatusOr<size_t>>;
     };
 
+// Default modes used when no mode is configured. Preserves the behavior Santa
+// shipped before the mode became configurable.
+inline constexpr mode_t kDefaultSpoolFileMode = 0400;
+inline constexpr mode_t kDefaultSpoolDirMode = 0700;
+
+// Derives a directory mode from a file mode by granting execute (i.e. traverse)
+// permission to each class that was granted read, so that a group-readable
+// spool file is actually reachable through the directories above it. Each
+// class's execute bit sits two positions below its read bit, so the read bits
+// shifted down are exactly the execute bits to add.
+inline constexpr mode_t DirectoryModeForFileMode(mode_t file_mode) {
+  return file_mode | ((file_mode & 0444) >> 2);
+}
+
 // Enqueues messages into the spool. Multiple concurrent writers can
 // write to the same directory. (Note that this class is only thread-compatible
 // and not thread-safe though!)
@@ -74,8 +88,12 @@ class FsSpoolWriter {
   // erased whenever the spool exceeds its size limit and the oldest files are
   // evicted to make room. Used to surface an eviction metric without coupling
   // this generic spool library to a particular metrics implementation.
+  // `file_mode`, when non-zero, is the permission mode applied to each spool
+  // file; the spool directories get the corresponding directory mode. Zero
+  // means use the defaults above.
   FsSpoolWriter(T batcher, absl::string_view base_dir, size_t max_spool_size,
-                std::function<void(size_t)> eviction_callback = nullptr)
+                std::function<void(size_t)> eviction_callback = nullptr,
+                mode_t file_mode = 0)
       : batcher_(std::move(batcher)),
         base_dir_(base_dir),
         spool_dir_(SpoolNewDirectory(base_dir)),
@@ -83,6 +101,10 @@ class FsSpoolWriter {
         space_check_failure_since_last_flush_(false),
         max_spool_size_(max_spool_size),
         eviction_callback_(std::move(eviction_callback)),
+        mode_configured_(file_mode != 0),
+        file_mode_(file_mode ? file_mode : kDefaultSpoolFileMode),
+        dir_mode_(file_mode ? DirectoryModeForFileMode(file_mode)
+                            : kDefaultSpoolDirMode),
         id_(absl::StrFormat(
             "%016x",
             absl::Uniform<uint64_t>(absl::BitGen(), 0,
@@ -103,6 +125,30 @@ class FsSpoolWriter {
             (void)Unlink(full_path.c_str());
           }
         });
+
+    // Spool files already on disk were written with whatever mode was
+    // configured at the time, so after a mode change the files waiting to be
+    // exported would stay unreadable to the very group the new mode grants.
+    // Re-apply it once here rather than on every flush: the mode is read at
+    // santad startup, which is also when this runs, so there is nothing later
+    // to catch up with.
+    //
+    // Only root can create entries in the spool directory (the configured mode
+    // is never group- or world-writable), so nothing untrusted can plant a
+    // symlink between the lstat and the chmod. LChmod rather than Chmod
+    // regardless, so a link that somehow is there - e.g. a SpoolDirectory
+    // pointed at a location others can write - is never followed.
+    if (mode_configured_) {
+      (void)IterateDirectory(
+          spool_dir_, [this](const std::string& file_name, bool* stop) {
+            std::string full_path =
+                absl::StrCat(spool_dir_, PathSeparator(), file_name);
+            struct stat sb;
+            if (lstat(full_path.c_str(), &sb) == 0 && S_ISREG(sb.st_mode)) {
+              (void)::fsspool::LChmod(full_path.c_str(), file_mode_);
+            }
+          });
+    }
   }
 
   ~FsSpoolWriter() { (void)Flush(); };
@@ -167,9 +213,20 @@ class FsSpoolWriter {
 
     current_spool_state_.tmp_fd =
         ::fsspool::Open(current_spool_state_.tmp_file.c_str(),
-                        O_WRONLY | O_CREAT | O_TRUNC, 0400);
+                        O_WRONLY | O_CREAT | O_TRUNC, file_mode_);
     if (current_spool_state_.tmp_fd < 0) {
       return absl::ErrnoToStatus(errno, "open() failed");
+    }
+
+    // open(2) applies the process umask to `file_mode_`, which would silently
+    // withhold the access the mode was configured to grant. Set it exactly,
+    // while the file is still in tmp/. Only when a mode was explicitly
+    // configured: without one, open(2)'s umask-adjusted result is the behavior
+    // Santa has always had. Best effort, as for the directories below - umask
+    // can only narrow what open(2) applied, never widen it, so a failure here
+    // can't leave the file more permissive than configured.
+    if (mode_configured_) {
+      (void)::fsspool::FChmod(current_spool_state_.tmp_fd, file_mode_);
     }
 
     return batcher_.InitializeBatch(current_spool_state_.tmp_fd);
@@ -258,21 +315,47 @@ class FsSpoolWriter {
   absl::Status BuildDirectoryStructureIfNeeded() {
     if (!IsDirectory(spool_dir_)) {
       if (!IsDirectory(base_dir_)) {
-        if (absl::Status status = MkDir(base_dir_); !status.ok()) {
+        if (absl::Status status = MkDir(base_dir_, dir_mode_); !status.ok()) {
           return status;  // failed to create base directory
         }
       }
 
-      if (absl::Status status = MkDir(spool_dir_); !status.ok()) {
+      if (absl::Status status = MkDir(spool_dir_, dir_mode_); !status.ok()) {
         return status;  // failed to create spool directory;
       }
     }
     if (!IsDirectory(tmp_dir_)) {
       // No need to check the base directory too, since spool_dir_ exists.
-      if (absl::Status status = MkDir(tmp_dir_); !status.ok()) {
+      if (absl::Status status = MkDir(tmp_dir_, dir_mode_); !status.ok()) {
         return status;  // failed to create tmp directory
       }
     }
+
+    // MkDir is a no-op on a directory that already exists, so a spool laid down
+    // by an earlier Santa (or before the mode was configured) would keep its
+    // old mode and hide the files inside it. Re-assert the mode on each
+    // directory. Only done when a mode was explicitly configured, so an
+    // unconfigured Santa leaves whatever mode the directories already carry
+    // alone. Best effort: a chmod that fails shouldn't stop telemetry being
+    // written.
+    //
+    // Through an fd opened O_NOFOLLOW rather than by pathname, so a symlink
+    // standing in for a spool directory is never chmod'd through: in a
+    // SpoolDirectory others can write, that would hand a non-root account a
+    // root-owned chmod of any path it cares to name. O_DIRECTORY makes the fd
+    // a directory by construction.
+    if (mode_configured_) {
+      for (const std::string& dir : {base_dir_, spool_dir_, tmp_dir_}) {
+        int fd = ::fsspool::Open(dir.c_str(),
+                                 O_RDONLY | O_DIRECTORY | O_NOFOLLOW, 0);
+        if (fd < 0) {
+          continue;
+        }
+        (void)::fsspool::FChmod(fd, dir_mode_);
+        (void)::fsspool::Close(fd);
+      }
+    }
+
     return absl::OkStatus();
   }
 
@@ -362,6 +445,15 @@ class FsSpoolWriter {
   // Invoked (when set) with the number of spool files erased during an
   // eviction.
   std::function<void(size_t)> eviction_callback_;
+
+  // Whether a mode was explicitly configured, as opposed to the modes below
+  // having been filled in with the built-in defaults.
+  const bool mode_configured_;
+
+  // Permission modes applied to spool files and to the directories holding
+  // them. Always resolved to a concrete mode by the constructor.
+  const mode_t file_mode_;
+  const mode_t dir_mode_;
 
   // 64bit hex ID for this writer. Used in combination with the sequence
   // number to generate unique names for files. This is generated through

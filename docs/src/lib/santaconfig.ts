@@ -542,6 +542,24 @@ changes in the release notes of any future release that changes them.`,
       enableIf: (data) => data.EventLogType == "protobuf",
     },
     {
+      key: "TelemetryFileMode",
+      description: `Unix-style octal permissions applied to the telemetry Santa writes: the log file at
+        \`EventLogPath\` (for the \`file\` and \`json\` event log types), the spool files under \`SpoolDirectory\`,
+        and the spool directories themselves. Expressed as a string, e.g. \`"0640"\`. The setuid/setgid/sticky
+        bits are dropped, group and world write are cleared (write access stays santad's alone), and owner
+        read/write is always granted. Directories
+        additionally get execute permission wherever read was granted, so a group-readable spool stays
+        traversable. When unset, Santa keeps its built-in defaults: \`0400\` spool files, \`0700\` spool
+        directories, and whatever mode the event log file already has. It is read once at santad startup, so
+        restart santad after changing it; on restart the mode is also re-applied to the spool directories and to
+        any spool files still waiting to be exported.
+        Santa re-applies this mode each time it opens the event log, including after a rotation - but newsyslog
+        creates the replacement file using the mode in \`com.northpolesec.santa.newsyslog.conf\`, so update that
+        file to match if you set this key`,
+      type: "string",
+      defaultValue: "",
+    },
+    {
       key: "EnableMachineIDDecoration",
       description: `If this key is true, the \`MachineID\` will be added to each log entry.`,
       type: "bool",

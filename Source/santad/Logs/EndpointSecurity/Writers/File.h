@@ -20,6 +20,7 @@
 
 #import <Foundation/Foundation.h>
 #include <dispatch/dispatch.h>
+#include <sys/types.h>
 
 #include <memory>
 #include <vector>
@@ -33,13 +34,14 @@ namespace santa {
 
 class File : public Writer, public std::enable_shared_from_this<File> {
  public:
-  // Factory
+  // Factory. `file_mode`, when non-zero, is the permission mode applied to the log file each
+  // time it is opened. Zero leaves the file's mode alone.
   static std::shared_ptr<File> Create(NSString* path, uint64_t flush_timeout_ms,
-                                      size_t batch_size_bytes,
-                                      size_t max_expected_write_size_bytes);
+                                      size_t batch_size_bytes, size_t max_expected_write_size_bytes,
+                                      mode_t file_mode = 0);
 
   File(NSString* path, size_t batch_size_bytes, size_t max_expected_write_size_bytes,
-       dispatch_queue_t q, dispatch_source_t timer_source);
+       dispatch_queue_t q, dispatch_source_t timer_source, mode_t file_mode = 0);
   ~File();
 
   void Write(std::vector<uint8_t>&& bytes) override;
@@ -63,6 +65,7 @@ class File : public Writer, public std::enable_shared_from_this<File> {
   dispatch_source_t watch_source_;
   NSString* path_;
   NSFileHandle* file_handle_;
+  mode_t file_mode_;
 
   // Used to manually track the size of valid data in the `buffer_`.
   // Benchmarking showed a large amount of time clearing the buffer after

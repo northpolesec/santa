@@ -220,7 +220,7 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator* configurator,
       spool_dir_threshold_bytes, spool_file_threshold_bytes, spool_flush_timeout_ms,
       telemetry_export_frequency_secs, [configurator telemetryExportTimeoutSec],
       [configurator telemetryExportBatchThresholdSizeMB],
-      [configurator telemetryExportMaxFilesPerBatch]);
+      [configurator telemetryExportMaxFilesPerBatch], [configurator telemetryFileMode]);
   if (!logger) {
     LOGE(@"Failed to create logger.");
     exit(EXIT_FAILURE);

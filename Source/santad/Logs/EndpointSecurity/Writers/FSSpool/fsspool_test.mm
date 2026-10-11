@@ -76,6 +76,22 @@ static constexpr size_t kSpoolSize = 1048576;
   XCTAssertTrue([self.fileMgr removeItemAtPath:self.testDir error:nil]);
 }
 
+// Permission bits of `path`, or 0 when it can't be stat'd.
+- (mode_t)modeOfPath:(NSString*)path {
+  struct stat sb;
+  if (stat([path UTF8String], &sb) != 0) {
+    return 0;
+  }
+  return sb.st_mode & ACCESSPERMS;
+}
+
+// Permission bits of the single file expected in the spool directory.
+- (mode_t)modeOfOnlySpoolFile {
+  NSArray<NSString*>* files = [self.fileMgr contentsOfDirectoryAtPath:self.spoolDir error:nil];
+  XCTAssertEqual(files.count, 1);
+  return [self modeOfPath:[NSString stringWithFormat:@"%@/%@", self.spoolDir, files.firstObject]];
+}
+
 - (void)testCleanSpoolTempDir {
   // Create the spool tmp dir
   XCTAssertTrue([self.fileMgr createDirectoryAtPath:self.tmpDir
@@ -182,6 +198,168 @@ static constexpr size_t kSpoolSize = 1048576;
   XCTAssertNil(err);
   XCTAssertEqual([[self.fileMgr contentsOfDirectoryAtPath:self.spoolDir error:&err] count], 1);
   XCTAssertNil(err);
+}
+
+- (void)testDefaultModes {
+  auto writer = std::make_unique<FsSpoolWriterPeer<fsspool::AnyBatcher>>(
+      fsspool::AnyBatcher(), [self.baseDir UTF8String], kSpoolSize);
+
+  XCTAssertStatusOk(writer->Write({123}));
+  XCTAssertStatusOk(writer->Flush());
+
+  XCTAssertEqual([self modeOfPath:self.baseDir], fsspool::kDefaultSpoolDirMode);
+  XCTAssertEqual([self modeOfPath:self.spoolDir], fsspool::kDefaultSpoolDirMode);
+  XCTAssertEqual([self modeOfPath:self.tmpDir], fsspool::kDefaultSpoolDirMode);
+  XCTAssertEqual([self modeOfOnlySpoolFile], fsspool::kDefaultSpoolFileMode);
+}
+
+- (void)testConfiguredModeAppliedToFilesAndDirs {
+  auto writer = std::make_unique<FsSpoolWriterPeer<fsspool::AnyBatcher>>(
+      fsspool::AnyBatcher(), [self.baseDir UTF8String], kSpoolSize, nullptr, 0640);
+
+  XCTAssertStatusOk(writer->Write({123}));
+  XCTAssertStatusOk(writer->Flush());
+
+  XCTAssertEqual([self modeOfOnlySpoolFile], 0640);
+
+  // Directories gain execute wherever the file mode granted read, so the spool stays traversable.
+  XCTAssertEqual([self modeOfPath:self.baseDir], 0750);
+  XCTAssertEqual([self modeOfPath:self.spoolDir], 0750);
+  XCTAssertEqual([self modeOfPath:self.tmpDir], 0750);
+}
+
+- (void)testConfiguredModeIgnoresUmask {
+  // A umask that would strip group read from both the file and the directories if the mode were
+  // left to open(2)/mkdir(2) alone.
+  mode_t prevMask = umask(0077);
+
+  auto writer = std::make_unique<FsSpoolWriterPeer<fsspool::AnyBatcher>>(
+      fsspool::AnyBatcher(), [self.baseDir UTF8String], kSpoolSize, nullptr, 0640);
+
+  XCTAssertStatusOk(writer->Write({123}));
+  XCTAssertStatusOk(writer->Flush());
+
+  umask(prevMask);
+
+  XCTAssertEqual([self modeOfOnlySpoolFile], 0640);
+  XCTAssertEqual([self modeOfPath:self.spoolDir], 0750);
+}
+
+- (void)testConfiguredModeReappliedToPreexistingDirs {
+  // A spool laid down by an earlier Santa, before a mode was configured.
+  for (NSString* dir in @[ self.baseDir, self.spoolDir, self.tmpDir ]) {
+    XCTAssertTrue([self.fileMgr createDirectoryAtPath:dir
+                          withIntermediateDirectories:YES
+                                           attributes:@{NSFilePosixPermissions : @0700}
+                                                error:nil]);
+  }
+
+  auto writer = std::make_unique<FsSpoolWriterPeer<fsspool::AnyBatcher>>(
+      fsspool::AnyBatcher(), [self.baseDir UTF8String], kSpoolSize, nullptr, 0640);
+
+  XCTAssertStatusOk(writer->Write({123}));
+  XCTAssertStatusOk(writer->Flush());
+
+  XCTAssertEqual([self modeOfPath:self.baseDir], 0750);
+  XCTAssertEqual([self modeOfPath:self.spoolDir], 0750);
+  XCTAssertEqual([self modeOfPath:self.tmpDir], 0750);
+}
+
+- (void)testUnconfiguredModeLeavesPreexistingDirsAlone {
+  // Without a configured mode, a directory an admin widened stays as they left it.
+  for (NSString* dir in @[ self.baseDir, self.spoolDir, self.tmpDir ]) {
+    XCTAssertTrue([self.fileMgr createDirectoryAtPath:dir
+                          withIntermediateDirectories:YES
+                                           attributes:@{NSFilePosixPermissions : @0755}
+                                                error:nil]);
+  }
+
+  auto writer = std::make_unique<FsSpoolWriterPeer<fsspool::AnyBatcher>>(
+      fsspool::AnyBatcher(), [self.baseDir UTF8String], kSpoolSize);
+
+  XCTAssertStatusOk(writer->Write({123}));
+  XCTAssertStatusOk(writer->Flush());
+
+  XCTAssertEqual([self modeOfPath:self.baseDir], 0755);
+  XCTAssertEqual([self modeOfPath:self.spoolDir], 0755);
+  XCTAssertEqual([self modeOfPath:self.tmpDir], 0755);
+}
+
+- (void)testConfiguredModeReappliedToPreexistingSpoolFiles {
+  // A spool written by an earlier Santa under the old 0400 mode, plus a symlink that must not be
+  // followed.
+  XCTAssertTrue([self.fileMgr createDirectoryAtPath:self.spoolDir
+                        withIntermediateDirectories:YES
+                                         attributes:nil
+                                              error:nil]);
+  NSString* stale = [NSString stringWithFormat:@"%@/stale.log", self.spoolDir];
+  NSString* outside = [NSString stringWithFormat:@"%@/outside.log", self.testDir];
+  NSString* link = [NSString stringWithFormat:@"%@/link.log", self.spoolDir];
+  XCTAssertTrue([self.fileMgr createFileAtPath:stale
+                                      contents:nil
+                                    attributes:@{NSFilePosixPermissions : @0400}]);
+  XCTAssertTrue([self.fileMgr createFileAtPath:outside
+                                      contents:nil
+                                    attributes:@{NSFilePosixPermissions : @0400}]);
+  XCTAssertTrue([self.fileMgr createSymbolicLinkAtPath:link withDestinationPath:outside error:nil]);
+
+  auto writer = std::make_unique<FsSpoolWriterPeer<fsspool::AnyBatcher>>(
+      fsspool::AnyBatcher(), [self.baseDir UTF8String], kSpoolSize, nullptr, 0640);
+
+  XCTAssertEqual([self modeOfPath:stale], 0640);
+
+  // The symlink's target is left alone rather than chmod'd through the link.
+  XCTAssertEqual([self modeOfPath:outside], 0400);
+}
+
+- (void)testUnconfiguredModeLeavesPreexistingSpoolFilesAlone {
+  XCTAssertTrue([self.fileMgr createDirectoryAtPath:self.spoolDir
+                        withIntermediateDirectories:YES
+                                         attributes:nil
+                                              error:nil]);
+  NSString* stale = [NSString stringWithFormat:@"%@/stale.log", self.spoolDir];
+  XCTAssertTrue([self.fileMgr createFileAtPath:stale
+                                      contents:nil
+                                    attributes:@{NSFilePosixPermissions : @0444}]);
+
+  auto writer = std::make_unique<FsSpoolWriterPeer<fsspool::AnyBatcher>>(
+      fsspool::AnyBatcher(), [self.baseDir UTF8String], kSpoolSize);
+
+  XCTAssertEqual([self modeOfPath:stale], 0444);
+}
+
+- (void)testConfiguredModeNotAppliedThroughDirectorySymlink {
+  // A symlink standing in for the spool directory must not be chmod'd through: in a
+  // SpoolDirectory others can write, that would be a root-owned chmod of an attacker-named path.
+  NSString* elsewhere = [NSString stringWithFormat:@"%@/elsewhere", self.testDir];
+  XCTAssertTrue([self.fileMgr createDirectoryAtPath:self.baseDir
+                        withIntermediateDirectories:YES
+                                         attributes:@{NSFilePosixPermissions : @0700}
+                                              error:nil]);
+  XCTAssertTrue([self.fileMgr createDirectoryAtPath:elsewhere
+                        withIntermediateDirectories:YES
+                                         attributes:@{NSFilePosixPermissions : @0700}
+                                              error:nil]);
+  XCTAssertTrue([self.fileMgr createSymbolicLinkAtPath:self.spoolDir
+                                   withDestinationPath:elsewhere
+                                                 error:nil]);
+
+  auto writer = std::make_unique<FsSpoolWriterPeer<fsspool::AnyBatcher>>(
+      fsspool::AnyBatcher(), [self.baseDir UTF8String], kSpoolSize, nullptr, 0640);
+  XCTAssertStatusOk(writer->BuildDirectoryStructureIfNeeded());
+
+  // The symlink's target keeps the mode it had; only real directories are touched.
+  XCTAssertEqual([self modeOfPath:elsewhere], 0700);
+  XCTAssertEqual([self modeOfPath:self.baseDir], 0750);
+}
+
+- (void)testDirectoryModeForFileMode {
+  XCTAssertEqual(fsspool::DirectoryModeForFileMode(0400), 0500);
+  XCTAssertEqual(fsspool::DirectoryModeForFileMode(0600), 0700);
+  XCTAssertEqual(fsspool::DirectoryModeForFileMode(0640), 0750);
+  XCTAssertEqual(fsspool::DirectoryModeForFileMode(0644), 0755);
+  // Write without read grants no traversal: nothing to add.
+  XCTAssertEqual(fsspool::DirectoryModeForFileMode(0620), 0720);
 }
 
 - (void)testSimpleWriteStreamBatcher {
