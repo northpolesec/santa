@@ -130,12 +130,13 @@ using santa::santad::process_tree::ProcessTree;
     return;
   }
 
-  // For NOTIFY_EXEC with holdAndAsk pending, skip logging here.
-  // The event will be logged after TouchID authentication completes.
+  // For NOTIFY_EXEC of a held execution (pending authorization, or held for a
+  // transitive rule), skip logging here. The execution controller logs the
+  // event with its final decision once the hold resolves.
   if (esMsg->event_type == ES_EVENT_TYPE_NOTIFY_EXEC) {
     SNTCachedDecision* cd = [[SNTDecisionCache sharedCache]
         cachedDecisionForFile:esMsg->event.exec.target->executable->stat];
-    if (cd && cd.holdAndAsk) {
+    if (cd && (cd.holdAndAsk || cd.heldForTransitiveRule)) {
       return;
     }
   }

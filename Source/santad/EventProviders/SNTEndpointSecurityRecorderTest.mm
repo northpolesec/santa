@@ -665,9 +665,9 @@ constexpr const char* kFilteredPrefix = "/foo/matches/";
                disposition:EventDisposition::kProcessed];
 }
 
-- (void)testHandleExecWithHoldAndAskSkipsLogging {
-  // When NOTIFY_EXEC arrives with holdAndAsk pending in the decision cache,
-  // logging should be skipped because it will be logged after TouchID authentication.
+// When NOTIFY_EXEC arrives for a held execution, logging is skipped because the
+// execution controller logs it once the hold resolves.
+- (void)checkHeldExecSkipsLogging:(SNTCachedDecision*)cd {
   es_file_t file = MakeESFile("foo");
   es_process_t proc = MakeESProcess(&file);
   es_file_t execFile = MakeESFile("bar", {.st_dev = 12, .st_ino = 34});
@@ -684,15 +684,12 @@ constexpr const char* kFilteredPrefix = "/foo/matches/";
   mockLogger->SetTelemetryMask(TelemetryEvent::kEverything);
   auto prefixTree = std::make_shared<PrefixTree<Unit>>();
 
-  // Enricher and Logger should NOT be called when holdAndAsk is set
+  // Enricher and Logger should NOT be called for a held execution
   EXPECT_CALL(*mockEnricher, Enrich).Times(0);
   EXPECT_CALL(*mockLogger, Log).Times(0);
 
-  // Mock decision cache to return a decision with holdAndAsk=YES
   id mockDecisionCache = OCMClassMock([SNTDecisionCache class]);
   OCMStub([mockDecisionCache sharedCache]).andReturn(mockDecisionCache);
-  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
-  cd.holdAndAsk = YES;
   OCMStub([mockDecisionCache cachedDecisionForFile:esMsg.event.exec.target->executable->stat])
       .ignoringNonObjectArgs()
       .andReturn(cd);
@@ -727,6 +724,18 @@ constexpr const char* kFilteredPrefix = "/foo/matches/";
 
   [mockCC stopMocking];
   [mockDecisionCache stopMocking];
+}
+
+- (void)testHandleExecWithHoldAndAskSkipsLogging {
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+  cd.holdAndAsk = YES;
+  [self checkHeldExecSkipsLogging:cd];
+}
+
+- (void)testHandleExecHeldForTransitiveRuleSkipsLogging {
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+  cd.heldForTransitiveRule = YES;
+  [self checkHeldExecSkipsLogging:cd];
 }
 
 - (void)testHandleExecWithoutHoldAndAskLogsNormally {

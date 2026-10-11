@@ -94,6 +94,7 @@
   copy.identityMismatched = _identityMismatched;
   copy.identityVendorMatched = _identityVendorMatched;
   copy.holdAndAsk = _holdAndAsk;
+  copy.heldForTransitiveRule = _heldForTransitiveRule;
   copy.silentAuthorization = _silentAuthorization;
   copy.authCooldownMinutes = _authCooldownMinutes;
   copy.authorizationMethod = _authorizationMethod;

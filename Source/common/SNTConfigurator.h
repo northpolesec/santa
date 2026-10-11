@@ -1101,6 +1101,14 @@ extern NSString* _Nonnull const kStateTempAdminTargetUIDKey;
 ///
 @property BOOL enableTransitiveRules;
 
+///
+///  The number of milliseconds to hold the execution of a freshly written binary that no rule
+///  allows while a compiler is active, waiting for its transitive rule. Applies only when the
+///  binary would otherwise be blocked as unknown. 0, or a negative value, disables the hold.
+///  Defaults to 2000, at most 10000.
+///
+@property(readonly) uint32_t compilerTransitiveWaitMilliseconds;
+
 #pragma mark Server Auth Settings
 
 ///

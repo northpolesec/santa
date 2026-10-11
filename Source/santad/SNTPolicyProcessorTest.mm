@@ -2856,4 +2856,58 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   [mockConfigurator stopMocking];
 }
 
+// Only a binary transitive rule for the decision's own content, governing its
+// identifiers while transitive rules are enabled, allows a held execution.
+- (void)testTransitiveRuleAllowsDecision {
+  NSString* sha = @"a326a1fb48074202e9ad41e4cd1e389eeea372c8c6f7d7e80da81176d5d9430e";
+  NSString* otherSHA = @"b326a1fb48074202e9ad41e4cd1e389eeea372c8c6f7d7e80da81176d5d9430e";
+  id mockRuleTable = OCMClassMock([SNTRuleTable class]);
+  SNTPolicyProcessor* processor =
+      [[SNTPolicyProcessor alloc] initWithRuleTable:mockRuleTable
+                                 entitlementsFilter:santa::EntitlementsFilter::Create(@[], @[])];
+  id mockConfigurator = OCMClassMock([SNTConfigurator class]);
+  __block BOOL transitiveEnabled = YES;
+  OCMStub([mockConfigurator enableTransitiveRules]).andDo(^(NSInvocation* inv) {
+    [inv setReturnValue:&transitiveEnabled];
+  });
+  processor.configurator = mockConfigurator;
+
+  __block SNTRule* governing;
+  OCMStub([mockRuleTable executionRuleForIdentifiers:(struct RuleIdentifiers){}])
+      .ignoringNonObjectArgs()
+      .andDo(^(NSInvocation* inv) {
+        __unsafe_unretained SNTRule* r = governing;
+        [inv setReturnValue:&r];
+      });
+
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+  cd.sha256 = sha;
+
+  governing = [[SNTRule alloc] initWithIdentifier:sha
+                                            state:SNTRuleStateAllowTransitive
+                                             type:SNTRuleTypeBinary];
+  XCTAssertTrue([processor transitiveRuleAllowsDecision:cd]);
+
+  transitiveEnabled = NO;
+  XCTAssertFalse([processor transitiveRuleAllowsDecision:cd]);
+  transitiveEnabled = YES;
+
+  governing = nil;
+  XCTAssertFalse([processor transitiveRuleAllowsDecision:cd]);
+
+  governing = [[SNTRule alloc] initWithIdentifier:otherSHA
+                                            state:SNTRuleStateAllowTransitive
+                                             type:SNTRuleTypeBinary];
+  XCTAssertFalse([processor transitiveRuleAllowsDecision:cd]);
+
+  // A rule of higher precedence, here a CDHash rule, governs instead.
+  governing = [[SNTRule alloc] initWithIdentifier:@"0123456789abcdef0123456789abcdef01234567"
+                                            state:SNTRuleStateBlock
+                                             type:SNTRuleTypeCDHash];
+  XCTAssertFalse([processor transitiveRuleAllowsDecision:cd]);
+
+  [mockConfigurator stopMocking];
+  [mockRuleTable stopMocking];
+}
+
 @end

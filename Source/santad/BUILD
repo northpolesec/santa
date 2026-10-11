@@ -133,11 +133,18 @@ objc_library(
 )
 
 objc_library(
+    name = "PendingExecCoordinator",
+    srcs = ["PendingExecCoordinator.mm"],
+    hdrs = ["PendingExecCoordinator.h"],
+)
+
+objc_library(
     name = "SNTCompilerController",
     srcs = ["SNTCompilerController.mm"],
     hdrs = ["SNTCompilerController.h"],
     deps = [
         ":EndpointSecurityLogger",
+        ":PendingExecCoordinator",
         ":SNTDatabaseController",
         ":SNTDecisionCache",
         ":SNTRuleTable",
@@ -491,6 +498,7 @@ objc_library(
     srcs = ["ProcessControl.mm"],
     hdrs = ["ProcessControl.h"],
     deps = [
+        "//Source/common:AuditUtilities",
         "//Source/common:SNTLogging",
     ],
 )
@@ -583,6 +591,7 @@ objc_library(
     hdrs = ["SNTExecutionController.h"],
     deps = [
         ":CELActivation",
+        ":PendingExecCoordinator",
         ":ProcessControl",
         ":SNTBelievableClock",
         ":SNTDecisionCache",
@@ -1483,6 +1492,7 @@ objc_library(
         ":EndpointSecurityLogger",
         ":EntitlementsFilter",
         ":Metrics",
+        ":PendingExecCoordinator",
         ":ProcessControl",
         ":SNTBelievableClock",
         ":SNTCompilerController",
@@ -2005,6 +2015,7 @@ santa_unit_test(
     ],
     deps = [
         ":EntitlementsFilter",
+        ":PendingExecCoordinator",
         ":ProcessControl",
         ":SNTDatabaseController",
         ":SNTDecisionCache",
@@ -2198,6 +2209,23 @@ santa_unit_test(
 )
 
 santa_unit_test(
+    name = "ProcessControlTest",
+    srcs = ["ProcessControlTest.mm"],
+    deps = [
+        ":ProcessControl",
+        "//Source/common:AuditUtilities",
+    ],
+)
+
+santa_unit_test(
+    name = "PendingExecCoordinatorTest",
+    srcs = ["PendingExecCoordinatorTest.mm"],
+    deps = [
+        ":PendingExecCoordinator",
+    ],
+)
+
+santa_unit_test(
     name = "SNTCompilerControllerTest",
     srcs = ["SNTCompilerControllerTest.mm"],
     sdk_dylibs = [
@@ -2205,11 +2233,17 @@ santa_unit_test(
     ],
     deps = [
         ":EndpointSecurityLogger",
+        ":PendingExecCoordinator",
         ":SNTCompilerController",
+        ":SNTDatabaseController",
         ":SNTDecisionCache",
+        ":SNTRuleTable",
         "//Source/common:SNTCachedDecision",
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTFileInfo",
+        "//Source/common:SNTRule",
+        "//Source/common:String",
+        "//Source/common:TelemetryEventMap",
         "//Source/common:TestUtils",
         "//Source/common/es:EndpointSecurityMessage",
         "//Source/common/es:MockEndpointSecurityAPI",
@@ -2238,6 +2272,8 @@ test_suite(
         ":FAAPolicyProcessorTest",
         ":KillingMachineTest",
         ":MetricsTest",
+        ":PendingExecCoordinatorTest",
+        ":ProcessControlTest",
         ":RateLimiterTest",
         ":SNTApplicationCoreMetricsTest",
         ":SNTBelievableClockTest",

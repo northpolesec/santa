@@ -27,21 +27,28 @@
 
 #import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTFileInfo.h"
+#import "Source/common/SNTRule.h"
+#include "Source/common/String.h"
+#include "Source/common/TelemetryEventMap.h"
 #include "Source/common/TestUtils.h"
 #include "Source/common/es/Message.h"
 #include "Source/common/es/MockEndpointSecurityAPI.h"
+#import "Source/santad/DataLayer/SNTRuleTable.h"
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
+#include "Source/santad/PendingExecCoordinator.h"
+#import "Source/santad/SNTDatabaseController.h"
 #import "Source/santad/SNTDecisionCache.h"
 
 using santa::Logger;
 using santa::Message;
+using santa::PendingExecCoordinator;
 
 static const pid_t PID_MAX = 99999;
 
 @interface SNTCompilerController (Testing)
 - (BOOL)isCompiler:(const audit_token_t&)tok;
-- (void)saveFakeDecision:(SNTFileInfo*)esFile;
-- (void)removeFakeDecision:(SNTFileInfo*)esFile;
+- (SNTCachedDecision*)saveFakeDecision:(SNTFileInfo*)fileInfo;
+- (void)removeFakeDecision:(SNTCachedDecision*)fakeDecision;
 - (void)createTransitiveRule:(const Message&)esMsg
                       target:(SNTFileInfo*)targetFile
                       logger:(std::shared_ptr<Logger>)logger;
@@ -190,37 +197,145 @@ static const pid_t PID_MAX = 99999;
       .fsid = 12,
       .fileid = 34,
   };
+  SNTCachedDecision* existing = [[SNTCachedDecision alloc] initWithVnode:vnode];
+  OCMStub([self.mockDecisionCache cachedDecisionForVnode:vnode]).andReturn(existing);
 
   OCMExpect([self.mockDecisionCache
-      cacheDecision:[OCMArg checkWithBlock:^BOOL(SNTCachedDecision* cd) {
-        return cd.vnodeId == vnode && cd.decision == SNTEventStateAllowPendingTransitive &&
-               [cd.sha256 isEqualToString:@"pending"];
-      }]]);
+                    cacheDecision:[OCMArg checkWithBlock:^BOOL(SNTCachedDecision* cd) {
+                      return cd.vnodeId == vnode &&
+                             cd.decision == SNTEventStateAllowPendingTransitive &&
+                             [cd.sha256 isEqualToString:@"pending"];
+                    }]
+                replacingDecision:existing])
+      .andReturn(YES);
 
   id mockFileInfo = OCMClassMock([SNTFileInfo class]);
-  OCMExpect([mockFileInfo vnode]).andReturn(vnode);
+  OCMStub([mockFileInfo vnode]).andReturn(vnode);
 
   SNTCompilerController* cc = [[SNTCompilerController alloc] init];
-  [cc saveFakeDecision:mockFileInfo];
+  SNTCachedDecision* fake = [cc saveFakeDecision:mockFileInfo];
 
   XCTAssertTrue(OCMVerifyAll(self.mockDecisionCache), "Unable to verify all expectations");
+  XCTAssertEqual(fake.decision, SNTEventStateAllowPendingTransitive);
 }
 
-- (void)testRemoveFakeDecision {
+// The decision of an execution held for a transitive rule is left in place, so
+// the Recorder keeps leaving that execution's logging to the hold.
+- (void)testSaveFakeDecisionKeepsHeldDecision {
   SantaVnode vnode{
       .fsid = 12,
       .fileid = 34,
   };
+  SNTCachedDecision* held = [[SNTCachedDecision alloc] initWithVnode:vnode];
+  held.heldForTransitiveRule = YES;
+  OCMStub([self.mockDecisionCache cachedDecisionForVnode:vnode]).andReturn(held);
+  OCMReject([self.mockDecisionCache cacheDecision:OCMOCK_ANY replacingDecision:OCMOCK_ANY]);
+  OCMReject([self.mockDecisionCache cacheDecision:OCMOCK_ANY]);
 
   id mockFileInfo = OCMClassMock([SNTFileInfo class]);
-  OCMExpect([mockFileInfo vnode]).andReturn(vnode);
-
-  OCMExpect([self.mockDecisionCache forgetCachedDecisionForVnode:vnode]);
+  OCMStub([mockFileInfo vnode]).andReturn(vnode);
 
   SNTCompilerController* cc = [[SNTCompilerController alloc] init];
-  [cc removeFakeDecision:mockFileInfo];
+  XCTAssertNil([cc saveFakeDecision:mockFileInfo]);
+  OCMVerifyAll(self.mockDecisionCache);
+}
+
+- (void)testRemoveFakeDecision {
+  SNTCachedDecision* fake = [[SNTCachedDecision alloc] init];
+  OCMExpect([self.mockDecisionCache forgetCachedDecision:fake]);
+
+  SNTCompilerController* cc = [[SNTCompilerController alloc] init];
+  [cc removeFakeDecision:fake];
 
   XCTAssertTrue(OCMVerifyAll(self.mockDecisionCache), "Unable to verify all expectations");
+
+  // Nothing was cached, so nothing is forgotten.
+  OCMReject([self.mockDecisionCache forgetCachedDecision:OCMOCK_ANY]);
+  [cc removeFakeDecision:nil];
+  OCMVerifyAll(self.mockDecisionCache);
+}
+
+// Marking a compiler, and clearing that mark, is compiler activity. Clearing the
+// slot of a process that was never a compiler, which every process exit does, is
+// not.
+- (void)testReportsCompilerActivity {
+  auto coord = std::make_shared<PendingExecCoordinator>(/*window_ms=*/150);
+  SNTCompilerController* cc = [[SNTCompilerController alloc] initWithPendingExecCoordinator:coord];
+
+  [cc setProcess:self.tok1 isCompiler:false];
+  XCTAssertFalse(coord->CompilerActiveRecently());
+
+  // A compiler stays active however long it runs.
+  [cc setProcess:self.tok1 isCompiler:true];
+  [NSThread sleepForTimeInterval:0.25];
+  XCTAssertTrue(coord->CompilerActiveRecently());
+
+  // Its exit is activity too, which then lapses.
+  [cc setProcess:self.tok1 isCompiler:false];
+  XCTAssertTrue(coord->CompilerActiveRecently());
+  [NSThread sleepForTimeInterval:0.25];
+  XCTAssertFalse(coord->CompilerActiveRecently());
+
+  // Clearing the slot again, as any later exit at that pid does, is not.
+  [cc setProcess:self.tok1 isCompiler:false];
+  XCTAssertFalse(coord->CompilerActiveRecently());
+}
+
+// Committing a transitive rule wakes an execution held for that content only.
+- (void)testCreatingTransitiveRuleWakesWaiterForItsHash {
+  id mockRuleTable = OCMClassMock([SNTRuleTable class]);
+  OCMStub([mockRuleTable executionRuleForIdentifiers:(struct RuleIdentifiers){}])
+      .ignoringNonObjectArgs()
+      .andReturn(nil);
+  OCMStub([mockRuleTable addExecutionRules:OCMOCK_ANY ruleCleanup:SNTRuleCleanupNone errors:nil])
+      .ignoringNonObjectArgs()
+      .andReturn(YES);
+  id mockDatabaseController = OCMClassMock([SNTDatabaseController class]);
+  OCMStub([mockDatabaseController ruleTable]).andReturn(mockRuleTable);
+
+  NSString* sha256 = @"0000000000000000000000000000000000000000000000000000000000000001";
+  id mockFileInfo = OCMClassMock([SNTFileInfo class]);
+  OCMStub([mockFileInfo isExecutable]).andReturn(YES);
+  OCMStub([mockFileInfo SHA256]).andReturn(sha256);
+  OCMStub([mockFileInfo path]).andReturn(@"/tmp/out");
+
+  auto coord = std::make_shared<PendingExecCoordinator>();
+  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+  __block bool woken = false;
+  coord->Wait(santa::NSStringToUTF8String(sha256), 5000, ^(bool ruleCreated) {
+    woken = ruleCreated;
+    dispatch_semaphore_signal(sema);
+  });
+  __block bool otherWoken = true;
+  coord->Wait("other content", 100, ^(bool ruleCreated) {
+    otherWoken = ruleCreated;
+    dispatch_semaphore_signal(sema);
+  });
+
+  es_file_t file = MakeESFile("foo");
+  es_process_t proc = MakeESProcess(&file);
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_CLOSE, &proc);
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+  auto logger = std::make_shared<Logger>(nullptr, nil, santa::TelemetryEvent::kNone, 0, 0, 0,
+                                         nullptr, nullptr);
+
+  SNTCompilerController* cc = [[SNTCompilerController alloc] initWithPendingExecCoordinator:coord];
+  {
+    Message msg(mockESApi, &esMsg);
+    [cc createTransitiveRule:msg target:mockFileInfo logger:logger];
+  }
+
+  dispatch_time_t deadline = dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC);
+  XCTAssertEqual(dispatch_semaphore_wait(sema, deadline), 0);
+  XCTAssertEqual(dispatch_semaphore_wait(sema, deadline), 0);
+  XCTAssertTrue(woken);
+  XCTAssertFalse(otherWoken);
+
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+  [mockDatabaseController stopMocking];
+  [mockRuleTable stopMocking];
+  [mockFileInfo stopMocking];
 }
 
 - (void)testHandleEventWithLogger {
