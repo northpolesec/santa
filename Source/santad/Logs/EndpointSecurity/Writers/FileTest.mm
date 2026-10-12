@@ -204,6 +204,27 @@ bool WaitForBufferSize(std::shared_ptr<FilePeer> file, size_t expectedSize) {
   XCTAssertEqual(sb.st_mode & ACCESSPERMS, 0666);
 }
 
+- (void)testFileModeNotAppliedThroughSymlink {
+  // An EventLogPath that is a symlink must not have the mode applied through it: the open
+  // follows the link, so the chmod would land on the target as root.
+  NSString* target = [NSString stringWithFormat:@"%@/target.out", self.path];
+  XCTAssertTrue([self.fileManager createFileAtPath:target
+                                          contents:nil
+                                        attributes:@{NSFilePosixPermissions : @0600}]);
+  XCTAssertTrue([self.fileManager createSymbolicLinkAtPath:self.logPath
+                                       withDestinationPath:target
+                                                     error:nil]);
+
+  auto file = std::make_shared<FilePeer>(self.logPath, 100, 500, self.q, self.timer, 0644);
+
+  struct stat sb;
+  XCTAssertEqual(stat([target UTF8String], &sb), 0);
+  XCTAssertEqual(sb.st_mode & ACCESSPERMS, 0600);
+
+  // The writer still logs through the link, as it did before the mode was configurable.
+  XCTAssertNotNil(file->FileHandle());
+}
+
 - (void)testFileModeReappliedAfterRotation {
   auto file = std::make_shared<FilePeer>(self.logPath, 100, 500, self.q, self.timer, 0640);
   file->WatchLogFile();

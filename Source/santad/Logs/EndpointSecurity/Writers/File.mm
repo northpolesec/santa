@@ -107,8 +107,17 @@ void File::OpenFileHandleSerialized() {
   // Apply the mode on every open rather than only on creation. `WatchLogFile` calls back in here
   // each time the log is rotated out from under us, and the replacement file was created by
   // newsyslog using the mode from its own config - not ours.
-  if (file_mode_ && file_handle_ && fchmod(file_handle_.fileDescriptor, file_mode_) != 0) {
-    LOGW(@"Unable to set mode 0%o on %@: %d: %s", file_mode_, path_, errno, strerror(errno));
+  //
+  // Only ever to a regular file. An EventLogPath in a directory others can write could be a
+  // symlink by the time it is opened, and `fileHandleForWritingAtPath:` follows it - so without
+  // this check the mode would land on whatever the link names, applied as root.
+  if (file_mode_ && file_handle_) {
+    struct stat sb;
+    if (lstat(path_.UTF8String, &sb) != 0 || !S_ISREG(sb.st_mode)) {
+      LOGW(@"Not setting mode on %@: not a regular file", path_);
+    } else if (fchmod(file_handle_.fileDescriptor, file_mode_) != 0) {
+      LOGW(@"Unable to set mode 0%o on %@: %d: %s", file_mode_, path_, errno, strerror(errno));
+    }
   }
 }
 
