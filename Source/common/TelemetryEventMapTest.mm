@@ -93,6 +93,7 @@ using santa::TelemetryEvent;
       {ES_EVENT_TYPE_NOTIFY_CS_INVALIDATED, TelemetryEvent::kCodesigningInvalidated},
       {ES_EVENT_TYPE_NOTIFY_EXCHANGEDATA, TelemetryEvent::kExchangeData},
       {ES_EVENT_TYPE_NOTIFY_EXEC, TelemetryEvent::kExecution},
+      {ES_EVENT_TYPE_AUTH_EXEC, TelemetryEvent::kExecution},
       {ES_EVENT_TYPE_NOTIFY_EXIT, TelemetryEvent::kExit},
       {ES_EVENT_TYPE_NOTIFY_FORK, TelemetryEvent::kFork},
       {ES_EVENT_TYPE_NOTIFY_LINK, TelemetryEvent::kLink},

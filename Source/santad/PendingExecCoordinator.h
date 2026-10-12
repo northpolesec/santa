@@ -71,10 +71,15 @@ class PendingExecCoordinator : public std::enable_shared_from_this<PendingExecCo
   // (+1 marked, -1 cleared, 0 a mark replaced), which is compiler activity.
   void UpdateCompilerMarks(int64_t delta);
 
+  // True while any process is marked as a compiler.
+  bool MarkedCompilersExist();
+
   // True while any process is marked as a compiler, or if one was marked or
   // cleared within the activity window. A mark is cleared when its process
-  // exits, so the clear of a compiler that ran a long time is processed only
-  // after its NOTIFY_CLOSEs; the count covers that gap.
+  // exits or exec's, so the clear of a compiler that ran a long time is
+  // processed only after its NOTIFY_CLOSEs; the count covers that gap. A mark
+  // whose process is gone without its exit being processed is cleared by the
+  // compiler controller's periodic sweep.
   bool CompilerActiveRecently();
 
  private:

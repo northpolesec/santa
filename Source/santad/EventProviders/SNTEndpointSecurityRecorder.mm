@@ -107,6 +107,12 @@ using santa::santad::process_tree::ProcessTree;
 
   [self.compilerController handleEvent:esMsg withLogger:self->_logger];
 
+  // Taken before the Recorder's own filters, so a mark outlives its hold only
+  // if its NOTIFY_EXEC never reaches this handler.
+  bool heldExecution =
+      esMsg->event_type == ES_EVENT_TYPE_NOTIFY_EXEC &&
+      [[SNTDecisionCache sharedCache] takeHeldExecution:esMsg->event.exec.target->audit_token];
+
   switch (esMsg->event_type) {
     case ES_EVENT_TYPE_NOTIFY_LW_SESSION_LOCK:
       [self.loginWindowSessionHandler
@@ -134,9 +140,12 @@ using santa::santad::process_tree::ProcessTree;
   // transitive rule), skip logging here. The execution controller logs the
   // event with its final decision once the hold resolves.
   if (esMsg->event_type == ES_EVENT_TYPE_NOTIFY_EXEC) {
+    if (heldExecution) {
+      return;
+    }
     SNTCachedDecision* cd = [[SNTDecisionCache sharedCache]
         cachedDecisionForFile:esMsg->event.exec.target->executable->stat];
-    if (cd && (cd.holdAndAsk || cd.heldForTransitiveRule)) {
+    if (cd.holdAndAsk) {
       return;
     }
   }

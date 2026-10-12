@@ -315,4 +315,16 @@ SNTCachedDecision* MakeCachedDecision(struct stat sb, SNTEventState decision) {
   [dc resetEntitlementsFilterForTesting];
 }
 
+// A held execution is taken once, and only for the process that was held.
+- (void)testTakeHeldExecution {
+  SNTDecisionCache* dc = [SNTDecisionCache sharedCache];
+  audit_token_t held = MakeAuditToken(4120, 7);
+  [dc holdExecution:held];
+
+  // Same pid, a different process.
+  XCTAssertFalse([dc takeHeldExecution:MakeAuditToken(4120, 8)]);
+  XCTAssertTrue([dc takeHeldExecution:held]);
+  XCTAssertFalse([dc takeHeldExecution:held]);
+}
+
 @end

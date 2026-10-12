@@ -22,6 +22,7 @@
 #include <sys/qos.h>
 
 #include <cassert>
+#include <memory>
 #include <optional>
 
 #include "Source/common/AuditUtilities.h"
@@ -41,6 +42,11 @@
 #import "Source/santad/SNTDatabaseController.h"
 #include "absl/container/flat_hash_set.h"
 
+// A mark outlives its hold only if ES drops the execution's NOTIFY_EXEC. When
+// the marks fill up they are all cleared, and an execution held at that moment
+// is logged twice.
+static constexpr uint64_t kMaxHeldExecutions = 1000;
+
 @interface SNTDecisionCache ()
 // Cache for sha256 -> date of last timestamp reset.
 @property NSCache<NSString*, NSDate*>* timestampResetMap;
@@ -49,6 +55,7 @@
 
 @implementation SNTDecisionCache {
   SantaCache<SantaVnode, SNTCachedDecision*> _decisionCache;
+  std::unique_ptr<SantaCache<santa::ProcessID, bool>> _heldExecutions;
   absl::flat_hash_set<SantaVnode> _pendingRehydrates;
   os_unfair_lock _pendingLock;
   std::shared_ptr<santa::EntitlementsFilter> _entitlementsFilter;
@@ -81,6 +88,7 @@
 - (instancetype)init {
   self = [super init];
   if (self) {
+    _heldExecutions = std::make_unique<SantaCache<santa::ProcessID, bool>>(kMaxHeldExecutions);
     _timestampResetMap = [[NSCache alloc] init];
     _timestampResetMap.countLimit = 100;
 
@@ -124,6 +132,23 @@
 
 - (void)forgetCachedDecision:(SNTCachedDecision*)cd {
   self->_decisionCache.set(cd.vnodeId, nil, cd);
+}
+
+- (void)holdExecution:(const audit_token_t&)tok {
+  // The insert below clears every mark when they are full. count() is read
+  // without the lock, so this is a diagnostic, not an exact account.
+  if (self->_heldExecutions->count() >= kMaxHeldExecutions) {
+    LOGW(@"Held execution marks are full (%llu) and will be cleared. Executions held now "
+         @"may be logged twice.",
+         kMaxHeldExecutions);
+  }
+  self->_heldExecutions->set(santa::ProcessID::FromToken(tok), true);
+}
+
+- (bool)takeHeldExecution:(const audit_token_t&)tok {
+  // Setting the empty value removes the entry; the swap makes test-and-remove
+  // atomic.
+  return self->_heldExecutions->set(santa::ProcessID::FromToken(tok), false, true);
 }
 
 // Whenever a cached decision resulting from a transitive allowlist rule is used to allow the

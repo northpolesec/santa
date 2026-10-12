@@ -121,6 +121,8 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
 @property BOOL transitiveRuleApplies;
 // Order of a hold's decision-cache restore and its log, by the hold helper.
 @property NSMutableArray<NSString*>* holdResolutionOrder;
+// One entry per -holdExecution: of the held target in the last transitive hold run.
+@property NSMutableArray<NSNumber*>* heldExecutionMarks;
 @end
 
 @implementation SNTExecutionControllerTest {
@@ -1322,6 +1324,23 @@ static std::shared_ptr<santa::PendingExecCoordinator> ActiveCoordinator() {
 
   NSMutableArray<NSString*>* order = [NSMutableArray array];
   self.holdResolutionOrder = order;
+
+  // The held process must be marked before the Hold response: ES sends its
+  // NOTIFY_EXEC only once it has a response.
+  NSMutableArray<NSNumber*>* marks = [NSMutableArray array];
+  self.heldExecutionMarks = marks;
+  OCMStub([self.mockDecisionCache holdExecution:kHeldTarget])
+      .ignoringNonObjectArgs()
+      .andDo(^(NSInvocation* invocation) {
+        const audit_token_t* tok;
+        [invocation getArgument:&tok atIndex:2];
+        @synchronized(actions) {
+          XCTAssertEqual(actions.count, 0UL);
+        }
+        @synchronized(marks) {
+          [marks addObject:@(IsHeldTarget(*tok))];
+        }
+      });
   OCMStub([self.mockDecisionCache cacheDecisionIfNotSet:decision])
       .andDo(^(NSInvocation* invocation) {
         @synchronized(order) {
@@ -1422,6 +1441,7 @@ static std::shared_ptr<santa::PendingExecCoordinator> ActiveCoordinator() {
                                }
                                XCTAssertTrue(Recorded(control, santa::ProcessControl::Suspend));
                                XCTAssertTrue(cd.heldForTransitiveRule);
+                               XCTAssertEqualObjects(self.heldExecutionMarks, @[ @YES ]);
                                XCTAssertEqual(logged.count, 0UL);
                                coord->NotifyRuleCreated("a");
                              }]);
@@ -1432,8 +1452,8 @@ static std::shared_ptr<santa::PendingExecCoordinator> ActiveCoordinator() {
   XCTAssertEqual(cd.decision, SNTEventStateAllowTransitive);
   XCTAssertEqualObjects(cd.decisionExtra, @"Transitive rule created during exec hold");
   XCTAssertEqual(logged.count, 1UL);
-  // Still set, so a NOTIFY_EXEC processed after the resolution is not logged too.
-  XCTAssertTrue(cd.heldForTransitiveRule);
+  // Cleared once logged. The Recorder finds a held execution by its mark.
+  XCTAssertFalse(cd.heldForTransitiveRule);
   [self checkMetricCounters:kAllowTransitive expected:@1];
 }
 
@@ -1727,6 +1747,7 @@ static std::shared_ptr<santa::PendingExecCoordinator> ActiveCoordinator() {
   XCTAssertEqualObjects(actions, @[ @(SNTActionRespondDeny) ]);
   XCTAssertEqualObjects(control, @[ @((int)santa::ProcessControl::Suspend) ]);
   XCTAssertFalse(cd.heldForTransitiveRule);
+  XCTAssertEqual(self.heldExecutionMarks.count, 0UL);
   XCTAssertEqual(logged.count, 0UL);
   OCMVerifyAll(mockNotifierQueue);
   [mockNotifierQueue stopMocking];

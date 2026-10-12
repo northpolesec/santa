@@ -23,11 +23,14 @@
 #include <sys/clonefile.h>
 #include <sys/stat.h>
 
+#include <functional>
+#include <map>
 #include <memory>
 
 #import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTFileInfo.h"
 #import "Source/common/SNTRule.h"
+#import "Source/common/SNTStrengthify.h"
 #include "Source/common/String.h"
 #include "Source/common/TelemetryEventMap.h"
 #include "Source/common/TestUtils.h"
@@ -52,7 +55,32 @@ static const pid_t PID_MAX = 99999;
 - (void)createTransitiveRule:(const Message&)esMsg
                       target:(SNTFileInfo*)targetFile
                       logger:(std::shared_ptr<Logger>)logger;
+- (instancetype)
+    initWithPendingExecCoordinator:(std::shared_ptr<santa::PendingExecCoordinator>)coordinator
+                       tokenForPid:(std::function<bool(pid_t, audit_token_t*)>)tokenForPid;
+- (void)sweepExitedCompilers;
 @end
+
+// Live processes by pid -> pidversion, for the injected token lookup. A pid
+// absent from the map has no process. `lookups` counts calls. `onLookup`, if
+// set, runs at the start of each lookup.
+struct FakeProcesses {
+  std::map<pid_t, int32_t> live;
+  int lookups = 0;
+  std::function<void(pid_t)> onLookup;
+};
+
+static std::function<bool(pid_t, audit_token_t*)> TokenForPidFrom(
+    std::shared_ptr<FakeProcesses> procs) {
+  return [procs](pid_t pid, audit_token_t* tok) {
+    procs->lookups++;
+    if (procs->onLookup) procs->onLookup(pid);
+    auto it = procs->live.find(pid);
+    if (it == procs->live.end()) return false;
+    *tok = MakeAuditToken(pid, it->second);
+    return true;
+  };
+}
 
 @interface SNTCompilerControllerTest : XCTestCase
 @property id mockDecisionCache;
@@ -731,6 +759,189 @@ static const pid_t PID_MAX = 99999;
 
   XCTAssertNil([self transitiveTargetForCloneOf:source stat:sourceStat to:dest]);
   [[NSFileManager defaultManager] removeItemAtPath:dir error:nil];
+}
+
+// The sweep looks up only marked pids, so with nothing marked it looks up none.
+- (void)testSweepDoesNothingWithoutMarks {
+  auto coord = std::make_shared<PendingExecCoordinator>();
+  auto procs = std::make_shared<FakeProcesses>();
+  SNTCompilerController* cc =
+      [[SNTCompilerController alloc] initWithPendingExecCoordinator:coord
+                                                        tokenForPid:TokenForPidFrom(procs)];
+  [cc sweepExitedCompilers];
+  [cc sweepExitedCompilers];
+  XCTAssertEqual(procs->lookups, 0);
+}
+
+// A compiler that is still running keeps its mark however many sweeps pass.
+- (void)testSweepKeepsLiveMark {
+  auto coord = std::make_shared<PendingExecCoordinator>();
+  auto procs = std::make_shared<FakeProcesses>();
+  procs->live[12] = 11;
+  SNTCompilerController* cc =
+      [[SNTCompilerController alloc] initWithPendingExecCoordinator:coord
+                                                        tokenForPid:TokenForPidFrom(procs)];
+  [cc setProcess:MakeAuditToken(12, 11) isCompiler:true];
+
+  for (int i = 0; i < 3; i++) {
+    [cc sweepExitedCompilers];
+  }
+  XCTAssertTrue([cc isCompiler:MakeAuditToken(12, 11)]);
+  XCTAssertTrue(coord->MarkedCompilersExist());
+  XCTAssertEqual(procs->lookups, 3);
+}
+
+// A mark whose process is gone is cleared on the second sweep that finds it
+// gone, not the first.
+- (void)testSweepClearsMarkOfExitedProcessOnSecondSweep {
+  auto coord = std::make_shared<PendingExecCoordinator>();
+  auto procs = std::make_shared<FakeProcesses>();
+  SNTCompilerController* cc =
+      [[SNTCompilerController alloc] initWithPendingExecCoordinator:coord
+                                                        tokenForPid:TokenForPidFrom(procs)];
+  [cc setProcess:MakeAuditToken(12, 11) isCompiler:true];  // no live process 12
+
+  [cc sweepExitedCompilers];
+  XCTAssertTrue([cc isCompiler:MakeAuditToken(12, 11)]);
+  XCTAssertTrue(coord->MarkedCompilersExist());
+
+  [cc sweepExitedCompilers];
+  XCTAssertFalse([cc isCompiler:MakeAuditToken(12, 11)]);
+  XCTAssertFalse(coord->MarkedCompilersExist());
+}
+
+// Strikes must be consecutive. A lookup can fail briefly for a running process,
+// so a passing check drops the earlier strike.
+- (void)testSweepForgetsStrikeAfterAPassingCheck {
+  auto coord = std::make_shared<PendingExecCoordinator>();
+  auto procs = std::make_shared<FakeProcesses>();
+  SNTCompilerController* cc =
+      [[SNTCompilerController alloc] initWithPendingExecCoordinator:coord
+                                                        tokenForPid:TokenForPidFrom(procs)];
+  [cc setProcess:MakeAuditToken(12, 11) isCompiler:true];
+
+  [cc sweepExitedCompilers];  // lookup fails: one strike
+  procs->live[12] = 11;
+  [cc sweepExitedCompilers];  // check passes: strike dropped
+  procs->live.erase(12);
+  [cc sweepExitedCompilers];  // lookup fails: one strike again, not two
+
+  XCTAssertTrue([cc isCompiler:MakeAuditToken(12, 11)]);
+  XCTAssertTrue(coord->MarkedCompilersExist());
+}
+
+// A pid now held by a different incarnation (the marked process exec'd and its
+// NOTIFY_EXEC was not processed, or the pid was reused) is stale like an exited
+// one.
+- (void)testSweepClearsMarkWhosePidHasADifferentPidversion {
+  auto coord = std::make_shared<PendingExecCoordinator>();
+  auto procs = std::make_shared<FakeProcesses>();
+  procs->live[12] = 99;
+  SNTCompilerController* cc =
+      [[SNTCompilerController alloc] initWithPendingExecCoordinator:coord
+                                                        tokenForPid:TokenForPidFrom(procs)];
+  [cc setProcess:MakeAuditToken(12, 11) isCompiler:true];
+
+  [cc sweepExitedCompilers];
+  [cc sweepExitedCompilers];
+  XCTAssertFalse([cc isCompiler:MakeAuditToken(12, 11)]);
+  XCTAssertFalse(coord->MarkedCompilersExist());
+}
+
+// A pid re-marked for a new compiler between two sweeps keeps the new mark, even
+// when the new mark also fails its check (here the new compiler has exited too,
+// and its exit is not processed yet): strikes belong to a (pid, pidversion), so
+// the new mark has only one.
+- (void)testSweepDoesNotClearAReplacedMark {
+  auto coord = std::make_shared<PendingExecCoordinator>();
+  auto procs = std::make_shared<FakeProcesses>();
+  SNTCompilerController* cc =
+      [[SNTCompilerController alloc] initWithPendingExecCoordinator:coord
+                                                        tokenForPid:TokenForPidFrom(procs)];
+  [cc setProcess:MakeAuditToken(12, 11) isCompiler:true];
+  [cc sweepExitedCompilers];  // (12, 11) gets one strike
+
+  [cc setProcess:MakeAuditToken(12, 22) isCompiler:true];  // count stays 1
+  [cc sweepExitedCompilers];                               // (12, 22) gets its first strike
+
+  XCTAssertTrue([cc isCompiler:MakeAuditToken(12, 22)]);
+  XCTAssertTrue(coord->MarkedCompilersExist());
+}
+
+// A pid re-marked while the sweep is clearing it (after the sweep read the old
+// mark) keeps the new mark, and the count does not drop.
+- (void)testSweepDoesNotClearAMarkReplacedDuringTheSweep {
+  auto coord = std::make_shared<PendingExecCoordinator>();
+  auto procs = std::make_shared<FakeProcesses>();
+  SNTCompilerController* cc =
+      [[SNTCompilerController alloc] initWithPendingExecCoordinator:coord
+                                                        tokenForPid:TokenForPidFrom(procs)];
+  [cc setProcess:MakeAuditToken(12, 11) isCompiler:true];  // no live process 12
+  [cc sweepExitedCompilers];                               // (12, 11) gets one strike
+
+  // The second sweep has read (12, 11) when its lookup runs. Re-mark the pid
+  // then. Re-marking is idempotent, so running on every lookup is fine.
+  WEAKIFY(cc);
+  procs->onLookup = [Weak_cc](pid_t pid) {
+    STRONGIFY(cc);
+    [cc setProcess:MakeAuditToken(12, 22) isCompiler:true];
+  };
+  [cc sweepExitedCompilers];
+
+  XCTAssertTrue([cc isCompiler:MakeAuditToken(12, 22)]);
+  XCTAssertTrue(coord->MarkedCompilersExist());
+}
+
+// The exit of a process whose mark the sweep already cleared changes nothing:
+// the count does not go below zero, so a later mark is counted.
+- (void)testLateExitAfterSweepDoesNotUndercount {
+  auto coord = std::make_shared<PendingExecCoordinator>();
+  auto procs = std::make_shared<FakeProcesses>();
+  SNTCompilerController* cc =
+      [[SNTCompilerController alloc] initWithPendingExecCoordinator:coord
+                                                        tokenForPid:TokenForPidFrom(procs)];
+  [cc setProcess:MakeAuditToken(12, 11) isCompiler:true];
+  [cc sweepExitedCompilers];
+  [cc sweepExitedCompilers];
+  XCTAssertFalse(coord->MarkedCompilersExist());
+
+  [cc setProcess:MakeAuditToken(12, 11) isCompiler:false];  // late NOTIFY_EXIT
+  XCTAssertFalse(coord->MarkedCompilersExist());
+
+  [cc setProcess:MakeAuditToken(34, 22) isCompiler:true];
+  XCTAssertTrue(coord->MarkedCompilersExist());
+}
+
+// NOTIFY_EXEC clears the mark of the image that exec'd, and only that mark: a
+// mark the Authorizer set for the new image stays.
+- (void)testExecClearsOnlyTheMarkOfTheImageThatExeced {
+  auto coord = std::make_shared<PendingExecCoordinator>();
+  SNTCompilerController* cc = [[SNTCompilerController alloc] initWithPendingExecCoordinator:coord];
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+  es_file_t file = MakeESFile("foo");
+
+  // A non-compiler (12, 11) exec's into a compiler (12, 22), which the
+  // Authorizer marked at AUTH_EXEC.
+  [cc setProcess:MakeAuditToken(12, 22) isCompiler:true];
+  es_process_t preExecProc = MakeESProcess(&file, MakeAuditToken(12, 11), {});
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_EXEC, &preExecProc);
+  {
+    Message msg(mockESApi, &esMsg);
+    [cc handleEvent:msg withLogger:nullptr];
+  }
+  XCTAssertTrue([cc isCompiler:MakeAuditToken(12, 22)]);
+  XCTAssertTrue(coord->MarkedCompilersExist());
+
+  // The compiler (12, 22) then exec's into a non-compiler.
+  es_process_t compilerProc = MakeESProcess(&file, MakeAuditToken(12, 22), {});
+  esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_EXEC, &compilerProc);
+  {
+    Message msg(mockESApi, &esMsg);
+    [cc handleEvent:msg withLogger:nullptr];
+  }
+  XCTAssertFalse([cc isCompiler:MakeAuditToken(12, 22)]);
+  XCTAssertFalse(coord->MarkedCompilersExist());
 }
 
 @end

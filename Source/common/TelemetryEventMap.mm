@@ -88,6 +88,8 @@ TelemetryEvent ESEventToTelemetryEvent(es_event_type_t event) {
     case ES_EVENT_TYPE_NOTIFY_COPYFILE: return TelemetryEvent::kCopyfile;
     case ES_EVENT_TYPE_NOTIFY_CS_INVALIDATED: return TelemetryEvent::kCodesigningInvalidated;
     case ES_EVENT_TYPE_NOTIFY_EXCHANGEDATA: return TelemetryEvent::kExchangeData;
+    // A held execution is logged from its AUTH_EXEC once the hold resolves.
+    case ES_EVENT_TYPE_AUTH_EXEC: return TelemetryEvent::kExecution;
     case ES_EVENT_TYPE_NOTIFY_EXEC: return TelemetryEvent::kExecution;
     case ES_EVENT_TYPE_NOTIFY_EXIT: return TelemetryEvent::kExit;
     case ES_EVENT_TYPE_NOTIFY_FORK: return TelemetryEvent::kFork;
