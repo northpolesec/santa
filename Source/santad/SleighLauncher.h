@@ -74,7 +74,8 @@ class SleighLauncher {
   // it only reports which signals matched. An empty/unparseable stdout, or a
   // non-zero exit, is returned as an error. The caller passes signals in (from
   // the synced signal_rules config). The telemetry filter expressions are read
-  // from configuration, so Sleigh redacts reported args/envs as it does exports.
+  // from configuration, so Sleigh redacts reported args/envs as it does
+  // exports.
   //
   // input_fd must be an already-open, readable fd positioned at offset 0. The
   // caller retains ownership of input_fd (this method scans a dup of it);
