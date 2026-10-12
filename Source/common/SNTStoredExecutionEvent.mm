@@ -66,6 +66,7 @@
   ENCODE(coder, fileBundleID);
   ENCODE(coder, fileBundleVersion);
   ENCODE(coder, fileBundleVersionString);
+  ENCODE(coder, fileBundleCategory);
 
   ENCODE(coder, signingChain);
   ENCODE(coder, teamID);
@@ -119,6 +120,7 @@
     DECODE(decoder, fileBundleID, NSString);
     DECODE(decoder, fileBundleVersion, NSString);
     DECODE(decoder, fileBundleVersionString, NSString);
+    DECODE(decoder, fileBundleCategory, NSString);
 
     DECODE_ARRAY(decoder, signingChain, MOLCertificate);
     DECODE(decoder, teamID, NSString);

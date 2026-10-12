@@ -259,6 +259,12 @@ typedef NS_ENUM(NSInteger, SNTFileInfoIdentityVerification) {
 - (NSString*)bundleShortVersionString;
 
 ///
+///  @return the LSApplicationCategoryType from this file's bundle Info.plist, or nil if this file
+///  is not part of a bundle.
+///
+- (NSString*)bundleCategory;
+
+///
 ///  @return LaunchServices quarantine data - download URL as an absolute string.
 ///
 - (NSString*)quarantineDataURL;
