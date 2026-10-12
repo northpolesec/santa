@@ -169,6 +169,14 @@
   XCTAssertEqualObjects(out.annotations, (@[ @"alpha", @"zeta" ]));
 }
 
+- (void)testFileBundleCategorySurvivesSecureCodingRoundTrip {
+  SNTStoredExecutionEvent* se = [[SNTStoredExecutionEvent alloc] init];
+  se.fileBundleCategory = @"public.app-category.developer-tools";
+
+  SNTStoredExecutionEvent* out = [self roundTripped:se];
+  XCTAssertEqualObjects(out.fileBundleCategory, @"public.app-category.developer-tools");
+}
+
 - (void)testIdentityVendorMatchedDefaultsToNoAndSurvivesRoundTrip {
   // A spurious identityVendorMatched on decode would route this through the
   // verified branches in -createRuleForStandaloneModeEvent:.

@@ -433,11 +433,12 @@
 		<dict>
 			<key>$classes</key>
 			<array>
+				<string>SNTStoredExecutionEvent</string>
 				<string>SNTStoredEvent</string>
 				<string>NSObject</string>
 			</array>
 			<key>$classname</key>
-			<string>SNTStoredEvent</string>
+			<string>SNTStoredExecutionEvent</string>
 		</dict>
 	</array>
 	<key>$top</key>

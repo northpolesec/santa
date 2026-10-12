@@ -40,6 +40,8 @@
 	<string>0731</string>
 	<key>DTXcodeBuild</key>
 	<string>7D1014</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.developer-tools</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>10.12</string>
 	<key>NSHumanReadableCopyright</key>
