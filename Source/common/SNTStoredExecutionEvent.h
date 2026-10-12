@@ -64,6 +64,9 @@
 /// If the executed file was part of the bundle, this is the CFBundleShortVersionString.
 @property(nullable) NSString* fileBundleVersionString;
 
+/// If the executed file was part of the bundle, this is the LSApplicationCategoryType.
+@property(nullable) NSString* fileBundleCategory;
+
 /// If the executed file was signed, this is an NSArray of MOLCertificate's
 /// representing the signing chain.
 @property(nullable) NSArray<MOLCertificate*>* signingChain;
