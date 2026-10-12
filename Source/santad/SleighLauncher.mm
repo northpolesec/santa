@@ -535,6 +535,12 @@ absl::StatusOr<std::string> SleighLauncher::SerializeSignalScanConfig(
     }
   }
 
+  NSArray<NSString*>* filterExpressions =
+      [[SNTConfigurator configurator] telemetryFilterExpressions];
+  for (NSString* expr in filterExpressions) {
+    signal_scan->add_filter_expressions([expr UTF8String]);
+  }
+
   std::string serialized;
   if (!config.SerializeToString(&serialized)) {
     return absl::UnknownError("Failed to serialize SleighConfig proto");
