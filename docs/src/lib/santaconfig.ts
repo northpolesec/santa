@@ -543,19 +543,20 @@ changes in the release notes of any future release that changes them.`,
     },
     {
       key: "TelemetryFileMode",
-      description: `Unix-style octal permissions applied to the telemetry Santa writes: the log file at
-        \`EventLogPath\` (for the \`file\` and \`json\` event log types), the spool files under \`SpoolDirectory\`,
-        and the spool directories themselves. Expressed as a string, e.g. \`"0640"\`. The setuid/setgid/sticky
-        bits are dropped, group and world write are cleared (write access stays santad's alone), and owner
-        read/write is always granted. Directories
-        additionally get execute permission wherever read was granted, so a group-readable spool stays
-        traversable. When unset, Santa keeps its built-in defaults: \`0400\` spool files, \`0700\` spool
-        directories, and whatever mode the event log file already has. It is read once at santad startup, so
-        restart santad after changing it; on restart the mode is also re-applied to the spool directories and to
-        any spool files still waiting to be exported.
-        Santa re-applies this mode each time it opens the event log, including after a rotation - but newsyslog
-        creates the replacement file using the mode in \`com.northpolesec.santa.newsyslog.conf\`, so update that
-        file to match if you set this key`,
+      description: `The permissions that Santa applies to the telemetry it writes. Give the value as a string of
+        octal digits, for example \`"0640"\`. The mode applies to the log file at \`EventLogPath\` (for the
+        \`file\` and \`json\` event log types), to the spool files under \`SpoolDirectory\`, and to the spool
+        directories.
+        Santa changes the mode before it applies the mode: it removes the setuid, setgid, and sticky bits, it
+        removes group write and world write, and it always gives read and write permission to the owner.
+        Santa gives a directory execute permission where the file mode gives read permission, so a file mode of
+        \`0640\` makes the directory mode \`0750\`.
+        If you do not set this key, Santa keeps its default modes: \`0400\` for spool files and \`0700\` for spool
+        directories, and it does not change the mode of the event log file.
+        Santa reads this key one time, at startup. If you change the key, restart santad.
+        Santa applies the mode again each time it opens the event log, which includes the open after a rotation.
+        But newsyslog makes the new log file with the mode in \`com.northpolesec.santa.newsyslog.conf\`, so change
+        the mode column in that file to match`,
       type: "string",
       defaultValue: "",
     },

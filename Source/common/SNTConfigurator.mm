@@ -15,7 +15,9 @@
 
 #import "Source/common/SNTConfigurator.h"
 
+#include <stdlib.h>
 #include <sys/stat.h>
+
 #include <optional>
 #include <set>
 #include <string>
@@ -40,22 +42,30 @@
 // isn't a short run of octal digits. Shared with `validateConfiguration` so `santactl doctor`
 // rejects exactly what santad would ignore.
 static mode_t ParseOctalMode(NSString* rawMode) {
-  if (!rawMode.length) {
+  // A mode is one to four octal digits. The length limit also keeps the value within mode_t, so
+  // strtoul(3) cannot overflow and its errno does not need checking.
+  if (!rawMode.length || rawMode.length > 4) {
     return 0;
   }
 
-  // Deliberately stricter than strtoul(3), which would accept leading whitespace, a sign, and a
-  // trailing suffix. A mode is a short run of octal digits and nothing else.
-  const char* digits = [rawMode UTF8String];
-  mode_t parsed = 0;
-  for (const char* c = digits; *c != '\0'; c++) {
-    if (*c < '0' || *c > '7' || (c - digits) >= 4) {
-      return 0;
-    }
-    parsed = (mode_t)(parsed << 3) | (mode_t)(*c - '0');
+  const char* str = [rawMode UTF8String];
+
+  // strtoul(3) skips leading whitespace and accepts a sign. A mode has neither, so reject
+  // anything that doesn't open with an octal digit.
+  if (*str < '0' || *str > '7') {
+    return 0;
   }
 
-  return parsed;
+  char* end = NULL;
+  unsigned long parsed = strtoul(str, &end, 8);
+
+  // strtoul(3) stops at the first character it can't use and reports it in `end`, rather than
+  // failing. That's how "0x1a0" and the 8 in "0648" are caught.
+  if (*end != '\0') {
+    return 0;
+  }
+
+  return (mode_t)parsed;
 }
 
 // Drops setuid/setgid/sticky and always keeps owner read/write so santad can't lock itself out of
