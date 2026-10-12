@@ -40,7 +40,6 @@ inline constexpr off_t kMaxSyncRehydrateBytes = 32 * 1024 * 1024;
 - (bool)cacheDecision:(SNTCachedDecision*)cd replacingDecision:(SNTCachedDecision*)previous;
 - (SNTCachedDecision*)cachedDecisionForFile:(const struct stat&)statInfo;
 - (SNTCachedDecision*)cachedDecisionForVnode:(SantaVnode)vnode;
-- (void)forgetCachedDecisionForVnode:(SantaVnode)vnode;
 // Forgets `cd` only if it is still the decision cached for its vnode.
 - (void)forgetCachedDecision:(SNTCachedDecision*)cd;
 - (SNTCachedDecision*)resetTimestampForCachedDecision:(const struct stat&)statInfo;

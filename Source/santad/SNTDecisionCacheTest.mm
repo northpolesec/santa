@@ -23,7 +23,6 @@
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTFileInfo.h"
 #import "Source/common/SNTRule.h"
-#import "Source/common/SantaVnode.h"
 #include "Source/common/TestUtils.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
 #import "Source/santad/EntitlementsFilter.h"
@@ -47,7 +46,6 @@ SNTCachedDecision* MakeCachedDecision(struct stat sb, SNTEventState decision) {
 - (void)waitForCachePopulateQueueForTesting;
 - (NSUInteger)pendingRehydrateCountForTesting;
 - (dispatch_queue_t)cachePopulateQ;
-- (void)resetEntitlementsFilterForTesting;
 @end
 
 @interface SNTDecisionCacheTest : XCTestCase
@@ -63,7 +61,7 @@ SNTCachedDecision* MakeCachedDecision(struct stat sb, SNTEventState decision) {
 }
 
 - (void)testBasicOperation {
-  SNTDecisionCache* dc = [SNTDecisionCache sharedCache];
+  SNTDecisionCache* dc = [[SNTDecisionCache alloc] init];
 
   struct stat sb = MakeStat();
 
@@ -81,12 +79,26 @@ SNTCachedDecision* MakeCachedDecision(struct stat sb, SNTEventState decision) {
   XCTAssertEqual(cachedCD.vnodeId.fileid, cd.vnodeId.fileid);
 
   // Delete the item from the cache and ensure it no longer exists
-  [dc forgetCachedDecisionForVnode:SantaVnode::VnodeForFile(sb)];
+  [dc forgetCachedDecision:cachedCD];
   XCTAssertNil([dc cachedDecisionForFile:sb]);
 }
 
+- (void)testForgetCachedDecisionKeepsNewerDecision {
+  SNTDecisionCache* dc = [[SNTDecisionCache alloc] init];
+  struct stat sb = MakeStat();
+
+  SNTCachedDecision* older = MakeCachedDecision(sb, SNTEventStateAllowPendingTransitive);
+  SNTCachedDecision* newer = MakeCachedDecision(sb, SNTEventStateAllowTransitive);
+  [dc cacheDecision:older];
+  [dc cacheDecision:newer];
+
+  // Forgetting a decision that was already replaced must not evict its replacement.
+  [dc forgetCachedDecision:older];
+  XCTAssertEqual([dc cachedDecisionForFile:sb], newer);
+}
+
 - (void)testResetTimestampForCachedDecision {
-  SNTDecisionCache* dc = [SNTDecisionCache sharedCache];
+  SNTDecisionCache* dc = [[SNTDecisionCache alloc] init];
   struct stat sb = MakeStat();
   SNTCachedDecision* cd = MakeCachedDecision(sb, SNTEventStateAllowTransitive);
 
@@ -122,8 +134,7 @@ SNTCachedDecision* MakeCachedDecision(struct stat sb, SNTEventState decision) {
   XCTAssertNotNil(fi);
   XCTAssertNotNil(fi.SHA256);
 
-  SNTDecisionCache* dc = [SNTDecisionCache sharedCache];
-  [dc forgetCachedDecisionForVnode:fi.vnode];  // start clean
+  SNTDecisionCache* dc = [[SNTDecisionCache alloc] init];
 
   SNTCachedDecision* cd = [dc rehydrateAndCacheDecisionForFileInfo:fi];
   XCTAssertNotNil(cd);
@@ -137,7 +148,6 @@ SNTCachedDecision* MakeCachedDecision(struct stat sb, SNTEventState decision) {
   XCTAssertEqualObjects(cached.sha256, fi.SHA256);
   XCTAssertEqual(cached, cd);
 
-  [dc forgetCachedDecisionForVnode:fi.vnode];
   [[NSFileManager defaultManager] removeItemAtPath:tmpPath error:nil];
 }
 
@@ -152,8 +162,7 @@ SNTCachedDecision* MakeCachedDecision(struct stat sb, SNTEventState decision) {
   SNTFileInfo* fi = [[SNTFileInfo alloc] initWithPath:tmpPath];
   XCTAssertNotNil(fi);
 
-  SNTDecisionCache* dc = [SNTDecisionCache sharedCache];
-  [dc forgetCachedDecisionForVnode:fi.vnode];
+  SNTDecisionCache* dc = [[SNTDecisionCache alloc] init];
 
   [dc asyncRehydrateAndCacheDecisionForFileInfo:fi];
   // Issue a second call before the queue drains — must be deduped.
@@ -168,7 +177,6 @@ SNTCachedDecision* MakeCachedDecision(struct stat sb, SNTEventState decision) {
   XCTAssertEqual(cached.decision, SNTEventStateUnknown);
   XCTAssertEqual(cached.cacheable, NO);
 
-  [dc forgetCachedDecisionForVnode:fi.vnode];
   [[NSFileManager defaultManager] removeItemAtPath:tmpPath error:nil];
 }
 
@@ -181,8 +189,7 @@ SNTCachedDecision* MakeCachedDecision(struct stat sb, SNTEventState decision) {
   XCTAssertTrue([contents writeToFile:tmpPath atomically:YES]);
 
   SNTFileInfo* fi = [[SNTFileInfo alloc] initWithPath:tmpPath];
-  SNTDecisionCache* dc = [SNTDecisionCache sharedCache];
-  [dc forgetCachedDecisionForVnode:fi.vnode];
+  SNTDecisionCache* dc = [[SNTDecisionCache alloc] init];
 
   // Block the queue with a long-running sync work item, then enqueue
   // multiple async rehydrates. After unblocking, only one should have
@@ -203,7 +210,6 @@ SNTCachedDecision* MakeCachedDecision(struct stat sb, SNTEventState decision) {
 
   XCTAssertEqual([dc pendingRehydrateCountForTesting], 0u);
 
-  [dc forgetCachedDecisionForVnode:fi.vnode];
   [[NSFileManager defaultManager] removeItemAtPath:tmpPath error:nil];
 }
 
@@ -236,8 +242,7 @@ SNTCachedDecision* MakeCachedDecision(struct stat sb, SNTEventState decision) {
   // Declining costs no whole-file read: the check precedes the hash.
   OCMReject([fiMock SHA256]);
 
-  SNTDecisionCache* dc = [SNTDecisionCache sharedCache];
-  [dc forgetCachedDecisionForVnode:fi.vnode];
+  SNTDecisionCache* dc = [[SNTDecisionCache alloc] init];
 
   XCTAssertNil([dc rehydrateAndCacheDecisionForFileInfo:fi]);
   XCTAssertNil([dc cachedDecisionForVnode:fi.vnode]);
@@ -257,8 +262,7 @@ SNTCachedDecision* MakeCachedDecision(struct stat sb, SNTEventState decision) {
   SNTFileInfo* fi = [[SNTFileInfo alloc] initWithPath:@"/sbin/launchd"];
   XCTAssertNotNil(fi);
 
-  SNTDecisionCache* dc = [SNTDecisionCache sharedCache];
-  [dc forgetCachedDecisionForVnode:fi.vnode];
+  SNTDecisionCache* dc = [[SNTDecisionCache alloc] init];
 
   SNTCachedDecision* cd = [dc rehydrateAndCacheDecisionForFileInfo:fi];
   XCTAssertNotNil(cd);
@@ -274,8 +278,6 @@ SNTCachedDecision* MakeCachedDecision(struct stat sb, SNTEventState decision) {
   XCTAssertNil(cd.teamID);
   XCTAssertEqualObjects(cd.signingID, @"platform:com.apple.xpc.launchd");
   XCTAssertEqualObjects(cd.rawSigningID, @"com.apple.xpc.launchd");
-
-  [dc forgetCachedDecisionForVnode:fi.vnode];
 }
 
 // Exercises the entitlements-filter branch of buildDecisionForFileInfo:. The
@@ -285,8 +287,7 @@ SNTCachedDecision* MakeCachedDecision(struct stat sb, SNTEventState decision) {
   SNTFileInfo* fi = [[SNTFileInfo alloc] initWithPath:@"/sbin/launchd"];
   XCTAssertNotNil(fi);
 
-  SNTDecisionCache* dc = [SNTDecisionCache sharedCache];
-  [dc forgetCachedDecisionForVnode:fi.vnode];
+  SNTDecisionCache* dc = [[SNTDecisionCache alloc] init];
 
   // Pass-through filter (no teamID drops, no prefix filtering) — Filter()
   // should deep-copy entitlements rather than dropping or trimming them.
@@ -305,14 +306,6 @@ SNTCachedDecision* MakeCachedDecision(struct stat sb, SNTEventState decision) {
   XCTAssertNotNil(cd.entitlements);
   XCTAssertEqual(cd.entitlements.count, cd.rawEntitlements.count);
   XCTAssertFalse(cd.entitlementsFiltered);
-
-  [dc forgetCachedDecisionForVnode:fi.vnode];
-
-  // Restore the singleton's filter to nullptr — none of the other tests
-  // expect it set, and the singleton state persists across tests. The
-  // production -setEntitlementsFilter: is strictly set-once, so use the
-  // test-only escape hatch.
-  [dc resetEntitlementsFilterForTesting];
 }
 
 @end
