@@ -561,6 +561,19 @@ changes in the release notes of any future release that changes them.`,
       defaultValue: "",
     },
     {
+      key: "TelemetryFileGroup",
+      description: `The name of the group that owns the telemetry Santa writes, for example \`"logshipper"\`.
+        Santa writes its telemetry as root, and a new file takes the group of the directory that holds it, which
+        is \`/var/db/santa\` with the group \`wheel\`. Without this key the group permissions that
+        \`TelemetryFileMode\` gives are of no use, so set both keys together.
+        Santa applies the group to the same files as \`TelemetryFileMode\`, and changes the group before it
+        changes the mode.
+        Give the name of a group, not a number. If the name is not a group on this system, Santa writes a warning
+        and leaves the group of the telemetry alone`,
+      type: "string",
+      defaultValue: "",
+    },
+    {
       key: "EnableMachineIDDecoration",
       description: `If this key is true, the \`MachineID\` will be added to each log entry.`,
       type: "bool",

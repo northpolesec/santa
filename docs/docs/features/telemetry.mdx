@@ -412,6 +412,19 @@ Applies when using the `protobuf` or `json` log types.
 
   :::
 
+- `TelemetryFileGroup`: The name of the group that owns the telemetry Santa writes, for example
+  `"logshipper"`. Santa writes its telemetry as root, and a new file takes the group of the
+  directory that holds it. The directory is `/var/db/santa`, whose group is `wheel`. Thus without
+  this key the telemetry belongs to `wheel`, and the group permissions that `TelemetryFileMode`
+  gives are of no use. Set both keys together to give one account read access.
+
+  Santa applies the group to the same files as `TelemetryFileMode`: the log file at
+  `EventLogPath`, the spool files, and the spool directories. Santa changes the group before it
+  changes the mode, because a change of group can remove the setuid and setgid bits.
+
+  Give the name of a group, not a number. If the name is not a group on this system, Santa writes
+  a warning and leaves the group of the telemetry alone. `santactl doctor` also reports the error.
+
 ### File Change Monitoring
 
 - `FileChangesRegex`: Regex pattern for paths to monitor for file changes

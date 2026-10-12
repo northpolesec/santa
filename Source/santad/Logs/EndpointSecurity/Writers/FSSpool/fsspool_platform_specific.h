@@ -45,6 +45,9 @@ absl::Status MkDir(const std::string& path, mode_t mode);
 int MkDir(const char* path, mode_t mode);
 // chmod that acts on a symlink itself rather than its target.
 int LChmod(const char* path, mode_t mode);
+int FChown(int fd, gid_t gid);
+// chown that acts on a symlink itself rather than its target.
+int LChown(const char* path, gid_t gid);
 int FChmod(int fd, mode_t mode);
 bool StatIsDir(mode_t mode);
 bool StatIsReg(mode_t mode);

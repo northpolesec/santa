@@ -66,6 +66,9 @@ concept BatcherInterface =
 inline constexpr mode_t kDefaultSpoolFileMode = 0400;
 inline constexpr mode_t kDefaultSpoolDirMode = 0700;
 
+// "Do not change the group", the value chown(2) uses for the same.
+inline constexpr gid_t kNoSpoolGroup = (gid_t)-1;
+
 // Derives a directory mode from a file mode by granting execute (i.e. traverse)
 // permission to each class that was granted read, so that a group-readable
 // spool file is actually reachable through the directories above it. Each
@@ -90,10 +93,13 @@ class FsSpoolWriter {
   // this generic spool library to a particular metrics implementation.
   // `file_mode`, when non-zero, is the permission mode applied to each spool
   // file; the spool directories get the corresponding directory mode. Zero
-  // means use the defaults above.
+  // means use the defaults above. `file_gid`, when not kNoSpoolGroup, is the
+  // group given to each spool file and directory - without it they take the
+  // group of the directory that holds the spool, so the group bits of
+  // `file_mode` have no useful group to grant to.
   FsSpoolWriter(T batcher, absl::string_view base_dir, size_t max_spool_size,
                 std::function<void(size_t)> eviction_callback = nullptr,
-                mode_t file_mode = 0)
+                mode_t file_mode = 0, gid_t file_gid = kNoSpoolGroup)
       : batcher_(std::move(batcher)),
         base_dir_(base_dir),
         spool_dir_(SpoolNewDirectory(base_dir)),
@@ -102,6 +108,8 @@ class FsSpoolWriter {
         max_spool_size_(max_spool_size),
         eviction_callback_(std::move(eviction_callback)),
         mode_configured_(file_mode != 0),
+        file_gid_(file_gid),
+        gid_configured_(file_gid != kNoSpoolGroup),
         file_mode_(file_mode ? file_mode : kDefaultSpoolFileMode),
         dir_mode_(file_mode ? DirectoryModeForFileMode(file_mode)
                             : kDefaultSpoolDirMode),
@@ -138,13 +146,21 @@ class FsSpoolWriter {
     // symlink between the lstat and the chmod. LChmod rather than Chmod
     // regardless, so a link that somehow is there - e.g. a SpoolDirectory
     // pointed at a location others can write - is never followed.
-    if (mode_configured_) {
+    if (mode_configured_ || gid_configured_) {
       (void)IterateDirectory(
           spool_dir_, [this](const std::string& file_name, bool* stop) {
             std::string full_path =
                 absl::StrCat(spool_dir_, PathSeparator(), file_name);
             struct stat sb;
-            if (lstat(full_path.c_str(), &sb) == 0 && S_ISREG(sb.st_mode)) {
+            if (lstat(full_path.c_str(), &sb) != 0 || !S_ISREG(sb.st_mode)) {
+              return;
+            }
+            // Group first: chown(2) can clear the set-id bits, so a chmod
+            // after it is the one that decides the final mode.
+            if (gid_configured_) {
+              (void)::fsspool::LChown(full_path.c_str(), file_gid_);
+            }
+            if (mode_configured_) {
               (void)::fsspool::LChmod(full_path.c_str(), file_mode_);
             }
           });
@@ -225,6 +241,9 @@ class FsSpoolWriter {
     // Santa has always had. Best effort, as for the directories below - umask
     // can only narrow what open(2) applied, never widen it, so a failure here
     // can't leave the file more permissive than configured.
+    if (gid_configured_) {
+      (void)::fsspool::FChown(current_spool_state_.tmp_fd, file_gid_);
+    }
     if (mode_configured_) {
       (void)::fsspool::FChmod(current_spool_state_.tmp_fd, file_mode_);
     }
@@ -344,14 +363,19 @@ class FsSpoolWriter {
     // SpoolDirectory others can write, that would hand a non-root account a
     // root-owned chmod of any path it cares to name. O_DIRECTORY makes the fd
     // a directory by construction.
-    if (mode_configured_) {
+    if (mode_configured_ || gid_configured_) {
       for (const std::string& dir : {base_dir_, spool_dir_, tmp_dir_}) {
         int fd = ::fsspool::Open(dir.c_str(),
                                  O_RDONLY | O_DIRECTORY | O_NOFOLLOW, 0);
         if (fd < 0) {
           continue;
         }
-        (void)::fsspool::FChmod(fd, dir_mode_);
+        if (gid_configured_) {
+          (void)::fsspool::FChown(fd, file_gid_);
+        }
+        if (mode_configured_) {
+          (void)::fsspool::FChmod(fd, dir_mode_);
+        }
         (void)::fsspool::Close(fd);
       }
     }
@@ -449,6 +473,11 @@ class FsSpoolWriter {
   // Whether a mode was explicitly configured, as opposed to the modes below
   // having been filled in with the built-in defaults.
   const bool mode_configured_;
+
+  // The group given to spool files and directories, and whether one was
+  // configured at all.
+  const gid_t file_gid_;
+  const bool gid_configured_;
 
   // Permission modes applied to spool files and to the directories holding
   // them. Always resolved to a concrete mode by the constructor.

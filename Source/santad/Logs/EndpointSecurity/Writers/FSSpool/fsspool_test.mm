@@ -19,6 +19,7 @@
 #include <sys/stat.h>
 
 #include <memory>
+#include <vector>
 
 #include "Source/common/TestUtils.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/AnyBatcher.h"
@@ -74,6 +75,33 @@ static constexpr size_t kSpoolSize = 1048576;
 
 - (void)tearDown {
   XCTAssertTrue([self.fileMgr removeItemAtPath:self.testDir error:nil]);
+}
+
+// A group this process belongs to that is not `currentGid`, so a chown to it is both permitted
+// without root and observable. Returns kNoTestGroup when the process has no second group.
+static constexpr gid_t kNoTestGroup = (gid_t)-1;
+- (gid_t)otherGroupThan:(gid_t)currentGid {
+  int count = getgroups(0, NULL);
+  if (count <= 0) {
+    return kNoTestGroup;
+  }
+  std::vector<gid_t> groups(count);
+  count = getgroups(count, groups.data());
+  for (int i = 0; i < count; i++) {
+    if (groups[i] != currentGid) {
+      return groups[i];
+    }
+  }
+  return kNoTestGroup;
+}
+
+// Group of `path`, or kNoTestGroup when it can't be stat'd.
+- (gid_t)groupOfPath:(NSString*)path {
+  struct stat sb;
+  if (stat([path UTF8String], &sb) != 0) {
+    return kNoTestGroup;
+  }
+  return sb.st_gid;
 }
 
 // Permission bits of `path`, or 0 when it can't be stat'd.
@@ -351,6 +379,68 @@ static constexpr size_t kSpoolSize = 1048576;
   // The symlink's target keeps the mode it had; only real directories are touched.
   XCTAssertEqual([self modeOfPath:elsewhere], 0700);
   XCTAssertEqual([self modeOfPath:self.baseDir], 0750);
+}
+
+- (void)testConfiguredGroupAppliedToFilesAndDirs {
+  auto probe = std::make_unique<FsSpoolWriterPeer<fsspool::AnyBatcher>>(
+      fsspool::AnyBatcher(), [self.baseDir UTF8String], kSpoolSize);
+  XCTAssertStatusOk(probe->BuildDirectoryStructureIfNeeded());
+
+  gid_t target = [self otherGroupThan:[self groupOfPath:self.spoolDir]];
+  if (target == kNoTestGroup) {
+    XCTSkip(@"Process belongs to only one group, so a chown cannot be observed here");
+  }
+  probe.reset();
+  XCTAssertTrue([self.fileMgr removeItemAtPath:self.baseDir error:nil]);
+
+  auto writer = std::make_unique<FsSpoolWriterPeer<fsspool::AnyBatcher>>(
+      fsspool::AnyBatcher(), [self.baseDir UTF8String], kSpoolSize, nullptr, 0640, target);
+
+  XCTAssertStatusOk(writer->Write({123}));
+  XCTAssertStatusOk(writer->Flush());
+
+  NSArray<NSString*>* files = [self.fileMgr contentsOfDirectoryAtPath:self.spoolDir error:nil];
+  XCTAssertEqual(files.count, 1);
+  NSString* spoolFile = [NSString stringWithFormat:@"%@/%@", self.spoolDir, files.firstObject];
+
+  XCTAssertEqual([self groupOfPath:spoolFile], target);
+  XCTAssertEqual([self groupOfPath:self.baseDir], target);
+  XCTAssertEqual([self groupOfPath:self.spoolDir], target);
+  XCTAssertEqual([self groupOfPath:self.tmpDir], target);
+
+  // The mode still lands, and lands after the chown.
+  XCTAssertEqual([self modeOfPath:spoolFile], 0640);
+  XCTAssertEqual([self modeOfPath:self.spoolDir], 0750);
+}
+
+- (void)testConfiguredGroupAppliedToPreexistingSpoolFiles {
+  XCTAssertTrue([self.fileMgr createDirectoryAtPath:self.spoolDir
+                        withIntermediateDirectories:YES
+                                         attributes:nil
+                                              error:nil]);
+  NSString* stale = [NSString stringWithFormat:@"%@/stale.log", self.spoolDir];
+  XCTAssertTrue([self.fileMgr createFileAtPath:stale contents:nil attributes:nil]);
+
+  gid_t target = [self otherGroupThan:[self groupOfPath:stale]];
+  if (target == kNoTestGroup) {
+    XCTSkip(@"Process belongs to only one group, so a chown cannot be observed here");
+  }
+
+  auto writer = std::make_unique<FsSpoolWriterPeer<fsspool::AnyBatcher>>(
+      fsspool::AnyBatcher(), [self.baseDir UTF8String], kSpoolSize, nullptr, 0, target);
+
+  XCTAssertEqual([self groupOfPath:stale], target);
+}
+
+- (void)testUnconfiguredGroupLeavesOwnershipAlone {
+  auto writer = std::make_unique<FsSpoolWriterPeer<fsspool::AnyBatcher>>(
+      fsspool::AnyBatcher(), [self.baseDir UTF8String], kSpoolSize, nullptr, 0640);
+
+  XCTAssertStatusOk(writer->Write({123}));
+  XCTAssertStatusOk(writer->Flush());
+
+  // The spool keeps the group it inherited from the directory above it.
+  XCTAssertEqual([self groupOfPath:self.spoolDir], [self groupOfPath:self.testDir]);
 }
 
 - (void)testDirectoryModeForFileMode {

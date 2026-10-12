@@ -18,6 +18,8 @@
 #include <errno.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #include <algorithm>
 #include <memory>
@@ -29,7 +31,7 @@ namespace santa {
 
 std::shared_ptr<File> File::Create(NSString* path, uint64_t flush_timeout_ms,
                                    size_t batch_size_bytes, size_t max_expected_write_size_bytes,
-                                   mode_t file_mode) {
+                                   mode_t file_mode, gid_t file_gid) {
   dispatch_queue_t q = dispatch_queue_create("com.northpolesec.santa.daemon.file_event_log",
                                              DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL);
   dispatch_source_t timer_source = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, q);
@@ -38,7 +40,7 @@ std::shared_ptr<File> File::Create(NSString* path, uint64_t flush_timeout_ms,
                             NSEC_PER_MSEC * flush_timeout_ms, 0);
 
   auto ret_writer = std::make_shared<File>(path, batch_size_bytes, max_expected_write_size_bytes, q,
-                                           timer_source, file_mode);
+                                           timer_source, file_mode, file_gid);
   ret_writer->WatchLogFile();
 
   std::weak_ptr<File> weak_writer(ret_writer);
@@ -56,7 +58,7 @@ std::shared_ptr<File> File::Create(NSString* path, uint64_t flush_timeout_ms,
 }
 
 File::File(NSString* path, size_t batch_size_bytes, size_t max_expected_write_size_bytes,
-           dispatch_queue_t q, dispatch_source_t timer_source, mode_t file_mode)
+           dispatch_queue_t q, dispatch_source_t timer_source, mode_t file_mode, gid_t file_gid)
     : buffer_(batch_size_bytes + max_expected_write_size_bytes),
       batch_size_bytes_(batch_size_bytes),
       q_(q),
@@ -64,6 +66,7 @@ File::File(NSString* path, size_t batch_size_bytes, size_t max_expected_write_si
       watch_source_(nullptr) {
   path_ = path;
   file_mode_ = file_mode;
+  file_gid_ = file_gid;
   OpenFileHandleSerialized();
 }
 
@@ -111,12 +114,28 @@ void File::OpenFileHandleSerialized() {
   // Only ever to a regular file. An EventLogPath in a directory others can write could be a
   // symlink by the time it is opened, and `fileHandleForWritingAtPath:` follows it - so without
   // this check the mode would land on whatever the link names, applied as root.
-  if (file_mode_ && file_handle_) {
-    struct stat sb;
-    if (lstat(path_.UTF8String, &sb) != 0 || !S_ISREG(sb.st_mode)) {
-      LOGW(@"Not setting mode on %@: not a regular file", path_);
-    } else if (fchmod(file_handle_.fileDescriptor, file_mode_) != 0) {
-      LOGW(@"Unable to set mode 0%o on %@: %d: %s", file_mode_, path_, errno, strerror(errno));
+  if ((file_mode_ || file_gid_ != (gid_t)-1) && file_handle_) {
+    // Confirm the descriptor refers to the regular file that this path names, and not to whatever
+    // a symlink pointed at. `fileHandleForWritingAtPath:` follows a symlink, and an lstat alone
+    // would leave a window between the open and the change. Comparing the lstat of the path with
+    // the fstat of the open descriptor closes it: if the path is a symlink, or was swapped after
+    // the open, the two do not describe the same file and nothing is changed.
+    struct stat path_sb;
+    struct stat fd_sb;
+    if (lstat(path_.UTF8String, &path_sb) != 0 || fstat(file_handle_.fileDescriptor, &fd_sb) != 0 ||
+        !S_ISREG(path_sb.st_mode) || path_sb.st_dev != fd_sb.st_dev ||
+        path_sb.st_ino != fd_sb.st_ino) {
+      LOGW(@"Not setting mode or group on %@: not the regular file it names", path_);
+    } else {
+      // Group first: chown(2) can clear the set-id bits, so the chmod after it is the one that
+      // decides the final mode.
+      if (file_gid_ != (gid_t)-1 &&
+          fchown(file_handle_.fileDescriptor, (uid_t)-1, file_gid_) != 0) {
+        LOGW(@"Unable to set group %u on %@: %d: %s", file_gid_, path_, errno, strerror(errno));
+      }
+      if (file_mode_ && fchmod(file_handle_.fileDescriptor, file_mode_) != 0) {
+        LOGW(@"Unable to set mode 0%o on %@: %d: %s", file_mode_, path_, errno, strerror(errno));
+      }
     }
   }
 }

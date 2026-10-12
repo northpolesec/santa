@@ -249,6 +249,34 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
   XCTAssertEqual(sut.telemetryFileMode, 0);
 }
 
+- (void)testTelemetryFileGroup {
+  SNTConfigurator* sut = [[SNTConfigurator alloc] init];
+
+  // Unset means "leave the group alone", which is the value chown(2) uses for the same.
+  XCTAssertEqual(sut.telemetryFileGroup, kNoGroup);
+  sut.configState[@"TelemetryFileGroup"] = @"";
+  XCTAssertEqual(sut.telemetryFileGroup, kNoGroup);
+
+  // wheel is gid 0 on macOS. Note that 0 is a real group id and must not read as "unset".
+  sut.configState[@"TelemetryFileGroup"] = @"wheel";
+  XCTAssertEqual(sut.telemetryFileGroup, 0);
+  XCTAssertNotEqual(sut.telemetryFileGroup, kNoGroup);
+
+  sut.configState[@"TelemetryFileGroup"] = @"everyone";
+  XCTAssertEqual(sut.telemetryFileGroup, 12);
+
+  // A name that is not a group on this system is ignored rather than guessed at.
+  sut.configState[@"TelemetryFileGroup"] = @"definitely-not-a-group-zz9";
+  XCTAssertEqual(sut.telemetryFileGroup, kNoGroup);
+
+  // A numeric string is a name lookup too, not a gid. Santa takes group names only.
+  sut.configState[@"TelemetryFileGroup"] = @"0";
+  XCTAssertEqual(sut.telemetryFileGroup, kNoGroup);
+
+  sut.configState[@"TelemetryFileGroup"] = nil;
+  XCTAssertEqual(sut.telemetryFileGroup, kNoGroup);
+}
+
 - (void)testSyncBaseURLRejectsNonLocalhostHTTP {
   SNTConfigurator* sut = [[SNTConfigurator alloc] init];
 

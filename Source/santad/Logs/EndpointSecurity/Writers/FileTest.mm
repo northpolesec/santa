@@ -18,6 +18,8 @@
 #include <gtest/gtest.h>
 #include <sys/stat.h>
 
+#include <unistd.h>
+
 #include <vector>
 
 #include "Source/common/TestUtils.h"
@@ -202,6 +204,55 @@ bool WaitForBufferSize(std::shared_ptr<FilePeer> file, size_t expectedSize) {
   struct stat sb;
   XCTAssertEqual(fstat(file->FileHandle().fileDescriptor, &sb), 0);
   XCTAssertEqual(sb.st_mode & ACCESSPERMS, 0666);
+}
+
+- (void)testFileGroupApplied {
+  XCTAssertTrue([self.fileManager createFileAtPath:self.logPath contents:nil attributes:nil]);
+
+  struct stat sb;
+  XCTAssertEqual(stat([self.logPath UTF8String], &sb), 0);
+
+  // A group this process belongs to, other than the file's current one, so the chown is both
+  // permitted without root and observable.
+  gid_t target = (gid_t)-1;
+  int count = getgroups(0, NULL);
+  std::vector<gid_t> groups(count > 0 ? count : 0);
+  if (count > 0) {
+    count = getgroups(count, groups.data());
+    for (int i = 0; i < count; i++) {
+      if (groups[i] != sb.st_gid) {
+        target = groups[i];
+        break;
+      }
+    }
+  }
+  if (target == (gid_t)-1) {
+    XCTSkip(@"Process belongs to only one group, so a chown cannot be observed here");
+  }
+
+  auto file = std::make_shared<FilePeer>(self.logPath, 100, 500, self.q, self.timer, 0640, target);
+
+  XCTAssertEqual(fstat(file->FileHandle().fileDescriptor, &sb), 0);
+  XCTAssertEqual(sb.st_gid, target);
+  XCTAssertEqual(sb.st_mode & ACCESSPERMS, 0640);
+}
+
+- (void)testFileGroupNotAppliedThroughSymlink {
+  NSString* target = [NSString stringWithFormat:@"%@/target.out", self.path];
+  XCTAssertTrue([self.fileManager createFileAtPath:target contents:nil attributes:nil]);
+  XCTAssertTrue([self.fileManager createSymbolicLinkAtPath:self.logPath
+                                       withDestinationPath:target
+                                                     error:nil]);
+
+  struct stat before;
+  XCTAssertEqual(stat([target UTF8String], &before), 0);
+
+  auto file = std::make_shared<FilePeer>(self.logPath, 100, 500, self.q, self.timer, 0644, 0);
+
+  struct stat after;
+  XCTAssertEqual(stat([target UTF8String], &after), 0);
+  XCTAssertEqual(after.st_gid, before.st_gid);
+  XCTAssertEqual(after.st_mode & ACCESSPERMS, before.st_mode & ACCESSPERMS);
 }
 
 - (void)testFileModeNotAppliedThroughSymlink {

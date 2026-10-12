@@ -82,6 +82,14 @@ int LChmod(const char* path, mode_t mode) {
   return fchmodat(AT_FDCWD, path, mode, AT_SYMLINK_NOFOLLOW);
 }
 
+// -1 for the owner leaves it alone, which is what chown(2) does with that
+// value.
+int FChown(int fd, gid_t gid) { return fchown(fd, (uid_t)-1, gid); }
+
+int LChown(const char* path, gid_t gid) {
+  return fchownat(AT_FDCWD, path, (uid_t)-1, gid, AT_SYMLINK_NOFOLLOW);
+}
+
 int FChmod(int fd, mode_t mode) { return fchmod(fd, mode); }
 
 absl::Status MkDir(const std::string& path, mode_t mode) {

@@ -15,8 +15,12 @@
 
 #import "Source/common/SNTConfigurator.h"
 
+#include <grp.h>
 #include <stdlib.h>
 #include <sys/stat.h>
+#include <sys/types.h>
+
+#include <vector>
 
 #include <optional>
 #include <set>
@@ -66,6 +70,32 @@ static mode_t ParseOctalMode(NSString* rawMode) {
   }
 
   return (mode_t)parsed;
+}
+
+// Resolves a group name to its id. Returns `kNoGroup` when the name is empty or unknown to the
+// system. Shared with `validateConfiguration` so `santactl doctor` rejects exactly what santad
+// would ignore.
+static gid_t LookupGroup(NSString* groupName) {
+  if (!groupName.length) {
+    return kNoGroup;
+  }
+
+  long bufSize = sysconf(_SC_GETGR_R_SIZE_MAX);
+  if (bufSize <= 0) {
+    bufSize = 4096;
+  }
+
+  struct group grp;
+  struct group* result = NULL;
+  std::vector<char> buf(bufSize);
+
+  // getgrnam_r reports "no such group" as success with a NULL result, so both must be checked.
+  if (getgrnam_r([groupName UTF8String], &grp, buf.data(), buf.size(), &result) != 0 ||
+      result == NULL) {
+    return kNoGroup;
+  }
+
+  return grp.gr_gid;
 }
 
 // Drops setuid/setgid/sticky and always keeps owner read/write so santad can't lock itself out of
@@ -271,6 +301,7 @@ static NSString* const kSpoolDirectoryFileSizeThresholdKB = @"SpoolDirectoryFile
 static NSString* const kSpoolDirectorySizeThresholdMB = @"SpoolDirectorySizeThresholdMB";
 static NSString* const kSpoolDirectoryEventMaxFlushTimeSec = @"SpoolDirectoryEventMaxFlushTimeSec";
 static NSString* const kTelemetryFileMode = @"TelemetryFileMode";
+static NSString* const kTelemetryFileGroup = @"TelemetryFileGroup";
 
 static NSString* const kFileAccessPolicy = @"FileAccessPolicy";
 static NSString* const kFileAccessPolicyPlist = @"FileAccessPolicyPlist";
@@ -494,6 +525,7 @@ static NSString* const kPushTokenChainKey = @"PushTokenChain";
       kSpoolDirectorySizeThresholdMB : number,
       kSpoolDirectoryEventMaxFlushTimeSec : number,
       kTelemetryFileMode : string,
+      kTelemetryFileGroup : string,
       kFileAccessPolicy : dictionary,
       kFileAccessPolicyPlist : string,
       kFileAccessBlockMessage : string,
@@ -841,6 +873,10 @@ static SNTConfigurator* sharedConfigurator = nil;
 }
 
 + (NSSet*)keyPathsForValuesAffectingTelemetryFileMode {
+  return [self configStateSet];
+}
+
++ (NSSet*)keyPathsForValuesAffectingTelemetryFileGroup {
   return [self configStateSet];
 }
 
@@ -1755,6 +1791,20 @@ static SNTConfigurator* sharedConfigurator = nil;
   }
 
   return sanitized;
+}
+
+- (gid_t)telemetryFileGroup {
+  NSString* groupName = self.configState[kTelemetryFileGroup];
+  if (!groupName.length) {
+    return kNoGroup;
+  }
+
+  gid_t gid = LookupGroup(groupName);
+  if (gid == kNoGroup) {
+    LOGW(@"%@ (\"%@\") is not a group on this system. Ignoring.", kTelemetryFileGroup, groupName);
+  }
+
+  return gid;
 }
 
 - (NSDictionary*)fileAccessPolicy {
@@ -2761,6 +2811,14 @@ static BOOL HoldsSyncedSettings(NSDictionary* syncState) {
           addObject:[NSString stringWithFormat:
                                   @"The key %@ (\"%@\") is not a valid octal mode, e.g. \"0640\"",
                                   key, value]];
+    }
+
+    // If the key is TelemetryFileGroup, check the group exists. A name that doesn't resolve would
+    // otherwise pass as a well-typed string and then be silently ignored by santad.
+    if ([key isEqualToString:kTelemetryFileGroup] && LookupGroup((NSString*)value) == kNoGroup) {
+      [errors addObject:[NSString stringWithFormat:@"The key %@ (\"%@\") is not a group on this "
+                                                   @"system",
+                                                   key, value]];
     }
 
     // If the key is StaticRules, validate the passed in rules.
