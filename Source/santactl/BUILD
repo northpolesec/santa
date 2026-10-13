@@ -401,6 +401,12 @@ santa_unit_test(
 )
 
 santa_unit_test(
+    name = "SNTCommandSandboxTest",
+    srcs = ["Commands/SNTCommandSandboxTest.mm"],
+    deps = [":SNTCommandSandbox"],
+)
+
+santa_unit_test(
     name = "SNTCommandTest",
     srcs = ["SNTCommandTest.mm"],
     deps = [
@@ -419,6 +425,7 @@ test_suite(
         ":SNTCommandFileInfoTest",
         ":SNTCommandMetricsTest",
         ":SNTCommandRuleTest",
+        ":SNTCommandSandboxTest",
         ":SNTCommandTest",
     ],
     visibility = ["//:santa_package_group"],
