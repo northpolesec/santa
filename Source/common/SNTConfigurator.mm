@@ -291,6 +291,8 @@ static NSString* const kBlockNetworkMountKey = @"BlockNetworkMount";
 static NSString* const kAllowedNetworkMountHosts = @"AllowedNetworkMountHosts";
 static NSString* const kEnableTransitiveRulesKey = @"EnableTransitiveRules";
 static NSString* const kEnableTransitiveRulesKeyDeprecated = @"EnableTransitiveWhitelisting";
+static NSString* const kCompilerTransitiveWaitMillisecondsKey =
+    @"CompilerTransitiveWaitMilliseconds";
 static NSString* const kAllowedPathRegexKey = @"AllowedPathRegex";
 static NSString* const kAllowedPathRegexKeyDeprecated = @"WhitelistRegex";
 static NSString* const kBlockedPathRegexKey = @"BlockedPathRegex";
@@ -387,6 +389,7 @@ static NSString* const kPushTokenChainKey = @"PushTokenChain";
       kFailClosedKey : number,
       kEnableTransitiveRulesKey : number,
       kEnableTransitiveRulesKeyDeprecated : number,
+      kCompilerTransitiveWaitMillisecondsKey : number,
       kFileChangesRegexKey : re,
       kFileChangesPrefixFiltersKey : array,
       kAllowedPathRegexKey : re,
@@ -830,6 +833,10 @@ static SNTConfigurator* sharedConfigurator = nil;
   return [self syncAndConfigStateSet];
 }
 
++ (NSSet*)keyPathsForValuesAffectingCompilerTransitiveWaitMilliseconds {
+  return [self configStateSet];
+}
+
 + (NSSet*)keyPathsForValuesAffectingEnableAllEventUpload {
   return [self syncAndConfigStateSet];
 }
@@ -1163,6 +1170,26 @@ static SNTConfigurator* sharedConfigurator = nil;
 
 - (void)setEnableTransitiveRules:(BOOL)enabled {
   [self updateSyncStateForKey:kEnableTransitiveRulesKey value:@(enabled)];
+}
+
+- (uint32_t)compilerTransitiveWaitMilliseconds {
+  static constexpr uint32_t kDefaultMs = 2000;
+  static constexpr uint32_t kMaxMs = 10000;
+  NSNumber* n = self.configState[kCompilerTransitiveWaitMillisecondsKey];
+  if (!n) {
+    return kDefaultMs;
+  }
+  long long ms = [n longLongValue];
+  if (ms < 0) {
+    LOGW(@"%@ of %lld is negative, disabling the hold", kCompilerTransitiveWaitMillisecondsKey, ms);
+    return 0;
+  }
+  if (ms > kMaxMs) {
+    LOGW(@"%@ of %lld exceeds the maximum, using %u", kCompilerTransitiveWaitMillisecondsKey, ms,
+         kMaxMs);
+    return kMaxMs;
+  }
+  return (uint32_t)ms;
 }
 
 - (BOOL)enableBundles {

@@ -154,6 +154,10 @@ using santa::Message;
       self->_authResultCache->RemoveFromCache(target);
       break;
     } else if (returnAction == SNTActionRespondHold) {
+      NSString* reason = cacheEntry.cached_decision.heldForTransitiveRule
+                             ? @"instance is waiting for its transitive rule. Try again\n"
+                               @"in a moment.\n"
+                             : @"instance is currently pending user authorization.\n";
       _ttyWriter->Write(
           targetProc,
           [NSString stringWithFormat:@"---\n"
@@ -162,10 +166,10 @@ using santa::Message;
                                      @"Blocked: %s\n"
                                      @"\n"
                                      @"Execution of this binary was blocked because a separate\n"
-                                     @"instance is currently pending user authorization.\n"
+                                     @"%@"
                                      @"---\n"
                                      @"\n",
-                                     targetProc->executable->path.data]);
+                                     targetProc->executable->path.data, reason]);
       [self respondToMessage:msg withAuthResult:ES_AUTH_RESULT_DENY cacheable:false];
       return;
     } else if (returnAction == SNTActionRequestBinary) {

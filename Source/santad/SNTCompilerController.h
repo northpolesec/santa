@@ -20,8 +20,12 @@
 
 #include "Source/common/es/Message.h"
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
+#include "Source/santad/PendingExecCoordinator.h"
 
 @interface SNTCompilerController : NSObject
+
+- (instancetype)initWithPendingExecCoordinator:
+    (std::shared_ptr<santa::PendingExecCoordinator>)coordinator;
 
 // This function will determine if the instigating process was a compiler and,
 // for appropriate events, will create appropriate transitive rules.

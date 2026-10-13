@@ -149,7 +149,7 @@ static const char* kBlockedCDHash = "7218eddfee4d3eba4873dedf22d1391d79aea25f";
 
   // Create deps and inject a ProcessControlBlock that has no side effects
   std::unique_ptr<SantadDeps> deps =
-      SantadDeps::Create(mockConfigurator, nil, ^bool(pid_t, santa::ProcessControl) {
+      SantadDeps::Create(mockConfigurator, nil, ^bool(audit_token_t, santa::ProcessControl) {
         return true;
       });
 

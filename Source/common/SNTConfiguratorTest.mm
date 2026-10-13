@@ -1251,4 +1251,21 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
                  SNTExecutableIntegrityPolicyEnforce);
 }
 
+- (void)testCompilerTransitiveWaitMilliseconds {
+  SNTConfigurator* sut = [[SNTConfigurator alloc] init];
+  XCTAssertEqual(sut.compilerTransitiveWaitMilliseconds, 2000u);
+
+  sut.configState[@"CompilerTransitiveWaitMilliseconds"] = @(500);
+  XCTAssertEqual(sut.compilerTransitiveWaitMilliseconds, 500u);
+
+  sut.configState[@"CompilerTransitiveWaitMilliseconds"] = @(0);
+  XCTAssertEqual(sut.compilerTransitiveWaitMilliseconds, 0u);
+
+  sut.configState[@"CompilerTransitiveWaitMilliseconds"] = @(60000);
+  XCTAssertEqual(sut.compilerTransitiveWaitMilliseconds, 10000u);
+
+  sut.configState[@"CompilerTransitiveWaitMilliseconds"] = @(-1);
+  XCTAssertEqual(sut.compilerTransitiveWaitMilliseconds, 0u);
+}
+
 @end

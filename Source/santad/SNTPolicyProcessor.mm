@@ -528,6 +528,15 @@ static void ApplySilentBlock(SNTCachedDecision* cd, SNTRuleState state) {
   }
 }
 
+- (BOOL)transitiveRuleAllowsDecision:(SNTCachedDecision*)cd {
+  if (!self.configurator.enableTransitiveRules || cd.sha256.length == 0) {
+    return NO;
+  }
+  SNTRule* rule = [self.ruleTable executionRuleForIdentifiers:CreateRuleIDs(cd)];
+  return rule.state == SNTRuleStateAllowTransitive && rule.type == SNTRuleTypeBinary &&
+         [rule.identifier isEqualToString:cd.sha256];
+}
+
 // This method applies the rules to the cached decision object.
 //
 // It returns YES if the decision was made, NO if the decision was not made.

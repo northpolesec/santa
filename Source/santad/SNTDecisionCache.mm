@@ -102,6 +102,10 @@
   return self->_decisionCache.set(cd.vnodeId, cd);
 }
 
+- (bool)cacheDecision:(SNTCachedDecision*)cd replacingDecision:(SNTCachedDecision*)previous {
+  return self->_decisionCache.set(cd.vnodeId, cd, previous);
+}
+
 - (bool)cacheDecisionIfNotSet:(SNTCachedDecision*)cd {
   return self->_decisionCache.set(cd.vnodeId, cd, nil);
 }
@@ -116,6 +120,10 @@
 
 - (void)forgetCachedDecisionForVnode:(SantaVnode)vnode {
   self->_decisionCache.remove(vnode);
+}
+
+- (void)forgetCachedDecision:(SNTCachedDecision*)cd {
+  self->_decisionCache.set(cd.vnodeId, nil, cd);
 }
 
 // Whenever a cached decision resulting from a transitive allowlist rule is used to allow the

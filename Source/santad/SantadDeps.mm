@@ -35,6 +35,7 @@
 #import "Source/santad/DataLayer/SNTEventTable.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
 #include "Source/santad/EntitlementsFilter.h"
+#include "Source/santad/PendingExecCoordinator.h"
 #import "Source/santad/SNTBelievableClock.h"
 #import "Source/santad/SNTDatabaseController.h"
 #import "Source/santad/SNTDecisionCache.h"
@@ -87,7 +88,11 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator* configurator,
     exit(EXIT_FAILURE);
   }
 
-  SNTCompilerController* compiler_controller = [[SNTCompilerController alloc] init];
+  // Shared by the compiler controller, which creates transitive rules, and the
+  // exec controller, which holds executions waiting for them.
+  auto pending_exec_coordinator = std::make_shared<santa::PendingExecCoordinator>();
+  SNTCompilerController* compiler_controller =
+      [[SNTCompilerController alloc] initWithPendingExecCoordinator:pending_exec_coordinator];
   if (!compiler_controller) {
     LOGE(@"Failed to initialize compiler controller.");
     exit(EXIT_FAILURE);
@@ -258,7 +263,8 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator* configurator,
                                             processTree:process_tree
                                     sandboxExpectations:sandbox_expectations
                                          timedRuleKills:timed_rule_kills
-                                        believableClock:believable_clock];
+                                        believableClock:believable_clock
+                                 pendingExecCoordinator:pending_exec_coordinator];
   if (!exec_controller) {
     LOGE(@"Failed to initialize exec controller.");
     exit(EXIT_FAILURE);

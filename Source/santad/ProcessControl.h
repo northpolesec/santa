@@ -15,13 +15,16 @@
 #ifndef SANTA_SANTAD_PROCESSCONTROL_H
 #define SANTA_SANTAD_PROCESSCONTROL_H
 
-#include <sys/types.h>
+#include <bsm/libbsm.h>
 
 namespace santa {
 
 enum class ProcessControl { Suspend, Resume, Kill };
 
-using ProcessControlBlock = bool (^)(pid_t, ProcessControl);
+// Acts on the process identified by `token`. Resume and Kill act only on the
+// process with the token's pid and pidversion, so a process that reused the pid
+// is never signaled.
+using ProcessControlBlock = bool (^)(audit_token_t token, ProcessControl);
 
 ProcessControlBlock ProdSuspendResumeBlock();
 

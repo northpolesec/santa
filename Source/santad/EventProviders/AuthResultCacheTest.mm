@@ -336,6 +336,31 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
   XCTAssertNil(cache->CheckCache(rootTarget).cached_decision);
 }
 
+// A transitive hold keeps its decision, so a concurrent execution can tell what
+// the hold is waiting for. Any other hold keeps none.
+- (void)testHoldKeepsOnlyATransitiveHoldsDecision {
+  auto esapi = std::make_shared<MockEndpointSecurityAPI>();
+  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(esapi, nil);
+
+  santa::ExecTarget rootTarget = MakeTarget(RootDevno(), 111);
+
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+  cd.heldForTransitiveRule = YES;
+  XCTAssertTrue(cache->AddToCache(rootTarget, SNTActionRequestBinary));
+  XCTAssertTrue(cache->AddToCache(rootTarget, SNTActionRespondHold, cd));
+  santa::CachedAuthResult entry = cache->CheckCache(rootTarget);
+  XCTAssertEqual(entry.action, SNTActionRespondHold);
+  XCTAssertTrue(entry.cached_decision.heldForTransitiveRule);
+
+  cache->RemoveFromCache(rootTarget);
+  cd.heldForTransitiveRule = NO;
+  XCTAssertTrue(cache->AddToCache(rootTarget, SNTActionRequestBinary));
+  XCTAssertTrue(cache->AddToCache(rootTarget, SNTActionRespondHold, cd));
+  entry = cache->CheckCache(rootTarget);
+  XCTAssertEqual(entry.action, SNTActionRespondHold);
+  XCTAssertNil(entry.cached_decision);
+}
+
 - (void)testCompilerNoCacheIsNarrowedAndNeverTerminal {
   auto esapi = std::make_shared<MockEndpointSecurityAPI>();
   std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(esapi, nil);

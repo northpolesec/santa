@@ -77,4 +77,11 @@ using ActivationCallbackBlock =
                   failClosed:(BOOL)failClosed
     andCELActivationCallback:(nullable ActivationCallbackBlock)activationCallback;
 
+///
+/// YES if transitive rules are enabled and the rule that now governs `cd`'s
+/// identifiers is the transitive rule for its SHA-256. Any other governing rule
+/// gives NO, including an allow rule of another state or type.
+///
+- (BOOL)transitiveRuleAllowsDecision:(nonnull SNTCachedDecision*)cd;
+
 @end
