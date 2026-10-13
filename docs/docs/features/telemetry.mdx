@@ -382,8 +382,9 @@ Applies when using the `protobuf` or `json` log types.
   value as a string of octal digits, for example `"0640"`. The mode applies to the log file at
   `EventLogPath`, to the spool files under `SpoolDirectory`, and to the spool directories. Use
   this key to let a log shipper that does not run as root read the telemetry. The mode that you
-  give controls which accounts can read the telemetry. A mode of `0640` gives read permission to
-  the group only. A mode of `0644` also gives read permission to every other account.
+  give controls which accounts can read the telemetry. Santa always gives read permission to the
+  owner, which is root. A mode of `0640` adds read permission for the group. A mode of `0644`
+  adds it for every other account.
 
   Santa changes the mode that you configure before it applies the mode. Santa removes the setuid,
   setgid, and sticky bits. Santa also removes group write and world write. Santa always gives read
