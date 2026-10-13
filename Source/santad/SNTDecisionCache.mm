@@ -57,17 +57,10 @@
 - (void)setEntitlementsFilter:(std::shared_ptr<santa::EntitlementsFilter>)filter {
   // Programming error to set twice: the filter is not safe to swap at runtime.
   // Reads on other threads are unsynchronized and rely on this set-once
-  // invariant plus the happens-before edges established at daemon init. Tests
-  // that need to restore singleton state use -resetEntitlementsFilterForTesting.
+  // invariant plus the happens-before edges established at daemon init.
   assert(!_entitlementsFilter);
   _entitlementsFilter = std::move(filter);
 }
-
-#ifdef DEBUG
-- (void)resetEntitlementsFilterForTesting {
-  _entitlementsFilter.reset();
-}
-#endif
 
 + (instancetype)sharedCache {
   static SNTDecisionCache* cache;
@@ -116,10 +109,6 @@
 
 - (SNTCachedDecision*)cachedDecisionForVnode:(SantaVnode)vnode {
   return self->_decisionCache.get(vnode);
-}
-
-- (void)forgetCachedDecisionForVnode:(SantaVnode)vnode {
-  self->_decisionCache.remove(vnode);
 }
 
 - (void)forgetCachedDecision:(SNTCachedDecision*)cd {

@@ -1971,7 +1971,6 @@ santa_unit_test(
         "//Source/common:SNTCommonEnums",
         "//Source/common:SNTFileInfo",
         "//Source/common:SNTRule",
-        "//Source/common:SantaVnode",
         "//Source/common:TestUtils",
         "@OCMock",
     ],
