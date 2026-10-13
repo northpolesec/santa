@@ -28,6 +28,7 @@
 @property(readwrite) NSUInteger timestamp;
 @property(readwrite) SNTRuleState state;
 @property(readwrite) SNTRuleType type;
+@property(readwrite) NSString* seatbeltPolicy;
 @end
 
 @interface SNTRuleTest : XCTestCase
@@ -383,6 +384,8 @@
       {{SNTRuleTypeBinary, SNTRuleStateAllowCompiler}, @"Allowed (Binary, Compiler)"},
       {{SNTRuleTypeBinary, SNTRuleStateAllowTransitive},
        @"Allowed (Binary, Transitive)\nlast access date: 2023-03-08 20:26:40 +0000"},
+      {{SNTRuleTypeBinary, SNTRuleStateAllowLocalBinary}, @"Allowed (Binary, Local)"},
+      {{SNTRuleTypeBinary, (SNTRuleState)99}, @"Unexpected rule state: 99 (Binary)"},
 
       {{SNTRuleTypeSigningID, SNTRuleStateUnknown}, @"None"},
       {{SNTRuleTypeSigningID, SNTRuleStateAllow}, @"Allowed (SigningID)"},
@@ -392,6 +395,7 @@
       {{SNTRuleTypeSigningID, SNTRuleStateAllowCompiler}, @"Allowed (SigningID, Compiler)"},
       {{SNTRuleTypeSigningID, SNTRuleStateAllowTransitive},
        @"Allowed (SigningID, Transitive)\nlast access date: 2023-03-08 20:26:40 +0000"},
+      {{SNTRuleTypeSigningID, SNTRuleStateAllowLocalSigningID}, @"Allowed (SigningID, Local)"},
 
       {{SNTRuleTypeCertificate, SNTRuleStateUnknown}, @"None"},
       {{SNTRuleTypeCertificate, SNTRuleStateAllow}, @"Allowed (Certificate)"},
@@ -421,6 +425,19 @@
 
     NSString* got = [rule stringifyWithColor:NO];
     XCTAssertEqualObjects(got, want);
+  }
+}
+
+- (void)testStringifyNamesSeatbeltPolicyOnCELRules {
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.type = SNTRuleTypeBinary;
+
+  for (SNTRuleState state : {SNTRuleStateCEL, SNTRuleStateCELv2}) {
+    rule.state = state;
+    rule.seatbeltPolicy = nil;
+    XCTAssertEqualObjects([rule stringifyWithColor:NO], @"CEL (Binary)");
+    rule.seatbeltPolicy = @"(version 1)";
+    XCTAssertEqualObjects([rule stringifyWithColor:NO], @"CEL (Binary, Seatbelt)");
   }
 }
 
