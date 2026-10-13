@@ -127,12 +127,21 @@ static NSString* TAMUsernameForUID(uid_t uid) {
 // decision:forRule:withTransitiveRules:failClosed:andCELActivationCallback:]. Returns nil where
 // the policy processor treats the rule as not found, so the caller decides as if no rule matched.
 static NSString* StaticDecisionForRule(SNTRule* rule, BOOL enableTransitiveRules) {
+  NSString* const kAllowed = @"Allowed by rule";
+  SNTRuleType type = rule.type;
   switch (rule.state) {
-    case SNTRuleStateAllow:
+    case SNTRuleStateAllow: return kAllowed;
+    // These states apply only to the rule types the policy processor's decision table lists for
+    // them. StaticRules does not validate the pairing.
     case SNTRuleStateAllowCompiler:
-    case SNTRuleStateAllowLocalBinary:
-    case SNTRuleStateAllowLocalSigningID: return @"Allowed by rule";
-    case SNTRuleStateAllowTransitive: return enableTransitiveRules ? @"Allowed by rule" : nil;
+      return (type == SNTRuleTypeCDHash || type == SNTRuleTypeBinary ||
+              type == SNTRuleTypeSigningID)
+                 ? kAllowed
+                 : nil;
+    case SNTRuleStateAllowLocalBinary: return type == SNTRuleTypeBinary ? kAllowed : nil;
+    case SNTRuleStateAllowLocalSigningID: return type == SNTRuleTypeSigningID ? kAllowed : nil;
+    case SNTRuleStateAllowTransitive:
+      return (enableTransitiveRules && type == SNTRuleTypeBinary) ? kAllowed : nil;
     case SNTRuleStateBlock:
     case SNTRuleStateSilentBlock:
     case SNTRuleStateSilentBlockGUI:

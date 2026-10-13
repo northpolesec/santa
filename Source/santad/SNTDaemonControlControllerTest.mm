@@ -42,6 +42,8 @@ using santa::SandboxExpectations;
 // shape for binary-type identifiers.
 static NSString* const kBinarySHA256 =
     @"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+static NSString* const kTeamID = @"ABCDEFGHIJ";
+static NSString* const kSigningID = @"ABCDEFGHIJ:com.example.tool";
 
 // Expose seatbeltPolicy readwrite so tests can simulate the (technically
 // unreachable-from-prod) "SEATBELT rule with empty policy" state.
@@ -464,9 +466,30 @@ static NSString* const kBinarySHA256 =
        @"Unknown - CEL rule cannot be evaluated statically"},
       {[self binaryRuleWithState:SNTRuleStateCELv2 seatbeltPolicy:@"(version 1)"],
        @"Unknown - CEL rule cannot be evaluated statically (may require santactl sandbox)"},
-      // States the policy processor treats as no rule.
+      {[[SNTRule alloc] initWithIdentifier:kSigningID
+                                     state:SNTRuleStateAllowCompiler
+                                      type:SNTRuleTypeSigningID],
+       @"Allowed by rule"},
+      {[[SNTRule alloc] initWithIdentifier:kSigningID
+                                     state:SNTRuleStateAllowLocalSigningID
+                                      type:SNTRuleTypeSigningID],
+       @"Allowed by rule"},
+      // States and type/state pairs the policy processor treats as no rule.
       {[self binaryRuleWithState:SNTRuleStateRemove seatbeltPolicy:nil], kNoRule},
       {[self binaryRuleWithState:(SNTRuleState)99 seatbeltPolicy:nil], kNoRule},
+      {[[SNTRule alloc] initWithIdentifier:kTeamID
+                                     state:SNTRuleStateAllowCompiler
+                                      type:SNTRuleTypeTeamID],
+       kNoRule},
+      {[[SNTRule alloc] initWithIdentifier:kTeamID
+                                     state:SNTRuleStateAllowLocalBinary
+                                      type:SNTRuleTypeTeamID],
+       kNoRule},
+      {[self binaryRuleWithState:SNTRuleStateAllowLocalSigningID seatbeltPolicy:nil], kNoRule},
+      {[[SNTRule alloc] initWithIdentifier:kSigningID
+                                     state:SNTRuleStateAllowTransitive
+                                      type:SNTRuleTypeSigningID],
+       kNoRule},
       {nil, kNoRule},
   };
 
