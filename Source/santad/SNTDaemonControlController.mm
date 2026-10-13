@@ -123,6 +123,46 @@ static NSString* TAMUsernameForUID(uid_t uid) {
   return username.has_value() ? @(username->c_str()) : @"";
 }
 
+// The expected decision for a matched rule, mirroring -[SNTPolicyProcessor
+// decision:forRule:withTransitiveRules:failClosed:andCELActivationCallback:]. Returns nil where
+// the policy processor treats the rule as not found, so the caller decides as if no rule matched.
+static NSString* StaticDecisionForRule(SNTRule* rule, BOOL enableTransitiveRules) {
+  NSString* const kAllowed = @"Allowed by rule";
+  SNTRuleType type = rule.type;
+  switch (rule.state) {
+    case SNTRuleStateAllow: return kAllowed;
+    // These states apply only to the rule types the policy processor's decision table lists for
+    // them. StaticRules does not validate the pairing.
+    case SNTRuleStateAllowCompiler:
+      return (type == SNTRuleTypeCDHash || type == SNTRuleTypeBinary ||
+              type == SNTRuleTypeSigningID)
+                 ? kAllowed
+                 : nil;
+    case SNTRuleStateAllowLocalBinary: return type == SNTRuleTypeBinary ? kAllowed : nil;
+    case SNTRuleStateAllowLocalSigningID: return type == SNTRuleTypeSigningID ? kAllowed : nil;
+    case SNTRuleStateAllowTransitive:
+      return (enableTransitiveRules && type == SNTRuleTypeBinary) ? kAllowed : nil;
+    case SNTRuleStateBlock:
+    case SNTRuleStateSilentBlock:
+    case SNTRuleStateSilentBlockGUI:
+    case SNTRuleStateSilentBlockTTY: return @"Denied by rule";
+    case SNTRuleStateSeatbelt: return @"Blocked unless run with santactl sandbox";
+    // Evaluation needs process context such as ancestors and args. A CEL rule that carries a
+    // seatbelt policy can return SEATBELT, which only santactl sandbox satisfies.
+    case SNTRuleStateCEL:
+    case SNTRuleStateCELv2:
+      return rule.seatbeltPolicy.length ? @"Unknown - CEL rule cannot be evaluated statically "
+                                          @"(may require santactl sandbox)"
+                                        : @"Unknown - CEL rule cannot be evaluated statically";
+    case SNTRuleStateUnknown:
+    case SNTRuleStateRemove: return nil;
+  }
+
+  // No default above, so -Wswitch flags a new state. The policy processor also treats a value
+  // outside the enum, such as one a newer version wrote, as not found.
+  return nil;
+}
+
 @implementation SNTDaemonControlController {
   std::shared_ptr<Logger> _logger;
   std::shared_ptr<WatchItems> _watchItems;
@@ -424,23 +464,15 @@ static NSString* TAMUsernameForUID(uid_t uid) {
 - (void)staticDecisionForFilePath:(NSString*)filePath
                       identifiers:(SNTRuleIdentifiers*)identifiers
                             reply:(void (^)(SNTRule* rule, NSString* decision))reply {
+  SNTConfigurator* config = [SNTConfigurator configurator];
   SNTRule* rule =
       [[SNTDatabaseController ruleTable] executionRuleForIdentifiers:[identifiers toStruct]];
 
-  if (rule) {
-    NSString* action;
-    switch (rule.state) {
-      case SNTRuleStateBlock:
-      case SNTRuleStateSilentBlock:
-      case SNTRuleStateSilentBlockGUI:
-      case SNTRuleStateSilentBlockTTY: action = @"Denied by rule"; break;
-      default: action = @"Allowed by rule"; break;
-    }
-    reply(rule, action);
+  NSString* ruleDecision = rule ? StaticDecisionForRule(rule, config.enableTransitiveRules) : nil;
+  if (ruleDecision) {
+    reply(rule, ruleDecision);
     return;
   }
-
-  SNTConfigurator* config = [SNTConfigurator configurator];
 
   // CEL fallback rules cannot be evaluated statically (they require an
   // ActivationCallbackBlock with process-level context like ancestors and

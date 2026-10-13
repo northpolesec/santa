@@ -524,7 +524,7 @@ static const NSUInteger kExpectedTeamIDLength = 10;
 }
 
 - (NSString*)stringifyWithColor:(BOOL)colorize {
-  NSMutableString* output;
+  NSMutableString* output = nil;
   // Rule state is saved as eventState for output colorization down below
   SNTEventState eventState = SNTEventStateUnknown;
 
@@ -532,7 +532,9 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     case SNTRuleStateUnknown: return @"None"; break;
     case SNTRuleStateAllow: OS_FALLTHROUGH;
     case SNTRuleStateAllowCompiler: OS_FALLTHROUGH;
-    case SNTRuleStateAllowTransitive:
+    case SNTRuleStateAllowTransitive: OS_FALLTHROUGH;
+    case SNTRuleStateAllowLocalBinary: OS_FALLTHROUGH;
+    case SNTRuleStateAllowLocalSigningID:
       output = [@"Allowed" mutableCopy];
       eventState = SNTEventStateAllow;
       break;
@@ -546,10 +548,12 @@ static const NSUInteger kExpectedTeamIDLength = 10;
     case SNTRuleStateCEL: OS_FALLTHROUGH;
     case SNTRuleStateCELv2: output = [@"CEL" mutableCopy]; break;
     case SNTRuleStateSeatbelt: output = [@"Seatbelt" mutableCopy]; break;
-    case SNTRuleStateRemove: OS_FALLTHROUGH;
-    default:
-      output = [NSMutableString stringWithFormat:@"Unexpected rule state: %ld", self.state];
-      break;
+    case SNTRuleStateRemove: break;
+  }
+
+  // No default above, so -Wswitch flags a new state. Remove and values outside the enum land here.
+  if (!output) {
+    output = [NSMutableString stringWithFormat:@"Unexpected rule state: %ld", self.state];
   }
 
   [output appendString:@" ("];
@@ -570,6 +574,12 @@ static const NSUInteger kExpectedTeamIDLength = 10;
   switch (self.state) {
     case SNTRuleStateAllowCompiler: [output appendString:@", Compiler"]; break;
     case SNTRuleStateAllowTransitive: [output appendString:@", Transitive"]; break;
+    case SNTRuleStateAllowLocalBinary: OS_FALLTHROUGH;
+    case SNTRuleStateAllowLocalSigningID: [output appendString:@", Local"]; break;
+    case SNTRuleStateCEL: OS_FALLTHROUGH;
+    case SNTRuleStateCELv2:
+      if (self.seatbeltPolicy.length) [output appendString:@", Seatbelt"];
+      break;
     case SNTRuleStateSilentBlock: [output appendString:@", Silent"]; break;
     case SNTRuleStateSilentBlockGUI: [output appendString:@", Silent GUI"]; break;
     case SNTRuleStateSilentBlockTTY: [output appendString:@", Silent TTY"]; break;

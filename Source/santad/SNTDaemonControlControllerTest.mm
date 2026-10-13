@@ -21,6 +21,8 @@
 #include <bsm/libbsm.h>
 
 #include <memory>
+#include <utility>
+#include <vector>
 
 #import "Source/common/AuditUtilities.h"
 #import "Source/common/MOLXPCConnection.h"
@@ -40,6 +42,8 @@ using santa::SandboxExpectations;
 // shape for binary-type identifiers.
 static NSString* const kBinarySHA256 =
     @"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+static NSString* const kTeamID = @"ABCDEFGHIJ";
+static NSString* const kSigningID = @"ABCDEFGHIJ:com.example.tool";
 
 // Expose seatbeltPolicy readwrite so tests can simulate the (technically
 // unreachable-from-prod) "SEATBELT rule with empty policy" state.
@@ -393,6 +397,118 @@ static NSString* const kBinarySHA256 =
   }];
 
   XCTAssertEqual(got.networkFlow, 7);
+}
+
+// ---- staticDecisionForFilePath (santactl fileinfo) -------------------
+
+- (id)mockConfiguratorForStaticDecisionWithTransitiveRules:(BOOL)enableTransitiveRules {
+  id cfg = OCMClassMock([SNTConfigurator class]);
+  OCMStub([cfg configurator]).andReturn(cfg);
+  OCMStub([cfg enableTransitiveRules]).andReturn(enableTransitiveRules);
+  OCMStub([(SNTConfigurator*)cfg clientMode]).andReturn(SNTClientModeLockdown);
+  return cfg;
+}
+
+- (SNTRule*)binaryRuleWithState:(SNTRuleState)state seatbeltPolicy:(NSString*)seatbeltPolicy {
+  BOOL isCEL = state == SNTRuleStateCEL || state == SNTRuleStateCELv2;
+  return [[SNTRule alloc] initWithIdentifier:kBinarySHA256
+                                       state:state
+                                        type:SNTRuleTypeBinary
+                                   customMsg:nil
+                                   customURL:nil
+                       eventDetailButtonText:nil
+                                   timestamp:0
+                                     comment:nil
+                                     celExpr:isCEL ? @"true" : nil
+                              seatbeltPolicy:seatbeltPolicy
+                                      ruleId:0
+                                       error:nil];
+}
+
+- (NSString*)staticDecision {
+  __block NSString* got;
+  SNTRuleIdentifiers* ids =
+      [[SNTRuleIdentifiers alloc] initWithRuleIdentifiers:{.binarySHA256 = kBinarySHA256}];
+  [self.sut staticDecisionForFilePath:@"/nonexistent/santa-test-binary"
+                          identifiers:ids
+                                reply:^(SNTRule*, NSString* decision) {
+                                  got = decision;
+                                }];
+  return got;
+}
+
+- (void)testStaticDecisionForMatchedRules {
+  id cfg = [self mockConfiguratorForStaticDecisionWithTransitiveRules:YES];
+
+  __block SNTRule* matchedRule;
+  OCMStub([self.mockRuleTable executionRuleForIdentifiers:(struct RuleIdentifiers){}])
+      .ignoringNonObjectArgs()
+      .andDo(^(NSInvocation* invocation) {
+        SNTRule* rule = matchedRule;
+        [invocation setReturnValue:&rule];
+      });
+
+  NSString* const kNoRule = @"Blocked (Unknown, Lockdown mode)";
+  std::vector<std::pair<SNTRule*, NSString*>> cases = {
+      {[self binaryRuleWithState:SNTRuleStateAllow seatbeltPolicy:nil], @"Allowed by rule"},
+      {[self binaryRuleWithState:SNTRuleStateAllowCompiler seatbeltPolicy:nil], @"Allowed by rule"},
+      {[self binaryRuleWithState:SNTRuleStateAllowTransitive seatbeltPolicy:nil],
+       @"Allowed by rule"},
+      {[self binaryRuleWithState:SNTRuleStateAllowLocalBinary seatbeltPolicy:nil],
+       @"Allowed by rule"},
+      {[self binaryRuleWithState:SNTRuleStateBlock seatbeltPolicy:nil], @"Denied by rule"},
+      {[self binaryRuleWithState:SNTRuleStateSilentBlockTTY seatbeltPolicy:nil], @"Denied by rule"},
+      {[self binaryRuleWithState:SNTRuleStateSeatbelt seatbeltPolicy:@"(version 1)"],
+       @"Blocked unless run with santactl sandbox"},
+      {[self binaryRuleWithState:SNTRuleStateCEL seatbeltPolicy:nil],
+       @"Unknown - CEL rule cannot be evaluated statically"},
+      {[self binaryRuleWithState:SNTRuleStateCELv2 seatbeltPolicy:nil],
+       @"Unknown - CEL rule cannot be evaluated statically"},
+      {[self binaryRuleWithState:SNTRuleStateCELv2 seatbeltPolicy:@"(version 1)"],
+       @"Unknown - CEL rule cannot be evaluated statically (may require santactl sandbox)"},
+      {[[SNTRule alloc] initWithIdentifier:kSigningID
+                                     state:SNTRuleStateAllowCompiler
+                                      type:SNTRuleTypeSigningID],
+       @"Allowed by rule"},
+      {[[SNTRule alloc] initWithIdentifier:kSigningID
+                                     state:SNTRuleStateAllowLocalSigningID
+                                      type:SNTRuleTypeSigningID],
+       @"Allowed by rule"},
+      // States and type/state pairs the policy processor treats as no rule.
+      {[self binaryRuleWithState:SNTRuleStateRemove seatbeltPolicy:nil], kNoRule},
+      {[self binaryRuleWithState:(SNTRuleState)99 seatbeltPolicy:nil], kNoRule},
+      {[[SNTRule alloc] initWithIdentifier:kTeamID
+                                     state:SNTRuleStateAllowCompiler
+                                      type:SNTRuleTypeTeamID],
+       kNoRule},
+      {[[SNTRule alloc] initWithIdentifier:kTeamID
+                                     state:SNTRuleStateAllowLocalBinary
+                                      type:SNTRuleTypeTeamID],
+       kNoRule},
+      {[self binaryRuleWithState:SNTRuleStateAllowLocalSigningID seatbeltPolicy:nil], kNoRule},
+      {[[SNTRule alloc] initWithIdentifier:kSigningID
+                                     state:SNTRuleStateAllowTransitive
+                                      type:SNTRuleTypeSigningID],
+       kNoRule},
+      {nil, kNoRule},
+  };
+
+  for (const auto& [rule, want] : cases) {
+    matchedRule = rule;
+    XCTAssertEqualObjects([self staticDecision], want, @"rule: %@", rule);
+  }
+
+  [cfg stopMocking];
+}
+
+- (void)testStaticDecisionIgnoresTransitiveRuleWhenTransitiveRulesAreDisabled {
+  id cfg = [self mockConfiguratorForStaticDecisionWithTransitiveRules:NO];
+  [self stubRuleLookupReturns:[self binaryRuleWithState:SNTRuleStateAllowTransitive
+                                         seatbeltPolicy:nil]];
+
+  XCTAssertEqualObjects([self staticDecision], @"Blocked (Unknown, Lockdown mode)");
+
+  [cfg stopMocking];
 }
 
 // ---- Manual (santactl) rule change gate ------------------------------
