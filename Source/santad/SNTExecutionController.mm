@@ -793,10 +793,12 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
 
   SuppressBlockUIIfKernelWillKill(cd, targetProc, esMsg->event.exec.image_cputype);
 
-  // Formulate an initial action from the decision.
+  // Formulate an initial action from the decision. A seatbelt denial is not
+  // retained: the next exec of the vnode may carry a valid expectation.
   SNTAction action = (SNTEventStateAllow & cd.decision)
                          ? (cd.cacheable ? SNTActionRespondAllow : SNTActionRespondAllowNoCache)
-                         : SNTActionRespondDeny;
+                     : cd.seatbeltRequired ? SNTActionRespondDenyOnce
+                                           : SNTActionRespondDeny;
 
   // Marked before the decision is first cached, so that no reader of the cache
   // sees a held execution unmarked.
