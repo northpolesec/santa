@@ -286,6 +286,8 @@
 ///
 ///  If eventLogType is set to protobuf, spoolDirectoryFileSizeThresholdKB sets the per-file size
 ///  limit for files saved in the spoolDirectory.
+///  The limit applies to event bytes before compression, so files written by the compressed
+///  log types are smaller on disk.
 ///  Defaults to 1024.
 ///
 ///  @note: This property is KVO compliant, but should only be read once at santad startup.
@@ -320,7 +322,7 @@
 
 ///
 ///  If enableTelemetryExport is true, this defines how often telemetry export is performed.
-///  Defaults to 900 (15 minutes). Minimum allowed value is 60.
+///  Defaults to 900 (15 minutes). Values are clamped between 60 and 3600.
 ///
 ///  @note: This property is KVO compliant.
 ///
@@ -328,7 +330,7 @@
 
 ///
 ///  When exporting telemetry, this defines how long Santa will wait for a given batch to upload.
-///  Defaults to 300 (5 minutes). Minimum allowed value is 60.
+///  Defaults to 300 (5 minutes). Values are clamped between 1 and 600.
 ///
 ///  @note: This property is KVO compliant.
 ///
@@ -351,7 +353,7 @@
 ///  export batch.
 ///  Note: All files in a batch are written as a single combined file at the destination.
 ///  See also: TelemetryExportBatchThresholdSizeMB
-///  Defaults to 100.
+///  Defaults to 100. Values are clamped between 1 and 250.
 ///
 ///  @note: This property is KVO compliant.
 ///

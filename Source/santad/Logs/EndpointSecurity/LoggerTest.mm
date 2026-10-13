@@ -651,11 +651,11 @@ class MockSleighLauncher : public santa::SleighLauncher {
   l.SetBatchThresholdSizeMB(75);
   XCTAssertEqual(l.export_batch_threshold_size_bytes_->load(), 75 * mb_multiplier);
 
-  // Max filesper batch must be between 1 and 100
+  // Max files per batch must be between 1 and 250
   l.SetMaxFilesPerBatch(0);
   XCTAssertEqual(l.export_max_files_per_batch_->load(), 1);
-  l.SetMaxFilesPerBatch(200);
-  XCTAssertEqual(l.export_max_files_per_batch_->load(), 100);
+  l.SetMaxFilesPerBatch(300);
+  XCTAssertEqual(l.export_max_files_per_batch_->load(), 250);
   l.SetMaxFilesPerBatch(60);
   XCTAssertEqual(l.export_max_files_per_batch_->load(), 60);
 

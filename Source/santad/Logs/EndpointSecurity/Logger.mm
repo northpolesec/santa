@@ -169,7 +169,7 @@ Logger::Logger(std::unique_ptr<santa::SleighLauncher> sleigh_launcher,
 }
 
 void Logger::SetBatchThresholdSizeMB(uint32_t val) {
-  // Limit between 10 MB to 5 GB
+  // Limit between 1 MB to 5 GB
   constexpr uint64_t mb_multiplier = 1024 * 1024;
   constexpr uint32_t upload_mb_min = 1;
   constexpr uint32_t upload_mb_max = 5120;
@@ -185,9 +185,10 @@ void Logger::SetBatchThresholdSizeMB(uint32_t val) {
 
 void Logger::SetMaxFilesPerBatch(uint32_t val) {
   // Ensure a sane max in order to limit the number of simultaneously opened files.
-  // Limit between 1 to 100
+  // The max fits one 3600s export interval of 15s spool flushes in a single batch.
+  // Limit between 1 to 250
   static constexpr uint32_t opened_min = 1;
-  static constexpr uint32_t opened_max = 100;
+  static constexpr uint32_t opened_max = 250;
 
   uint32_t new_val = std::clamp(val, opened_min, opened_max);
 

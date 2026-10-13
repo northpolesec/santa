@@ -363,13 +363,13 @@ The `EventLogType` key determines how event logs are stored:
 
 ### File Options
 
-Applies when using the `file` log type.
+Applies when using the `file` or `json` log types.
 
 - `EventLogPath`: Path for filelog/JSON output (default: `/var/db/santa/santa.log`)
 
 ### Protobuf-based Options
 
-Applies when using the `protobuf` or `json` log types.
+Applies when using the `protobuf` log type.
 
 - `SpoolDirectory`: Base directory for protobuf format (default: `/var/db/santa/spool`)
 - `SpoolDirectoryFileSizeThresholdKB`: Per-file size limit (default: 1024KB)
