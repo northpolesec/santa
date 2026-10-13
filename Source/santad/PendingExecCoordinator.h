@@ -19,11 +19,12 @@
 
 #include <atomic>
 #include <cstdint>
-#include <map>
 #include <memory>
 #include <mutex>
 #include <string>
 #include <vector>
+
+#include "absl/container/flat_hash_map.h"
 
 namespace santa {
 
@@ -89,8 +90,8 @@ class PendingExecCoordinator : public std::enable_shared_from_this<PendingExecCo
 
   dispatch_queue_t q_;
   std::mutex mu_;
-  std::map<std::string, std::vector<Waiter>> waiters_;   // guarded by mu_
-  std::map<std::string, uint64_t> recently_created_ms_;  // guarded by mu_
+  absl::flat_hash_map<std::string, std::vector<Waiter>> waiters_;   // guarded by mu_
+  absl::flat_hash_map<std::string, uint64_t> recently_created_ms_;  // guarded by mu_
   uint64_t compiler_activity_window_ms_;
   std::atomic<uint64_t> last_compiler_activity_ms_;
   std::atomic<int64_t> marked_compilers_;

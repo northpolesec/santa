@@ -25,7 +25,12 @@ PendingExecCoordinator::PendingExecCoordinator(uint64_t compiler_activity_window
     : compiler_activity_window_ms_(compiler_activity_window_ms),
       last_compiler_activity_ms_(0),
       marked_compilers_(0) {
-  q_ = dispatch_queue_create("com.northpolesec.santa.daemon.pending_exec", DISPATCH_QUEUE_SERIAL);
+  // Resolutions resume or kill a held execution, completing its AUTH_EXEC, so
+  // they run at the QoS of the auth path.
+  q_ = dispatch_queue_create(
+      "com.northpolesec.santa.daemon.pending_exec",
+      dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL,
+                                              QOS_CLASS_USER_INTERACTIVE, 0));
 }
 
 PendingExecCoordinator::~PendingExecCoordinator() {}
@@ -127,13 +132,9 @@ void PendingExecCoordinator::NotifyRuleCreated(const std::string& sha256) {
     }
 
     // Opportunistic prune of stale recently-created entries.
-    for (auto pit = recently_created_ms_.begin(); pit != recently_created_ms_.end();) {
-      if (now >= pit->second && now - pit->second > kRecentlyCreatedTTLMs) {
-        pit = recently_created_ms_.erase(pit);
-      } else {
-        ++pit;
-      }
-    }
+    absl::erase_if(recently_created_ms_, [now](const auto& entry) {
+      return now >= entry.second && now - entry.second > kRecentlyCreatedTTLMs;
+    });
   }
 
   // Resolves run outside mu_, on q_, so a resolve block never executes while

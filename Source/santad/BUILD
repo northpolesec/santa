@@ -136,6 +136,9 @@ objc_library(
     name = "PendingExecCoordinator",
     srcs = ["PendingExecCoordinator.mm"],
     hdrs = ["PendingExecCoordinator.h"],
+    deps = [
+        "@abseil-cpp//absl/container:flat_hash_map",
+    ],
 )
 
 objc_library(
