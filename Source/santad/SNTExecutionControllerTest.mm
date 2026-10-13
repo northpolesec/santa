@@ -1930,7 +1930,39 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   rule.type = SNTRuleTypeBinary;
   [self stubRule:rule forIdentifiers:{.binarySHA256 = @"a"}];
 
-  [self validateExecEvent:SNTActionRespondDeny];
+  [self validateExecEvent:SNTActionRespondDenyOnce];
+}
+
+// A bare exec retried at once through `santactl sandbox`: the first denial must
+// not govern the second exec of the same vnode, which carries an expectation.
+- (void)testSeatbeltRuleRetryWithExpectationAfterDenialAllows {
+  OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"cafebabe");
+
+  SNTRule* rule = [[SNTRule alloc] init];
+  rule.state = SNTRuleStateSeatbelt;
+  rule.type = SNTRuleTypeBinary;
+  [self stubRule:rule forIdentifiers:{.binarySHA256 = @"cafebabe"}];
+
+  [self validateExecEvent:SNTActionRespondDenyOnce
+             messageSetup:^(es_message_t* msg) {
+               msg->process->audit_token = santa::MakeStubAuditToken(310, 1);
+               msg->event.exec.target->codesigning_flags = 0;
+               msg->event.exec.target->executable->stat.st_dev = 17;
+               msg->event.exec.target->executable->stat.st_ino = 42;
+             }];
+
+  [self validateExecEvent:SNTActionRespondAllowNoCache
+             messageSetup:^(es_message_t* msg) {
+               msg->process->audit_token = santa::MakeStubAuditToken(311, 1);
+               msg->event.exec.target->codesigning_flags = 0;
+               msg->event.exec.target->executable->stat.st_dev = 17;
+               msg->event.exec.target->executable->stat.st_ino = 42;
+
+               const uint8_t cdhash[20] = {0};
+               _sandboxExpectations->Register(msg->process->audit_token,
+                                              MakeSandboxRequest(17, 42, cdhash, @"cafebabe"));
+             }];
 }
 
 // ---------------- Strict mode ----------------
@@ -1996,7 +2028,7 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   [self stubRule:rule
       forIdentifiers:{.cdhash = @"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", .binarySHA256 = @"a"}];
 
-  [self validateExecEvent:SNTActionRespondDeny
+  [self validateExecEvent:SNTActionRespondDenyOnce
              messageSetup:^(es_message_t* msg) {
                msg->process->audit_token = santa::MakeStubAuditToken(203, 1);
                msg->event.exec.target->codesigning_flags = CS_SIGNED | CS_VALID | CS_HARD;
@@ -2046,7 +2078,7 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   rule.type = SNTRuleTypeBinary;
   [self stubRule:rule forIdentifiers:{.binarySHA256 = @"cafebabe"}];
 
-  [self validateExecEvent:SNTActionRespondDeny
+  [self validateExecEvent:SNTActionRespondDenyOnce
              messageSetup:^(es_message_t* msg) {
                msg->process->audit_token = santa::MakeStubAuditToken(302, 1);
                msg->event.exec.target->codesigning_flags = 0;
@@ -2069,7 +2101,7 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   rule.type = SNTRuleTypeBinary;
   [self stubRule:rule forIdentifiers:{.binarySHA256 = @"cafebabe"}];
 
-  [self validateExecEvent:SNTActionRespondDeny
+  [self validateExecEvent:SNTActionRespondDenyOnce
              messageSetup:^(es_message_t* msg) {
                msg->process->audit_token = santa::MakeStubAuditToken(303, 1);
                msg->event.exec.target->codesigning_flags = 0;
@@ -2092,7 +2124,7 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   rule.type = SNTRuleTypeBinary;
   [self stubRule:rule forIdentifiers:{.binarySHA256 = @"cafebabe"}];
 
-  [self validateExecEvent:SNTActionRespondDeny
+  [self validateExecEvent:SNTActionRespondDenyOnce
              messageSetup:^(es_message_t* msg) {
                msg->process->audit_token = santa::MakeStubAuditToken(304, 1);
                msg->event.exec.target->codesigning_flags = 0;
@@ -2114,7 +2146,7 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   rule.type = SNTRuleTypeBinary;
   [self stubRule:rule forIdentifiers:{}];
 
-  [self validateExecEvent:SNTActionRespondDeny
+  [self validateExecEvent:SNTActionRespondDenyOnce
              messageSetup:^(es_message_t* msg) {
                msg->process->audit_token = santa::MakeStubAuditToken(305, 1);
                msg->event.exec.target->codesigning_flags = 0;
@@ -2136,7 +2168,7 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   rule.type = SNTRuleTypeBinary;
   [self stubRule:rule forIdentifiers:{.binarySHA256 = @"cafebabe"}];
 
-  [self validateExecEvent:SNTActionRespondDeny
+  [self validateExecEvent:SNTActionRespondDenyOnce
              messageSetup:^(es_message_t* msg) {
                msg->process->audit_token = santa::MakeStubAuditToken(306, 1);
                msg->event.exec.target->codesigning_flags = 0;
@@ -2182,7 +2214,7 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   rule.type = SNTRuleTypeBinary;
   [self stubRule:rule forIdentifiers:{.binarySHA256 = @"a"}];
 
-  [self validateExecEvent:SNTActionRespondDeny
+  [self validateExecEvent:SNTActionRespondDenyOnce
              messageSetup:^(es_message_t* msg) {
                msg->process->audit_token = santa::MakeStubAuditToken(10, 1);
 
@@ -2290,7 +2322,7 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   rule.type = SNTRuleTypeBinary;
   [self stubRule:rule forIdentifiers:{.binarySHA256 = @"cafebabe"}];
 
-  [self validateExecEvent:SNTActionRespondDeny
+  [self validateExecEvent:SNTActionRespondDenyOnce
              messageSetup:^(es_message_t* msg) {
                msg->process->audit_token = santa::MakeStubAuditToken(520, 1);
                msg->process->codesigning_flags = CS_SIGNED | CS_VALID;
@@ -2331,7 +2363,7 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
 
   // Call 2: instigator (531, 1) is recorded, but the target is a different
   // binary (different dev/ino) -> not a self-exec -> denied.
-  [self validateExecEvent:SNTActionRespondDeny
+  [self validateExecEvent:SNTActionRespondDenyOnce
              messageSetup:^(es_message_t* msg) {
                msg->process->audit_token = santa::MakeStubAuditToken(531, 1);
                msg->process->codesigning_flags = CS_SIGNED | CS_VALID;
@@ -2428,7 +2460,7 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   [self stubRule:rule forIdentifiers:{.binarySHA256 = @"cafebabe"}];
 
   // No ancestor was recorded -> C (701, 2) self-exec is denied.
-  [self validateExecEvent:SNTActionRespondDeny
+  [self validateExecEvent:SNTActionRespondDenyOnce
              messageSetup:^(es_message_t* msg) {
                msg->process->audit_token = santa::MakeStubAuditToken(701, 2);
                msg->process->codesigning_flags = CS_SIGNED | CS_VALID;
@@ -2511,7 +2543,7 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
   [self.sut forgetSandboxedSeatbeltProc:exited];
 
   // Call 2: the now-forgotten (801, 1) re-execs -> no longer relaxed -> denied.
-  [self validateExecEvent:SNTActionRespondDeny
+  [self validateExecEvent:SNTActionRespondDenyOnce
              messageSetup:^(es_message_t* msg) {
                msg->process->audit_token = santa::MakeStubAuditToken(801, 1);
                msg->process->codesigning_flags = CS_SIGNED | CS_VALID;
@@ -3014,7 +3046,7 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
 
   [self authorizeSandboxedSeatbeltProcess];
 
-  [self validateExecEvent:SNTActionRespondDeny
+  [self validateExecEvent:SNTActionRespondDenyOnce
              messageSetup:^(es_message_t* msg) {
                msg->process->audit_token = santa::MakeStubAuditToken(501, 1);
                msg->process->codesigning_flags = CS_SIGNED | CS_VALID;

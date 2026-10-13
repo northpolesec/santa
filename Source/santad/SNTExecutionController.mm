@@ -754,10 +754,12 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
 
   SuppressBlockUIIfKernelWillKill(cd, targetProc, esMsg->event.exec.image_cputype);
 
-  // Formulate an initial action from the decision.
+  // Formulate an initial action from the decision. A seatbelt denial is not
+  // retained: the next exec of the vnode may carry a valid expectation.
   SNTAction action = (SNTEventStateAllow & cd.decision)
                          ? (cd.cacheable ? SNTActionRespondAllow : SNTActionRespondAllowNoCache)
-                         : SNTActionRespondDeny;
+                     : cd.seatbeltRequired ? SNTActionRespondDenyOnce
+                                           : SNTActionRespondDeny;
 
   // Save decision details for logging the execution later.  For transitive rules, we also use
   // the shasum stored in the decision details to update the rule's timestamp whenever an
