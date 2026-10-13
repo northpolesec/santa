@@ -16,6 +16,7 @@
 
 #include <memory>
 
+#include "Source/common/es/ESCacheFlusher.h"
 #include "Source/common/es/ESMetricsObserver.h"
 #include "Source/common/es/EndpointSecurityAPI.h"
 #import "Source/common/es/SNTEndpointSecurityClient.h"
@@ -32,7 +33,8 @@
                         metrics:(std::shared_ptr<santa::ESMetricsObserver>)metrics
              faaPolicyProcessor:
                  (std::shared_ptr<santa::ProcessFAAPolicyProcessorProxy>)faaPolicyProcessorProxy
-    iterateProcessPoliciesBlock:(santa::IterateProcessPoliciesBlock)findProcessPoliciesBlock;
+    iterateProcessPoliciesBlock:(santa::IterateProcessPoliciesBlock)findProcessPoliciesBlock
+                 esCacheFlusher:(std::shared_ptr<santa::ESCacheFlusher>)esCacheFlusher;
 
 @property SNTFileAccessDeniedBlock fileAccessDeniedBlock;
 

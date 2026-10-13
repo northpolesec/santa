@@ -31,6 +31,7 @@
 #import "Source/common/SNTXPCNotifierInterface.h"
 #import "Source/common/SNTXPCSyncServiceInterface.h"
 #include "Source/common/TelemetryEventMap.h"
+#include "Source/common/es/ESCacheFlusher.h"
 #include "Source/common/es/EndpointSecurityAPI.h"
 #include "Source/common/es/Enricher.h"
 #include "Source/common/faa/WatchItemPolicy.h"
@@ -77,9 +78,10 @@ static NSString* ClientModeName(SNTClientMode mode) {
   }
 }
 
-void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logger> logger,
-                std::shared_ptr<Metrics> metrics, std::shared_ptr<santa::WatchItems> watch_items,
-                std::shared_ptr<Enricher> enricher,
+void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi,
+                std::shared_ptr<santa::ESCacheFlusher> es_cache_flusher,
+                std::shared_ptr<Logger> logger, std::shared_ptr<Metrics> metrics,
+                std::shared_ptr<santa::WatchItems> watch_items, std::shared_ptr<Enricher> enricher,
                 std::shared_ptr<AuthResultCache> auth_result_cache,
                 MOLXPCConnection* control_connection, SNTCompilerController* compiler_controller,
                 SNTNotificationQueue* notifier_queue, SNTSyncdQueue* syncd_queue,
@@ -190,10 +192,6 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                                  ttyWriter:tty_writer
                                                processTree:process_tree];
 
-  // While any client could be used, this implementation chooses to use the
-  // authorizer client as it is most concerned with the state of ES caches.
-  auth_result_cache->SetESClient(authorizer_client);
-
   SNTEndpointSecurityTamperResistance* tamper_client = [[SNTEndpointSecurityTamperResistance alloc]
               initWithESAPI:esapi
                     metrics:metrics
@@ -230,19 +228,8 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                             ttyWriter:tty_writer
           findPoliciesForTargetsBlock:^(santa::IterateTargetsBlock iterateBlock) {
             watch_items->FindPoliciesForTargets(iterateBlock);
-          }];
-
-  watch_items->RegisterDataWatchItemsUpdatedCallback(
-      ^(size_t count, const santa::SetPairPathAndType& new_paths,
-        const santa::SetPairPathAndType& removed_paths,
-        const santa::SetPairPathAndType& new_ancestor_paths,
-        const santa::SetPairPathAndType& removed_ancestor_paths) {
-        [data_faa_client watchItemsCount:count
-                                newPaths:new_paths
-                            removedPaths:removed_paths
-                        newAncestorPaths:new_ancestor_paths
-                    removedAncestorPaths:removed_ancestor_paths];
-      });
+          }
+                       esCacheFlusher:es_cache_flusher];
 
   data_faa_client.fileAccessDeniedBlock = ^(SNTStoredFileAccessEvent* event, NSString* customMsg,
                                             NSString* customURL, NSString* customText) {
@@ -264,11 +251,8 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                                           faaPolicyProcessor)
           iterateProcessPoliciesBlock:^(santa::CheckPolicyBlock checkPolicyBlock) {
             watch_items->IterateProcessPolicies(checkPolicyBlock);
-          }];
-
-  watch_items->RegisterProcWatchItemsUpdatedCallback(^(size_t count) {
-    [proc_faa_client processWatchItemsCount:count];
-  });
+          }
+                       esCacheFlusher:es_cache_flusher];
 
   proc_faa_client.fileAccessDeniedBlock = ^(SNTStoredFileAccessEvent* event, NSString* customMsg,
                                             NSString* customURL, NSString* customText) {
@@ -281,6 +265,17 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                              customText:customText
                             configState:cs];
   };
+
+  // Every authorization client is registered before the first subscription.
+  // The authorizer is registered first so that it is cleared when a flush has
+  // no requester. Only clients with AUTH subscriptions have cached results, so
+  // the recorder is not registered. A client that adds an AUTH subscription
+  // must be registered here.
+  es_cache_flusher->AddClient(authorizer_client);
+  es_cache_flusher->AddClient(proc_faa_client);
+  es_cache_flusher->AddClient(data_faa_client);
+  es_cache_flusher->AddClient(tamper_client);
+  es_cache_flusher->AddClient(device_client);
 
   [authorizer_client registerAuthExecProbe:proc_faa_client];
   [authorizer_client registerAuthExecProbe:data_faa_client];
@@ -568,12 +563,11 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                 // Get the value from the configurator since it ensures proper types
                 entitlements_filter->UpdateTeamIDFilter([configurator entitlementsTeamIDFilter]);
 
-                // Clear the AuthResultCache, then clear the ES cache to ensure
-                // future execs get SNTCachedDecision entitlement values filtered
-                // with the new settings.
+                // Clear the AuthResultCache and ES caches to ensure future
+                // execs get SNTCachedDecision entitlement values filtered with
+                // the new settings.
                 auth_result_cache->FlushCache(FlushCacheMode::kAllCaches,
                                               FlushCacheReason::kEntitlementsTeamIDFilterChanged);
-                [authorizer_client clearCache];
               }],
     [[SNTKVOManager alloc]
         initWithObject:configurator
@@ -590,12 +584,11 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
                 // Get the value from the configurator since it ensures proper types
                 entitlements_filter->UpdatePrefixFilter([configurator entitlementsPrefixFilter]);
 
-                // Clear the AuthResultCache, then clear the ES cache to ensure
-                // future execs get SNTCachedDecision entitlement values filtered
-                // with the new settings.
+                // Clear the AuthResultCache and ES caches to ensure future
+                // execs get SNTCachedDecision entitlement values filtered with
+                // the new settings.
                 auth_result_cache->FlushCache(FlushCacheMode::kAllCaches,
                                               FlushCacheReason::kEntitlementsPrefixFilterChanged);
-                [authorizer_client clearCache];
               }],
     [[SNTKVOManager alloc]
         initWithObject:configurator
@@ -861,6 +854,25 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi, std::shared_ptr<Logg
   // means that the AUTH EXEC event is subscribed first and Santa can apply
   // execution policy appropriately.
   [authorizer_client enable];
+
+  // FAA clients are enabled by their WatchItems callbacks, which are sent the
+  // current state on registration. Registering only after the authorizer's
+  // first subscription keeps FAA from subscribing before it.
+  watch_items->RegisterDataWatchItemsUpdatedCallback(
+      ^(size_t count, const santa::SetPairPathAndType& new_paths,
+        const santa::SetPairPathAndType& removed_paths,
+        const santa::SetPairPathAndType& new_ancestor_paths,
+        const santa::SetPairPathAndType& removed_ancestor_paths) {
+        [data_faa_client watchItemsCount:count
+                                newPaths:new_paths
+                            removedPaths:removed_paths
+                        newAncestorPaths:new_ancestor_paths
+                    removedAncestorPaths:removed_ancestor_paths];
+      });
+
+  watch_items->RegisterProcWatchItemsUpdatedCallback(^(size_t count) {
+    [proc_faa_client processWatchItemsCount:count];
+  });
 
   // Tamper protection is not enabled on debug builds.
 #ifndef DEBUG

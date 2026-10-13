@@ -17,6 +17,7 @@
 
 #include <memory>
 
+#include "Source/common/es/ESCacheFlusher.h"
 #include "Source/common/es/ESMetricsObserver.h"
 #include "Source/common/es/EndpointSecurityAPI.h"
 #include "Source/common/es/Enricher.h"
@@ -40,7 +41,8 @@
              faaPolicyProcessor:
                  (std::shared_ptr<santa::DataFAAPolicyProcessorProxy>)faaPolicyProcessorProxy
                       ttyWriter:(std::shared_ptr<santa::TTYWriter>)ttyWriter
-    findPoliciesForTargetsBlock:(santa::FindPoliciesForTargetsBlock)findPoliciesForTargetsBlock;
+    findPoliciesForTargetsBlock:(santa::FindPoliciesForTargetsBlock)findPoliciesForTargetsBlock
+                 esCacheFlusher:(std::shared_ptr<santa::ESCacheFlusher>)esCacheFlusher;
 
 @property SNTFileAccessDeniedBlock fileAccessDeniedBlock;
 

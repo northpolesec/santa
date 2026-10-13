@@ -63,18 +63,21 @@ using ProcessRuleCache = SantaCache<PidPidverPair, MatchedProcessPolicy>;
 @implementation SNTEndpointSecurityProcessFileAccessAuthorizer {
   std::unique_ptr<ProcessRuleCache> _procRuleCache;
   std::shared_ptr<santa::ProcessFAAPolicyProcessorProxy> _faaPolicyProcessorProxy;
+  std::shared_ptr<santa::ESCacheFlusher> _esCacheFlusher;
 }
 
 - (instancetype)initWithESAPI:(std::shared_ptr<santa::EndpointSecurityAPI>)esApi
                         metrics:(std::shared_ptr<santa::ESMetricsObserver>)metrics
              faaPolicyProcessor:
                  (std::shared_ptr<santa::ProcessFAAPolicyProcessorProxy>)faaPolicyProcessorProxy
-    iterateProcessPoliciesBlock:(IterateProcessPoliciesBlock)iterateProcessPoliciesBlock {
+    iterateProcessPoliciesBlock:(IterateProcessPoliciesBlock)iterateProcessPoliciesBlock
+                 esCacheFlusher:(std::shared_ptr<santa::ESCacheFlusher>)esCacheFlusher {
   self = [super initWithESAPI:std::move(esApi)
                       metrics:std::move(metrics)
                     processor:santa::Processor::kProcessFileAccessAuthorizer];
   if (self) {
     _faaPolicyProcessorProxy = std::move(faaPolicyProcessorProxy);
+    _esCacheFlusher = std::move(esCacheFlusher);
     _iterateProcessPoliciesBlock = iterateProcessPoliciesBlock;
 
     _procRuleCache = std::make_unique<ProcessRuleCache>(2000);
@@ -295,8 +298,10 @@ using ProcessRuleCache = SantaCache<PidPidverPair, MatchedProcessPolicy>;
         santa::MakeStubAuditToken(pidPidver.first, pidPidver.second));
   });
 
-  // Always clear cache to ensure operations that were previously allowed are re-evaluated.
-  [super clearCache];
+  // Always invalidate ES caches to ensure operations that were previously
+  // allowed are re-evaluated. This includes cached execs, so that the EXEC
+  // probe can start watching newly matching processes.
+  _esCacheFlusher->Flush(self);
 }
 
 - (void)disable {

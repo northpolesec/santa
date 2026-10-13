@@ -179,6 +179,47 @@ static NSMutableDictionary* WrapWatchItemsConfig(NSDictionary* config) {
   return [@{@"Version" : @(kVersion.data()), @"WatchItems" : [config mutableCopy]} mutableCopy];
 }
 
+struct DataUpdate {
+  size_t count;
+  SetPairPathAndType new_paths;
+  SetPairPathAndType removed_paths;
+  SetPairPathAndType new_ancestor_paths;
+  SetPairPathAndType removed_ancestor_paths;
+
+  bool operator==(const DataUpdate& other) const {
+    return count == other.count && new_paths == other.new_paths &&
+           removed_paths == other.removed_paths && new_ancestor_paths == other.new_ancestor_paths &&
+           removed_ancestor_paths == other.removed_ancestor_paths;
+  }
+};
+
+// Records every data callback invocation. Only read the result after a
+// dispatch_sync on the callback queue.
+static WatchItems::DataWatchItemsUpdatedBlock RecordDataUpdates(
+    std::shared_ptr<std::vector<DataUpdate>> updates) {
+  return [updates](size_t count, const SetPairPathAndType& new_paths,
+                   const SetPairPathAndType& removed_paths,
+                   const SetPairPathAndType& new_ancestor_paths,
+                   const SetPairPathAndType& removed_ancestor_paths) {
+    updates->push_back(
+        {count, new_paths, removed_paths, new_ancestor_paths, removed_ancestor_paths});
+  };
+}
+
+static WatchItems::ProcWatchItemsUpdatedBlock RecordProcUpdates(
+    std::shared_ptr<std::vector<size_t>> updates) {
+  return [updates](size_t count) { updates->push_back(count); };
+}
+
+static NSDictionary* ProcRule(NSString* path) {
+  return @{
+    kWatchItemConfigKeyPaths : @[ path ],
+    kWatchItemConfigKeyOptions :
+        @{kWatchItemConfigKeyOptionsRuleType : @"ProcessesWithDeniedPaths"},
+    kWatchItemConfigKeyProcesses : @[ @{kWatchItemConfigKeyProcessesTeamID : @"ABCDEFGHIJ"} ],
+  };
+}
+
 struct BlockGenResult {
   std::vector<std::optional<std::shared_ptr<WatchItemPolicyBase>>>& targetPolicies;
   // clang-format off
@@ -2237,6 +2278,8 @@ BlockGenResult CreatePolicyBlockGen() {
       {"/u/lib/chrome", WatchItemPathType::kLiteral},
   };
 
+  XCTAssertSemaTrue(sema, 5, "Callback not invoked for the initial state");
+
   watchItems->ReloadConfig(WrapWatchItemsConfig(@{@"chrome" : rule(@"disabled")}));
   XCTAssertSemaTrue(sema, 5, "Callback not invoked for the initial config");
   XCTAssertTrue(gotNewAncestors.empty());
@@ -2271,6 +2314,8 @@ BlockGenResult CreatePolicyBlockGen() {
 
   NSDictionary* chrome = @{kWatchItemConfigKeyPaths : @[ @"/u/lib/chrome/cookies" ]};
   NSDictionary* keychain = @{kWatchItemConfigKeyPaths : @[ @"/u/lib/keychains/login.db" ]};
+
+  XCTAssertSemaTrue(sema, 5, "Callback not invoked for the initial state");
 
   watchItems->ReloadConfig(WrapWatchItemsConfig(@{@"chrome" : chrome, @"keychain" : keychain}));
   XCTAssertSemaTrue(sema, 5, "Callback not invoked for the initial config");
@@ -2332,11 +2377,12 @@ BlockGenResult CreatePolicyBlockGen() {
   }));
   dispatch_resume(q);
 
-  for (int i = 0; i < 4; i++) {
+  // Each registration also replays the empty initial state
+  for (int i = 0; i < 6; i++) {
     XCTAssertSemaTrue(sema, 5, "Callback not invoked");
   }
-  XCTAssertTrue(dataCounts == std::vector<size_t>({2, 1}));
-  XCTAssertTrue(procCounts == std::vector<size_t>({2, 1}));
+  XCTAssertTrue(dataCounts == std::vector<size_t>({0, 2, 1}));
+  XCTAssertTrue(procCounts == std::vector<size_t>({0, 2, 1}));
 }
 
 - (void)testDataWatchItemsSubtraction {
@@ -2378,6 +2424,233 @@ BlockGenResult CreatePolicyBlockGen() {
   XCTAssertEqual(pathTypePairs2_1.count({"/x", WatchItemPathType::kPrefix}), 1);
   XCTAssertEqual(pathTypePairs2_1.count({"/y", WatchItemPathType::kPrefix}), 1);
   XCTAssertEqual(pathTypePairs2_1.count({"/z", WatchItemPathType::kPrefix}), 1);
+}
+
+- (void)testDataCallbackRegistrationReplaysCurrentState {
+  dispatch_queue_t q =
+      dispatch_queue_create("com.northpolesec.santa.test.watch_items.q", DISPATCH_QUEUE_SERIAL);
+  auto watchItems = std::make_shared<WatchItemsPeer>((NSString*)nil, q);
+
+  // No callback is registered yet, so this load notifies nobody
+  watchItems->ReloadConfig(WrapWatchItemsConfig(@{
+    @"chrome" : @{kWatchItemConfigKeyPaths : @[ @"/u/lib/chrome/cookies" ]},
+    @"keychain" : @{kWatchItemConfigKeyPaths : @[ @"/u/lib/keychains/login.db" ]},
+  }));
+
+  // Registration delivers the loaded state without waiting for another reload
+  auto updates = std::make_shared<std::vector<DataUpdate>>();
+  watchItems->RegisterDataWatchItemsUpdatedCallback(RecordDataUpdates(updates));
+  dispatch_sync(q, ^{
+                });
+
+  XCTAssertTrue(*updates == std::vector<DataUpdate>({{
+                                .count = 2,
+                                .new_paths =
+                                    {
+                                        {"/u/lib/chrome/cookies", WatchItemPathType::kLiteral},
+                                        {"/u/lib/keychains/login.db", WatchItemPathType::kLiteral},
+                                    },
+                                .removed_paths = {},
+                                .new_ancestor_paths =
+                                    {
+                                        {"/u", WatchItemPathType::kLiteral},
+                                        {"/u/lib", WatchItemPathType::kLiteral},
+                                        {"/u/lib/chrome", WatchItemPathType::kLiteral},
+                                        {"/u/lib/keychains", WatchItemPathType::kLiteral},
+                                    },
+                                .removed_ancestor_paths = {},
+                            }}));
+}
+
+- (void)testProcCallbackRegistrationReplaysCurrentCount {
+  dispatch_queue_t q =
+      dispatch_queue_create("com.northpolesec.santa.test.watch_items.q", DISPATCH_QUEUE_SERIAL);
+  auto watchItems = std::make_shared<WatchItemsPeer>((NSString*)nil, q);
+
+  watchItems->ReloadConfig(WrapWatchItemsConfig(@{
+    @"p1" : ProcRule(@"/p1"),
+    @"p2" : ProcRule(@"/p2"),
+    @"d1" : @{kWatchItemConfigKeyPaths : @[ @"/d1" ]},
+  }));
+
+  auto updates = std::make_shared<std::vector<size_t>>();
+  watchItems->RegisterProcWatchItemsUpdatedCallback(RecordProcUpdates(updates));
+  dispatch_sync(q, ^{
+                });
+
+  XCTAssertTrue(*updates == std::vector<size_t>({2}));
+}
+
+- (void)testDuplicateCallbackRegistrationDoesNotReplay {
+  dispatch_queue_t q =
+      dispatch_queue_create("com.northpolesec.santa.test.watch_items.q", DISPATCH_QUEUE_SERIAL);
+  auto watchItems = std::make_shared<WatchItemsPeer>((NSString*)nil, q);
+
+  watchItems->ReloadConfig(WrapWatchItemsConfig(@{
+    @"d1" : @{kWatchItemConfigKeyPaths : @[ @"/d1" ]},
+    @"p1" : ProcRule(@"/p1"),
+  }));
+
+  auto dataUpdates = std::make_shared<std::vector<DataUpdate>>();
+  auto ignoredDataUpdates = std::make_shared<std::vector<DataUpdate>>();
+  auto procUpdates = std::make_shared<std::vector<size_t>>();
+  auto ignoredProcUpdates = std::make_shared<std::vector<size_t>>();
+
+  watchItems->RegisterDataWatchItemsUpdatedCallback(RecordDataUpdates(dataUpdates));
+  watchItems->RegisterDataWatchItemsUpdatedCallback(RecordDataUpdates(ignoredDataUpdates));
+  watchItems->RegisterProcWatchItemsUpdatedCallback(RecordProcUpdates(procUpdates));
+  watchItems->RegisterProcWatchItemsUpdatedCallback(RecordProcUpdates(ignoredProcUpdates));
+  dispatch_sync(q, ^{
+                });
+
+  XCTAssertEqual(dataUpdates->size(), 1);
+  XCTAssertTrue(ignoredDataUpdates->empty());
+  XCTAssertTrue(*procUpdates == std::vector<size_t>({1}));
+  XCTAssertTrue(ignoredProcUpdates->empty());
+}
+
+- (void)testCallbackRegistrationBeforeFirstLoad {
+  dispatch_queue_t q =
+      dispatch_queue_create("com.northpolesec.santa.test.watch_items.q", DISPATCH_QUEUE_SERIAL);
+  auto watchItems = std::make_shared<WatchItemsPeer>((NSString*)nil, q);
+
+  auto dataUpdates = std::make_shared<std::vector<DataUpdate>>();
+  auto procUpdates = std::make_shared<std::vector<size_t>>();
+  watchItems->RegisterDataWatchItemsUpdatedCallback(RecordDataUpdates(dataUpdates));
+  watchItems->RegisterProcWatchItemsUpdatedCallback(RecordProcUpdates(procUpdates));
+
+  // The first load then delivers the complete initial state
+  watchItems->ReloadConfig(WrapWatchItemsConfig(@{
+    @"chrome" : @{kWatchItemConfigKeyPaths : @[ @"/u/lib/chrome/cookies" ]},
+    @"p1" : ProcRule(@"/p1"),
+  }));
+  dispatch_sync(q, ^{
+                });
+
+  XCTAssertTrue(*dataUpdates ==
+                std::vector<DataUpdate>({
+                    {0, {}, {}, {}, {}},
+                    {
+                        .count = 1,
+                        .new_paths = {{"/u/lib/chrome/cookies", WatchItemPathType::kLiteral}},
+                        .removed_paths = {},
+                        .new_ancestor_paths =
+                            {
+                                {"/u", WatchItemPathType::kLiteral},
+                                {"/u/lib", WatchItemPathType::kLiteral},
+                                {"/u/lib/chrome", WatchItemPathType::kLiteral},
+                            },
+                        .removed_ancestor_paths = {},
+                    },
+                }));
+  XCTAssertTrue(*procUpdates == std::vector<size_t>({0, 1}));
+}
+
+- (void)testCallbackRegistrationAfterInvalidReloadReplaysLastValidState {
+  dispatch_queue_t q =
+      dispatch_queue_create("com.northpolesec.santa.test.watch_items.q", DISPATCH_QUEUE_SERIAL);
+  auto watchItems = std::make_shared<WatchItemsPeer>((NSString*)nil, q);
+
+  watchItems->ReloadConfig(WrapWatchItemsConfig(@{
+    @"d1" : @{kWatchItemConfigKeyPaths : @[ @"/d1" ]},
+    @"p1" : ProcRule(@"/p1"),
+  }));
+  // A config that fails to parse leaves the valid state in place
+  watchItems->ReloadConfig(@{
+    kWatchItemConfigKeyVersion : @(kVersion.data()),
+    kWatchItemConfigKeyWatchItems : @[ @"not a dictionary" ],
+  });
+  XCTAssertEqual(watchItems->State()->rule_count, 2);
+
+  auto dataUpdates = std::make_shared<std::vector<DataUpdate>>();
+  auto procUpdates = std::make_shared<std::vector<size_t>>();
+  watchItems->RegisterDataWatchItemsUpdatedCallback(RecordDataUpdates(dataUpdates));
+  watchItems->RegisterProcWatchItemsUpdatedCallback(RecordProcUpdates(procUpdates));
+  dispatch_sync(q, ^{
+                });
+
+  XCTAssertTrue(*dataUpdates == std::vector<DataUpdate>({{
+                                    .count = 1,
+                                    .new_paths = {{"/d1", WatchItemPathType::kLiteral}},
+                                    .removed_paths = {},
+                                    .new_ancestor_paths = {},
+                                    .removed_ancestor_paths = {},
+                                }}));
+  XCTAssertTrue(*procUpdates == std::vector<size_t>({1}));
+}
+
+- (void)testCallbackReplayPrecedesConcurrentUpdate {
+  dispatch_queue_t q =
+      dispatch_queue_create("com.northpolesec.santa.test.watch_items.q", DISPATCH_QUEUE_SERIAL);
+  auto watchItems = std::make_shared<WatchItemsPeer>((NSString*)nil, q);
+
+  NSDictionary* chrome = @{kWatchItemConfigKeyPaths : @[ @"/u/lib/chrome/cookies" ]};
+  NSDictionary* keychain = @{kWatchItemConfigKeyPaths : @[ @"/u/lib/keychains/login.db" ]};
+
+  watchItems->ReloadConfig(WrapWatchItemsConfig(@{@"chrome" : chrome}));
+
+  // Hold the callback queue so the update after registration is committed
+  // before the replay runs. The replay must still carry the state from the
+  // moment of registration, followed by the delta.
+  dispatch_suspend(q);
+  auto updates = std::make_shared<std::vector<DataUpdate>>();
+  watchItems->RegisterDataWatchItemsUpdatedCallback(RecordDataUpdates(updates));
+  watchItems->ReloadConfig(WrapWatchItemsConfig(@{@"keychain" : keychain}));
+  dispatch_resume(q);
+  dispatch_sync(q, ^{
+                });
+
+  XCTAssertTrue(*updates ==
+                std::vector<DataUpdate>({
+                    {
+                        .count = 1,
+                        .new_paths = {{"/u/lib/chrome/cookies", WatchItemPathType::kLiteral}},
+                        .removed_paths = {},
+                        .new_ancestor_paths =
+                            {
+                                {"/u", WatchItemPathType::kLiteral},
+                                {"/u/lib", WatchItemPathType::kLiteral},
+                                {"/u/lib/chrome", WatchItemPathType::kLiteral},
+                            },
+                        .removed_ancestor_paths = {},
+                    },
+                    {
+                        .count = 1,
+                        .new_paths = {{"/u/lib/keychains/login.db", WatchItemPathType::kLiteral}},
+                        .removed_paths = {{"/u/lib/chrome/cookies", WatchItemPathType::kLiteral}},
+                        .new_ancestor_paths = {{"/u/lib/keychains", WatchItemPathType::kLiteral}},
+                        .removed_ancestor_paths = {{"/u/lib/chrome", WatchItemPathType::kLiteral}},
+                    },
+                }));
+}
+
+- (void)testCallbackReplayDoesNotNotifyOtherSubscriber {
+  dispatch_queue_t q =
+      dispatch_queue_create("com.northpolesec.santa.test.watch_items.q", DISPATCH_QUEUE_SERIAL);
+  auto watchItems = std::make_shared<WatchItemsPeer>((NSString*)nil, q);
+
+  NSDictionary* config = WrapWatchItemsConfig(@{
+    @"d1" : @{kWatchItemConfigKeyPaths : @[ @"/d1" ]},
+    @"p1" : ProcRule(@"/p1"),
+  });
+
+  auto dataUpdates = std::make_shared<std::vector<DataUpdate>>();
+  watchItems->RegisterDataWatchItemsUpdatedCallback(RecordDataUpdates(dataUpdates));
+  watchItems->ReloadConfig(config);
+  dispatch_sync(q, ^{
+                });
+  XCTAssertEqual(dataUpdates->size(), 2);
+
+  // Registering the process subscriber replays only to it, and leaves the
+  // committed state alone, so an unchanged reload still notifies nobody.
+  auto procUpdates = std::make_shared<std::vector<size_t>>();
+  watchItems->RegisterProcWatchItemsUpdatedCallback(RecordProcUpdates(procUpdates));
+  watchItems->ReloadConfig(config);
+  dispatch_sync(q, ^{
+                });
+
+  XCTAssertEqual(dataUpdates->size(), 2);
+  XCTAssertTrue(*procUpdates == std::vector<size_t>({1}));
 }
 
 @end

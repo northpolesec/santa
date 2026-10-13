@@ -25,6 +25,7 @@
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTMetricSet.h"
 #include "Source/common/Unit.h"
+#include "Source/common/es/ESCacheFlusher.h"
 #include "Source/common/es/EndpointSecurityAPI.h"
 #include "Source/common/es/Enricher.h"
 #include "Source/common/faa/WatchItems.h"
@@ -53,6 +54,7 @@ class SantadDeps {
 
   SantadDeps(
       std::shared_ptr<santa::EndpointSecurityAPI> esapi,
+      std::shared_ptr<santa::ESCacheFlusher> es_cache_flusher,
       std::shared_ptr<santa::Logger> logger,
       std::shared_ptr<santa::Metrics> metrics,
       std::shared_ptr<santa::WatchItems> watch_items,
@@ -72,6 +74,7 @@ class SantadDeps {
   std::shared_ptr<santa::AuthResultCache> AuthResultCache();
   std::shared_ptr<santa::Enricher> Enricher();
   std::shared_ptr<santa::EndpointSecurityAPI> ESAPI();
+  std::shared_ptr<santa::ESCacheFlusher> ESCacheFlusher();
   std::shared_ptr<santa::Logger> Logger();
   std::shared_ptr<santa::Metrics> Metrics();
   std::shared_ptr<santa::WatchItems> WatchItems();
@@ -90,6 +93,7 @@ class SantadDeps {
 
  private:
   std::shared_ptr<santa::EndpointSecurityAPI> esapi_;
+  std::shared_ptr<santa::ESCacheFlusher> es_cache_flusher_;
   std::shared_ptr<santa::Logger> logger_;
   std::shared_ptr<santa::Metrics> metrics_;
   std::shared_ptr<santa::WatchItems> watch_items_;

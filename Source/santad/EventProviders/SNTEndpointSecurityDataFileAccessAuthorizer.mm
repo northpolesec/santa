@@ -93,6 +93,7 @@ FAAPolicyProcessor::TargetPolicyPairList TargetPolicyPairs(
 
 @implementation SNTEndpointSecurityDataFileAccessAuthorizer {
   std::shared_ptr<santa::DataFAAPolicyProcessorProxy> _faaPolicyProcessorProxy;
+  std::shared_ptr<santa::ESCacheFlusher> _esCacheFlusher;
 }
 
 - (instancetype)initWithESAPI:(std::shared_ptr<santa::EndpointSecurityAPI>)esApi
@@ -102,12 +103,14 @@ FAAPolicyProcessor::TargetPolicyPairList TargetPolicyPairs(
              faaPolicyProcessor:
                  (std::shared_ptr<santa::DataFAAPolicyProcessorProxy>)faaPolicyProcessorProxy
                       ttyWriter:(std::shared_ptr<santa::TTYWriter>)ttyWriter
-    findPoliciesForTargetsBlock:(FindPoliciesForTargetsBlock)findPoliciesForTargetsBlock {
+    findPoliciesForTargetsBlock:(FindPoliciesForTargetsBlock)findPoliciesForTargetsBlock
+                 esCacheFlusher:(std::shared_ptr<santa::ESCacheFlusher>)esCacheFlusher {
   self = [super initWithESAPI:std::move(esApi)
                       metrics:metrics
                     processor:santa::Processor::kDataFileAccessAuthorizer];
   if (self) {
     _faaPolicyProcessorProxy = std::move(faaPolicyProcessorProxy);
+    _esCacheFlusher = std::move(esCacheFlusher);
     _findPoliciesForTargetsBlock = findPoliciesForTargetsBlock;
 
     _configurator = [SNTConfigurator configurator];
@@ -239,8 +242,10 @@ FAAPolicyProcessor::TargetPolicyPairList TargetPolicyPairs(
     }
   }
 
-  // Always clear cache to ensure operations that were previously allowed are re-evaluated.
-  [super clearCache];
+  // Always invalidate ES caches to ensure operations that were previously
+  // allowed are re-evaluated. This includes cached execs, so that the EXEC
+  // probe can exempt Santa's bundle service.
+  _esCacheFlusher->Flush(self);
 }
 
 - (void)disable {
