@@ -237,6 +237,43 @@ bool WaitForBufferSize(std::shared_ptr<FilePeer> file, size_t expectedSize) {
   XCTAssertEqual(sb.st_mode & ACCESSPERMS, 0640);
 }
 
+- (void)testModeNotWidenedWhenGroupCannotBeSet {
+  // gid 0 is wheel, which this test does not run as and cannot chown to, so the chown fails. The
+  // mode must not be widened then: 0644 would grant read to whichever group owns the log now,
+  // which is not the group that was asked for.
+  XCTAssertTrue([self.fileManager createFileAtPath:self.logPath
+                                          contents:nil
+                                        attributes:@{NSFilePosixPermissions : @0600}]);
+
+  struct stat before;
+  XCTAssertEqual(stat([self.logPath UTF8String], &before), 0);
+  if (before.st_gid == 0 || geteuid() == 0) {
+    XCTSkip(@"Running as root, or the log already belongs to wheel, so the chown would succeed");
+  }
+
+  auto file = std::make_shared<FilePeer>(self.logPath, 100, 500, self.q, self.timer, 0644, 0);
+
+  struct stat after;
+  XCTAssertEqual(fstat(file->FileHandle().fileDescriptor, &after), 0);
+  XCTAssertEqual(after.st_gid, before.st_gid);
+  XCTAssertEqual(after.st_mode & ACCESSPERMS, 0600);
+}
+
+- (void)testNewLogCreatedOwnerOnlyWhenGroupConfigured {
+  // The log must never exist group-readable while it still belongs to the wrong group, so it is
+  // created 0600 and widened only once the chown succeeds. Here the chown to wheel fails.
+  if (geteuid() == 0) {
+    XCTSkip(@"Running as root, so the chown would succeed");
+  }
+  XCTAssertFalse([self.fileManager fileExistsAtPath:self.logPath]);
+
+  auto file = std::make_shared<FilePeer>(self.logPath, 100, 500, self.q, self.timer, 0644, 0);
+
+  struct stat sb;
+  XCTAssertEqual(stat([self.logPath UTF8String], &sb), 0);
+  XCTAssertEqual(sb.st_mode & ACCESSPERMS, 0600);
+}
+
 - (void)testFileGroupNotAppliedThroughSymlink {
   NSString* target = [NSString stringWithFormat:@"%@/target.out", self.path];
   XCTAssertTrue([self.fileManager createFileAtPath:target contents:nil attributes:nil]);

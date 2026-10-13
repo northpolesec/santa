@@ -157,8 +157,13 @@ class FsSpoolWriter {
             }
             // Group first: chown(2) can clear the set-id bits, so a chmod
             // after it is the one that decides the final mode.
-            if (gid_configured_) {
-              (void)::fsspool::LChown(full_path.c_str(), file_gid_);
+            // A mode that grants group access is only safe once the file
+            // belongs to the configured group. If the chown fails, widening
+            // the mode would grant that access to whichever group owns the
+            // file now, so the mode is left alone.
+            if (gid_configured_ &&
+                ::fsspool::LChown(full_path.c_str(), file_gid_) != 0) {
+              return;
             }
             if (mode_configured_) {
               (void)::fsspool::LChmod(full_path.c_str(), file_mode_);
@@ -227,9 +232,13 @@ class FsSpoolWriter {
     current_spool_state_.spool_file =
         absl::StrCat(spool_dir_, PathSeparator(), fname);
 
+    // Created with the restrictive default rather than `file_mode_`, and
+    // widened below only once the group is settled. Otherwise a group-readable
+    // file would exist, however briefly, while it still belonged to the group
+    // of the directory above it.
     current_spool_state_.tmp_fd =
         ::fsspool::Open(current_spool_state_.tmp_file.c_str(),
-                        O_WRONLY | O_CREAT | O_TRUNC, file_mode_);
+                        O_WRONLY | O_CREAT | O_TRUNC, kDefaultSpoolFileMode);
     if (current_spool_state_.tmp_fd < 0) {
       return absl::ErrnoToStatus(errno, "open() failed");
     }
@@ -241,10 +250,8 @@ class FsSpoolWriter {
     // Santa has always had. Best effort, as for the directories below - umask
     // can only narrow what open(2) applied, never widen it, so a failure here
     // can't leave the file more permissive than configured.
-    if (gid_configured_) {
-      (void)::fsspool::FChown(current_spool_state_.tmp_fd, file_gid_);
-    }
-    if (mode_configured_) {
+    if (!gid_configured_ ||
+        ::fsspool::FChown(current_spool_state_.tmp_fd, file_gid_) == 0) {
       (void)::fsspool::FChmod(current_spool_state_.tmp_fd, file_mode_);
     }
 
@@ -334,18 +341,21 @@ class FsSpoolWriter {
   absl::Status BuildDirectoryStructureIfNeeded() {
     if (!IsDirectory(spool_dir_)) {
       if (!IsDirectory(base_dir_)) {
-        if (absl::Status status = MkDir(base_dir_, dir_mode_); !status.ok()) {
+        if (absl::Status status = MkDir(base_dir_, kDefaultSpoolDirMode);
+            !status.ok()) {
           return status;  // failed to create base directory
         }
       }
 
-      if (absl::Status status = MkDir(spool_dir_, dir_mode_); !status.ok()) {
+      if (absl::Status status = MkDir(spool_dir_, kDefaultSpoolDirMode);
+          !status.ok()) {
         return status;  // failed to create spool directory;
       }
     }
     if (!IsDirectory(tmp_dir_)) {
       // No need to check the base directory too, since spool_dir_ exists.
-      if (absl::Status status = MkDir(tmp_dir_, dir_mode_); !status.ok()) {
+      if (absl::Status status = MkDir(tmp_dir_, kDefaultSpoolDirMode);
+          !status.ok()) {
         return status;  // failed to create tmp directory
       }
     }
@@ -370,10 +380,11 @@ class FsSpoolWriter {
         if (fd < 0) {
           continue;
         }
-        if (gid_configured_) {
-          (void)::fsspool::FChown(fd, file_gid_);
-        }
-        if (mode_configured_) {
+        // As for the files above: only widen once the group is settled. Each
+        // directory is created with the restrictive default, so one that fails
+        // to change hands stays closed rather than open to the wrong group.
+        if ((!gid_configured_ || ::fsspool::FChown(fd, file_gid_) == 0) &&
+            mode_configured_) {
           (void)::fsspool::FChmod(fd, dir_mode_);
         }
         (void)::fsspool::Close(fd);

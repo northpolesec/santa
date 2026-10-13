@@ -98,11 +98,13 @@ File::~File() {
 void File::OpenFileHandleSerialized() {
   NSFileManager* fm = [NSFileManager defaultManager];
   if (![fm fileExistsAtPath:path_]) {
+    // When a group is configured the log is created owner-only and widened below, once the group
+    // is settled. Otherwise a group-readable log would exist, however briefly, while it still
+    // belonged to the group of the directory above it.
+    NSNumber* createMode = file_gid_ != (gid_t)-1 ? @(0600) : (file_mode_ ? @(file_mode_) : nil);
     [fm createFileAtPath:path_
                 contents:nil
-              attributes:file_mode_
-                             ? @{NSFilePosixPermissions : @(file_mode_)}
-                             : nil];
+              attributes:createMode ? @{NSFilePosixPermissions : createMode} : nil];
   }
   file_handle_ = [NSFileHandle fileHandleForWritingAtPath:path_];
   [file_handle_ seekToEndOfFile];
@@ -127,13 +129,19 @@ void File::OpenFileHandleSerialized() {
         path_sb.st_ino != fd_sb.st_ino) {
       LOGW(@"Not setting mode or group on %@: not the regular file it names", path_);
     } else {
-      // Group first: chown(2) can clear the set-id bits, so the chmod after it is the one that
-      // decides the final mode.
+      // Group first, for two reasons. chown(2) can clear the set-id bits, so the chmod after it
+      // is the one that decides the final mode. And a mode that grants group access is only safe
+      // once the file belongs to the configured group: if the chown fails, widening the mode
+      // would grant that access to whichever group owns the log now, so the mode is left alone.
+      bool groupOK = true;
       if (file_gid_ != (gid_t)-1 &&
           fchown(file_handle_.fileDescriptor, (uid_t)-1, file_gid_) != 0) {
+        groupOK = false;
         LOGW(@"Unable to set group %u on %@: %d: %s", file_gid_, path_, errno, strerror(errno));
       }
-      if (file_mode_ && fchmod(file_handle_.fileDescriptor, file_mode_) != 0) {
+      if (!groupOK) {
+        LOGW(@"Not setting mode 0%o on %@: its group could not be set", file_mode_, path_);
+      } else if (file_mode_ && fchmod(file_handle_.fileDescriptor, file_mode_) != 0) {
         LOGW(@"Unable to set mode 0%o on %@: %d: %s", file_mode_, path_, errno, strerror(errno));
       }
     }
