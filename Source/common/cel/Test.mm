@@ -86,17 +86,27 @@ std::unique_ptr<santa::cel::Activation<IsV2>> MakeActivation(
 // records what add_annotation() stamped.
 struct FakeAnnotations {
   std::set<std::string> present;
+  // Names some OTHER process in the tree carries, for annotation_exists().
+  std::set<std::string> anywhere;
   std::vector<std::pair<std::string, santa::cel::AnnotationPropagation>> added;
+  // Names the add hook reported as session-expanded. Kept separate from
+  // `added` so the existing assertions on it still read the same.
+  std::set<std::string> sessionNames;
 
   santa::cel::AnnotationHooks Hooks() {
     return {
         .has = [this](const std::string& name) { return present.count(name) > 0; },
         .add =
-            [this](const std::string& name, santa::cel::AnnotationPropagation propagation) {
+            [this](const std::string& name, santa::cel::AnnotationPropagation propagation,
+                   bool session_expanded) {
               added.push_back({name, propagation});
+              if (session_expanded) {
+                sessionNames.insert(name);
+              }
               present.insert(name);
             },
         .session = [] { return std::string("123-4"); },
+        .exists = [this](const std::string& name) { return anywhere.count(name) > 0; },
     };
   }
 };
@@ -2365,6 +2375,10 @@ class ScopedHostZone {
     XCTAssertEqual(annotations.added[0].first, "claude-code-123-4");
     XCTAssertEqual(annotations.added[1].first, "claude-code");
     XCTAssertEqual(annotations.added[2].first, "123-4/123-4");
+    // Only the expanded names are flagged. The flag is what keeps a name that
+    // is unique per run out of the tree's annotation index.
+    XCTAssertTrue(annotations.sessionNames ==
+                  (std::set<std::string>{"claude-code-123-4", "123-4/123-4"}));
   }
 
   {
@@ -2382,6 +2396,7 @@ class ScopedHostZone {
   }
 
   annotations.added.clear();
+  annotations.sessionNames.clear();
 
   {
     // Without a session hook the placeholder is left as written.
@@ -2390,6 +2405,9 @@ class ScopedHostZone {
     XCTAssertTrue(evaluate("add_annotation('claude-code-{session}', ALLOWLIST)", hooks).ok());
     XCTAssertEqual(annotations.added.size(), 1u);
     XCTAssertEqual(annotations.added[0].first, "claude-code-{session}");
+    // Left as written, so it is a literal name, not unique per run: not
+    // flagged, and correctly indexable.
+    XCTAssertTrue(annotations.sessionNames.empty());
   }
 }
 
@@ -2597,14 +2615,15 @@ class ScopedHostZone {
   XCTAssertFalse(result.value().cacheable);
 }
 
-// Annotations are CELv2 only: neither function, and neither of the propagation
-// identifiers, exists for V1.
+// Annotations are CELv2 only: none of the three functions, and neither of the
+// propagation identifiers, exists for V1.
 - (void)testAnnotationsNotAvailableInV1 {
   auto sut = santa::cel::Evaluator<false>::Create();
   XCTAssertTrue(sut.ok());
 
   std::vector<std::string> exprs = {
       "has_annotation('MARK')",
+      "annotation_exists('MARK')",
       "add_annotation('MARK', ALLOWLIST)",
       "add_annotation('MARK', FORK_AND_EXEC, ALLOWLIST)",
   };
@@ -2617,6 +2636,81 @@ class ScopedHostZone {
     auto activation = MakeActivation<false>();
     XCTAssertFalse(sut.value()->CompileAndEvaluate(expr, *activation).ok(),
                    @"%s unexpectedly compiled under CELv1", expr.c_str());
+  }
+}
+
+- (void)testAnnotationExists {
+  using ReturnValue = santa::cel::CELProtoTraits<true>::ReturnValue;
+
+  auto sut = santa::cel::Evaluator<true>::Create();
+  XCTAssertTrue(sut.ok());
+
+  FakeAnnotations annotations;
+  auto evaluate = [&](absl::string_view expr) {
+    auto activation = MakeActivation<true>(absl::Now, annotations.Hooks());
+    return sut.value()->CompileAndEvaluate(expr, *activation);
+  };
+
+  {
+    auto result = evaluate("annotation_exists('claude-code') ? ALLOWLIST : BLOCKLIST");
+    if (!result.ok()) {
+      XCTFail(@"Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::BLOCKLIST);
+      // Live tree state, so the answer must never be cached.
+      XCTAssertFalse(result.value().cacheable);
+    }
+  }
+
+  annotations.anywhere.insert("claude-code");
+
+  {
+    auto result = evaluate("annotation_exists('claude-code') ? ALLOWLIST : BLOCKLIST");
+    if (!result.ok()) {
+      XCTFail(@"Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
+      XCTAssertFalse(result.value().cacheable);
+    }
+  }
+
+  {
+    // It answers a different question from has_annotation(): nothing was
+    // stamped on THIS process, so "somebody else has it" is true.
+    auto result = evaluate("annotation_exists('claude-code') && !has_annotation('claude-code') "
+                           "? ALLOWLIST : BLOCKLIST");
+    if (!result.ok()) {
+      XCTFail(@"Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
+    }
+  }
+
+  {
+    // Unlike add_annotation(), it is a pure read, so it is legal off the
+    // result path -- here inside another call's argument.
+    auto result = evaluate("[annotation_exists('claude-code'), false][0] ? ALLOWLIST : BLOCKLIST");
+    if (!result.ok()) {
+      XCTFail(@"Failed to evaluate: %s", result.status().message().data());
+    } else {
+      XCTAssertEqual(result.value().value, ReturnValue::ALLOWLIST);
+    }
+  }
+}
+
+- (void)testAnnotationExistsWithoutATree {
+  // An empty hook (santad built the activation with no process tree) answers
+  // false rather than erroring, as has_annotation() does.
+  auto sut = santa::cel::Evaluator<true>::Create();
+  XCTAssertTrue(sut.ok());
+
+  auto activation = MakeActivation<true>(absl::Now, santa::cel::AnnotationHooks{});
+  auto result = sut.value()->CompileAndEvaluate(
+      "annotation_exists('claude-code') ? ALLOWLIST : BLOCKLIST", *activation);
+  if (!result.ok()) {
+    XCTFail(@"Failed to evaluate: %s", result.status().message().data());
+  } else {
+    XCTAssertEqual(result.value().value, santa::cel::CELProtoTraits<true>::ReturnValue::BLOCKLIST);
   }
 }
 

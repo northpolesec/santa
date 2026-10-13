@@ -72,9 +72,15 @@ absl::Status RegisterAnnotationDecls(::cel::TypeCheckerBuilder& builder) {
       ::cel::MakeFunctionDecl("has_annotation",
                               ::cel::MakeOverloadDecl("has_annotation_string", ::cel::BoolType(),
                                                       ::cel::StringType())));
+  CEL_ASSIGN_OR_RETURN(
+      auto existsDecl,
+      ::cel::MakeFunctionDecl("annotation_exists",
+                              ::cel::MakeOverloadDecl("annotation_exists_string", ::cel::BoolType(),
+                                                      ::cel::StringType())));
 
   CEL_RETURN_IF_ERROR(builder.AddFunction(std::move(addDecl)));
-  return builder.AddFunction(std::move(hasDecl));
+  CEL_RETURN_IF_ERROR(builder.AddFunction(std::move(hasDecl)));
+  return builder.AddFunction(std::move(existsDecl));
 }
 
 // Runs after type checking. add_annotation() writes to the process tree, and
@@ -112,6 +118,15 @@ std::vector<cel_runtime::CelFunctionDescriptor> HasAnnotationDescriptors() {
   };
 }
 
+std::vector<cel_runtime::CelFunctionDescriptor> AnnotationExistsDescriptors() {
+  using Type = cel_runtime::CelValue::Type;
+  return {
+      cel_runtime::CelFunctionDescriptor("annotation_exists", /*receiver_style=*/false,
+                                         /*types=*/{Type::kString},
+                                         /*is_strict=*/true),
+  };
+}
+
 std::vector<cel_runtime::CelFunctionDescriptor> AddAnnotationDescriptors() {
   using Type = cel_runtime::CelValue::Type;
   // The policy argument is a message, which is kStruct in the runtime's kinds.
@@ -134,20 +149,21 @@ std::vector<cel_runtime::CelFunctionDescriptor> AddAnnotationDescriptors() {
   };
 }
 
-absl::Status HasAnnotationFunction::Evaluate(absl::Span<const cel_runtime::CelValue> args,
-                                             cel_runtime::CelValue* result,
-                                             google::protobuf::Arena*) const {
+absl::Status AnnotationPredicateFunction::Evaluate(absl::Span<const cel_runtime::CelValue> args,
+                                                   cel_runtime::CelValue* result,
+                                                   google::protobuf::Arena*) const {
   if (args.size() != 1) {
-    return absl::InvalidArgumentError("has_annotation() expects a single name argument");
+    return absl::InvalidArgumentError(
+        absl::StrCat(descriptor().name(), "() expects a single name argument"));
   }
 
-  // The answer is a property of this process, not of the binary, so a cached
-  // decision would leak one process's annotations onto another.
+  // The answer is live tree state, not a property of the binary, so a cached
+  // decision would carry one process's (or one moment's) answer onto another.
   *used_sink_ = true;
 
   bool present = false;
-  if (hooks_.has) {
-    present = hooks_.has(std::string(args[0].StringOrDie().value()));
+  if (hook_) {
+    present = hook_(std::string(args[0].StringOrDie().value()));
   }
   *result = cel_runtime::CelValue::CreateBool(present);
   return absl::OkStatus();
@@ -239,6 +255,9 @@ absl::Status RegisterAnnotationFunctions(cel_runtime::CelFunctionRegistry* regis
   // how they reach the process tree and how they mark the evaluation
   // non-cacheable.
   for (const auto& descriptor : HasAnnotationDescriptors()) {
+    CEL_RETURN_IF_ERROR(registry->RegisterLazyFunction(descriptor));
+  }
+  for (const auto& descriptor : AnnotationExistsDescriptors()) {
     CEL_RETURN_IF_ERROR(registry->RegisterLazyFunction(descriptor));
   }
   for (const auto& descriptor : AddAnnotationDescriptors()) {

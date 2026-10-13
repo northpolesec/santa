@@ -24,6 +24,8 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <string>
+#include <string_view>
 #include <typeindex>
 #include <utility>
 #include <vector>
@@ -33,6 +35,7 @@
 #include "Source/common/processtree/process_tree.pb.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
+#include "absl/container/inlined_vector.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/synchronization/mutex.h"
@@ -69,7 +72,9 @@ void ProcessTree::BackfillInsertChildren(
       // has run yet), but keep the invariant in one place rather than three.
       PropagateAnnotationsLocked(*parent, *proc, /*across_exec=*/false);
     }
-    map_.emplace(backfilled_proc.pid, proc);
+    if (map_.emplace(backfilled_proc.pid, proc).second) {
+      IndexProcessLocked(*proc);
+    }
   }
 
   // The only case where we should not have a parent is the root processes
@@ -114,7 +119,11 @@ void ProcessTree::HandleFork(uint64_t timestamp,
     // this event as a duplicate must never see the child without the
     // annotations it inherits. See Annotator::Propagate.
     PropagateAnnotationsLocked(*parent, *child, /*across_exec=*/false);
-    map_.emplace(new_pid, child);
+    // Index only the winner of the first-wins insert: a loser's names are
+    // already contributed by the entry that won.
+    if (map_.emplace(new_pid, child).second) {
+      IndexProcessLocked(*child);
+    }
     // Reap AFTER applying, so a late event can never reap the actor it needs.
     DrainRemovals();
   }
@@ -148,9 +157,20 @@ void ProcessTree::HandleExec(uint64_t timestamp, const Process& p,
     if (!StepLocked({timestamp, EventKind::kExec, p.pid_, new_pid})) {
       return;
     }
-    remove_at_.push({timestamp, p.pid_});
+    // The pre-exec process is gone as of this event. Retire it from the index
+    // now rather than when it is finally reaped, or the program it used to be
+    // would keep answering annotation_exists() for the whole removal grace.
+    // At AUTH time this is provisional: if the decision is DENY the execve
+    // fails and the actor keeps running, so HandleExecDenied undoes both of
+    // these.
+    if (auto old = GetLocked(p.pid_)) {
+      UnindexProcessLocked(**old);
+      ScheduleRemovalLocked(timestamp, **old);
+    }
     PropagateAnnotationsLocked(p, *new_proc, /*across_exec=*/true);
-    map_.emplace(new_proc->pid_, new_proc);
+    if (map_.emplace(new_proc->pid_, new_proc).second) {
+      IndexProcessLocked(*new_proc);
+    }
     DrainRemovals();
   }
   for (const auto& annotator : annotators_) {
@@ -163,7 +183,63 @@ void ProcessTree::HandleExit(uint64_t timestamp, const Process& p) {
   if (!StepLocked({timestamp, EventKind::kExit, p.pid_, Pid{}})) {
     return;
   }
-  remove_at_.push({timestamp, p.pid_});
+  // As in HandleExec: retire now, not at reap. The process is gone even though
+  // it lingers in map_ for the removal grace.
+  if (auto exiting = GetLocked(p.pid_)) {
+    UnindexProcessLocked(**exiting);
+    ScheduleRemovalLocked(timestamp, **exiting);
+  }
+  DrainRemovals();
+}
+
+void ProcessTree::HandleExecDenied(uint64_t timestamp, const Pid actor,
+                                   const Pid target) {
+  absl::MutexLock lock(mtx_);
+  // Deliberately NOT gated on StepLocked: this is a decision, not an ES event,
+  // so it has no EventKey of its own, and keying it on the exec's would make
+  // the exec itself look like a duplicate afterwards. Every step below is
+  // individually idempotent instead, which is what repeated calls need:
+  // Un/IndexProcessLocked are gated on Process::indexed_, a second remove_at_
+  // entry for a pid that is already gone is dropped by DrainRemovals' own
+  // lookup, and the flags are plain assignments.
+
+  // Retire the target first, then revive the actor. They always differ (an
+  // exec bumps the pidversion), but if a caller ever passed the same pid
+  // twice, ending alive is the safer of the two outcomes.
+  //
+  // The target is scheduled on the AUTH_EXEC's timestamp, not on "now", so
+  // after a long-pending decision latest_ts_ has already moved past it and
+  // the DrainRemovals below is due to reap it in this same call -- the grace
+  // is effectively zero for a phantom. That is fine, and deliberate: the
+  // message being answered still holds a ProcessToken on the target, so the
+  // reap turns into a tombstone and the node survives until this event
+  // finishes processing. Nothing else can be referencing a pidversion that
+  // never came into existence.
+  if (auto proc = GetLocked(target)) {
+    UnindexProcessLocked(**proc);
+    ScheduleRemovalLocked(timestamp, **proc);
+  }
+  if (auto proc = GetLocked(actor)) {
+    // Revive ONLY the removal this denial is cancelling. HandleExec scheduled
+    // the actor at exactly this timestamp and the authorizer hands back the
+    // same mach_time, so an exact match means nothing has happened to the
+    // actor since. Anything else means something has, and the actor is gone
+    // for a reason this denial does not undo. Three ways that happens, all
+    // real: it is killed while blocked in the ES auth wait (^C in the spawning
+    // shell, a watchdog, a process-group teardown -- an AUTH_EXEC can be
+    // pending for seconds) and its NOTIFY_EXIT, arriving through a different
+    // client on a different queue, is processed before this denial; or, since
+    // the authorizer answers ES before calling here, the released actor exits
+    // voluntarily; or it execs again. Each of those re-stamps removal_ts_, so
+    // the match fails. Reviving anyway would put a dead process back in the
+    // index with its removal cancelled and nothing left to schedule it again
+    // -- StepLocked drops the duplicate exit -- which is the pinned-annotation
+    // bug all over again.
+    if ((*proc)->pending_removal_ && (*proc)->removal_ts_ == timestamp) {
+      ReviveProcessLocked(**proc);
+    }
+  }
+  // Reap after applying, as the Handle* paths do.
   DrainRemovals();
 }
 
@@ -211,6 +287,28 @@ bool ProcessTree::StepLocked(const EventKey& key) {
   return true;
 }
 
+void ProcessTree::ScheduleRemovalLocked(uint64_t timestamp, Process& p) {
+  remove_at_.push({timestamp, p.pid_});
+  p.pending_removal_ = true;
+  // Last schedule wins. Not std::max: an out-of-order redelivery stamped in
+  // the past is still the most recent thing the tree was told, and whichever
+  // timestamp is recorded here is the one entry that will reap -- taking the
+  // max of the two would leave the recorded deadline matching no entry at all
+  // if the older timestamp were the one pushed last.
+  p.removal_ts_ = timestamp;
+}
+
+void ProcessTree::ReviveProcessLocked(Process& p) {
+  p.pending_removal_ = false;
+  p.removal_ts_ = 0;
+  // DrainRemovals may already have tombstoned the process while the decision
+  // was outstanding (the authorization deadline can outlast the grace). Clear
+  // it, or ReleaseProcess erases the process the moment the event's
+  // ProcessToken drops its reference.
+  p.tombstoned_ = false;
+  IndexProcessLocked(p);
+}
+
 void ProcessTree::DrainRemovals() {
   // Reap deferred removals once `grace` mach_time ticks have elapsed past the
   // scheduling event (measured against the newest timestamp seen). The grace
@@ -226,12 +324,34 @@ void ProcessTree::DrainRemovals() {
   // at the first that has not — every deeper entry is newer. This is O(K log R)
   // in the number reaped, not O(R) in the number pending.
   while (!remove_at_.empty() && remove_at_.top().first < cutoff) {
+    const uint64_t scheduled_at = remove_at_.top().first;
     const struct Pid pid = remove_at_.top().second;
     remove_at_.pop();
-    if (auto target = GetLocked(pid);
-        target && (*target)->refcnt_.load(std::memory_order_relaxed) > 0) {
+    auto target = GetLocked(pid);
+    if (!target) {
+      continue;
+    }
+    // The queue is advisory; the Process holds the authoritative decision.
+    // Discard this entry unless the process is still slated for removal AND
+    // this is the entry that was recorded for it. The first test is how a
+    // cancelled removal is honoured (HandleExecDenied revived the actor of a
+    // denied exec, which is still running). The second stops an earlier,
+    // superseded entry from reaping on a stale deadline: one exec schedules
+    // the actor twice (AUTH_EXEC then NOTIFY_EXEC), and a process revived and
+    // later genuinely exited has an old entry still in the queue. Neither test
+    // can resurrect a process that really did exit -- the exit path sets both
+    // fields, so its own entry always matches.
+    if (!(*target)->pending_removal_ ||
+        (*target)->removal_ts_ != scheduled_at) {
+      continue;
+    }
+    if ((*target)->refcnt_.load(std::memory_order_relaxed) > 0) {
       (*target)->tombstoned_ = true;
     } else {
+      // Belt and braces: whatever scheduled this removal already retired the
+      // process. Unindexing here too makes "nothing outside map_ is in the
+      // index" hold unconditionally, and the indexed_ flag makes it free.
+      UnindexProcessLocked(**target);
       map_.erase(pid);
     }
   }
@@ -255,8 +375,9 @@ PidList ProcessTree::RetainProcess(const PidList& pids) {
 
 void ProcessTree::ReleaseProcess(const PidList& pids) {
   // Fast path under the reader lock: the decrement is atomic, and tombstoned_
-  // is stable here (written only in DrainRemovals under the exclusive lock).
-  // Only the rare erase of a tombstoned process needs the exclusive lock.
+  // is stable here -- its only writers, DrainRemovals (sets) and
+  // ReviveProcessLocked (clears), both hold the exclusive lock. Only the rare
+  // erase of a tombstoned process needs the exclusive lock.
   PidList to_erase;
   {
     absl::ReaderMutexLock lock(mtx_);
@@ -284,6 +405,7 @@ void ProcessTree::ReleaseProcess(const PidList& pids) {
     auto proc = GetLocked(p);
     if (proc && (*proc)->refcnt_.load(std::memory_order_relaxed) == 0 &&
         (*proc)->tombstoned_) {
+      UnindexProcessLocked(**proc);
       map_.erase(p);
     }
   }
@@ -294,6 +416,76 @@ void ProcessTree::ReleaseProcess(const PidList& pids) {
 Annotation get/set
 ---
 */
+
+void ProcessTree::IndexProcessLocked(Process& p) {
+  if (p.indexed_) {
+    return;
+  }
+  p.indexed_ = true;
+  for (const auto& [_, annotation] : p.annotations_) {
+    IndexAnnotationLocked(*annotation);
+  }
+}
+
+void ProcessTree::UnindexProcessLocked(Process& p) {
+  if (!p.indexed_) {
+    return;
+  }
+  p.indexed_ = false;
+  for (const auto& [_, annotation] : p.annotations_) {
+    UnindexAnnotationLocked(*annotation);
+  }
+}
+
+void ProcessTree::IndexAnnotationLocked(const Annotator& a) {
+  // ForEachIndexedName's callback is a type-erased absl::FunctionRef, so the
+  // thread-safety analyzer cannot see that it only ever runs here,
+  // synchronously, with mtx_ already held. Collect the names into a plain
+  // local first -- untouched by the analysis -- so the actual
+  // annotation_index_ mutation below happens directly in this function's
+  // body, where the ABSL_EXCLUSIVE_LOCKS_REQUIRED on the declaration covers it.
+  //
+  // Inline capacity 32: matches CELAnnotator::kMaxEntries (not referenced
+  // directly -- depending on annotations:cel here would be a dependency
+  // cycle), so a process carrying the max number of names still doesn't
+  // malloc inside mtx_ on the fork/exec path.
+  absl::InlinedVector<std::string_view, 32> names;
+  a.ForEachIndexedName(
+      [&names](std::string_view name) { names.push_back(name); });
+
+  for (std::string_view name : names) {
+    // The common case is a name already present (every descendant inheriting
+    // it), so look up by view first and only allocate a key on a real insert.
+    if (auto it = annotation_index_.find(name); it != annotation_index_.end()) {
+      it->second++;
+    } else {
+      annotation_index_.emplace(std::string(name), 1);
+    }
+  }
+}
+
+void ProcessTree::UnindexAnnotationLocked(const Annotator& a) {
+  // See IndexAnnotationLocked for why the names are collected before
+  // annotation_index_ is touched, and for the inline capacity of 32.
+  absl::InlinedVector<std::string_view, 32> names;
+  a.ForEachIndexedName(
+      [&names](std::string_view name) { names.push_back(name); });
+
+  for (std::string_view name : names) {
+    auto it = annotation_index_.find(name);
+    if (it == annotation_index_.end()) {
+      continue;
+    }
+    if (--it->second == 0) {
+      annotation_index_.erase(it);
+    }
+  }
+}
+
+bool ProcessTree::AnnotationExists(std::string_view name) const {
+  absl::ReaderMutexLock lock(mtx_);
+  return annotation_index_.contains(name);
+}
 
 void ProcessTree::PropagateAnnotationsLocked(const Process& from, Process& to,
                                              bool across_exec) {
@@ -322,7 +514,13 @@ void ProcessTree::AnnotateProcess(const Process& p,
     return;
   }
   const Annotator& x = *a;
-  it->second->annotations_.emplace(std::type_index(typeid(x)), std::move(a));
+  // emplace is first-wins; count the names only if this annotation is the one
+  // that landed, and only while the process is itself counted.
+  auto [entry, inserted] = it->second->annotations_.emplace(
+      std::type_index(typeid(x)), std::move(a));
+  if (inserted && it->second->indexed_) {
+    IndexAnnotationLocked(*entry->second);
+  }
 }
 
 std::optional<::santa::pb::v1::process_tree::Annotations>

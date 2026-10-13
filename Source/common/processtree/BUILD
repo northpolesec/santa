@@ -41,6 +41,7 @@ objc_library(
         "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/container:flat_hash_set",
         "@abseil-cpp//absl/container:inlined_vector",
+        "@abseil-cpp//absl/functional:function_ref",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/synchronization",
@@ -91,6 +92,7 @@ santa_unit_test(
         ":process",
         ":process_tree_test_helpers",
         "//Source/common/processtree/annotations:annotator",
+        "@abseil-cpp//absl/functional:function_ref",
         "@abseil-cpp//absl/synchronization",
     ],
 )

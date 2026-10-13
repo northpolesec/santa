@@ -26,6 +26,7 @@
 #include "Source/common/processtree/process.h"
 #include "Source/common/processtree/process_tree.pb.h"
 #include "absl/container/flat_hash_map.h"
+#include "absl/functional/function_ref.h"
 
 namespace santa::santad::process_tree {
 
@@ -55,9 +56,16 @@ class CELAnnotator : public Annotator {
   struct Entry {
     bool fork = false;
     bool exec = false;
+    // The name carries an expanded {session} id, making it unique to one run
+    // of one process. Nothing can look such a name up tree-wide -- a rule
+    // cannot write the expanded form, because the id is not known when the
+    // rule is written -- so it is kept out of the tree's annotation index.
+    // Telemetry still exports it; that is what these names are for.
+    bool session = false;
 
     bool operator==(const Entry& other) const {
-      return fork == other.fork && exec == other.exec;
+      return fork == other.fork && exec == other.exec &&
+             session == other.session;
     }
   };
   using EntryMap = absl::flat_hash_map<std::string, Entry>;
@@ -77,6 +85,8 @@ class CELAnnotator : public Annotator {
 
   std::shared_ptr<const Annotator> Propagate(bool across_exec) const override;
   bool PropagatesWholly(bool across_exec) const override;
+  void ForEachIndexedName(
+      absl::FunctionRef<void(std::string_view)> f) const override;
 
   std::optional<::santa::pb::v1::process_tree::Annotations> Proto()
       const override;

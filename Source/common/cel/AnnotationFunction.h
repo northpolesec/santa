@@ -65,6 +65,19 @@ namespace cel {
 //     written. A rule that needs both must add the plain and suffixed names,
 //     e.g. add_annotation(['claude-code-{session}', 'claude-code'], ALLOWLIST).
 //
+//   annotation_exists(string name) -> bool
+//     True if ANY process in the tree carries `name` right now -- not just
+//     this one. For gating a tool on another process being alive:
+//
+//         annotation_exists('claude-code') ? ALLOWLIST : BLOCKLIST
+//
+//     Answered from a refcounted index on the tree, so it is a hash lookup
+//     rather than a scan. The process being executed counts itself (it may
+//     have inherited the name), so "somebody else has it" is
+//     annotation_exists('X') && !has_annotation('X'). A name carrying an
+//     expanded {session} id is never visible here: it is unique to one run of
+//     one process, so no rule could name it.
+//
 // Together they replace an ancestor walk with a hash lookup. Instead of every
 // descendant re-matching the ancestor it cares about:
 //
@@ -112,16 +125,24 @@ inline constexpr std::pair<absl::string_view, AnnotationPropagation>
 
 // How the CEL layer reaches the process tree. Supplied by santad (see
 // CreateCELActivationBlock); empty hooks mean there is no tree, in which case
-// has_annotation() is false and add_annotation() only passes its policy
-// through.
+// has_annotation() and annotation_exists() are false and add_annotation()
+// only passes its policy through.
 struct AnnotationHooks {
   std::function<bool(const std::string& name)> has;
-  std::function<void(const std::string& name,
-                     AnnotationPropagation propagation)>
+  // `session_expanded` is true when the name was produced by substituting
+  // kSessionPlaceholder, which makes it unique to one run of one process.
+  // Such a name is kept out of the tree's annotation index: no rule can write
+  // the expanded form, so annotation_exists() could never answer from it.
+  std::function<void(const std::string& name, AnnotationPropagation propagation,
+                     bool session_expanded)>
       add;
   // The value kSessionPlaceholder expands to in an add_annotation() name. If
   // unset, the placeholder is left as written.
   std::function<std::string()> session;
+  // Whether any process in the tree carries `name`. Unlike `has` and `add`,
+  // this takes no process: it is a whole-tree question. An unset hook means
+  // there is no tree, and annotation_exists() is then false.
+  std::function<bool(const std::string& name)> exists;
 };
 
 inline constexpr absl::string_view kSessionPlaceholder = "{session}";
@@ -141,23 +162,31 @@ inline constexpr absl::string_view kSessionPlaceholder = "{session}";
 using StagedAnnotations =
     std::vector<std::pair<std::string, AnnotationPropagation>>;
 
-// Descriptors for has_annotation() and the add_annotation() overloads. Both are
-// returned as vectors because the Activation vends whole overload sets.
+// Descriptors for has_annotation(), annotation_exists() and the
+// add_annotation() overloads. All are returned as vectors because the
+// Activation vends whole overload sets.
 std::vector<::google::api::expr::runtime::CelFunctionDescriptor>
 HasAnnotationDescriptors();
 std::vector<::google::api::expr::runtime::CelFunctionDescriptor>
+AnnotationExistsDescriptors();
+std::vector<::google::api::expr::runtime::CelFunctionDescriptor>
 AddAnnotationDescriptors();
 
-// Lazy CEL function backing has_annotation(). Sets the supplied flag to mark
-// the evaluation non-cacheable. The sink pointer must outlive every evaluation.
-class HasAnnotationFunction : public ::google::api::expr::runtime::CelFunction {
+// Lazy CEL function backing the boolean annotation predicates
+// has_annotation() and annotation_exists(). They differ only in which hook
+// answers them -- one string argument in, the hook's bool out -- so they share
+// one implementation and are distinguished by the descriptor they carry. Sets
+// the supplied flag to mark the evaluation non-cacheable. The sink pointer
+// must outlive every evaluation.
+class AnnotationPredicateFunction
+    : public ::google::api::expr::runtime::CelFunction {
  public:
-  HasAnnotationFunction(
+  AnnotationPredicateFunction(
       ::google::api::expr::runtime::CelFunctionDescriptor descriptor,
-      bool* used_sink, AnnotationHooks hooks)
+      bool* used_sink, std::function<bool(const std::string&)> hook)
       : ::google::api::expr::runtime::CelFunction(std::move(descriptor)),
         used_sink_(used_sink),
-        hooks_(hooks) {}
+        hook_(std::move(hook)) {}
 
   absl::Status Evaluate(
       absl::Span<const ::google::api::expr::runtime::CelValue> args,
@@ -166,7 +195,7 @@ class HasAnnotationFunction : public ::google::api::expr::runtime::CelFunction {
 
  private:
   bool* used_sink_;
-  AnnotationHooks hooks_;
+  std::function<bool(const std::string&)> hook_;
 };
 
 // Lazy CEL function backing every add_annotation() overload: the argument count
@@ -192,8 +221,8 @@ class AddAnnotationFunction : public ::google::api::expr::runtime::CelFunction {
   StagedAnnotations* staged_;
 };
 
-// Register the add_annotation() and has_annotation() decls with the type
-// checker at compile time. Only available in CELv2.
+// Register the add_annotation(), has_annotation() and annotation_exists()
+// decls with the type checker at compile time. Only available in CELv2.
 absl::Status AddAnnotationCompilerLibrary(::cel::CompilerBuilder& builder);
 
 // Register the annotation functions at runtime. Both are lazy; the Activation

@@ -2075,6 +2075,7 @@ santa_unit_test(
         "//Source/common/es:EndpointSecurityMessage",
         "//Source/common/es:MockEndpointSecurityAPI",
         "//Source/common/processtree:process_tree",
+        "//Source/common/processtree:process_tree_test_helpers",
         "@OCMock",
         "@googletest//:gtest",
     ],

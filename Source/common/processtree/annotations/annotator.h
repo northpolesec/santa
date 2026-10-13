@@ -18,8 +18,10 @@
 
 #include <memory>
 #include <optional>
+#include <string_view>
 
 #include "Source/common/processtree/process_tree.pb.h"
+#include "absl/functional/function_ref.h"
 
 namespace santa::santad::process_tree {
 
@@ -74,6 +76,23 @@ class Annotator {
   // The default is false, which is always safe: the tree falls back to
   // Propagate().
   virtual bool PropagatesWholly(bool across_exec) const { return false; }
+
+  // Visit every name this annotation contributes to the tree's annotation
+  // index, which backs ProcessTree::AnnotationExists() (the CEL
+  // annotation_exists()). The tree calls this while holding the lock that
+  // publishes or retires the process, so an implementation MUST NOT touch the
+  // tree, and must not do more work than walking what it already holds.
+  //
+  // The default contributes nothing, so an annotation that is not queryable by
+  // name is simply absent from the index.
+  //
+  // Each yielded view must remain valid until ForEachIndexedName returns: the
+  // tree collects the views and uses them after the callback returns them all,
+  // rather than consuming each one inline. An implementation must therefore
+  // yield views into storage the annotation itself owns (e.g. a member
+  // std::string), never into a temporary.
+  virtual void ForEachIndexedName(
+      absl::FunctionRef<void(std::string_view)> f) const {}
 
   virtual std::optional<::santa::pb::v1::process_tree::Annotations> Proto()
       const = 0;
