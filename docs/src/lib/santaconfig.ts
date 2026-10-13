@@ -343,14 +343,18 @@ The following sequences will be replaced in the final URL:
     },
     {
       key: "BannedUSBBlockMessage",
-      description: `Message to display when a Removable Media (e.g. USB device) is prevented from being mounted`,
+      description: `Message to display when a Removable Media (e.g. USB device) is prevented from being mounted.
+        Workshop can set this for hosts running Santa 2026.9 or later.`,
       type: "string",
+      syncConfigurable: true,
     },
     {
       key: "RemountUSBBlockMessage",
       description: `Message to display when a Removable Media (e.g. USB device) is allowed to be mounted with a subset of the requested flags
-        as defined by \`RemountUSBMode\``,
+        as defined by \`RemovableMediaRemountFlags\` or \`EncryptedRemovableMediaRemountFlags\`. Workshop can set this for
+        hosts running Santa 2026.9 or later.`,
       type: "string",
+      syncConfigurable: true,
     },
     {
       key: "FileAccessBlockMessage",

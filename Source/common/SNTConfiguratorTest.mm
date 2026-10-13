@@ -1049,6 +1049,58 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
   XCTAssertTrue([self.fileMgr removeItemAtPath:plistPath error:nil]);
 }
 
+#pragma mark - Removable media message tests
+
+- (void)testUSBBlockMessagesPreferSyncOverProfile {
+  NSString* plistPath = [NSString stringWithFormat:@"%@/usb-block-messages.plist", self.testDir];
+  SNTConfigurator* cfg = [self configuratorWithEmptySyncStateAtPath:plistPath];
+  // Start from a known profile state; the host's managed preferences may set these keys.
+  [cfg.configState removeObjectForKey:@"BannedUSBBlockMessage"];
+  [cfg.configState removeObjectForKey:@"RemountUSBBlockMessage"];
+
+  XCTAssertNil(cfg.bannedUSBBlockMessage);
+  XCTAssertNil(cfg.remountUSBBlockMessage);
+
+  // Profile only
+  cfg.configState[@"BannedUSBBlockMessage"] = @"Profile banned";
+  cfg.configState[@"RemountUSBBlockMessage"] = @"Profile remount";
+  XCTAssertEqualObjects(cfg.bannedUSBBlockMessage, @"Profile banned");
+  XCTAssertEqualObjects(cfg.remountUSBBlockMessage, @"Profile remount");
+
+  // Sync overrides the profile
+  [cfg setSyncServerBannedUSBBlockMessage:@"Sync banned"];
+  [cfg setSyncServerRemountUSBBlockMessage:@"Sync remount"];
+  XCTAssertEqualObjects(cfg.bannedUSBBlockMessage, @"Sync banned");
+  XCTAssertEqualObjects(cfg.remountUSBBlockMessage, @"Sync remount");
+
+  // An empty or whitespace-only sync message removes the synced value, so the profile governs
+  [cfg setSyncServerBannedUSBBlockMessage:@""];
+  [cfg setSyncServerRemountUSBBlockMessage:@" \n\t"];
+  XCTAssertNil(cfg.syncState[@"BannedUSBBlockMessage"]);
+  XCTAssertNil(cfg.syncState[@"RemountUSBBlockMessage"]);
+  XCTAssertEqualObjects(cfg.bannedUSBBlockMessage, @"Profile banned");
+  XCTAssertEqualObjects(cfg.remountUSBBlockMessage, @"Profile remount");
+
+  // nil removes it too
+  [cfg setSyncServerBannedUSBBlockMessage:@"Sync banned"];
+  [cfg setSyncServerBannedUSBBlockMessage:nil];
+  XCTAssertNil(cfg.syncState[@"BannedUSBBlockMessage"]);
+  XCTAssertEqualObjects(cfg.bannedUSBBlockMessage, @"Profile banned");
+}
+
+- (void)testSyncedUSBBlockMessagesSurviveARestart {
+  NSString* plistPath =
+      [NSString stringWithFormat:@"%@/usb-block-messages-restart.plist", self.testDir];
+  SNTConfigurator* cfg = [self configuratorWithEmptySyncStateAtPath:plistPath];
+  [cfg setSyncServerBannedUSBBlockMessage:@"Sync banned"];
+  [cfg setSyncServerRemountUSBBlockMessage:@"Sync remount"];
+
+  // A second configurator over the same file stands in for the next launch.
+  SNTConfigurator* restarted = [self configuratorWithEmptySyncStateAtPath:plistPath];
+  XCTAssertEqualObjects(restarted.syncState[@"BannedUSBBlockMessage"], @"Sync banned");
+  XCTAssertEqualObjects(restarted.syncState[@"RemountUSBBlockMessage"], @"Sync remount");
+}
+
 #pragma mark - ExecutableIntegrityPolicy tests
 
 - (void)testExecutableIntegrityPolicy {

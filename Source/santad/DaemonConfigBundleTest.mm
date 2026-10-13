@@ -51,18 +51,31 @@
 }
 
 - (void)testUSBMountConfigBundle {
-  __block XCTestExpectation* exp = [self expectationWithDescription:@"Result Block"];
+  __block XCTestExpectation* exp = [self expectationWithDescription:@"Result Blocks"];
+  exp.expectedFulfillmentCount = 3;
   SNTConfigBundle* bundle;
 
   SNTConfigurator* configurator = [SNTConfigurator configurator];
   id mockConfigurator = OCMPartialMock(configurator);
 
   OCMExpect([mockConfigurator enableNotificationSilences]).andReturn(YES);
+  OCMExpect([mockConfigurator bannedUSBBlockMessage]).andReturn(@"USB storage is blocked");
+  OCMExpect([mockConfigurator remountUSBBlockMessage]).andReturn(@"Mounted read-only");
 
   bundle = santa::USBMountConfigBundle(mockConfigurator);
 
   [bundle enableNotificationSilences:^(BOOL val) {
     XCTAssertTrue(val);
+    [exp fulfill];
+  }];
+
+  [bundle bannedUSBBlockMessage:^(NSString* val) {
+    XCTAssertEqualObjects(val, @"USB storage is blocked");
+    [exp fulfill];
+  }];
+
+  [bundle remountUSBBlockMessage:^(NSString* val) {
+    XCTAssertEqualObjects(val, @"Mounted read-only");
     [exp fulfill];
   }];
 

@@ -37,6 +37,8 @@
 - (void)blockNetworkMount:(void (^)(BOOL))block;
 - (void)bannedNetworkMountBlockMessage:(void (^)(NSString*))block;
 - (void)allowedNetworkMountHosts:(void (^)(NSArray<NSString*>*))block;
+- (void)bannedUSBBlockMessage:(void (^)(NSString*))block;
+- (void)remountUSBBlockMessage:(void (^)(NSString*))block;
 - (void)enableBundles:(void (^)(BOOL))block;
 - (void)enableTransitiveRules:(void (^)(BOOL))block;
 - (void)enableAllEventUpload:(void (^)(BOOL))block;

@@ -162,7 +162,9 @@ static id EncodedValueOrNull(id value) {
        withFallback:defaultBlockedMesage];
 }
 
-+ (NSAttributedString*)attributedBlockMessageForDeviceEvent:(SNTDeviceEvent*)event {
++ (NSAttributedString*)attributedBlockMessageForDeviceEvent:(SNTDeviceEvent*)event
+                                              bannedMessage:(NSString*)bannedMessage
+                                             remountMessage:(NSString*)remountMessage {
   NSString* defaultRemountMessage =
       NSLocalizedString(@"The following device has been remounted with reduced permissions",
                         @"The default message to show the user when a Removable Media "
@@ -176,11 +178,9 @@ static id EncodedValueOrNull(id value) {
   // Use the actual event.remountArgs rather than global config,
   // since we have distinct RemovableMediaRemountFlags and EncryptedRemovableMediaRemountFlags
   if (event.remountArgs.count > 0) {
-    return [SNTBlockMessage formatMessage:[[SNTConfigurator configurator] remountUSBBlockMessage]
-                             withFallback:defaultRemountMessage];
+    return [SNTBlockMessage formatMessage:remountMessage withFallback:defaultRemountMessage];
   }
-  return [SNTBlockMessage formatMessage:[[SNTConfigurator configurator] bannedUSBBlockMessage]
-                           withFallback:defaultBannedMessage];
+  return [SNTBlockMessage formatMessage:bannedMessage withFallback:defaultBannedMessage];
 }
 
 + (NSAttributedString*)attributedBlockMessageForNetworkMountEventWithCustomMessage:

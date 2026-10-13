@@ -18,6 +18,7 @@
 
 #import "Source/common/SNTBlockMessage.h"
 #import "Source/common/SNTConfigurator.h"
+#import "Source/common/SNTDeviceEvent.h"
 #import "Source/common/SNTStoredExecutionEvent.h"
 #import "Source/common/SNTStoredFileAccessEvent.h"
 #import "Source/common/SNTStoredNetworkFlowEvent.h"
@@ -522,6 +523,44 @@
                                                @"rn=block%20%23secrets&"
                                                @"ap=%2FUsers%2Fme%2FMy%20Documents%2Ffile.txt&"
                                                @"rv=v1");
+}
+
+- (void)testAttributedBlockMessageForDeviceEvent {
+  // The GUI's configurator has no sync state, so the dialog must use only the messages it is
+  // handed, never the profile values the GUI process can see.
+  OCMStub([self.mockConfigurator bannedUSBBlockMessage]).andReturn(@"Profile banned");
+  OCMStub([self.mockConfigurator remountUSBBlockMessage]).andReturn(@"Profile remount");
+
+  SNTDeviceEvent* blocked = [[SNTDeviceEvent alloc] initWithOnName:@"/Volumes/USB"
+                                                          fromName:@"/dev/disk4s1"];
+  // An encrypted volume remounted under its own policy gets the remount message whatever the
+  // baseline policy is: the choice follows the event's remount arguments.
+  SNTDeviceEvent* remounted = [[SNTDeviceEvent alloc] initWithOnName:@"/Volumes/USB"
+                                                            fromName:@"/dev/disk4s1"];
+  remounted.isEncrypted = YES;
+  remounted.remountArgs = @[ @"rdonly", @"noexec" ];
+
+  XCTAssertEqualObjects(
+      [[SNTBlockMessage attributedBlockMessageForDeviceEvent:blocked
+                                               bannedMessage:@"Sync banned"
+                                              remountMessage:@"Sync remount"] string],
+      @"Sync banned");
+  XCTAssertEqualObjects(
+      [[SNTBlockMessage attributedBlockMessageForDeviceEvent:remounted
+                                               bannedMessage:@"Sync banned"
+                                              remountMessage:@"Sync remount"] string],
+      @"Sync remount");
+
+  // A missing or empty message falls back to the default text
+  XCTAssertEqualObjects(
+      [[SNTBlockMessage attributedBlockMessageForDeviceEvent:blocked
+                                               bannedMessage:nil
+                                              remountMessage:@"Sync remount"] string],
+      @"The following device has been blocked from mounting");
+  XCTAssertEqualObjects([[SNTBlockMessage attributedBlockMessageForDeviceEvent:remounted
+                                                                 bannedMessage:@"Sync banned"
+                                                                remountMessage:@""] string],
+                        @"The following device has been remounted with reduced permissions");
 }
 
 @end

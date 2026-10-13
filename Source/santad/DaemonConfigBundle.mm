@@ -18,6 +18,8 @@
 @interface SNTConfigBundle (DaemonConfigBundleCreator)
 @property NSNumber* enableNotificationSilences;
 @property NSString* bannedNetworkMountBlockMessage;
+@property NSString* bannedUSBBlockMessage;
+@property NSString* remountUSBBlockMessage;
 @end
 
 namespace santa {
@@ -43,6 +45,8 @@ SNTConfigBundle* USBMountConfigBundle(SNTConfigurator* configurator) {
   SNTConfigBundle* bundle = [[SNTConfigBundle alloc] init];
 
   bundle.enableNotificationSilences = @(configurator.enableNotificationSilences);
+  bundle.bannedUSBBlockMessage = configurator.bannedUSBBlockMessage;
+  bundle.remountUSBBlockMessage = configurator.remountUSBBlockMessage;
 
   return bundle;
 }

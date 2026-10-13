@@ -91,6 +91,8 @@
 @property NSNumber* blockNetworkMount;
 @property NSString* bannedNetworkMountBlockMessage;
 @property NSArray<NSString*>* allowedNetworkMountHosts;
+@property NSString* bannedUSBBlockMessage;
+@property NSString* remountUSBBlockMessage;
 @property NSString* overrideFileAccessAction;
 @property SNTExportConfiguration* exportConfig;
 @property SNTModeTransition* modeTransition;

@@ -415,10 +415,7 @@ struct DeviceView: View {
         event.mntonname = device
         event.remountArgs = remountArgs.components(separatedBy: ",")
 
-        var configMap = [
-          "RemountUSBBlockMessage": remountUSBBlockMessage,
-          "BannedUSBBlockMessage": bannedUSBBlockMessage,
-        ]
+        var configMap: [String: String] = [:]
         if !brandingCompanyName.isEmpty {
           configMap["BrandingCompanyName"] = brandingCompanyName
         }
@@ -432,6 +429,8 @@ struct DeviceView: View {
 
         let bundle = SNTConfigBundle()
         bundle.setValue(NSNumber(value: allowNotificationSilence), forKey: "enableNotificationSilences")
+        bundle.setValue(bannedUSBBlockMessage, forKey: "bannedUSBBlockMessage")
+        bundle.setValue(remountUSBBlockMessage, forKey: "remountUSBBlockMessage")
 
         let window = NSWindow()
         ShowWindow(

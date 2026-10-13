@@ -1376,6 +1376,7 @@ santa_unit_test(
     deps = [
         ":SNTBlockMessage_SantaGUI",
         ":SNTConfigurator",
+        ":SNTDeviceEvent",
         ":SNTStoredExecutionEvent",
         ":SNTStoredFileAccessEvent",
         ":SNTStoredNetworkFlowEvent",

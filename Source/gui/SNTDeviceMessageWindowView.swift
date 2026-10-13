@@ -51,7 +51,7 @@ struct SNTDeviceMessageWindowView: View {
   @State public var preventFutureNotificationPeriod: TimeInterval = NotificationSilencePeriods[0]
 
   var body: some View {
-    SNTMessageView(SNTBlockMessage.attributedBlockMessage(for: event)) {
+    SNTMessageView(getBlockMessage()) {
       HStack(spacing: 20.0) {
         VStack(alignment: .trailing, spacing: 10.0) {
           Text("Path").bold().font(Font.system(size: 12.0))
@@ -89,6 +89,22 @@ struct SNTDeviceMessageWindowView: View {
 
       Spacer()
     }.fixedSize()
+  }
+
+  func getBlockMessage() -> NSAttributedString {
+    var bannedMessage: String? = nil
+    var remountMessage: String? = nil
+    configBundle.bannedUSBBlockMessage { message in
+      bannedMessage = message
+    }
+    configBundle.remountUSBBlockMessage { message in
+      remountMessage = message
+    }
+    return SNTBlockMessage.attributedBlockMessage(
+      for: event,
+      bannedMessage: bannedMessage,
+      remountMessage: remountMessage
+    )
   }
 
   func dismissButton() {

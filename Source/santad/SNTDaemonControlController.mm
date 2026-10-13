@@ -776,6 +776,14 @@ static NSString* StaticDecisionForRule(SNTRule* rule, BOOL enableTransitiveRules
       [configurator setSyncServerAllowedNetworkMountHosts:val];
     }];
 
+    [result bannedUSBBlockMessage:^(NSString* val) {
+      [configurator setSyncServerBannedUSBBlockMessage:val];
+    }];
+
+    [result remountUSBBlockMessage:^(NSString* val) {
+      [configurator setSyncServerRemountUSBBlockMessage:val];
+    }];
+
     [result enableBundles:^(BOOL val) {
       [configurator setEnableBundles:val];
     }];
