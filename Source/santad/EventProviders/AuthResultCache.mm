@@ -127,8 +127,13 @@ bool AuthResultCache::AddToCache(const ExecTarget& target, SNTAction decision,
     // contain a timestamp to allow for proper transitions out of the state.
     case SNTActionRequestBinary: return cache->set(key, requestBinary, CachedAuthResult{});
     case SNTActionRespondHold:
-      return cache->set(key, CachedAuthResult{SNTActionRespondHold, 0, nil, target.identity},
-                        requestBinary);
+      // A transitive hold keeps its decision so a concurrent execution can tell
+      // what the hold is waiting for. Its identity is always confirmed.
+      return cache->set(
+          key,
+          CachedAuthResult{SNTActionRespondHold, 0, cd.heldForTransitiveRule ? [cd copy] : nil,
+                           target.identity},
+          requestBinary);
 
     case SNTActionRespondAllow: OS_FALLTHROUGH;
     case SNTActionRespondAllowCompiler: OS_FALLTHROUGH;
