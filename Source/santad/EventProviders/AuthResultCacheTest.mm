@@ -353,8 +353,8 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
 // A transitive hold keeps its decision, so a concurrent execution can tell what
 // the hold is waiting for. Any other hold keeps none.
 - (void)testHoldKeepsOnlyATransitiveHoldsDecision {
-  auto esapi = std::make_shared<MockEndpointSecurityAPI>();
-  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(esapi, nil);
+  auto flusher = std::make_shared<ESCacheFlusher>(ESCacheClearStrategy::kEveryClient);
+  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(flusher, nil);
 
   santa::ExecTarget rootTarget = MakeTarget(RootDevno(), 111);
 
