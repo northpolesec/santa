@@ -244,9 +244,35 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
     XCTAssertEqual(sut.telemetryFileMode, 0, @"%@ should have been rejected", invalid);
   }
 
-  // A non-string is dropped by type enforcement before the getter ever sees it.
+  // Removing the key returns to the unset case.
   sut.configState[@"TelemetryFileMode"] = nil;
   XCTAssertEqual(sut.telemetryFileMode, 0);
+}
+
+- (void)testTelemetryFileModeNonStringIsDropped {
+  SNTConfigurator* sut = [[SNTConfigurator alloc] init];
+
+  // The key is typed as a string, so a number never reaches the getter: type enforcement in
+  // readForcedConfig drops it first. The exact stub has to precede the catch-all to win.
+  id partial = OCMPartialMock(sut);
+  OCMStub([partial forcedConfigValueForKey:@"TelemetryFileMode"]).andReturn(@640);
+  OCMStub([partial forcedConfigValueForKey:[OCMArg any]]).andReturn(nil);
+
+  XCTAssertNil([partial readForcedConfig][@"TelemetryFileMode"]);
+
+  [partial stopMocking];
+}
+
+- (void)testTelemetryFileGroupNonStringIsDropped {
+  SNTConfigurator* sut = [[SNTConfigurator alloc] init];
+
+  id partial = OCMPartialMock(sut);
+  OCMStub([partial forcedConfigValueForKey:@"TelemetryFileGroup"]).andReturn(@20);
+  OCMStub([partial forcedConfigValueForKey:[OCMArg any]]).andReturn(nil);
+
+  XCTAssertNil([partial readForcedConfig][@"TelemetryFileGroup"]);
+
+  [partial stopMocking];
 }
 
 - (void)testTelemetryFileGroup {
