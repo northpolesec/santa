@@ -1022,6 +1022,11 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
     return NO;
   }
 
+  // Marked before the Hold response: ES sends this execution's NOTIFY_EXEC
+  // only once it has a response, so the Recorder finds the mark unless the ES
+  // deadline already responded.
+  [[SNTDecisionCache sharedCache] holdExecution:token];
+
   // Respond before arming the wait. Every resolution runs asynchronously, so
   // the Hold entry is in AuthResultCache before the HoldAllowed or HoldDenied
   // that removes it.
@@ -1076,8 +1081,10 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
                           targetProc:esMsgCopy->event.exec.target
                                esMsg:esMsgCopy
                          configState:configState];
-        // The Recorder skips this execution's NOTIFY_EXEC (heldForTransitiveRule).
+        // The Recorder skips this execution's NOTIFY_EXEC (-holdExecution:).
         self->_logger(std::move(esMsgCopy));
+        // Logged, so the compiler controller may now replace this decision.
+        cd.heldForTransitiveRule = NO;
 
         // Last: removing the Hold entry lets other executions of the file be
         // evaluated, and one could replace the decision the logger reads.

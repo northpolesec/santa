@@ -666,12 +666,13 @@ constexpr const char* kFilteredPrefix = "/foo/matches/";
 }
 
 // When NOTIFY_EXEC arrives for a held execution, logging is skipped because the
-// execution controller logs it once the hold resolves.
-- (void)checkHeldExecSkipsLogging:(SNTCachedDecision*)cd {
+// execution controller logs it once the hold resolves. `marked` is whether the
+// exec target was marked as a held execution.
+- (void)checkHeldExecSkipsLogging:(SNTCachedDecision*)cd marked:(bool)marked {
   es_file_t file = MakeESFile("foo");
-  es_process_t proc = MakeESProcess(&file);
+  es_process_t proc = MakeESProcess(&file, MakeAuditToken(4100, 3));
   es_file_t execFile = MakeESFile("bar", {.st_dev = 12, .st_ino = 34});
-  es_process_t execProc = MakeESProcess(&execFile);
+  es_process_t execProc = MakeESProcess(&execFile, MakeAuditToken(4120, 7));
   es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_EXEC, &proc, ActionType::Notify);
   esMsg.event.exec.target = &execProc;
 
@@ -693,6 +694,16 @@ constexpr const char* kFilteredPrefix = "/foo/matches/";
   OCMStub([mockDecisionCache cachedDecisionForFile:esMsg.event.exec.target->executable->stat])
       .ignoringNonObjectArgs()
       .andReturn(cd);
+  // The mark is looked up for the exec target, not the process that called exec.
+  OCMStub([mockDecisionCache takeHeldExecution:MakeAuditToken(0, 0)])
+      .ignoringNonObjectArgs()
+      .andDo(^(NSInvocation* invocation) {
+        const audit_token_t* tok;
+        [invocation getArgument:&tok atIndex:2];
+        bool held =
+            marked && audit_token_to_pid(*tok) == 4120 && audit_token_to_pidversion(*tok) == 7;
+        [invocation setReturnValue:&held];
+      });
 
   id mockCC = OCMStrictClassMock([SNTCompilerController class]);
   Message msg(mockESApi, &esMsg);
@@ -729,17 +740,16 @@ constexpr const char* kFilteredPrefix = "/foo/matches/";
 - (void)testHandleExecWithHoldAndAskSkipsLogging {
   SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
   cd.holdAndAsk = YES;
-  [self checkHeldExecSkipsLogging:cd];
+  [self checkHeldExecSkipsLogging:cd marked:false];
 }
 
 - (void)testHandleExecHeldForTransitiveRuleSkipsLogging {
-  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
-  cd.heldForTransitiveRule = YES;
-  [self checkHeldExecSkipsLogging:cd];
+  [self checkHeldExecSkipsLogging:[[SNTCachedDecision alloc] init] marked:true];
 }
 
-- (void)testHandleExecWithoutHoldAndAskLogsNormally {
-  // When NOTIFY_EXEC arrives without holdAndAsk set, logging should proceed normally.
+// When NOTIFY_EXEC arrives for an execution that is not held, logging proceeds
+// normally, whatever the decision cached for the file.
+- (void)checkExecLogsNormally:(SNTCachedDecision*)cd {
   es_file_t file = MakeESFile("foo");
   es_process_t proc = MakeESProcess(&file);
   es_file_t execFile = MakeESFile("bar", {.st_dev = 12, .st_ino = 34});
@@ -763,17 +773,14 @@ constexpr const char* kFilteredPrefix = "/foo/matches/";
 
   dispatch_semaphore_t sema = dispatch_semaphore_create(0);
 
-  // Enricher and Logger SHOULD be called when holdAndAsk is not set
+  // Enricher and Logger SHOULD be called for an execution that is not held
   EXPECT_CALL(*mockEnricher, Enrich).WillOnce(testing::Return(std::move(enrichedMsg)));
   EXPECT_CALL(*mockLogger, Log).WillOnce(testing::InvokeWithoutArgs(^() {
     dispatch_semaphore_signal(sema);
   }));
 
-  // Mock decision cache to return a decision with holdAndAsk=NO
   id mockDecisionCache = OCMClassMock([SNTDecisionCache class]);
   OCMStub([mockDecisionCache sharedCache]).andReturn(mockDecisionCache);
-  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
-  cd.holdAndAsk = NO;
   OCMStub([mockDecisionCache cachedDecisionForFile:esMsg.event.exec.target->executable->stat])
       .ignoringNonObjectArgs()
       .andReturn(cd);
@@ -809,6 +816,18 @@ constexpr const char* kFilteredPrefix = "/foo/matches/";
 
   [mockCC stopMocking];
   [mockDecisionCache stopMocking];
+}
+
+- (void)testHandleExecWithoutHoldAndAskLogsNormally {
+  [self checkExecLogsNormally:[[SNTCachedDecision alloc] init]];
+}
+
+// Another execution of a file whose cached decision is from a transitive hold
+// (another slice, say) was not held, so it is logged.
+- (void)testHandleExecOfFileHeldForAnotherExecutionLogsNormally {
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+  cd.heldForTransitiveRule = YES;
+  [self checkExecLogsNormally:cd];
 }
 
 - (void)testHandleExecWithNoCachedDecisionLogsNormally {

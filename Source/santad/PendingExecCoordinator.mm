@@ -157,8 +157,12 @@ void PendingExecCoordinator::UpdateCompilerMarks(int64_t delta) {
   last_compiler_activity_ms_.store(NowMs(), std::memory_order_relaxed);
 }
 
+bool PendingExecCoordinator::MarkedCompilersExist() {
+  return marked_compilers_.load(std::memory_order_relaxed) > 0;
+}
+
 bool PendingExecCoordinator::CompilerActiveRecently() {
-  if (marked_compilers_.load(std::memory_order_relaxed) > 0) return true;
+  if (MarkedCompilersExist()) return true;
   uint64_t last = last_compiler_activity_ms_.load(std::memory_order_relaxed);
   if (last == 0) return false;
   uint64_t now = NowMs();

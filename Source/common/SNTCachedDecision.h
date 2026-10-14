@@ -98,10 +98,9 @@
 /// holdAndAsk is set. Standalone mode holds leave this at Touch ID.
 @property SNTAuthorizationMethod authorizationMethod;
 
-/// YES when this execution was held waiting for a transitive rule. The
-/// execution controller logs it once the hold resolves, so its NOTIFY_EXEC is
-/// not logged. Stays set after the hold resolves: the resolution can be
-/// processed before that NOTIFY_EXEC is.
+/// YES while this execution is held waiting for a transitive rule, until the
+/// hold has logged it. The compiler controller does not replace a held
+/// decision, which the hold's log reads from the decision cache.
 @property BOOL heldForTransitiveRule;
 
 /// Set when the matching rule's policy_for_range() evaluated in-window with a

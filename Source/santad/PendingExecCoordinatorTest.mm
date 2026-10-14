@@ -158,4 +158,23 @@ static dispatch_time_t TwoSeconds() {
   XCTAssertFalse(got);
 }
 
+// The marked-compiler count, unlike CompilerActiveRecently(), ignores the
+// activity window.
+- (void)testMarkedCompilersExist {
+  auto coord = std::make_shared<PendingExecCoordinator>(/*window_ms=*/10000);
+  XCTAssertFalse(coord->MarkedCompilersExist());
+
+  coord->UpdateCompilerMarks(+1);
+  XCTAssertTrue(coord->MarkedCompilersExist());
+
+  coord->UpdateCompilerMarks(+1);
+  coord->UpdateCompilerMarks(-1);
+  XCTAssertTrue(coord->MarkedCompilersExist());
+
+  coord->UpdateCompilerMarks(-1);
+  XCTAssertFalse(coord->MarkedCompilersExist());
+  // Still active through the window after the last clear.
+  XCTAssertTrue(coord->CompilerActiveRecently());
+}
+
 @end

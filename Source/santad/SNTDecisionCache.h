@@ -13,6 +13,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
+#include <bsm/libbsm.h>
 #include <sys/stat.h>
 
 #import <Foundation/Foundation.h>
@@ -42,6 +43,11 @@ inline constexpr off_t kMaxSyncRehydrateBytes = 32 * 1024 * 1024;
 - (SNTCachedDecision*)cachedDecisionForVnode:(SantaVnode)vnode;
 // Forgets `cd` only if it is still the decision cached for its vnode.
 - (void)forgetCachedDecision:(SNTCachedDecision*)cd;
+// Marks the execution whose exec target has audit token `tok` as held. The hold
+// logs a held execution when it resolves, so its NOTIFY_EXEC is not logged.
+- (void)holdExecution:(const audit_token_t&)tok;
+// Removes the mark for `tok` and returns whether there was one.
+- (bool)takeHeldExecution:(const audit_token_t&)tok;
 - (SNTCachedDecision*)resetTimestampForCachedDecision:(const struct stat&)statInfo;
 // Must be called exactly once, during daemon initialization, before any
 // rehydrate or backfill caller can run. Subsequent calls trip an assert —
