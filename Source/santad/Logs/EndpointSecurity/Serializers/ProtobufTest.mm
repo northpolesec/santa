@@ -46,6 +46,7 @@
 #include "absl/status/status.h"
 #include "google/protobuf/any.pb.h"
 #include "google/protobuf/timestamp.pb.h"
+#import "src/santanetd/SNDProcessFlows.h"
 
 using google::protobuf::Timestamp;
 using JsonPrintOptions = google::protobuf::json::PrintOptions;
@@ -2271,6 +2272,15 @@ void SerializeAndCheckNonESEvents(
   XCTAssertTrue(santaMsg2.ParseFromString(std::string(vec.begin(), vec.end())));
   XCTAssertTrue(santaMsg2.has_file_access());
   XCTAssertFalse(santaMsg2.file_access().has_rule_id());
+}
+
+- (void)testSerializeNetworkFlowsAndDNSActivitySkipAnEmptyProcess {
+  // The stub populates nothing, so neither kind produces a message.
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  std::shared_ptr<Serializer> bs = Protobuf::Create(mockESApi, nil);
+  SNDProcessFlows* processFlows = [[SNDProcessFlows alloc] init];
+  XCTAssertTrue(bs->SerializeNetworkFlows(processFlows, {}, {}, nil).empty());
+  XCTAssertTrue(bs->SerializeDNSActivity(processFlows, {}, {}, nil).empty());
 }
 
 @end

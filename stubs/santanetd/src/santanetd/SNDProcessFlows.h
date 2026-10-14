@@ -22,7 +22,9 @@
 //
 // Santa only accesses SNDProcessFlows via processFlows.processInfo in
 // Serializer.mm. All other methods are used inside
-// PopulateNetworkActivityProcess which is stubbed as a no-op.
+// PopulateNetworkActivityProcess, PopulateDNSActivityProcess,
+// FormatNetworkFlowsBasicString, and FormatDNSActivityBasicString, which are
+// stubbed as no-ops.
 @interface SNDProcessFlows : NSObject <NSSecureCoding>
 
 @property(nonatomic, readonly) SNDProcessInfo* processInfo;

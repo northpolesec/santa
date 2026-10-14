@@ -113,17 +113,26 @@ std::vector<uint8_t> Serializer::SerializeFileAccess(
                              rule_id);
 }
 
+// The decision for the process image. A decision from an unconfirmed read
+// carries values derived from the file that was read, not from this process's
+// image; only the execution event reports them, marked identity_unverified.
+static SNTCachedDecision* ProcessDecision(SNTDecisionCache* cache, SNDProcessFlows* processFlows) {
+  SNTCachedDecision* cd = [cache cachedDecisionForVnode:[processFlows.processInfo vnode]];
+  return cd.identityMismatched ? nil : cd;
+}
+
 std::vector<uint8_t> Serializer::SerializeNetworkFlows(SNDProcessFlows* processFlows,
                                                        struct timespec window_start,
                                                        struct timespec window_end) {
-  SNTCachedDecision* cd = [decision_cache_ cachedDecisionForVnode:[processFlows.processInfo vnode]];
-  // A decision from an unconfirmed read carries values derived from the file
-  // that was read, not from this process's image. Only the execution event
-  // reports them, marked identity_unverified.
-  if (cd.identityMismatched) {
-    cd = nil;
-  }
-  return SerializeNetworkFlows(processFlows, window_start, window_end, cd);
+  return SerializeNetworkFlows(processFlows, window_start, window_end,
+                               ProcessDecision(decision_cache_, processFlows));
+}
+
+std::vector<uint8_t> Serializer::SerializeDNSActivity(SNDProcessFlows* processFlows,
+                                                      struct timespec window_start,
+                                                      struct timespec window_end) {
+  return SerializeDNSActivity(processFlows, window_start, window_end,
+                              ProcessDecision(decision_cache_, processFlows));
 }
 
 };  // namespace santa

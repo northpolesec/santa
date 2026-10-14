@@ -32,4 +32,11 @@ std::string FormatNetworkFlowsBasicString(SNDProcessFlows*, SNTCachedDecision*) 
   return {};
 }
 
+void PopulateDNSActivityProcess(google::protobuf::Arena*, ::santa::pb::v1::DNSActivity_Process*,
+                                SNDProcessFlows*, SNTCachedDecision*) {}
+
+std::string FormatDNSActivityBasicString(SNDProcessFlows*, SNTCachedDecision*) {
+  return {};
+}
+
 }  // namespace santanetd

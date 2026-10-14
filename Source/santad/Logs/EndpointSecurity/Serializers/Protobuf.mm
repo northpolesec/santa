@@ -1435,9 +1435,27 @@ std::vector<uint8_t> Protobuf::SerializeNetworkFlows(SNDProcessFlows* processFlo
                                                      SNTCachedDecision* cd) {
   Arena arena;
   ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, window_start, window_end);
-  auto* na = santa_msg->mutable_network_activity();
-  auto* process = na->add_processes();
+  auto* process = santa_msg->mutable_network_activity()->add_processes();
   santanetd::PopulateNetworkActivityProcess(&arena, process, processFlows, cd);
+  // A process with no connections in the window produces no message.
+  if (process->flows_size() == 0) {
+    return {};
+  }
+  return FinalizeProto(santa_msg);
+}
+
+std::vector<uint8_t> Protobuf::SerializeDNSActivity(SNDProcessFlows* processFlows,
+                                                    struct timespec window_start,
+                                                    struct timespec window_end,
+                                                    SNTCachedDecision* cd) {
+  Arena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, window_start, window_end);
+  auto* process = santa_msg->mutable_dns_activity()->add_processes();
+  santanetd::PopulateDNSActivityProcess(&arena, process, processFlows, cd);
+  // A process with no questions in the window produces no message.
+  if (process->questions_size() == 0 && process->questions_dropped() == 0) {
+    return {};
+  }
   return FinalizeProto(santa_msg);
 }
 

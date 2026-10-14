@@ -50,6 +50,8 @@ enum class TelemetryEvent : uint64_t {
   kTCCModification         = 1 << 22,
   kXProtect                = 1 << 23,
   kProcSuspendResume       = 1 << 24,
+  kNetworkActivity         = 1 << 25,  // network_activity: connection rows
+  kDNSActivity             = 1 << 26,  // dns_activity: DNS question rows
   kEverything              = ~0ULL,
 };
 // clang-format on

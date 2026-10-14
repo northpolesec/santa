@@ -249,6 +249,7 @@ objc_library(
         "//Source/common:SNTStoredProcess",
         "//Source/common:SNTStrengthify",
         "//Source/common:SNTXPCNotifierInterface",
+        "//Source/common:TelemetryEventMap",
         "//Source/common/ne:SNDXPCNetworkExtensionInterface",
         "//Source/common/ne:SNTNetworkExtensionSettings",
         "//Source/common/ne:SNTSyncNetworkExtensionSettings",
@@ -1850,6 +1851,7 @@ santa_unit_test(
         "@abseil-cpp//absl/status",
         "@googletest//:gtest",
         "@protobuf//src/google/protobuf/json",
+        "@santanetd//src/santanetd:SNDProcessFlows",
     ],
 )
 

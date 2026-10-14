@@ -160,6 +160,11 @@ std::vector<uint8_t> Empty::SerializeNetworkFlows(SNDProcessFlows*, struct times
   return {};
 }
 
+std::vector<uint8_t> Empty::SerializeDNSActivity(SNDProcessFlows*, struct timespec, struct timespec,
+                                                 SNTCachedDecision*) {
+  return {};
+}
+
 std::vector<uint8_t> Empty::SerializeFileAccess(
     const std::string& policy_version, const std::string& policy_name, const Message& msg,
     const EnrichedProcess& enriched_process, size_t target_index,

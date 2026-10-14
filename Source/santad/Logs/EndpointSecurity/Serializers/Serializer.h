@@ -112,6 +112,17 @@ class Serializer {
                                              struct timespec window_start,
                                              struct timespec window_end);
 
+  // The dns_activity message for one process entry of a window. Returns an
+  // empty vector when the process asked no questions, as SerializeNetworkFlows
+  // does when it had no connections in the window.
+  virtual std::vector<uint8_t> SerializeDNSActivity(SNDProcessFlows* processFlows,
+                                                    struct timespec window_start,
+                                                    struct timespec window_end,
+                                                    SNTCachedDecision* cd) = 0;
+  std::vector<uint8_t> SerializeDNSActivity(SNDProcessFlows* processFlows,
+                                            struct timespec window_start,
+                                            struct timespec window_end);
+
   virtual std::vector<uint8_t> SerializeDiskAppeared(NSDictionary*, bool) = 0;
   virtual std::vector<uint8_t> SerializeDiskDisappeared(NSDictionary*) = 0;
 

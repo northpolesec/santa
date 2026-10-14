@@ -29,7 +29,7 @@ typedef NS_ENUM(NSInteger, SNTNetworkFlowDefaultAction) {
 /// This class conforms to NSSecureCoding, allowing it to be passed directly as a typed
 /// argument in XPC protocol methods. NSKeyedArchiver's keyed format provides inherent
 /// forward/backward compatibility: old receivers ignore unknown keys, new receivers get
-/// nil/0/NO for missing keys.
+/// nil/0/NO for missing keys unless a property says otherwise.
 @interface SNTNetworkExtensionSettings : NSObject <NSSecureCoding>
 
 @property(readonly) BOOL enable;
@@ -50,6 +50,12 @@ typedef NS_ENUM(NSInteger, SNTNetworkFlowDefaultAction) {
 /// DNS names santanetd forwards before any DNS rule: each name, its children, and its exact
 /// ancestors. Lowercase, no trailing dot. Part of -isEqual:/-hash, so a change is pushed.
 @property(copy) NSArray<NSString*>* protectedDNSNames;
+
+/// What santanetd collects for telemetry, from the Telemetry key: connection
+/// rows and DNS question rows. An archive without these keys decodes as YES
+/// and NO. Part of -isEqual:/-hash, so a change is pushed.
+@property BOOL networkActivityTelemetry;
+@property BOOL dnsActivityTelemetry;
 
 /// Defaults flowDefaultAction to Unspecified and dnsUpstreamTimeoutSecs to 30s.
 - (instancetype)initWithEnable:(BOOL)enable;

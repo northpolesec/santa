@@ -61,6 +61,8 @@ using santa::TelemetryEvent;
       {"TCCModification", TelemetryEvent::kTCCModification},
       {"XProtect", TelemetryEvent::kXProtect},
       {"ProcSuspendResume", TelemetryEvent::kProcSuspendResume},
+      {"NetworkActivity", TelemetryEvent::kNetworkActivity},
+      {"dnsactivity", TelemetryEvent::kDNSActivity},
 
       // special cases
       {"none", TelemetryEvent::kNone},
@@ -83,6 +85,15 @@ using santa::TelemetryEvent;
 
   // When telemetry config is nil, all events should be set
   XCTAssertEqual(TelemetryConfigToBitmask(nil), TelemetryEvent::kEverything);
+
+  // Everything covers the two network bits; a list without them leaves both clear.
+  XCTAssertEqual(TelemetryEvent::kEverything & TelemetryEvent::kNetworkActivity,
+                 TelemetryEvent::kNetworkActivity);
+  XCTAssertEqual(TelemetryEvent::kEverything & TelemetryEvent::kDNSActivity,
+                 TelemetryEvent::kDNSActivity);
+  XCTAssertEqual(TelemetryConfigToBitmask(@[ @"execution" ]) &
+                     (TelemetryEvent::kNetworkActivity | TelemetryEvent::kDNSActivity),
+                 TelemetryEvent::kNone);
 }
 
 - (void)testESEventToTelemetryEvent {

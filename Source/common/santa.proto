@@ -1292,6 +1292,112 @@ message NetworkActivity {
   repeated Process processes = 1;
 }
 
+// DNS questions the DNS proxy handled, per process, in one monitoring window.
+// event_time and processed_time are the window start and end, as for
+// NetworkActivity. A question is reported once, in the window it closed in,
+// so Question.start_time can precede event_time. One Question is one DNS
+// question; a retry is another Question.
+//
+// Not covered: answers the macOS resolver served from its cache, a question
+// folded into an identical one already in flight (only the first asker gets
+// a row), encrypted DNS (DNS over HTTPS or TLS, Private Relay), and mDNS. A
+// cache refresh carries the process whose lookup triggered it.
+message DNSActivity {
+  enum Decision {
+    DECISION_UNKNOWN = 0;
+    DECISION_ALLOW = 1;
+    DECISION_BLOCK = 2;
+    DECISION_AUDIT = 3;
+  }
+
+  // The DNS rule field that matched: exact_names or suffixes. The sync
+  // schema calls these HOSTNAME and DOMAIN.
+  enum Tier {
+    TIER_UNKNOWN = 0;
+    TIER_EXACT_NAME = 1;
+    TIER_SUFFIX = 2;
+  }
+
+  // How the question ended.
+  enum Outcome {
+    OUTCOME_UNKNOWN = 0;
+    // The upstream answer arrived and was relayed to the client.
+    OUTCOME_ANSWERED = 1;
+    // santanetd replied NXDOMAIN or NODATA; never carries answers.
+    OUTCOME_LOCAL_REPLY = 2;
+    // The proxy gave up waiting for upstream.
+    OUTCOME_TIMEOUT = 3;
+    // The client's TCP session ended, or stopped reading, first.
+    OUTCOME_CLIENT_CLOSED = 4;
+    // A later question on the same TCP session reused the message ID.
+    OUTCOME_SUPERSEDED = 5;
+    // An upstream reply the proxy relayed but could not parse.
+    OUTCOME_MALFORMED_RESPONSE = 6;
+    // The question did not decode; name, qtype, and decision fields are unset.
+    OUTCOME_MALFORMED_QUERY = 7;
+    // Reserved: OUTCOME_OVERRIDE = 8, a local reply carrying the rule's
+    // addresses in answers (syncv2 DNSResponse KIND_OVERRIDE).
+  }
+
+  // A resource record from the answer section of the reply the client received.
+  message Answer {
+    // The record's owner name, lowercase, no trailing dot.
+    optional string owner = 1;
+    // RR type: e.g. 1 = A, 5 = CNAME, 28 = AAAA, 65 = HTTPS.
+    optional uint32 type = 2;
+    // Seconds, as received.
+    optional uint32 ttl = 3;
+    // RDATA in presentation form: the address for A and AAAA, the target name
+    // for CNAME (same form as owner), RFC 9460 form for HTTPS. Unset for
+    // other types.
+    optional string data = 4;
+  }
+
+  message Question {
+    // A new UUID per question.
+    optional string id = 1;
+    // The question name in presentation form: lowercase, no trailing dot,
+    // "\." for a dot inside a label, IDNs as punycode. The same form as
+    // NetworkActivity.Flow.remote_hostname. Unset for MALFORMED_QUERY.
+    optional string name = 2;
+    // e.g. 1 = A, 28 = AAAA, 65 = HTTPS.
+    optional uint32 qtype = 3;
+    // Where the question was addressed, contacted or not.
+    optional string resolver_address = 4;
+    optional uint32 resolver_port = 5;
+    // 17 = UDP, 6 = TCP.
+    optional int32 protocol = 6;
+    optional Decision decision = 7;
+    optional Tier decision_tier = 8;
+    optional int64 rule_id = 9;
+    optional string rule_name = 10;
+    optional Outcome outcome = 11;
+    // Raw RCODE; set for ANSWERED and LOCAL_REPLY.
+    optional uint32 rcode = 12;
+    // At most 32, in section order; none for a local reply today.
+    repeated Answer answers = 13;
+    // Question size; TCP's 2-byte length prefix not counted.
+    optional uint64 bytes_outbound = 14;
+    // Reply size, 0 when nothing reached the client.
+    optional uint64 bytes_inbound = 15;
+    // Question received.
+    optional google.protobuf.Timestamp start_time = 16;
+    // The outcome was reached.
+    optional google.protobuf.Timestamp close_time = 17;
+    // next ID: 18
+  }
+
+  message Process {
+    optional ProcessInfo process = 1;
+    repeated Question questions = 2;
+    // Questions this process asked in the window beyond the 1,000 kept.
+    optional uint64 questions_dropped = 3;
+    // next ID: 4
+  }
+
+  repeated Process processes = 1;
+}
+
 // Information about a process suspend/resume event
 message ProcSuspendResume {
   // The process initiating the suspend/resume
@@ -1357,6 +1463,7 @@ message SantaMessage {
     XProtect xprotect = 33;
     NetworkActivity network_activity = 34;
     ProcSuspendResume proc_suspend_resume = 35;
+    DNSActivity dns_activity = 36;
   }
 }
 
