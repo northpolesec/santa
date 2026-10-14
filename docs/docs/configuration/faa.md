@@ -172,10 +172,35 @@ Processes can be matched using several identifiers:
 
 Signing IDs must be scoped to a specific TeamID. You can use the same format as
 binary authorization rules where the SigningID is prefixed with the TeamID (e.g.
-`TeamID:SigningID`. For platform binaries, you can use the hard coded string
+`TeamID:SigningID`). For platform binaries, you can use the hard coded string
 `platform` as the TeamID (e.g. `platform:com.apple.yes`).
 
 :::
+
+### Signing ID Wildcards
+
+A `SigningID` value can contain a `*` wildcard that matches zero or more
+characters. This is useful when a vendor ships many related binaries. For
+example, `platform:com.apple.XProtectFramework.plugins.*` matches every XProtect
+remediator, including ones added by future XProtect updates.
+
+The wildcard can appear anywhere in the value:
+
+| SigningID                               | Matches                                                                                   | Does not match                         |
+| --------------------------------------- | ----------------------------------------------------------------------------------------- | -------------------------------------- |
+| `com.apple.XProtect*`                   | `com.apple.XProtectFramework.XProtect`, `com.apple.XProtectFramework.plugins.Eicar`       | `com.apple.xprotectd`                  |
+| `com.apple.XProtectFramework.plugins.*` | `com.apple.XProtectFramework.plugins.Eicar`, `com.apple.XProtectFramework.plugins.Adload` | `com.apple.XProtectFramework.XProtect` |
+| `*-aws`                                 | `cli-aws`, `com.example.sync-aws`, `-aws`                                                 | `cli-aws-helper`, `cli-AWS`            |
+| `com.example.*.daemon`                  | `com.example.sync.daemon`                                                                 | `com.example.daemon`                   |
+
+The following rules apply:
+
+- A wildcard Signing ID must be scoped with a Team ID or `PlatformBinary`. Use
+  the `TeamID` or `PlatformBinary` key, or the `TeamID:` / `platform:` prefix
+  (e.g. `platform:com.apple.XProtect*`). Without one, the policy is rejected.
+- Only the first `*` is a wildcard. Any later `*` is matched literally, so a
+  value like `com.*.*.daemon` will almost never match anything.
+- Matching is case-sensitive.
 
 :::warning
 
