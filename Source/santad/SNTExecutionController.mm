@@ -1023,7 +1023,8 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
   }
 
   // Marked before the Hold response: ES sends this execution's NOTIFY_EXEC
-  // only once it has a response, so the Recorder always finds the mark.
+  // only once it has a response, so the Recorder finds the mark unless the ES
+  // deadline already responded.
   [[SNTDecisionCache sharedCache] holdExecution:token];
 
   // Respond before arming the wait. Every resolution runs asynchronously, so

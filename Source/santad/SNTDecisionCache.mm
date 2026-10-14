@@ -42,9 +42,11 @@
 #import "Source/santad/SNTDatabaseController.h"
 #include "absl/container/flat_hash_set.h"
 
-// A mark outlives its hold only if ES drops the execution's NOTIFY_EXEC. When
-// the marks fill up they are all cleared, and an execution held at that moment
-// is logged twice.
+// A mark outlives its hold only if the Recorder never takes it: ES drops the
+// execution's NOTIFY_EXEC, Santa ignores it (IgnoreOtherEndpointSecurityClients),
+// or the Recorder handles it before the mark is set, which happens only when the
+// ES deadline responded first. When the marks fill up they are all cleared, and
+// an execution held at that moment is logged twice.
 static constexpr uint64_t kMaxHeldExecutions = 1000;
 
 @interface SNTDecisionCache ()
