@@ -18,6 +18,7 @@
 #include <fcntl.h>
 #include <sandbox.h>
 #include <string.h>
+#include <sys/param.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -28,6 +29,9 @@ extern "C" int sandbox_init_with_parameters(const char* profile, uint64_t flags,
 
 #include <atomic>
 #include <memory>
+#include <optional>
+#include <string>
+#include <utility>
 #include <vector>
 
 #import "Source/common/AccountLookup.h"
@@ -43,6 +47,17 @@ extern "C" int sandbox_init_with_parameters(const char* profile, uint64_t flags,
 
 @interface SNTCommandSandbox : SNTCommand <SNTCommandProtocol>
 @end
+
+/// The kernel's path for an open descriptor, which is the form seatbelt matches
+/// against. Returns std::nullopt and sets errorCode to an errno value on failure.
+static std::optional<std::string> PathForFD(int fd, int* errorCode) {
+  char buf[MAXPATHLEN];
+  if (fcntl(fd, F_GETPATH, buf) != 0) {
+    *errorCode = errno;
+    return std::nullopt;
+  }
+  return std::string(buf);
+}
 
 @implementation SNTCommandSandbox
 
@@ -114,6 +129,56 @@ REGISTER_COMMAND_NAME(@"sandbox")
   return nil;
 }
 
+/// Resolve an absolute directory path for use as a seatbelt parameter. Seatbelt
+/// matches rules against resolved paths, so /var/folders/... must be passed as
+/// /private/var/folders/.... Symlinks above the last component are resolved;
+/// the last component itself must be a directory, not a symlink, and may not be
+/// "." or "..". If nothing exists at the last component (e.g. a home directory
+/// that has not been created), the result is the resolved parent with that name
+/// appended. The result has no trailing slash. Returns std::nullopt and sets
+/// errorCode to an errno value on failure.
++ (std::optional<std::string>)resolvedDirectoryPath:(const char*)path errorCode:(int*)errorCode {
+  std::string p(path);
+  if (!p.starts_with('/')) {
+    *errorCode = EINVAL;
+    return std::nullopt;
+  }
+  while (p.size() > 1 && p.ends_with('/')) {
+    p.pop_back();
+  }
+  if (p == "/") return p;
+
+  size_t slash = p.rfind('/');
+  std::string parent = slash == 0 ? "/" : p.substr(0, slash);
+  std::string leaf = p.substr(slash + 1);
+  if (leaf == "." || leaf == "..") {
+    *errorCode = EINVAL;
+    return std::nullopt;
+  }
+
+  int parentFD = open(parent.c_str(), O_SEARCH | O_CLOEXEC);
+  if (parentFD < 0) {
+    *errorCode = errno;
+    return std::nullopt;
+  }
+  std::optional<std::string> resolved;
+  int fd = openat(parentFD, leaf.c_str(), O_SEARCH | O_NOFOLLOW | O_CLOEXEC);
+  if (fd >= 0) {
+    resolved = PathForFD(fd, errorCode);
+    close(fd);
+  } else if (errno == ENOENT) {
+    resolved = PathForFD(parentFD, errorCode);
+    if (resolved) {
+      if (!resolved->ends_with('/')) resolved->push_back('/');
+      resolved->append(leaf);
+    }
+  } else {
+    *errorCode = errno;
+  }
+  close(parentFD);
+  return resolved;
+}
+
 - (void)runWithArguments:(NSArray*)arguments {
 #ifdef DEBUG
   BOOL printProfile = NO;
@@ -165,6 +230,16 @@ REGISTER_COMMAND_NAME(@"sandbox")
     fprintf(stderr, "Error: %s is not a regular file\n", resolvedPath.UTF8String);
     exit(EXIT_FAILURE);
   }
+  // BINARY_PATH must be the path seatbelt sees at exec, which resolvedPath is not
+  // when it is relative or passes through a symlink (e.g. Homebrew's bin/). Take
+  // it from the pinned descriptor instead.
+  int binaryPathError = 0;
+  std::optional<std::string> binaryPath = PathForFD(fd, &binaryPathError);
+  if (!binaryPath) {
+    fprintf(stderr, "Error: unable to resolve the path of %s: %s\n", resolvedPath.UTF8String,
+            strerror(binaryPathError));
+    exit(EXIT_FAILURE);
+  }
   NSString* fdPath = [NSString stringWithFormat:@"/dev/fd/%d", fd];
 
   // Hand over the stat just read from the pinned descriptor rather than letting
@@ -201,6 +276,60 @@ REGISTER_COMMAND_NAME(@"sandbox")
                                                    fsDev:static_cast<uint64_t>(sb.st_dev)
                                                    fsIno:static_cast<uint64_t>(sb.st_ino)
                                             resolvedPath:resolvedPath];
+
+  // Build the sandbox parameters before registering the exec with santad, so a
+  // slow lookup here (e.g. an automounted home directory) cannot outlive the
+  // registration.
+  //
+  // Only pass parameters whose values are actually defined; substituting empty
+  // strings for unset env vars would silently alter profile semantics (e.g. a
+  // path like (param "HOME") becoming "").  sandbox_init_with_parameters fails
+  // if the profile references an unset parameter; `unsetParams` records why
+  // each one was left out so that failure can be explained.
+  std::vector<std::pair<std::string, std::string>> paramValues;
+  std::vector<std::pair<std::string, std::string>> unsetParams;
+  auto addDirectoryParam = [&](const char* name, const char* path) {
+    int err = 0;
+    std::optional<std::string> resolved = [SNTCommandSandbox resolvedDirectoryPath:path
+                                                                         errorCode:&err];
+    if (resolved) {
+      paramValues.emplace_back(name, *resolved);
+    } else {
+      unsetParams.emplace_back(
+          name,
+          std::string("cannot resolve ") + path + ": " +
+              (err == ENOTDIR ? "not a directory; symlinks are not followed" : strerror(err)));
+    }
+  };
+  // currentDirectoryPath comes from getcwd(3), which already returns a resolved path.
+  NSString* cwd = [NSFileManager defaultManager].currentDirectoryPath;
+  if (cwd.length > 0) {
+    paramValues.emplace_back("CWD", cwd.fileSystemRepresentation);
+  } else {
+    unsetParams.emplace_back("CWD", "cannot determine the current directory");
+  }
+  // Look up HOME from the password database rather than $HOME so the placeholder
+  // resolves to the calling uid's canonical home (e.g. /private/var/root under
+  // sudo) instead of whatever the shell happened to inherit.
+  std::optional<std::string> homeDir = santa::account::HomeDirForUID(getuid());
+  if (homeDir.has_value()) {
+    addDirectoryParam("HOME", homeDir->c_str());
+  } else {
+    unsetParams.emplace_back("HOME", "no home directory found for this user");
+  }
+  // Read the per-user darwin temp dir directly rather than $TMPDIR so the
+  // placeholder is consistent under sudo / inherited environments.
+  char tmpdirBuf[PATH_MAX];
+  size_t tmpdirLen = confstr(_CS_DARWIN_USER_TEMP_DIR, tmpdirBuf, sizeof(tmpdirBuf));
+  if (tmpdirLen > 0 && tmpdirLen <= sizeof(tmpdirBuf)) {
+    addDirectoryParam("TMPDIR", tmpdirBuf);
+  } else {
+    unsetParams.emplace_back("TMPDIR", "cannot determine the user temporary directory");
+  }
+  paramValues.emplace_back("UID", std::to_string(getuid()));
+  // The full path to the binary being evaluated, so profiles can reference the
+  // executable they are sandboxing via (param "BINARY_PATH").
+  paramValues.emplace_back("BINARY_PATH", *binaryPath);
 
   // Atomic flag raised by the XPC invalidation handler — checked below
   // before sandbox_init. If santad dies between the RPC reply and execv,
@@ -254,41 +383,11 @@ REGISTER_COMMAND_NAME(@"sandbox")
   }
   argv[argc] = nullptr;
 
-  // Only pass parameters whose values are actually defined; substituting empty
-  // strings for unset env vars would silently alter profile semantics (e.g. a
-  // path like (param "HOME") becoming "").  sandbox_init_with_parameters will
-  // surface a clear error if the profile references an undefined parameter.
   std::vector<const char*> params;
-  if (NSString* cwd = [NSFileManager defaultManager].currentDirectoryPath) {
-    params.push_back("CWD");
-    params.push_back(cwd.fileSystemRepresentation);
+  for (const auto& [name, value] : paramValues) {
+    params.push_back(name.c_str());
+    params.push_back(value.c_str());
   }
-  // Look up HOME from the password database rather than $HOME so the placeholder
-  // resolves to the calling uid's canonical home (e.g. /var/root under sudo)
-  // instead of whatever the shell happened to inherit. `homeDir` is held for the
-  // rest of the function so the c_str() pushed into `params` stays valid until
-  // sandbox_init_with_parameters consumes it below.
-  std::optional<std::string> homeDir = santa::account::HomeDirForUID(getuid());
-  if (homeDir.has_value()) {
-    params.push_back("HOME");
-    params.push_back(homeDir->c_str());
-  }
-  // Read the per-user darwin temp dir directly rather than $TMPDIR so the
-  // placeholder is consistent under sudo / inherited environments.
-  char tmpdirBuf[PATH_MAX];
-  size_t tmpdirLen = confstr(_CS_DARWIN_USER_TEMP_DIR, tmpdirBuf, sizeof(tmpdirBuf));
-  if (tmpdirLen > 0 && tmpdirLen <= sizeof(tmpdirBuf)) {
-    params.push_back("TMPDIR");
-    params.push_back(tmpdirBuf);
-  }
-  char uidBuf[16];
-  snprintf(uidBuf, sizeof(uidBuf), "%u", getuid());
-  params.push_back("UID");
-  params.push_back(uidBuf);
-  // The full path to the binary being evaluated, so profiles can reference the
-  // executable they are sandboxing via (param "BINARY_PATH").
-  params.push_back("BINARY_PATH");
-  params.push_back(execPathCStr);
   params.push_back(nullptr);
 
   char* errorbuf = NULL;
@@ -296,15 +395,23 @@ REGISTER_COMMAND_NAME(@"sandbox")
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
   if (sandbox_init_with_parameters(policyCStr, 0, params.data(), &errorbuf) != 0) {
     fprintf(stderr, "sandbox_init failed: %s\n", errorbuf ? errorbuf : "unknown error");
+    // Only mention parameters the profile names, so an unrelated failure is not
+    // attributed to them.
+    for (const auto& [name, reason] : unsetParams) {
+      if ([profile containsString:[NSString stringWithFormat:@"\"%s\"", name.c_str()]]) {
+        fprintf(stderr, "Note: %s was not set: %s\n", name.c_str(), reason.c_str());
+      }
+    }
     sandbox_free_error(errorbuf);
     exit(EXIT_FAILURE);
   }
 #pragma clang diagnostic pop
 
-  // fd is O_CLOEXEC; execve closes it atomically. Execute by real path so
-  // _NSGetExecutablePath / NSBundle / @executable_path behave correctly for
-  // both CLI binaries and .app bundles. santad's AUTH_EXEC handler verifies
-  // the kernel-reported cdhash against the expectation registered above.
+  // fd is O_CLOEXEC; execve closes it atomically. Execute by resolvedPath (not
+  // /dev/fd/N) so _NSGetExecutablePath / NSBundle / @executable_path behave
+  // correctly for both CLI binaries and .app bundles. santad's AUTH_EXEC
+  // handler verifies the kernel-reported cdhash against the expectation
+  // registered above.
   execv(execPathCStr, const_cast<char* const*>(argv.data()));
   perror("execv");
   exit(EXIT_FAILURE);
