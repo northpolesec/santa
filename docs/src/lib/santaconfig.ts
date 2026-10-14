@@ -604,7 +604,8 @@ changes in the release notes of any future release that changes them.`,
       // TODO: Remove once the config generator can support generating FAA policies.
       enableIf: (data) => false,
       description: `A complete file access configuration policy embedded in the main Santa config.
-        If set, \`FileAccessPolicyPlist\` will be ignored. See File Access Authorization for configuration details`,
+        If set, \`FileAccessPolicyPlist\` will be ignored. See [File Access Authorization](/configuration/faa) for
+        configuration details.`,
       type: "dict",
       subFields: [
         {

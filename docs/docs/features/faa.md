@@ -271,6 +271,9 @@ Processes can be matched using:
 
       :::
 
+  Signing IDs can contain a single `*` wildcard (e.g. `com.apple.XProtect*`).
+  See [Signing ID Wildcards](/configuration/faa#signing-id-wildcards).
+
 - Team IDs: `ZMCG7MLDV9`
 - CDHash: `397d55ebec87943ea3c3fe6b4d4f47edc490d25e`
 - Leaf Certificate Hash: `d84db96af8c2e60ac4c851a21ec460f6f84e0235beb17d24a78712b9b021ed57`
