@@ -111,7 +111,7 @@ applied as expected by running `santactl status`.
 
 Additionally, reviewing Santa's [logs](#checking-santa-daemon-logs) and
 [telemetry](../features/telemetry.mdx) is helpful for understanding Santa's
-operation. The documentation on [binary authorization](../features/binary-authorization.md)
+operation. The documentation on [binary authorization](../features/binary-authorization.mdx)
 explains precedence and decision-making.
 
 ## Invalid Code Signatures
