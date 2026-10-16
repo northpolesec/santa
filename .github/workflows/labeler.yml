@@ -1,30 +1,31 @@
 name: Process PRs
 
+# pull_request_target, not pull_request: santa is public, so a fork's PR runs with a
+# read-only GITHUB_TOKEN that a job's `permissions:` block cannot elevate, and the labeler
+# fails with "Resource not accessible by integration". Running in the base repo's context
+# gets a writable token. Safe only because nothing here checks out or runs the PR's code:
+# both actions read PR metadata over the API, and actions/labeler fetches its config at
+# github.sha, which is the base branch, so the config is ours and not the PR author's.
 on:
-  pull_request:
+  pull_request_target:
 
 permissions:
   contents: read
-  pull-requests: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
   labels:
     name: Labelers
     runs-on: ubuntu-latest
-    # Labeling is best-effort. Fork PRs get a read-only GITHUB_TOKEN, so the
-    # labeler can't apply labels there — don't let that fail the PR.
-    continue-on-error: true
+    timeout-minutes: 5
     permissions:
-      contents: read
-      issues: write
-      pull-requests: write
+      contents: read # read .github/labeler-pr.yml from the base ref
+      pull-requests: write # apply the labels
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # ratchet:actions/checkout@v6.0.2
-        with:
-          sparse-checkout: .github
-
       - name: Apply Labels
         uses: actions/labeler@634933edcd8ababfe52f92936142cc22ac488b1b # ratchet:actions/labeler@v6
         with:
@@ -32,4 +33,3 @@ jobs:
 
       - name: Apply Size Labels
         uses: codelytv/pr-size-labeler@4ec67706cd878fbc1c8db0a5dcd28b6bb412e85a # ratchet:codelytv/pr-size-labeler@v1.10.3
-
