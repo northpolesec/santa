@@ -1490,10 +1490,13 @@ void Protobuf::SerializeNetworkActivityProtos(const pbv1::NetworkActivity::Proce
                        : chunk->network_activity().processes(0).flows_size() > 0)) {
       // The conservative running size includes every repeated-field envelope.
       // Keep an exact final guard as the schema evolves.
-      if (chunk->ByteSizeLong() <= kMaxActivityMessageBytes)
+      if (chunk->ByteSizeLong() <= kMaxActivityMessageBytes) {
         write(FinalizeProto(chunk));
-      else
+      } else {
+        // The questions in a discarded DNS chunk count as dropped.
+        if (kind) dropped += chunk->dns_activity().processes(0).questions_size();
         LOGE(@"Network activity message exceeds its byte budget");
+      }
     }
     chunk = nullptr;
     chunkArena.reset();
