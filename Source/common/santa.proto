@@ -1374,9 +1374,11 @@ message DNSActivity {
     optional int64 rule_id = 9;
     optional string rule_name = 10;
     optional Outcome outcome = 11;
-    // Raw RCODE; set for ANSWERED and LOCAL_REPLY.
+    // The reply's RCODE, with the EDNS extended bits (RFC 6891). Unset when
+    // no reply carried one.
     optional uint32 rcode = 12;
-    // At most 32, in section order; none for a local reply today.
+    // The reply's answer section, in order. answers_truncated says some
+    // records were left out.
     repeated Answer answers = 13;
     // Question size; TCP's 2-byte length prefix not counted.
     optional uint64 bytes_outbound = 14;
