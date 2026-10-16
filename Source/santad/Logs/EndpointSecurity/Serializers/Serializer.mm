@@ -78,6 +78,21 @@ std::vector<uint8_t> Serializer::SerializeMessageTemplate(const santa::EnrichedE
     cd = [decision_cache_ cachedDecisionForFile:msg->event.exec.target->executable->stat];
   }
 
+  if (!cd) {
+    // Santa never sees the AUTH_EXEC for the targets in the default mute set, so
+    // no evaluation caches a decision for them.
+    cd = [decision_cache_ criticalSystemDecisionForFile:msg->event.exec.target->executable->stat];
+  }
+
+  if (cd.decisionClientMode == SNTClientModeUnknown) {
+    // No evaluation recorded the mode, e.g. no AUTH_EXEC was delivered. The
+    // current mode is almost always the one that applied to this execution.
+    SNTConfigurator* config = [SNTConfigurator configurator];
+    cd = cd ? [cd copy] : [[SNTCachedDecision alloc] init];
+    cd.decisionClientMode = config.clientMode;
+    cd.decisionTemporaryMonitorMode = config.inTemporaryMonitorMode;
+  }
+
   return SerializeMessage(msg, cd);
 }
 

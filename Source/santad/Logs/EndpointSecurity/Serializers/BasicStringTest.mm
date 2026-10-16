@@ -197,6 +197,47 @@ class NetworkFlowsCapturingBasicString : public BasicString {
   XCTAssertCppStringEqual(got, want);
 }
 
+- (void)testSerializeMessageExecWithoutCachedDecision {
+  es_file_t procFile = MakeESFile("foo");
+  es_process_t proc = MakeESProcess(&procFile, MakeAuditToken(12, 34), MakeAuditToken(56, 78));
+
+  es_file_t criticalFile = MakeESFile("/usr/sbin/lsof", MakeStat(100));
+  es_process_t criticalExec =
+      MakeESProcess(&criticalFile, MakeAuditToken(12, 89), MakeAuditToken(56, 78));
+  es_file_t otherFile = MakeESFile("/usr/bin/other", MakeStat(200));
+  es_process_t otherExec =
+      MakeESProcess(&otherFile, MakeAuditToken(12, 90), MakeAuditToken(56, 78));
+
+  SNTCachedDecision* critical =
+      [[SNTCachedDecision alloc] initWithVnode:SantaVnode::VnodeForFile(criticalFile.stat)];
+  critical.decision = SNTEventStateAllowSigningID;
+  critical.decisionExtra = @"critical system binary";
+  critical.sha256 = @"lsof_hash";
+  SNTDecisionCache* dc = [[SNTDecisionCache alloc] init];
+  [dc setCriticalSystemDecisions:@[ critical ]];
+
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_EXEC, &proc);
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  EXPECT_CALL(*mockESApi, ExecArgCount).WillRepeatedly(testing::Return(0));
+
+  // A critical system binary logs its startup decision, with the current mode.
+  esMsg.event.exec.target = &criticalExec;
+  XCTAssertCppStringEqual(BasicStringSerializeMessage(mockESApi, &esMsg, dc),
+                          "action=EXEC|decision=ALLOW|reason=SIGNINGID|"
+                          "explain=critical system binary|sha256=lsof_hash|pid=12|"
+                          "pidversion=89|ppid=56|uid=-2|user=nobody|gid=-1|group=nogroup|"
+                          "mode=L|path=/usr/sbin/lsof|machineid=my_id\n");
+  // The fallback reads the shared decision but must not change it.
+  XCTAssertEqual(critical.decisionClientMode, SNTClientModeUnknown);
+
+  // Any other miss is still unknown, but carries the current mode.
+  esMsg.event.exec.target = &otherExec;
+  XCTAssertCppStringEqual(BasicStringSerializeMessage(mockESApi, &esMsg, dc),
+                          "action=EXEC|decision=UNKNOWN|reason=UNKNOWN|pid=12|pidversion=90|"
+                          "ppid=56|uid=-2|user=nobody|gid=-1|group=nogroup|mode=L|"
+                          "path=/usr/bin/other|machineid=my_id\n");
+}
+
 - (void)testSerializeMessageExit {
   es_file_t procFile = MakeESFile("foo");
   es_process_t proc = MakeESProcess(&procFile, MakeAuditToken(12, 34), MakeAuditToken(56, 78));

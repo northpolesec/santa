@@ -78,7 +78,8 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
 
   for (size_t i = 0; i < mps->count; i++) {
     // Only add literal paths, prefix paths would require recursive directory search
-    if (mps->paths[i].type == ES_MUTE_PATH_TYPE_LITERAL) {
+    if (mps->paths[i].type == ES_MUTE_PATH_TYPE_LITERAL ||
+        mps->paths[i].type == ES_MUTE_PATH_TYPE_TARGET_LITERAL) {
       [criticalPaths addObject:@(mps->paths[i].path.data)];
     }
   }
@@ -226,7 +227,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
       continue;
     }
 
-    SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+    SNTCachedDecision* cd = [[SNTCachedDecision alloc] initWithVnode:binInfo.vnode];
 
     cd.decision = SNTEventStateAllowSigningID;
     cd.decisionExtra = systemBin ? @"critical system binary" : @"santa binary";

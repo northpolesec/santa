@@ -80,7 +80,8 @@ std::unique_ptr<SantadDeps> SantadDeps::Create(SNTConfigurator* configurator,
   }
   // Prime the lazily-computed critical system binaries now, at startup, so the
   // expensive hashing/codesigning doesn't block the first AUTH decision.
-  (void)rule_table.criticalSystemBinaries;
+  [[SNTDecisionCache sharedCache]
+      setCriticalSystemDecisions:rule_table.criticalSystemBinaries.allValues];
 
   SNTEventTable* event_table = [SNTDatabaseController eventTable];
   if (!event_table) {

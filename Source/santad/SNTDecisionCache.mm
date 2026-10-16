@@ -40,6 +40,7 @@
 #include "Source/common/SystemResources.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
 #import "Source/santad/SNTDatabaseController.h"
+#include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 
 // A mark outlives its hold only if the Recorder never takes it: ES drops the
@@ -61,6 +62,7 @@ static constexpr uint64_t kMaxHeldExecutions = 1000;
   absl::flat_hash_set<SantaVnode> _pendingRehydrates;
   os_unfair_lock _pendingLock;
   std::shared_ptr<santa::EntitlementsFilter> _entitlementsFilter;
+  absl::flat_hash_map<SantaVnode, SNTCachedDecision*> _criticalSystemDecisions;
 }
 
 - (void)setEntitlementsFilter:(std::shared_ptr<santa::EntitlementsFilter>)filter {
@@ -69,6 +71,19 @@ static constexpr uint64_t kMaxHeldExecutions = 1000;
   // invariant plus the happens-before edges established at daemon init.
   assert(!_entitlementsFilter);
   _entitlementsFilter = std::move(filter);
+}
+
+- (void)setCriticalSystemDecisions:(NSArray<SNTCachedDecision*>*)decisions {
+  // Programming error to set twice, for the same reason as the entitlements filter.
+  assert(_criticalSystemDecisions.empty());
+  for (SNTCachedDecision* cd in decisions) {
+    _criticalSystemDecisions[cd.vnodeId] = cd;
+  }
+}
+
+- (SNTCachedDecision*)criticalSystemDecisionForFile:(const struct stat&)statInfo {
+  auto it = _criticalSystemDecisions.find(SantaVnode::VnodeForFile(statInfo));
+  return it == _criticalSystemDecisions.end() ? nil : it->second;
 }
 
 + (instancetype)sharedCache {
