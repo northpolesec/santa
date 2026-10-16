@@ -128,6 +128,7 @@ objc_library(
         "//Source/common:SantaCache",
         "//Source/common:SantaVnode",
         "//Source/common:SystemResources",
+        "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/container:flat_hash_set",
     ],
 )

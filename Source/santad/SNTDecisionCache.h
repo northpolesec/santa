@@ -56,6 +56,12 @@ inline constexpr off_t kMaxSyncRehydrateBytes = 32 * 1024 * 1024;
 // edges established by ES client enablement and the initial backfill
 // dispatch.
 - (void)setEntitlementsFilter:(std::shared_ptr<santa::EntitlementsFilter>)filter;
+// Decisions for critical system binaries, keyed by each decision's vnode. They
+// are never evicted, because the default mute set keeps ES from delivering
+// AUTH_EXEC for some of these binaries, so no evaluation ever caches one. Same
+// set-once contract as -setEntitlementsFilter:.
+- (void)setCriticalSystemDecisions:(NSArray<SNTCachedDecision*>*)decisions;
+- (SNTCachedDecision*)criticalSystemDecisionForFile:(const struct stat&)statInfo;
 - (void)backfillDecisionCacheAsync;
 // Synchronously hashes `fi` and inserts a pseudo-decision into the cache.
 // Caller contract: invoke only after observing a cache miss for `fi.vnode`
