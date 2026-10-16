@@ -164,6 +164,10 @@ extern char** environ;
   char* const argv[] = {(char*)kBinary, (char*)"30", NULL};
   pid_t pid = 0;
   XCTAssertEqual(posix_spawn(&pid, kBinary, NULL, NULL, argv, environ), 0);
+  // A failed spawn leaves pid at 0, and the assertion above does not end the
+  // method. Registering the teardown anyway would kill(0, SIGKILL) the whole
+  // process group, the test runner included.
+  if (pid <= 0) return;
   [self addTeardownBlock:^{
     kill(pid, SIGKILL);
     waitpid(pid, NULL, 0);
