@@ -15,6 +15,8 @@
 
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Protobuf.h"
 
+#include <algorithm>
+
 #include <DiskArbitration/DiskArbitration.h>
 #include <EndpointSecurity/EndpointSecurity.h>
 #include <Kernel/kern/cs_blobs.h>
@@ -1457,6 +1459,109 @@ std::vector<uint8_t> Protobuf::SerializeDNSActivity(SNDProcessFlows* processFlow
     return {};
   }
   return FinalizeProto(santa_msg);
+}
+
+void Protobuf::SerializeNetworkActivities(SNDProcessFlows* flows, struct timespec start,
+                                          struct timespec end, SNTCachedDecision* cd, bool network,
+                                          bool dns, const ActivityWriter& write) {
+  Arena arena;
+  pbv1::NetworkActivity::Process connections;
+  pbv1::DNSActivity::Process questions;
+  if (network) santanetd::PopulateNetworkActivityProcess(&arena, &connections, flows, cd);
+  if (dns) santanetd::PopulateDNSActivityProcess(&arena, &questions, flows, cd);
+  SerializeNetworkActivityProtos(connections, questions, start, end, write);
+}
+
+void Protobuf::SerializeNetworkActivityProtos(const pbv1::NetworkActivity::Process& connections,
+                                              const pbv1::DNSActivity::Process& questions,
+                                              struct timespec start, struct timespec end,
+                                              const ActivityWriter& write) {
+  constexpr size_t kMaxActivityMessageBytes = 1 << 20;
+  struct Row {
+    bool dns;
+    int index;
+    int64_t seconds;
+    int32_t nanos;
+  };
+  std::vector<Row> rows;
+  for (int i = 0; i < questions.questions_size(); ++i) {
+    const auto& q = questions.questions(i);
+    const auto& t = q.close_time();
+    rows.push_back({true, i, t.seconds(), t.nanos()});
+  }
+  for (int i = 0; i < connections.flows_size(); ++i) {
+    const auto& f = connections.flows(i);
+    const auto& t = f.start_time();
+    // Carried-forward flows have no new connection time. They remain exportable
+    // but Sleigh excludes them from temporal correlation.
+    rows.push_back({false, i, f.has_start_time() ? t.seconds() : start.tv_sec,
+                    f.has_start_time() ? t.nanos() : static_cast<int32_t>(start.tv_nsec)});
+  }
+  std::stable_sort(rows.begin(), rows.end(), [](const Row& a, const Row& b) {
+    return a.seconds != b.seconds ? a.seconds < b.seconds : a.nanos < b.nanos;
+  });
+
+  std::unique_ptr<Arena> chunkArena;
+  pbv1::SantaMessage* chunk = nullptr;
+  size_t size = 0;
+  bool kind = false;
+  uint64_t dropped = questions.questions_dropped();
+  auto flush = [&] {
+    if (chunk && (kind ? (chunk->dns_activity().processes(0).questions_size() > 0 ||
+                          chunk->dns_activity().processes(0).questions_dropped() > 0)
+                       : chunk->network_activity().processes(0).flows_size() > 0)) {
+      // The conservative running size includes every repeated-field envelope.
+      // Keep an exact final guard as the schema evolves.
+      if (chunk->ByteSizeLong() <= kMaxActivityMessageBytes)
+        write(FinalizeProto(chunk));
+      else
+        LOGE(@"Network activity message exceeds its byte budget");
+    }
+    chunk = nullptr;
+    chunkArena.reset();
+  };
+  auto begin = [&](bool isDNS) {
+    chunkArena = std::make_unique<Arena>();
+    chunk = CreateDefaultProto(chunkArena.get(), start, end);
+    kind = isDNS;
+    if (isDNS) {
+      auto* p = chunk->mutable_dns_activity()->add_processes();
+      if (questions.has_process()) *p->mutable_process() = questions.process();
+    } else {
+      auto* p = chunk->mutable_network_activity()->add_processes();
+      if (connections.has_process()) *p->mutable_process() = connections.process();
+    }
+    size = chunk->ByteSizeLong() + 32;  // enclosing length prefixes may grow
+  };
+  for (const Row& row : rows) {
+    size_t rowSize = row.dns ? questions.questions(row.index).ByteSizeLong()
+                             : connections.flows(row.index).ByteSizeLong();
+    if (chunk && (kind != row.dns || size + rowSize + 16 > kMaxActivityMessageBytes)) flush();
+    if (!chunk) begin(row.dns);
+    if (size + rowSize + 16 > kMaxActivityMessageBytes) {
+      // Defensive for incompatible/older collectors. Their oversized question
+      // cannot poison the stream or hide subsequent ordinary events.
+      if (row.dns) ++dropped;
+      LOGW(@"Omitting an oversized network activity row");
+      continue;
+    }
+    if (row.dns) {
+      *chunk->mutable_dns_activity()->mutable_processes(0)->add_questions() =
+          questions.questions(row.index);
+    } else {
+      *chunk->mutable_network_activity()->mutable_processes(0)->add_flows() =
+          connections.flows(row.index);
+    }
+    size += rowSize + 16;
+  }
+  flush();
+  // Loss is a process/window metric, emitted once in its own summary message.
+  // It is not repeated across chunks or question rows.
+  if (dropped) {
+    begin(true);
+    chunk->mutable_dns_activity()->mutable_processes(0)->set_questions_dropped(dropped);
+    flush();
+  }
 }
 
 std::vector<uint8_t> Protobuf::SerializeFileAccess(

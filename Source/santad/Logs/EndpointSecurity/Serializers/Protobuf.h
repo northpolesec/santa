@@ -89,6 +89,15 @@ class Protobuf : public Serializer {
   std::vector<uint8_t> SerializeDNSActivity(SNDProcessFlows*, struct timespec, struct timespec,
                                             SNTCachedDecision*) override;
 
+  void SerializeNetworkActivities(SNDProcessFlows*, struct timespec, struct timespec,
+                                  SNTCachedDecision*, bool network, bool dns,
+                                  const ActivityWriter&) override;
+
+  // The proto boundary is also usable without the optional Network Extension.
+  void SerializeNetworkActivityProtos(const ::santa::pb::v1::NetworkActivity::Process&,
+                                      const ::santa::pb::v1::DNSActivity::Process&, struct timespec,
+                                      struct timespec, const ActivityWriter&);
+
   std::vector<uint8_t> SerializeFileAccess(
       const std::string& policy_version, const std::string& policy_name, const santa::Message& msg,
       const santa::EnrichedProcess& enriched_process, size_t target_index,

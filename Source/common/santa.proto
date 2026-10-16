@@ -1351,6 +1351,8 @@ message DNSActivity {
     // for CNAME (same form as owner), RFC 9460 form for HTTPS. Unset for
     // other types.
     optional string data = 4;
+    // Data was omitted because it exceeded the collector's byte budget.
+    optional bool data_truncated = 5;
   }
 
   message Question {
@@ -1384,13 +1386,17 @@ message DNSActivity {
     optional google.protobuf.Timestamp start_time = 16;
     // The outcome was reached.
     optional google.protobuf.Timestamp close_time = 17;
-    // next ID: 18
+    // Some answer records were omitted by the count/byte budget or failed parsing.
+    optional bool answers_truncated = 18;
+    // next ID: 19
   }
 
   message Process {
     optional ProcessInfo process = 1;
     repeated Question questions = 2;
-    // Questions this process asked in the window beyond the 1,000 kept.
+    // Questions omitted by collection capacity limits in this window.
+    // Reported once per process/window in a summary with no questions.
+    // A process with no identity reports losses whose attribution budget was full.
     optional uint64 questions_dropped = 3;
     // next ID: 4
   }

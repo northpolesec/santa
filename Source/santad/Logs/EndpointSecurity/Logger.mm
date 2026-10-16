@@ -345,23 +345,10 @@ void Logger::LogDiskDisappeared(NSDictionary* props) {
 
 void Logger::LogNetworkFlows(SNDProcessFlows* processFlows, struct timespec window_start,
                              struct timespec window_end) {
-  // One message per kind, each under its own key. DNS first, so a signal that
-  // chains a lookup to its connection sees them in order. A kind with no rows
-  // serializes to nothing and is not written.
-  if (ShouldLog(TelemetryEvent::kDNSActivity)) {
-    std::vector<uint8_t> bytes =
-        serializer_->SerializeDNSActivity(processFlows, window_start, window_end);
-    if (!bytes.empty()) {
-      writer_->Write(std::move(bytes));
-    }
-  }
-  if (ShouldLog(TelemetryEvent::kNetworkActivity)) {
-    std::vector<uint8_t> bytes =
-        serializer_->SerializeNetworkFlows(processFlows, window_start, window_end);
-    if (!bytes.empty()) {
-      writer_->Write(std::move(bytes));
-    }
-  }
+  serializer_->SerializeNetworkActivities(
+      processFlows, window_start, window_end, ShouldLog(TelemetryEvent::kNetworkActivity),
+      ShouldLog(TelemetryEvent::kDNSActivity),
+      [this](std::vector<uint8_t> bytes) { writer_->Write(std::move(bytes)); });
 }
 
 void Logger::LogFileAccess(const std::string& policy_version, const std::string& policy_name,

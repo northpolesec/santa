@@ -123,6 +123,16 @@ class Serializer {
                                             struct timespec window_start,
                                             struct timespec window_end);
 
+  // Emit one message at a time for one process window. Protobuf
+  // interleaves question completions and connection starts chronologically,
+  // and splits batches to stay below the consumer's message size limit.
+  using ActivityWriter = std::function<void(std::vector<uint8_t>)>;
+  void SerializeNetworkActivities(SNDProcessFlows*, struct timespec, struct timespec, bool network,
+                                  bool dns, const ActivityWriter&);
+  virtual void SerializeNetworkActivities(SNDProcessFlows*, struct timespec, struct timespec,
+                                          SNTCachedDecision*, bool network, bool dns,
+                                          const ActivityWriter&);
+
   virtual std::vector<uint8_t> SerializeDiskAppeared(NSDictionary*, bool) = 0;
   virtual std::vector<uint8_t> SerializeDiskDisappeared(NSDictionary*) = 0;
 
