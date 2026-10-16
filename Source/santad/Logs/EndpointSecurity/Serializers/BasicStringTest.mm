@@ -84,12 +84,19 @@ std::string BasicStringSerializeMessage(es_message_t* esMsg) {
 class NetworkFlowsCapturingBasicString : public BasicString {
  public:
   using BasicString::BasicString;
+  using Serializer::SerializeDNSActivity;
   using Serializer::SerializeNetworkFlows;
 
   std::vector<uint8_t> SerializeNetworkFlows(SNDProcessFlows* pf, struct timespec start,
                                              struct timespec end, SNTCachedDecision* cd) override {
     captured_cd = cd;
     return BasicString::SerializeNetworkFlows(pf, start, end, cd);
+  }
+
+  std::vector<uint8_t> SerializeDNSActivity(SNDProcessFlows* pf, struct timespec start,
+                                            struct timespec end, SNTCachedDecision* cd) override {
+    captured_cd = cd;
+    return BasicString::SerializeDNSActivity(pf, start, end, cd);
   }
 
   SNTCachedDecision* captured_cd;
@@ -1582,6 +1589,23 @@ class NetworkFlowsCapturingBasicString : public BasicString {
   cd.identityMismatched = YES;
   bs.SerializeNetworkFlows(processFlows, {}, {});
   XCTAssertNil(bs.captured_cd);
+
+  cd.identityMismatched = NO;
+  bs.SerializeDNSActivity(processFlows, {}, {});
+  XCTAssertEqual(bs.captured_cd, cd);
+
+  cd.identityMismatched = YES;
+  bs.SerializeDNSActivity(processFlows, {}, {});
+  XCTAssertNil(bs.captured_cd);
+}
+
+- (void)testSerializeNetworkFlowsAndDNSActivitySkipAnEmptyProcess {
+  // The stub formats nothing for a process, so neither kind produces a line.
+  id processFlows = OCMClassMock([SNDProcessFlows class]);
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  std::shared_ptr<Serializer> bs = BasicString::Create(mockESApi, nil, false);
+  XCTAssertTrue(bs->SerializeNetworkFlows(processFlows, {}, {}, nil).empty());
+  XCTAssertTrue(bs->SerializeDNSActivity(processFlows, {}, {}, nil).empty());
 }
 
 - (void)testGetModeString {

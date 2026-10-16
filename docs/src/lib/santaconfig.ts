@@ -433,7 +433,7 @@ See [Custom Branding](/configuration/branding) for examples of how this appears 
     },
     {
       key: "Telemetry",
-      description: `Array of strings for events that should be logged`,
+      description: `Array of strings for events that should be logged. NetworkActivity (connections) and DNSActivity (DNS questions) need the network extension.`,
       type: "string",
       repeated: true,
       defaultValue: ["Everything"],
@@ -464,6 +464,8 @@ See [Custom Branding](/configuration/branding) for examples of how this appears 
         { value: "TCCModification" },
         { value: "XProtect" },
         { value: "ProcSuspendResume" },
+        { value: "NetworkActivity" },
+        { value: "DNSActivity" },
         { value: "None" },
       ],
       versionAdded: "2024.11",

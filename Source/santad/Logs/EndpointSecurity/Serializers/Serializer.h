@@ -112,6 +112,27 @@ class Serializer {
                                              struct timespec window_start,
                                              struct timespec window_end);
 
+  // The dns_activity message for one process entry of a window. Returns an
+  // empty vector when the process asked no questions, as SerializeNetworkFlows
+  // does when it had no connections in the window.
+  virtual std::vector<uint8_t> SerializeDNSActivity(SNDProcessFlows* processFlows,
+                                                    struct timespec window_start,
+                                                    struct timespec window_end,
+                                                    SNTCachedDecision* cd) = 0;
+  std::vector<uint8_t> SerializeDNSActivity(SNDProcessFlows* processFlows,
+                                            struct timespec window_start,
+                                            struct timespec window_end);
+
+  // Emit one message at a time for one process window: dns_activity, then
+  // network_activity. Protobuf splits a message by size so each stays below
+  // sleigh's reader limit.
+  using ActivityWriter = std::function<void(std::vector<uint8_t>)>;
+  void SerializeNetworkActivities(SNDProcessFlows*, struct timespec, struct timespec, bool network,
+                                  bool dns, const ActivityWriter&);
+  virtual void SerializeNetworkActivities(SNDProcessFlows*, struct timespec, struct timespec,
+                                          SNTCachedDecision*, bool network, bool dns,
+                                          const ActivityWriter&);
+
   virtual std::vector<uint8_t> SerializeDiskAppeared(NSDictionary*, bool) = 0;
   virtual std::vector<uint8_t> SerializeDiskDisappeared(NSDictionary*) = 0;
 

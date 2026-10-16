@@ -22,6 +22,7 @@
 // Forward declare for stub
 namespace santa::pb::v1 {
 class NetworkActivity_Process;
+class DNSActivity_Process;
 }  // namespace santa::pb::v1
 
 @class SNDProcessFlows;
@@ -33,7 +34,17 @@ void PopulateNetworkActivityProcess(google::protobuf::Arena* arena,
                                     ::santa::pb::v1::NetworkActivity_Process* process,
                                     SNDProcessFlows* processFlows, SNTCachedDecision* cd);
 
+// Returns "" when the process has no flows.
 std::string FormatNetworkFlowsBasicString(SNDProcessFlows* processFlows, SNTCachedDecision* cd);
+
+// Fills process, questions, and questions_dropped for one process entry.
+// questions_dropped is set only when above zero.
+void PopulateDNSActivityProcess(google::protobuf::Arena* arena,
+                                ::santa::pb::v1::DNSActivity_Process* process,
+                                SNDProcessFlows* processFlows, SNTCachedDecision* cd);
+
+// Returns "" when the process has no questions.
+std::string FormatDNSActivityBasicString(SNDProcessFlows* processFlows, SNTCachedDecision* cd);
 
 }  // namespace santanetd
 

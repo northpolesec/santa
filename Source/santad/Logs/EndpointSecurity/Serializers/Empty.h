@@ -70,6 +70,8 @@ class Empty : public Serializer {
 
   std::vector<uint8_t> SerializeNetworkFlows(SNDProcessFlows*, struct timespec, struct timespec,
                                              SNTCachedDecision*) override;
+  std::vector<uint8_t> SerializeDNSActivity(SNDProcessFlows*, struct timespec, struct timespec,
+                                            SNTCachedDecision*) override;
 
   std::vector<uint8_t> SerializeFileAccess(
       const std::string& policy_version, const std::string& policy_name, const santa::Message& msg,
