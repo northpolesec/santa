@@ -18,6 +18,8 @@
 #include <gtest/gtest.h>
 #include <sys/stat.h>
 
+#include <unistd.h>
+
 #include <vector>
 
 #include "Source/common/TestUtils.h"
@@ -169,6 +171,169 @@ bool WaitForBufferSize(std::shared_ptr<FilePeer> file, size_t expectedSize) {
 
   XCTAssertEqual(wantSBAfterRename.st_ino, gotSBAfterRename.st_ino);
   XCTAssertNotEqual(wantSBAfterDelete.st_ino, wantSBAfterRename.st_ino);
+}
+
+- (void)testFileModeAppliedOnCreate {
+  auto file = std::make_shared<FilePeer>(self.logPath, 100, 500, self.q, self.timer, 0640);
+
+  struct stat sb;
+  XCTAssertEqual(fstat(file->FileHandle().fileDescriptor, &sb), 0);
+  XCTAssertEqual(sb.st_mode & ACCESSPERMS, 0640);
+}
+
+- (void)testFileModeAppliedToExistingFile {
+  // A log file left behind by an earlier Santa, before a mode was configured.
+  XCTAssertTrue([self.fileManager createFileAtPath:self.logPath
+                                          contents:nil
+                                        attributes:@{NSFilePosixPermissions : @0600}]);
+
+  auto file = std::make_shared<FilePeer>(self.logPath, 100, 500, self.q, self.timer, 0640);
+
+  struct stat sb;
+  XCTAssertEqual(fstat(file->FileHandle().fileDescriptor, &sb), 0);
+  XCTAssertEqual(sb.st_mode & ACCESSPERMS, 0640);
+}
+
+- (void)testFileModeUnsetLeavesExistingFileAlone {
+  XCTAssertTrue([self.fileManager createFileAtPath:self.logPath
+                                          contents:nil
+                                        attributes:@{NSFilePosixPermissions : @0666}]);
+
+  auto file = std::make_shared<FilePeer>(self.logPath, 100, 500, self.q, self.timer);
+
+  struct stat sb;
+  XCTAssertEqual(fstat(file->FileHandle().fileDescriptor, &sb), 0);
+  XCTAssertEqual(sb.st_mode & ACCESSPERMS, 0666);
+}
+
+- (void)testFileGroupApplied {
+  XCTAssertTrue([self.fileManager createFileAtPath:self.logPath contents:nil attributes:nil]);
+
+  struct stat sb;
+  XCTAssertEqual(stat([self.logPath UTF8String], &sb), 0);
+
+  // A group this process belongs to, other than the file's current one, so the chown is both
+  // permitted without root and observable.
+  gid_t target = (gid_t)-1;
+  int count = getgroups(0, NULL);
+  std::vector<gid_t> groups(count > 0 ? count : 0);
+  if (count > 0) {
+    count = getgroups(count, groups.data());
+    for (int i = 0; i < count; i++) {
+      if (groups[i] != sb.st_gid) {
+        target = groups[i];
+        break;
+      }
+    }
+  }
+  if (target == (gid_t)-1) {
+    XCTSkip(@"Process belongs to only one group, so a chown cannot be observed here");
+  }
+
+  auto file = std::make_shared<FilePeer>(self.logPath, 100, 500, self.q, self.timer, 0640, target);
+
+  XCTAssertEqual(fstat(file->FileHandle().fileDescriptor, &sb), 0);
+  XCTAssertEqual(sb.st_gid, target);
+  XCTAssertEqual(sb.st_mode & ACCESSPERMS, 0640);
+}
+
+- (void)testModeNotWidenedWhenGroupCannotBeSet {
+  // gid 0 is wheel, which this test does not run as and cannot chown to, so the chown fails. The
+  // mode must not be widened then: 0644 would grant read to whichever group owns the log now,
+  // which is not the group that was asked for.
+  XCTAssertTrue([self.fileManager createFileAtPath:self.logPath
+                                          contents:nil
+                                        attributes:@{NSFilePosixPermissions : @0600}]);
+
+  struct stat before;
+  XCTAssertEqual(stat([self.logPath UTF8String], &before), 0);
+  if (before.st_gid == 0 || geteuid() == 0) {
+    XCTSkip(@"Running as root, or the log already belongs to wheel, so the chown would succeed");
+  }
+
+  auto file = std::make_shared<FilePeer>(self.logPath, 100, 500, self.q, self.timer, 0644, 0);
+
+  struct stat after;
+  XCTAssertEqual(fstat(file->FileHandle().fileDescriptor, &after), 0);
+  XCTAssertEqual(after.st_gid, before.st_gid);
+  XCTAssertEqual(after.st_mode & ACCESSPERMS, 0600);
+}
+
+- (void)testNewLogCreatedOwnerOnlyWhenGroupConfigured {
+  // The log must never exist group-readable while it still belongs to the wrong group, so it is
+  // created 0600 and widened only once the chown succeeds. Here the chown to wheel fails.
+  if (geteuid() == 0) {
+    XCTSkip(@"Running as root, so the chown would succeed");
+  }
+  XCTAssertFalse([self.fileManager fileExistsAtPath:self.logPath]);
+
+  auto file = std::make_shared<FilePeer>(self.logPath, 100, 500, self.q, self.timer, 0644, 0);
+
+  struct stat sb;
+  XCTAssertEqual(stat([self.logPath UTF8String], &sb), 0);
+  XCTAssertEqual(sb.st_mode & ACCESSPERMS, 0600);
+}
+
+- (void)testFileGroupNotAppliedThroughSymlink {
+  NSString* target = [NSString stringWithFormat:@"%@/target.out", self.path];
+  XCTAssertTrue([self.fileManager createFileAtPath:target contents:nil attributes:nil]);
+  XCTAssertTrue([self.fileManager createSymbolicLinkAtPath:self.logPath
+                                       withDestinationPath:target
+                                                     error:nil]);
+
+  struct stat before;
+  XCTAssertEqual(stat([target UTF8String], &before), 0);
+
+  auto file = std::make_shared<FilePeer>(self.logPath, 100, 500, self.q, self.timer, 0644, 0);
+
+  struct stat after;
+  XCTAssertEqual(stat([target UTF8String], &after), 0);
+  XCTAssertEqual(after.st_gid, before.st_gid);
+  XCTAssertEqual(after.st_mode & ACCESSPERMS, before.st_mode & ACCESSPERMS);
+}
+
+- (void)testFileModeNotAppliedThroughSymlink {
+  // An EventLogPath that is a symlink must not have the mode applied through it: the open
+  // follows the link, so the chmod would land on the target as root.
+  NSString* target = [NSString stringWithFormat:@"%@/target.out", self.path];
+  XCTAssertTrue([self.fileManager createFileAtPath:target
+                                          contents:nil
+                                        attributes:@{NSFilePosixPermissions : @0600}]);
+  XCTAssertTrue([self.fileManager createSymbolicLinkAtPath:self.logPath
+                                       withDestinationPath:target
+                                                     error:nil]);
+
+  auto file = std::make_shared<FilePeer>(self.logPath, 100, 500, self.q, self.timer, 0644);
+
+  struct stat sb;
+  XCTAssertEqual(stat([target UTF8String], &sb), 0);
+  XCTAssertEqual(sb.st_mode & ACCESSPERMS, 0600);
+
+  // The writer still logs through the link, as it did before the mode was configurable.
+  XCTAssertNotNil(file->FileHandle());
+}
+
+- (void)testFileModeReappliedAfterRotation {
+  auto file = std::make_shared<FilePeer>(self.logPath, 100, 500, self.q, self.timer, 0640);
+  file->WatchLogFile();
+
+  struct stat sb;
+  XCTAssertEqual(stat([self.logPath UTF8String], &sb), 0);
+  XCTAssertEqual(sb.st_mode & ACCESSPERMS, 0640);
+  ino_t origIno = sb.st_ino;
+
+  // Stand in for a newsyslog rotation: the live log is renamed away and the writer reopens.
+  XCTAssertTrue([self.fileManager moveItemAtPath:self.logPath toPath:self.logRenamePath error:nil]);
+  XCTAssertTrue(WaitForNewLogFile(self.fileManager, self.logPath),
+                "New log file not created within expected time after rename");
+
+  XCTAssertEqual(stat([self.logPath UTF8String], &sb), 0);
+  XCTAssertNotEqual(sb.st_ino, origIno);
+  XCTAssertEqual(sb.st_mode & ACCESSPERMS, 0640);
+
+  // The rotated-away copy keeps the mode it was written with, so archives are covered too.
+  XCTAssertEqual(stat([self.logRenamePath UTF8String], &sb), 0);
+  XCTAssertEqual(sb.st_mode & ACCESSPERMS, 0640);
 }
 
 - (void)testWrite {

@@ -376,6 +376,56 @@ Applies when using the `protobuf` log type.
 - `SpoolDirectorySizeThresholdMB`: Total spool directory size limit (default: 250MB)
 - `SpoolDirectoryEventMaxFlushTimeSec`: Maximum buffer time before flush (default: 15 sec)
 
+### File Permissions
+
+- `TelemetryFileMode`: The permissions that Santa applies to the telemetry it writes. Give the
+  value as a string of octal digits, for example `"0640"`. The mode applies to the log file at
+  `EventLogPath`, to the spool files under `SpoolDirectory`, and to the spool directories. Use
+  this key to let a log shipper that does not run as root read the telemetry. The mode that you
+  give controls which accounts can read the telemetry. Santa always gives read permission to the
+  owner, which is root. A mode of `0640` adds read permission for the group. A mode of `0644`
+  adds it for every other account.
+
+  Santa changes the mode that you configure before it applies the mode. Santa removes the setuid,
+  setgid, and sticky bits. Santa also removes group write and world write. Santa always gives read
+  and write permission to the owner, because santad must write its own telemetry. A log shipper
+  only reads the telemetry. A spool directory that other accounts can write to is a risk: those
+  accounts can replace a spool file with a symlink.
+
+  Santa gives a directory execute permission where the file mode gives read permission. A file
+  mode of `0640` makes the directory mode `0750`. Thus a group that can read the spool files can
+  also go through the directories that hold them.
+
+  If you do not set this key, Santa keeps its default modes. The default mode is `0400` for spool
+  files and `0700` for spool directories. Santa does not change the mode of the event log file.
+
+  Santa reads this key one time, at startup. If you change the key, restart santad. At startup
+  Santa applies the mode again to the spool directories, and to the spool files that wait for
+  export. Thus the files that Santa wrote with the old mode do not stay unreadable.
+
+  :::note
+
+  A rotated copy of the event log keeps the mode that the file had before the rotation. But
+  newsyslog makes each new event log file with the mode in
+  `/etc/newsyslog.d/com.northpolesec.santa.newsyslog.conf`. That file gives the mode `644`. Santa
+  applies `TelemetryFileMode` again when it opens the log after a rotation. To remove the time
+  between the two, change the mode column in that file.
+
+  :::
+
+- `TelemetryFileGroup`: The name of the group that owns the telemetry Santa writes, for example
+  `"logshipper"`. Santa writes its telemetry as root, and a new file takes the group of the
+  directory that holds it. The directory is `/var/db/santa`, whose group is `wheel`. Thus without
+  this key the telemetry belongs to `wheel`, and the group permissions that `TelemetryFileMode`
+  gives are of no use. Set both keys together to give one account read access.
+
+  Santa applies the group to the same files as `TelemetryFileMode`: the log file at
+  `EventLogPath`, the spool files, and the spool directories. Santa changes the group before it
+  changes the mode, because a change of group can remove the setuid and setgid bits.
+
+  Give the name of a group, not a number. If the name is not a group on this system, Santa writes
+  a warning and leaves the group of the telemetry alone. `santactl doctor` also reports the error.
+
 ### File Change Monitoring
 
 - `FileChangesRegex`: Regex pattern for paths to monitor for file changes

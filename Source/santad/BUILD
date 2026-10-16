@@ -1025,6 +1025,7 @@ objc_library(
     deps = [
         ":EndpointSecurityWriter",
         "//Source/common:BranchPrediction",
+        "//Source/common:SNTLogging",
     ],
 )
 

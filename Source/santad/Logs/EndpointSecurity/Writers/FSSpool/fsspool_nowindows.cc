@@ -78,12 +78,26 @@ int Unlink(const char* pathname) { return unlink(pathname); }
 
 int MkDir(const char* path, mode_t mode) { return mkdir(path, mode); }
 
-absl::Status MkDir(const std::string& path) {
+int LChmod(const char* path, mode_t mode) {
+  return fchmodat(AT_FDCWD, path, mode, AT_SYMLINK_NOFOLLOW);
+}
+
+// -1 for the owner leaves it alone, which is what chown(2) does with that
+// value.
+int FChown(int fd, gid_t gid) { return fchown(fd, (uid_t)-1, gid); }
+
+int LChown(const char* path, gid_t gid) {
+  return fchownat(AT_FDCWD, path, (uid_t)-1, gid, AT_SYMLINK_NOFOLLOW);
+}
+
+int FChmod(int fd, mode_t mode) { return fchmod(fd, mode); }
+
+absl::Status MkDir(const std::string& path, mode_t mode) {
   if (!IsAbsolutePath(path)) {
     return absl::InvalidArgumentError(
         absl::StrCat(path, " is not an absolute path."));
   }
-  if (fsspool::MkDir(path.c_str(), 0700) < 0) {
+  if (fsspool::MkDir(path.c_str(), mode) < 0) {
     if (errno == EEXIST && IsDirectory(path)) {
       return absl::OkStatus();
     }

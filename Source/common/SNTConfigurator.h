@@ -14,6 +14,7 @@
 /// limitations under the License.
 
 #import <Foundation/Foundation.h>
+#include <sys/types.h>
 
 #import "Source/common/SNTCommonEnums.h"
 
@@ -29,6 +30,12 @@
 ///  @note This class is designed as a singleton but that is not strictly enforced.
 ///  @note All properties are KVO compliant.
 ///
+///
+///  Sentinel for "do not change the group". Matches the value that chown(2) uses to mean the same,
+///  so it can be passed straight through.
+///
+static const gid_t kNoGroup = (gid_t)-1;
+
 @interface SNTConfigurator : NSObject
 
 #pragma mark - Daemon Settings
@@ -311,6 +318,33 @@
 ///  @note: This property is KVO compliant, but should only be read once at santad startup.
 ///
 @property(readonly, nonatomic) float spoolDirectoryEventMaxFlushTimeSec;
+
+///
+///  Unix-style octal permissions applied to the telemetry Santa writes: the log file at
+///  eventLogPath, the spool files under spoolDirectory, and the spool directories themselves.
+///  Parsed from a string, e.g. "0640", and sanitized: write access stays santad's alone (see the
+///  implementation).
+///
+///  Returns 0 when unset or unparseable, in which case Santa keeps its built-in defaults (0400
+///  spool files, 0700 spool directories, and whatever mode the event log file already has).
+///  See the telemetry documentation for the interaction with newsyslog rotation.
+///
+///  @note: This property is KVO compliant, but should only be read once at santad startup.
+///
+@property(readonly, nonatomic) mode_t telemetryFileMode;
+
+///
+///  The name of the group that owns the telemetry Santa writes, for example "logshipper". Santa
+///  writes telemetry as root, and a new file takes the group of the directory that holds it, so
+///  without this key the telemetry belongs to the group of /var/db/santa, which is wheel. The
+///  group permissions that telemetryFileMode grants are only useful with this key set.
+///
+///  Returns `kNoGroup` when unset, or when the name is not a group on this system. Santa then
+///  leaves the group of its telemetry alone.
+///
+///  @note: This property is KVO compliant, but should only be read once at santad startup.
+///
+@property(readonly, nonatomic) gid_t telemetryFileGroup;
 
 ///
 ///  If true, Santa will attempt to periodically export telemetry to configured location.

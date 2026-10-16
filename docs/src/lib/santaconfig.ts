@@ -546,6 +546,38 @@ changes in the release notes of any future release that changes them.`,
       enableIf: (data) => data.EventLogType == "protobuf",
     },
     {
+      key: "TelemetryFileMode",
+      description: `The permissions that Santa applies to the telemetry it writes. Give the value as a string of
+        octal digits, for example \`"0640"\`. The mode applies to the log file at \`EventLogPath\` (for the
+        \`file\` and \`json\` event log types), to the spool files under \`SpoolDirectory\`, and to the spool
+        directories.
+        Santa changes the mode before it applies the mode: it removes the setuid, setgid, and sticky bits, it
+        removes group write and world write, and it always gives read and write permission to the owner.
+        Santa gives a directory execute permission where the file mode gives read permission, so a file mode of
+        \`0640\` makes the directory mode \`0750\`.
+        If you do not set this key, Santa keeps its default modes: \`0400\` for spool files and \`0700\` for spool
+        directories, and it does not change the mode of the event log file.
+        Santa reads this key one time, at startup. If you change the key, restart santad.
+        Santa applies the mode again each time it opens the event log, which includes the open after a rotation.
+        But newsyslog makes the new log file with the mode in \`com.northpolesec.santa.newsyslog.conf\`, so change
+        the mode column in that file to match`,
+      type: "string",
+      defaultValue: "",
+    },
+    {
+      key: "TelemetryFileGroup",
+      description: `The name of the group that owns the telemetry Santa writes, for example \`"logshipper"\`.
+        Santa writes its telemetry as root, and a new file takes the group of the directory that holds it, which
+        is \`/var/db/santa\` with the group \`wheel\`. Without this key the group permissions that
+        \`TelemetryFileMode\` gives are of no use, so set both keys together.
+        Santa applies the group to the same files as \`TelemetryFileMode\`, and changes the group before it
+        changes the mode.
+        Give the name of a group, not a number. If the name is not a group on this system, Santa writes a warning
+        and leaves the group of the telemetry alone`,
+      type: "string",
+      defaultValue: "",
+    },
+    {
       key: "EnableMachineIDDecoration",
       description: `If this key is true, the \`MachineID\` will be added to each log entry.`,
       type: "bool",
