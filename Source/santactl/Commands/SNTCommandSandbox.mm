@@ -44,7 +44,6 @@ extern "C" int sandbox_init_with_parameters(const char* profile, uint64_t flags,
 #import "Source/common/SNTRuleIdentifiers.h"
 #import "Source/common/SNTSandboxExecRequest.h"
 #import "Source/common/SNTXPCControlInterface.h"
-#include "Source/common/ScopedCFTypeRef.h"
 #import "Source/common/SigningIDHelpers.h"
 #import "Source/santactl/SNTCommand.h"
 #import "Source/santactl/SNTCommandController.h"
@@ -62,8 +61,6 @@ static std::optional<std::string> PathForFD(int fd, int* errorCode) {
   }
   return std::string(buf);
 }
-
-using ScopedSecStaticCode = santa::ScopedCFTypeRef<SecStaticCodeRef>;
 
 @implementation SNTCommandSandbox
 
@@ -137,20 +134,14 @@ REGISTER_COMMAND_NAME(@"sandbox")
 
 /// The cdhash of the Mach-O slice the kernel will execute, read from the pinned
 /// descriptor. santad compares this against the kernel-reported cdhash of the
-/// exec'd image, so it has to name the slice that actually runs, and
+/// exec'd image, so it has to name the slice that actually runs -- and
 /// SecStaticCode's own pick is not that slice: macOS 26 ships Apple platform
 /// binaries with an arm64e.x1 slice that Security.framework grades above
 /// arm64e, while the kernel still executes arm64e. Rather than restate the
 /// kernel's grading here, ask the loader: macho_best_slice_in_fd documents its
 /// answer for a main executable as "the slice the kernel would execute", so it
-/// tracks any subtype Apple adds later.
-///
-/// A file offset of 0 is passed through rather than special-cased: a thin
-/// binary's only slice starts at 0, and Security reads an offset of 0 as the
-/// whole file, which for a thin binary is that slice.
-///
-/// Returns nil when the file is not a Mach-O at all (a script), is malformed,
-/// has no loadable slice, or carries no readable signature.
+/// tracks any subtype Apple adds later. A thin binary yields an offset of 0,
+/// which Security reads as the whole file -- for a thin binary, the same slice.
 + (NSString*)cdhashForExecutedSliceOfFD:(int)fd path:(NSString*)path {
   __block uint64_t sliceOffset = 0;
   if (macho_best_slice_in_fd(
@@ -169,8 +160,10 @@ REGISTER_COMMAND_NAME(@"sandbox")
       !codeRef) {
     return nil;
   }
-  ScopedSecStaticCode scopedCodeRef = ScopedSecStaticCode::Assume(codeRef);
-  return [[MOLCodesignChecker alloc] initWithSecStaticCodeRef:codeRef error:NULL].cdhash;
+  MOLCodesignChecker* checker = [[MOLCodesignChecker alloc] initWithSecStaticCodeRef:codeRef
+                                                                               error:NULL];
+  CFRelease(codeRef);  // it was retained above
+  return checker.cdhash;
 }
 
 /// Resolve an absolute directory path for use as a seatbelt parameter. Seatbelt

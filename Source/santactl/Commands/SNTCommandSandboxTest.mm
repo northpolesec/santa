@@ -173,7 +173,7 @@ extern char** environ;
   MOLCodesignChecker* running = nil;
   for (int i = 0; i < 200 && running.cdhash.length == 0; i++) {
     running = [[MOLCodesignChecker alloc] initWithPID:pid error:NULL];
-    if (running.cdhash.length == 0) usleep(10 * NSEC_PER_MSEC / NSEC_PER_USEC);
+    if (running.cdhash.length == 0) usleep(10 * USEC_PER_SEC / 1000);
   }
   XCTAssertGreaterThan(running.cdhash.length, 0UL, @"could not read the running cdhash");
 
