@@ -2284,7 +2284,7 @@ void SerializeAndCheckNonESEvents(
   XCTAssertTrue(bs->SerializeDNSActivity(processFlows, {}, {}, nil).empty());
 }
 
-- (void)testActivityMessagesAreBoundedAndChronological {
+- (void)testActivityMessagesAreSplitBySizeWithDNSFirst {
   auto serializer = Protobuf::Create(std::make_shared<MockEndpointSecurityAPI>(), nil);
   pbv1::DNSActivity::Process questions;
   pbv1::NetworkActivity::Process connections;
@@ -2314,35 +2314,59 @@ void SerializeAndCheckNonESEvents(
   XCTAssertGreaterThan(messages.size(), 5u);
   size_t questionCount = 0, flowCount = 0;
   uint64_t dropped = 0;
-  int64_t previous = 0;
+  bool seenNetwork = false;
   std::set<std::string> eventIDs;
   for (const auto& m : messages) {
     XCTAssertEqual(m.event_time().seconds(), 90);
     XCTAssertEqual(m.processed_time().seconds(), 135);
     XCTAssertTrue(eventIDs.insert(m.event_id()).second);
     for (const auto& p : m.dns_activity().processes()) {
+      XCTAssertFalse(seenNetwork);
       XCTAssertEqual(p.process().id().pid(), 123);
       dropped += p.questions_dropped();
+      if (p.questions_dropped() > 0) XCTAssertEqual(p.questions_size(), 0);
       for (const auto& q : p.questions()) {
-        int64_t now = q.close_time().seconds() * NSEC_PER_SEC + q.close_time().nanos();
-        XCTAssertGreaterThanOrEqual(now, previous);
-        previous = now;
         XCTAssertEqual(q.id(), std::to_string(questionCount++));
       }
     }
     for (const auto& p : m.network_activity().processes()) {
-      for (const auto& f : p.flows()) {
-        int64_t now = f.start_time().seconds() * NSEC_PER_SEC + f.start_time().nanos();
-        XCTAssertGreaterThanOrEqual(now, previous);
-        previous = now;
-        flowCount++;
-        XCTAssertEqual(questionCount, 9u);
-      }
+      seenNetwork = true;
+      flowCount += p.flows_size();
     }
   }
   XCTAssertEqual(questionCount, 18u);
   XCTAssertEqual(flowCount, 1u);
   XCTAssertEqual(dropped, 7u);
+}
+
+- (void)testAnOversizedQuestionIsDroppedAndCounted {
+  auto serializer = Protobuf::Create(std::make_shared<MockEndpointSecurityAPI>(), nil);
+  pbv1::DNSActivity::Process questions;
+  questions.mutable_process()->mutable_id()->set_pid(123);
+  questions.set_questions_dropped(2);
+  for (int i = 0; i < 3; ++i)
+    questions.add_questions()->set_id(std::to_string(i));
+  questions.mutable_questions(1)->add_answers()->set_data(std::string(1 << 20, 'x'));
+  std::vector<pbv1::SantaMessage> messages;
+  serializer->SerializeNetworkActivityProtos(
+      {}, questions, {90, 0}, {135, 0}, [&](std::vector<uint8_t> bytes) {
+        XCTAssertLessThanOrEqual(bytes.size(), 1u << 20);
+        pbv1::SantaMessage message;
+        XCTAssertTrue(message.ParseFromArray(bytes.data(), static_cast<int>(bytes.size())));
+        messages.push_back(std::move(message));
+      });
+  std::vector<std::string> ids;
+  uint64_t dropped = 0;
+  for (const auto& m : messages) {
+    for (const auto& p : m.dns_activity().processes()) {
+      dropped += p.questions_dropped();
+      if (p.questions_dropped() > 0) XCTAssertEqual(p.questions_size(), 0);
+      for (const auto& q : p.questions())
+        ids.push_back(q.id());
+    }
+  }
+  XCTAssertTrue(ids == (std::vector<std::string>{"0", "2"}));
+  XCTAssertEqual(dropped, 3u);
 }
 
 @end

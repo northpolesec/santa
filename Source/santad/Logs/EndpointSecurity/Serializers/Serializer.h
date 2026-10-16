@@ -123,9 +123,9 @@ class Serializer {
                                             struct timespec window_start,
                                             struct timespec window_end);
 
-  // Emit one message at a time for one process window. Protobuf
-  // interleaves question completions and connection starts chronologically,
-  // and splits batches to stay below the consumer's message size limit.
+  // Emit one message at a time for one process window: dns_activity, then
+  // network_activity. Protobuf splits a message by size so each stays below
+  // sleigh's reader limit.
   using ActivityWriter = std::function<void(std::vector<uint8_t>)>;
   void SerializeNetworkActivities(SNDProcessFlows*, struct timespec, struct timespec, bool network,
                                   bool dns, const ActivityWriter&);

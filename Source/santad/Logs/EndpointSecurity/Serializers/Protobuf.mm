@@ -1476,31 +1476,9 @@ void Protobuf::SerializeNetworkActivityProtos(const pbv1::NetworkActivity::Proce
                                               const pbv1::DNSActivity::Process& questions,
                                               struct timespec start, struct timespec end,
                                               const ActivityWriter& write) {
+  // sleigh rejects a message over 4 MiB (pkg/parquet/protodelim.go, maxSize).
+  // 1 MiB keeps every chunk well under that as the schema grows.
   constexpr size_t kMaxActivityMessageBytes = 1 << 20;
-  struct Row {
-    bool dns;
-    int index;
-    int64_t seconds;
-    int32_t nanos;
-  };
-  std::vector<Row> rows;
-  for (int i = 0; i < questions.questions_size(); ++i) {
-    const auto& q = questions.questions(i);
-    const auto& t = q.close_time();
-    rows.push_back({true, i, t.seconds(), t.nanos()});
-  }
-  for (int i = 0; i < connections.flows_size(); ++i) {
-    const auto& f = connections.flows(i);
-    const auto& t = f.start_time();
-    // Carried-forward flows have no new connection time. They remain exportable
-    // but Sleigh excludes them from temporal correlation.
-    rows.push_back({false, i, f.has_start_time() ? t.seconds() : start.tv_sec,
-                    f.has_start_time() ? t.nanos() : static_cast<int32_t>(start.tv_nsec)});
-  }
-  std::stable_sort(rows.begin(), rows.end(), [](const Row& a, const Row& b) {
-    return a.seconds != b.seconds ? a.seconds < b.seconds : a.nanos < b.nanos;
-  });
-
   std::unique_ptr<Arena> chunkArena;
   pbv1::SantaMessage* chunk = nullptr;
   size_t size = 0;
@@ -1533,26 +1511,24 @@ void Protobuf::SerializeNetworkActivityProtos(const pbv1::NetworkActivity::Proce
     }
     size = chunk->ByteSizeLong() + 32;  // enclosing length prefixes may grow
   };
-  for (const Row& row : rows) {
-    size_t rowSize = row.dns ? questions.questions(row.index).ByteSizeLong()
-                             : connections.flows(row.index).ByteSizeLong();
-    if (chunk && (kind != row.dns || size + rowSize + 16 > kMaxActivityMessageBytes)) flush();
-    if (!chunk) begin(row.dns);
+  // Make room for one row in the open chunk, or in a new chunk of this kind.
+  // False if the row does not fit an empty chunk.
+  auto fit = [&](bool isDNS, size_t rowSize) {
+    if (chunk && size + rowSize + 16 > kMaxActivityMessageBytes) flush();
+    if (!chunk) begin(isDNS);
     if (size + rowSize + 16 > kMaxActivityMessageBytes) {
       // Defensive for incompatible/older collectors. Their oversized question
       // cannot poison the stream or hide subsequent ordinary events.
-      if (row.dns) ++dropped;
+      if (isDNS) ++dropped;
       LOGW(@"Omitting an oversized network activity row");
-      continue;
-    }
-    if (row.dns) {
-      *chunk->mutable_dns_activity()->mutable_processes(0)->add_questions() =
-          questions.questions(row.index);
-    } else {
-      *chunk->mutable_network_activity()->mutable_processes(0)->add_flows() =
-          connections.flows(row.index);
+      return false;
     }
     size += rowSize + 16;
+    return true;
+  };
+  for (const auto& q : questions.questions()) {
+    if (fit(true, q.ByteSizeLong()))
+      *chunk->mutable_dns_activity()->mutable_processes(0)->add_questions() = q;
   }
   flush();
   // Loss is a process/window metric, emitted once in its own summary message.
@@ -1562,6 +1538,11 @@ void Protobuf::SerializeNetworkActivityProtos(const pbv1::NetworkActivity::Proce
     chunk->mutable_dns_activity()->mutable_processes(0)->set_questions_dropped(dropped);
     flush();
   }
+  for (const auto& f : connections.flows()) {
+    if (fit(false, f.ByteSizeLong()))
+      *chunk->mutable_network_activity()->mutable_processes(0)->add_flows() = f;
+  }
+  flush();
 }
 
 std::vector<uint8_t> Protobuf::SerializeFileAccess(
