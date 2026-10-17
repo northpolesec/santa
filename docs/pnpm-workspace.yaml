@@ -11,6 +11,10 @@ overrides:
   "@babel/plugin-transform-modules-systemjs@<7.29.4": 7.29.4
   "@docsearch/react@<4.4.1": 4.6.3
   "@swc/html@<1.15.47": 1.15.47
+  # GHSA-hp3w-g68c-fv3c: no sprintf-js release is unaffected, so nothing to bump.
+  # argparse 1.x is its only consumer, via gray-matter > js-yaml@3, which needs
+  # argparse only in its CLI bin. Drop when gray-matter moves off js-yaml@3.
+  "argparse@<2.0.0": 2.0.1
   "body-parser@<1.20.6": 1.20.6
   "brace-expansion@<5.0.12": 5.0.12
   "browserslist@<=4.28.6": 4.28.9
