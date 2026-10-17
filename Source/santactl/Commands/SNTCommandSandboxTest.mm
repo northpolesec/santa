@@ -16,15 +16,24 @@
 #import <XCTest/XCTest.h>
 
 #include <errno.h>
+#include <fcntl.h>
 #include <limits.h>
+#include <signal.h>
+#include <spawn.h>
 #include <stdlib.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 #include <optional>
 #include <string>
 
+#import "Source/common/MOLCodesignChecker.h"
+
+extern char** environ;
+
 @interface SNTCommandSandbox : NSObject
 + (std::optional<std::string>)resolvedDirectoryPath:(const char*)path errorCode:(int*)errorCode;
++ (NSString*)cdhashForExecutedSliceOfFD:(int)fd path:(NSString*)path;
 @end
 
 @interface SNTCommandSandboxTest : XCTestCase
@@ -142,6 +151,46 @@
     XCTAssertNil([self resolve:path errorCode:&err], @"%@", path);
     XCTAssertEqual(err, cases[path].intValue, @"%@", path);
   }
+}
+
+/// santad compares the registered cdhash against the kernel-reported cdhash of
+/// the exec'd image, so the oracle here is a running process: a SecCodeRef for a
+/// live pid names the slice the kernel actually loaded. /bin/sleep is a fat
+/// Apple binary, which is the case that regressed -- Security.framework grades
+/// its arm64e.x1 slice above the arm64e slice the kernel executes, so the
+/// whole-file cdhash names a slice that never runs.
+- (void)testCdhashNamesTheSliceTheKernelExecutes {
+  const char* kBinary = "/bin/sleep";
+  char* const argv[] = {(char*)kBinary, (char*)"30", NULL};
+  pid_t pid = 0;
+  XCTAssertEqual(posix_spawn(&pid, kBinary, NULL, NULL, argv, environ), 0);
+  // A failed spawn leaves pid at 0, and the assertion above does not end the
+  // method. Registering the teardown anyway would kill(0, SIGKILL) the whole
+  // process group, the test runner included.
+  if (pid <= 0) return;
+  [self addTeardownBlock:^{
+    kill(pid, SIGKILL);
+    waitpid(pid, NULL, 0);
+  }];
+
+  // The guest lookup only resolves once the child has finished exec'ing.
+  MOLCodesignChecker* running = nil;
+  for (int i = 0; i < 200 && running.cdhash.length == 0; i++) {
+    running = [[MOLCodesignChecker alloc] initWithPID:pid error:NULL];
+    if (running.cdhash.length == 0) usleep(10 * USEC_PER_SEC / 1000);
+  }
+  XCTAssertGreaterThan(running.cdhash.length, 0UL, @"could not read the running cdhash");
+
+  int fd = open(kBinary, O_RDONLY | O_CLOEXEC);
+  XCTAssertGreaterThanOrEqual(fd, 0);
+  [self addTeardownBlock:^{
+    close(fd);
+  }];
+
+  // santactl reads the signature off the descriptor it pinned, not the path.
+  NSString* fdPath = [NSString stringWithFormat:@"/dev/fd/%d", fd];
+  XCTAssertEqualObjects([SNTCommandSandbox cdhashForExecutedSliceOfFD:fd path:fdPath],
+                        running.cdhash);
 }
 
 @end

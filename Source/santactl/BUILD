@@ -403,7 +403,10 @@ santa_unit_test(
 santa_unit_test(
     name = "SNTCommandSandboxTest",
     srcs = ["Commands/SNTCommandSandboxTest.mm"],
-    deps = [":SNTCommandSandbox"],
+    deps = [
+        ":SNTCommandSandbox",
+        "//Source/common:MOLCodesignChecker",
+    ],
 )
 
 santa_unit_test(

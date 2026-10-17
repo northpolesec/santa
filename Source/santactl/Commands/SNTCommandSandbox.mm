@@ -14,8 +14,11 @@
 
 #import <Foundation/Foundation.h>
 
+#import <Security/Security.h>
+
 #include <errno.h>
 #include <fcntl.h>
+#include <mach-o/utils.h>
 #include <sandbox.h>
 #include <string.h>
 #include <sys/param.h>
@@ -127,6 +130,40 @@ REGISTER_COMMAND_NAME(@"sandbox")
     if (isExecutableFile(fullPath)) return fullPath;
   }
   return nil;
+}
+
+/// The cdhash of the Mach-O slice the kernel will execute, read from the pinned
+/// descriptor. santad compares this against the kernel-reported cdhash of the
+/// exec'd image, so it has to name the slice that actually runs -- and
+/// SecStaticCode's own pick is not that slice: macOS 26 ships Apple platform
+/// binaries with an arm64e.x1 slice that Security.framework grades above
+/// arm64e, while the kernel still executes arm64e. Rather than restate the
+/// kernel's grading here, ask the loader: macho_best_slice_in_fd documents its
+/// answer for a main executable as "the slice the kernel would execute", so it
+/// tracks any subtype Apple adds later. A thin binary yields an offset of 0,
+/// which Security reads as the whole file -- for a thin binary, the same slice.
++ (NSString*)cdhashForExecutedSliceOfFD:(int)fd path:(NSString*)path {
+  __block uint64_t sliceOffset = 0;
+  if (macho_best_slice_in_fd(
+          fd, ^(const struct mach_header* slice, uint64_t sliceFileOffset, size_t sliceSize) {
+            sliceOffset = sliceFileOffset;
+          }) != 0) {
+    return nil;
+  }
+
+  NSDictionary* attributes =
+      @{(__bridge NSString*)kSecCodeAttributeUniversalFileOffset : @(sliceOffset)};
+  SecStaticCodeRef codeRef = NULL;
+  if (SecStaticCodeCreateWithPathAndAttributes(
+          (__bridge CFURLRef)[NSURL fileURLWithPath:path], kSecCSDefaultFlags,
+          (__bridge CFDictionaryRef)attributes, &codeRef) != errSecSuccess ||
+      !codeRef) {
+    return nil;
+  }
+  MOLCodesignChecker* checker = [[MOLCodesignChecker alloc] initWithSecStaticCodeRef:codeRef
+                                                                               error:NULL];
+  CFRelease(codeRef);  // it was retained above
+  return checker.cdhash;
 }
 
 /// Resolve an absolute directory path for use as a seatbelt parameter. Seatbelt
@@ -263,9 +300,13 @@ REGISTER_COMMAND_NAME(@"sandbox")
     exit(EXIT_FAILURE);
   }
   MOLCodesignChecker* csc = [fileInfo codesignCheckerWithError:nil];
+  // csc describes the whole file, which is what every identifier below wants
+  // except the cdhash: that one has to name the single slice the kernel will
+  // execute, because that is what santad is handed at AUTH_EXEC.
+  NSString* cdhash = [SNTCommandSandbox cdhashForExecutedSliceOfFD:fd path:fdPath] ?: csc.cdhash;
 
   SNTRuleIdentifiers* ruleIds = [[SNTRuleIdentifiers alloc]
-      initWithRuleIdentifiers:{.cdhash = csc.cdhash,
+      initWithRuleIdentifiers:{.cdhash = cdhash,
                                .binarySHA256 = fileInfo.SHA256,
                                .signingID = FormatSigningID(csc),
                                .certificateSHA256 = csc.leafCertificate.SHA256,
