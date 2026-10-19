@@ -91,6 +91,7 @@ NSTimeInterval NormalizeDNSUpstreamTimeout(NSTimeInterval v) {
     _flowDefaultAction = flowDefaultAction;
     _dnsUpstreamTimeoutSecs = NormalizeDNSUpstreamTimeout(dnsUpstreamTimeoutSecs);
     _networkFlowRules = [networkFlowRules copy];
+    _networkActivityTelemetry = YES;
   }
   return self;
 }
@@ -103,6 +104,8 @@ NSTimeInterval NormalizeDNSUpstreamTimeout(NSTimeInterval v) {
                                    dnsUpstreamTimeoutSecs:self.dnsUpstreamTimeoutSecs
                                          networkFlowRules:networkFlowRules];
   s.protectedDNSNames = self.protectedDNSNames;
+  s.networkActivityTelemetry = self.networkActivityTelemetry;
+  s.dnsActivityTelemetry = self.dnsActivityTelemetry;
   return s;
 }
 
@@ -120,6 +123,8 @@ NSTimeInterval NormalizeDNSUpstreamTimeout(NSTimeInterval v) {
   // defeat that fast-path and force materializing/deep-comparing the full ruleset every reconcile.
   return self.enable == o.enable && self.flowDefaultAction == o.flowDefaultAction &&
          self.dnsUpstreamTimeoutSecs == o.dnsUpstreamTimeoutSecs &&
+         self.networkActivityTelemetry == o.networkActivityTelemetry &&
+         self.dnsActivityTelemetry == o.dnsActivityTelemetry &&
          (self.protectedDNSNames == o.protectedDNSNames ||
           [self.protectedDNSNames isEqualToArray:o.protectedDNSNames]);
 }
@@ -130,6 +135,8 @@ NSTimeInterval NormalizeDNSUpstreamTimeout(NSTimeInterval v) {
   result = prime * result + self.enable;
   result = prime * result + self.flowDefaultAction;
   result = prime * result + (NSUInteger)self.dnsUpstreamTimeoutSecs;
+  result = prime * result + self.networkActivityTelemetry;
+  result = prime * result + self.dnsActivityTelemetry;
   result = prime * result + self.protectedDNSNames.hash;
   return result;
 }
@@ -144,6 +151,8 @@ NSTimeInterval NormalizeDNSUpstreamTimeout(NSTimeInterval v) {
   ENCODE_BOXABLE(coder, dnsUpstreamTimeoutSecs);
   ENCODE(coder, networkFlowRules);
   ENCODE(coder, protectedDNSNames);
+  ENCODE_BOXABLE(coder, networkActivityTelemetry);
+  ENCODE_BOXABLE(coder, dnsActivityTelemetry);
 }
 
 - (instancetype)initWithCoder:(NSCoder*)decoder {
@@ -154,6 +163,13 @@ NSTimeInterval NormalizeDNSUpstreamTimeout(NSTimeInterval v) {
     DECODE_SELECTOR(decoder, dnsUpstreamTimeoutSecs, NSNumber, doubleValue);
     DECODE_ARRAY(decoder, networkFlowRules, SNTNetworkFlowRule);
     DECODE_ARRAY(decoder, protectedDNSNames, NSString);
+    // A santad without the telemetry keys means connections on, DNS off.
+    if ([decoder containsValueForKey:@"networkActivityTelemetry"]) {
+      DECODE_SELECTOR(decoder, networkActivityTelemetry, NSNumber, boolValue);
+    } else {
+      _networkActivityTelemetry = YES;
+    }
+    DECODE_SELECTOR(decoder, dnsActivityTelemetry, NSNumber, boolValue);
     // Missing key decodes to 0 -> NormalizeDNSUpstreamTimeout turns it into the default.
     _dnsUpstreamTimeoutSecs = NormalizeDNSUpstreamTimeout(_dnsUpstreamTimeoutSecs);
   }

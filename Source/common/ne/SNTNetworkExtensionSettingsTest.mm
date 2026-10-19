@@ -97,6 +97,8 @@
       [[SNTNetworkExtensionSettings alloc] initWithEnable:YES
                                         flowDefaultAction:SNTNetworkFlowDefaultActionDeny];
   settings.protectedDNSNames = @[ @"sync.example.com", @"workshop.cloud" ];
+  settings.networkActivityTelemetry = NO;
+  settings.dnsActivityTelemetry = YES;
   NSData* data = [NSKeyedArchiver archivedDataWithRootObject:settings
                                        requiringSecureCoding:YES
                                                        error:nil];
@@ -111,6 +113,8 @@
   XCTAssertEqual(deserialized.flowDefaultAction, SNTNetworkFlowDefaultActionDeny);
   XCTAssertEqualObjects(deserialized.protectedDNSNames,
                         (@[ @"sync.example.com", @"workshop.cloud" ]));
+  XCTAssertFalse(deserialized.networkActivityTelemetry);
+  XCTAssertTrue(deserialized.dnsActivityTelemetry);
 
   settings = [[SNTNetworkExtensionSettings alloc] initWithEnable:NO
                                                flowDefaultAction:SNTNetworkFlowDefaultActionAllow];
@@ -183,6 +187,9 @@
   // Missing keys should result in default values (NO for BOOL).
   XCTAssertFalse(deserialized.enable);
   XCTAssertNil(deserialized.protectedDNSNames);
+  // A santad without the telemetry keys means connections on, DNS off.
+  XCTAssertTrue(deserialized.networkActivityTelemetry);
+  XCTAssertFalse(deserialized.dnsActivityTelemetry);
 }
 
 - (void)testTimeoutDefaultFromEnableInit {
@@ -307,6 +314,26 @@
   a.protectedDNSNames = @[ @"workshop.cloud" ];
   XCTAssertEqualObjects(a, b);
   XCTAssertEqual(a.hash, b.hash);
+}
+
+- (void)testTelemetryBitsDefaultAndTakePartInEquality {
+  // Fresh settings: connections on, DNS off. A changed bit must reach santanetd,
+  // so each is part of equality and of the attach copy.
+  SNTNetworkExtensionSettings* a = [[SNTNetworkExtensionSettings alloc] initWithEnable:YES];
+  XCTAssertTrue(a.networkActivityTelemetry);
+  XCTAssertFalse(a.dnsActivityTelemetry);
+  SNTNetworkExtensionSettings* b = [[SNTNetworkExtensionSettings alloc] initWithEnable:YES];
+  XCTAssertEqualObjects(a, b);
+  b.dnsActivityTelemetry = YES;
+  XCTAssertNotEqualObjects(a, b);
+  a.dnsActivityTelemetry = YES;
+  XCTAssertEqualObjects(a, b);
+  XCTAssertEqual(a.hash, b.hash);
+  b.networkActivityTelemetry = NO;
+  XCTAssertNotEqualObjects(a, b);
+  SNTNetworkExtensionSettings* c = [b settingsByAttachingNetworkFlowRules:nil];
+  XCTAssertFalse(c.networkActivityTelemetry);
+  XCTAssertTrue(c.dnsActivityTelemetry);
 }
 
 - (void)testNetworkFlowRulesRoundTrip {
