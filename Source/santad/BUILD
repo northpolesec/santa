@@ -772,6 +772,7 @@ objc_library(
         "//Source/common:SantaCache",
         "//Source/common:SantaSetCache",
         "//Source/common:SantaVnode",
+        "//Source/common:SigningIDHelpers",
         "//Source/common:String",
         "//Source/common/es:EndpointSecurityEnricher",
         "//Source/common/es:EndpointSecurityMessage",

@@ -28,6 +28,7 @@
 #import "Source/common/SNTFileInfo.h"
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTStoredFileAccessEvent.h"
+#import "Source/common/SigningIDHelpers.h"
 #include "Source/common/String.h"
 #include "Source/common/es/EnrichedTypes.h"
 #include "absl/container/inlined_vector.h"
@@ -670,7 +671,10 @@ FAAPolicyProcessor::DecisionAndOptions FAAPolicyProcessor::ProcessTargetAndPolic
     event.process.fileSHA256 = cd.sha256 ?: @"<unknown sha>";
     event.process.filePath = StringTokenToNSString(msg->process->executable->path);
     event.process.teamID = StringTokenToNSString(msg->process->team_id);
-    event.process.signingID = StringTokenToNSString(msg->process->signing_id);
+    // Prefixed like the execution event's signing ID.
+    event.process.signingID =
+        FormatSigningID(StringTokenToNSString(msg->process->signing_id), event.process.teamID,
+                        msg->process->is_platform_binary);
     event.process.cdhash =
         (msg->process->codesigning_flags & CS_SIGNED)
             ? StringToNSString(BufToHexString(msg->process->cdhash, sizeof(msg->process->cdhash)))
