@@ -1465,11 +1465,12 @@ void Protobuf::SerializeNetworkActivities(SNDProcessFlows* flows, struct timespe
                                           struct timespec end, SNTCachedDecision* cd, bool network,
                                           bool dns, const ActivityWriter& write) {
   Arena arena;
-  pbv1::NetworkActivity::Process connections;
-  pbv1::DNSActivity::Process questions;
-  if (network) santanetd::PopulateNetworkActivityProcess(&arena, &connections, flows, cd);
-  if (dns) santanetd::PopulateDNSActivityProcess(&arena, &questions, flows, cd);
-  SerializeNetworkActivityProtos(connections, questions, start, end, write);
+  // The collector may allocate on the arena, so its targets live there too.
+  auto* connections = Arena::Create<pbv1::NetworkActivity::Process>(&arena);
+  auto* questions = Arena::Create<pbv1::DNSActivity::Process>(&arena);
+  if (network) santanetd::PopulateNetworkActivityProcess(&arena, connections, flows, cd);
+  if (dns) santanetd::PopulateDNSActivityProcess(&arena, questions, flows, cd);
+  SerializeNetworkActivityProtos(*connections, *questions, start, end, write);
 }
 
 void Protobuf::SerializeNetworkActivityProtos(const pbv1::NetworkActivity::Process& connections,
