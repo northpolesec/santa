@@ -115,8 +115,8 @@
 ///
 ///  As `executionRuleForIdentifiers:`, but may answer from the negative miss cache.
 ///
-///  @param useCache Pass YES only from the execution path, and only when these are all the
-///         identifiers the file has. NO behaves exactly like `executionRuleForIdentifiers:`.
+///  @param useCache Pass YES only from the execution path, so that only executions populate the
+///         cache. NO behaves exactly like `executionRuleForIdentifiers:`.
 ///
 - (SNTRule*)executionRuleForIdentifiers:(struct RuleIdentifiers)identifiers useCache:(BOOL)useCache;
 

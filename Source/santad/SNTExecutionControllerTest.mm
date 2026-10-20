@@ -5413,7 +5413,7 @@ static std::shared_ptr<santa::PendingExecCoordinator> ActiveCoordinator() {
   SNTRule* rule = [[SNTRule alloc] init];
   rule.state = SNTRuleStateSeatbelt;
   rule.type = SNTRuleTypeBinary;
-  OCMStub([self.mockRuleDatabase executionRuleForIdentifiers:{} useCache:NO])
+  OCMStub([self.mockRuleDatabase executionRuleForIdentifiers:{} useCache:YES])
       .ignoringNonObjectArgs()
       .andReturn(rule);
 
