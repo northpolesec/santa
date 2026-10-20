@@ -67,21 +67,28 @@ static inline constexpr id SmartBoxVaue(T value) {
 #endif
 
 /// Decode a property of an array of objects of the given type
-/// and assign the value to the named property.
-#define DECODE_ARRAY(d, o, c)                                                              \
-  do {                                                                                     \
-    _##o = [d decodeObjectOfClasses:[NSSet setWithObjects:[NSArray class], [c class], nil] \
-                             forKey:@(#o)];                                                \
+/// and assign the value to the named property. The element class must be listed so
+/// NSSecureCoding admits the array's contents, but that also lets the archive present a bare
+/// element at the root; guard the result so a malformed archive yields nil rather than a non-array.
+#define DECODE_ARRAY(d, o, c)                                                                      \
+  do {                                                                                             \
+    id decoded__ = [d decodeObjectOfClasses:[NSSet setWithObjects:[NSArray class], [c class], nil] \
+                                     forKey:@(#o)];                                                \
+    _##o = [decoded__ isKindOfClass:[NSArray class]] ? decoded__ : nil;                            \
   } while (0)
 
 /// Decode a property of a dictionary of objects of many common types
-/// and assign the value to the named property.
-#define DECODE_DICT(d, o)                                                                        \
-  do {                                                                                           \
-    _##o = [d decodeObjectOfClasses:[NSSet setWithObjects:[NSDictionary class], [NSArray class], \
-                                                          [NSString class], [NSNumber class],    \
-                                                          [NSData class], nil]                   \
-                             forKey:@(#o)];                                                      \
+/// and assign the value to the named property. The value classes must be listed so NSSecureCoding
+/// admits the dictionary's contents, but that also lets the archive present one of them at the
+/// root; guard the result so a malformed archive yields nil rather than a non-dictionary.
+#define DECODE_DICT(d, o)                                                                     \
+  do {                                                                                        \
+    id decoded__ =                                                                            \
+        [d decodeObjectOfClasses:[NSSet setWithObjects:[NSDictionary class], [NSArray class], \
+                                                       [NSString class], [NSNumber class],    \
+                                                       [NSData class], nil]                   \
+                          forKey:@(#o)];                                                      \
+    _##o = [decoded__ isKindOfClass:[NSDictionary class]] ? decoded__ : nil;                  \
   } while (0)
 
 /// Decode a property of a specific set of given objects and

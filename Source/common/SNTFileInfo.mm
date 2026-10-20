@@ -79,6 +79,11 @@ static const uint32_t kMaxFatArchCount =
 @property MOLCodesignChecker* cachedCodesignChecker;
 @property(nonatomic) NSError* codesignCheckerError;
 @property SNTFileInfoIdentityVerification identityVerification;
+
+// The parsed Info.plist (embedded __info_plist, or the containing bundle's Info.plist). Guaranteed
+// to be a dictionary or nil. Kept private: its values are untrusted, so callers must go through the
+// type-checked infoPlist accessors rather than reading keys off the raw dictionary.
+- (NSDictionary*)infoPlist;
 @end
 
 ///
@@ -595,18 +600,30 @@ static BOOL IsAllowedAncestorExtension(NSString* ext) {
   return self.infoDict == (NSDictionary*)[NSNull null] ? nil : self.infoDict;
 }
 
+- (id)infoPlistObjectForKey:(NSString*)key ofClass:(Class)cls {
+  // self.infoPlist is guaranteed to be a dictionary or nil, so objectForKey: is safe. The value,
+  // however, is attacker-controlled (an embedded __info_plist is arbitrary file content), so it is
+  // only returned when it actually is the class the caller asked for.
+  id value = [self.infoPlist objectForKey:key];
+  return [value isKindOfClass:cls] ? value : nil;
+}
+
+- (NSString*)infoPlistStringForKey:(NSString*)key {
+  return [self infoPlistObjectForKey:key ofClass:[NSString class]];
+}
+
 - (NSString*)bundleIdentifier {
-  return [[self.infoPlist objectForKey:@"CFBundleIdentifier"] description];
+  return [self infoPlistStringForKey:@"CFBundleIdentifier"];
 }
 
 ///
 ///  Return either CFBundleDisplayName or CFBundleName, or nil if those
-///  keys are not set or are empty strings.
+///  keys are not set, are empty strings, or are not strings.
 ///
 - (NSString*)bundleName {
-  NSString* name = [[self.infoPlist objectForKey:@"CFBundleDisplayName"] description];
+  NSString* name = [self infoPlistStringForKey:@"CFBundleDisplayName"];
   if (name.length == 0) {
-    name = [[self.infoPlist objectForKey:@"CFBundleName"] description];
+    name = [self infoPlistStringForKey:@"CFBundleName"];
     if (name.length == 0) {
       return nil;
     }
@@ -616,11 +633,11 @@ static BOOL IsAllowedAncestorExtension(NSString* ext) {
 }
 
 - (NSString*)bundleVersion {
-  return [[self.infoPlist objectForKey:@"CFBundleVersion"] description];
+  return [self infoPlistStringForKey:@"CFBundleVersion"];
 }
 
 - (NSString*)bundleShortVersionString {
-  return [[self.infoPlist objectForKey:@"CFBundleShortVersionString"] description];
+  return [self infoPlistStringForKey:@"CFBundleShortVersionString"];
 }
 
 - (NSString*)bundleCategory {
@@ -829,12 +846,15 @@ static BOOL IsAllowedAncestorExtension(NSString* ext) {
       NSData* plistData =
           [self safeSubdataWithRange:NSMakeRange(mhwo.offset + sectoffset, sectsize)];
       if (!plistData) return nil;
-      NSDictionary* plist;
-      plist = [NSPropertyListSerialization propertyListWithData:plistData
-                                                        options:NSPropertyListImmutable
-                                                         format:NULL
-                                                          error:NULL];
-      if (plist) return plist;
+      // The property-list root of an embedded __info_plist section is arbitrary content and may
+      // deserialize to any type (array, string, number, ...), not just a dictionary. Only return
+      // it when it actually is a dictionary; otherwise treat the section as absent so callers
+      // never send dictionary selectors to a non-dictionary.
+      id plist = [NSPropertyListSerialization propertyListWithData:plistData
+                                                           options:NSPropertyListImmutable
+                                                            format:NULL
+                                                             error:NULL];
+      if ([plist isKindOfClass:[NSDictionary class]]) return plist;
     }
     offset += sz_section;
   }
@@ -890,9 +910,13 @@ static BOOL IsAllowedAncestorExtension(NSString* ext) {
         // If self.path is on a quarantine disk image, LSQuarantineDiskImageURL will point to the
         // disk image and self.fileOwnerHomeDir will be incorrect (probably root).
         NSString* fileOwnerHomeDir = self.fileOwnerHomeDir;
-        if (d[@"LSQuarantineDiskImageURL"]) {
+        // LaunchServices normalizes this to an NSURL, but the underlying quarantine xattr is
+        // user-writable; only send fileSystemRepresentation to a type that responds to it.
+        id diskImageURL = d[@"LSQuarantineDiskImageURL"];
+        if ([diskImageURL isKindOfClass:[NSURL class]] ||
+            [diskImageURL isKindOfClass:[NSString class]]) {
           struct stat fileStat;
-          stat([d[@"LSQuarantineDiskImageURL"] fileSystemRepresentation], &fileStat);
+          stat([diskImageURL fileSystemRepresentation], &fileStat);
           if (fileStat.st_uid != 0) {
             std::optional<std::string> homeDir = santa::account::HomeDirForUID(fileStat.st_uid);
             if (homeDir.has_value()) {

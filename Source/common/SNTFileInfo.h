@@ -202,7 +202,7 @@ typedef NS_ENUM(NSInteger, SNTFileInfoIdentityVerification) {
 - (BOOL)isMissingPageZero;
 
 ///
-///  If set to YES, the bundle* and infoPlist methods will search for and use the highest bundle
+///  If set to YES, the bundle* and infoPlist* methods will search for and use the highest bundle
 ///  found in the tree, and only bundles with one of a small set of known extensions (.app,
 ///  .framework, .xpc, ...) are considered. Defaults to NO, which uses the first found bundle with
 ///  any extension, if any.
@@ -213,7 +213,7 @@ typedef NS_ENUM(NSInteger, SNTFileInfoIdentityVerification) {
 ///      useAncestorBundle is set to YES
 ///        /Applications/Photos.app will be used to get data backing all the bundle methods
 ///
-///  @note: The result backing the bundle* and infoPlist methods is cached once found. Setting the
+///  @note: The result backing the bundle* and infoPlist* methods is cached once found. Setting the
 ///         useAncestorBundle propery will clear this cache and force a re-search.
 ///
 @property(nonatomic) BOOL useAncestorBundle;
@@ -232,11 +232,21 @@ typedef NS_ENUM(NSInteger, SNTFileInfoIdentityVerification) {
 - (NSString*)bundlePath;
 
 ///
-///  @return Either the Info.plist in the bundle this file is part of, or an embedded plist if there
-///  is one. In the unlikely event that a file has both an embedded Info.plist and is part of a
-///  bundle, the embedded plist will be returned.
+///  Look up a value in this file's Info.plist (an embedded __info_plist, or the Info.plist of the
+///  bundle this file is part of; the embedded plist wins if both exist), returning it only when it
+///  is of the expected class.
 ///
-- (NSDictionary*)infoPlist;
+///  @return The value for `key` if it is present and an instance of `cls` (or a subclass), else
+///  nil.
+///
+- (id)infoPlistObjectForKey:(NSString*)key ofClass:(Class)cls;
+
+///
+///  Convenience for the common case of a string-valued Info.plist key.
+///
+///  @return The string value for `key`, or nil if the key is absent or its value is not a string.
+///
+- (NSString*)infoPlistStringForKey:(NSString*)key;
 
 ///
 ///  @return the CFBundleIdentifier from this file's Info.plist.
