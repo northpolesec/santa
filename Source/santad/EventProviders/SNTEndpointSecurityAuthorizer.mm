@@ -126,8 +126,11 @@ using santa::Message;
   santa::ExecTarget target = santa::ExecTarget::ForExecEvent(&(*msg));
 
   SNTCachedDecision* cd = nil;
+  uint64_t reservation = 0;
 
   while (true) {
+    cd = nil;
+    santa::CachedAuthResult expected{};
     santa::CachedAuthResult cacheEntry = self->_authResultCache->CheckCache(target);
     SNTAction returnAction = cacheEntry.action;
     if (RESPONSE_VALID(returnAction)) {
@@ -150,9 +153,8 @@ using santa::Message;
     } else if (returnAction == SNTActionRespondAllowNoCache) {
       // Cache hit — we have pre-computed identity data but need to re-evaluate policy.
       cd = cacheEntry.cached_decision;
-      // Remove the entry so we can transition through RequestBinary for re-evaluation.
-      self->_authResultCache->RemoveFromCache(target);
-      break;
+      // Reserve over this entry so the transition to RequestBinary is atomic.
+      expected = cacheEntry;
     } else if (returnAction == SNTActionRespondHold) {
       NSString* reason = cacheEntry.cached_decision.heldForTransitiveRule
                              ? @"instance is waiting for its transitive rule. Try again\n"
@@ -178,17 +180,21 @@ using santa::Message;
       // raciness of multiple threads checking the cache simultaneously.
       // Also mitigates need to poll.
       usleep(5000);
-    } else {
-      break;
+      continue;
     }
-  }
 
-  self->_authResultCache->AddToCache(target, SNTActionRequestBinary);
+    reservation = self->_authResultCache->Reserve(target, expected);
+    if (reservation) break;
+    // Another exec of this target reserved first; wait for its result.
+  }
 
   [self.execController validateExecEvent:msg
                           cachedDecision:cd
                               postAction:^bool(SNTAction action, SNTCachedDecision* cd) {
-                                return [self postAction:action forMessage:msg withDecision:cd];
+                                return [self postAction:action
+                                             forMessage:msg
+                                           withDecision:cd
+                                            reservation:reservation];
                               }];
 }
 
@@ -197,7 +203,7 @@ using santa::Message;
   switch (esMsg->event_type) {
     case ES_EVENT_TYPE_AUTH_EXEC:
       if (![self.execController synchronousShouldProcessExecEvent:esMsg]) {
-        [self postAction:SNTActionRespondDeny forMessage:esMsg withDecision:nil];
+        [self postAction:SNTActionRespondDeny forMessage:esMsg withDecision:nil reservation:0];
         recordEventMetrics(EventDisposition::kDropped);
         return;
       }
@@ -225,7 +231,8 @@ using santa::Message;
 
 - (bool)postAction:(SNTAction)action
         forMessage:(const Message&)esMsg
-      withDecision:(SNTCachedDecision*)cd {
+      withDecision:(SNTCachedDecision*)cd
+       reservation:(uint64_t)reservation {
   es_auth_result_t authResult;
   bool cacheable = true;
 
@@ -288,7 +295,11 @@ using santa::Message;
       [NSException raise:@"Invalid post action" format:@"Invalid post action: %ld", action];
   }
 
-  self->_authResultCache->AddToCache(santa::ExecTarget::ForExecEvent(&(*esMsg)), action, cd);
+  // The verdict still holds for this exec but must not outlive it.
+  if (!self->_authResultCache->AddToCache(santa::ExecTarget::ForExecEvent(&(*esMsg)), action, cd,
+                                          reservation)) {
+    cacheable = false;
+  }
 
   if (action != SNTActionHoldAllowed && action != SNTActionHoldDenied) {
     return [self respondToMessage:esMsg withAuthResult:authResult forcePreventCache:!cacheable];

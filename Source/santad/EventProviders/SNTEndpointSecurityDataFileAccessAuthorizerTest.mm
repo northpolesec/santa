@@ -508,8 +508,8 @@ void ActivateDataFAA(DataFAAHarness& h) {
 
   // Warm the local and modeled ES caches while Data FAA is disabled
   santa::ExecTarget target = santa::ExecTarget::ForExecEvent(&esMsg);
-  h.authResultCache->AddToCache(target, SNTActionRequestBinary);
-  h.authResultCache->AddToCache(target, SNTActionRespondAllow);
+  uint64_t r = h.authResultCache->Reserve(target, {});
+  h.authResultCache->AddToCache(target, SNTActionRespondAllow, nil, r);
   XCTAssertTrue(h.DeliverExec(&esMsg));
   XCTAssertTrue(h.execCached->load());
   // The cached exec is not delivered again

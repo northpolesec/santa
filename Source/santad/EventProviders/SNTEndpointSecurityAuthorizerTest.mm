@@ -23,6 +23,7 @@
 #include <map>
 #include <memory>
 #include <set>
+#include <vector>
 
 #import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTCommonEnums.h"
@@ -46,17 +47,23 @@ class MockAuthResultCache : public AuthResultCache {
  public:
   using AuthResultCache::AuthResultCache;
 
+  MOCK_METHOD(uint64_t, Reserve,
+              (const santa::ExecTarget& target, const santa::CachedAuthResult& expected));
   MOCK_METHOD(bool, AddToCache,
-              (const santa::ExecTarget& target, SNTAction decision, SNTCachedDecision* cd));
+              (const santa::ExecTarget& target, SNTAction decision, SNTCachedDecision* cd,
+               uint64_t reservation));
   MOCK_METHOD(santa::CachedAuthResult, CheckCache, (const santa::ExecTarget& target));
-  MOCK_METHOD(void, RemoveFromCache, (const santa::ExecTarget& target));
 };
 
 @interface SNTEndpointSecurityAuthorizer (Testing)
 - (void)processMessage:(Message)msg;
 - (bool)postAction:(SNTAction)action
         forMessage:(const Message&)esMsg
-      withDecision:(SNTCachedDecision*)cd;
+      withDecision:(SNTCachedDecision*)cd
+       reservation:(uint64_t)reservation;
+- (bool)respondToMessage:(const Message&)msg
+          withAuthResult:(es_auth_result_t)result
+       forcePreventCache:(BOOL)forcePreventCache;
 @end
 
 // This test fake exists due to limitations with OCMPartialMock. The partial mock object
@@ -253,11 +260,13 @@ class MockAuthResultCache : public AuthResultCache {
 
       OCMExpect([mockAuthClient postAction:SNTActionRespondDeny
                                 forMessage:Message(mockESApi, &esMsg)
-                              withDecision:nil])
+                              withDecision:nil
+                               reservation:0])
           .ignoringNonObjectArgs();
       OCMStub([mockAuthClient postAction:SNTActionRespondDeny
                               forMessage:Message(mockESApi, &esMsg)
-                            withDecision:nil])
+                            withDecision:nil
+                             reservation:0])
           .ignoringNonObjectArgs()
           .andDo(nil);
 
@@ -346,8 +355,7 @@ class MockAuthResultCache : public AuthResultCache {
       .WillOnce(testing::Return(santa::CachedAuthResult{SNTActionRespondAllowCompiler}))
       .WillOnce(testing::Return(santa::CachedAuthResult{}))
       .WillOnce(testing::Return(santa::CachedAuthResult{SNTActionRespondHold}));
-  EXPECT_CALL(*mockAuthCache, AddToCache(testing::_, SNTActionRequestBinary, testing::_))
-      .WillOnce(testing::Return(true));
+  EXPECT_CALL(*mockAuthCache, Reserve).WillOnce(testing::Return(1));
 
   id mockCompilerController = OCMStrictClassMock([SNTCompilerController class]);
   OCMExpect([mockCompilerController setProcess:execProc.audit_token isCompiler:true]);
@@ -410,6 +418,185 @@ class MockAuthResultCache : public AuthResultCache {
   [mockAuthClient stopMocking];
 }
 
+// Runs postAction: with the cache's AddToCache returning `published`, and reports
+// what reached respondToMessage:withAuthResult:forcePreventCache:.
+- (void)runPostAction:(SNTAction)action
+             published:(bool)published
+    compilerController:(id)compilerController
+            authResult:(es_auth_result_t*)gotAuthResult
+     forcePreventCache:(BOOL*)gotForcePreventCache {
+  es_file_t file = MakeESFile("foo");
+  es_process_t proc = MakeESProcess(&file);
+  es_file_t execFile = MakeESFile("bar");
+  es_process_t execProc = MakeESProcess(&execFile, MakeAuditToken(12, 23), MakeAuditToken(34, 45));
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_EXEC, &proc, ActionType::Auth);
+  esMsg.event.exec.target = &execProc;
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsESNewClient();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+
+  auto mockAuthCache = std::make_shared<MockAuthResultCache>(nullptr, nil);
+  EXPECT_CALL(*mockAuthCache, AddToCache(testing::_, action, testing::_, 7))
+      .WillOnce(testing::Return(published));
+
+  SNTEndpointSecurityAuthorizer* authClient =
+      [[SNTEndpointSecurityAuthorizer alloc] initWithESAPI:mockESApi
+                                                   metrics:nullptr
+                                            execController:nil
+                                        compilerController:compilerController
+                                           authResultCache:mockAuthCache
+                                                 ttyWriter:santa::TTYWriter::Create(true)
+                                               processTree:nil];
+  id mockAuthClient = OCMPartialMock(authClient);
+
+  __block es_auth_result_t authResult = (es_auth_result_t)-1;
+  __block BOOL forcePreventCache = NO;
+  OCMStub([mockAuthClient respondToMessage:Message(mockESApi, &esMsg)
+                            withAuthResult:(es_auth_result_t)0
+                         forcePreventCache:NO])
+      .ignoringNonObjectArgs()
+      .andDo(^(NSInvocation* inv) {
+        [inv getArgument:&authResult atIndex:3];
+        [inv getArgument:&forcePreventCache atIndex:4];
+      });
+
+  {
+    Message msg(mockESApi, &esMsg);
+    [mockAuthClient postAction:action forMessage:msg withDecision:nil reservation:7];
+  }
+
+  [mockAuthClient stopMocking];
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+  XCTBubbleMockVerifyAndClearExpectations(mockAuthCache.get());
+
+  *gotAuthResult = authResult;
+  *gotForcePreventCache = forcePreventCache;
+}
+
+- (void)testFailedPublishIsNotCached {
+  es_auth_result_t result;
+  BOOL forcePreventCache;
+  [self runPostAction:SNTActionRespondAllow
+               published:false
+      compilerController:nil
+              authResult:&result
+       forcePreventCache:&forcePreventCache];
+  XCTAssertEqual(result, ES_AUTH_RESULT_ALLOW);
+  XCTAssertTrue(forcePreventCache);
+}
+
+- (void)testSuccessfulPublishIsCacheable {
+  es_auth_result_t result;
+  BOOL forcePreventCache;
+  [self runPostAction:SNTActionRespondAllow
+               published:true
+      compilerController:nil
+              authResult:&result
+       forcePreventCache:&forcePreventCache];
+  XCTAssertEqual(result, ES_AUTH_RESULT_ALLOW);
+  XCTAssertFalse(forcePreventCache);
+}
+
+- (void)testFailedPublishCompilerStillMarksCompiler {
+  id mockCompilerController = OCMStrictClassMock([SNTCompilerController class]);
+  __block bool markedCompiler = false;
+  OCMExpect([mockCompilerController setProcess:MakeAuditToken(12, 23) isCompiler:true])
+      .ignoringNonObjectArgs()
+      .andDo(^(NSInvocation* inv) {
+        [inv getArgument:&markedCompiler atIndex:3];
+      });
+
+  es_auth_result_t result;
+  BOOL forcePreventCache;
+  [self runPostAction:SNTActionRespondAllowCompiler
+               published:false
+      compilerController:mockCompilerController
+              authResult:&result
+       forcePreventCache:&forcePreventCache];
+  XCTAssertEqual(result, ES_AUTH_RESULT_ALLOW);
+  XCTAssertTrue(forcePreventCache);
+  XCTAssertTrue(OCMVerifyAll(mockCompilerController));
+  XCTAssertTrue(markedCompiler);
+  [mockCompilerController stopMocking];
+}
+
+- (void)testFailedPublishDenyStillDenies {
+  es_auth_result_t result;
+  BOOL forcePreventCache;
+  [self runPostAction:SNTActionRespondDeny
+               published:false
+      compilerController:nil
+              authResult:&result
+       forcePreventCache:&forcePreventCache];
+  XCTAssertEqual(result, ES_AUTH_RESULT_DENY);
+  XCTAssertTrue(forcePreventCache);
+}
+
+- (void)testEarlyDenyPassesNoReservation {
+  es_file_t file = MakeESFile("foo");
+  es_process_t proc = MakeESProcess(&file);
+  es_file_t execFile = MakeESFile("bar");
+  es_process_t execProc = MakeESProcess(&execFile, MakeAuditToken(12, 23), MakeAuditToken(34, 45));
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_EXEC, &proc, ActionType::Auth);
+  esMsg.event.exec.target = &execProc;
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsESNewClient();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+  ::testing::Mock::AllowLeak(mockESApi.get());
+
+  auto mockAuthCache = std::make_shared<MockAuthResultCache>(nullptr, nil);
+  EXPECT_CALL(*mockAuthCache, AddToCache(testing::_, SNTActionRespondDeny, testing::_, 0))
+      .WillOnce(testing::Return(false));
+  EXPECT_CALL(*mockAuthCache, Reserve).Times(0);
+
+  SNTEndpointSecurityAuthorizer* authClient =
+      [[SNTEndpointSecurityAuthorizer alloc] initWithESAPI:mockESApi
+                                                   metrics:nullptr
+                                            execController:self.mockExecController
+                                        compilerController:nil
+                                           authResultCache:mockAuthCache
+                                                 ttyWriter:santa::TTYWriter::Create(true)
+                                               processTree:nullptr];
+  id mockAuthClient = OCMPartialMock(authClient);
+
+  dispatch_semaphore_t semaMetrics = dispatch_semaphore_create(0);
+  __block es_auth_result_t authResult = (es_auth_result_t)-1;
+  __block BOOL forcePreventCache = NO;
+  OCMStub([mockAuthClient respondToMessage:Message(mockESApi, &esMsg)
+                            withAuthResult:(es_auth_result_t)0
+                         forcePreventCache:NO])
+      .ignoringNonObjectArgs()
+      .andDo(^(NSInvocation* inv) {
+        [inv getArgument:&authResult atIndex:3];
+        [inv getArgument:&forcePreventCache atIndex:4];
+      });
+
+  {
+    Message msg(mockESApi, &esMsg);
+    OCMExpect([self.mockExecController synchronousShouldProcessExecEvent:msg])
+        .ignoringNonObjectArgs()
+        .andReturn(NO);
+
+    [mockAuthClient handleMessage:std::move(msg)
+               recordEventMetrics:^(EventDisposition d) {
+                 XCTAssertEqual(d, EventDisposition::kDropped);
+                 dispatch_semaphore_signal(semaMetrics);
+               }];
+
+    XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
+    XCTAssertTrue(OCMVerifyAll(self.mockExecController));
+  }
+
+  XCTAssertEqual(authResult, ES_AUTH_RESULT_DENY);
+  XCTAssertTrue(forcePreventCache);
+
+  [mockAuthClient stopMocking];
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+  XCTBubbleMockVerifyAndClearExpectations(mockAuthCache.get());
+}
+
 - (void)testPostAction {
   es_file_t file = MakeESFile("foo");
   es_process_t proc = MakeESProcess(&file);
@@ -431,20 +618,26 @@ class MockAuthResultCache : public AuthResultCache {
   auto hasExpectedKey = testing::Field(&santa::ExecTarget::key, expectedKey);
 
   auto mockAuthCache = std::make_shared<MockAuthResultCache>(nullptr, nil);
-  EXPECT_CALL(*mockAuthCache, AddToCache(hasExpectedKey, SNTActionRespondAllowCompiler, testing::_))
-      .WillOnce(testing::Return(true));
-  EXPECT_CALL(*mockAuthCache, AddToCache(hasExpectedKey, SNTActionRespondAllow, testing::_))
-      .WillOnce(testing::Return(true));
-  EXPECT_CALL(*mockAuthCache, AddToCache(hasExpectedKey, SNTActionRespondDeny, testing::_))
-      .WillOnce(testing::Return(true));
-  EXPECT_CALL(*mockAuthCache, AddToCache(hasExpectedKey, SNTActionRespondDenyOnce, testing::_))
-      .WillOnce(testing::Return(true));
-  EXPECT_CALL(*mockAuthCache, AddToCache(hasExpectedKey, SNTActionRespondHold, testing::_))
-      .WillOnce(testing::Return(true));
-  EXPECT_CALL(*mockAuthCache, AddToCache(hasExpectedKey, SNTActionRespondAllowNoCache, testing::_))
+  EXPECT_CALL(*mockAuthCache,
+              AddToCache(hasExpectedKey, SNTActionRespondAllowCompiler, testing::_, testing::_))
       .WillOnce(testing::Return(true));
   EXPECT_CALL(*mockAuthCache,
-              AddToCache(hasExpectedKey, SNTActionRespondAllowCompilerNoCache, testing::_))
+              AddToCache(hasExpectedKey, SNTActionRespondAllow, testing::_, testing::_))
+      .WillOnce(testing::Return(true));
+  EXPECT_CALL(*mockAuthCache,
+              AddToCache(hasExpectedKey, SNTActionRespondDeny, testing::_, testing::_))
+      .WillOnce(testing::Return(true));
+  EXPECT_CALL(*mockAuthCache,
+              AddToCache(hasExpectedKey, SNTActionRespondDenyOnce, testing::_, testing::_))
+      .WillOnce(testing::Return(true));
+  EXPECT_CALL(*mockAuthCache,
+              AddToCache(hasExpectedKey, SNTActionRespondHold, testing::_, testing::_))
+      .WillOnce(testing::Return(true));
+  EXPECT_CALL(*mockAuthCache,
+              AddToCache(hasExpectedKey, SNTActionRespondAllowNoCache, testing::_, testing::_))
+      .WillOnce(testing::Return(true));
+  EXPECT_CALL(*mockAuthCache, AddToCache(hasExpectedKey, SNTActionRespondAllowCompilerNoCache,
+                                         testing::_, testing::_))
       .WillOnce(testing::Return(true));
 
   id mockCompilerController = OCMStrictClassMock([SNTCompilerController class]);
@@ -466,7 +659,10 @@ class MockAuthResultCache : public AuthResultCache {
   {
     Message msg(mockESApi, &esMsg);
 
-    XCTAssertThrows([mockAuthClient postAction:(SNTAction)123 forMessage:msg withDecision:nil]);
+    XCTAssertThrows([mockAuthClient postAction:(SNTAction)123
+                                    forMessage:msg
+                                  withDecision:nil
+                                   reservation:0]);
 
     std::map<SNTAction, es_auth_result_t> actions = {
         {SNTActionRespondAllowCompiler, ES_AUTH_RESULT_ALLOW},
@@ -490,7 +686,7 @@ class MockAuthResultCache : public AuthResultCache {
         });
 
     for (const auto& kv : actions) {
-      [mockAuthClient postAction:kv.first forMessage:msg withDecision:nil];
+      [mockAuthClient postAction:kv.first forMessage:msg withDecision:nil reservation:0];
 
       XCTAssertEqual(gotAuthResult, kv.second);
       XCTAssertEqual(gotCachable, kv.second == ES_AUTH_RESULT_ALLOW &&
@@ -506,6 +702,158 @@ class MockAuthResultCache : public AuthResultCache {
 
   [mockCompilerController stopMocking];
   [mockAuthClient stopMocking];
+}
+
+// Runs processMessage: against a cache that returns `checks` in order and a Reserve that
+// returns `reserves` in order. Reports the last response, the `cacheable:` argument of a
+// direct response (YES if none), how often evaluation ran, and the `expected` argument of
+// each Reserve call.
+- (void)runProcessMessageWithChecks:(std::vector<santa::CachedAuthResult>)checks
+                           reserves:(std::vector<uint64_t>)reserves
+                         authResult:(es_auth_result_t*)gotAuthResult
+                          cacheable:(BOOL*)gotCacheable
+                        evaluations:(int*)evaluations
+                    reserveExpected:(std::vector<santa::CachedAuthResult>*)reserveExpected {
+  es_file_t file = MakeESFile("foo");
+  es_process_t proc = MakeESProcess(&file);
+  es_file_t execFile = MakeESFile("bar");
+  es_process_t execProc = MakeESProcess(&execFile, MakeAuditToken(12, 23), MakeAuditToken(34, 45));
+  execProc.codesigning_flags = CS_VALID | CS_KILL;
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_EXEC, &proc, ActionType::Auth);
+  esMsg.event.exec.target = &execProc;
+  esMsg.event.exec.image_cputype = CPU_TYPE_ARM64;
+  esMsg.event.exec.image_cpusubtype = CPU_SUBTYPE_ARM64E;
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsESNewClient();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+
+  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+  FakeExecutionController* fakeExecController = [[FakeExecutionController alloc] initWithSema:sema];
+
+  auto mockAuthCache = std::make_shared<MockAuthResultCache>(nullptr, nil);
+  auto& checkExpectation = EXPECT_CALL(*mockAuthCache, CheckCache);
+  for (const auto& check : checks) {
+    checkExpectation.WillOnce(testing::Return(check));
+  }
+  auto& reserveExpectation = EXPECT_CALL(*mockAuthCache, Reserve);
+  for (uint64_t reserve : reserves) {
+    reserveExpectation.WillOnce(
+        [reserveExpected, reserve](const santa::ExecTarget&, const santa::CachedAuthResult& e) {
+          reserveExpected->push_back(e);
+          return reserve;
+        });
+  }
+
+  SNTEndpointSecurityAuthorizer* authClient = [[SNTEndpointSecurityAuthorizer alloc]
+           initWithESAPI:mockESApi
+                 metrics:nullptr
+          execController:(SNTExecutionController*)fakeExecController
+      compilerController:nil
+         authResultCache:mockAuthCache
+               ttyWriter:santa::TTYWriter::Create(true)
+             processTree:nullptr];
+  id mockAuthClient = OCMPartialMock(authClient);
+
+  __block es_auth_result_t authResult = (es_auth_result_t)-1;
+  __block BOOL cacheable = YES;
+  OCMStub([mockAuthClient respondToMessage:Message(mockESApi, &esMsg)
+                            withAuthResult:(es_auth_result_t)0
+                         forcePreventCache:NO])
+      .ignoringNonObjectArgs()
+      .andDo(^(NSInvocation* inv) {
+        [inv getArgument:&authResult atIndex:3];
+      });
+  OCMStub([mockAuthClient respondToMessage:Message(mockESApi, &esMsg)
+                            withAuthResult:(es_auth_result_t)0
+                                 cacheable:NO])
+      .ignoringNonObjectArgs()
+      .andDo(^(NSInvocation* inv) {
+        [inv getArgument:&authResult atIndex:3];
+        [inv getArgument:&cacheable atIndex:4];
+      });
+
+  [mockAuthClient processMessage:Message(mockESApi, &esMsg)];
+
+  int evaluated = 0;
+  while (dispatch_semaphore_wait(sema, DISPATCH_TIME_NOW) == 0)
+    evaluated++;
+  *evaluations = evaluated;
+  *gotAuthResult = authResult;
+  *gotCacheable = cacheable;
+
+  [mockAuthClient stopMocking];
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+  XCTBubbleMockVerifyAndClearExpectations(mockAuthCache.get());
+}
+
+- (void)testLostReservationJoinsInFlightEvaluation {
+  es_auth_result_t result = (es_auth_result_t)-1;
+  BOOL cacheable = YES;
+  int evaluations = -1;
+  std::vector<santa::CachedAuthResult> expected;
+  [self runProcessMessageWithChecks:{santa::CachedAuthResult{},
+                                     santa::CachedAuthResult{SNTActionRequestBinary},
+                                     santa::CachedAuthResult{SNTActionRespondAllow}}
+                           reserves:{0}
+                         authResult:&result
+                          cacheable:&cacheable
+                        evaluations:&evaluations
+                    reserveExpected:&expected];
+  XCTAssertEqual(result, ES_AUTH_RESULT_ALLOW);
+  XCTAssertEqual(evaluations, 0);
+  XCTAssertEqual(expected.size(), 1);
+  XCTAssertTrue(expected[0] == santa::CachedAuthResult{});
+}
+
+- (void)testLostReservationThenHoldIsDenied {
+  es_auth_result_t result = (es_auth_result_t)-1;
+  BOOL cacheable = YES;
+  int evaluations = -1;
+  std::vector<santa::CachedAuthResult> expected;
+  [self runProcessMessageWithChecks:{santa::CachedAuthResult{},
+                                     santa::CachedAuthResult{SNTActionRespondHold}}
+                           reserves:{0}
+                         authResult:&result
+                          cacheable:&cacheable
+                        evaluations:&evaluations
+                    reserveExpected:&expected];
+  XCTAssertEqual(result, ES_AUTH_RESULT_DENY);
+  XCTAssertFalse(cacheable);
+  XCTAssertEqual(evaluations, 0);
+}
+
+- (void)testLostReservationThenEmptySlotEvaluates {
+  es_auth_result_t result = (es_auth_result_t)-1;
+  BOOL cacheable = YES;
+  int evaluations = -1;
+  std::vector<santa::CachedAuthResult> expected;
+  [self runProcessMessageWithChecks:{santa::CachedAuthResult{}, santa::CachedAuthResult{}}
+                           reserves:{0, 7}
+                         authResult:&result
+                          cacheable:&cacheable
+                        evaluations:&evaluations
+                    reserveExpected:&expected];
+  XCTAssertEqual(evaluations, 1);
+}
+
+- (void)testLostReservationAfterNoCacheEntryJoins {
+  es_auth_result_t result = (es_auth_result_t)-1;
+  BOOL cacheable = YES;
+  int evaluations = -1;
+  std::vector<santa::CachedAuthResult> expected;
+  [self runProcessMessageWithChecks:{santa::CachedAuthResult{SNTActionRespondAllowNoCache, 42},
+                                     santa::CachedAuthResult{SNTActionRequestBinary},
+                                     santa::CachedAuthResult{SNTActionRespondAllow}}
+                           reserves:{0}
+                         authResult:&result
+                          cacheable:&cacheable
+                        evaluations:&evaluations
+                    reserveExpected:&expected];
+  XCTAssertEqual(result, ES_AUTH_RESULT_ALLOW);
+  XCTAssertEqual(evaluations, 0);
+  XCTAssertEqual(expected.size(), 1);
+  XCTAssertTrue((expected[0] == santa::CachedAuthResult{SNTActionRespondAllowNoCache, 42}));
 }
 
 @end

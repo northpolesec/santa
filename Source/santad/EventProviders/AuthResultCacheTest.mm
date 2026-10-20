@@ -103,33 +103,28 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
   santa::ExecTarget nonrootTarget = MakeTarget(RootDevno() + 123, 222);
 
   // Add the root file to the cache
-  cache->AddToCache(rootTarget, SNTActionRequestBinary);
+  uint64_t rootToken = cache->Reserve(rootTarget, {});
+  XCTAssertNotEqual(rootToken, 0);
 
   AssertCacheCounts(cache, 1, 0);
   XCTAssertEqual(cache->CheckCache(rootTarget).action, SNTActionRequestBinary);
   XCTAssertEqual(cache->CheckCache(nonrootTarget).action, SNTActionUnset);
 
   // Now add the non-root file
-  cache->AddToCache(nonrootTarget, SNTActionRequestBinary);
+  uint64_t nonrootToken = cache->Reserve(nonrootTarget, {});
+  XCTAssertNotEqual(nonrootToken, 0);
 
   AssertCacheCounts(cache, 1, 1);
   XCTAssertEqual(cache->CheckCache(rootTarget).action, SNTActionRequestBinary);
   XCTAssertEqual(cache->CheckCache(nonrootTarget).action, SNTActionRequestBinary);
 
   // Update the cached values
-  cache->AddToCache(rootTarget, SNTActionRespondAllow);
-  cache->AddToCache(nonrootTarget, SNTActionRespondDeny);
+  cache->AddToCache(rootTarget, SNTActionRespondAllow, nil, rootToken);
+  cache->AddToCache(nonrootTarget, SNTActionRespondDeny, nil, nonrootToken);
 
   AssertCacheCounts(cache, 1, 1);
   XCTAssertEqual(cache->CheckCacheForVnode(rootTarget.key.vnode).action, SNTActionRespondAllow);
   XCTAssertEqual(cache->CheckCacheForVnode(nonrootTarget.key.vnode).action, SNTActionRespondDeny);
-
-  // Remove the root file
-  cache->RemoveFromCache(rootTarget);
-
-  AssertCacheCounts(cache, 0, 1);
-  XCTAssertEqual(cache->CheckCache(rootTarget).action, SNTActionUnset);
-  XCTAssertEqual(cache->CheckCache(nonrootTarget).action, SNTActionRespondDeny);
 }
 
 - (void)testDenyOnceLeavesNoEntry {
@@ -142,12 +137,13 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
 
   // Like the other terminal actions, this one is only reachable from the
   // in-flight state.
-  XCTAssertFalse(cache->AddToCache(rootTarget, SNTActionRespondDenyOnce));
+  XCTAssertFalse(cache->AddToCache(rootTarget, SNTActionRespondDenyOnce, nil, 0));
 
-  XCTAssertTrue(cache->AddToCache(rootTarget, SNTActionRequestBinary));
+  uint64_t r = cache->Reserve(rootTarget, {});
+  XCTAssertNotEqual(r, 0);
   XCTAssertEqual(cache->CheckCache(rootTarget).action, SNTActionRequestBinary);
 
-  XCTAssertTrue(cache->AddToCache(rootTarget, SNTActionRespondDenyOnce));
+  XCTAssertTrue(cache->AddToCache(rootTarget, SNTActionRespondDenyOnce, nil, r));
 
   // No entry at all, so the result cannot reach a later execution of this vnode
   // and does not depend on elapsed time.
@@ -161,8 +157,9 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
 
   santa::ExecTarget rootTarget = MakeTarget(RootDevno(), 111);
 
-  XCTAssertTrue(cache->AddToCache(rootTarget, SNTActionRequestBinary));
-  XCTAssertTrue(cache->AddToCache(rootTarget, SNTActionRespondDeny));
+  uint64_t r = cache->Reserve(rootTarget, {});
+  XCTAssertNotEqual(r, 0);
+  XCTAssertTrue(cache->AddToCache(rootTarget, SNTActionRespondDeny, nil, r));
 
   XCTAssertEqual(cache->CheckCache(rootTarget).action, SNTActionRespondDeny);
   AssertCacheCounts(cache, 1, 0);
@@ -196,8 +193,8 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
   santa::ExecTarget rootTarget = MakeTarget(RootDevno(), 111);
   santa::ExecTarget nonrootTarget = MakeTarget(RootDevno() + 123, 111);
 
-  cache->AddToCache(rootTarget, SNTActionRequestBinary);
-  cache->AddToCache(nonrootTarget, SNTActionRequestBinary);
+  XCTAssertNotEqual(cache->Reserve(rootTarget, {}), 0);
+  XCTAssertNotEqual(cache->Reserve(nonrootTarget, {}), 0);
 
   AssertCacheCounts(cache, 1, 1);
 
@@ -207,7 +204,7 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
   AssertCacheCounts(cache, 1, 0);
 
   // Add back the non-root file
-  cache->AddToCache(nonrootTarget, SNTActionRequestBinary);
+  XCTAssertNotEqual(cache->Reserve(nonrootTarget, {}), 0);
 
   AssertCacheCounts(cache, 1, 1);
 
@@ -234,17 +231,17 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
   santa::ExecTarget rootTarget = MakeTarget(RootDevno(), 111);
 
   // Cached items must first be in the SNTActionRequestBinary state
-  XCTAssertFalse(cache->AddToCache(rootTarget, SNTActionRespondAllow));
-  XCTAssertFalse(cache->AddToCache(rootTarget, SNTActionRespondAllowCompiler));
-  XCTAssertFalse(cache->AddToCache(rootTarget, SNTActionRespondDeny));
-  XCTAssertFalse(cache->AddToCache(rootTarget, SNTActionRespondHold));
+  XCTAssertFalse(cache->AddToCache(rootTarget, SNTActionRespondAllow, nil, 1));
+  XCTAssertFalse(cache->AddToCache(rootTarget, SNTActionRespondAllowCompiler, nil, 1));
+  XCTAssertFalse(cache->AddToCache(rootTarget, SNTActionRespondDeny, nil, 1));
+  XCTAssertFalse(cache->AddToCache(rootTarget, SNTActionRespondHold, nil, 1));
   XCTAssertEqual(cache->CheckCache(rootTarget).action, SNTActionUnset);
 
-  XCTAssertTrue(cache->AddToCache(rootTarget, SNTActionRequestBinary));
+  XCTAssertNotEqual(cache->Reserve(rootTarget, {}), 0);
   XCTAssertEqual(cache->CheckCache(rootTarget).action, SNTActionRequestBinary);
 
   // Items in the `SNTActionRequestBinary` state cannot reenter the same state
-  XCTAssertFalse(cache->AddToCache(rootTarget, SNTActionRequestBinary));
+  XCTAssertEqual(cache->Reserve(rootTarget, {}), 0);
   XCTAssertEqual(cache->CheckCache(rootTarget).action, SNTActionRequestBinary);
 
   std::vector<SNTAction> allowedTransitions = {
@@ -256,15 +253,16 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
 
   for (const SNTAction transition : allowedTransitions) {
     // First make sure the item doesn't exist
-    cache->RemoveFromCache(rootTarget);
+    cache->FlushCache(FlushCacheMode::kAllCaches, FlushCacheReason::kExplicitCommand);
     XCTAssertEqual(cache->CheckCache(rootTarget).action, SNTActionUnset);
 
     // Now add the item to be in the first allowed state
-    XCTAssertTrue(cache->AddToCache(rootTarget, SNTActionRequestBinary));
+    uint64_t r = cache->Reserve(rootTarget, {});
+    XCTAssertNotEqual(r, 0);
     XCTAssertEqual(cache->CheckCache(rootTarget).action, SNTActionRequestBinary);
 
     // Now assert the allowed transition
-    XCTAssertTrue(cache->AddToCache(rootTarget, transition));
+    XCTAssertTrue(cache->AddToCache(rootTarget, transition, nil, r));
     XCTAssertEqual(cache->CheckCache(rootTarget).action, transition);
   }
 
@@ -276,41 +274,43 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
   // Check hold-related states
   for (const SNTAction transition : allowedTransitions) {
     // First make sure the item doesn't exist and move into the starting state
-    cache->RemoveFromCache(rootTarget);
+    cache->FlushCache(FlushCacheMode::kAllCaches, FlushCacheReason::kExplicitCommand);
     XCTAssertEqual(cache->CheckCache(rootTarget).action, SNTActionUnset);
-    XCTAssertTrue(cache->AddToCache(rootTarget, SNTActionRequestBinary));
+    uint64_t r = cache->Reserve(rootTarget, {});
+    XCTAssertNotEqual(r, 0);
     XCTAssertEqual(cache->CheckCache(rootTarget).action, SNTActionRequestBinary);
 
     // Check the item can transition to the new hold state
-    XCTAssertTrue(cache->AddToCache(rootTarget, SNTActionRespondHold));
+    XCTAssertTrue(cache->AddToCache(rootTarget, SNTActionRespondHold, nil, r));
     XCTAssertEqual(cache->CheckCache(rootTarget).action, SNTActionRespondHold);
 
     // Now assert the allowed transition returns YES and that the cache entry is removed.
-    XCTAssertTrue(cache->AddToCache(rootTarget, transition));
+    XCTAssertTrue(cache->AddToCache(rootTarget, transition, nil, r));
     XCTAssertEqual(cache->CheckCache(rootTarget).action, SNTActionUnset);
   }
 
   // Ensure improper transitions from the hold state are disallowed
   // First, get into the hold state
-  cache->RemoveFromCache(rootTarget);
+  cache->FlushCache(FlushCacheMode::kAllCaches, FlushCacheReason::kExplicitCommand);
   XCTAssertEqual(cache->CheckCache(rootTarget).action, SNTActionUnset);
-  XCTAssertTrue(cache->AddToCache(rootTarget, SNTActionRequestBinary));
+  uint64_t r = cache->Reserve(rootTarget, {});
+  XCTAssertNotEqual(r, 0);
   XCTAssertEqual(cache->CheckCache(rootTarget).action, SNTActionRequestBinary);
-  XCTAssertTrue(cache->AddToCache(rootTarget, SNTActionRespondHold));
+  XCTAssertTrue(cache->AddToCache(rootTarget, SNTActionRespondHold, nil, r));
   XCTAssertEqual(cache->CheckCache(rootTarget).action, SNTActionRespondHold);
 
   // Ensure all the following state transition attempts fail
-  XCTAssertFalse(cache->AddToCache(rootTarget, SNTActionRespondHold));
+  XCTAssertFalse(cache->AddToCache(rootTarget, SNTActionRespondHold, nil, r));
   XCTAssertEqual(cache->CheckCache(rootTarget).action, SNTActionRespondHold);
-  XCTAssertFalse(cache->AddToCache(rootTarget, SNTActionRespondAllow));
+  XCTAssertFalse(cache->AddToCache(rootTarget, SNTActionRespondAllow, nil, r));
   XCTAssertEqual(cache->CheckCache(rootTarget).action, SNTActionRespondHold);
-  XCTAssertFalse(cache->AddToCache(rootTarget, SNTActionRespondAllowCompiler));
+  XCTAssertFalse(cache->AddToCache(rootTarget, SNTActionRespondAllowCompiler, nil, r));
   XCTAssertEqual(cache->CheckCache(rootTarget).action, SNTActionRespondHold);
-  XCTAssertFalse(cache->AddToCache(rootTarget, SNTActionRespondDeny));
+  XCTAssertFalse(cache->AddToCache(rootTarget, SNTActionRespondDeny, nil, r));
   XCTAssertEqual(cache->CheckCache(rootTarget).action, SNTActionRespondHold);
-  XCTAssertFalse(cache->AddToCache(rootTarget, SNTActionRespondAllowNoCache));
+  XCTAssertFalse(cache->AddToCache(rootTarget, SNTActionRespondAllowNoCache, nil, r));
   XCTAssertEqual(cache->CheckCache(rootTarget).action, SNTActionRespondHold);
-  XCTAssertFalse(cache->AddToCache(rootTarget, SNTActionRequestBinary));
+  XCTAssertEqual(cache->Reserve(rootTarget, {}), 0);
   XCTAssertEqual(cache->CheckCache(rootTarget).action, SNTActionRespondHold);
 }
 
@@ -325,8 +325,9 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
   cd.certSHA256 = @"cert456";
 
   // SNTActionRespondAllowNoCache transitions from RequestBinary
-  XCTAssertTrue(cache->AddToCache(rootTarget, SNTActionRequestBinary));
-  XCTAssertTrue(cache->AddToCache(rootTarget, SNTActionRespondAllowNoCache, cd));
+  uint64_t r = cache->Reserve(rootTarget, {});
+  XCTAssertNotEqual(r, 0);
+  XCTAssertTrue(cache->AddToCache(rootTarget, SNTActionRespondAllowNoCache, cd, r));
 
   // CheckCache returns AllowNoCache with the cached decision
   santa::CachedAuthResult entry = cache->CheckCache(rootTarget);
@@ -335,17 +336,7 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
   XCTAssertEqualObjects(entry.cached_decision.sha256, @"abc123");
   XCTAssertEqualObjects(entry.cached_decision.certSHA256, @"cert456");
 
-  // RemoveFromCache clears the decision
-  cache->RemoveFromCache(rootTarget);
-  entry = cache->CheckCache(rootTarget);
-  XCTAssertEqual(entry.action, SNTActionUnset);
-  XCTAssertNil(entry.cached_decision);
-
-  // FlushCache also clears decisions
-  XCTAssertTrue(cache->AddToCache(rootTarget, SNTActionRequestBinary));
-  XCTAssertTrue(cache->AddToCache(rootTarget, SNTActionRespondAllowNoCache, cd));
-  XCTAssertNotNil(cache->CheckCache(rootTarget).cached_decision);
-
+  // FlushCache clears decisions
   cache->FlushCache(FlushCacheMode::kAllCaches, FlushCacheReason::kRulesChanged);
   XCTAssertNil(cache->CheckCache(rootTarget).cached_decision);
 }
@@ -360,16 +351,18 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
 
   SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
   cd.heldForTransitiveRule = YES;
-  XCTAssertTrue(cache->AddToCache(rootTarget, SNTActionRequestBinary));
-  XCTAssertTrue(cache->AddToCache(rootTarget, SNTActionRespondHold, cd));
+  uint64_t r = cache->Reserve(rootTarget, {});
+  XCTAssertNotEqual(r, 0);
+  XCTAssertTrue(cache->AddToCache(rootTarget, SNTActionRespondHold, cd, r));
   santa::CachedAuthResult entry = cache->CheckCache(rootTarget);
   XCTAssertEqual(entry.action, SNTActionRespondHold);
   XCTAssertTrue(entry.cached_decision.heldForTransitiveRule);
 
-  cache->RemoveFromCache(rootTarget);
+  XCTAssertTrue(cache->AddToCache(rootTarget, SNTActionHoldDenied, nil, r));
   cd.heldForTransitiveRule = NO;
-  XCTAssertTrue(cache->AddToCache(rootTarget, SNTActionRequestBinary));
-  XCTAssertTrue(cache->AddToCache(rootTarget, SNTActionRespondHold, cd));
+  r = cache->Reserve(rootTarget, {});
+  XCTAssertNotEqual(r, 0);
+  XCTAssertTrue(cache->AddToCache(rootTarget, SNTActionRespondHold, cd, r));
   entry = cache->CheckCache(rootTarget);
   XCTAssertEqual(entry.action, SNTActionRespondHold);
   XCTAssertNil(entry.cached_decision);
@@ -386,8 +379,9 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
   cd.certSHA256 = @"cert789";
 
   // Transitions out of RequestBinary exactly like SNTActionRespondAllowNoCache.
-  XCTAssertTrue(cache->AddToCache(rootTarget, SNTActionRequestBinary));
-  XCTAssertTrue(cache->AddToCache(rootTarget, SNTActionRespondAllowCompilerNoCache, cd));
+  uint64_t r = cache->Reserve(rootTarget, {});
+  XCTAssertNotEqual(r, 0);
+  XCTAssertTrue(cache->AddToCache(rootTarget, SNTActionRespondAllowCompilerNoCache, cd, r));
 
   santa::CachedAuthResult entry = cache->CheckCache(rootTarget);
 
@@ -416,8 +410,9 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
   santa::ExecTarget rootTarget = MakeTarget(RootDevno(), 111);
 
   // Add a file to the cache and put into the SNTActionRespondDeny state
-  XCTAssertTrue(cache->AddToCache(rootTarget, SNTActionRequestBinary));
-  XCTAssertTrue(cache->AddToCache(rootTarget, SNTActionRespondDeny));
+  uint64_t r = cache->Reserve(rootTarget, {});
+  XCTAssertNotEqual(r, 0);
+  XCTAssertTrue(cache->AddToCache(rootTarget, SNTActionRespondDeny, nil, r));
 
   // Ensure the file exists
   XCTAssertEqual(cache->CheckCache(rootTarget).action, SNTActionRespondDeny);
@@ -440,14 +435,14 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
   santa::ExecTarget arm = MakeTarget(RootDevno(), 111, CPU_TYPE_ARM64);
   santa::ExecTarget x86 = MakeTarget(RootDevno(), 111, CPU_TYPE_X86_64);
 
-  cache->AddToCache(arm, SNTActionRequestBinary);
-  cache->AddToCache(arm, SNTActionRespondAllow);
+  uint64_t armToken = cache->Reserve(arm, {});
+  cache->AddToCache(arm, SNTActionRespondAllow, nil, armToken);
   XCTAssertEqual(cache->CheckCache(arm).action, SNTActionRespondAllow);
   // The other slice of the same vnode is a distinct state machine.
   XCTAssertEqual(cache->CheckCache(x86).action, SNTActionUnset);
 
-  cache->AddToCache(x86, SNTActionRequestBinary);
-  cache->AddToCache(x86, SNTActionRespondDeny);
+  uint64_t x86Token = cache->Reserve(x86, {});
+  cache->AddToCache(x86, SNTActionRespondDeny, nil, x86Token);
   XCTAssertEqual(cache->CheckCache(x86).action, SNTActionRespondDeny);
   XCTAssertEqual(cache->CheckCache(arm).action, SNTActionRespondAllow);
 }
@@ -457,8 +452,8 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
   std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(flusher, nil);
 
   santa::ExecTarget arm = MakeTarget(RootDevno(), 222, CPU_TYPE_ARM64);
-  cache->AddToCache(arm, SNTActionRequestBinary);
-  cache->AddToCache(arm, SNTActionRespondAllow);
+  uint64_t r = cache->Reserve(arm, {});
+  cache->AddToCache(arm, SNTActionRespondAllow, nil, r);
 
   XCTAssertEqual(cache->CheckCacheForVnode(arm.key.vnode).action, SNTActionRespondAllow);
   XCTAssertEqual(
@@ -480,22 +475,74 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
   };
 
   for (const SNTAction transition : transitions) {
-    cache->RemoveFromCache(target);
+    cache->FlushCache(FlushCacheMode::kAllCaches, FlushCacheReason::kExplicitCommand);
 
-    XCTAssertTrue(cache->AddToCache(target, SNTActionRequestBinary));
+    uint64_t r = cache->Reserve(target, {});
+    XCTAssertNotEqual(r, 0);
     XCTAssertTrue(cache->CheckCache(target).identity == target.identity,
                   @"RequestBinary entry must carry the target's identity");
 
-    XCTAssertTrue(cache->AddToCache(target, transition));
+    XCTAssertTrue(cache->AddToCache(target, transition, nil, r));
     XCTAssertTrue(cache->CheckCache(target).identity == target.identity,
                   @"entry stored for action %ld must carry the target's identity", transition);
   }
 }
 
-// operator== compares action + timestamp only, so a stored entry whose identity
-// differs from the incoming target still satisfies the CAS precondition. The CAS
-// is identity-agnostic; identity is enforced on the read side, in CheckCache.
-- (void)testDifferingIdentityDoesNotBlockTheCASTransition {
+- (void)testReservationTokensAreUnique {
+  auto flusher = std::make_shared<ESCacheFlusher>(ESCacheClearStrategy::kEveryClient);
+  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(flusher, nil);
+
+  santa::ExecTarget rootTarget = MakeTarget(RootDevno(), 111);
+  santa::ExecTarget nonrootTarget = MakeTarget(RootDevno() + 123, 111);
+
+  uint64_t rootToken = cache->Reserve(rootTarget, {});
+  uint64_t nonrootToken = cache->Reserve(nonrootTarget, {});
+  XCTAssertNotEqual(rootToken, 0);
+  XCTAssertNotEqual(nonrootToken, 0);
+  XCTAssertNotEqual(rootToken, nonrootToken);
+
+  // An occupied slot is not reserved again.
+  XCTAssertEqual(cache->Reserve(rootTarget, {}), 0);
+  XCTAssertEqual(cache->Reserve(nonrootTarget, {}), 0);
+  XCTAssertEqual(cache->CheckCache(rootTarget).timestamp, rootToken);
+}
+
+- (void)testUnreservedDenyLeavesAnotherExecsMarker {
+  auto flusher = std::make_shared<ESCacheFlusher>(ESCacheClearStrategy::kEveryClient);
+  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(flusher, nil);
+
+  santa::ExecTarget a = MakeTarget(RootDevno(), 333);
+  uint64_t r = cache->Reserve(a, {});
+  XCTAssertNotEqual(r, 0);
+
+  XCTAssertFalse(cache->AddToCache(a, SNTActionRespondDeny, nil, 0));
+  XCTAssertEqual(cache->CheckCache(a).action, SNTActionRequestBinary);
+
+  XCTAssertTrue(cache->AddToCache(a, SNTActionRespondDeny, nil, r));
+  XCTAssertEqual(cache->CheckCache(a).action, SNTActionRespondDeny);
+}
+
+- (void)testPublishRequiresTheCurrentReservation {
+  auto flusher = std::make_shared<ESCacheFlusher>(ESCacheClearStrategy::kEveryClient);
+  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(flusher, nil);
+
+  santa::ExecTarget a = MakeTarget(RootDevno(), 333);
+  uint64_t r1 = cache->Reserve(a, {});
+  XCTAssertNotEqual(r1, 0);
+
+  cache->FlushCache(FlushCacheMode::kAllCaches, FlushCacheReason::kRulesChanged);
+
+  uint64_t r2 = cache->Reserve(a, {});
+  XCTAssertNotEqual(r2, 0);
+  XCTAssertNotEqual(r2, r1);
+
+  XCTAssertFalse(cache->AddToCache(a, SNTActionRespondAllow, nil, r1));
+  XCTAssertEqual(cache->CheckCache(a).action, SNTActionRequestBinary);
+  XCTAssertTrue(cache->AddToCache(a, SNTActionRespondAllow, nil, r2));
+  XCTAssertEqual(cache->CheckCache(a).action, SNTActionRespondAllow);
+}
+
+- (void)testReplantedMarkerBlocksTheOriginalPublish {
   auto flusher = std::make_shared<ESCacheFlusher>(ESCacheClearStrategy::kEveryClient);
   std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(flusher, nil);
 
@@ -504,20 +551,92 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
   XCTAssertTrue(a.key == aPrime.key);
   XCTAssertFalse(a.identity == aPrime.identity);
 
-  XCTAssertTrue(cache->AddToCache(a, SNTActionRequestBinary));
-  XCTAssertTrue(cache->CheckCache(a).identity == a.identity);
+  uint64_t ra = cache->Reserve(a, {});
+  XCTAssertNotEqual(ra, 0);
 
-  // Same key, different content identity: the CAS must still succeed and the
-  // newly observed identity must replace the stored one.
-  XCTAssertTrue(cache->AddToCache(aPrime, SNTActionRespondAllow));
+  // The differing identity evicts a's marker, which aPrime then re-plants.
+  XCTAssertEqual(cache->CheckCache(aPrime).action, SNTActionUnset);
+  uint64_t rb = cache->Reserve(aPrime, {});
+  XCTAssertNotEqual(rb, 0);
 
-  santa::CachedAuthResult entry = cache->CheckCache(aPrime);
-  XCTAssertEqual(entry.action, SNTActionRespondAllow);
-  XCTAssertTrue(entry.identity == aPrime.identity);
+  XCTAssertFalse(cache->AddToCache(a, SNTActionRespondAllow, nil, ra));
+  XCTAssertEqual(cache->CheckCache(aPrime).action, SNTActionRequestBinary);
+}
 
-  // A lookup carrying the superseded identity does not get the hit: CheckCache
-  // verifies identity even though the CAS did not.
+- (void)testHoldAndDenyOnceRequireTheReservation {
+  auto flusher = std::make_shared<ESCacheFlusher>(ESCacheClearStrategy::kEveryClient);
+  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(flusher, nil);
+
+  santa::ExecTarget a = MakeTarget(RootDevno(), 333);
+  uint64_t r = cache->Reserve(a, {});
+  XCTAssertNotEqual(r, 0);
+
+  XCTAssertFalse(cache->AddToCache(a, SNTActionRespondHold, nil, r + 1));
+  XCTAssertEqual(cache->CheckCache(a).action, SNTActionRequestBinary);
+  XCTAssertFalse(cache->AddToCache(a, SNTActionRespondDenyOnce, nil, r + 1));
+  XCTAssertEqual(cache->CheckCache(a).action, SNTActionRequestBinary);
+
+  XCTAssertTrue(cache->AddToCache(a, SNTActionRespondDenyOnce, nil, r));
   XCTAssertEqual(cache->CheckCache(a).action, SNTActionUnset);
+}
+
+- (void)testHoldExitRequiresTheReservation {
+  auto flusher = std::make_shared<ESCacheFlusher>(ESCacheClearStrategy::kEveryClient);
+  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(flusher, nil);
+
+  santa::ExecTarget a = MakeTarget(RootDevno(), 333);
+  uint64_t r = cache->Reserve(a, {});
+  XCTAssertTrue(cache->AddToCache(a, SNTActionRespondHold, nil, r));
+  XCTAssertEqual(cache->CheckCache(a).timestamp, r);
+
+  XCTAssertFalse(cache->AddToCache(a, SNTActionHoldAllowed, nil, r + 1));
+  XCTAssertFalse(cache->AddToCache(a, SNTActionHoldDenied, nil, r + 1));
+  XCTAssertEqual(cache->CheckCache(a).action, SNTActionRespondHold);
+
+  XCTAssertTrue(cache->AddToCache(a, SNTActionHoldDenied, nil, r));
+  XCTAssertEqual(cache->CheckCache(a).action, SNTActionUnset);
+}
+
+- (void)testStaleHoldExitLeavesTheCurrentReservation {
+  auto flusher = std::make_shared<ESCacheFlusher>(ESCacheClearStrategy::kEveryClient);
+  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(flusher, nil);
+
+  santa::ExecTarget a = MakeTarget(RootDevno(), 333);
+  uint64_t r1 = cache->Reserve(a, {});
+  XCTAssertTrue(cache->AddToCache(a, SNTActionRespondHold, nil, r1));
+
+  cache->FlushCache(FlushCacheMode::kAllCaches, FlushCacheReason::kRulesChanged);
+  uint64_t r2 = cache->Reserve(a, {});
+  XCTAssertNotEqual(r2, 0);
+
+  XCTAssertFalse(cache->AddToCache(a, SNTActionHoldAllowed, nil, r1));
+  santa::CachedAuthResult entry = cache->CheckCache(a);
+  XCTAssertEqual(entry.action, SNTActionRequestBinary);
+  XCTAssertEqual(entry.timestamp, r2);
+}
+
+- (void)testReserveReplacesOnlyTheExpectedEntry {
+  auto flusher = std::make_shared<ESCacheFlusher>(ESCacheClearStrategy::kEveryClient);
+  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(flusher, nil);
+
+  santa::ExecTarget a = MakeTarget(RootDevno(), 333);
+  uint64_t r1 = cache->Reserve(a, {});
+  XCTAssertTrue(cache->AddToCache(a, SNTActionRespondAllowNoCache, nil, r1));
+  santa::CachedAuthResult noCache = cache->CheckCache(a);
+  XCTAssertEqual(noCache.action, SNTActionRespondAllowNoCache);
+
+  // An occupied slot is not taken as empty.
+  XCTAssertEqual(cache->Reserve(a, {}), 0);
+
+  uint64_t r2 = cache->Reserve(a, noCache);
+  XCTAssertNotEqual(r2, 0);
+  santa::CachedAuthResult entry = cache->CheckCache(a);
+  XCTAssertEqual(entry.action, SNTActionRequestBinary);
+  XCTAssertEqual(entry.timestamp, r2);
+
+  // The entry has been replaced, so a second Reserve over it fails.
+  XCTAssertEqual(cache->Reserve(a, noCache), 0);
+  XCTAssertEqual(cache->CheckCache(a).timestamp, r2);
 }
 
 - (void)testIdentityMismatchIsMissAndRemoves {
@@ -525,8 +644,8 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
   std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(flusher, nil);
 
   santa::ExecTarget original = MakeTarget(RootDevno(), 333);
-  cache->AddToCache(original, SNTActionRequestBinary);
-  cache->AddToCache(original, SNTActionRespondAllow);
+  uint64_t r = cache->Reserve(original, {});
+  cache->AddToCache(original, SNTActionRespondAllow, nil, r);
   XCTAssertEqual(cache->CheckCache(original).action, SNTActionRespondAllow);
 
   // Same key, different ctime: simulates recycled/overwritten content.
@@ -543,8 +662,8 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
   std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(flusher, nil);
 
   santa::ExecTarget original = MakeTarget(RootDevno(), 444, CPU_TYPE_ARM64, 0xAA);
-  cache->AddToCache(original, SNTActionRequestBinary);
-  cache->AddToCache(original, SNTActionRespondAllow);
+  uint64_t r = cache->Reserve(original, {});
+  cache->AddToCache(original, SNTActionRespondAllow, nil, r);
 
   santa::ExecTarget forged = MakeTarget(RootDevno(), 444, CPU_TYPE_ARM64, 0xBB);
   XCTAssertEqual(cache->CheckCache(forged).action, SNTActionUnset);
@@ -555,8 +674,8 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
   std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(flusher, nil);
 
   santa::ExecTarget original = MakeTarget(RootDevno(), 666);
-  cache->AddToCache(original, SNTActionRequestBinary);
-  cache->AddToCache(original, SNTActionRespondAllow);
+  uint64_t r = cache->Reserve(original, {});
+  cache->AddToCache(original, SNTActionRespondAllow, nil, r);
 
   santa::ExecTarget resized = original;
   resized.identity.size += 1;
@@ -568,16 +687,16 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
   std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(flusher, nil);
 
   santa::ExecTarget original = MakeTarget(RootDevno(), 555);
-  cache->AddToCache(original, SNTActionRequestBinary);
+  uint64_t r = cache->Reserve(original, {});
 
   santa::ExecTarget replaced = original;
   replaced.identity.ctime.tv_nsec += 1;
   // Content changed under an in-flight marker: marker is dead, treat as miss.
   XCTAssertEqual(cache->CheckCache(replaced).action, SNTActionUnset);
 
-  // The original exec's terminal CAS (previous == RequestBinary) must now
+  // The original exec's terminal CAS (previous == its reserved marker) must now
   // fail: its result must NOT be cached after the marker was invalidated.
-  cache->AddToCache(original, SNTActionRespondAllow);
+  cache->AddToCache(original, SNTActionRespondAllow, nil, r);
   XCTAssertEqual(cache->CheckCache(original).action, SNTActionUnset);
 }
 
@@ -590,8 +709,9 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
   std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(flusher, nil);
 
   santa::ExecTarget original = MakeTarget(RootDevno(), 777);
-  XCTAssertTrue(cache->AddToCache(original, SNTActionRequestBinary));
-  XCTAssertTrue(cache->AddToCache(original, SNTActionRespondHold));
+  uint64_t r = cache->Reserve(original, {});
+  XCTAssertNotEqual(r, 0);
+  XCTAssertTrue(cache->AddToCache(original, SNTActionRespondHold, nil, r));
   XCTAssertEqual(cache->CheckCache(original).action, SNTActionRespondHold);
 
   santa::ExecTarget replaced = original;
@@ -610,8 +730,9 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
   std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(flusher, nil, 600000);
 
   santa::ExecTarget original = MakeTarget(RootDevno(), 888);
-  XCTAssertTrue(cache->AddToCache(original, SNTActionRequestBinary));
-  XCTAssertTrue(cache->AddToCache(original, SNTActionRespondDeny));
+  uint64_t r = cache->Reserve(original, {});
+  XCTAssertNotEqual(r, 0);
+  XCTAssertTrue(cache->AddToCache(original, SNTActionRespondDeny, nil, r));
   XCTAssertEqual(cache->CheckCache(original).action, SNTActionRespondDeny);
 
   santa::ExecTarget replaced = original;
@@ -704,8 +825,9 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
   cd.sha256 = @"unconfirmed-hash";
   cd.identityMismatched = YES;
 
-  XCTAssertTrue(cache->AddToCache(target, SNTActionRequestBinary));
-  XCTAssertTrue(cache->AddToCache(target, SNTActionRespondAllowNoCache, cd));
+  uint64_t r = cache->Reserve(target, {});
+  XCTAssertNotEqual(r, 0);
+  XCTAssertTrue(cache->AddToCache(target, SNTActionRespondAllowNoCache, cd, r));
 
   // The entry itself is kept, and the ExecTarget's own identity is still stored
   // so the hit above verifies. Only the decision is dropped.
@@ -724,8 +846,9 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
   SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
   cd.sha256 = @"confirmed-hash";
 
-  XCTAssertTrue(cache->AddToCache(target, SNTActionRequestBinary));
-  XCTAssertTrue(cache->AddToCache(target, SNTActionRespondAllowNoCache, cd));
+  uint64_t r = cache->Reserve(target, {});
+  XCTAssertNotEqual(r, 0);
+  XCTAssertTrue(cache->AddToCache(target, SNTActionRespondAllowNoCache, cd, r));
 
   santa::CachedAuthResult entry = cache->CheckCache(target);
   XCTAssertEqualObjects(entry.cached_decision.sha256, @"confirmed-hash");

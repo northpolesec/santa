@@ -629,8 +629,8 @@ ProcessFAAHarness MakeProcessFAAHarness(ESCacheClearStrategy strategy) {
 
   // Warm the local and modeled ES caches with an ALLOW the probe did not want
   santa::ExecTarget target = santa::ExecTarget::ForExecEvent(&esMsg);
-  h.authResultCache->AddToCache(target, SNTActionRequestBinary);
-  h.authResultCache->AddToCache(target, SNTActionRespondAllow);
+  uint64_t r = h.authResultCache->Reserve(target, {});
+  h.authResultCache->AddToCache(target, SNTActionRespondAllow, nil, r);
   XCTAssertTrue(h.DeliverExec(&esMsg));
   XCTAssertTrue(h.execCached->load());
   // The cached exec is not delivered again

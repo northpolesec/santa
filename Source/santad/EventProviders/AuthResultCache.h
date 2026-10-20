@@ -22,6 +22,7 @@
 #include <mach/machine.h>
 #include <sys/stat.h>
 #include <array>
+#include <atomic>
 #include <memory>
 
 #import "Source/common/SNTCommonEnums.h"
@@ -82,7 +83,10 @@ struct CachedAuthResult {
   uint64_t timestamp = 0;
   SNTCachedDecision* cached_decision = nil;
   // Identity is deliberately excluded from operator==: the SantaCache CAS
-  // transitions compare action+timestamp only.
+  // transitions compare action+timestamp only. A SNTActionRequestBinary marker
+  // and a SNTActionRespondHold entry carry their reservation token in
+  // timestamp, so a transition out of either succeeds only for the reservation
+  // that planted it.
   ExecIdentity identity;
 
   // For equality purposes, only the SNTAction and timestamp are considered.
@@ -143,9 +147,16 @@ class AuthResultCache {
   AuthResultCache(const AuthResultCache& other) = delete;
   AuthResultCache& operator=(const AuthResultCache& other) = delete;
 
-  virtual bool AddToCache(const ExecTarget& target, SNTAction decision,
-                          SNTCachedDecision* cd = nil);
-  virtual void RemoveFromCache(const ExecTarget& target);
+  // Plants an in-flight marker carrying a unique token and returns it, or 0
+  // unless the slot still holds `expected` (CachedAuthResult{} for an empty
+  // slot).
+  virtual uint64_t Reserve(const ExecTarget& target, const CachedAuthResult& expected);
+  // Transitions the marker planted by Reserve to a result. Returns false, and
+  // leaves the entry alone, unless it still holds the marker for `reservation`.
+  // HoldAllowed and HoldDenied likewise remove only the Hold entry planted by
+  // `reservation`.
+  virtual bool AddToCache(const ExecTarget& target, SNTAction decision, SNTCachedDecision* cd,
+                          uint64_t reservation);
   virtual CachedAuthResult CheckCache(const ExecTarget& target);
   // Diagnostic only (santactl checkcache): scans every entry under all bucket
   // locks. Never call on the hot path.
@@ -169,6 +180,7 @@ class AuthResultCache {
   SNTMetricCounter* flush_count_;
   uint64_t root_devno_;
   uint64_t cache_deny_time_ns_;
+  std::atomic<uint64_t> next_reservation_{1};
 };
 
 }  // namespace santa
