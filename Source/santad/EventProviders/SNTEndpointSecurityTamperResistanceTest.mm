@@ -105,6 +105,16 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
   EXPECT_CALL(*mockESApi, MuteTargetPath(testing::_, testing::_, WatchItemPathType::kPrefix))
       .WillRepeatedly(testing::Return(true));
 
+  // Ancestor directories of protected paths are watched for RENAME only
+  const std::set<es_event_type_t> renameOnly{ES_EVENT_TYPE_AUTH_RENAME};
+  EXPECT_CALL(*mockESApi,
+              MuteTargetPathEvents(testing::_, testing::_, WatchItemPathType::kLiteral, renameOnly))
+      .WillRepeatedly(testing::Return(true));
+  EXPECT_CALL(*mockESApi,
+              MuteTargetPathEvents(testing::_, std::string_view("/Library/LaunchDaemons"),
+                                   WatchItemPathType::kLiteral, renameOnly))
+      .WillOnce(testing::Return(true));
+
   SNTEndpointSecurityTamperResistance* tamperClient =
       [[SNTEndpointSecurityTamperResistance alloc] initWithESAPI:mockESApi
                                                          metrics:nullptr
@@ -155,6 +165,10 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
   EXPECT_CALL(*mockESApi, MuteTargetPath(testing::_, testing::_, WatchItemPathType::kLiteral))
       .WillRepeatedly(testing::Return(true));
   EXPECT_CALL(*mockESApi, MuteTargetPath(testing::_, testing::_, WatchItemPathType::kPrefix))
+      .WillRepeatedly(testing::Return(true));
+  EXPECT_CALL(*mockESApi,
+              MuteTargetPathEvents(testing::_, testing::_, WatchItemPathType::kLiteral,
+                                   std::set<es_event_type_t>{ES_EVENT_TYPE_AUTH_RENAME}))
       .WillRepeatedly(testing::Return(true));
 
   // Expect muting "/" prefix for PROC_SUSPEND_RESUME when signing IDs are provided
@@ -208,6 +222,10 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
   EXPECT_CALL(*mockESApi, MuteTargetPath(testing::_, testing::_, WatchItemPathType::kLiteral))
       .WillRepeatedly(testing::Return(true));
   EXPECT_CALL(*mockESApi, MuteTargetPath(testing::_, testing::_, WatchItemPathType::kPrefix))
+      .WillRepeatedly(testing::Return(true));
+  EXPECT_CALL(*mockESApi,
+              MuteTargetPathEvents(testing::_, testing::_, WatchItemPathType::kLiteral,
+                                   std::set<es_event_type_t>{ES_EVENT_TYPE_AUTH_RENAME}))
       .WillRepeatedly(testing::Return(true));
 
   // No MuteTargetPathEvents during enable (nil signing IDs)
@@ -658,19 +676,23 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
     }
   }
 
-  // Check MOUNT tamper events. A mount whose mount point shadows the protected database directory
-  // (or any ancestor of it) is denied; unrelated mount points are allowed.
+  // Check MOUNT tamper events. A mount at a protected path, an ancestor of one, or inside a
+  // protected prefix is denied; unrelated mount points are allowed.
   {
     esMsg.event_type = ES_EVENT_TYPE_AUTH_MOUNT;
     std::map<std::string_view, es_auth_result_t> mountPointToResult{
-        {"/private/var/db/santa", ES_AUTH_RESULT_DENY},           // the database directory itself
-        {"/private/var/db", ES_AUTH_RESULT_DENY},                 // parent
-        {"/private/var", ES_AUTH_RESULT_DENY},                    // grandparent
-        {"/", ES_AUTH_RESULT_DENY},                               // root shadows everything
-        {"/private/var/db/santa-backup", ES_AUTH_RESULT_ALLOW},   // component-boundary near miss
-        {"/private/var/db/santa/staging", ES_AUTH_RESULT_ALLOW},  // below the dir, cannot shadow
-        {"/Volumes/attacker", ES_AUTH_RESULT_ALLOW},              // unrelated mount point
-        {"", ES_AUTH_RESULT_ALLOW},                               // empty path must not match all
+        {"/private/var/db/santa", ES_AUTH_RESULT_DENY},          // the database directory itself
+        {"/private/var/db", ES_AUTH_RESULT_DENY},                // parent
+        {"/private/var", ES_AUTH_RESULT_DENY},                   // grandparent
+        {"/", ES_AUTH_RESULT_DENY},                              // root shadows everything
+        {"/private/var/db/santa-backup", ES_AUTH_RESULT_ALLOW},  // component-boundary near miss
+        {"/private/var/db/santa/staging", ES_AUTH_RESULT_DENY},  // protected prefix
+        {"/Library/LaunchDaemons", ES_AUTH_RESULT_DENY},         // ancestor of a protected prefix
+        {"/Applications/Santa.app/Contents/MacOS",
+         ES_AUTH_RESULT_DENY},                        // inside a protected prefix
+        {"/Library/Fonts", ES_AUTH_RESULT_ALLOW},     // sibling of a protected ancestor
+        {"/Volumes/attacker", ES_AUTH_RESULT_ALLOW},  // unrelated mount point
+        {"", ES_AUTH_RESULT_ALLOW},                   // empty path must not match all
     };
 
     for (const auto& kv : mountPointToResult) {
@@ -992,6 +1014,38 @@ static constexpr std::string_view kBenignPath = "/some/other/path";
       XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
       XCTAssertEqual(gotAuthResult, ES_AUTH_RESULT_ALLOW);
       XCTAssertTrue(gotCachable);
+    }
+  }
+
+  // Check RENAME of a protected ancestor directory is denied, and of its other children allowed.
+  {
+    esMsg.event_type = ES_EVENT_TYPE_AUTH_RENAME;
+    es_file_t renameDestBenignDir = MakeESFile("/tmp");
+    es_string_token_t renameDestBenignFilename = MakeESStringToken("benign");
+    std::map<std::string_view, es_auth_result_t> renameSourceToResult{
+        {"/Library/LaunchDaemons", ES_AUTH_RESULT_DENY},
+        {"/Library/LaunchDaemons/com.example.plist", ES_AUTH_RESULT_ALLOW},
+    };
+
+    for (const auto& kv : renameSourceToResult) {
+      es_file_t source = MakeESFile(kv.first.data());
+      Message msg(mockESApi, &esMsg);
+      esMsg.event.rename.source = &source;
+      esMsg.event.rename.destination_type = ES_DESTINATION_TYPE_NEW_PATH;
+      esMsg.event.rename.destination.new_path.dir = &renameDestBenignDir;
+      esMsg.event.rename.destination.new_path.filename = renameDestBenignFilename;
+
+      [mockTamperClient
+               handleMessage:std::move(msg)
+          recordEventMetrics:^(EventDisposition d) {
+            XCTAssertEqual(d, kv.second == ES_AUTH_RESULT_DENY ? EventDisposition::kProcessed
+                                                               : EventDisposition::kDropped);
+            dispatch_semaphore_signal(semaMetrics);
+          }];
+
+      XCTAssertSemaTrue(semaMetrics, 5, "Metrics not recorded within expected window");
+      XCTAssertEqual(gotAuthResult, kv.second, @"rename source: %s", kv.first.data());
+      XCTAssertEqual(gotCachable, kv.second == ES_AUTH_RESULT_ALLOW);
     }
   }
 
