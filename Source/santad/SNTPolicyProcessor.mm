@@ -346,6 +346,7 @@ struct FallbackBatch {
     if (!evalResult.ok()) {
       LOGE(@"Failed to evaluate CEL expression: %s",
            std::string(evalResult.status().message()).c_str());
+      cd.cacheable = NO;
       if (failClosed) {
         cd.decision = SNTEventStateBlockUnknown;
         return {.succeeded = false, .decisionMade = true, .resultState = {}};
@@ -365,6 +366,7 @@ struct FallbackBatch {
     if (!evalResult.ok()) {
       LOGE(@"Failed to evaluate CEL expression: %s",
            std::string(evalResult.status().message()).c_str());
+      cd.cacheable = NO;
       if (failClosed) {
         cd.decision = SNTEventStateBlockUnknown;
         return {.succeeded = false, .decisionMade = true, .resultState = {}};

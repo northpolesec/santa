@@ -1545,6 +1545,18 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     XCTAssertFalse(cd.silentBlockTTY);
     XCTAssertFalse(cd.cacheable);
   }
+  for (BOOL v2 : {NO, YES}) {
+    // Evaluation errors are not cacheable.
+    SNTRule* r = createCELRule(@"int(args[0]) == 1", v2);
+    SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+    cd.sha256 = r.identifier;
+    XCTAssertFalse([self.processor decision:cd
+                                    forRule:r
+                        withTransitiveRules:YES
+                                 failClosed:NO
+                   andCELActivationCallback:activation]);
+    XCTAssertFalse(cd.cacheable);
+  }
   {
     // CELv2 expression returning SEATBELT: rule starts at the block state for
     // its rule type, with cd.seatbeltRequired set so the execution controller
