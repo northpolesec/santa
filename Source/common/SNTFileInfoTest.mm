@@ -878,7 +878,7 @@ static es_file_t MakeESFile(NSString* path, const struct stat* sb) {
 
   SNTFileInfo* sut = [[SNTFileInfo alloc] initWithPath:execPath];
   // The embedded plist wins for infoPlist, but does not describe the bundle.
-  XCTAssertEqualObjects([sut infoPlist][@"CFBundleIdentifier"], @"com.google.i386plist");
+  XCTAssertEqualObjects([sut infoPlistStringForKey:@"CFBundleIdentifier"], @"com.google.i386plist");
   XCTAssertEqualObjects([sut bundleCategory], @"public.app-category.utilities");
 }
 

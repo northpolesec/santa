@@ -178,6 +178,46 @@ using santa::WatchItemPathType;
   [mockConfigurator stopMocking];
 }
 
+- (void)testOtherESClientExecIsNotCached {
+  es_file_t file = MakeESFile("foo");
+  es_process_t proc = MakeESProcess(&file);
+  proc.is_es_client = true;
+  es_file_t fileExec = MakeESFile("target");
+  es_process_t procExec = MakeESProcess(&fileExec);
+  es_message_t execMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_EXEC, &proc, ActionType::Auth);
+  execMsg.event.exec.target = &procExec;
+  es_message_t openMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_OPEN, &proc, ActionType::Auth);
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+  EXPECT_CALL(*mockESApi, RespondAuthResult(testing::_, testing::_, ES_AUTH_RESULT_ALLOW, false))
+      .WillOnce(testing::Return(true));
+  EXPECT_CALL(*mockESApi, RespondFlagsResult(testing::_, testing::_, 0xffffffff, true))
+      .WillOnce(testing::Return(true));
+
+  id mockConfigurator = OCMStrictClassMock([SNTConfigurator class]);
+  OCMStub([mockConfigurator configurator]).andReturn(mockConfigurator);
+  OCMStub([mockConfigurator ignoreOtherEndpointSecurityClients]).andReturn(YES);
+
+  SNTEndpointSecurityClient* client =
+      [[SNTEndpointSecurityClient alloc] initWithESAPI:mockESApi
+                                               metrics:nullptr
+                                             processor:Processor::kUnknown];
+
+  {
+    Message msg(mockESApi, &execMsg);
+    XCTAssertFalse([client shouldHandleMessage:msg]);
+  }
+  {
+    Message msg(mockESApi, &openMsg);
+    XCTAssertFalse([client shouldHandleMessage:msg]);
+  }
+
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+
+  [mockConfigurator stopMocking];
+}
+
 - (void)testPopulateAuditTokenSelf {
   std::optional<audit_token_t> myAuditToken = santa::GetMyAuditToken();
   if (!myAuditToken.has_value()) {

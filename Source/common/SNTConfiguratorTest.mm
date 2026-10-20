@@ -871,6 +871,7 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
   NSArray<NSString*>* keyPaths = @[
     @"allowedPathRegex",
     @"blockedPathRegex",
+    @"disableExecutableIntegrityRecheck",
   ];
 
   for (NSString* keyPath in keyPaths) {
@@ -884,6 +885,7 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
   cfg.syncState = [@{
     @"AllowedPathRegex" : @"a",
     @"BlockedPathRegex" : @"b",
+    @"DisableExecutableIntegrityRecheck" : @YES,
   } mutableCopy];
 
   for (NSString* keyPath in keyPaths) {
@@ -1318,6 +1320,38 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
 
   sut.configState[@"CompilerTransitiveWaitMilliseconds"] = @(-1);
   XCTAssertEqual(sut.compilerTransitiveWaitMilliseconds, 0u);
+}
+
+#pragma mark - DisableExecutableIntegrityRecheck tests
+
+- (void)testDisableExecutableIntegrityRecheckSyncOverridesProfile {
+  NSString* plistPath = [NSString stringWithFormat:@"%@/integrity-recheck.plist", self.testDir];
+  SNTConfigurator* cfg = [self configuratorWithEmptySyncStateAtPath:plistPath];
+
+  XCTAssertFalse(cfg.disableExecutableIntegrityRecheck);
+
+  cfg.configState[@"DisableExecutableIntegrityRecheck"] = @YES;
+  XCTAssertTrue(cfg.disableExecutableIntegrityRecheck);
+
+  // A synced false overrides a profile true.
+  [cfg setSyncServerDisableExecutableIntegrityRecheck:SNTSyncedBoolFalse];
+  XCTAssertFalse(cfg.disableExecutableIntegrityRecheck);
+
+  // Fails if the key is missing from _syncServerKeyTypes.
+  SNTConfigurator* restarted = [self configuratorWithEmptySyncStateAtPath:plistPath];
+  restarted.configState[@"DisableExecutableIntegrityRecheck"] = @YES;
+  XCTAssertFalse(restarted.disableExecutableIntegrityRecheck);
+
+  // Unset clears the synced value, so the profile governs again.
+  [cfg setSyncServerDisableExecutableIntegrityRecheck:SNTSyncedBoolUnset];
+  XCTAssertNil(cfg.syncState[@"DisableExecutableIntegrityRecheck"]);
+  XCTAssertTrue(cfg.disableExecutableIntegrityRecheck);
+
+  [cfg.configState removeObjectForKey:@"DisableExecutableIntegrityRecheck"];
+  [cfg setSyncServerDisableExecutableIntegrityRecheck:SNTSyncedBoolTrue];
+  XCTAssertTrue(cfg.disableExecutableIntegrityRecheck);
+
+  XCTAssertTrue([self.fileMgr removeItemAtPath:plistPath error:nil]);
 }
 
 @end

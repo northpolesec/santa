@@ -854,4 +854,56 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
   XCTAssertEqualObjects(entry.cached_decision.sha256, @"confirmed-hash");
 }
 
+- (void)testAllowStoresConfirmedSHA256 {
+  auto flusher = std::make_shared<ESCacheFlusher>(ESCacheClearStrategy::kEveryClient);
+  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(flusher, nil);
+
+  for (SNTAction action : {SNTActionRespondAllow, SNTActionRespondAllowCompiler}) {
+    santa::ExecTarget target = MakeTarget(RootDevno(), 460 + action);
+    SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+    cd.sha256 = @"aa";
+
+    uint64_t r = cache->Reserve(target, {});
+    XCTAssertNotEqual(r, 0);
+    XCTAssertTrue(cache->AddToCache(target, action, cd, r));
+    XCTAssertEqualObjects(cache->CheckCache(target).sha256, @"aa");
+  }
+}
+
+- (void)testUnconfirmedAllowStoresNoSHA256 {
+  auto flusher = std::make_shared<ESCacheFlusher>(ESCacheClearStrategy::kEveryClient);
+  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(flusher, nil);
+
+  santa::ExecTarget mismatched = MakeTarget(RootDevno(), 470);
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+  cd.sha256 = @"aa";
+  cd.identityMismatched = YES;
+  uint64_t r = cache->Reserve(mismatched, {});
+  XCTAssertNotEqual(r, 0);
+  XCTAssertTrue(cache->AddToCache(mismatched, SNTActionRespondAllow, cd, r));
+  XCTAssertEqual(cache->CheckCache(mismatched).action, SNTActionRespondAllow);
+  XCTAssertNil(cache->CheckCache(mismatched).sha256);
+
+  santa::ExecTarget noDecision = MakeTarget(RootDevno(), 471);
+  r = cache->Reserve(noDecision, {});
+  XCTAssertNotEqual(r, 0);
+  XCTAssertTrue(cache->AddToCache(noDecision, SNTActionRespondAllow, nil, r));
+  XCTAssertEqual(cache->CheckCache(noDecision).action, SNTActionRespondAllow);
+  XCTAssertNil(cache->CheckCache(noDecision).sha256);
+}
+
+- (void)testDenyStoresNoSHA256 {
+  auto flusher = std::make_shared<ESCacheFlusher>(ESCacheClearStrategy::kEveryClient);
+  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(flusher, nil);
+
+  santa::ExecTarget target = MakeTarget(RootDevno(), 480);
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+  cd.sha256 = @"aa";
+  uint64_t r = cache->Reserve(target, {});
+  XCTAssertNotEqual(r, 0);
+  XCTAssertTrue(cache->AddToCache(target, SNTActionRespondDeny, cd, r));
+  XCTAssertEqual(cache->CheckCache(target).action, SNTActionRespondDeny);
+  XCTAssertNil(cache->CheckCache(target).sha256);
+}
+
 @end

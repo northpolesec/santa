@@ -208,6 +208,18 @@
 @property(readonly, nonatomic) BOOL enableBadSignatureProtection;
 
 ///
+///  Skip the integrity check for x86_64 executables that don't use the hardened runtime,
+///  defaults to NO. A synced value overrides the profile.
+///
+@property(readonly, nonatomic) BOOL disableExecutableIntegrityRecheck;
+
+///
+///  Set DisableExecutableIntegrityRecheck as received from a sync server. Unset clears the synced
+///  value so the profile value or the default governs again.
+///
+- (void)setSyncServerDisableExecutableIntegrityRecheck:(SNTSyncedBool)value;
+
+///
 ///  Enable anti-tamper process suspend/resume protection.
 ///  When enabled, attempts to suspend or resume the Santa daemon process will be blocked.
 ///  Defaults to YES.

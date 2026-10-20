@@ -1050,6 +1050,16 @@ mount flags that are a superset of \`RemovableMediaRemountFlags\` or \`Encrypted
       defaultValue: false,
     },
     {
+      key: "DisableExecutableIntegrityRecheck",
+      description: `If true, Santa skips an integrity check for x86_64 executables that don't use the hardened
+        runtime, such as unsigned or ad hoc signed binaries, on Intel Macs and under Rosetta 2 on Apple silicon.
+        The check hashes the file each time such an executable runs. Native arm64 executables are not affected.`,
+      type: "bool",
+      defaultValue: false,
+      syncConfigurable: true,
+      versionAdded: "2026.9",
+    },
+    {
       key: "EnablePageZeroProtection",
       description: `If true, 32-bit binaries that are missing the \`__PAGEZERO\` segment will be blocked even in
         \`MONITOR\` mode, **unless** the binary is allowed by an explicit rule. This only applies to 32-bit

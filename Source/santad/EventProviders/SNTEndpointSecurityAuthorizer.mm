@@ -19,10 +19,18 @@
 #include <os/base.h>
 #include <stdlib.h>
 
+#include <atomic>
+#include <cassert>
+
 #import "Source/common/BranchPrediction.h"
 #import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTCommonEnums.h"
+#import "Source/common/SNTConfigurator.h"
+#import "Source/common/SNTFileInfo.h"
+#import "Source/common/SNTKVOManager.h"
 #import "Source/common/SNTLogging.h"
+#import "Source/common/SNTStrengthify.h"
+#include "Source/common/SystemResources.h"
 #include "Source/common/es/ESMetricsObserver.h"
 #include "Source/common/es/EnrichedTypes.h"
 #include "Source/common/es/Message.h"
@@ -38,11 +46,13 @@ using santa::Message;
 @property SNTExecutionController* execController;
 @property NSMutableArray<id<SNTEndpointSecurityProbe>>* probes;
 @property BOOL enabled;
+@property SNTKVOManager* recheckWatcher;
 @end
 
 @implementation SNTEndpointSecurityAuthorizer {
   std::shared_ptr<AuthResultCache> _authResultCache;
   std::shared_ptr<santa::TTYWriter> _ttyWriter;
+  std::atomic<bool> _disableIntegrityRecheck;
 }
 
 - (instancetype)initWithESAPI:(std::shared_ptr<EndpointSecurityAPI>)esApi
@@ -65,6 +75,21 @@ using santa::Message;
 
     _probes = [NSMutableArray array];
 
+    // Watch before reading so a change in between is not missed.
+    SNTConfigurator* configurator = [SNTConfigurator configurator];
+    WEAKIFY(self);
+    _recheckWatcher =
+        [[SNTKVOManager alloc] initWithObject:configurator
+                                     selector:@selector(disableExecutableIntegrityRecheck)
+                                         type:[NSNumber class]
+                                     callback:^(NSNumber* oldValue, NSNumber* newValue) {
+                                       STRONGIFY(self);
+                                       if (self)
+                                         self->_disableIntegrityRecheck.store(
+                                             newValue.boolValue, std::memory_order_relaxed);
+                                     }];
+    _disableIntegrityRecheck = configurator.disableExecutableIntegrityRecheck;
+
     [self establishClientOrDie];
   }
   return self;
@@ -72,6 +97,12 @@ using santa::Message;
 
 - (NSString*)description {
   return @"Authorizer";
+}
+
+- (NSString*)verifiedSHA256ForExecutable:(const es_file_t*)file {
+  SNTFileInfo* fileInfo = [[SNTFileInfo alloc] initWithEndpointSecurityFile:file error:NULL];
+  if (!fileInfo || fileInfo.identityVerification == SNTFileInfoIdentityMismatch) return nil;
+  return [fileInfo SHA256];
 }
 
 - (bool)handleContextMessage:(Message&)esMsg {
@@ -87,15 +118,22 @@ using santa::Message;
   return addedOnly;
 }
 
+// Only called for ES_EVENT_TYPE_AUTH_EXEC messages.
 - (bool)respondToMessage:(const santa::Message&)msg
           withAuthResult:(es_auth_result_t)result
        forcePreventCache:(BOOL)forcePreventCache {
+  assert(msg->event_type == ES_EVENT_TYPE_AUTH_EXEC);
+
   // Don't let the ES framework cache DENY results. Santa only flushes ES cache
   // when a new DENY rule is received. If DENY results were cached and a rule
   // update made the executable allowable, ES would continue to apply the DENY
   // cached result. Note however that the local AuthResultCache will cache
   // DENY results. The caller may also prevent caching if it has reason to so.
-  bool cacheable = (result == ES_AUTH_RESULT_ALLOW) && !forcePreventCache;
+  //
+  // The ES framework's exec cache does not track the target's content, so only
+  // targets nobody can modify are cached there.
+  bool cacheable = (result == ES_AUTH_RESULT_ALLOW) && !forcePreventCache &&
+                   StatIsSystemProtected(&msg->event.exec.target->executable->stat);
 
   for (id<SNTEndpointSecurityProbe> probe in self.probes) {
     santa::ProbeInterest interest = [probe probeInterest:msg];
@@ -128,12 +166,29 @@ using santa::Message;
   SNTCachedDecision* cd = nil;
   uint64_t reservation = 0;
 
+  // The content of executables the kernel does not code-sign enforce is re-checked
+  // before a cached decision for them is reused.
+  const bool recheckContent = !target.enforced &&
+                              !StatIsSystemProtected(&targetProc->executable->stat) &&
+                              !_disableIntegrityRecheck.load(std::memory_order_relaxed);
+
   while (true) {
     cd = nil;
     santa::CachedAuthResult expected{};
     santa::CachedAuthResult cacheEntry = self->_authResultCache->CheckCache(target);
     SNTAction returnAction = cacheEntry.action;
-    if (RESPONSE_VALID(returnAction)) {
+
+    // Only a cached allow is re-checked. It is then either served or reserved over, so
+    // waiting on another evaluation never hashes. A nil hash on either side never matches.
+    if (recheckContent &&
+        (returnAction == SNTActionRespondAllow || returnAction == SNTActionRespondAllowCompiler) &&
+        ![[self verifiedSHA256ForExecutable:targetProc->executable]
+            isEqualToString:cacheEntry.sha256]) {
+      LOGD(@"Re-evaluating the cached decision for %s: its content could not be confirmed",
+           targetProc->executable->path.data);
+      // Reserve over this entry so its replacement is atomic.
+      expected = cacheEntry;
+    } else if (RESPONSE_VALID(returnAction)) {
       es_auth_result_t authResult = ES_AUTH_RESULT_DENY;
 
       switch (returnAction) {
@@ -152,7 +207,8 @@ using santa::Message;
       return;
     } else if (returnAction == SNTActionRespondAllowNoCache) {
       // Cache hit — we have pre-computed identity data but need to re-evaluate policy.
-      cd = cacheEntry.cached_decision;
+      // That data is not reused when the content must be re-checked.
+      if (!recheckContent) cd = cacheEntry.cached_decision;
       // Reserve over this entry so the transition to RequestBinary is atomic.
       expected = cacheEntry;
     } else if (returnAction == SNTActionRespondHold) {

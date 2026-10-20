@@ -86,8 +86,10 @@ struct CachedAuthResult {
   // transitions compare action+timestamp only. A SNTActionRequestBinary marker
   // and a SNTActionRespondHold entry carry their reservation token in
   // timestamp, so a transition out of either succeeds only for the reservation
-  // that planted it.
+  // that planted it. sha256 is likewise a payload, like cached_decision.
   ExecIdentity identity;
+  // Content hash confirmed for a cached allow. nil for every other entry.
+  NSString* sha256 = nil;
 
   // For equality purposes, only the SNTAction and timestamp are considered.
   bool operator==(const CachedAuthResult& rhs) const {

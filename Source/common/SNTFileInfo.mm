@@ -86,32 +86,6 @@ static const uint32_t kMaxFatArchCount =
 - (NSDictionary*)infoPlist;
 @end
 
-///
-///  Whether a caller-supplied stat can be accepted without comparing it against
-///  the descriptor.
-///
-///  Both conditions are required and neither is sufficient alone. Do not drop
-///  either one:
-///
-///  * SF_RESTRICTED means the system protects the file, and every directory on
-///    the way to such a file is protected too, so the path cannot be made to
-///    resolve elsewhere while those protections are in force.
-///  * Requiring the boot volume group excludes any filesystem mounted after
-///    boot, which gets its own device number. Note the sealed system volume and
-///    the writable data volume share one device number, so this admits both,
-///    which is intended: the protected files that ship outside the system
-///    volume live on the latter.
-///
-///  Reads no state from the descriptor, so this costs nothing.
-///
-static bool ESStatIsTrustworthy(const struct stat* sb) {
-  if (!sb || !(sb->st_flags & SF_RESTRICTED)) {
-    return false;
-  }
-  std::optional<dev_t> bootDev = GetBootVolumeGroupDev();
-  return bootDev.has_value() && sb->st_dev == *bootDev;
-}
-
 @implementation SNTFileInfo
 
 - (instancetype)initWithResolvedPath:(NSString*)path error:(NSError**)error {
@@ -174,10 +148,11 @@ static bool ESStatIsTrustworthy(const struct stat* sb) {
     struct stat actualStat;
     const struct stat* effectiveStat = fileStat;
 
-    if (ESStatIsTrustworthy(fileStat)) {
-      // No descriptor state is read, so the supplied values stand as given,
-      // including the size that drives the read loop. That is this path's
-      // premise, not an oversight: the file cannot be replaced at this path.
+    if (StatIsSystemProtected(fileStat)) {
+      // A system-protected file is accepted without comparison. No descriptor
+      // state is read, so the supplied values stand as given, including the
+      // size that drives the read loop. That is this path's premise, not an
+      // oversight: the file cannot be replaced at this path.
       _identityVerification = SNTFileInfoIdentityTrustedUnverified;
     } else {
       if (fstat(fd, &actualStat) != 0) {

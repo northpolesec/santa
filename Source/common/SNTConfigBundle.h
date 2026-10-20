@@ -27,6 +27,7 @@
 /// If the value for the backing property was set, the given block will be called.
 - (void)clientMode:(void (^)(SNTClientMode))block;
 - (void)executableIntegrityPolicy:(void (^)(SNTExecutableIntegrityPolicy))block;
+- (void)disableExecutableIntegrityRecheck:(void (^)(SNTSyncedBool))block;
 - (void)syncType:(void (^)(SNTSyncType))block;
 - (void)allowlistRegex:(void (^)(NSString*))block;
 - (void)blocklistRegex:(void (^)(NSString*))block;

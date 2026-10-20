@@ -29,6 +29,7 @@
 
 #import "Source/common/SNTConfigurator.h"
 
+#include "Source/common/SystemResources.h"
 #include "Source/common/TestUtils.h"
 #include "Source/common/es/ESCacheFlusher.h"
 #include "Source/common/es/Message.h"
@@ -224,6 +225,14 @@ ProcessFAAHarness MakeProcessFAAHarness(ESCacheClearStrategy strategy) {
 @end
 
 @implementation SNTEndpointSecurityProcessFileAccessAuthorizerTest
+
+- (void)tearDown {
+#ifdef DEBUG
+  SetBootVolumeGroupDevForTesting(std::nullopt);
+  SetBootVolumeGroupDevUnavailableForTesting(false);
+#endif
+  [super tearDown];
+}
 
 - (void)testEnable {
   std::set<es_event_type_t> expectedEventSubs = {
@@ -623,6 +632,13 @@ ProcessFAAHarness MakeProcessFAAHarness(ESCacheClearStrategy strategy) {
   es_file_t instigatorFile = MakeESFile("foo");
   es_process_t instigator = MakeESProcess(&instigatorFile);
   es_file_t execFile = MakeESFile("bar");
+#ifndef DEBUG
+  XCTSkip(@"the boot volume group overrides are DEBUG-only and are not built with -c opt");
+#else
+  // A system-protected target, so the authorizer lets ES cache the ALLOW.
+  execFile.stat.st_flags |= SF_RESTRICTED;
+  SetBootVolumeGroupDevForTesting(execFile.stat.st_dev);
+#endif
   es_process_t execProc = MakeESProcess(&execFile, MakeAuditToken(12, 23), MakeAuditToken(34, 45));
   es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_EXEC, &instigator);
   esMsg.event.exec.target = &execProc;

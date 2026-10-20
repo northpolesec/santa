@@ -221,6 +221,7 @@ static NSString* const kEnableMenuItem = @"EnableMenuItem";
 
 static NSString* const kEnablePageZeroProtectionKey = @"EnablePageZeroProtection";
 static NSString* const kEnableBadSignatureProtectionKey = @"EnableBadSignatureProtection";
+static NSString* const kDisableExecutableIntegrityRecheckKey = @"DisableExecutableIntegrityRecheck";
 static NSString* const kEnableAntiTamperProcessSuspendResumeKey =
     @"EnableAntiTamperProcessSuspendResume";
 static NSString* const kAntiSuspendSigningIDsKey = @"AntiSuspendSigningIDs";
@@ -353,6 +354,7 @@ static NSString* const kPushTokenChainKey = @"PushTokenChain";
     _syncServerKeyTypes = @{
       kClientModeKey : number,
       kExecutableIntegrityPolicyKey : number,
+      kDisableExecutableIntegrityRecheckKey : number,
       kEnableTransitiveRulesKey : number,
       kEnableTransitiveRulesKeyDeprecated : number,
       kAllowedPathRegexKey : re,
@@ -414,6 +416,7 @@ static NSString* const kPushTokenChainKey = @"PushTokenChain";
       kOnStartUSBOptions : string,
       kEnablePageZeroProtectionKey : number,
       kEnableBadSignatureProtectionKey : number,
+      kDisableExecutableIntegrityRecheckKey : number,
       kEnableAntiTamperProcessSuspendResumeKey : number,
       kAntiSuspendSigningIDsKey : array,
       kAllowDelegatedSignalsKey : number,
@@ -884,6 +887,10 @@ static SNTConfigurator* sharedConfigurator = nil;
 
 + (NSSet*)keyPathsForValuesAffectingEnableBadSignatureProtection {
   return [self configStateSet];
+}
+
++ (NSSet*)keyPathsForValuesAffectingDisableExecutableIntegrityRecheck {
+  return [self syncAndConfigStateSet];
 }
 
 + (NSSet*)keyPathsForValuesAffectingEnableAntiTamperProcessSuspendResume {
@@ -1385,6 +1392,22 @@ static SNTConfigurator* sharedConfigurator = nil;
 - (BOOL)enableBadSignatureProtection {
   NSNumber* number = self.configState[kEnableBadSignatureProtectionKey];
   return number ? [number boolValue] : NO;
+}
+
+- (BOOL)disableExecutableIntegrityRecheck {
+  NSNumber* synced = self.syncState[kDisableExecutableIntegrityRecheckKey];
+  if (synced) return synced.boolValue;
+  return [self.configState[kDisableExecutableIntegrityRecheckKey] boolValue];
+}
+
+- (void)setSyncServerDisableExecutableIntegrityRecheck:(SNTSyncedBool)value {
+  NSNumber* synced = nil;
+  switch (value) {
+    case SNTSyncedBoolFalse: synced = @NO; break;
+    case SNTSyncedBoolTrue: synced = @YES; break;
+    case SNTSyncedBoolUnset: break;
+  }
+  [self updateSyncStateForKey:kDisableExecutableIntegrityRecheckKey value:synced];
 }
 
 - (BOOL)enableAntiTamperProcessSuspendResume {

@@ -56,6 +56,7 @@ static NSString* const kSigningID = @"ABCDEFGHIJ:com.example.tool";
 @interface SNTConfigBundle (Testing)
 @property NSNumber* clientMode;
 @property NSNumber* executableIntegrityPolicy;
+@property NSNumber* disableExecutableIntegrityRecheck;
 @property NSString* bannedUSBBlockMessage;
 @property NSString* remountUSBBlockMessage;
 @end
@@ -619,6 +620,27 @@ static NSString* const kSigningID = @"ABCDEFGHIJ:com.example.tool";
   XCTAssertTrue(replied);
   OCMVerifyAll(cfg);
   [cfg stopMocking];
+}
+
+- (void)testUpdateSyncSettingsAppliesDisableExecutableIntegrityRecheck {
+  for (NSNumber* value in @[ @(SNTSyncedBoolUnset), @(SNTSyncedBoolFalse), @(SNTSyncedBoolTrue) ]) {
+    id cfg = [self mockConfiguratorForSyncSettings];
+    OCMExpect(
+        [cfg setSyncServerDisableExecutableIntegrityRecheck:(SNTSyncedBool)value.integerValue]);
+
+    SNTConfigBundle* bundle = [[SNTConfigBundle alloc] init];
+    bundle.disableExecutableIntegrityRecheck = value;
+
+    __block BOOL replied = NO;
+    [self.sut updateSyncSettings:bundle
+                           reply:^{
+                             replied = YES;
+                           }];
+
+    XCTAssertTrue(replied);
+    OCMVerifyAll(cfg);
+    [cfg stopMocking];
+  }
 }
 
 - (void)testUpdateSyncSettingsAppliesUSBBlockMessages {

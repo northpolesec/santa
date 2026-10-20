@@ -213,7 +213,7 @@ static const std::vector<std::string> kBlockedArgs = {"clang", "--link"};
   es_file_t fileExec = MakeESFile("clang", {.st_dev = (dev_t)dev, .st_ino = ino});
   es_process_t procExec = MakeESProcess(&fileExec, MakeAuditToken(12, 23), MakeAuditToken(34, 45));
   procExec.is_platform_binary = false;
-  procExec.codesigning_flags = CS_SIGNED | CS_VALID;
+  procExec.codesigning_flags = CS_SIGNED | CS_VALID | CS_KILL;
   es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_EXEC, &proc, ActionType::Auth);
   esMsg.event.exec.target = &procExec;
 

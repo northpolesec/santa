@@ -586,6 +586,14 @@ void HandleV2Responses(const ::pbv2::PreflightResponse& resp, SNTSyncState* sync
     }
   }
 
+  // Absent clears the synced value so the profile value or the default governs.
+  if (resp.has_disable_executable_integrity_recheck()) {
+    syncState.disableExecutableIntegrityRecheck =
+        resp.disable_executable_integrity_recheck() ? SNTSyncedBoolTrue : SNTSyncedBoolFalse;
+  } else {
+    syncState.disableExecutableIntegrityRecheck = SNTSyncedBoolUnset;
+  }
+
   // Similar to `block_usb_mount`, `allowed_network_mount_hosts` state can change
   // only when `block_network_mount` is set.
   if (resp.has_block_network_mount()) {

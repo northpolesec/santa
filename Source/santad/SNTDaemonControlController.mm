@@ -736,6 +736,10 @@ static NSString* StaticDecisionForRule(SNTRule* rule, BOOL enableTransitiveRules
       [configurator setSyncServerExecutableIntegrityPolicy:p];
     }];
 
+    [result disableExecutableIntegrityRecheck:^(SNTSyncedBool val) {
+      [configurator setSyncServerDisableExecutableIntegrityRecheck:val];
+    }];
+
     [result syncType:^(SNTSyncType val) {
       [configurator setSyncTypeRequired:val];
     }];

@@ -137,7 +137,12 @@ bool AuthResultCache::AddToCache(const ExecTarget& target, SNTAction decision,
           requestBinary);
 
     case SNTActionRespondAllow: OS_FALLTHROUGH;
-    case SNTActionRespondAllowCompiler: OS_FALLTHROUGH;
+    case SNTActionRespondAllowCompiler:
+      return cache->set(key,
+                        CachedAuthResult{decision, GetCurrentUptime(), nil, target.identity,
+                                         (cd && !cd.identityMismatched) ? cd.sha256 : nil},
+                        requestBinary);
+
     case SNTActionRespondDeny:
       return cache->set(key, CachedAuthResult{decision, GetCurrentUptime(), nil, target.identity},
                         requestBinary);
