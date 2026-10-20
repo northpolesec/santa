@@ -636,7 +636,6 @@ objc_library(
         "//Source/common/processtree:process",
         "//Source/common/processtree:process_tree",
         "//Source/common/processtree/annotations:cel",
-        "@abseil-cpp//absl/strings",
         "@abseil-cpp//absl/synchronization",
         "@abseil-cpp//absl/time",
     ],
