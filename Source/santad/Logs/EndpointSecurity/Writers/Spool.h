@@ -53,7 +53,8 @@ class Spool : public Writer, public std::enable_shared_from_this<Spool<T>> {
   static std::shared_ptr<Spool<T>> Create(
       T batcher, std::string_view base_dir, size_t max_spool_disk_size, size_t max_spool_batch_size,
       uint64_t flush_timeout_ms,
-      void (^file_closed_f)(std::string, std::shared_ptr<santa::ScopedFile>) = nullptr) {
+      void (^file_closed_f)(std::string, std::shared_ptr<santa::ScopedFile>) = nullptr,
+      mode_t file_mode = 0, gid_t file_gid = ::fsspool::kNoSpoolGroup) {
     dispatch_queue_t q = dispatch_queue_create("com.northpolesec.santa.daemon.file_base_q",
                                                DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL);
     dispatch_source_t timer_source = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, q);
@@ -83,7 +84,7 @@ class Spool : public Writer, public std::enable_shared_from_this<Spool<T>> {
 
     auto spool_writer = std::make_shared<Spool<T>>(
         q, timer_source, std::move(batcher), base_dir, max_spool_disk_size, max_spool_batch_size,
-        nullptr, nullptr, file_closed_f, std::move(eviction_callback));
+        nullptr, nullptr, file_closed_f, std::move(eviction_callback), file_mode, file_gid);
 
     spool_writer->BeginFlushTask();
 
@@ -94,12 +95,13 @@ class Spool : public Writer, public std::enable_shared_from_this<Spool<T>> {
         size_t max_spool_disk_size, size_t max_spool_file_size,
         void (^write_complete_f)(void) = nullptr, void (^flush_task_complete_f)(void) = nullptr,
         void (^file_closed_f)(std::string, std::shared_ptr<santa::ScopedFile>) = nullptr,
-        std::function<void(size_t)> eviction_callback = nullptr)
+        std::function<void(size_t)> eviction_callback = nullptr, mode_t file_mode = 0,
+        gid_t file_gid = ::fsspool::kNoSpoolGroup)
       : q_(q),
         timer_source_(timer_source),
         spool_reader_(absl::string_view(base_dir.data(), base_dir.length())),
         spool_writer_(std::move(batcher), absl::string_view(base_dir.data(), base_dir.length()),
-                      max_spool_disk_size, std::move(eviction_callback)),
+                      max_spool_disk_size, std::move(eviction_callback), file_mode, file_gid),
         spool_file_size_threshold_(max_spool_file_size),
         spool_file_size_threshold_leniency_(spool_file_size_threshold_ *
                                             spool_file_size_threshold_leniency_factor_),

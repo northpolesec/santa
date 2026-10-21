@@ -16,6 +16,9 @@
 #ifndef SANTA_SANTAD_LOGS_ENDPOINTSECURITY_WRITERS_FSSPOOL_FSSPOOLPLATFORMSPECIFIC_H
 #define SANTA_SANTAD_LOGS_ENDPOINTSECURITY_WRITERS_FSSPOOL_FSSPOOLPLATFORMSPECIFIC_H
 
+#include <sys/stat.h>
+#include <sys/types.h>
+
 #include <ctime>
 #include <functional>
 #include <string>
@@ -36,10 +39,16 @@ bool IsDirectory(const std::string& d);
 int Close(int fd);
 int Open(const char* filename, int flags, mode_t mode);
 absl::Status RenameFile(const std::string& src, const std::string& dst);
-// Creates a directory if it doesn't exist.
+// Creates a directory with the given mode if it doesn't exist.
 // It only accepts absolute paths.
-absl::Status MkDir(const std::string& path);
+absl::Status MkDir(const std::string& path, mode_t mode);
 int MkDir(const char* path, mode_t mode);
+// chmod that acts on a symlink itself rather than its target.
+int LChmod(const char* path, mode_t mode);
+int FChown(int fd, gid_t gid);
+// chown that acts on a symlink itself rather than its target.
+int LChown(const char* path, gid_t gid);
+int FChmod(int fd, mode_t mode);
 bool StatIsDir(mode_t mode);
 bool StatIsReg(mode_t mode);
 int Unlink(const char* pathname);
