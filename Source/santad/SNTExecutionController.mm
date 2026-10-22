@@ -660,7 +660,14 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
   // CS_SIGNED and CS_VALID gate. Content-derived values come from the file, or
   // from a cached decision's pre-computed signing metadata, which avoids
   // expensive codesign verification.
-  ActivationCallbackBlock activationBlock = [&] {
+  //
+  // Built when called rather than here: a critical system binary is decided
+  // before any rule or CEL evaluation, and that decision must not depend on
+  // static code validation. The policy processor validates the file before it
+  // calls this, and SNTFileInfo caches the result, so the call adds none. The
+  // block captures esMsg by reference and must not outlive this method.
+  ActivationCallbackBlock activationBlock =
+      ^std::unique_ptr<::google::api::expr::runtime::BaseActivation>(bool useV2) {
     BOOL kernelSigned =
         (targetProc->codesigning_flags & CS_SIGNED) && (targetProc->codesigning_flags & CS_VALID);
     NSString* signingID = kernelSigned ? santa::StringTokenToNSString(targetProc->signing_id) : nil;
@@ -668,8 +675,8 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
     if (existingDecision) {
       return santa::CreateCELActivationBlock(
           esMsg, signingID, teamID, targetProc->is_platform_binary, existingDecision.signingTime,
-          existingDecision.secureSigningTime, existingDecision.rawEntitlements, _processTree,
-          _celNow);
+          existingDecision.secureSigningTime, existingDecision.rawEntitlements, self->_processTree,
+          self->_celNow)(useV2);
     } else {
       // The file's content-derived values are withheld only when CEL would pair
       // them with a kernel identity they may not belong to. Without one, they give
@@ -679,9 +686,9 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
       MOLCodesignChecker* csInfo = withholdContent ? nil : [binInfo codesignCheckerWithError:NULL];
       return santa::CreateCELActivationBlock(
           esMsg, signingID, teamID, targetProc->is_platform_binary, csInfo.signingTime,
-          csInfo.secureSigningTime, csInfo.entitlements, _processTree, _celNow);
+          csInfo.secureSigningTime, csInfo.entitlements, self->_processTree, self->_celNow)(useV2);
     }
-  }();
+  };
 
   SNTCachedDecision* cd = [self.policyProcessor decisionForFileInfo:binInfo
                                                       targetProcess:targetProc

@@ -440,6 +440,38 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
              }];
 }
 
+- (void)testCriticalSystemBinaryIsDecidedWithoutStaticCodeValidation {
+  // Replace the shared SNTFileInfo mock: OCMock applies the first matching
+  // stub, so the validation stub installed in -setUp would otherwise win over
+  // the reject.
+  [self.mockFileInfo stopMocking];
+  self.mockFileInfo = OCMClassMock([SNTFileInfo class]);
+  OCMStub([self.mockFileInfo alloc]).andReturn(self.mockFileInfo);
+  OCMStub([self.mockFileInfo initWithEndpointSecurityFile:NULL error:[OCMArg setTo:nil]])
+      .ignoringNonObjectArgs()
+      .andReturn(self.mockFileInfo);
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
+  OCMReject([self.mockFileInfo codesignCheckerWithError:[OCMArg anyObjectRef]]);
+
+  SNTCachedDecision* systemCd = [[SNTCachedDecision alloc] init];
+  systemCd.decision = SNTEventStateAllowSigningID;
+  systemCd.decisionExtra = @"critical system binary";
+  NSString* signingID = [NSString stringWithFormat:@"%s:%s", kExampleTeamID, kExampleSigningID];
+  OCMStub([self.mockRuleDatabase criticalSystemBinaries]).andReturn(@{signingID : systemCd});
+
+  SNTCachedDecision* cd = [self
+      postedDecisionForExecEvent:SNTActionRespondAllow
+                  cachedDecision:nil
+                    messageSetup:^(es_message_t* msg) {
+                      msg->event.exec.target->team_id = MakeESStringToken(kExampleTeamID);
+                      msg->event.exec.target->signing_id = MakeESStringToken(kExampleSigningID);
+                    }];
+
+  XCTAssertEqual(cd.decision, SNTEventStateAllowSigningID);
+  XCTAssertEqualObjects(cd.decisionExtra, @"critical system binary");
+  OCMVerifyAll(self.mockFileInfo);
+}
+
 - (void)testBinaryAllowRule {
   OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
   OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
