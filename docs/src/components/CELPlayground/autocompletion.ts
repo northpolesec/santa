@@ -1,6 +1,6 @@
 // CEL (Common Expression Language) language definition for Monaco Editor
 // This module provides CEL syntax highlighting for @monaco-editor/react
-// Reference: https://github.com/google/cel-spec/blob/master/doc/langdef.md
+// Reference: https://github.com/cel-expr/cel-spec/blob/master/doc/langdef.md
 
 // Autocomplete items with documentation and snippets
 export interface CELCompletionItem {
