@@ -234,13 +234,20 @@ ActivationCallbackBlock CreateCELActivationBlock(
         }
       }
 
+      // Copied so the lookups below own them. Inside this lambda the names
+      // refer to this block's captures, and a lookup capturing those would
+      // dangle once a caller releases the block, which it may do as soon as
+      // the activation is built.
+      std::shared_ptr<EndpointSecurityAPI> api = esApi;
+      std::shared_ptr<santad::process_tree::ProcessTree> tree = processTree;
+
       return std::make_unique<santa::cel::Activation<IsV2>>(
           std::move(f),
           ^std::vector<std::string>() {
-            return esApi->ExecArgs(&esMsg->event.exec);
+            return api->ExecArgs(&esMsg->event.exec);
           },
           ^std::map<std::string, std::string>() {
-            return esApi->ExecEnvs(&esMsg->event.exec);
+            return api->ExecEnvs(&esMsg->event.exec);
           },
           ^uid_t() {
             return audit_token_to_euid(esMsg->event.exec.target->audit_token);
@@ -256,15 +263,15 @@ ActivationCallbackBlock CreateCELActivationBlock(
             return std::string(f->path.data, f->path.length);
           },
           ^std::vector<AncestorT>() {
-            return Ancestors<IsV2>(processTree, esMsg);
+            return Ancestors<IsV2>(tree, esMsg);
           },
           ^std::vector<FileDescriptorT>() {
             if constexpr (IsV2) {
               std::vector<FileDescriptorT> fds;
-              uint32_t fdCount = esApi->ExecFDCount(&esMsg->event.exec);
+              uint32_t fdCount = api->ExecFDCount(&esMsg->event.exec);
               fds.reserve(fdCount);
               for (uint32_t i = 0; i < fdCount; i++) {
-                const es_fd_t* esFD = esApi->ExecFD(&esMsg->event.exec, i);
+                const es_fd_t* esFD = api->ExecFD(&esMsg->event.exec, i);
                 FileDescriptorT fd;
                 fd.set_fd(esFD->fd);
                 fd.set_type(FDTypeFromES(esFD->fdtype));
