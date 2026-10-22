@@ -23,7 +23,7 @@ which MDM you are using. Many MDMs have specific support for this kind of
 profile, usually labelled as a "Privacy Configuration Profile" or similar. You
 will need the following information to configure this profile:
 
-#### App/Process #1:
+### App/Process #1:
 
 - Identifier type: "Bundle ID"
 - Identifier: `com.northpolesec.santa.daemon`
@@ -37,7 +37,7 @@ will need the following information to configure this profile:
 - Permission or Service: `SystemPolicyAllFiles` or `Full-disk Access`
 - Access: Allow
 
-#### App/Process #2 (Network Extension):
+### App/Process #2 (Network Extension):
 
 :::info Network Extension
 This entry is only required if you are deploying the [network
@@ -56,7 +56,7 @@ extension](network-extension.md). It can be safely omitted otherwise.
 - Permission or Service: `SystemPolicyAllFiles` or `Full-disk Access`
 - Access: Allow
 
-#### App/Process #3:
+### App/Process #3:
 
 - Identifier type: "Bundle ID"
 - Identifier: `com.northpolesec.santa.bundleservice`

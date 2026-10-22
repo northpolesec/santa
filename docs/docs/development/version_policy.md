@@ -7,13 +7,13 @@ sidebar_position: 3
 This document describes North Pole Security's policies on versioning as it
 applies to Santa.
 
-### Santa Version
+## Santa Version
 
 When responding to help requests (in GitHub issues, MacAdmins Slack, etc.) we
 will endeavour to support any version that is under 1 year old but we reserve
 the right to request updating to the latest version.
 
-### macOS Version
+## macOS Version
 
 Santa will always support the latest 3 major releases of macOS.
 
