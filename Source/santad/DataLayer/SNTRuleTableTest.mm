@@ -1250,6 +1250,21 @@ static struct RuleIdentifiers UnruledIdentifiers() {
   XCTAssertEqualObjects(teamID, cd.teamID, @"team IDs should match");
 }
 
+- (void)testTrustdFileHelperIsACriticalBinary {
+  NSString* path = @"/usr/libexec/trustdFileHelper";
+  if (![[NSFileManager defaultManager] fileExistsAtPath:path]) {
+    XCTSkip(@"%@ is not present on this OS", path);
+  }
+
+  SNTFileInfo* fi = [[SNTFileInfo alloc] initWithPath:path];
+  NSString* signingID = FormatSigningID([fi codesignCheckerWithError:nil]);
+
+  SNTCachedDecision* cd = self.sut.criticalSystemBinaries[signingID];
+  XCTAssertNotNil(cd, @"trustdFileHelper should have a critical binary decision");
+  XCTAssertEqual(SNTEventStateAllowSigningID, cd.decision);
+  XCTAssertEqualObjects(@"critical system binary", cd.decisionExtra);
+}
+
 // This test ensures that we bump the constant on updates to the rule table
 // schema.
 - (void)testConstantVersionIsUpdated {

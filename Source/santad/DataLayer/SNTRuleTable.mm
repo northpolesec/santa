@@ -217,6 +217,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
 
     NSSet* santaDefinedCriticalPaths = [NSSet setWithArray:@[
       @"/usr/libexec/trustd",
+      @"/usr/libexec/trustdFileHelper",
       @"/usr/lib/dyld",
       @"/usr/libexec/xpcproxy",
       @"/usr/sbin/ocspd",
