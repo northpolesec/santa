@@ -142,6 +142,29 @@ class Process {
   Process(Process&&) = delete;
   Process& operator=(Process&&) = delete;
 
+  ~Process() {
+    // Unwind the parent chain iteratively.
+    std::shared_ptr<const Process> parent = std::move(parent_);
+    while (parent && parent.use_count() == 1) {
+      // use_count() == 1 means we hold the only reference: it is not in the
+      // tree's map, nor any other proc's parent_, and nothing can mint a new
+      // one (there is no weak_ptr<Process> and Process does not use
+      // enable_shared_from_this). So it dies at reset() below and no one else
+      // can reach it. use_count() is a relaxed load, though, so pair it with an
+      // acquire fence: a lock-free reader (e.g. RootSlice) reads this
+      // ancestor's parent_ while holding it, then releases its handle with a
+      // release decrement; the fence makes that read happen-before our move-out
+      // below, exactly as shared_ptr's own zero-count teardown would.
+      std::atomic_thread_fence(std::memory_order_acquire);
+      // const_cast is safe: the object was heap-allocated (not
+      // const-qualified), we uniquely own it, and it is about to be destroyed.
+      std::shared_ptr<const Process> grandparent =
+          std::move(const_cast<Process&>(*parent).parent_);
+      parent.reset();
+      parent = std::move(grandparent);
+    }
+  }
+
   // Const "attributes" are public
   const struct Pid pid_;
   const struct Cred effective_cred_;

@@ -28,6 +28,7 @@
 @interface SNTConfigBundle (ConfigBundleCreator)
 @property NSNumber* clientMode;
 @property NSNumber* executableIntegrityPolicy;
+@property NSNumber* disableExecutableIntegrityRecheck;
 @property NSNumber* syncType;
 @property NSString* allowlistRegex;
 @property NSString* blocklistRegex;
@@ -79,6 +80,7 @@
 
   XCTAssertNil(bundle.clientMode);
   XCTAssertNil(bundle.executableIntegrityPolicy);
+  XCTAssertNil(bundle.disableExecutableIntegrityRecheck);
   XCTAssertNil(bundle.syncType);
   XCTAssertNil(bundle.allowlistRegex);
   XCTAssertNil(bundle.blocklistRegex);
@@ -128,6 +130,14 @@
   syncState.executableIntegrityPolicy = @(SNTExecutableIntegrityPolicyReport);
   bundle = PostflightConfigBundle(syncState);
   XCTAssertEqualObjects(bundle.executableIntegrityPolicy, @(SNTExecutableIntegrityPolicyReport));
+
+  // Unset is passed through: it tells the daemon to clear the synced value.
+  bundle = PostflightConfigBundle(syncState);
+  XCTAssertEqualObjects(bundle.disableExecutableIntegrityRecheck, @(SNTSyncedBoolUnset));
+
+  syncState.disableExecutableIntegrityRecheck = SNTSyncedBoolFalse;
+  bundle = PostflightConfigBundle(syncState);
+  XCTAssertEqualObjects(bundle.disableExecutableIntegrityRecheck, @(SNTSyncedBoolFalse));
 
   syncState.syncType = SNTSyncTypeNormal;
   bundle = PostflightConfigBundle(syncState);

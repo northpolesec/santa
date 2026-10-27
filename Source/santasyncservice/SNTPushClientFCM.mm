@@ -176,10 +176,12 @@ static NSString* const kFCMTargetHostIDKey = @"target_host_id";
     return nil;
   }
   NSError* error;
+  // Require a dictionary so the string-keyed subscripting below can't send
+  // objectForKeyedSubscript: to a non-dictionary and crash the sync service.
   NSDictionary* rawMessage = [NSJSONSerialization JSONObjectWithData:messageData
                                                              options:0
                                                                error:&error];
-  if (!rawMessage) {
+  if (![rawMessage isKindOfClass:[NSDictionary class]]) {
     LOGD(@"Unable to parse push notification message data: %@", error);
     return nil;
   }

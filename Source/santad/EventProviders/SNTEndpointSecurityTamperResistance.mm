@@ -24,8 +24,11 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <string>
+#include <string_view>
 #include <tuple>
 #include <unordered_set>
+#include <utility>
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/synchronization/mutex.h"
@@ -94,6 +97,21 @@ constexpr std::pair<std::string_view, WatchItemPathType> kProtectedDirectories[]
     {"/private/var/db", WatchItemPathType::kLiteral},
     {"/private/var/db/santa", WatchItemPathType::kLiteral},
 };
+
+// The ancestor directories of every kProtectedFiles entry, matched exactly (not as prefixes).
+static const absl::flat_hash_set<std::string>& ProtectedAncestorDirectories() {
+  static dispatch_once_t onceToken;
+  static absl::flat_hash_set<std::string> ancestors;
+
+  dispatch_once(&onceToken, ^{
+    for (const auto& protectedFile : kProtectedFiles) {
+      for (std::string& dir : santa::AncestorDirectories(std::get<0>(protectedFile))) {
+        ancestors.insert(std::move(dir));
+      }
+    }
+  });
+  return ancestors;
+}
 
 // Sleigh's signal-scan state database. It is a BoltDB (single file, no sidecar journals), and
 // Sleigh needs full read/write/truncate/unlink access to it: santad hands it an open fd but BoltDB
@@ -361,11 +379,10 @@ TamperAuthResult ValidateLaunchctlExec(const Message& esMsg) {
     }
 
     case ES_EVENT_TYPE_AUTH_MOUNT: {
-      // A mount whose mount point is a protected directory (or one of its ancestors) would shadow
-      // the real Santa databases behind an attacker-controlled filesystem. Deny such mounts. MOUNT
-      // is not subject to target-path muting, so it is delivered despite the inverted mute set.
+      // Deny mounts over protected paths. MOUNT is not subject to target-path muting, so it is
+      // delivered despite the inverted mute set.
       std::string_view mountPoint(esMsg->event.mount.statfs->f_mntonname);
-      if ([SNTEndpointSecurityTamperResistance isMountShadowingProtectedDirectory:mountPoint]) {
+      if ([SNTEndpointSecurityTamperResistance isMountShadowingProtectedPath:mountPoint]) {
         return TamperAuthResult::Deny([NSString
             stringWithFormat:@"Preventing mount over protected path (by PID %d, %@) at mount "
                              @"point: %s",
@@ -483,6 +500,13 @@ TamperAuthResult ValidateLaunchctlExec(const Message& esMsg) {
   // Begin watching the protected set for path-based event types.
   [super muteTargetPaths:protectedPaths];
 
+  // Watch protected ancestor directories for RENAME only.
+  SetPairPathAndType ancestorPaths;
+  for (const std::string& path : ProtectedAncestorDirectories()) {
+    ancestorPaths.insert({path, WatchItemPathType::kLiteral});
+  }
+  [super muteTargetPaths:ancestorPaths forEvents:{ES_EVENT_TYPE_AUTH_RENAME}];
+
   // With inverted target path muting, only events whose target matches a muted path are delivered.
   // PROC_SUSPEND_RESUME targets processes, so we mute "/" as a prefix to match all executable
   // paths, ensuring all suspend/resume events are delivered for signing ID matching. Only do this
@@ -541,9 +565,15 @@ TamperAuthResult ValidateLaunchctlExec(const Message& esMsg) {
   return false;
 }
 
-+ (bool)isMountShadowingProtectedDirectory:(const std::string_view)mountPoint {
-  for (const auto& [protectedPath, pathType] : kProtectedDirectories) {
-    if (MountPointShadowsPath(mountPoint, protectedPath)) return true;
+// True when `mountPoint` is a protected path, an ancestor of one, or inside a protected prefix.
+// kProtectedDirectories needs no separate pass: each is an ancestor of a kProtectedFiles entry.
++ (bool)isMountShadowingProtectedPath:(const std::string_view)mountPoint {
+  for (const auto& [protectedPath, pathType, allowRead] : kProtectedFiles) {
+    if (MountPointShadowsPath(mountPoint, protectedPath) ||
+        (pathType == WatchItemPathType::kPrefix &&
+         ProtectedPathMatches(mountPoint, protectedPath, pathType))) {
+      return true;
+    }
   }
   return false;
 }
@@ -558,8 +588,13 @@ TamperAuthResult ValidateLaunchctlExec(const Message& esMsg) {
 // Returns true when `path` in the context of `esMsg` should be denied as a tamper attempt.
 // Encapsulates the per-event-type semantics: writable opens of protected paths are denied, as are
 // read-only opens when the matching protected-path policy does not allow reads. Protected
-// directories only deny replacement (rename) and wholesale duplication (clone/copyfile).
+// database directories deny replacement (rename) and wholesale duplication (clone/copyfile).
+// All protected paths' ancestors additionally deny rename, without restricting their children.
 + (bool)isTamperedPath:(std::string_view)path forMessage:(const santa::Message&)esMsg {
+  if (esMsg->event_type == ES_EVENT_TYPE_AUTH_RENAME &&
+      ProtectedAncestorDirectories().contains(path)) {
+    return true;
+  }
   if ([SNTEndpointSecurityTamperResistance isProtectedDirectory:path]) {
     return esMsg->event_type == ES_EVENT_TYPE_AUTH_RENAME ||
            esMsg->event_type == ES_EVENT_TYPE_AUTH_CLONE ||

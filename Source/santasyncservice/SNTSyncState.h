@@ -78,6 +78,8 @@
 /// Sync v2 only. nil means the server did not send a policy, so the synced value is left alone.
 /// SNTExecutableIntegrityPolicyUnknown clears the synced value so the profile or default governs.
 @property NSNumber* executableIntegrityPolicy;
+/// Sync v2 only. Unset when the server did not send it, which clears the synced value.
+@property SNTSyncedBool disableExecutableIntegrityRecheck;
 @property NSString* allowlistRegex;
 @property NSString* blocklistRegex;
 @property NSNumber* enableBundles;

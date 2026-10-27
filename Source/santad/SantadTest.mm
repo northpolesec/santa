@@ -29,6 +29,7 @@
 #import "Source/common/MOLCodesignChecker.h"
 #import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTConfigurator.h"
+#include "Source/common/SystemResources.h"
 #include "Source/common/TestUtils.h"
 #include "Source/common/es/Message.h"
 #include "Source/common/es/MockEndpointSecurityAPI.h"
@@ -165,6 +166,11 @@ static const char* kBlockedCDHash = "7218eddfee4d3eba4873dedf22d1391d79aea25f";
   XCTestExpectation* expectation =
       [self expectationWithDescription:@"Wait for santa's Auth dispatch queue"];
 
+  NSString* binaryPath =
+      [[NSString pathWithComponents:@[ testPath, binaryName ]] stringByResolvingSymlinksInPath];
+  struct stat fileStat;
+  XCTAssertEqual(lstat(binaryPath.UTF8String, &fileStat), 0);
+
   // Note: Determining cacheability is slightly different than the real check because
   // the test does not have access to the SNTAction used when calling postAction.
   // Checking client mode and the eventState is a sufficient stand-in since this
@@ -172,7 +178,8 @@ static const char* kBlockedCDHash = "7218eddfee4d3eba4873dedf22d1391d79aea25f";
   EXPECT_CALL(*mockESApi, RespondAuthResult(testing::_, testing::_, wantResult,
                                             testing::Truly(^BOOL(const bool cacheable) {
                                               return cacheable ==
-                                                     (wantResult == ES_AUTH_RESULT_ALLOW &&
+                                                     (StatIsSystemProtected(&fileStat) &&
+                                                      wantResult == ES_AUTH_RESULT_ALLOW &&
                                                       (clientMode != SNTClientModeStandalone ||
                                                        eventState != SNTEventStateBlockUnknown));
                                             })))
@@ -181,10 +188,6 @@ static const char* kBlockedCDHash = "7218eddfee4d3eba4873dedf22d1391d79aea25f";
         return true;
       }));
 
-  NSString* binaryPath =
-      [[NSString pathWithComponents:@[ testPath, binaryName ]] stringByResolvingSymlinksInPath];
-  struct stat fileStat;
-  XCTAssertEqual(lstat(binaryPath.UTF8String, &fileStat), 0);
   es_file_t file = MakeESFile([binaryPath UTF8String], fileStat);
   es_process_t proc = MakeESProcess(&file);
   proc.is_platform_binary = false;

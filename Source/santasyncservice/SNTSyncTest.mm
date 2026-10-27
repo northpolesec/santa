@@ -648,6 +648,33 @@
   }
 }
 
+- (void)testPreflightDisableExecutableIntegrityRecheck {
+  // disable_executable_integrity_recheck is a sync v2-only field.
+  if (!self.syncState.isSyncV2) return;
+
+  NSDictionary<NSString*, NSNumber*>* cases = @{
+    @"{\"disable_executable_integrity_recheck\": true}" : @(SNTSyncedBoolTrue),
+    @"{\"disable_executable_integrity_recheck\": false}" : @(SNTSyncedBoolFalse),
+    @"{}" : @(SNTSyncedBoolUnset),
+  };
+  for (NSString* body in cases) {
+    [self setupDefaultDaemonConnResponses];
+    // OCMock applies the first matching stub, so each response needs a fresh session.
+    self.syncState.session = OCMClassMock([NSURLSession class]);
+    self.syncState.disableExecutableIntegrityRecheck = SNTSyncedBoolTrue;
+    SNTSyncPreflight* sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
+
+    [self stubRequestBody:[body dataUsingEncoding:NSUTF8StringEncoding]
+                 response:nil
+                    error:nil
+            validateBlock:nil];
+
+    XCTAssertTrue([sut sync]);
+    XCTAssertEqual(self.syncState.disableExecutableIntegrityRecheck, cases[body].integerValue,
+                   @"%@", body);
+  }
+}
+
 - (void)testPreflightExecutableIntegrityPolicyNeverSetBySyncV1 {
   if (self.syncState.isSyncV2) return;
 

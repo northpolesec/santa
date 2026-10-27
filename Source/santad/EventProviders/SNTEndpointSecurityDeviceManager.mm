@@ -175,8 +175,15 @@ NSArray<NSString*>* maskToMountArgs(uint32_t remountOpts) {
 
 uint32_t mountArgsToMask(NSArray<NSString*>* args) {
   uint32_t flags = 0;
-  for (NSString* i in args) {
-    NSString* arg = [i lowercaseString];
+  for (id rawArg in args) {
+    // The remount-flag arrays come from configuration; their elements are only validated as an
+    // array, not element-by-element. Skip any non-string element rather than sending it
+    // lowercaseString and crashing.
+    if (![rawArg isKindOfClass:[NSString class]]) {
+      LOGE(@"SNTEndpointSecurityDeviceManager: ignoring non-string mount arg: %@", rawArg);
+      continue;
+    }
+    NSString* arg = [rawArg lowercaseString];
     if ([arg isEqualToString:@"rdonly"]) {
       flags |= MNT_RDONLY;
     } else if ([arg isEqualToString:@"noexec"]) {

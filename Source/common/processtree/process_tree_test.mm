@@ -764,4 +764,27 @@ using namespace santa::santad::process_tree;
   XCTAssertTrue(readerSawChild.load());  // never saw "absent"
 }
 
+// A deep parent chain must tear down without one stack frame per node. Run it
+// on a dispatch worker thread (smaller stack than main) so a regression is
+// deterministic; surviving is the assertion.
+- (void)testDeepAncestorChainTeardownDoesNotOverflowStack {
+  constexpr int kDepth = 200000;
+  // Heap-allocated so the block holds the only reference.
+  auto* leaf = new std::shared_ptr<const Process>();
+  for (int i = 0; i < kDepth; i++) {
+    *leaf = std::make_shared<Process>(Pid{.pid = i + 1, .pidversion = 1}, Cred{.uid = 0, .gid = 0},
+                                      /*program=*/nullptr, std::move(*leaf));
+  }
+
+  dispatch_semaphore_t done = dispatch_semaphore_create(0);
+  dispatch_async(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
+    delete leaf;
+    dispatch_semaphore_signal(done);
+  });
+
+  // Bounded wait so a hang fails here instead of blocking the suite.
+  XCTAssertEqual(dispatch_semaphore_wait(done, dispatch_time(DISPATCH_TIME_NOW, 30 * NSEC_PER_SEC)),
+                 0, @"deep-chain teardown did not complete within 30s");
+}
+
 @end

@@ -48,13 +48,54 @@ static const int64_t kTransitiveRuleCullingThreshold = 500000;
 // Consider transitive rules out of date if they haven't been used in six months.
 static const NSUInteger kTransitiveRuleExpirationSeconds = 6 * 30 * 24 * 3600;
 
-// Maximum number of file hashes remembered by the execution rule miss cache. Measured at ~0.8MB
-// of live heap when full.
-static const uint64_t kExecutionRuleMissCacheSize = 10000;
+// Maximum number of lookups remembered by the execution rule miss cache. Measured at ~1.6MB of
+// live heap when full.
+static const uint64_t kExecutionRuleMissCacheSize = 5000;
 
-// Miss cache key: the binary SHA-256 as its 64 hex characters. Fixed size so the key is trivially
-// copyable into the db block and stored inline by the cache, leaving a lookup allocation-free.
-using ExecutionRuleMissCacheKey = std::array<char, 64>;
+// Miss cache key: every identifier the execution rules query binds, as zero-padded UTF-8 bytes,
+// with an absent identifier left all zeros. Compared exactly, never as a digest. Fixed size so the
+// key is trivially copyable into the db block and stored inline by the cache, leaving a lookup
+// allocation-free.
+struct ExecutionRuleMissCacheKey {
+  std::array<char, 40> cdhash{};
+  std::array<char, 64> binarySHA256{};
+  std::array<char, 128> signingID{};
+  std::array<char, 64> certificateSHA256{};
+  std::array<char, 10> teamID{};
+
+  bool operator==(const ExecutionRuleMissCacheKey&) const = default;
+
+  template <typename H>
+  friend H AbslHashValue(H h, const ExecutionRuleMissCacheKey& k) {
+    return H::combine(std::move(h), k.cdhash, k.binarySHA256, k.signingID, k.certificateSHA256,
+                      k.teamID);
+  }
+};
+static_assert(std::is_trivially_copyable_v<ExecutionRuleMissCacheKey>);
+
+// Copies `identifier` into `field` up to its first NUL, which is also where FMDB's binding ends it.
+// Returns false for an empty string, which would read as absent, or one longer than the field.
+template <size_t N>
+static bool CopyMissCacheIdentifier(NSString* identifier, std::array<char, N>& field) {
+  if (!identifier) return true;
+  const char* bytes = identifier.UTF8String;
+  if (!bytes) return false;
+  size_t len = strnlen(bytes, N + 1);
+  if (len == 0 || len > N) return false;
+  memcpy(field.data(), bytes, len);
+  return true;
+}
+
+// Fills `key` from `ids`. Returns false, leaving the lookup uncached, if any identifier doesn't
+// fit.
+static bool MakeExecutionRuleMissCacheKey(const struct RuleIdentifiers& ids,
+                                          ExecutionRuleMissCacheKey& key) {
+  return CopyMissCacheIdentifier(ids.cdhash, key.cdhash) &&
+         CopyMissCacheIdentifier(ids.binarySHA256, key.binarySHA256) &&
+         CopyMissCacheIdentifier(ids.signingID, key.signingID) &&
+         CopyMissCacheIdentifier(ids.certificateSHA256, key.certificateSHA256) &&
+         CopyMissCacheIdentifier(ids.teamID, key.teamID);
+}
 
 static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
   // Create a temporary ES client in order to grab the default set of muted paths.
@@ -93,12 +134,11 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
   std::unique_ptr<santa::cel::Evaluator<true>> _celV2Evaluator;
   dispatch_once_t _criticalSystemBinariesToken;
   // Negative cache for the `execution_rules` query in `executionRuleForIdentifiers:`: records the
-  // file hashes that matched no row, so repeat executions of the same unruled binary skip the
+  // identifier sets that matched no row, so repeat executions of the same unruled binary skip the
   // query entirely. Only the SQL lookup is cached -- the static rules are an in-memory dictionary
-  // and are checked on every call. Keyed on the binary SHA-256 alone -- it identifies the file
-  // contents, and so determines every other identifier a lookup would match on. Entries are only
-  // ever cleared wholesale, by `addExecutionRules:...:errors:` -- there is no per-entry
-  // invalidation.
+  // and are checked on every call. Keyed on every identifier the query binds, so an entry is only
+  // reused for an identical query. Entries are only ever cleared wholesale, by
+  // `addExecutionRules:...:errors:` -- there is no per-entry invalidation.
   std::unique_ptr<SantaCache<ExecutionRuleMissCacheKey, bool>> _executionRuleMissCache;
 }
 @property MOLCodesignChecker* santadCSInfo;
@@ -177,6 +217,7 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
 
     NSSet* santaDefinedCriticalPaths = [NSSet setWithArray:@[
       @"/usr/libexec/trustd",
+      @"/usr/libexec/trustdFileHelper",
       @"/usr/lib/dyld",
       @"/usr/libexec/xpcproxy",
       @"/usr/sbin/ocspd",
@@ -613,18 +654,10 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
     rule = nil;
   }
 
-  // If we already looked in the db during another exec and there was no rule,
-  // return early. The cache will be cleared when new rules are added. Keyed by
-  // file sha256. Using a cdhash is appealing, but a cdhash is not guaranteed
-  // unique across files. A hash that is not exactly key-length cannot be keyed, so it is not
-  // cached.
+  // If an earlier exec ran this exact query and found no rule, return early. A lookup whose
+  // identifiers don't fit the key is not cached.
   ExecutionRuleMissCacheKey missCacheKey{};
-  const BOOL cacheable =
-      useCache && [identifiers.binarySHA256 lengthOfBytesUsingEncoding:NSUTF8StringEncoding] ==
-                      missCacheKey.size();
-  if (cacheable) {
-    memcpy(missCacheKey.data(), identifiers.binarySHA256.UTF8String, missCacheKey.size());
-  }
+  const BOOL cacheable = useCache && MakeExecutionRuleMissCacheKey(identifiers, missCacheKey);
   if (cacheable && _executionRuleMissCache->get(missCacheKey)) {
     return nil;
   }
@@ -946,6 +979,11 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
     self.cachedFileAccessRulesHash = nil;
     self.cachedNetworkFlowRulesHash = nil;
 
+    // Clear the miss cache before the transaction commits. Misses are only recorded on the db
+    // queue, so none can be recorded between this clear and the commit. Clearing after the commit
+    // would leave a window where a cached miss hides a committed rule.
+    self->_executionRuleMissCache->clear();
+
     faaRulesHashAfter = [self fileAccessRulesHashSerialized:db];
     faaRuleCount = [self fileAccessRuleCountSerialized:db];
     signalRulesHashAfter = [self signalRulesHashSerialized:db];
@@ -955,10 +993,6 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
   if (blockErrors.count > 0 && errors) {
     *errors = [blockErrors copy];
   }
-
-  // Clear the miss cache regardless of rule type. We could ignore clearing if
-  // there were only REMOVE rules, but it is not worth the effort.
-  _executionRuleMissCache->clear();
 
   // If the DB updated successfully, call the "rules changed" callbacks if appropriate
   if (!failed && self.fileAccessRulesChangedCallback &&

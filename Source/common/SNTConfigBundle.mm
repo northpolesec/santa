@@ -24,6 +24,7 @@
 @interface SNTConfigBundle ()
 @property NSNumber* clientMode;
 @property NSNumber* executableIntegrityPolicy;
+@property NSNumber* disableExecutableIntegrityRecheck;
 @property NSNumber* syncType;
 @property NSString* allowlistRegex;
 @property NSString* blocklistRegex;
@@ -70,6 +71,7 @@
 - (void)encodeWithCoder:(NSCoder*)coder {
   ENCODE(coder, clientMode);
   ENCODE(coder, executableIntegrityPolicy);
+  ENCODE(coder, disableExecutableIntegrityRecheck);
   ENCODE(coder, syncType);
   ENCODE(coder, allowlistRegex);
   ENCODE(coder, blocklistRegex);
@@ -112,6 +114,7 @@
   if (self) {
     DECODE(decoder, clientMode, NSNumber);
     DECODE(decoder, executableIntegrityPolicy, NSNumber);
+    DECODE(decoder, disableExecutableIntegrityRecheck, NSNumber);
     DECODE(decoder, syncType, NSNumber);
     DECODE(decoder, allowlistRegex, NSString);
     DECODE(decoder, blocklistRegex, NSString);
@@ -160,6 +163,12 @@
 - (void)executableIntegrityPolicy:(void (^)(SNTExecutableIntegrityPolicy))block {
   if (self.executableIntegrityPolicy) {
     block((SNTExecutableIntegrityPolicy)[self.executableIntegrityPolicy integerValue]);
+  }
+}
+
+- (void)disableExecutableIntegrityRecheck:(void (^)(SNTSyncedBool))block {
+  if (self.disableExecutableIntegrityRecheck) {
+    block((SNTSyncedBool)[self.disableExecutableIntegrityRecheck integerValue]);
   }
 }
 

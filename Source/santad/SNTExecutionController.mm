@@ -19,12 +19,14 @@
 
 #include <bsm/libbsm.h>
 #include <libproc.h>
+#include <mach/machine.h>
 #include <sys/param.h>
 #include <utmpx.h>
 
 #include <cstring>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <set>
 #include <string>
 #include <utility>
@@ -63,7 +65,6 @@
 #import "Source/santad/SNTNotificationQueue.h"
 #import "Source/santad/SNTSyncdQueue.h"
 #import "Source/santad/SNTTimedRuleKills.h"
-#include "absl/strings/str_cat.h"
 #include "absl/synchronization/mutex.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
@@ -117,13 +118,33 @@ static NSString* DecisionExtra(SNTAuthorizationMethod method, NSString* outcome)
   return [NSString stringWithFormat:@"%@ %@", AuthorizationMethodName(method), outcome];
 }
 
-// The approval cooldown cache is keyed on the authorization method as well as
-// the content hash. Without the method an approval granted under one method
-// would satisfy a later rule that demands a different one, so a Touch ID
-// approval would stand in for a REQUIRE_SECURITY_KEY hold and the key would
-// never be presented.
-static std::string AuthApprovalCacheKey(NSString* sha256, SNTAuthorizationMethod method) {
-  return absl::StrCat(static_cast<int>(method), ":", santa::NSStringToUTF8String(sha256));
+// A cooldown approval: the content hash, the slice that ran (as in AuthResultKey),
+// and the authorization method.
+struct AuthApprovalKey {
+  std::string sha256;
+  cpu_type_t cputype = 0;
+  cpu_subtype_t cpusubtype = 0;
+  SNTAuthorizationMethod method = SNTAuthorizationMethodTouchID;
+
+  bool operator==(const AuthApprovalKey& rhs) const {
+    return sha256 == rhs.sha256 && cputype == rhs.cputype && cpusubtype == rhs.cpusubtype &&
+           method == rhs.method;
+  }
+
+  template <typename H>
+  friend H AbslHashValue(H h, const AuthApprovalKey& k) {
+    return H::combine(std::move(h), k.sha256, k.cputype, k.cpusubtype, k.method);
+  }
+};
+
+static AuthApprovalKey AuthApprovalKeyFor(SNTCachedDecision* cd, const es_event_exec_t& exec) {
+  return {
+      .sha256 = santa::NSStringToUTF8String(cd.sha256),
+      .cputype = exec.image_cputype,
+      // Capability bits are dropped, as in AuthResultKey.
+      .cpusubtype = static_cast<cpu_subtype_t>(exec.image_cpusubtype & ~CPU_SUBTYPE_MASK),
+      .method = cd.authorizationMethod,
+  };
 }
 
 static SNTEventState BlockToAllowDecision(SNTEventState blockDecision) {
@@ -171,11 +192,8 @@ static bool SameBinary(const es_process_t* a, NSString* aSHA256, const es_proces
   std::unique_ptr<SantaCache<std::pair<pid_t, int>, bool>> _procSignalCache;
   std::shared_ptr<santa::PendingExecCoordinator> _pendingExecCoordinator;
 
-  // Cache of user authorization approvals: key (see AuthApprovalCacheKey) ->
-  // timestamp (nanoseconds since boot).
-  // Note: We use std::string instead of NSString* because SantaCache uses == for key comparison,
-  // which would compare pointer addresses for NSString*, not string contents.
-  std::unique_ptr<SantaCache<std::string, uint64_t>> _authApprovalCache;
+  // Cooldown approvals: key -> approval time (nanoseconds since boot).
+  std::unique_ptr<SantaCache<AuthApprovalKey, uint64_t>> _authApprovalCache;
 
   std::shared_ptr<santa::santad::process_tree::ProcessTree> _processTree;
   std::shared_ptr<santa::SandboxExpectations> _sandboxExpectations;
@@ -219,7 +237,7 @@ static bool SameBinary(const es_process_t* a, NSString* aSHA256, const es_proces
     _ttyWriter = std::move(ttyWriter);
     _policyProcessor = policyProcessor;
     _procSignalCache = std::make_unique<SantaCache<std::pair<pid_t, int>, bool>>(100000);
-    _authApprovalCache = std::make_unique<SantaCache<std::string, uint64_t>>(100);
+    _authApprovalCache = std::make_unique<SantaCache<AuthApprovalKey, uint64_t>>(100);
     _sandboxedSeatbeltProcs = std::make_unique<SantaCache<std::pair<pid_t, int>, bool>>(100000);
     _processControlBlock = processControlBlock;
     _processTree = std::move(processTree);
@@ -642,7 +660,14 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
   // CS_SIGNED and CS_VALID gate. Content-derived values come from the file, or
   // from a cached decision's pre-computed signing metadata, which avoids
   // expensive codesign verification.
-  ActivationCallbackBlock activationBlock = [&] {
+  //
+  // Built when called rather than here: a critical system binary is decided
+  // before any rule or CEL evaluation, and that decision must not depend on
+  // static code validation. The policy processor validates the file before it
+  // calls this, and SNTFileInfo caches the result, so the call adds none. The
+  // block captures esMsg by reference and must not outlive this method.
+  ActivationCallbackBlock activationBlock =
+      ^std::unique_ptr<::google::api::expr::runtime::BaseActivation>(bool useV2) {
     BOOL kernelSigned =
         (targetProc->codesigning_flags & CS_SIGNED) && (targetProc->codesigning_flags & CS_VALID);
     NSString* signingID = kernelSigned ? santa::StringTokenToNSString(targetProc->signing_id) : nil;
@@ -650,8 +675,8 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
     if (existingDecision) {
       return santa::CreateCELActivationBlock(
           esMsg, signingID, teamID, targetProc->is_platform_binary, existingDecision.signingTime,
-          existingDecision.secureSigningTime, existingDecision.rawEntitlements, _processTree,
-          _celNow);
+          existingDecision.secureSigningTime, existingDecision.rawEntitlements, self->_processTree,
+          self->_celNow)(useV2);
     } else {
       // The file's content-derived values are withheld only when CEL would pair
       // them with a kernel identity they may not belong to. Without one, they give
@@ -661,9 +686,9 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
       MOLCodesignChecker* csInfo = withholdContent ? nil : [binInfo codesignCheckerWithError:NULL];
       return santa::CreateCELActivationBlock(
           esMsg, signingID, teamID, targetProc->is_platform_binary, csInfo.signingTime,
-          csInfo.secureSigningTime, csInfo.entitlements, _processTree, _celNow);
+          csInfo.secureSigningTime, csInfo.entitlements, self->_processTree, self->_celNow)(useV2);
     }
-  }();
+  };
 
   SNTCachedDecision* cd = [self.policyProcessor decisionForFileInfo:binInfo
                                                       targetProcess:targetProc
@@ -831,13 +856,15 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
       std::make_pair(newProcPid, audit_token_to_pidversion(targetProc->audit_token));
 
   // Check the authorization approval cache (only when a cooldown is set). Skipped for an
-  // unconfirmed read, like the write below: a hit converts this exec to an allow, but the
-  // key is the hash of the file read, not the loaded image.
+  // unconfirmed read: a hit converts this exec to an allow, but the key is the hash of the
+  // file read, not the loaded image. The reply block below records an approval only
+  // under approvalKey, so the write is skipped wherever this lookup is.
+  std::optional<AuthApprovalKey> approvalKey;
   if (cd.holdAndAsk && cd.sha256 && !cd.identityMismatched && cd.authCooldownMinutes != nil) {
     uint64_t cooldownMinutes = [cd.authCooldownMinutes unsignedLongLongValue];
     if (cooldownMinutes > 0) {
-      uint64_t cachedTimestamp =
-          _authApprovalCache->get(AuthApprovalCacheKey(cd.sha256, cd.authorizationMethod));
+      approvalKey = AuthApprovalKeyFor(cd, esMsg->event.exec);
+      uint64_t cachedTimestamp = _authApprovalCache->get(*approvalKey);
       if (cachedTimestamp > 0) {
         uint64_t expiryTime = cachedTimestamp + (cooldownMinutes * 60 * NSEC_PER_SEC);
         if (GetCurrentUptime() < expiryTime) {
@@ -936,14 +963,9 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
             cd.decisionExtra = DecisionExtra(cd.authorizationMethod, @"Approved");
 
             // Cache the approval so subsequent executions within the cooldown period
-            // don't require re-authorization - only if cooldown was specified and > 0
-            // The cooldown cache is keyed on the content hash, which names the
-            // file that was read. Skip it for an unconfirmed read, so a later
-            // execution is not matched against someone else's approval.
-            if (cd.sha256 && !cd.identityMismatched && cd.authCooldownMinutes != nil &&
-                [cd.authCooldownMinutes unsignedLongLongValue] > 0) {
-              self->_authApprovalCache->set(AuthApprovalCacheKey(cd.sha256, cd.authorizationMethod),
-                                            GetCurrentUptime());
+            // don't require re-authorization.
+            if (approvalKey) {
+              self->_authApprovalCache->set(*approvalKey, GetCurrentUptime());
             }
 
             if (stoppedProc) {

@@ -20,6 +20,7 @@
 #include <mach/mach_time.h>
 #include <sys/cdefs.h>
 #include <sys/proc_info.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <time.h>
 
@@ -78,6 +79,20 @@ std::optional<std::vector<pid_t>> GetPidList();
 // Resolved once per process. Returns std::nullopt if it could not be
 // determined.
 std::optional<dev_t> GetBootVolumeGroupDev();
+
+// Whether the stat describes a SIP-protected file on the boot volume group.
+// Neither a user nor root can modify such a file while SIP is enabled.
+//
+// Both conditions are required and neither is sufficient alone:
+//  * SF_RESTRICTED means the system protects the file, and every directory on
+//    the way to it, so the path cannot be made to resolve elsewhere.
+//  * The boot volume group excludes any filesystem mounted after boot, which
+//    gets its own device number. The sealed system volume and the writable data
+//    volume share one device number, so both are admitted, which is intended:
+//    protected files that ship outside the system volume live on the latter.
+//
+// Returns false for a null stat or when the boot device is undetermined.
+bool StatIsSystemProtected(const struct stat* sb);
 
 // Debug builds only. GetBootVolumeGroupDev feeds the check that decides whether
 // a caller-supplied stat may be accepted without comparison, so an override

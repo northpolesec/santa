@@ -1326,6 +1326,7 @@ santa_unit_test(
     srcs = ["SNTFileInfoTest.mm"],
     resources = [
         "testdata/32bitplist",
+        "testdata/arrayplist",
         "testdata/bad_pagezero",
         "testdata/cal-yikes-universal",
         "testdata/missing_pagezero",

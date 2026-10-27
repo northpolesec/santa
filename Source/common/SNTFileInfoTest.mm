@@ -807,14 +807,55 @@ static es_file_t MakeESFile(NSString* path, const struct stat* sb) {
   NSString* path = [[NSBundle bundleForClass:[self class]] pathForResource:@"32bitplist"
                                                                     ofType:@""];
   SNTFileInfo* sut = [[SNTFileInfo alloc] initWithPath:path];
-  XCTAssertNotNil([sut infoPlist]);
-  XCTAssertEqualObjects([sut infoPlist][@"CFBundleShortVersionString"], @"1.0");
-  XCTAssertEqualObjects([sut infoPlist][@"CFBundleIdentifier"], @"com.google.i386plist");
+  XCTAssertEqualObjects([sut infoPlistStringForKey:@"CFBundleShortVersionString"], @"1.0");
+  XCTAssertEqualObjects([sut bundleShortVersionString], @"1.0");
+  XCTAssertEqualObjects([sut infoPlistStringForKey:@"CFBundleIdentifier"], @"com.google.i386plist");
+  XCTAssertEqualObjects([sut bundleIdentifier], @"com.google.i386plist");
+
+  // A key present but of the wrong type reads as absent, not as a coerced/garbage value.
+  XCTAssertNil([sut infoPlistObjectForKey:@"CFBundleIdentifier" ofClass:[NSArray class]]);
 
   // csreq is installed on all machines with Xcode installed. If you're running these tests,
   // it should be available..
   sut = [[SNTFileInfo alloc] initWithPath:@"/usr/bin/csreq"];
-  XCTAssertNotNil([sut infoPlist]);
+  XCTAssertNotNil([sut bundleIdentifier]);
+}
+
+// An embedded __info_plist whose top-level object is an array (not a dictionary) must not crash the
+// bundle accessors: a crafted binary can put any type there. Before the type guard, this aborted
+// with -[__NSArrayI objectForKey:] / objectForKeyedSubscript: unrecognized selector.
+- (void)testEmbeddedInfoPlistArrayRootIsIgnored {
+  NSString* src = [[NSBundle bundleForClass:[self class]] pathForResource:@"arrayplist" ofType:@""];
+  XCTAssertNotNil(src);
+
+  // Copy the fixture out of the test bundle so the embedded-plist path is exercised in isolation.
+  // Left in place, it sits inside SNTFileInfoTest.xctest, and once the array root is rejected the
+  // accessors fall back to the test bundle's own Info.plist, masking the case under test. A
+  // standalone executable on disk (the real crash scenario) has no such containing bundle.
+  NSString* dir = [NSTemporaryDirectory()
+      stringByAppendingPathComponent:[NSString
+                                         stringWithFormat:@"sntfi-%@", [[NSUUID UUID] UUIDString]]];
+  NSFileManager* fm = [NSFileManager defaultManager];
+  XCTAssertTrue([fm createDirectoryAtPath:dir
+              withIntermediateDirectories:YES
+                               attributes:nil
+                                    error:NULL]);
+  NSString* dst = [dir stringByAppendingPathComponent:@"arrayplist"];
+  XCTAssertTrue([fm copyItemAtPath:src toPath:dst error:NULL]);
+
+  SNTFileInfo* sut = [[SNTFileInfo alloc] initWithPath:dst];
+  XCTAssertNotNil(sut);
+  XCTAssertNil([sut bundlePath]);  // not inside any bundle
+
+  // None of these may throw; the array-root embedded plist is unusable, so all report nil.
+  XCTAssertNil([sut bundleIdentifier]);
+  XCTAssertNil([sut bundleName]);
+  XCTAssertNil([sut bundleVersion]);
+  XCTAssertNil([sut bundleShortVersionString]);
+  XCTAssertNil([sut infoPlistStringForKey:@"CFBundleIdentifier"]);
+  XCTAssertNil([sut infoPlistObjectForKey:@"CFBundleIdentifier" ofClass:[NSString class]]);
+
+  [fm removeItemAtPath:dir error:NULL];
 }
 
 - (void)testBundleCategoryIgnoresEmbeddedInfoPlist {
@@ -837,7 +878,7 @@ static es_file_t MakeESFile(NSString* path, const struct stat* sb) {
 
   SNTFileInfo* sut = [[SNTFileInfo alloc] initWithPath:execPath];
   // The embedded plist wins for infoPlist, but does not describe the bundle.
-  XCTAssertEqualObjects([sut infoPlist][@"CFBundleIdentifier"], @"com.google.i386plist");
+  XCTAssertEqualObjects([sut infoPlistStringForKey:@"CFBundleIdentifier"], @"com.google.i386plist");
   XCTAssertEqualObjects([sut bundleCategory], @"public.app-category.utilities");
 }
 
