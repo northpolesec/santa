@@ -156,14 +156,9 @@ class StreamMessageSource : public MessageSource {
     }
 
     if (expected_hash != 0) {
-      santa::Xxhash64 xxhash;
-      xxhash.Update(msg_buf.data(), msg_buf.size());
-      __block uint64_t got_hash;
-      xxhash.Digest(^(const uint8_t* buf, size_t size) {
-        got_hash = *(uint64_t*)buf;
-      });
-
-      if (got_hash != expected_hash) {
+      santa::Xxhash64::canonical_type got_hash =
+          santa::Xxhash64::CanonicalDigestOneShot(msg_buf.data(), msg_buf.size());
+      if (memcmp(got_hash.digest, &expected_hash, sizeof(expected_hash)) != 0) {
         return absl::InternalError("Message corruption detected");
       }
     }
