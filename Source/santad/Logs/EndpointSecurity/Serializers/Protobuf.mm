@@ -487,7 +487,10 @@ std::vector<uint8_t> Protobuf::FinalizeProto(::pbv1::SantaMessage* santa_msg) {
       LOGE(@"Failed to convert protobuf to JSON: %s", status.ToString().c_str());
     }
 
-    std::vector<uint8_t> vec(json.begin(), json.end());
+    // Reserve room for the trailing newline so the vector is allocated once.
+    std::vector<uint8_t> vec;
+    vec.reserve(json.length() + 1);
+    vec.insert(vec.end(), json.begin(), json.end());
     // Add a newline to the end of the JSON row.
     vec.push_back('\n');
     return vec;
