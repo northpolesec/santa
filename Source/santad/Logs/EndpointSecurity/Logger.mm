@@ -112,7 +112,9 @@ std::unique_ptr<Logger> Logger::Create(
       serializer = Protobuf::Create(esapi, std::move(decision_cache));
       writer = Spool<::fsspool::ZstdStreamBatcher>::Create(
           ::fsspool::ZstdStreamBatcher(^(google::protobuf::io::ZeroCopyOutputStream* raw_stream) {
-            return ::fsspool::ZstdOutputStream::Create(raw_stream);
+            return ::fsspool::ZstdOutputStream::Create(
+                raw_stream, ZSTD_CLEVEL_DEFAULT, ::fsspool::ZstdOutputStream::kDefaultBufferSize,
+                spool_file_size_threshold);
           }),
           [spool_log_path UTF8String], spool_dir_size_threshold, spool_file_size_threshold,
           spool_flush_timeout_ms, spoolFileClosed);
