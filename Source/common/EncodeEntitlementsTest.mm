@@ -144,14 +144,54 @@ using santa::StandardizedNestedObjects;
     entitlements[[NSString stringWithFormat:@"ent%d", i]] = [NSString stringWithFormat:@"val%d", i];
   }
 
-  EncodeEntitlementsCommon(entitlements, false,
-                           ^(NSUInteger count, bool is_filtered) {
-                             XCTAssertLessThan(count, entitlements.count);
-                             XCTAssertTrue(is_filtered);
-                           },
-                           ^(NSString* entitlement, NSString* value){
-                               // noop
-                           });
+  __block NSUInteger encoded = 0;
+  EncodeEntitlementsCommon(
+      entitlements, false,
+      ^(NSUInteger count, bool is_filtered) {
+        XCTAssertEqual(count, 64);
+        XCTAssertTrue(is_filtered);
+      },
+      ^(NSString* entitlement, NSString* value) {
+        encoded++;
+      });
+  XCTAssertEqual(encoded, 64);
+}
+
+- (void)testEncodeEntitlementsCommonValueTypes {
+  NSDictionary* entitlements = @{
+    @"bool_yes" : @YES,
+    @"bool_no" : @NO,
+    @"num_one" : @1,
+    @"num_zero" : @0,
+    @"str" : @"a\"b",
+    @"arr" : @[ @"a", @"b" ],
+    @"data" : [@"hi" dataUsingEncoding:NSUTF8StringEncoding],
+    // Nested past the level limit: the innermost array becomes its description
+    @"deep" : @[ @[ @[ @[ @[ @"x" ] ] ] ] ],
+  };
+  NSDictionary* want = @{
+    @"bool_yes" : @"true",
+    @"bool_no" : @"false",
+    @"num_one" : @"1",
+    @"num_zero" : @"0",
+    @"str" : @"\"a\\\"b\"",
+    @"arr" : @"[\"a\",\"b\"]",
+    @"data" : @"\"aGk=\"",
+    @"deep" : @"[[[[\"(\\n    x\\n)\"]]]]",
+  };
+
+  NSMutableDictionary* got = [NSMutableDictionary dictionary];
+  EncodeEntitlementsCommon(
+      entitlements, false,
+      ^(NSUInteger count, bool is_filtered) {
+        XCTAssertEqual(count, entitlements.count);
+        XCTAssertFalse(is_filtered);
+      },
+      ^(NSString* entitlement, NSString* value) {
+        got[entitlement] = value;
+      });
+
+  XCTAssertEqualObjects(got, want);
 }
 
 @end
