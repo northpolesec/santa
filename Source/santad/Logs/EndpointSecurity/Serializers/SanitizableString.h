@@ -26,7 +26,8 @@ namespace santa {
 
 // Append `src` to `dst`, replacing the characters that would break the
 // '|'-delimited log format: '|' with "<pipe>", '\n' with "\\n" and '\r' with
-// "\\r". The full length of `src` is sanitized.
+// "\\r". The full length of `src` is sanitized. `src` must not point into
+// `dst`, because appending can reallocate `dst`.
 void AppendSanitized(std::string& dst, std::string_view src);
 void AppendSanitized(std::string& dst, const es_file_t* file);
 void AppendSanitized(std::string& dst, const es_string_token_t& tok);
