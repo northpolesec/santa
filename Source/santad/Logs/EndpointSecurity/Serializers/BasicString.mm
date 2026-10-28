@@ -47,10 +47,6 @@
 
 namespace santa {
 
-static inline SanitizableString FilePath(const es_file_t* file) {
-  return SanitizableString(file);
-}
-
 static NSDateFormatter* GetDateFormatter() {
   static dispatch_once_t onceToken;
   static NSDateFormatter* dateFormatter;
@@ -158,15 +154,17 @@ std::string GetFileAccessPolicyDecisionString(FileAccessPolicyDecision decision)
 
 static inline void AppendProcess(std::string& str, const es_process_t* es_proc,
                                  const std::string prefix = "") {
-  char bname[MAXPATHLEN];
+  std::string_view path(es_proc->executable->path.data, es_proc->executable->path.length);
+  size_t slash = path.rfind('/');
   str.append("|" + prefix + "pid=");
   str.append(std::to_string(Pid(es_proc->audit_token)));
   str.append("|" + prefix + "ppid=");
   str.append(std::to_string(es_proc->original_ppid));
   str.append("|" + prefix + "process=");
-  str.append(basename_r(FilePath(es_proc->executable).Sanitized().data(), bname) ?: "");
+  // Sanitizing never changes '/', so the name can be taken from the raw path.
+  AppendSanitized(str, slash == std::string_view::npos ? path : path.substr(slash + 1));
   str.append("|" + prefix + "processpath=");
-  str.append(FilePath(es_proc->executable).Sanitized());
+  AppendSanitized(str, path);
 }
 
 static inline void AppendUserGroup(std::string& str, const audit_token_t& tok,
@@ -236,7 +234,7 @@ static inline void AppendSocketAddress(std::string& str, es_address_type_t type,
 
   if (addr.length > 0) {
     str.append("|address=");
-    str.append(SanitizableString(addr).Sanitized());
+    AppendSanitized(str, addr);
   }
 }
 
@@ -311,7 +309,7 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedClose& msg) {
   std::string str = CreateDefaultString();
 
   str.append("action=WRITE|path=");
-  str.append(FilePath(msg->event.close.target).Sanitized());
+  AppendSanitized(str, msg->event.close.target);
 
   AppendInstigator(str, msg);
 
@@ -322,9 +320,9 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedExchange& msg) 
   std::string str = CreateDefaultString();
 
   str.append("action=EXCHANGE|path=");
-  str.append(FilePath(msg->event.exchangedata.file1).Sanitized());
+  AppendSanitized(str, msg->event.exchangedata.file1);
   str.append("|newpath=");
-  str.append(FilePath(msg->event.exchangedata.file2).Sanitized());
+  AppendSanitized(str, msg->event.exchangedata.file2);
 
   AppendInstigator(str, msg);
 
@@ -357,7 +355,7 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedExec& msg, SNTC
     str.append("|cert_sha256=");
     str.append([cd.certSHA256 UTF8String]);
     str.append("|cert_cn=");
-    str.append(SanitizableString(cd.certCommonName).Sanitized());
+    AppendSanitized(str, cd.certCommonName);
   }
 
   if (cd.teamID.length) {
@@ -367,7 +365,7 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedExec& msg, SNTC
 
   if (cd.quarantineURL) {
     str.append("|quarantine_url=");
-    str.append(SanitizableString(cd.quarantineURL).Sanitized());
+    AppendSanitized(str, cd.quarantineURL);
   }
 
   str.append("|pid=");
@@ -383,12 +381,12 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedExec& msg, SNTC
   str.append("|mode=");
   str.append(GetModeString(cd.decisionClientMode));
   str.append("|path=");
-  str.append(FilePath(msg->event.exec.target->executable).Sanitized());
+  AppendSanitized(str, msg->event.exec.target->executable);
 
   NSString* origPath = santa::OriginalPathForTranslocation(msg->event.exec.target);
   if (origPath) {
     str.append("|origpath=");
-    str.append(SanitizableString(origPath).Sanitized());
+    AppendSanitized(str, origPath);
   }
 
   uint32_t argCount = esapi_->ExecArgCount(&msg->event.exec);
@@ -399,7 +397,7 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedExec& msg, SNTC
         str.append(" ");
       }
 
-      str.append(SanitizableString(esapi_->ExecArg(&msg->event.exec, i)).Sanitized());
+      AppendSanitized(str, esapi_->ExecArg(&msg->event.exec, i));
     }
   }
 
@@ -444,11 +442,11 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedLink& msg) {
   std::string str = CreateDefaultString();
 
   str.append("action=LINK|path=");
-  str.append(FilePath(msg->event.link.source).Sanitized());
+  AppendSanitized(str, msg->event.link.source);
   str.append("|newpath=");
-  str.append(FilePath(msg->event.link.target_dir).Sanitized());
+  AppendSanitized(str, msg->event.link.target_dir);
   str.append("/");
-  str.append(SanitizableString(msg->event.link.target_filename).Sanitized());
+  AppendSanitized(str, msg->event.link.target_filename);
 
   AppendInstigator(str, msg);
 
@@ -459,17 +457,17 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedRename& msg) {
   std::string str = CreateDefaultString();
 
   str.append("action=RENAME|path=");
-  str.append(FilePath(msg->event.rename.source).Sanitized());
+  AppendSanitized(str, msg->event.rename.source);
   str.append("|newpath=");
 
   switch (msg->event.rename.destination_type) {
     case ES_DESTINATION_TYPE_EXISTING_FILE:
-      str.append(FilePath(msg->event.rename.destination.existing_file).Sanitized());
+      AppendSanitized(str, msg->event.rename.destination.existing_file);
       break;
     case ES_DESTINATION_TYPE_NEW_PATH:
-      str.append(FilePath(msg->event.rename.destination.new_path.dir).Sanitized());
+      AppendSanitized(str, msg->event.rename.destination.new_path.dir);
       str.append("/");
-      str.append(SanitizableString(msg->event.rename.destination.new_path.filename).Sanitized());
+      AppendSanitized(str, msg->event.rename.destination.new_path.filename);
       break;
     default: str.append("(null)"); break;
   }
@@ -483,7 +481,7 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedUnlink& msg) {
   std::string str = CreateDefaultString();
 
   str.append("action=DELETE|path=");
-  str.append(FilePath(msg->event.unlink.target).Sanitized());
+  AppendSanitized(str, msg->event.unlink.target);
 
   AppendInstigator(str, msg);
 
@@ -504,11 +502,11 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedClone& msg) {
   std::string str = CreateDefaultString();
 
   str.append("action=CLONE|source=");
-  str.append(FilePath(msg->event.clone.source).Sanitized());
+  AppendSanitized(str, msg->event.clone.source);
   str.append("|target=");
-  str.append(FilePath(msg->event.clone.target_dir).Sanitized());
+  AppendSanitized(str, msg->event.clone.target_dir);
   str.append("/");
-  str.append(SanitizableString(msg->event.clone.target_name).Sanitized());
+  AppendSanitized(str, msg->event.clone.target_name);
   AppendInstigator(str, msg);
 
   return FinalizeString(str);
@@ -518,11 +516,11 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedCopyfile& msg) 
   std::string str = CreateDefaultString();
 
   str.append("action=COPYFILE|source=");
-  str.append(FilePath(msg->event.copyfile.source).Sanitized());
+  AppendSanitized(str, msg->event.copyfile.source);
   str.append("|target=");
-  str.append(FilePath(msg->event.copyfile.target_dir).Sanitized());
+  AppendSanitized(str, msg->event.copyfile.target_dir);
   str.append("/");
-  str.append(SanitizableString(msg->event.copyfile.target_name).Sanitized());
+  AppendSanitized(str, msg->event.copyfile.target_name);
   AppendInstigator(str, msg);
 
   return FinalizeString(str);
@@ -544,7 +542,7 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedProcSuspendResu
     str.append("|targetpid=");
     str.append(std::to_string(Pid(msg->event.proc_suspend_resume.target->audit_token)));
     str.append("|targetpath=");
-    str.append(FilePath(msg->event.proc_suspend_resume.target->executable).Sanitized());
+    AppendSanitized(str, msg->event.proc_suspend_resume.target->executable);
   }
 
   AppendInstigator(str, msg);
@@ -607,23 +605,22 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedScreenSharingAt
 
   if (msg->event.screensharing_attach->viewer_appleid.length > 0) {
     str.append("|viewer=");
-    str.append(SanitizableString(msg->event.screensharing_attach->viewer_appleid).Sanitized());
+    AppendSanitized(str, msg->event.screensharing_attach->viewer_appleid);
   }
 
   if (msg->event.screensharing_attach->authentication_type.length > 0) {
     str.append("|auth_type=");
-    str.append(SanitizableString(msg->event.screensharing_attach->authentication_type).Sanitized());
+    AppendSanitized(str, msg->event.screensharing_attach->authentication_type);
   }
 
   if (msg->event.screensharing_attach->authentication_username.length > 0) {
     str.append("|auth_user=");
-    str.append(
-        SanitizableString(msg->event.screensharing_attach->authentication_username).Sanitized());
+    AppendSanitized(str, msg->event.screensharing_attach->authentication_username);
   }
 
   if (msg->event.screensharing_attach->session_username.length > 0) {
     str.append("|session_user=");
-    str.append(SanitizableString(msg->event.screensharing_attach->session_username).Sanitized());
+    AppendSanitized(str, msg->event.screensharing_attach->session_username);
   }
 
   str.append("|existing_session=");
@@ -645,7 +642,7 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedScreenSharingDe
 
   if (msg->event.screensharing_detach->viewer_appleid.length > 0) {
     str.append("|viewer=");
-    str.append(SanitizableString(msg->event.screensharing_detach->viewer_appleid).Sanitized());
+    AppendSanitized(str, msg->event.screensharing_detach->viewer_appleid);
   }
 
   AppendInstigator(str, msg);
@@ -694,7 +691,7 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedLoginLogin& msg
   str.append(msg->event.login_login->success ? "true" : "false");
   if (!msg->event.login_login->success) {
     str.append("|failure=");
-    str.append(SanitizableString(msg->event.login_login->failure_message).Sanitized());
+    AppendSanitized(str, msg->event.login_login->failure_message);
   }
 
   AppendInstigator(str, msg);
@@ -987,11 +984,9 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedGatekeeperOverr
   str.append("action=GATEKEEPER_OVERRIDE|target=");
   switch (gk->file_type) {
     case ES_GATEKEEPER_USER_OVERRIDE_FILE_TYPE_PATH:
-      str.append(SanitizableString(gk->file.file_path).Sanitized());
+      AppendSanitized(str, gk->file.file_path);
       break;
-    case ES_GATEKEEPER_USER_OVERRIDE_FILE_TYPE_FILE:
-      str.append(FilePath(gk->file.file).Sanitized());
-      break;
+    case ES_GATEKEEPER_USER_OVERRIDE_FILE_TYPE_FILE: AppendSanitized(str, gk->file.file); break;
     default: break;
   }
 
@@ -1007,7 +1002,7 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedGatekeeperOverr
     }
     if (gk->signing_info->signing_id.length > 0) {
       str.append("|signing_id=");
-      str.append(SanitizableString(gk->signing_info->signing_id).Sanitized());
+      AppendSanitized(str, gk->signing_info->signing_id);
     }
     str.append("|cdhash=");
     str.append(BufToHexString(gk->signing_info->cdhash, sizeof(gk->signing_info->cdhash)));
@@ -1085,7 +1080,7 @@ std::vector<uint8_t> BasicString::SerializeMessage(const EnrichedTCCModification
   str.append("|service=");
   str.append(msg->event.tcc_modify->service.data);
   str.append("|identity=");
-  str.append(SanitizableString(msg->event.tcc_modify->identity).Sanitized());
+  AppendSanitized(str, msg->event.tcc_modify->identity);
   str.append("|identity_type=");
   str.append(GetTCCIdentityTypeString(msg->event.tcc_modify->identity_type));
   str.append("|auth_right=");
@@ -1172,7 +1167,7 @@ std::vector<uint8_t> BasicString::SerializeAllowlist(const Message& msg,
   str.append("|pidversion=");
   str.append(std::to_string(Pidversion(msg->process->audit_token)));
   str.append("|path=");
-  str.append(SanitizableString(target_path.data(), target_path.size()).Sanitized());
+  AppendSanitized(str, target_path);
   str.append("|sha256=");
   str.append(hash);
 

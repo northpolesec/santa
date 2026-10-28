@@ -1,4 +1,5 @@
 /// Copyright 2022 Google Inc. All rights reserved.
+/// Copyright 2026 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -14,98 +15,54 @@
 
 #include "Source/santad/Logs/EndpointSecurity/Serializers/SanitizableString.h"
 
+#include <array>
+
 #include "Source/common/String.h"
 
 using santa::NSStringToUTF8StringView;
 
 namespace santa {
 
-SanitizableString::SanitizableString(const es_file_t* file)
-    : data_(file->path.data, file->path.length) {}
+namespace {
 
-SanitizableString::SanitizableString(const es_string_token_t& tok) : data_(tok.data, tok.length) {}
+constexpr std::array<bool, 256> kNeedsEscape = [] {
+  std::array<bool, 256> t{};
+  t['|'] = t['\n'] = t['\r'] = true;
+  return t;
+}();
 
-SanitizableString::SanitizableString(NSString* str) : data_(NSStringToUTF8StringView(str)) {}
+}  // namespace
 
-SanitizableString::SanitizableString(const char* str, size_t len) : data_(str, len) {}
-
-std::string_view SanitizableString::String() const {
-  return data_;
-}
-
-std::string_view SanitizableString::Sanitized() const {
-  if (!sanitized_) {
-    sanitized_ = true;
-    sanitized_string_ = SanitizeString(data_.data(), data_.length());
-  }
-
-  if (sanitized_string_.has_value()) {
-    return sanitized_string_.value();
-  } else {
-    return data_;
-  }
-}
-
-std::ostream& operator<<(std::ostream& ss, const SanitizableString& sani_string) {
-  ss << sani_string.Sanitized();
-  return ss;
-}
-
-std::optional<std::string> SanitizableString::SanitizeString(const char* str) {
-  return SanitizeString(str, str ? strlen(str) : 0);
-}
-
-std::optional<std::string> SanitizableString::SanitizeString(const char* str, size_t length) {
-  size_t strOffset = 0;
-  char c = 0;
-  std::string buf;
-  bool reservedStringSpace = false;
-
-  if (!str) {
-    return std::nullopt;
-  }
-
-  if (length < 1) {
-    return std::nullopt;
-  }
-
-  // Loop through the string one character at a time, looking for the characters
-  // we want to remove.
-  for (const char* p = str; (c = *p) != 0; ++p) {
-    if (c == '|' || c == '\n' || c == '\r') {
-      if (!reservedStringSpace) {
-        // Assume the common case won't grow the string length by more than a
-        // factor of 2. String will grow more if it needs to.
-        buf.reserve(length * 2);
-        reservedStringSpace = true;
-      }
-
-      // Copy from the last offset up to the character we just found into the buffer
-      ptrdiff_t diff = p - str;
-      buf.append(str + strOffset, diff - strOffset);
-
-      // Update the buffer and string offsets
-      strOffset = diff + 1;
-
-      // Replace the found character and advance the buffer offset
-      switch (c) {
-        case '|': buf.append("<pipe>"); break;
-        case '\n': buf.append("\\n"); break;
-        case '\r': buf.append("\\r"); break;
-      }
+void AppendSanitized(std::string& dst, std::string_view src) {
+  size_t start = 0;
+  for (size_t i = 0; i < src.size(); ++i) {
+    unsigned char c = src[i];
+    if (!kNeedsEscape[c]) {
+      continue;
     }
+
+    dst.append(src.substr(start, i - start));
+    switch (c) {
+      case '|': dst.append("<pipe>"); break;
+      case '\n': dst.append("\\n"); break;
+      case '\r': dst.append("\\r"); break;
+    }
+    start = i + 1;
   }
 
-  if (strOffset > 0 && strOffset < length) {
-    // Copy any characters from the last match to the end of the string into the buffer.
-    buf.append(str + strOffset, length - strOffset);
-  }
+  dst.append(src.substr(start));
+}
 
-  if (reservedStringSpace) {
-    return buf;
-  }
+void AppendSanitized(std::string& dst, const es_file_t* file) {
+  AppendSanitized(dst, std::string_view(file->path.data, file->path.length));
+}
 
-  return std::nullopt;
+void AppendSanitized(std::string& dst, const es_string_token_t& tok) {
+  AppendSanitized(dst, std::string_view(tok.data, tok.length));
+}
+
+void AppendSanitized(std::string& dst, NSString* str) {
+  AppendSanitized(dst, NSStringToUTF8StringView(str));
 }
 
 }  // namespace santa

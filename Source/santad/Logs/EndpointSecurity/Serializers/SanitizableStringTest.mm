@@ -1,4 +1,5 @@
 /// Copyright 2022 Google Inc. All rights reserved.
+/// Copyright 2026 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -15,76 +16,78 @@
 #include "Source/santad/Logs/EndpointSecurity/Serializers/SanitizableString.h"
 
 #include <EndpointSecurity/ESTypes.h>
-#import <OCMock/OCMock.h>
 #import <XCTest/XCTest.h>
-#include <sstream>
+#include <string>
 #include <string_view>
 
 #include "Source/common/TestUtils.h"
 
-using santa::SanitizableString;
+using santa::AppendSanitized;
+
+static std::string Sanitize(std::string_view src) {
+  std::string dst;
+  AppendSanitized(dst, src);
+  return dst;
+}
 
 @interface SanitizableStringTest : XCTestCase
 @end
 
 @implementation SanitizableStringTest
 
-- (void)testSanitizeString {
-  const char* empty = "";
-  size_t emptyLen = strlen(empty);
-  const char* noSanitize = "nothing_to_sanitize";
-  size_t noSanitizeLen = strlen(noSanitize);
-  const char* sanitizable = "sani|tizable";
-  size_t sanitizableLen = strlen(sanitizable);
+- (void)testAppendSanitized {
+  XCTAssertCppStringEqual(Sanitize(""), "");
+  XCTAssertCppStringEqual(Sanitize("nothing_to_sanitize"), "nothing_to_sanitize");
 
-  // NULL pointers are handled
-  XCTAssertFalse(SanitizableString::SanitizeString(NULL).has_value());
+  XCTAssertCppStringEqual(Sanitize("|"), "<pipe>");
+  XCTAssertCppStringEqual(Sanitize("\n"), "\\n");
+  XCTAssertCppStringEqual(Sanitize("\r"), "\\r");
 
-  // Non-sanitized strings return std::nullopt
-  XCTAssertEqual(std::nullopt, SanitizableString::SanitizeString(empty));
-  XCTAssertEqual(std::nullopt, SanitizableString::SanitizeString(noSanitize));
+  XCTAssertCppStringEqual(Sanitize("a\nb\rc|"), "a\\nb\\rc<pipe>");
+  XCTAssertCppStringEqual(Sanitize("a|trail"), "a<pipe>trail");
+  XCTAssertCppStringEqual(Sanitize("||"), "<pipe><pipe>");
 
-  // Intentional pointer compare to ensure the data member of the returned
-  // string_view matches the original buffer when not sanitized, and not equal
-  // when the string needs sanitization
-  XCTAssertEqual(empty, SanitizableString(empty, emptyLen).Sanitized().data());
-  XCTAssertEqual(noSanitize, SanitizableString(noSanitize, noSanitizeLen).Sanitized().data());
-  XCTAssertNotEqual(sanitizable, SanitizableString(sanitizable, sanitizableLen).Sanitized().data());
-
-  // Ensure the `String` method always returns the unsanitized buffer
-  XCTAssertEqual(empty, SanitizableString(empty, emptyLen).String().data());
-  XCTAssertEqual(noSanitize, SanitizableString(noSanitize, noSanitizeLen).String().data());
-  XCTAssertEqual(sanitizable, SanitizableString(sanitizable, sanitizableLen).String().data());
-
-  XCTAssertCStringEqual(SanitizableString(@"|").Sanitized().data(), "<pipe>");
-  XCTAssertCStringEqual(SanitizableString(@"\n").Sanitized().data(), "\\n");
-  XCTAssertCStringEqual(SanitizableString(@"\r").Sanitized().data(), "\\r");
-
-  XCTAssertCStringEqual(SanitizableString(@"a\nb\rc|").Sanitized().data(), "a\\nb\\rc<pipe>");
-  XCTAssertCStringEqual(SanitizableString(@"a|trail").Sanitized().data(), "a<pipe>trail");
+  // Existing contents of dst are preserved
+  std::string dst = "prefix=";
+  AppendSanitized(dst, "x|y");
+  XCTAssertCppStringEqual(dst, "prefix=x<pipe>y");
 
   // Handle some long strings
-  NSString* base = [NSString stringWithFormat:@"%@|abc", [@"" stringByPaddingToLength:66 * 1024
-                                                                           withString:@"A"
-                                                                      startingAtIndex:0]];
-
-  NSString* want = [NSString stringWithFormat:@"%@<pipe>abc", [@"" stringByPaddingToLength:66 * 1024
-                                                                                withString:@"A"
-                                                                           startingAtIndex:0]];
-
-  XCTAssertCStringEqual(SanitizableString(base).Sanitized().data(), [want UTF8String]);
+  std::string base(66 * 1024, 'A');
+  XCTAssertCppStringEqual(Sanitize(base + "|abc"), base + "<pipe>abc");
 }
 
-- (void)testStream {
-  // Test that using the `<<` operator will sanitize the string
-  std::ostringstream ss;
+- (void)testSanitizesFullLength {
+  // Compare std::strings directly; C string comparison would stop at the NUL.
+  std::string_view src("a\0|b", 4);
+  XCTAssertTrue(Sanitize(src) == std::string("a\0<pipe>b", 9));
+
+  // Only `length` bytes are read
+  std::string_view prefix("ab|cd", 2);
+  XCTAssertCppStringEqual(Sanitize(prefix), "ab");
+}
+
+- (void)testOverloads {
   const char* sanitizable = "sani|tizable";
   const char* sanitized = "sani<pipe>tizable";
+
+  std::string dst;
   es_string_token_t tok = {.length = strlen(sanitizable), .data = sanitizable};
+  AppendSanitized(dst, tok);
+  XCTAssertCppStringEqual(dst, sanitized);
 
-  ss << SanitizableString(tok);
+  dst.clear();
+  es_file_t file = MakeESFile(sanitizable);
+  AppendSanitized(dst, &file);
+  XCTAssertCppStringEqual(dst, sanitized);
 
-  XCTAssertCStringEqual(ss.str().c_str(), sanitized);
+  dst.clear();
+  AppendSanitized(dst, @"sani|tizable");
+  XCTAssertCppStringEqual(dst, sanitized);
+
+  dst.clear();
+  AppendSanitized(dst, (NSString*)nil);
+  XCTAssertCppStringEqual(dst, "");
 }
 
 @end

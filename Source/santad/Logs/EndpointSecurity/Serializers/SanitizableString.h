@@ -1,4 +1,5 @@
 /// Copyright 2022 Google Inc. All rights reserved.
+/// Copyright 2026 North Pole Security, Inc.
 ///
 /// Licensed under the Apache License, Version 2.0 (the "License");
 /// you may not use this file except in compliance with the License.
@@ -18,43 +19,18 @@
 #include <EndpointSecurity/EndpointSecurity.h>
 #import <Foundation/Foundation.h>
 
-#include <optional>
-#include <sstream>
 #include <string>
+#include <string_view>
 
 namespace santa {
 
-// Small helper class that will sanitize a given string, but will only use new
-// memory if the string required sanitization. If the string is already
-// sanitized, this class only uses the given buffers.
-class SanitizableString {
- public:
-  SanitizableString(const es_file_t* file);
-  SanitizableString(const es_string_token_t& tok);
-  SanitizableString(const char* str, size_t len);
-  SanitizableString(NSString* str);
-
-  SanitizableString(SanitizableString&& other) = delete;
-  SanitizableString(const SanitizableString& other) = delete;
-  SanitizableString& operator=(const SanitizableString& rhs) = delete;
-  SanitizableString& operator=(SanitizableString&& rhs) = delete;
-
-  // Return the original, unsanitized string
-  std::string_view String() const;
-
-  // Return the sanitized string
-  std::string_view Sanitized() const;
-
-  static std::optional<std::string> SanitizeString(const char* str);
-  static std::optional<std::string> SanitizeString(const char* str, size_t length);
-
-  friend std::ostream& operator<<(std::ostream& ss, const SanitizableString& sani_string);
-
- private:
-  std::string_view data_;
-  mutable bool sanitized_ = false;
-  mutable std::optional<std::string> sanitized_string_;
-};
+// Append `src` to `dst`, replacing the characters that would break the
+// '|'-delimited log format: '|' with "<pipe>", '\n' with "\\n" and '\r' with
+// "\\r". The full length of `src` is sanitized.
+void AppendSanitized(std::string& dst, std::string_view src);
+void AppendSanitized(std::string& dst, const es_file_t* file);
+void AppendSanitized(std::string& dst, const es_string_token_t& tok);
+void AppendSanitized(std::string& dst, NSString* str);
 
 }  // namespace santa
 

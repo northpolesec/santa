@@ -1788,7 +1788,6 @@ santa_unit_test(
     deps = [
         ":EndpointSecuritySanitizableString",
         "//Source/common:TestUtils",
-        "@OCMock",
     ],
 )
 
