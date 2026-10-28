@@ -56,6 +56,26 @@ namespace pbv1 = ::santa::pb::v1;
 
 namespace santa {
 
+namespace {
+
+// Large enough that typical events, including execs, need no heap arena blocks.
+constexpr size_t kEventArenaInitialBlockSize = 8 * 1024;
+
+// Arena for serializing one event, with its first block on the stack. Events
+// that outgrow it get heap blocks as usual.
+class EventArena {
+ public:
+  EventArena() : arena_(initial_block_, sizeof(initial_block_)) {}
+  Arena* get() { return &arena_; }
+
+ private:
+  // Declared before arena_ so that it outlives the arena.
+  alignas(8) char initial_block_[kEventArenaInitialBlockSize];
+  Arena arena_;
+};
+
+}  // namespace
+
 std::shared_ptr<Protobuf> Protobuf::Create(std::shared_ptr<EndpointSecurityAPI> esapi,
                                            SNTDecisionCache* decision_cache, bool json) {
   return std::make_shared<Protobuf>(esapi, std::move(decision_cache), json);
@@ -499,8 +519,8 @@ std::vector<uint8_t> Protobuf::FinalizeProto(::pbv1::SantaMessage* santa_msg) {
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedClose& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
 
   ::pbv1::Close* pb_close = santa_msg->mutable_close();
 
@@ -512,8 +532,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedClose& msg) {
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedExchange& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
 
   ::pbv1::Exchangedata* pb_exchangedata = santa_msg->mutable_exchangedata();
 
@@ -541,8 +561,8 @@ void EncodeEntitlements(::pbv1::Execution* pb_exec, SNTCachedDecision* cd) {
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedExec& msg, SNTCachedDecision* cd) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
 
   ::pbv1::Execution* pb_exec = santa_msg->mutable_execution();
 
@@ -639,8 +659,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedExec& msg, SNTCach
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedExit& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
 
   ::pbv1::Exit* pb_exit = santa_msg->mutable_exit();
 
@@ -651,8 +671,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedExit& msg) {
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedFork& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
 
   ::pbv1::Fork* pb_fork = santa_msg->mutable_fork();
 
@@ -663,8 +683,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedFork& msg) {
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedLink& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
 
   ::pbv1::Link* pb_link = santa_msg->mutable_link();
   EncodeProcessInfoLight(pb_link->mutable_instigator(), msg);
@@ -676,8 +696,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedLink& msg) {
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedRename& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
 
   ::pbv1::Rename* pb_rename = santa_msg->mutable_rename();
   EncodeProcessInfoLight(pb_rename->mutable_instigator(), msg);
@@ -695,8 +715,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedRename& msg) {
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedUnlink& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
 
   ::pbv1::Unlink* pb_unlink = santa_msg->mutable_unlink();
   EncodeProcessInfoLight(pb_unlink->mutable_instigator(), msg);
@@ -706,8 +726,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedUnlink& msg) {
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedCSInvalidated& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
 
   ::pbv1::CodesigningInvalidated* pb_cs_invalidated = santa_msg->mutable_codesigning_invalidated();
   EncodeProcessInfoLight(pb_cs_invalidated->mutable_instigator(), msg);
@@ -727,8 +747,8 @@ static ::pbv1::ProcSuspendResume::Type GetProcSuspendResumeType(
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedProcSuspendResume& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
 
   ::pbv1::ProcSuspendResume* pb_psr = santa_msg->mutable_proc_suspend_resume();
   EncodeProcessInfoLight(pb_psr->mutable_instigator(), msg);
@@ -742,8 +762,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedProcSuspendResume&
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedClone& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
 
   ::pbv1::Clone* pb_clone = santa_msg->mutable_clone();
   EncodeProcessInfoLight(pb_clone->mutable_instigator(), msg);
@@ -754,8 +774,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedClone& msg) {
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedCopyfile& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
 
   ::pbv1::Copyfile* pb_copyfile = santa_msg->mutable_copyfile();
   EncodeProcessInfoLight(pb_copyfile->mutable_instigator(), msg);
@@ -810,8 +830,8 @@ static inline void EncodeUserInfo(F&& lazy_f, const es_string_token_t& name) {
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedLoginWindowSessionLogin& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
   ::pbv1::LoginWindowSessionLogin* pb_lw_login =
       santa_msg->mutable_login_window_session()->mutable_login();
 
@@ -826,8 +846,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedLoginWindowSession
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedLoginWindowSessionLogout& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
   ::pbv1::LoginWindowSessionLogout* pb_lw_logout =
       santa_msg->mutable_login_window_session()->mutable_logout();
 
@@ -842,8 +862,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedLoginWindowSession
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedLoginWindowSessionLock& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
   ::pbv1::LoginWindowSessionLock* pb_lw_lock =
       santa_msg->mutable_login_window_session()->mutable_lock();
 
@@ -857,8 +877,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedLoginWindowSession
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedLoginWindowSessionUnlock& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
   ::pbv1::LoginWindowSessionUnlock* pb_lw_unlock =
       santa_msg->mutable_login_window_session()->mutable_unlock();
 
@@ -873,8 +893,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedLoginWindowSession
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedScreenSharingAttach& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
   ::pbv1::ScreenSharingAttach* pb_attach = santa_msg->mutable_screen_sharing()->mutable_attach();
 
   EncodeProcessInfoLight(pb_attach->mutable_instigator(), msg);
@@ -901,8 +921,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedScreenSharingAttac
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedScreenSharingDetach& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
   ::pbv1::ScreenSharingDetach* pb_detach = santa_msg->mutable_screen_sharing()->mutable_detach();
 
   EncodeProcessInfoLight(pb_detach->mutable_instigator(), msg);
@@ -919,8 +939,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedScreenSharingDetac
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedOpenSSHLogin& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
   ::pbv1::OpenSSHLogin* pb_ssh_login = santa_msg->mutable_open_ssh()->mutable_login();
 
   EncodeProcessInfoLight(pb_ssh_login->mutable_instigator(), msg);
@@ -940,8 +960,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedOpenSSHLogin& msg)
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedOpenSSHLogout& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
   ::pbv1::OpenSSHLogout* pb_ssh_logout = santa_msg->mutable_open_ssh()->mutable_logout();
 
   EncodeProcessInfoLight(pb_ssh_logout->mutable_instigator(), msg);
@@ -956,8 +976,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedOpenSSHLogout& msg
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedLoginLogin& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
   ::pbv1::Login* pb_login = santa_msg->mutable_login_logout()->mutable_login();
 
   EncodeProcessInfoLight(pb_login->mutable_instigator(), msg);
@@ -975,8 +995,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedLoginLogin& msg) {
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedLoginLogout& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
   ::pbv1::Logout* pb_logout = santa_msg->mutable_login_logout()->mutable_logout();
 
   EncodeProcessInfoLight(pb_logout->mutable_instigator(), msg);
@@ -1010,8 +1030,8 @@ static inline void EncodeEventInstigatorOrFallback(const EnrichedEventWithInstig
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedAuthenticationOD& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
 
   ::pbv1::Authentication* pb_auth = santa_msg->mutable_authentication();
   pb_auth->set_success(msg->event.authentication->success);
@@ -1041,8 +1061,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedAuthenticationOD& 
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedAuthenticationTouchID& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
 
   ::pbv1::Authentication* pb_auth = santa_msg->mutable_authentication();
   pb_auth->set_success(msg->event.authentication->success);
@@ -1064,8 +1084,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedAuthenticationTouc
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedAuthenticationToken& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
 
   ::pbv1::Authentication* pb_auth = santa_msg->mutable_authentication();
   pb_auth->set_success(msg->event.authentication->success);
@@ -1097,8 +1117,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedAuthenticationToke
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedAuthenticationAutoUnlock& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
 
   ::pbv1::Authentication* pb_auth = santa_msg->mutable_authentication();
   pb_auth->set_success(msg->event.authentication->success);
@@ -1130,8 +1150,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedAuthenticationAuto
 
 std::vector<uint8_t> Protobuf::SerializeMessageLaunchItemAdd(const EnrichedLaunchItem& msg) {
   assert(msg->event_type == ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_ADD);
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
 
   const es_event_btm_launch_item_add_t* btm = msg->event.btm_launch_item_add;
 
@@ -1168,8 +1188,8 @@ std::vector<uint8_t> Protobuf::SerializeMessageLaunchItemAdd(const EnrichedLaunc
 
 std::vector<uint8_t> Protobuf::SerializeMessageLaunchItemRemove(const EnrichedLaunchItem& msg) {
   assert(msg->event_type == ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_REMOVE);
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
 
   const es_event_btm_launch_item_remove_t* btm = msg->event.btm_launch_item_remove;
 
@@ -1216,8 +1236,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedLaunchItem& msg) {
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedXProtectDetected& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
 
   ::pbv1::XProtect* pb_xp = santa_msg->mutable_xprotect();
   ::pbv1::XProtectDetected* pb_xp_detected = pb_xp->mutable_detected();
@@ -1238,8 +1258,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedXProtectDetected& 
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedXProtectRemediated& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
 
   ::pbv1::XProtect* pb_xp = santa_msg->mutable_xprotect();
   ::pbv1::XProtectRemediated* pb_xp_remediated = pb_xp->mutable_remediated();
@@ -1291,8 +1311,8 @@ static inline void EncodeFileInfo(::pbv1::FileInfo* pb_file, es_string_token_t p
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedGatekeeperOverride& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
   ::pbv1::GatekeeperOverride* pb_gk = santa_msg->mutable_gatekeeper_override();
   es_event_gatekeeper_user_override_t* gk = msg->event.gatekeeper_user_override;
 
@@ -1402,8 +1422,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedGatekeeperOverride
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedTCCModification& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
 
   const es_event_tcc_modify_t* tcc = msg->event.tcc_modify;
 
@@ -1435,10 +1455,10 @@ std::vector<uint8_t> Protobuf::SerializeNetworkFlows(SNDProcessFlows* processFlo
                                                      struct timespec window_start,
                                                      struct timespec window_end,
                                                      SNTCachedDecision* cd) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, window_start, window_end);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), window_start, window_end);
   auto* process = santa_msg->mutable_network_activity()->add_processes();
-  santanetd::PopulateNetworkActivityProcess(&arena, process, processFlows, cd);
+  santanetd::PopulateNetworkActivityProcess(arena.get(), process, processFlows, cd);
   // A process with no connections in the window produces no message.
   if (process->flows_size() == 0) {
     return {};
@@ -1450,10 +1470,10 @@ std::vector<uint8_t> Protobuf::SerializeDNSActivity(SNDProcessFlows* processFlow
                                                     struct timespec window_start,
                                                     struct timespec window_end,
                                                     SNTCachedDecision* cd) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, window_start, window_end);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), window_start, window_end);
   auto* process = santa_msg->mutable_dns_activity()->add_processes();
-  santanetd::PopulateDNSActivityProcess(&arena, process, processFlows, cd);
+  santanetd::PopulateDNSActivityProcess(arena.get(), process, processFlows, cd);
   // A process with no questions in the window produces no message.
   if (process->questions_size() == 0 && process->questions_dropped() == 0) {
     return {};
@@ -1464,12 +1484,12 @@ std::vector<uint8_t> Protobuf::SerializeDNSActivity(SNDProcessFlows* processFlow
 void Protobuf::SerializeNetworkActivities(SNDProcessFlows* flows, struct timespec start,
                                           struct timespec end, SNTCachedDecision* cd, bool network,
                                           bool dns, const ActivityWriter& write) {
-  Arena arena;
+  EventArena arena;
   // The collector may allocate on the arena, so its targets live there too.
-  auto* connections = Arena::Create<pbv1::NetworkActivity::Process>(&arena);
-  auto* questions = Arena::Create<pbv1::DNSActivity::Process>(&arena);
-  if (network) santanetd::PopulateNetworkActivityProcess(&arena, connections, flows, cd);
-  if (dns) santanetd::PopulateDNSActivityProcess(&arena, questions, flows, cd);
+  auto* connections = Arena::Create<pbv1::NetworkActivity::Process>(arena.get());
+  auto* questions = Arena::Create<pbv1::DNSActivity::Process>(arena.get());
+  if (network) santanetd::PopulateNetworkActivityProcess(arena.get(), connections, flows, cd);
+  if (dns) santanetd::PopulateDNSActivityProcess(arena.get(), questions, flows, cd);
   SerializeNetworkActivityProtos(*connections, *questions, start, end, write);
 }
 
@@ -1554,8 +1574,8 @@ std::vector<uint8_t> Protobuf::SerializeFileAccess(
     const EnrichedProcess& enriched_process, size_t target_index,
     std::optional<santa::EnrichedFile> enriched_event_target, FileAccessPolicyDecision decision,
     std::string_view operation_id, int64_t rule_id) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
 
   ::pbv1::FileAccess* file_access = santa_msg->mutable_file_access();
 
@@ -1587,8 +1607,8 @@ std::vector<uint8_t> Protobuf::SerializeFileAccess(
 
 std::vector<uint8_t> Protobuf::SerializeAllowlist(const Message& msg, const std::string_view hash,
                                                   const std::string_view target_path) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get());
 
   const es_file_t* es_file = santa::GetAllowListTargetFile(msg);
 
@@ -1614,8 +1634,8 @@ std::vector<uint8_t> Protobuf::SerializeAllowlist(const Message& msg, const std:
 }
 
 std::vector<uint8_t> Protobuf::SerializeBundleHashingEvent(SNTStoredExecutionEvent* event) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get());
 
   ::pbv1::Bundle* pb_bundle = santa_msg->mutable_bundle();
 
@@ -1682,8 +1702,8 @@ static void EncodeDisk(::pbv1::Disk* pb_disk, ::pbv1::Disk_Action action, NSDict
 }
 
 std::vector<uint8_t> Protobuf::SerializeDiskAppeared(NSDictionary* props, bool allowed) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get());
 
   EncodeDisk(santa_msg->mutable_disk(),
              allowed ? ::pbv1::Disk::ACTION_APPEARED : ::pbv1::Disk::ACTION_BLOCKED, props,
@@ -1693,8 +1713,8 @@ std::vector<uint8_t> Protobuf::SerializeDiskAppeared(NSDictionary* props, bool a
 }
 
 std::vector<uint8_t> Protobuf::SerializeDiskDisappeared(NSDictionary* props) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get());
 
   EncodeDisk(santa_msg->mutable_disk(), ::pbv1::Disk::ACTION_DISAPPEARED, props, true);
 
