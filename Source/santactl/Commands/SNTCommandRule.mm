@@ -536,15 +536,26 @@ BOOL SNTCommandRuleChangesAreRefused(NSURL* syncBaseURL, NSUInteger staticRuleCo
   //    "custom_url" : "",
   //    "custom_msg" : "/bin/ls block for demo"
   //  }]}
-  NSDictionary* rules = [NSJSONSerialization JSONObjectWithData:data options:0 error:&error];
-  if (error) {
+  id parsed = [NSJSONSerialization JSONObjectWithData:data options:0 error:&error];
+  if (error || ![parsed isKindOfClass:[NSDictionary class]]) {
     [self printErrorUsageAndExit:[NSString stringWithFormat:@"Failed to parse %@: %@", jsonFilePath,
                                                             error.localizedDescription]];
   }
 
+  // The file is untrusted input: the root must be an object and "rules" must be an array of
+  // objects, or the enumeration below would send the wrong selector to the wrong type.
+  id ruleList = parsed[@"rules"];
+  if (![ruleList isKindOfClass:[NSArray class]]) {
+    [self printErrorUsageAndExit:[NSString stringWithFormat:@"%@ must contain a \"rules\" array",
+                                                            jsonFilePath]];
+  }
+
   NSMutableArray<SNTRule*>* parsedRules = [[NSMutableArray alloc] init];
 
-  for (NSDictionary* jsonRule in rules[@"rules"]) {
+  for (id jsonRule in ruleList) {
+    if (![jsonRule isKindOfClass:[NSDictionary class]]) {
+      [self printErrorUsageAndExit:[NSString stringWithFormat:@"Invalid rule: %@", jsonRule]];
+    }
     NSError* error;
     SNTRule* rule = [[SNTRule alloc] initWithDictionary:jsonRule error:&error];
     if (!rule) {

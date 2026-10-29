@@ -142,6 +142,14 @@ typedef NS_ENUM(NSInteger, SNTExecutableIntegrityPolicy) {
   SNTExecutableIntegrityPolicyIgnore = 3,
 };
 
+// A bool setting received from a sync server. Unset clears the synced value so the profile value
+// or the default governs.
+typedef NS_ENUM(NSInteger, SNTSyncedBool) {
+  SNTSyncedBoolUnset = 0,
+  SNTSyncedBoolFalse = 1,
+  SNTSyncedBoolTrue = 2,
+};
+
 /// How a held execution must be authorized by the user. Set from the CEL return
 /// value that held the execution; Standalone mode holds always use Touch ID.
 ///

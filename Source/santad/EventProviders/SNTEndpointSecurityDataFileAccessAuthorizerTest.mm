@@ -38,6 +38,7 @@
 #include <vector>
 
 #import "Source/common/SNTConfigurator.h"
+#include "Source/common/SystemResources.h"
 #include "Source/common/TestUtils.h"
 #include "Source/common/es/ESCacheFlusher.h"
 #include "Source/common/es/MockEndpointSecurityAPI.h"
@@ -239,6 +240,10 @@ void ActivateDataFAA(DataFAAHarness& h) {
 }
 
 - (void)tearDown {
+#ifdef DEBUG
+  SetBootVolumeGroupDevForTesting(std::nullopt);
+  SetBootVolumeGroupDevUnavailableForTesting(false);
+#endif
   [super tearDown];
 }
 
@@ -499,6 +504,13 @@ void ActivateDataFAA(DataFAAHarness& h) {
   es_file_t instigatorFile = MakeESFile("foo");
   es_process_t instigator = MakeESProcess(&instigatorFile);
   es_file_t execFile = MakeESFile("santabundleservice");
+#ifndef DEBUG
+  XCTSkip(@"the boot volume group overrides are DEBUG-only and are not built with -c opt");
+#else
+  // A system-protected target, so the authorizer lets ES cache the ALLOW.
+  execFile.stat.st_flags |= SF_RESTRICTED;
+  SetBootVolumeGroupDevForTesting(execFile.stat.st_dev);
+#endif
   es_process_t execProc = MakeESProcess(&execFile, MakeAuditToken(12, 23), MakeAuditToken(34, 45));
   execProc.codesigning_flags = CS_SIGNED | CS_VALID;
   execProc.team_id = MakeESStringToken("ZMCG7MLDV9");
@@ -508,8 +520,8 @@ void ActivateDataFAA(DataFAAHarness& h) {
 
   // Warm the local and modeled ES caches while Data FAA is disabled
   santa::ExecTarget target = santa::ExecTarget::ForExecEvent(&esMsg);
-  h.authResultCache->AddToCache(target, SNTActionRequestBinary);
-  h.authResultCache->AddToCache(target, SNTActionRespondAllow);
+  uint64_t r = h.authResultCache->Reserve(target, {});
+  h.authResultCache->AddToCache(target, SNTActionRespondAllow, nil, r);
   XCTAssertTrue(h.DeliverExec(&esMsg));
   XCTAssertTrue(h.execCached->load());
   // The cached exec is not delivered again

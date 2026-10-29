@@ -317,6 +317,31 @@
   XCTAssertEqualWithAccuracy(settings.dnsUpstreamTimeoutSecs, 30.0, 0.0001);
 }
 
+- (void)testGenerateSettingsCarriesTheTelemetryBits {
+  // Unset key: everything. A list carries only what it names.
+  [self stubConfiguratorEnable:YES action:SNTNetworkFlowDefaultActionDeny];
+  // OCMock uses the first matching stub, so one stub reads a variable.
+  __block NSArray<NSString*>* telemetry = nil;
+  OCMStub([self.mockConfigurator telemetry]).andDo(^(NSInvocation* invocation) {
+    NSArray* t = telemetry;
+    [invocation setReturnValue:&t];
+  });
+  struct Case {
+    NSArray<NSString*>* telemetry;
+    BOOL flows;
+    BOOL dns;
+  };
+  for (const Case& c : std::vector<Case>{{nil, YES, YES},
+                                         {@[ @"NetworkActivity" ], YES, NO},
+                                         {@[ @"DNSActivity" ], NO, YES},
+                                         {@[ @"Execution" ], NO, NO}}) {
+    telemetry = c.telemetry;
+    SNTNetworkExtensionSettings* s = [self.sut generateSettingsForProtocolVersion:@"1.2"];
+    XCTAssertEqual(s.networkActivityTelemetry, c.flows, @"%@", c.telemetry);
+    XCTAssertEqual(s.dnsActivityTelemetry, c.dns, @"%@", c.telemetry);
+  }
+}
+
 - (void)testGenerateSettingsIgnoresSyncBelowProtocolV1 {
   [self stubConfiguratorEnable:YES action:SNTNetworkFlowDefaultActionDeny dnsTimeout:7.5];
   SNTNetworkExtensionSettings* settings = [self.sut generateSettingsForProtocolVersion:@"0.9"];

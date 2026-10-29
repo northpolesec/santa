@@ -108,27 +108,41 @@ AuthResultCache::~AuthResultCache() {
   delete nonroot_cache_;
 }
 
+uint64_t AuthResultCache::Reserve(const ExecTarget& target, const CachedAuthResult& expected) {
+  const AuthResultKey& key = target.key;
+  uint64_t token = next_reservation_.fetch_add(1, std::memory_order_relaxed);
+  return CacheForVnodeID(key.vnode)->set(
+             key, CachedAuthResult{SNTActionRequestBinary, token, nil, target.identity}, expected)
+             ? token
+             : 0;
+}
+
 bool AuthResultCache::AddToCache(const ExecTarget& target, SNTAction decision,
-                                 SNTCachedDecision* cd) {
+                                 SNTCachedDecision* cd, uint64_t reservation) {
   const AuthResultKey& key = target.key;
   SantaCache<AuthResultKey, CachedAuthResult>* cache = CacheForVnodeID(key.vnode);
-  CachedAuthResult requestBinary = {SNTActionRequestBinary, 0, nil, target.identity};
+  CachedAuthResult requestBinary = {SNTActionRequestBinary, reservation, nil, target.identity};
+  CachedAuthResult hold = {SNTActionRespondHold, reservation, nil, target.identity};
 
   switch (decision) {
-    // SNTActionRequestBinary and SNTActionRespondHold are not terminal states and should not
-    // contain a timestamp to allow for proper transitions out of the state.
-    case SNTActionRequestBinary: return cache->set(key, requestBinary, CachedAuthResult{});
+    // SNTActionRespondHold is not a terminal state. Like the marker, it carries the reservation
+    // in timestamp so only this reservation can transition out of it.
     case SNTActionRespondHold:
       // A transitive hold keeps its decision so a concurrent execution can tell
       // what the hold is waiting for. Its identity is always confirmed.
       return cache->set(
           key,
-          CachedAuthResult{SNTActionRespondHold, 0, cd.heldForTransitiveRule ? [cd copy] : nil,
-                           target.identity},
+          CachedAuthResult{SNTActionRespondHold, reservation,
+                           cd.heldForTransitiveRule ? [cd copy] : nil, target.identity},
           requestBinary);
 
     case SNTActionRespondAllow: OS_FALLTHROUGH;
-    case SNTActionRespondAllowCompiler: OS_FALLTHROUGH;
+    case SNTActionRespondAllowCompiler:
+      return cache->set(key,
+                        CachedAuthResult{decision, GetCurrentUptime(), nil, target.identity,
+                                         (cd && !cd.identityMismatched) ? cd.sha256 : nil},
+                        requestBinary);
+
     case SNTActionRespondDeny:
       return cache->set(key, CachedAuthResult{decision, GetCurrentUptime(), nil, target.identity},
                         requestBinary);
@@ -179,17 +193,13 @@ bool AuthResultCache::AddToCache(const ExecTarget& target, SNTAction decision,
     // cached action is translated to SNTActionRespondAllow or SNTActionRespondDeny respectively.
     // We do not want to cache this result and later execs need to go through this path again.
     case SNTActionHoldAllowed: OS_FALLTHROUGH;
-    case SNTActionHoldDenied: cache->remove(key); return YES;
+    case SNTActionHoldDenied: return cache->set(key, CachedAuthResult{}, hold);
 
     default:
       // This is a programming error. Bail.
       LOGE(@"Invalid cache value, exiting.");
       exit(EXIT_FAILURE);
   }
-}
-
-void AuthResultCache::RemoveFromCache(const ExecTarget& target) {
-  CacheForVnodeID(target.key.vnode)->remove(target.key);
 }
 
 CachedAuthResult AuthResultCache::CheckCache(const ExecTarget& target) {
@@ -210,9 +220,9 @@ CachedAuthResult AuthResultCache::CheckCache(const ExecTarget& target) {
     // CAS-remove rather than unconditional remove: evict only if the entry
     // still holds the value just examined, so one refreshed concurrently is
     // left alone. Equality here is CachedAuthResult::operator==, i.e. action +
-    // timestamp only. The marker states carry no timestamp, so a marker may be
-    // evicted; that is safe, because the terminal CAS that would have followed
-    // it then fails and the next exec re-validates.
+    // timestamp only. A marker may be evicted; that is safe, because the
+    // terminal CAS that would have followed it then fails and the next exec
+    // re-validates.
     cache->set(key, CachedAuthResult{}, entry);
     return {};
   }
@@ -220,7 +230,8 @@ CachedAuthResult AuthResultCache::CheckCache(const ExecTarget& target) {
   if (entry.action == SNTActionRespondDeny) {
     uint64_t expiry_time = entry.timestamp + cache_deny_time_ns_;
     if (expiry_time < GetCurrentUptime()) {
-      cache->remove(key);
+      // CAS-remove, as above.
+      cache->set(key, CachedAuthResult{}, entry);
       return {};
     }
   }

@@ -440,6 +440,38 @@ static SNTSandboxExecRequest* MakeSandboxRequest(uint64_t dev, uint64_t ino, con
              }];
 }
 
+- (void)testCriticalSystemBinaryIsDecidedWithoutStaticCodeValidation {
+  // Replace the shared SNTFileInfo mock: OCMock applies the first matching
+  // stub, so the validation stub installed in -setUp would otherwise win over
+  // the reject.
+  [self.mockFileInfo stopMocking];
+  self.mockFileInfo = OCMClassMock([SNTFileInfo class]);
+  OCMStub([self.mockFileInfo alloc]).andReturn(self.mockFileInfo);
+  OCMStub([self.mockFileInfo initWithEndpointSecurityFile:NULL error:[OCMArg setTo:nil]])
+      .ignoringNonObjectArgs()
+      .andReturn(self.mockFileInfo);
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
+  OCMReject([self.mockFileInfo codesignCheckerWithError:[OCMArg anyObjectRef]]);
+
+  SNTCachedDecision* systemCd = [[SNTCachedDecision alloc] init];
+  systemCd.decision = SNTEventStateAllowSigningID;
+  systemCd.decisionExtra = @"critical system binary";
+  NSString* signingID = [NSString stringWithFormat:@"%s:%s", kExampleTeamID, kExampleSigningID];
+  OCMStub([self.mockRuleDatabase criticalSystemBinaries]).andReturn(@{signingID : systemCd});
+
+  SNTCachedDecision* cd = [self
+      postedDecisionForExecEvent:SNTActionRespondAllow
+                  cachedDecision:nil
+                    messageSetup:^(es_message_t* msg) {
+                      msg->event.exec.target->team_id = MakeESStringToken(kExampleTeamID);
+                      msg->event.exec.target->signing_id = MakeESStringToken(kExampleSigningID);
+                    }];
+
+  XCTAssertEqual(cd.decision, SNTEventStateAllowSigningID);
+  XCTAssertEqualObjects(cd.decisionExtra, @"critical system binary");
+  OCMVerifyAll(self.mockFileInfo);
+}
+
 - (void)testBinaryAllowRule {
   OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
   OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
@@ -4971,15 +5003,25 @@ static std::shared_ptr<santa::PendingExecCoordinator> ActiveCoordinator() {
                                       replySink:(void (^)(NotificationReplyBlock))replySink
                                   notifierQueue:(id __strong*)outQueue
                                  processControl:(santa::ProcessControlBlock)processControl {
-  OCMStub([self.mockConfigurator clientMode]).andReturn(SNTClientModeMonitor);
-  [self stubExecutableIntegrityPolicy:SNTExecutableIntegrityPolicyReport];
-
   SNTRule* rule = [[SNTRule alloc] init];
   rule.state = SNTRuleStateCELv2;
   rule.type = SNTRuleTypeBinary;
   rule.celExpr =
       [NSString stringWithFormat:@"require_touchid_with_cooldown_minutes(%lu)", cooldownMinutes];
   [self stubRule:rule forIdentifiers:{.binarySHA256 = @"a"}];
+
+  return [self makeMonitorHoldControllerWithReplySink:replySink
+                                        notifierQueue:outQueue
+                                       processControl:processControl];
+}
+
+// Monitor/Report controller whose prompts go to replySink. The caller stubs the rules.
+- (SNTExecutionController*)
+    makeMonitorHoldControllerWithReplySink:(void (^)(NotificationReplyBlock))replySink
+                             notifierQueue:(id __strong*)outQueue
+                            processControl:(santa::ProcessControlBlock)processControl {
+  OCMStub([self.mockConfigurator clientMode]).andReturn(SNTClientModeMonitor);
+  [self stubExecutableIntegrityPolicy:SNTExecutableIntegrityPolicyReport];
 
   id mockNotifierQueue = OCMClassMock([SNTNotificationQueue class]);
   OCMStub([mockNotifierQueue addEvent:OCMOCK_ANY
@@ -5202,6 +5244,137 @@ static std::shared_ptr<santa::PendingExecCoordinator> ActiveCoordinator() {
   [mockNotifierQueue stopMocking];
 }
 
+// Runs `first` and approves its prompt, then runs `second`, which must prompt for
+// itself. `replies` collects the controller's prompts in order.
+- (void)approveExec:(es_message_t*)first
+    thenExpectPromptForExec:(es_message_t*)second
+               onController:(SNTExecutionController*)controller
+                    replies:(NSMutableArray<NotificationReplyBlock>*)replies {
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  EXPECT_CALL(*mockESApi, ExecArgs).WillRepeatedly(testing::Return(std::vector<std::string>{}));
+
+  SNTCachedDecision* approved = nil;
+  NSArray<NSNumber*>* actions = [self runExecMessage:first
+                                        onController:controller
+                                           mockESApi:mockESApi
+                                            decision:&approved];
+  XCTAssertEqualObjects(actions.firstObject, @(SNTActionRespondHold));
+  XCTAssertEqual(replies.count, 1UL, @"the first execution was never prompted");
+  if (replies.count != 1) return;
+  NotificationReplyBlock approve = replies.firstObject;
+  approve(YES);
+  XCTAssertEqualObjects(approved.decisionExtra, @"TouchID Approved");
+
+  SNTCachedDecision* held = nil;
+  actions = [self runExecMessage:second onController:controller mockESApi:mockESApi decision:&held];
+  XCTAssertEqualObjects(actions.firstObject, @(SNTActionRespondHold), @"decision extra: %@",
+                        held.decisionExtra);
+  XCTAssertTrue(held.holdAndAsk);
+  XCTAssertEqual(replies.count, 2UL, @"the second execution was never prompted");
+
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+}
+
+// A cooldown approval applies to the slice it was given for.
+- (void)testCooldownApprovalAppliesToTheSliceItWasGivenFor {
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
+
+  auto celRule = [](NSString* expr) {
+    SNTRule* rule = [[SNTRule alloc] init];
+    rule.state = SNTRuleStateCELv2;
+    rule.type = SNTRuleTypeSigningID;
+    rule.celExpr = expr;
+    return rule;
+  };
+  NSDictionary<NSString*, SNTRule*>* rules = @{
+    @"myteamid:com.example.viewer" : celRule(@"require_touchid_with_cooldown_minutes(60)"),
+    @"myteamid:com.example.admin" : celRule(@"require_touchid_with_cooldown_minutes(5)"),
+  };
+  OCMStub([self.mockRuleDatabase executionRuleForIdentifiers:{} useCache:YES])
+      .ignoringNonObjectArgs()
+      .andDo(^(NSInvocation* inv) {
+        struct RuleIdentifiers ids = {};
+        [inv getArgument:&ids atIndex:2];
+        __unsafe_unretained SNTRule* rule = ids.signingID ? rules[ids.signingID] : nil;
+        [inv setReturnValue:&rule];
+      });
+
+  NSMutableArray<NotificationReplyBlock>* replies = [NSMutableArray array];
+  id mockNotifierQueue = nil;
+  SNTExecutionController* controller = [self
+      makeMonitorHoldControllerWithReplySink:^(NotificationReplyBlock block) {
+        [replies addObject:block];
+      }
+      notifierQueue:&mockNotifierQueue
+      processControl:^bool(audit_token_t token, santa::ProcessControl control) {
+        return true;
+      }];
+
+  es_file_t file = MakeESFile("foo");
+  es_process_t proc = MakeESProcess(&file);
+  es_file_t fileExec = MakeESFile("bar", {.st_dev = 12, .st_ino = 34});
+
+  es_process_t armProc = MakeESProcess(&fileExec);
+  armProc.is_platform_binary = false;
+  armProc.codesigning_flags = CS_SIGNED | CS_VALID;
+  armProc.team_id = MakeESStringToken(kExampleTeamID);
+  armProc.signing_id = MakeESStringToken("com.example.viewer");
+  es_message_t armMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_EXEC, &proc);
+  armMsg.event.exec.target = &armProc;
+  armMsg.event.exec.image_cputype = CPU_TYPE_ARM64;
+
+  es_process_t x86Proc = MakeESProcess(&fileExec);
+  x86Proc.is_platform_binary = false;
+  x86Proc.codesigning_flags = CS_SIGNED | CS_VALID;
+  x86Proc.team_id = MakeESStringToken(kExampleTeamID);
+  x86Proc.signing_id = MakeESStringToken("com.example.admin");
+  es_message_t x86Msg = MakeESMessage(ES_EVENT_TYPE_AUTH_EXEC, &proc);
+  x86Msg.event.exec.target = &x86Proc;
+  x86Msg.event.exec.image_cputype = CPU_TYPE_X86_64;
+
+  [self approveExec:&armMsg
+      thenExpectPromptForExec:&x86Msg
+                 onController:controller
+                      replies:replies];
+
+  [mockNotifierQueue stopMocking];
+}
+
+// The same, for slices with no signing identity.
+- (void)testCooldownApprovalAppliesToTheAdhocSliceItWasGivenFor {
+  OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
+
+  NSMutableArray<NotificationReplyBlock>* replies = [NSMutableArray array];
+  id mockNotifierQueue = nil;
+  SNTExecutionController* controller =
+      [self makeCELTouchIDControllerWithCooldownMinutes:60
+                                              replySink:^(NotificationReplyBlock block) {
+                                                [replies addObject:block];
+                                              }
+                                          notifierQueue:&mockNotifierQueue];
+
+  es_file_t file = MakeESFile("foo");
+  es_process_t proc = MakeESProcess(&file);
+  es_file_t fileExec = MakeESFile("bar", {.st_dev = 12, .st_ino = 34});
+  es_process_t procExec = MakeESProcess(&fileExec);
+  procExec.is_platform_binary = false;
+  procExec.codesigning_flags = CS_SIGNED | CS_VALID | CS_ADHOC;
+
+  es_message_t armMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_EXEC, &proc);
+  armMsg.event.exec.target = &procExec;
+  armMsg.event.exec.image_cputype = CPU_TYPE_ARM64;
+  es_message_t x86Msg = MakeESMessage(ES_EVENT_TYPE_AUTH_EXEC, &proc);
+  x86Msg.event.exec.target = &procExec;
+  x86Msg.event.exec.image_cputype = CPU_TYPE_X86_64;
+
+  [self approveExec:&armMsg
+      thenExpectPromptForExec:&x86Msg
+                 onController:controller
+                      replies:replies];
+
+  [mockNotifierQueue stopMocking];
+}
+
 #pragma mark Early-denial ordering
 
 // Runs an execution that must take one of the early-denial paths and returns the
@@ -5413,7 +5586,7 @@ static std::shared_ptr<santa::PendingExecCoordinator> ActiveCoordinator() {
   SNTRule* rule = [[SNTRule alloc] init];
   rule.state = SNTRuleStateSeatbelt;
   rule.type = SNTRuleTypeBinary;
-  OCMStub([self.mockRuleDatabase executionRuleForIdentifiers:{} useCache:NO])
+  OCMStub([self.mockRuleDatabase executionRuleForIdentifiers:{} useCache:YES])
       .ignoringNonObjectArgs()
       .andReturn(rule);
 

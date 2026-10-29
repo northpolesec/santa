@@ -35,6 +35,7 @@
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTXPCNotifierInterface.h"
 #import "Source/common/String.h"
+#include "Source/common/TelemetryEventMap.h"
 #import "Source/common/ne/SNDXPCNetworkExtensionInterface.h"
 #import "Source/common/ne/SNTNetworkExtensionSettings.h"
 #import "Source/common/ne/SNTSyncNetworkExtensionSettings.h"
@@ -558,6 +559,11 @@ static NSArray<NSString*>* ProtectedDNSNames(NSURL* syncBaseURL) {
                                         flowDefaultAction:flowDefaultAction
                                    dnsUpstreamTimeoutSecs:config.dnsUpstreamTimeoutSecs];
   settings.protectedDNSNames = ProtectedDNSNames(config.syncBaseURL);
+  santa::TelemetryEvent mask = santa::TelemetryConfigToBitmask([config telemetry]);
+  settings.networkActivityTelemetry =
+      (mask & santa::TelemetryEvent::kNetworkActivity) == santa::TelemetryEvent::kNetworkActivity;
+  settings.dnsActivityTelemetry =
+      (mask & santa::TelemetryEvent::kDNSActivity) == santa::TelemetryEvent::kDNSActivity;
   return settings;
 }
 

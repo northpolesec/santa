@@ -15,6 +15,8 @@
 
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Protobuf.h"
 
+#include <algorithm>
+
 #include <DiskArbitration/DiskArbitration.h>
 #include <EndpointSecurity/EndpointSecurity.h>
 #include <Kernel/kern/cs_blobs.h>
@@ -1435,10 +1437,116 @@ std::vector<uint8_t> Protobuf::SerializeNetworkFlows(SNDProcessFlows* processFlo
                                                      SNTCachedDecision* cd) {
   Arena arena;
   ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, window_start, window_end);
-  auto* na = santa_msg->mutable_network_activity();
-  auto* process = na->add_processes();
+  auto* process = santa_msg->mutable_network_activity()->add_processes();
   santanetd::PopulateNetworkActivityProcess(&arena, process, processFlows, cd);
+  // A process with no connections in the window produces no message.
+  if (process->flows_size() == 0) {
+    return {};
+  }
   return FinalizeProto(santa_msg);
+}
+
+std::vector<uint8_t> Protobuf::SerializeDNSActivity(SNDProcessFlows* processFlows,
+                                                    struct timespec window_start,
+                                                    struct timespec window_end,
+                                                    SNTCachedDecision* cd) {
+  Arena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, window_start, window_end);
+  auto* process = santa_msg->mutable_dns_activity()->add_processes();
+  santanetd::PopulateDNSActivityProcess(&arena, process, processFlows, cd);
+  // A process with no questions in the window produces no message.
+  if (process->questions_size() == 0 && process->questions_dropped() == 0) {
+    return {};
+  }
+  return FinalizeProto(santa_msg);
+}
+
+void Protobuf::SerializeNetworkActivities(SNDProcessFlows* flows, struct timespec start,
+                                          struct timespec end, SNTCachedDecision* cd, bool network,
+                                          bool dns, const ActivityWriter& write) {
+  Arena arena;
+  // The collector may allocate on the arena, so its targets live there too.
+  auto* connections = Arena::Create<pbv1::NetworkActivity::Process>(&arena);
+  auto* questions = Arena::Create<pbv1::DNSActivity::Process>(&arena);
+  if (network) santanetd::PopulateNetworkActivityProcess(&arena, connections, flows, cd);
+  if (dns) santanetd::PopulateDNSActivityProcess(&arena, questions, flows, cd);
+  SerializeNetworkActivityProtos(*connections, *questions, start, end, write);
+}
+
+void Protobuf::SerializeNetworkActivityProtos(const pbv1::NetworkActivity::Process& connections,
+                                              const pbv1::DNSActivity::Process& questions,
+                                              struct timespec start, struct timespec end,
+                                              const ActivityWriter& write) {
+  // sleigh rejects a message over 4 MiB (pkg/parquet/protodelim.go, maxSize).
+  // 1 MiB keeps every chunk well under that as the schema grows.
+  constexpr size_t kMaxActivityMessageBytes = 1 << 20;
+  std::unique_ptr<Arena> chunkArena;
+  pbv1::SantaMessage* chunk = nullptr;
+  size_t size = 0;
+  bool kind = false;
+  uint64_t dropped = questions.questions_dropped();
+  auto flush = [&] {
+    if (chunk && (kind ? (chunk->dns_activity().processes(0).questions_size() > 0 ||
+                          chunk->dns_activity().processes(0).questions_dropped() > 0)
+                       : chunk->network_activity().processes(0).flows_size() > 0)) {
+      // The conservative running size includes every repeated-field envelope.
+      // Keep an exact final guard as the schema evolves.
+      if (chunk->ByteSizeLong() <= kMaxActivityMessageBytes) {
+        write(FinalizeProto(chunk));
+      } else {
+        // The questions in a discarded DNS chunk count as dropped.
+        if (kind) dropped += chunk->dns_activity().processes(0).questions_size();
+        LOGE(@"Network activity message exceeds its byte budget");
+      }
+    }
+    chunk = nullptr;
+    chunkArena.reset();
+  };
+  auto begin = [&](bool isDNS) {
+    chunkArena = std::make_unique<Arena>();
+    chunk = CreateDefaultProto(chunkArena.get(), start, end);
+    kind = isDNS;
+    if (isDNS) {
+      auto* p = chunk->mutable_dns_activity()->add_processes();
+      if (questions.has_process()) *p->mutable_process() = questions.process();
+    } else {
+      auto* p = chunk->mutable_network_activity()->add_processes();
+      if (connections.has_process()) *p->mutable_process() = connections.process();
+    }
+    size = chunk->ByteSizeLong() + 32;  // enclosing length prefixes may grow
+  };
+  // Make room for one row in the open chunk, or in a new chunk of this kind.
+  // False if the row does not fit an empty chunk.
+  auto fit = [&](bool isDNS, size_t rowSize) {
+    if (chunk && size + rowSize + 16 > kMaxActivityMessageBytes) flush();
+    if (!chunk) begin(isDNS);
+    if (size + rowSize + 16 > kMaxActivityMessageBytes) {
+      // Defensive for incompatible/older collectors. Their oversized question
+      // cannot poison the stream or hide subsequent ordinary events.
+      if (isDNS) ++dropped;
+      LOGW(@"Omitting an oversized network activity row");
+      return false;
+    }
+    size += rowSize + 16;
+    return true;
+  };
+  for (const auto& q : questions.questions()) {
+    if (fit(true, q.ByteSizeLong()))
+      *chunk->mutable_dns_activity()->mutable_processes(0)->add_questions() = q;
+  }
+  flush();
+  // Loss is a process/window metric, emitted once in its own summary message.
+  // It is not repeated across chunks or question rows.
+  if (dropped) {
+    begin(true);
+    chunk->mutable_dns_activity()->mutable_processes(0)->set_questions_dropped(dropped);
+    flush();
+  }
+  for (const auto& f : connections.flows()) {
+    if (fit(false, f.ByteSizeLong()))
+      *chunk->mutable_network_activity()->mutable_processes(0)->add_flows() = f;
+  }
+  flush();
 }
 
 std::vector<uint8_t> Protobuf::SerializeFileAccess(

@@ -615,6 +615,8 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi,
                 LOGI(@"Telemetry changed: %@ -> %@", [oldValue componentsJoinedByString:@","],
                      [newValue componentsJoinedByString:@","]);
                 logger->SetTelemetryMask(santa::TelemetryConfigToBitmask(newValue));
+                // Push the new bits to santanetd.
+                [netext_queue reconcileNetworkExtensionConfig];
               }],
     [[SNTKVOManager alloc] initWithObject:configurator
                                  selector:@selector(enableSilentTTYMode)

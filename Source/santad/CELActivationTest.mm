@@ -294,4 +294,45 @@ std::string MakeRawCDHash() {
   }
 }
 
+// A caller may release the block as soon as it has built an activation, so the
+// activation must keep alive everything its lookups read. V1, because the V2
+// annotation hooks hold their own reference to the process tree.
+- (void)testActivationOutlivesTheBlockThatBuiltIt {
+  auto tree = std::make_shared<ProcessTreeTestPeer>(
+      std::vector<std::unique_ptr<santa::santad::process_tree::Annotator>>{});
+  std::weak_ptr<ProcessTreeTestPeer> weakTree = tree;
+
+  es_file_t file = MakeESFile("/bin/tool");
+  es_process_t proc = MakeESProcess(&file, MakeAuditToken(30, 1), MakeAuditToken(1, 1));
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_EXEC, &proc);
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+  EXPECT_CALL(*mockESApi, ExecArgs)
+      .WillOnce(testing::Return(std::vector<std::string>{"/bin/tool", "--check"}));
+  Message msg(mockESApi, &esMsg);
+
+  std::unique_ptr<::google::api::expr::runtime::BaseActivation> base;
+  @autoreleasepool {
+    ActivationCallbackBlock block = santa::CreateCELActivationBlock(
+        msg, /*signingID=*/nil, /*teamID=*/nil, /*isPlatformBinary=*/NO, /*signingTime=*/nil,
+        /*secureSigningTime=*/nil, /*entitlements=*/nil, std::move(tree));
+    base = block(/*useV2=*/false);
+  }
+
+  // The block held the only other reference to the tree.
+  XCTAssertFalse(weakTree.expired());
+
+  // block(useV2=false) always builds a concrete Activation<false>.
+  auto* activation = static_cast<santa::cel::Activation<false>*>(base.get());
+  auto evaluator = santa::cel::Evaluator<false>::Create();
+  XCTAssertTrue(evaluator.ok());
+  auto result = evaluator.value()->CompileAndEvaluate(
+      "args[1] == '--check' ? ALLOWLIST : BLOCKLIST", *activation);
+  XCTAssertTrue(result.ok());
+  XCTAssertEqual(result.value().value, santa::cel::CELProtoTraits<false>::ReturnValue::ALLOWLIST);
+
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+}
+
 @end

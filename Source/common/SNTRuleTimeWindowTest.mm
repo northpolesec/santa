@@ -92,4 +92,22 @@ static NSString* Plain(NSString* s) {
   XCTAssertEqualObjects(decoded.zoneName, window.zoneName);
 }
 
+// Exercises the DECODE_ARRAY guard (shared by every DECODE_ARRAY/DECODE_DICT site). `days` decodes
+// with an allow-list of {NSArray, NSNumber}, so a malformed archive can present a lone NSNumber --
+// an allowed element class -- where the array belongs. NSSecureCoding admits it, so without the
+// guard `days` would hold a non-array and later crash on array selectors. It must decode to nil.
+- (void)testDecodeArrayRejectsNonArrayRoot {
+  NSKeyedArchiver* archiver = [[NSKeyedArchiver alloc] initRequiringSecureCoding:YES];
+  [archiver encodeObject:@42 forKey:@"days"];
+  [archiver finishEncoding];
+
+  NSKeyedUnarchiver* unarchiver =
+      [[NSKeyedUnarchiver alloc] initForReadingFromData:archiver.encodedData error:NULL];
+  unarchiver.requiresSecureCoding = YES;
+  SNTRuleTimeWindow* decoded = [[SNTRuleTimeWindow alloc] initWithCoder:unarchiver];
+
+  XCTAssertNotNil(decoded);
+  XCTAssertNil(decoded.days);
+}
+
 @end

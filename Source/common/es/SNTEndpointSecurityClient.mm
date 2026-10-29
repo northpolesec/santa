@@ -120,7 +120,9 @@ using santa::Processor;
 - (BOOL)shouldHandleMessage:(const Message&)esMsg {
   if (esMsg->process->is_es_client && [self.configurator ignoreOtherEndpointSecurityClients]) {
     if (esMsg->action_type == ES_ACTION_TYPE_AUTH) {
-      [self respondToMessage:esMsg withAuthResult:ES_AUTH_RESULT_ALLOW cacheable:true];
+      [self respondToMessage:esMsg
+              withAuthResult:ES_AUTH_RESULT_ALLOW
+                   cacheable:(esMsg->event_type != ES_EVENT_TYPE_AUTH_EXEC)];
     }
     return NO;
   }

@@ -1108,8 +1108,25 @@ std::vector<uint8_t> BasicString::SerializeNetworkFlows(SNDProcessFlows* process
                                                         struct timespec window_start,
                                                         struct timespec window_end,
                                                         SNTCachedDecision* cd) {
+  std::string entry = santanetd::FormatNetworkFlowsBasicString(processFlows, cd);
+  if (entry.empty()) {
+    return {};
+  }
   std::string line = CreateDefaultString();
-  line += santanetd::FormatNetworkFlowsBasicString(processFlows, cd);
+  line += entry;
+  return FinalizeString(line);
+}
+
+std::vector<uint8_t> BasicString::SerializeDNSActivity(SNDProcessFlows* processFlows,
+                                                       struct timespec window_start,
+                                                       struct timespec window_end,
+                                                       SNTCachedDecision* cd) {
+  std::string entry = santanetd::FormatDNSActivityBasicString(processFlows, cd);
+  if (entry.empty()) {
+    return {};
+  }
+  std::string line = CreateDefaultString();
+  line += entry;
   return FinalizeString(line);
 }
 

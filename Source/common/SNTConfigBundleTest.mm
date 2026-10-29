@@ -25,6 +25,7 @@
 @interface SNTConfigBundle (Testing)
 @property NSNumber* clientMode;
 @property NSNumber* executableIntegrityPolicy;
+@property NSNumber* disableExecutableIntegrityRecheck;
 @property NSNumber* syncType;
 @property NSString* allowlistRegex;
 @property NSString* blocklistRegex;
@@ -67,12 +68,13 @@
 
 - (void)testGettersWithValues {
   __block XCTestExpectation* exp = [self expectationWithDescription:@"Result Blocks"];
-  exp.expectedFulfillmentCount = 31;
+  exp.expectedFulfillmentCount = 32;
   NSDate* nowDate = [NSDate now];
 
   SNTConfigBundle* bundle = [[SNTConfigBundle alloc] init];
   bundle.clientMode = @(SNTClientModeLockdown);
   bundle.executableIntegrityPolicy = @(SNTExecutableIntegrityPolicyReport);
+  bundle.disableExecutableIntegrityRecheck = @(SNTSyncedBoolFalse);
   bundle.syncType = @(SNTSyncTypeNormal);
   bundle.allowlistRegex = @"allow";
   bundle.blocklistRegex = @"block";
@@ -114,6 +116,11 @@
 
   [bundle executableIntegrityPolicy:^(SNTExecutableIntegrityPolicy val) {
     XCTAssertEqual(val, SNTExecutableIntegrityPolicyReport);
+    [exp fulfill];
+  }];
+
+  [bundle disableExecutableIntegrityRecheck:^(SNTSyncedBool val) {
+    XCTAssertEqual(val, SNTSyncedBoolFalse);
     [exp fulfill];
   }];
 
@@ -279,6 +286,10 @@
   }];
 
   [bundle executableIntegrityPolicy:^(SNTExecutableIntegrityPolicy val) {
+    XCTFail(@"This shouldn't be called");
+  }];
+
+  [bundle disableExecutableIntegrityRecheck:^(SNTSyncedBool val) {
     XCTFail(@"This shouldn't be called");
   }];
 

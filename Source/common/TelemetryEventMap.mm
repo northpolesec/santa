@@ -51,6 +51,8 @@ static inline TelemetryEvent EventNameToMask(std::string_view event) {
       {"tccmodification", TelemetryEvent::kTCCModification},
       {"xprotect", TelemetryEvent::kXProtect},
       {"procsuspendresume", TelemetryEvent::kProcSuspendResume},
+      {"networkactivity", TelemetryEvent::kNetworkActivity},
+      {"dnsactivity", TelemetryEvent::kDNSActivity},
       // IMPORTANT: When adding new keys to the map, keep the set of keys in
       // `docs/src/lib/santaconfig.ts` in sync.
 

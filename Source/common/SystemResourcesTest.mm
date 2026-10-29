@@ -116,4 +116,47 @@
 #endif
 }
 
+- (void)testStatIsSystemProtectedRequiresRestrictedFlagAndBootDev {
+#ifndef DEBUG
+  XCTSkip(@"the boot volume group overrides are DEBUG-only and are not built with -c opt");
+#else
+  SetBootVolumeGroupDevForTesting(std::make_optional<dev_t>(42));
+
+  struct stat sb = {};
+  sb.st_flags = SF_RESTRICTED;
+  sb.st_dev = 42;
+  XCTAssertTrue(StatIsSystemProtected(&sb));
+
+  // Other flags neither add nor remove protection.
+  sb.st_flags = SF_RESTRICTED | UF_COMPRESSED;
+  XCTAssertTrue(StatIsSystemProtected(&sb));
+
+  sb.st_flags = UF_COMPRESSED;
+  XCTAssertFalse(StatIsSystemProtected(&sb));
+
+  sb.st_flags = 0;
+  XCTAssertFalse(StatIsSystemProtected(&sb));
+
+  sb.st_flags = SF_RESTRICTED;
+  SetBootVolumeGroupDevForTesting(std::make_optional<dev_t>(43));
+  XCTAssertFalse(StatIsSystemProtected(&sb));
+#endif
+}
+
+- (void)testStatIsSystemProtectedFailsClosedWithoutBootDev {
+#ifndef DEBUG
+  XCTSkip(@"the boot volume group overrides are DEBUG-only and are not built with -c opt");
+#else
+  struct stat sb = {};
+  sb.st_flags = SF_RESTRICTED;
+  sb.st_dev = 42;
+
+  SetBootVolumeGroupDevForTesting(std::make_optional<dev_t>(42));
+  XCTAssertFalse(StatIsSystemProtected(nullptr));
+
+  SetBootVolumeGroupDevUnavailableForTesting(true);
+  XCTAssertFalse(StatIsSystemProtected(&sb));
+#endif
+}
+
 @end

@@ -44,13 +44,13 @@ following diagram shows Santa's rule precedence:
 
 ```mermaid
 flowchart TD
-    Start(["Execution Attempt"]) --> RuleCDHash("Rule: **CDHash**")
-    RuleCDHash --> RuleBinary("Rule: **BINARY**")
-    RuleBinary --> RuleSigningID("Rule: **SIGNINGID**")
-    RuleSigningID --> RuleCertificate("Rule: **CERTIFICATE**")
-    RuleCertificate --> RuleTeamID("Rule: **TEAMID**")
-    RuleTeamID --> Scope("**Scope**")
-    Scope --> ClientMode("**Client Mode**")
+    Start(["Execution Attempt"]) --> RuleCDHash("`Rule: **CDHash**`")
+    RuleCDHash --> RuleBinary("`Rule: **BINARY**`")
+    RuleBinary --> RuleSigningID("`Rule: **SIGNINGID**`")
+    RuleSigningID --> RuleCertificate("`Rule: **CERTIFICATE**`")
+    RuleCertificate --> RuleTeamID("`Rule: **TEAMID**`")
+    RuleTeamID --> Scope("`**Scope**`")
+    Scope --> ClientMode("`**Client Mode**`")
     ClientMode --> End(["Decision"])
 
     click RuleCDHash "#cdhash"
@@ -387,7 +387,7 @@ process.
 
 :::
 
-In addition to the [CEL standard library](https://github.com/google/cel-spec/blob/master/doc/langdef.md#standard-definitions)
+In addition to the [CEL standard library](https://github.com/cel-expr/cel-spec/blob/master/doc/langdef.md#standard-definitions)
 (including `timestamp`, `duration`, and the arithmetic between them), the
 following helper functions are available. They require [Workshop](https://northpole.security/):
 

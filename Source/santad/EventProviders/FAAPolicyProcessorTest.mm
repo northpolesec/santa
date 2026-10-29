@@ -1598,6 +1598,63 @@ static void ClearWatchItemPolicyProcess(WatchItemProcess& proc) {
   XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
 }
 
+- (void)testProcessTargetAndPolicyPrefixesSigningID {
+  struct {
+    const char* teamID;
+    const char* signingID;
+    bool isPlatformBinary;
+    NSString* want;
+  } cases[] = {
+      {"EQHXZ8M8AV", "com.example.app", false, @"EQHXZ8M8AV:com.example.app"},
+      {nullptr, "com.example.app", true, @"platform:com.example.app"},
+      {nullptr, "com.example.app", false, nil},
+      {nullptr, nullptr, true, nil},
+  };
+
+  auto matcher = ^FAAPolicyProcessor::PolicyMatch(const santa::WatchItemPolicyBase&,
+                                                  const Message::PathTarget&, const Message&) {
+    return {true, nullptr};
+  };
+  auto policy = std::make_shared<santa::WatchItemPolicyBase>("test-policy", "v1");
+  FAAPolicyProcessor::TargetPolicyPair pair{0, policy};
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+  cd.sha256 = @"existing-sha256";
+
+  for (const auto& tc : cases) {
+    es_file_t esFile = MakeESFile("/proc/instigator");
+    es_process_t esProc = MakeESProcess(&esFile);
+    esProc.team_id = MakeESStringToken(tc.teamID);
+    esProc.signing_id = MakeESStringToken(tc.signingID);
+    esProc.is_platform_binary = tc.isPlatformBinary;
+    es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_OPEN, &esProc);
+    es_file_t targetFile = MakeESFile("/etc/hosts");
+    esMsg.event.open.file = &targetFile;
+
+    auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+    mockESApi->SetExpectationsRetainReleaseMessage();
+    Message msg(mockESApi, &esMsg);
+    msg.PathTargets();
+
+    __block SNTStoredFileAccessEvent* observedEvent;
+    MockFAAPolicyProcessor faaPolicyProcessor(self.dcMock, nullptr, nullptr, nullptr, nullptr, 0, 0,
+                                              nil, ^(SNTStoredFileAccessEvent* event, bool) {
+                                                observedEvent = event;
+                                              });
+    EXPECT_CALL(faaPolicyProcessor, GetCachedDecision).WillOnce(testing::Return(cd));
+    EXPECT_CALL(faaPolicyProcessor, ApplyPolicy)
+        .WillOnce(testing::Return(FAAPolicyProcessor::DecisionAndOptions{
+            FileAccessPolicyDecision::kAllowedAuditOnly, {}}));
+
+    faaPolicyProcessor.ProcessTargetAndPolicyWrapper(msg, pair, matcher, nil,
+                                                     SNTOverrideFileAccessActionNone);
+
+    XCTAssertNotNil(observedEvent);
+    XCTAssertEqualObjects(observedEvent.process.signingID, tc.want, @"team %s, signing %s",
+                          tc.teamID, tc.signingID);
+    XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+  }
+}
+
 // A cached decision from an unconfirmed read describes a different file than the
 // process's image, so the event gets neither its hash nor its certificates. The
 // cached entry still blocks a rehydrate: the insert is first-writer-wins.

@@ -569,6 +569,13 @@ class MockAuthResultCache : public AuthResultCache {
   strlcpy(sfs.f_fstypename, "apfs", sizeof(sfs.f_fstypename));
   XCTAssertEqual([deviceManager updatedMountFlags:&sfs remountArgs:args],
                  (sfs.f_flags | MNT_RDONLY | MNT_NOEXEC) & ~MNT_JOURNALED);
+
+  // A non-string element (e.g. a malformed RemovableMediaRemountFlags config entry) is ignored
+  // rather than crashing on -lowercaseString.
+  strlcpy(sfs.f_fstypename, "foo", sizeof(sfs.f_fstypename));
+  NSArray* mixedArgs = @[ @"rdonly", @123, @"noexec" ];
+  XCTAssertEqual([deviceManager updatedMountFlags:&sfs remountArgs:mixedArgs],
+                 sfs.f_flags | MNT_RDONLY | MNT_NOEXEC);
 }
 
 - (void)testEnable {

@@ -25,6 +25,7 @@
 @interface SNTConfigBundle (ConfigBundleCreator)
 @property NSNumber* clientMode;
 @property NSNumber* executableIntegrityPolicy;
+@property NSNumber* disableExecutableIntegrityRecheck;
 @property NSNumber* syncType;
 @property NSString* allowlistRegex;
 @property NSString* blocklistRegex;
@@ -76,6 +77,8 @@ SNTConfigBundle* PostflightConfigBundle(SNTSyncState* syncState) {
 
   bundle.clientMode = syncState.clientMode ? @(syncState.clientMode) : nil;
   bundle.executableIntegrityPolicy = syncState.executableIntegrityPolicy;
+  // Always set so that Unset reaches the daemon and clears the synced value.
+  bundle.disableExecutableIntegrityRecheck = @(syncState.disableExecutableIntegrityRecheck);
   bundle.syncType = syncState.syncType != SNTSyncTypeNormal ? @(SNTSyncTypeNormal) : nil;
   bundle.allowlistRegex = syncState.allowlistRegex;
   bundle.blocklistRegex = syncState.blocklistRegex;

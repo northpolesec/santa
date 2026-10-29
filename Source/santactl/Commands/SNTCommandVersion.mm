@@ -148,12 +148,12 @@ REGISTER_COMMAND_NAME(@"version")
   return enabled;
 }
 
-- (NSString*)composeVersionsFromDict:(NSDictionary*)dict {
-  if (!dict[@"CFBundleVersion"]) return @"";
-  NSString* productVersion = dict[@"CFBundleShortVersionString"];
-  NSString* buildVersion = [[dict[@"CFBundleVersion"] componentsSeparatedByString:@"."] lastObject];
+- (NSString*)composeVersionWithShortVersion:(NSString*)productVersion
+                                fullVersion:(NSString*)fullVersion
+                                 commitHash:(NSString*)commitHash {
+  if (!fullVersion.length) return @"";
+  NSString* buildVersion = [[fullVersion componentsSeparatedByString:@"."] lastObject];
 
-  NSString* commitHash = dict[@"SNTCommitHash"];
   if (commitHash.length > 8) {
     commitHash = [commitHash substringToIndex:8];
   }
@@ -162,14 +162,31 @@ REGISTER_COMMAND_NAME(@"version")
       stringWithFormat:@"%@ (build %@, commit %@)", productVersion, buildVersion, commitHash];
 }
 
+// Compose a version string from a plist dictionary whose values are read type-safely. Used for
+// dictionaries that don't come from an SNTFileInfo: the netext bundle info returned over XPC and
+// santactl's own mainBundle.
+- (NSString*)composeVersionsFromDict:(NSDictionary*)dict {
+  NSString* (^string)(NSString*) = ^NSString*(NSString* key) {
+    id value = dict[key];
+    return [value isKindOfClass:[NSString class]] ? value : nil;
+  };
+  return [self composeVersionWithShortVersion:string(@"CFBundleShortVersionString")
+                                  fullVersion:string(@"CFBundleVersion")
+                                   commitHash:string(@"SNTCommitHash")];
+}
+
+- (NSString*)composeVersionsFromFileInfo:(SNTFileInfo*)fileInfo {
+  return [self composeVersionWithShortVersion:[fileInfo bundleShortVersionString]
+                                  fullVersion:[fileInfo bundleVersion]
+                                   commitHash:[fileInfo infoPlistStringForKey:@"SNTCommitHash"]];
+}
+
 - (NSString*)santadVersion {
-  SNTFileInfo* daemonInfo = [[SNTFileInfo alloc] initWithPath:@(kSantaDPath)];
-  return [self composeVersionsFromDict:daemonInfo.infoPlist];
+  return [self composeVersionsFromFileInfo:[[SNTFileInfo alloc] initWithPath:@(kSantaDPath)]];
 }
 
 - (NSString*)santaAppVersion {
-  SNTFileInfo* guiInfo = [[SNTFileInfo alloc] initWithPath:@(kSantaAppPath)];
-  return [self composeVersionsFromDict:guiInfo.infoPlist];
+  return [self composeVersionsFromFileInfo:[[SNTFileInfo alloc] initWithPath:@(kSantaAppPath)]];
 }
 
 - (NSString*)santactlVersion {
@@ -177,8 +194,7 @@ REGISTER_COMMAND_NAME(@"version")
 }
 
 - (NSString*)santanetdBundledVersion {
-  SNTFileInfo* netdInfo = [[SNTFileInfo alloc] initWithPath:@(kSantaNetdPath)];
-  return [self composeVersionsFromDict:netdInfo.infoPlist];
+  return [self composeVersionsFromFileInfo:[[SNTFileInfo alloc] initWithPath:@(kSantaNetdPath)]];
 }
 
 @end

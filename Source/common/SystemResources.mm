@@ -142,6 +142,14 @@ std::optional<dev_t> GetBootVolumeGroupDev() {
   return cached;
 }
 
+bool StatIsSystemProtected(const struct stat* sb) {
+  if (!sb || !(sb->st_flags & SF_RESTRICTED)) {
+    return false;
+  }
+  std::optional<dev_t> bootDev = GetBootVolumeGroupDev();
+  return bootDev.has_value() && sb->st_dev == *bootDev;
+}
+
 #ifdef DEBUG
 
 void SetBootVolumeGroupDevForTesting(std::optional<dev_t> dev) {

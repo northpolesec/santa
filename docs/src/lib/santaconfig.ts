@@ -433,7 +433,7 @@ See [Custom Branding](/configuration/branding) for examples of how this appears 
     },
     {
       key: "Telemetry",
-      description: `Array of strings for events that should be logged`,
+      description: `Array of strings for events that should be logged. NetworkActivity (connections) and DNSActivity (DNS questions) need the network extension.`,
       type: "string",
       repeated: true,
       defaultValue: ["Everything"],
@@ -464,6 +464,8 @@ See [Custom Branding](/configuration/branding) for examples of how this appears 
         { value: "TCCModification" },
         { value: "XProtect" },
         { value: "ProcSuspendResume" },
+        { value: "NetworkActivity" },
+        { value: "DNSActivity" },
         { value: "None" },
       ],
       versionAdded: "2024.11",
@@ -864,7 +866,7 @@ changes in the release notes of any future release that changes them.`,
     {
       key: "FileAccessGlobalWindowSizeSec",
       description: `Sets the window size over which the FileAccessGlobalLogsPerSec setting
-        is applied in order to allow for burts of logs. Setting to 0 will disable log rate
+        is applied in order to allow for bursts of logs. Setting to 0 will disable log rate
         limiting. Rate limiting only applies to logging. FAA rules that are not audit only
         will still block operations that violate the rule.`,
       type: "integer",
@@ -1046,6 +1048,16 @@ mount flags that are a superset of \`RemovableMediaRemountFlags\` or \`Encrypted
         the binary is allowed by an explicit rule.`,
       type: "bool",
       defaultValue: false,
+    },
+    {
+      key: "DisableExecutableIntegrityRecheck",
+      description: `If true, Santa skips an integrity check for x86_64 executables that don't use the hardened
+        runtime, such as unsigned or ad hoc signed binaries, on Intel Macs and under Rosetta 2 on Apple silicon.
+        The check hashes the file each time such an executable runs. Native arm64 executables are not affected.`,
+      type: "bool",
+      defaultValue: false,
+      syncConfigurable: true,
+      versionAdded: "2026.9",
     },
     {
       key: "EnablePageZeroProtection",
@@ -1232,7 +1244,7 @@ thousand static rules working correctly, but we don't recommend using StaticRule
     },
     {
       key: "MachineIDPlist",
-      description: `The path to a plist that contains the \`MachineOwnerKey\` / value pair`,
+      description: `The path to a plist that contains the \`MachineIDKey\` / value pair`,
       type: "string",
     },
     {

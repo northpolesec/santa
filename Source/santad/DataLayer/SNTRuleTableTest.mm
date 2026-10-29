@@ -58,6 +58,17 @@ static int InterruptStepProgressHandler(void* context) {
   return 1;
 }
 
+// Identifiers that match none of the example rules.
+static struct RuleIdentifiers UnruledIdentifiers() {
+  return {
+      .cdhash = @"ffffffffffffffffffffffffffffffffffffffff",
+      .binarySHA256 = @"b6ee1c3c5a715c049d14a8457faa6b6701b8507efe908300e238e0768bd759c2",
+      .signingID = @"ZZZZZZZZZZ:otherSigningID",
+      .certificateSHA256 = @"0000000000000000000000000000000000000000000000000000000000000000",
+      .teamID = @"ZZZZZZZZZZ",
+  };
+}
+
 @implementation SNTRuleTableTest
 
 - (void)setUp {
@@ -511,45 +522,95 @@ static int InterruptStepProgressHandler(void* context) {
   XCTAssertNil(r);
 }
 
-// A lookup with no binary SHA-256 has no key to cache a miss under, so it must not record one --
-// doing so would make the first unhashable file's miss the answer for every later lookup.
-- (void)testExecutionRuleMissCacheIgnoresLookupsWithoutAFileHash {
-  [self.sut addExecutionRules:@[ [self _exampleCDHashRule] ]
-                  ruleCleanup:SNTRuleCleanupNone
-                       errors:nil];
+// Records a miss for `missed`, then looks up `ruled`, which must find `rule`. There is no rule
+// write in between, as a write clears the cache.
+- (void)assertMiss:(struct RuleIdentifiers)missed
+       doesNotHide:(SNTRule*)rule
+              from:(struct RuleIdentifiers)ruled {
+  NSArray<NSError*>* errors;
+  XCTAssertTrue([self.sut addExecutionRules:@[ rule ]
+                                ruleCleanup:SNTRuleCleanupNone
+                                     errors:&errors],
+                @"%@", errors);
 
-  struct RuleIdentifiers missed = {
-      .cdhash = @"ffffffffffffffffffffffffffffffffffffffff",
-  };
   XCTAssertNil([self.sut executionRuleForIdentifiers:missed useCache:YES]);
 
-  struct RuleIdentifiers ids = {
-      .cdhash = @"dbe8c39801f93e05fc7bc53a02af5b4d3cfc670a",
-  };
-  SNTRule* r = [self.sut executionRuleForIdentifiers:ids useCache:YES];
-  XCTAssertNotNil(r, @"a miss with no file hash must not be cached");
-  XCTAssertEqual(r.type, SNTRuleTypeCDHash);
+  SNTRule* r = [self.sut executionRuleForIdentifiers:ruled useCache:YES];
+  XCTAssertEqualObjects(r.identifier, rule.identifier, @"a cached miss hid the rule for %@",
+                        rule.identifier);
+  XCTAssertEqual(r.type, rule.type);
 }
 
-// A cached miss must only suppress lookups for the file it was recorded for. Both lookups carry
-// the same Team ID, so only the file hash distinguishes them. Note there is no rule write between
-// them -- a write would clear the cache and hide the bug.
-- (void)testExecutionRuleMissCacheIsPerFileHash {
-  [self.sut addExecutionRules:@[ [self _exampleBinaryRule] ]
-                  ruleCleanup:SNTRuleCleanupNone
-                       errors:nil];
+// A miss is only reused for a lookup with identical identifiers.
+- (void)testExecutionRuleMissCacheIsPerIdentifier {
+  struct RuleIdentifiers ruled = UnruledIdentifiers();
+  ruled.cdhash = [self _exampleCDHashRule].identifier;
+  [self assertMiss:UnruledIdentifiers() doesNotHide:[self _exampleCDHashRule] from:ruled];
 
-  struct RuleIdentifiers missed = {
-      .binarySHA256 = @"b6ee1c3c5a715c049d14a8457faa6b6701b8507efe908300e238e0768bd759c2",
-  };
-  XCTAssertNil([self.sut executionRuleForIdentifiers:missed useCache:YES]);
+  ruled = UnruledIdentifiers();
+  ruled.binarySHA256 = [self _exampleBinaryRule].identifier;
+  [self assertMiss:UnruledIdentifiers() doesNotHide:[self _exampleBinaryRule] from:ruled];
 
-  struct RuleIdentifiers ruled = {
-      .binarySHA256 = @"b7c1e3fd640c5f211c89b02c2c6122f78ce322aa5c56eb0bb54bc422a8f8b670",
+  ruled = UnruledIdentifiers();
+  ruled.signingID = [self _exampleSigningIDRuleIsPlatform:NO].identifier;
+  [self assertMiss:UnruledIdentifiers()
+       doesNotHide:[self _exampleSigningIDRuleIsPlatform:NO]
+              from:ruled];
+
+  ruled = UnruledIdentifiers();
+  ruled.certificateSHA256 = [self _exampleCertRule].identifier;
+  [self assertMiss:UnruledIdentifiers() doesNotHide:[self _exampleCertRule] from:ruled];
+
+  ruled = UnruledIdentifiers();
+  ruled.teamID = [self _exampleTeamIDRule].identifier;
+  [self assertMiss:UnruledIdentifiers() doesNotHide:[self _exampleTeamIDRule] from:ruled];
+}
+
+// A miss for a lookup without an identifier must not answer for the same lookup with it.
+- (void)testExecutionRuleMissCacheDistinguishesAbsentIdentifiers {
+  struct RuleIdentifiers missed = {.binarySHA256 = UnruledIdentifiers().binarySHA256};
+  struct RuleIdentifiers ruled = missed;
+  ruled.cdhash = [self _exampleCDHashRule].identifier;
+  [self assertMiss:missed doesNotHide:[self _exampleCDHashRule] from:ruled];
+
+  ruled = missed;
+  ruled.signingID = [self _exampleSigningIDRuleIsPlatform:NO].identifier;
+  [self assertMiss:missed doesNotHide:[self _exampleSigningIDRuleIsPlatform:NO] from:ruled];
+}
+
+// Truncating an over-long signing ID would make IDs that share a prefix one entry.
+- (void)testExecutionRuleMissCacheKeepsLongSigningIDsDistinct {
+  NSString* prefix = [@"ABCDEFGHIJ:" stringByPaddingToLength:200 withString:@"a" startingAtIndex:0];
+
+  SNTRule* rule = [self _exampleSigningIDRuleIsPlatform:NO];
+  rule.identifier = [prefix stringByAppendingString:@"ruled"];
+
+  struct RuleIdentifiers missed = UnruledIdentifiers();
+  missed.signingID = [prefix stringByAppendingString:@"other"];
+  struct RuleIdentifiers ruled = UnruledIdentifiers();
+  ruled.signingID = rule.identifier;
+  [self assertMiss:missed doesNotHide:rule from:ruled];
+}
+
+// An identical repeat lookup, here an ad hoc signed one, is answered from the cache. The rule is
+// inserted directly, which does not clear the cache, so only a cached miss can hide it.
+- (void)testExecutionRuleMissCacheAnswersRepeatLookups {
+  struct RuleIdentifiers ids = {
+      .cdhash = UnruledIdentifiers().cdhash,
+      .binarySHA256 = UnruledIdentifiers().binarySHA256,
   };
-  SNTRule* r = [self.sut executionRuleForIdentifiers:ruled useCache:YES];
-  XCTAssertNotNil(r, @"a miss must only suppress lookups for the same file hash");
-  XCTAssertEqual(r.type, SNTRuleTypeBinary);
+  XCTAssertNil([self.sut executionRuleForIdentifiers:ids useCache:YES]);
+
+  [self.dbq inDatabase:^(FMDatabase* db) {
+    BOOL inserted = [db executeUpdate:@"INSERT INTO execution_rules (identifier, state, type) "
+                                      @"VALUES (?, ?, ?)",
+                                      ids.cdhash, @(SNTRuleStateBlock), @(SNTRuleTypeCDHash)];
+    XCTAssertTrue(inserted, @"%@", db.lastErrorMessage);
+  }];
+
+  XCTAssertNil([self.sut executionRuleForIdentifiers:ids useCache:YES],
+               @"an identical lookup must be answered by the cached miss");
+  XCTAssertEqual([self.sut executionRuleForIdentifiers:ids useCache:NO].type, SNTRuleTypeCDHash);
 }
 
 // The only invalidation the miss cache has is a full clear on the rule write paths.
@@ -1187,6 +1248,21 @@ static int InterruptStepProgressHandler(void* context) {
   XCTAssertEqualObjects(csInfo.certificates, cd.certChain, @"cert chains should match");
   XCTAssertEqualObjects(signingID, cd.signingID, @"signing IDs should match");
   XCTAssertEqualObjects(teamID, cd.teamID, @"team IDs should match");
+}
+
+- (void)testTrustdFileHelperIsACriticalBinary {
+  NSString* path = @"/usr/libexec/trustdFileHelper";
+  if (![[NSFileManager defaultManager] fileExistsAtPath:path]) {
+    XCTSkip(@"%@ is not present on this OS", path);
+  }
+
+  SNTFileInfo* fi = [[SNTFileInfo alloc] initWithPath:path];
+  NSString* signingID = FormatSigningID([fi codesignCheckerWithError:nil]);
+
+  SNTCachedDecision* cd = self.sut.criticalSystemBinaries[signingID];
+  XCTAssertNotNil(cd, @"trustdFileHelper should have a critical binary decision");
+  XCTAssertEqual(SNTEventStateAllowSigningID, cd.decision);
+  XCTAssertEqualObjects(@"critical system binary", cd.decisionExtra);
 }
 
 // This test ensures that we bump the constant on updates to the rule table

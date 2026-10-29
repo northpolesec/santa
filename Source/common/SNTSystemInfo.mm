@@ -107,7 +107,9 @@
 
 + (NSString*)santaBuildVersion {
   NSDictionary* info_dict = [[NSBundle mainBundle] infoDictionary];
-  return [[info_dict[@"CFBundleVersion"] componentsSeparatedByString:@"."] lastObject];
+  id fullVersion = info_dict[@"CFBundleVersion"];
+  if (![fullVersion isKindOfClass:[NSString class]]) return nil;
+  return [[fullVersion componentsSeparatedByString:@"."] lastObject];
 }
 
 + (NSString*)santaFullVersion {
