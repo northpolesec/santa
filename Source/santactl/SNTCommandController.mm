@@ -119,7 +119,8 @@ static NSMutableDictionary* registeredAliases;
       printf("An error occurred communicating with the Santa daemon. Check to make sure\n"
              "the process is running and has been granted Full Disk Access permissions.\n"
              "\n"
-             "For detailed steps, see: https://northpole.dev/deployment/troubleshooting\n");
+             "For detailed steps, see: "
+             "https://northpole.security/docs/santa/deployment/troubleshooting\n");
       exit(1);
     };
     [daemonConn resume];
