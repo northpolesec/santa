@@ -674,9 +674,11 @@ event/telemetry output this is the `UNKNOWN` case:
   <video src="/videos/lockdown-block.mp4" poster="/videos/lockdown-block.jpg" controls muted playsInline preload="metadata" style={{ width: "100%" }} aria-label="Santa blocks an unknown app in Lockdown mode and shows its details" />
 
 - Standalone: All unknown executions are held until the user approves them,
-  with Touch ID, a security key, or their password. If they approve the
-  execution the execution is allowed to continue (without requiring
-  re-execution) and a local SigningID or SHA-256 rule is automatically created.
+  with Touch ID, their password (if `EnableStandalonePasswordFallback` is set),
+  or a security key (if `EnableStandaloneSecurityKeyAuthorization` is set). If
+  they approve the execution the execution is allowed to continue (without
+  requiring re-execution) and a local SigningID or SHA-256 rule is
+  automatically created.
 
   <video src="/videos/standalone-approve.mp4" poster="/videos/standalone-approve.jpg" controls muted playsInline preload="metadata" style={{ width: "100%" }} aria-label="A user approves an unknown app in Standalone mode with their password" />
 
@@ -698,13 +700,20 @@ without showing the usual Santa block dialog, and a
 minutes. An approval is cached against the method that was used, so an approval
 given with Touch ID never satisfies a later `REQUIRE_SECURITY_KEY` hold.
 
-Standalone client mode asks for presence, so either will do there too.
+Standalone client mode uses Touch ID unless
+`EnableStandaloneSecurityKeyAuthorization` is set, in which case it asks for
+presence and either will do.
 
 ### Security Keys
 
-Nothing needs enabling. A rule that returns `REQUIRE_SECURITY_KEY` or
-`REQUIRE_PRESENCE` is itself the opt-in, and Standalone mode asks for presence,
-so a user with a key can approve with it on a Mac that has no Touch ID.
+A rule that returns `REQUIRE_SECURITY_KEY` or `REQUIRE_PRESENCE` is itself the
+opt-in; it needs no other setting. Standalone mode, which has no rule to name a
+method, only accepts a security key when `EnableStandaloneSecurityKeyAuthorization`
+is set. Set it so that a user with a key can approve with it on a Mac that has
+no Touch ID; leave it unset (the default) and Standalone holds use Touch ID, or
+a password with `EnableStandalonePasswordFallback`. Because any attached key
+satisfies a presence check (see below), enabling it lets anyone with physical
+access approve an unknown binary and create a permanent local rule.
 
 A `REQUIRE_SECURITY_KEY` hold with no key attached is denied. A
 `REQUIRE_PRESENCE` hold falls back to Touch ID, because the user was never asked

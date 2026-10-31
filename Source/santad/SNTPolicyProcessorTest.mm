@@ -1003,15 +1003,16 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
   }
 }
 
-// Standalone has no expression to name an authorization method, so it must ask
-// for presence: Touch ID or a security key, whichever the Mac has.
-- (void)testStandaloneHoldsForPresence {
+// Returns the decision for an unknown binary in Standalone mode, with
+// EnableStandaloneSecurityKeyAuthorization stubbed to the given value.
+- (SNTCachedDecision*)standaloneDecisionWithSecurityKeyAuthorization:(BOOL)enabled {
   id mockRuleTable = OCMClassMock([SNTRuleTable class]);
   SNTPolicyProcessor* processor =
       [[SNTPolicyProcessor alloc] initWithRuleTable:mockRuleTable
                                  entitlementsFilter:santa::EntitlementsFilter::Create(@[], @[])];
   id mockConfigurator = OCMClassMock([SNTConfigurator class]);
   OCMStub([mockConfigurator clientMode]).andReturn(SNTClientModeStandalone);
+  OCMStub([mockConfigurator enableStandaloneSecurityKeyAuthorization]).andReturn(enabled);
   processor.configurator = mockConfigurator;
 
   id mockFileInfo = OCMClassMock([SNTFileInfo class]);
@@ -1033,12 +1034,31 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
                                       activationCallback:nil
                                           cachedDecision:cached];
 
-  XCTAssertTrue(cd.holdAndAsk);
-  XCTAssertEqual(cd.authorizationMethod, SNTAuthorizationMethodPresence);
-
   [mockFileInfo stopMocking];
   [mockConfigurator stopMocking];
   [mockRuleTable stopMocking];
+  return cd;
+}
+
+// Standalone has no expression to name an authorization method, so by default
+// it holds for Touch ID: a touch on any attached security key proves presence,
+// not identity.
+- (void)testStandaloneHoldsForTouchIDByDefault {
+  SNTCachedDecision* cd = [self standaloneDecisionWithSecurityKeyAuthorization:NO];
+
+  XCTAssertTrue(cd.holdAndAsk);
+  XCTAssertEqual(cd.decision, SNTEventStateBlockUnknown);
+  XCTAssertEqual(cd.authorizationMethod, SNTAuthorizationMethodTouchID);
+}
+
+// With EnableStandaloneSecurityKeyAuthorization set, Standalone asks for
+// presence: Touch ID or a security key, whichever the Mac has.
+- (void)testStandaloneHoldsForPresenceWhenSecurityKeyEnabled {
+  SNTCachedDecision* cd = [self standaloneDecisionWithSecurityKeyAuthorization:YES];
+
+  XCTAssertTrue(cd.holdAndAsk);
+  XCTAssertEqual(cd.decision, SNTEventStateBlockUnknown);
+  XCTAssertEqual(cd.authorizationMethod, SNTAuthorizationMethodPresence);
 }
 
 - (void)testDecisionBlocksFreshCodesignValidationFailure {

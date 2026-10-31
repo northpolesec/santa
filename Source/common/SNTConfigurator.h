@@ -524,6 +524,22 @@
 @property(readonly, nonatomic) BOOL enableStandalonePasswordFallback;
 
 ///
+///  When in Standalone mode, Santa normally holds unknown binaries for TouchID (or a password,
+///  if EnableStandalonePasswordFallback is set). If this option is enabled, Standalone holds
+///  instead ask for presence: when a FIDO2 security key is attached, a touch on any attached
+///  key approves the binary, with TouchID offered as an alternative.
+///
+///  A touch on a security key proves that someone touched it, not who they are, and Santa
+///  does not register a specific key, so this must be explicitly opted into.
+///
+///  CEL rules that return REQUIRE_SECURITY_KEY or REQUIRE_PRESENCE are unaffected by this
+///  option.
+///
+///  Defaults to NO.
+///
+@property(readonly, nonatomic) BOOL enableStandaloneSecurityKeyAuthorization;
+
+///
 ///  When silent mode is enabled, Santa will never show notifications for
 ///  blocked processes.
 ///
