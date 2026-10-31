@@ -151,7 +151,9 @@ typedef NS_ENUM(NSInteger, SNTSyncedBool) {
 };
 
 /// How a held execution must be authorized by the user. Set from the CEL return
-/// value that held the execution; Standalone mode holds always use Touch ID.
+/// value that held the execution; Standalone mode holds use Touch ID unless
+/// EnableStandaloneSecurityKeyAuthorization is set, in which case they use
+/// Presence.
 ///
 /// Touch ID is zero so that a decision, or an archived event, from a Santa that
 /// predates this enum decodes to the existing behavior.
