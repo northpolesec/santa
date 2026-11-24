@@ -20,6 +20,7 @@
 #include "Source/common/TestUtils.h"
 
 #include <string>
+#include <vector>
 
 @interface SNTXxhashTest : XCTestCase
 @end
@@ -139,6 +140,35 @@
   state128.Update("helloworld", 10);
   XCTAssertCppStringEqual(santa::Xxhash128::HexDigestOneShot("helloworld", 10),
                           state128.HexDigest());
+}
+
+- (void)testOneShotCanonicalDigest {
+  // Lengths cover XXH3's separate short, medium and long input paths.
+  std::string data(1000, 'x');
+  for (size_t len : {0, 10, 200, 240, 1000}) {
+    santa::Xxhash64 state64;
+    state64.Update(data.data(), len);
+    __block std::vector<uint8_t> want64;
+    state64.Digest(^(const uint8_t* buf, size_t size) {
+      want64.assign(buf, buf + size);
+    });
+    santa::Xxhash64::canonical_type got64 =
+        santa::Xxhash64::CanonicalDigestOneShot(data.data(), len);
+    XCTAssertTrue(std::vector<uint8_t>(got64.digest, got64.digest + sizeof(got64.digest)) == want64,
+                  @"len %zu", len);
+
+    santa::Xxhash128 state128;
+    state128.Update(data.data(), len);
+    __block std::vector<uint8_t> want128;
+    state128.Digest(^(const uint8_t* buf, size_t size) {
+      want128.assign(buf, buf + size);
+    });
+    santa::Xxhash128::canonical_type got128 =
+        santa::Xxhash128::CanonicalDigestOneShot(data.data(), len);
+    XCTAssertTrue(
+        std::vector<uint8_t>(got128.digest, got128.digest + sizeof(got128.digest)) == want128,
+        @"len %zu", len);
+  }
 }
 
 @end

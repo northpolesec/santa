@@ -1,26 +1,8 @@
-load("@protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
-load("@protobuf//bazel:proto_library.bzl", "proto_library")
 load("@rules_cc//cc:defs.bzl", "cc_library", "objc_library")
 load("//:helper.bzl", "santa_unit_test")
 
 package(
     default_visibility = ["//:santa_package_group"],
-)
-
-proto_library(
-    name = "binaryproto_proto",
-    srcs = ["binaryproto.proto"],
-    deps = [
-        "@protobuf//:any_proto",
-        "@protobuf//:timestamp_proto",
-    ],
-)
-
-cc_proto_library(
-    name = "binaryproto_cc_proto",
-    deps = [
-        ":binaryproto_proto",
-    ],
 )
 
 cc_library(
@@ -73,14 +55,13 @@ objc_library(
     ],
     deps = [
         ":ZstdOutputStream",
-        ":binaryproto_cc_proto",
         ":fsspool_nowindows",
         "//Source/common:SNTXxhash",
         "//Source/common:Unit",
-        "//Source/common:santa_cc_proto",
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/synchronization",
+        "@northpolesec_protos//telemetry:v1_cc_proto",
     ],
 )
 

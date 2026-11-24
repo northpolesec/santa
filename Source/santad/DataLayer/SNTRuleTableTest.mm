@@ -197,11 +197,11 @@ static struct RuleIdentifiers UnruledIdentifiers() {
 - (void)testAddRulesCleanNonTransitive {
   // Add a multiple binary rules, including a transitive rule
   NSArray<NSError*>* errors;
-  XCTAssertTrue(([self.sut addExecutionRules:@[
-    [self _exampleBinaryRule], [self _exampleCertRule], [self _exampleTransitiveRule]
-  ]
+  XCTAssertTrue(([self.sut addExecutionRules:@[ [self _exampleBinaryRule], [self _exampleCertRule] ]
                                  ruleCleanup:SNTRuleCleanupNone
                                       errors:&errors]));
+  XCTAssertTrue([self.sut addTransitiveRuleForSHA256:[self _exampleTransitiveRule].identifier
+                                               error:nil]);
   XCTAssertEqual([self.sut binaryRuleCount], 2);
   XCTAssertNil(errors);
 
@@ -263,6 +263,195 @@ static struct RuleIdentifiers UnruledIdentifiers() {
   XCTAssertFalse([self.sut addExecutionRules:@[ r ] ruleCleanup:SNTRuleCleanupNone errors:&errors]);
   XCTAssertEqual(errors.count, 1);
   XCTAssertEqual(errors.firstObject.code, SNTErrorCodeRuleInvalid);
+}
+
+- (NSDictionary*)executionRuleRowForSHA256:(NSString*)sha256 {
+  __block NSDictionary* row;
+  [self.dbq inDatabase:^(FMDatabase* db) {
+    FMResultSet* rs =
+        [db executeQuery:@"SELECT rowid, * FROM execution_rules WHERE identifier=? AND type=?",
+                         sha256, @(SNTRuleTypeBinary)];
+    if ([rs next]) row = [rs resultDictionary];
+    [rs close];
+  }];
+  return row;
+}
+
+- (void)testTransitiveRulesPreserveConfiguredBinaryRules {
+  NSString* sha256 = [self _exampleBinaryRule].identifier;
+  struct RuleIdentifiers ids = {.binarySHA256 = sha256};
+  // A configured rule can arrive after the compiler's earlier lookup missed it.
+  XCTAssertNil([self.sut executionRuleForIdentifiers:ids]);
+  for (NSNumber* state in @[
+         @(SNTRuleStateBlock),
+         @(SNTRuleStateSilentBlock),
+         @(SNTRuleStateSilentBlockGUI),
+         @(SNTRuleStateSilentBlockTTY),
+         @(SNTRuleStateAllow),
+         @(SNTRuleStateAllowCompiler),
+         @(SNTRuleStateAllowLocalBinary),
+         @(SNTRuleStateAllowLocalSigningID),
+         @(SNTRuleStateCEL),
+         @(SNTRuleStateCELv2),
+         @(SNTRuleStateSeatbelt),
+       ]) {
+    SNTRule* rule = [[SNTRule alloc] initWithIdentifier:sha256
+                                                  state:(SNTRuleState)state.integerValue
+                                                   type:SNTRuleTypeBinary
+                                              customMsg:@"Preserve this message"
+                                              customURL:@"https://example.com/rule"
+                                  eventDetailButtonText:@"Rule details"
+                                              timestamp:123
+                                                comment:@"Preserve this comment"
+                                                celExpr:@"ALLOWLIST"
+                                         seatbeltPolicy:@"(version 1) (allow default)"
+                                                 ruleId:456
+                                                  error:nil];
+    NSArray<NSError*>* errors;
+    XCTAssertTrue([self.sut addExecutionRules:@[ rule ]
+                                  ruleCleanup:SNTRuleCleanupAll
+                                       errors:&errors]);
+    XCTAssertNil(errors);
+    NSDictionary* before = [self executionRuleRowForSHA256:sha256];
+    XCTAssertNotNil(before);
+    NSString* rulesHash = [self.sut hashOfHashes].executionRulesHash;
+
+    NSError* error = [SNTError createErrorWithCode:SNTErrorCodeUnknown format:@"Previous error"];
+    XCTAssertFalse([self.sut addTransitiveRuleForSHA256:sha256.uppercaseString error:&error],
+                   @"state %@", state);
+    XCTAssertNil(error);
+    XCTAssertEqual(self.sut.executionRuleCount, 1);
+    XCTAssertEqualObjects([self executionRuleRowForSHA256:sha256], before, @"state %@", state);
+    XCTAssertEqualObjects([self.sut hashOfHashes].executionRulesHash, rulesHash);
+  }
+}
+
+- (void)testTransitiveRulesInsertRefreshAndInvalidateMisses {
+  NSString* sha256 = [self _exampleBinaryRule].identifier;
+  struct RuleIdentifiers ids = {.binarySHA256 = sha256};
+  XCTAssertNil([self.sut executionRuleForIdentifiers:ids useCache:YES]);
+
+  NSUInteger earliestTimestamp = (NSUInteger)[[NSDate date] timeIntervalSinceReferenceDate];
+  NSError* error;
+  XCTAssertTrue([self.sut addTransitiveRuleForSHA256:sha256.uppercaseString error:&error]);
+  XCTAssertNil(error);
+  SNTRule* inserted = [self.sut executionRuleForIdentifiers:ids useCache:YES];
+  XCTAssertEqualObjects(inserted.identifier, sha256);
+  XCTAssertEqual(inserted.state, SNTRuleStateAllowTransitive);
+  XCTAssertEqual(inserted.type, SNTRuleTypeBinary);
+  XCTAssertGreaterThanOrEqual(inserted.timestamp, earliestTimestamp);
+  XCTAssertLessThanOrEqual(inserted.timestamp,
+                           (NSUInteger)[[NSDate date] timeIntervalSinceReferenceDate]);
+  XCTAssertEqual(self.sut.executionRuleCount, 1);
+
+  // Age the existing row and give it metadata so a refresh must preserve more than its key.
+  [self.dbq inDatabase:^(FMDatabase* db) {
+    XCTAssertTrue((
+        [db executeUpdate:@"UPDATE execution_rules SET timestamp=1, custommsg=? WHERE identifier=?",
+                          @"Keep on refresh", sha256]));
+  }];
+  NSMutableDictionary* before = [[self executionRuleRowForSHA256:sha256] mutableCopy];
+  XCTAssertTrue([self.sut addTransitiveRuleForSHA256:sha256 error:&error]);
+  XCTAssertNil(error);
+  NSMutableDictionary* after = [[self executionRuleRowForSHA256:sha256] mutableCopy];
+  XCTAssertGreaterThanOrEqual([after[@"timestamp"] unsignedIntegerValue], earliestTimestamp);
+  XCTAssertLessThanOrEqual([after[@"timestamp"] unsignedIntegerValue],
+                           (NSUInteger)[[NSDate date] timeIntervalSinceReferenceDate]);
+  [before removeObjectForKey:@"timestamp"];
+  [after removeObjectForKey:@"timestamp"];
+  XCTAssertEqualObjects(after, before);
+  XCTAssertEqual(self.sut.executionRuleCount, 1);
+  XCTAssertTrue([self.sut addTransitiveRuleForSHA256:sha256 error:nil]);
+
+  // The reverse ordering still lets an administrator replace a transitive allowance.
+  XCTAssertTrue([self.sut addExecutionRules:@[ [self _exampleBinaryRule] ]
+                                ruleCleanup:SNTRuleCleanupNone
+                                     errors:nil]);
+  XCTAssertEqual([self.sut executionRuleForIdentifiers:ids].state, SNTRuleStateBlock);
+}
+
+- (void)testTransitiveRulesRespectStaticBinaryRules {
+  NSString* sha256 = [self _exampleBinaryRule].identifier;
+  for (NSString* policy in @[ @"BLOCKLIST", @"ALLOWLIST", @"ALLOWLIST_COMPILER" ]) {
+    [self.sut updateStaticRules:@[ @{
+                @"identifier" : sha256,
+                @"policy" : policy,
+                @"rule_type" : @"BINARY",
+              } ]];
+    NSError* error = [SNTError createErrorWithCode:SNTErrorCodeUnknown format:@"Previous error"];
+    XCTAssertFalse([self.sut addTransitiveRuleForSHA256:sha256.uppercaseString error:&error]);
+    XCTAssertNil(error);
+    XCTAssertEqual(self.sut.executionRuleCount, 0);
+    [self.sut updateStaticRules:nil];
+    XCTAssertNil(
+        [self.sut executionRuleForIdentifiers:(struct RuleIdentifiers){.binarySHA256 = sha256}]);
+  }
+
+  [self.sut updateStaticRules:@[ @{
+              @"identifier" : sha256,
+              @"policy" : @"BLOCKLIST",
+              @"rule_type" : @"CERTIFICATE",
+            } ]];
+  XCTAssertTrue([self.sut addTransitiveRuleForSHA256:sha256 error:nil]);
+  XCTAssertEqual(self.sut.transitiveRuleCount, 1);
+}
+
+- (void)testTransitiveRulesRejectInvalidHashesAndDatabaseFailures {
+  for (id value in @[
+         [NSNull null], @"", @"bad",
+         [@"z" stringByPaddingToLength:64 withString:@"z" startingAtIndex:0]
+       ]) {
+    NSString* sha256 = value == [NSNull null] ? nil : value;
+    NSError* error;
+    XCTAssertFalse([self.sut addTransitiveRuleForSHA256:sha256 error:&error]);
+    XCTAssertEqualObjects(error.domain, SantaErrorDomain);
+    XCTAssertEqual(error.code, SNTErrorCodeRuleInvalidIdentifier);
+  }
+  XCTAssertFalse([self.sut addTransitiveRuleForSHA256:nil error:nil]);
+  XCTAssertEqual(self.sut.executionRuleCount, 0);
+
+  [self.dbq inDatabase:^(FMDatabase* db) {
+    XCTAssertTrue([db executeUpdate:@"PRAGMA query_only=ON"]);
+  }];
+  NSError* error;
+  XCTAssertFalse([self.sut addTransitiveRuleForSHA256:[self _exampleBinaryRule].identifier
+                                                error:&error]);
+  XCTAssertEqualObjects(error.domain, SantaErrorDomain);
+  XCTAssertEqual(error.code, SNTErrorCodeInsertOrReplaceRuleFailed);
+  XCTAssertEqual(self.sut.executionRuleCount, 0);
+  [self.dbq inDatabase:^(FMDatabase* db) {
+    XCTAssertTrue([db executeUpdate:@"PRAGMA query_only=OFF"]);
+  }];
+}
+
+- (void)testBulkTransitiveRulesAreRejectedAndRolledBack {
+  SNTRule* original = [self _exampleBinaryRule];
+  XCTAssertTrue([self.sut addExecutionRules:@[ original ]
+                            fileAccessRules:@[ [self _exampleFileAccessAddRuleWithName:@"Keep"] ]
+                           networkFlowRules:nil
+                                    signals:nil
+                                ruleCleanup:SNTRuleCleanupNone
+                                     errors:nil]);
+  NSDictionary* before = [self executionRuleRowForSHA256:original.identifier];
+  for (NSNumber* cleanup in @[ @(SNTRuleCleanupNone), @(SNTRuleCleanupAll) ]) {
+    for (SNTRule* transitive in @[
+           [self _exampleTransitiveRule],
+           [[SNTRule alloc] initWithIdentifier:@"ABCDEFGHIJ:signingID"
+                                         state:SNTRuleStateAllowTransitive
+                                          type:SNTRuleTypeSigningID],
+         ]) {
+      NSArray<NSError*>* errors;
+      XCTAssertFalse(([self.sut addExecutionRules:@[ [self _exampleCertRule], transitive ]
+                                      ruleCleanup:(SNTRuleCleanup)cleanup.integerValue
+                                           errors:&errors]));
+      XCTAssertEqual(errors.count, 1);
+      XCTAssertEqual(errors.firstObject.code, SNTErrorCodeRuleInvalid);
+      XCTAssertEqualObjects([self executionRuleRowForSHA256:original.identifier], before);
+      XCTAssertEqual(self.sut.executionRuleCount, 1);
+      XCTAssertEqual(self.sut.certificateRuleCount, 0);
+      XCTAssertEqual(self.sut.fileAccessRuleCount, 1);
+    }
+  }
 }
 
 - (void)testAddInvalidCELExpression {
@@ -815,13 +1004,11 @@ static struct RuleIdentifiers UnruledIdentifiers() {
 // whatever a compiler produced -- so it must lose to every configured rule type, including the
 // Binary slot it nominally occupies.
 //
-// The writer cannot be relied on to prevent the overlap: its existing-rule guard looks up only
-// .binarySHA256, so a Signing ID / Certificate / Team ID rule covering the same executable is
-// invisible to it and the transitive rule is written regardless.
+// The writer protects the Binary key. Other configured rule types can coexist with a transitive
+// Binary rule and must win at lookup time.
 - (void)testFetchRuleOrderingTransitiveLosesToEveryConfiguredType {
   NSArray<NSError*>* err;
   [self.sut addExecutionRules:@[
-    [self _exampleTransitiveRule],
     [self _exampleCDHashRule],
     [self _exampleSigningIDRuleIsPlatform:NO],
     [self _exampleCertRule],
@@ -832,6 +1019,7 @@ static struct RuleIdentifiers UnruledIdentifiers() {
   XCTAssertNil(err);
 
   NSString* transitiveID = [self _exampleTransitiveRule].identifier;
+  XCTAssertTrue([self.sut addTransitiveRuleForSHA256:transitiveID error:nil]);
 
   // Each case pairs the transitive Binary rule with exactly one configured rule. The configured
   // rule must win every time, even Team ID -- the lowest-priority type there is.
@@ -915,11 +1103,12 @@ static struct RuleIdentifiers UnruledIdentifiers() {
   NSArray<NSError*>* err;
   [self.sut addExecutionRules:@[
     [self _exampleSigningIDCompilerRule],
-    [self _exampleTransitiveRule],
   ]
                   ruleCleanup:SNTRuleCleanupNone
                        errors:&err];
   XCTAssertNil(err);
+  XCTAssertTrue([self.sut addTransitiveRuleForSHA256:[self _exampleTransitiveRule].identifier
+                                               error:nil]);
 
   SNTRule* r = [self.sut
       executionRuleForIdentifiers:(struct RuleIdentifiers){
@@ -947,7 +1136,6 @@ static struct RuleIdentifiers UnruledIdentifiers() {
   certRule.type = SNTRuleTypeCertificate;
 
   [self.sut addExecutionRules:@[
-    [self _exampleTransitiveRule],
     [self _exampleSigningIDRuleIsPlatform:NO],
     certRule,
     [self _exampleTeamIDRule],
@@ -957,6 +1145,7 @@ static struct RuleIdentifiers UnruledIdentifiers() {
   XCTAssertNil(err);
 
   NSString* transitiveID = [self _exampleTransitiveRule].identifier;
+  XCTAssertTrue([self.sut addTransitiveRuleForSHA256:transitiveID error:nil]);
 
   NSArray<NSDictionary*>* cases = @[
     @{
@@ -1052,36 +1241,6 @@ static struct RuleIdentifiers UnruledIdentifiers() {
                  @"alias in executionRuleForIdentifiers:. Rename one of them.");
 }
 
-// The transitive demotion is scoped to type=1000 because SNTCompilerController is the only writer
-// of transitive rules and always writes type Binary. This asserts the half of that invariant the
-// rule table can see: a transitive rule at another type would NOT be demoted, so if a new writer
-// ever introduces one, this test documents what breaks.
-- (void)testTransitiveDemotionIsScopedToBinaryType {
-  NSArray<NSError*>* err;
-  SNTRule* transitiveSigningID = [[SNTRule alloc] init];
-  transitiveSigningID.identifier = @"ABCDEFGHIJ:signingID";
-  transitiveSigningID.state = SNTRuleStateAllowTransitive;
-  transitiveSigningID.type = SNTRuleTypeSigningID;
-
-  [self.sut addExecutionRules:@[ transitiveSigningID, [self _exampleTeamIDRule] ]
-                  ruleCleanup:SNTRuleCleanupNone
-                       errors:&err];
-  XCTAssertNil(err);
-
-  SNTRule* r = [self.sut executionRuleForIdentifiers:(struct RuleIdentifiers){
-                                                         .signingID = @"ABCDEFGHIJ:signingID",
-                                                         .teamID = @"ABCDEFGHIJ",
-                                                     }];
-  XCTAssertNotNil(r);
-  // Characterization, not an endorsement: a transitive rule stored at a non-Binary type keeps
-  // that type's precedence. Reaching this state requires a new writer of transitive rules, since
-  // no policy string parses to SNTRuleStateAllowTransitive. If that ever happens, extend the
-  // state split in executionRuleForIdentifiers: to the affected type.
-  XCTAssertEqual(r.type, SNTRuleTypeSigningID);
-  XCTAssertEqual(r.state, SNTRuleStateAllowTransitive,
-                 @"demotion is type-scoped; a non-Binary transitive rule is not demoted");
-}
-
 - (void)testBadDatabase {
   NSString* dbPath = [NSTemporaryDirectory() stringByAppendingString:@"sntruletabletest_baddb.db"];
   [@"some text" writeToFile:dbPath atomically:YES encoding:NSUTF8StringEncoding error:NULL];
@@ -1164,8 +1323,7 @@ static struct RuleIdentifiers UnruledIdentifiers() {
 }
 
 - (void)testAddedRulesShouldFlushDecisionCacheWithCompilerRule {
-  // Ensure that an allow rule that overrides a compiler rule flushes the
-  // decision cache.
+  // The daemon selectively invalidates compiler decisions for plain allows.
   NSArray<NSError*>* errors;
   SNTRule* r = [self _exampleBinaryRule];
   r.type = SNTRuleTypeBinary;
@@ -1176,7 +1334,7 @@ static struct RuleIdentifiers UnruledIdentifiers() {
   XCTAssertEqual(self.sut.binaryRuleCount, 1);
   // make the rule an allow rule
   r.state = SNTRuleStateAllow;
-  XCTAssertEqual(YES, [self.sut addedRulesShouldFlushDecisionCache:@[ r ]]);
+  XCTAssertEqual(NO, [self.sut addedRulesShouldFlushDecisionCache:@[ r ]]);
 }
 
 - (void)testAddedRulesShouldFlushDecisionCacheWithRemoveRule {
@@ -1302,7 +1460,7 @@ static struct RuleIdentifiers UnruledIdentifiers() {
 
   // Add a transitive rule. The hashes should not change.
   SNTRule* transitiveRule = [self _exampleTransitiveRule];
-  [self.sut addExecutionRules:@[ transitiveRule ] ruleCleanup:SNTRuleCleanupNone errors:nil];
+  XCTAssertTrue([self.sut addTransitiveRuleForSHA256:transitiveRule.identifier error:nil]);
   rulesHash = [self.sut hashOfHashes];
   XCTAssertEqualObjects(rulesHash.executionRulesHash, @"a6cb5171bbb8895820d61e395592b293");
   XCTAssertEqualObjects(rulesHash.fileAccessRulesHash, @"010a7393bae8f2e97c296063dd2f39cf");

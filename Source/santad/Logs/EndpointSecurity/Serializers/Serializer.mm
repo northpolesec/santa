@@ -136,39 +136,12 @@ static SNTCachedDecision* ProcessDecision(SNTDecisionCache* cache, SNDProcessFlo
   return cd.identityMismatched ? nil : cd;
 }
 
-std::vector<uint8_t> Serializer::SerializeNetworkFlows(SNDProcessFlows* processFlows,
-                                                       struct timespec window_start,
-                                                       struct timespec window_end) {
-  return SerializeNetworkFlows(processFlows, window_start, window_end,
-                               ProcessDecision(decision_cache_, processFlows));
-}
-
-std::vector<uint8_t> Serializer::SerializeDNSActivity(SNDProcessFlows* processFlows,
-                                                      struct timespec window_start,
-                                                      struct timespec window_end) {
-  return SerializeDNSActivity(processFlows, window_start, window_end,
-                              ProcessDecision(decision_cache_, processFlows));
-}
-
 void Serializer::SerializeNetworkActivities(SNDProcessFlows* flows, struct timespec start,
                                             struct timespec end, bool network, bool dns,
                                             const ActivityWriter& write) {
   if (!network && !dns) return;
   SerializeNetworkActivities(flows, start, end, ProcessDecision(decision_cache_, flows), network,
                              dns, write);
-}
-
-void Serializer::SerializeNetworkActivities(SNDProcessFlows* flows, struct timespec start,
-                                            struct timespec end, SNTCachedDecision* cd,
-                                            bool network, bool dns, const ActivityWriter& write) {
-  if (dns) {
-    auto bytes = SerializeDNSActivity(flows, start, end, cd);
-    if (!bytes.empty()) write(std::move(bytes));
-  }
-  if (network) {
-    auto bytes = SerializeNetworkFlows(flows, start, end, cd);
-    if (!bytes.empty()) write(std::move(bytes));
-  }
 }
 
 };  // namespace santa

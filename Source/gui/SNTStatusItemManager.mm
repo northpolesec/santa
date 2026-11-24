@@ -273,6 +273,16 @@ static void SetMenuItemTitle(NSMenuItem* item, NSString* title) {
         reason = NSLocalizedString(@"the admin group membership change failed",
                                    @"Reason shown when the group membership change fails");
         break;
+      case SNTErrorCodeTAMRequesterMismatch:
+        reason = NSLocalizedString(
+            @"the Santa prompt currently belongs to another user's session",
+            @"Reason shown when the requesting user does not own the registered Santa GUI");
+        break;
+      case SNTErrorCodeTAMNoGUI:
+        reason = NSLocalizedString(
+            @"Santa has not finished connecting",
+            @"Reason shown when the daemon has no registered Santa GUI to show the prompt");
+        break;
       default:
         reason =
             NSLocalizedString(@"an unknown error occurred",

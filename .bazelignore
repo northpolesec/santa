@@ -1,0 +1,4 @@
+# Private modules under Source/internal/ are built as their own Bazel modules
+# (with --override_module), so this repo must not load their BUILD files as its
+# own packages.
+Source/internal

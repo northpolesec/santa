@@ -17,6 +17,7 @@
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTLogging.h"
 #include "Source/common/String.h"
+#import "Source/santasyncservice/SNTSantaCommandHandler+AIAccountInventory.h"
 #import "Source/santasyncservice/SNTSantaCommandHandler+BinaryUpload.h"
 #import "Source/santasyncservice/SNTSantaCommandHandler+EventUpload.h"
 #import "Source/santasyncservice/SNTSantaCommandHandler+Kill.h"
@@ -37,6 +38,7 @@ NSString* CommandName(const ::pbv1::QueuedCommand& command) {
     case ::pbv1::QueuedCommand::kEventUpload: return @"event_upload";
     case ::pbv1::QueuedCommand::kBinaryUpload: return @"binary_upload";
     case ::pbv1::QueuedCommand::kPackageInventory: return @"package_inventory";
+    case ::pbv1::QueuedCommand::kAiAccountInventory: return @"ai_account_inventory";
     case ::pbv1::QueuedCommand::COMMAND_NOT_SET: return nil;
   }
 }
@@ -59,13 +61,14 @@ NSString* CommandName(const ::pbv1::QueuedCommand& command) {
 }
 
 + (BOOL)shouldPostDeliveredAckForCommand:(const ::pbv1::QueuedCommand&)command {
-  // Uploads and package-inventory scans can run for minutes; acking first lets
+  // Uploads and inventory scans can run for minutes; acking first lets
   // the server show them in flight instead of untouched while they run.
   // Everything else is fast enough to post straight to COMPLETE.
   switch (command.command_case()) {
     case ::pbv1::QueuedCommand::kEventUpload:
     case ::pbv1::QueuedCommand::kBinaryUpload:
-    case ::pbv1::QueuedCommand::kPackageInventory: break;
+    case ::pbv1::QueuedCommand::kPackageInventory:
+    case ::pbv1::QueuedCommand::kAiAccountInventory: break;
     default: return NO;
   }
 
@@ -149,6 +152,22 @@ NSString* CommandName(const ::pbv1::QueuedCommand& command) {
       }
       result->set_host_status(::pbv1::CommandResult::HOST_STATUS_COMPLETE);
       result->unsafe_arena_set_allocated_package_inventory(scanResponse);
+      break;
+    }
+
+    case ::pbv1::QueuedCommand::kAiAccountInventory: {
+      LOGI(@"SantaCommand: Executing queued AIAccountInventoryRequest command %lld",
+           (long long)command.command_id());
+      // Like package inventory, this blocks until santad's scan finishes.
+      std::string errorMessage;
+      auto* scanResponse = [self handleAIAccountInventoryRequest:command.ai_account_inventory()
+                                                         onArena:arena
+                                                    errorMessage:&errorMessage];
+      if (!errorMessage.empty()) {
+        result->set_error_message(errorMessage);
+      }
+      result->set_host_status(::pbv1::CommandResult::HOST_STATUS_COMPLETE);
+      result->unsafe_arena_set_allocated_ai_account_inventory(scanResponse);
       break;
     }
 

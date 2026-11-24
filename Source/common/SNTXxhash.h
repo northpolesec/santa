@@ -93,14 +93,21 @@ class Xxhash {
   // One-shot hex digest of `data`. Hashes in a single call without allocating
   // or copying streaming state, making it cheap on hot paths.
   static std::string HexDigestOneShot(const void* data, size_t size) {
-    hash_type hash = XxhashFuncPtrs::OneShot(data, size);
-    canonical_type canonical_hash;
-    XxhashFuncPtrs::CanonicalFromHash(&canonical_hash, hash);
+    canonical_type canonical_hash = CanonicalDigestOneShot(data, size);
 
     char output[sizeof(canonical_type) * 2 + 1];
     CanonicalHashToHex(&canonical_hash, output);
 
     return std::string(output, sizeof(canonical_type) * 2);
+  }
+
+  // One-shot canonical digest of `data`: the same bytes as Update() followed
+  // by Digest(), without building streaming state.
+  static canonical_type CanonicalDigestOneShot(const void* data, size_t size) {
+    canonical_type canonical;
+    XxhashFuncPtrs::CanonicalFromHash(&canonical,
+                                      XxhashFuncPtrs::OneShot(data, size));
+    return canonical;
   }
 
   static inline void CanonicalHashToHex(const canonical_type* canonical,

@@ -38,6 +38,8 @@
 #include "Source/common/es/MockEndpointSecurityAPI.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
 #include "Source/santad/Logs/EndpointSecurity/Logger.h"
+#include "Source/santad/Logs/EndpointSecurity/Serializers/Empty.h"
+#include "Source/santad/Logs/EndpointSecurity/Writers/Null.h"
 #include "Source/santad/PendingExecCoordinator.h"
 #import "Source/santad/SNTDatabaseController.h"
 #import "Source/santad/SNTDecisionCache.h"
@@ -47,6 +49,12 @@ using santa::Message;
 using santa::PendingExecCoordinator;
 
 static const pid_t PID_MAX = 99999;
+
+class MockCompilerAllowlistSerializer : public santa::Empty {
+ public:
+  MOCK_METHOD(std::vector<uint8_t>, SerializeAllowlist,
+              (const Message&, const std::string_view, const std::string_view), (override));
+};
 
 @interface SNTCompilerController (Testing)
 - (BOOL)isCompiler:(const audit_token_t&)tok;
@@ -309,61 +317,102 @@ static std::function<bool(pid_t, audit_token_t*)> TokenForPidFrom(
   XCTAssertFalse(coord->CompilerActiveRecently());
 }
 
-// Committing a transitive rule wakes an execution held for that content only.
-- (void)testCreatingTransitiveRuleWakesWaiterForItsHash {
-  id mockRuleTable = OCMClassMock([SNTRuleTable class]);
-  OCMStub([mockRuleTable executionRuleForIdentifiers:(struct RuleIdentifiers){}])
-      .ignoringNonObjectArgs()
-      .andReturn(nil);
-  OCMStub([mockRuleTable addExecutionRules:OCMOCK_ANY ruleCleanup:SNTRuleCleanupNone errors:nil])
-      .ignoringNonObjectArgs()
-      .andReturn(YES);
-  id mockDatabaseController = OCMClassMock([SNTDatabaseController class]);
-  OCMStub([mockDatabaseController ruleTable]).andReturn(mockRuleTable);
-
+- (void)testCreatingTransitiveRuleOnlyReportsWrites {
   NSString* sha256 = @"0000000000000000000000000000000000000000000000000000000000000001";
-  id mockFileInfo = OCMClassMock([SNTFileInfo class]);
-  OCMStub([mockFileInfo isExecutable]).andReturn(YES);
-  OCMStub([mockFileInfo SHA256]).andReturn(sha256);
-  OCMStub([mockFileInfo path]).andReturn(@"/tmp/out");
+  NSError* dbError = [NSError errorWithDomain:@"test.database" code:1 userInfo:nil];
+  struct {
+    const char* name;
+    BOOL executable;
+    NSString* hash;
+    BOOL written;
+    NSError* error;
+  } cases[] = {
+      {"written", YES, sha256, YES, nil},           {"protected rule", YES, sha256, NO, nil},
+      {"database error", YES, sha256, NO, dbError}, {"hash failure", YES, nil, NO, nil},
+      {"not executable", NO, sha256, NO, nil},
+  };
 
-  auto coord = std::make_shared<PendingExecCoordinator>();
-  dispatch_semaphore_t sema = dispatch_semaphore_create(0);
-  __block bool woken = false;
-  coord->Wait(santa::NSStringToUTF8String(sha256), 5000, ^(bool ruleCreated) {
-    woken = ruleCreated;
-    dispatch_semaphore_signal(sema);
-  });
-  __block bool otherWoken = true;
-  coord->Wait("other content", 100, ^(bool ruleCreated) {
-    otherWoken = ruleCreated;
-    dispatch_semaphore_signal(sema);
-  });
+  [self.mockDecisionCache stopMocking];
+  for (const auto& c : cases) {
+    SCOPED_TRACE(c.name);
+    self.mockDecisionCache = OCMClassMock([SNTDecisionCache class]);
+    OCMStub([self.mockDecisionCache sharedCache]).andReturn(self.mockDecisionCache);
+    __block SNTCachedDecision* fakeDecision;
+    OCMExpect([self.mockDecisionCache
+                      cacheDecision:[OCMArg checkWithBlock:^BOOL(SNTCachedDecision* cd) {
+                        fakeDecision = cd;
+                        return cd.decision == SNTEventStateAllowPendingTransitive &&
+                               [cd.sha256 isEqualToString:@"pending"];
+                      }]
+                  replacingDecision:nil])
+        .andReturn(YES);
+    OCMExpect([self.mockDecisionCache
+        forgetCachedDecision:[OCMArg checkWithBlock:^BOOL(SNTCachedDecision* cd) {
+          return cd && cd == fakeDecision;
+        }]]);
 
-  es_file_t file = MakeESFile("foo");
-  es_process_t proc = MakeESProcess(&file);
-  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_CLOSE, &proc);
-  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
-  mockESApi->SetExpectationsRetainReleaseMessage();
-  auto logger = std::make_shared<Logger>(nullptr, nil, santa::TelemetryEvent::kNone, 0, 0, 0,
-                                         nullptr, nullptr);
+    id mockRuleTable = OCMClassMock([SNTRuleTable class]);
+    if (c.executable && c.hash) {
+      OCMExpect([mockRuleTable addTransitiveRuleForSHA256:sha256 error:[OCMArg setTo:c.error]])
+          .andReturn(c.written);
+    } else {
+      OCMReject([mockRuleTable addTransitiveRuleForSHA256:OCMOCK_ANY error:[OCMArg anyObjectRef]]);
+    }
+    id mockDatabaseController = OCMClassMock([SNTDatabaseController class]);
+    OCMStub([mockDatabaseController ruleTable]).andReturn(mockRuleTable);
+    id mockFileInfo = OCMClassMock([SNTFileInfo class]);
+    OCMStub([mockFileInfo isExecutable]).andReturn(c.executable);
+    OCMStub([mockFileInfo SHA256]).andReturn(c.hash);
+    OCMStub([mockFileInfo path]).andReturn(@"/compiler-output");
 
-  SNTCompilerController* cc = [[SNTCompilerController alloc] initWithPendingExecCoordinator:coord];
-  {
-    Message msg(mockESApi, &esMsg);
-    [cc createTransitiveRule:msg target:mockFileInfo logger:logger];
+    auto coord = std::make_shared<PendingExecCoordinator>();
+    auto serializer = std::make_shared<MockCompilerAllowlistSerializer>();
+    EXPECT_CALL(*serializer, SerializeAllowlist(testing::_, santa::NSStringToUTF8StringView(sha256),
+                                                "/compiler-output"))
+        .Times(c.written ? 1 : 0);
+    auto logger = std::make_shared<Logger>(nullptr, nil, santa::TelemetryEvent::kEverything, 0, 0,
+                                           0, serializer, santa::Null::Create());
+    auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+    mockESApi->SetExpectationsRetainReleaseMessage();
+    es_file_t file = MakeESFile("foo");
+    es_process_t proc = MakeESProcess(&file);
+    es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_CLOSE, &proc);
+    SNTCompilerController* cc =
+        [[SNTCompilerController alloc] initWithPendingExecCoordinator:coord];
+    {
+      Message msg(mockESApi, &esMsg);
+      [cc createTransitiveRule:msg target:mockFileInfo logger:logger];
+    }
+
+    // An immediate waiter observes a prior notification without a timeout race.
+    dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+    __block bool notified = false;
+    coord->Wait(santa::NSStringToUTF8String(c.hash ?: @""), 0, ^(bool ruleCreated) {
+      notified = ruleCreated;
+      dispatch_semaphore_signal(sema);
+    });
+    __block bool otherNotified = true;
+    coord->Wait("other content", 0, ^(bool ruleCreated) {
+      otherNotified = ruleCreated;
+      dispatch_semaphore_signal(sema);
+    });
+    dispatch_time_t deadline = dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC);
+    XCTAssertEqual(dispatch_semaphore_wait(sema, deadline), 0, @"%s", c.name);
+    XCTAssertEqual(dispatch_semaphore_wait(sema, deadline), 0, @"%s", c.name);
+    XCTAssertEqual(notified, (bool)c.written, @"%s", c.name);
+    XCTAssertFalse(otherNotified, @"%s", c.name);
+
+    OCMVerify(times(c.executable ? 1 : 0), [mockFileInfo SHA256]);
+    OCMVerifyAll(mockRuleTable);
+    OCMVerifyAll(self.mockDecisionCache);
+    XCTBubbleMockVerifyAndClearExpectations(serializer.get());
+    XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+    [mockDatabaseController stopMocking];
+    [mockRuleTable stopMocking];
+    [mockFileInfo stopMocking];
+    [self.mockDecisionCache stopMocking];
   }
-
-  dispatch_time_t deadline = dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC);
-  XCTAssertEqual(dispatch_semaphore_wait(sema, deadline), 0);
-  XCTAssertEqual(dispatch_semaphore_wait(sema, deadline), 0);
-  XCTAssertTrue(woken);
-  XCTAssertFalse(otherWoken);
-
-  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
-  [mockDatabaseController stopMocking];
-  [mockRuleTable stopMocking];
-  [mockFileInfo stopMocking];
+  self.mockDecisionCache = nil;
 }
 
 - (void)testHandleEventWithLogger {

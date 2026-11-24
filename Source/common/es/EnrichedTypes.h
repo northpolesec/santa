@@ -30,7 +30,7 @@
 #include "Source/common/Platform.h"
 #include "Source/common/TelemetryEventMap.h"
 #include "Source/common/es/Message.h"
-#include "Source/common/processtree/process_tree.pb.h"
+#include "telemetry/v1.pb.h"
 
 namespace santa {
 
@@ -85,7 +85,7 @@ class EnrichedProcess {
       std::optional<std::shared_ptr<std::string>>&& real_user,
       std::optional<std::shared_ptr<std::string>>&& real_group,
       EnrichedFile&& executable,
-      std::optional<santa::pb::v1::process_tree::Annotations>&& annotations)
+      std::optional<santa::telemetry::v1::Annotations>&& annotations)
       : effective_user_(std::move(effective_user)),
         effective_group_(std::move(effective_group)),
         real_user_(std::move(real_user)),
@@ -120,8 +120,7 @@ class EnrichedProcess {
     return real_group_;
   }
   const EnrichedFile& executable() const { return executable_; }
-  const std::optional<santa::pb::v1::process_tree::Annotations>& annotations()
-      const {
+  const std::optional<santa::telemetry::v1::Annotations>& annotations() const {
     return annotations_;
   }
 
@@ -131,7 +130,7 @@ class EnrichedProcess {
   std::optional<std::shared_ptr<std::string>> real_user_;
   std::optional<std::shared_ptr<std::string>> real_group_;
   EnrichedFile executable_;
-  std::optional<santa::pb::v1::process_tree::Annotations> annotations_;
+  std::optional<santa::telemetry::v1::Annotations> annotations_;
 };
 
 class EnrichedEventType {

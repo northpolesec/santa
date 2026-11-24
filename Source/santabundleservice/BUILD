@@ -33,10 +33,7 @@ macos_command_line_application(
         "--force",
         "--options library,kill,runtime",
     ],
-    infoplists = [
-        "Info.plist",
-        "//Source/common:CommitHash",
-    ],
+    infoplists = ["Info.plist"],
     minimum_os_version = SANTA_MINIMUM_OS_VERSION,
     provisioning_profile = select({
         "//:adhoc_build": None,

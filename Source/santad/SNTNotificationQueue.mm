@@ -24,6 +24,8 @@
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTXPCNotifierInterface.h"
 
+const uid_t kSNTNotifierNoOwner = (uid_t)-1;
+
 @interface SNTNotificationQueue ()
 @property dispatch_queue_t pendingQueue;
 @property NSMutableArray* sentToUser;
@@ -31,6 +33,10 @@
 
 @implementation SNTNotificationQueue {
   std::unique_ptr<santa::RingBuffer<NSMutableDictionary*>> _pendingNotifications;
+  // The connection and its owner are only ever read and written together, under @synchronized
+  // (self), so a reader never pairs a connection with the owner of the one it replaced.
+  MOLXPCConnection* _notifierConnection;
+  uid_t _notifierOwnerUID;
 }
 
 - (instancetype)initWithRingBuffer:
@@ -38,6 +44,7 @@
   self = [super init];
   if (self) {
     _pendingNotifications = std::move(pendingNotifications);
+    _notifierOwnerUID = kSNTNotifierNoOwner;
 
     _pendingQueue = dispatch_queue_create("com.northpolesec.santa.daemon.SNTNotificationQueue",
                                           DISPATCH_QUEUE_SERIAL);
@@ -89,18 +96,12 @@
   });
 }
 
-/// For each pending notification, call the reply block if set then clear the
-/// reply so it won't be called again when the notification is eventually sent.
+/// Call the reply block, with NO, of each queued notification that has one, and drop those
+/// notifications: there is no GUI to send them to. Notifications without a reply stay queued for
+/// the next GUI. Notifications already sent are not touched: each is answered by its GUI, or by
+/// -clearRepliesSentOverConnectionSerialized: when the connection it went over dies. A replaced
+/// GUI can still be alive and showing its prompt.
 - (void)clearAllPendingWithRepliesSerialized {
-  // Auto-respond to blocks that have been sent to the UI but have not yet received a response.
-  for (NSDictionary* d in self.sentToUser) {
-    NotificationReplyBlock replyBlock = d[@"reply"];
-    if (replyBlock) {
-      replyBlock(NO);
-    }
-  }
-  [self.sentToUser removeAllObjects];
-
   _pendingNotifications->Erase(
       std::remove_if(_pendingNotifications->begin(), _pendingNotifications->end(),
                      [](NSMutableDictionary* d) {
@@ -115,8 +116,25 @@
       _pendingNotifications->end());
 }
 
+/// Call the reply block, with NO, of each notification sent over `connection` that has not been
+/// answered, and stop tracking them. XPC drops a dead connection's replies, so nothing else will.
+- (void)clearRepliesSentOverConnectionSerialized:(MOLXPCConnection*)connection {
+  NSIndexSet* unanswered = [self.sentToUser
+      indexesOfObjectsPassingTest:^BOOL(NSDictionary* d, NSUInteger idx, BOOL* stop) {
+        return d[@"connection"] == connection;
+      }];
+  for (NSDictionary* d in [self.sentToUser objectsAtIndexes:unanswered]) {
+    NotificationReplyBlock replyBlock = d[@"reply"];
+    if (replyBlock) {
+      replyBlock(NO);
+    }
+  }
+  [self.sentToUser removeObjectsAtIndexes:unanswered];
+}
+
 - (void)flushQueueSerialized {
-  id rop = [self.notifierConnection remoteObjectProxy];
+  MOLXPCConnection* connection = self.notifierConnection;
+  id rop = [connection remoteObjectProxy];
   if (!rop) {
     // If a connection doesn't exist, clear any reply blocks in pending messages
     [self clearAllPendingWithRepliesSerialized];
@@ -124,7 +142,7 @@
   }
 
   while (!_pendingNotifications->Empty()) {
-    NSDictionary* d = _pendingNotifications->Dequeue().value_or(nil);
+    NSMutableDictionary* d = _pendingNotifications->Dequeue().value_or(nil);
     if (!d) {
       // This shouldn't ever be possible, but bail just in case.
       return;
@@ -142,16 +160,29 @@
     // the replyBlock so that we can remove that object when we get a response
     // from the UI.
     // NB: It is required for this wrapped block to be called asynchronously.
+    // The connection is recorded so that when it dies, only the notifications sent over it are
+    // answered. Holding it also keeps the MOLXPCConnection alive, and its invalidation handler
+    // only runs while it is.
+    d[@"connection"] = connection;
     [self.sentToUser addObject:d];
     WEAKIFY(self);
     NotificationReplyBlock wrappedReplyBlock = ^(BOOL authenticated) {
       STRONGIFY(self);
+      // The reply block runs once: either here or in -clearRepliesSentOverConnectionSerialized:,
+      // whichever removes the notification from sentToUser first.
+      __block BOOL unanswered = YES;
       if (self) {
         dispatch_sync(self.pendingQueue, ^{
-          [self.sentToUser removeObject:d];
+          NSUInteger i = [self.sentToUser indexOfObjectIdenticalTo:d];
+          unanswered = (i != NSNotFound);
+          if (unanswered) {
+            [self.sentToUser removeObjectAtIndex:i];
+          }
         });
       }
-      replyBlock(authenticated);
+      if (unanswered) {
+        replyBlock(authenticated);
+      }
     };
 
     [rop postBlockNotification:d[@"event"]
@@ -163,17 +194,44 @@
   }
 }
 
-- (void)setNotifierConnection:(MOLXPCConnection*)notifierConnection {
-  _notifierConnection = notifierConnection;
+- (MOLXPCConnection*)notifierConnection {
+  @synchronized(self) {
+    return _notifierConnection;
+  }
+}
+
+- (uid_t)notifierOwnerUID {
+  @synchronized(self) {
+    return _notifierOwnerUID;
+  }
+}
+
+- (void)setNotifierConnection:(MOLXPCConnection*)notifierConnection ownerUID:(uid_t)ownerUID {
+  @synchronized(self) {
+    _notifierConnection = notifierConnection;
+    _notifierOwnerUID = notifierConnection ? ownerUID : kSNTNotifierNoOwner;
+  }
 
   WEAKIFY(self);
-  _notifierConnection.invalidationHandler = ^{
+  WEAKIFY(notifierConnection);
+  notifierConnection.invalidationHandler = ^{
     STRONGIFY(self);
-    _notifierConnection = nil;
+    STRONGIFY(notifierConnection);
+    @synchronized(self) {
+      // A connection that was already replaced (a newer GUI registered, as on a fast user
+      // switch) must not clear its successor, or the new session's owner with it.
+      if (self->_notifierConnection == notifierConnection) {
+        self->_notifierConnection = nil;
+        self->_notifierOwnerUID = kSNTNotifierNoOwner;
+      }
+    }
 
-    // When the connection is invalidated, clear any pending notifications with reply blocks
+    // Outside the lock: flushQueueSerialized takes it on pendingQueue.
     dispatch_sync(self.pendingQueue, ^{
-      [self clearAllPendingWithRepliesSerialized];
+      // Answer only what this GUI was sent. Any other GUI, current or replaced, answers its own.
+      // Nothing with a reply stays queued to clear here: every enqueue is followed by a flush,
+      // which sends it or, with no GUI, answers it.
+      [self clearRepliesSentOverConnectionSerialized:notifierConnection];
     });
   };
 
@@ -203,10 +261,21 @@
   }
 }
 
-- (void)authorizeTemporaryAdminModeRequiringJustification:(BOOL)requireJustification
-                                                    reply:(void (^)(BOOL authenticated,
-                                                                    NSString* reason))reply {
-  id rop = [self.notifierConnection synchronousRemoteObjectProxy];
+- (void)authorizeTemporaryAdminModeForUID:(uid_t)uid
+                   requiringJustification:(BOOL)requireJustification
+                                    reply:(void (^)(BOOL authenticated, NSString* reason))reply {
+  MOLXPCConnection* connection;
+  uid_t owner;
+  @synchronized(self) {
+    connection = _notifierConnection;
+    owner = _notifierOwnerUID;
+  }
+  // Only a request for the connection's owner reaches the prompt.
+  if (!connection || owner != uid) {
+    reply(NO, @"");
+    return;
+  }
+  id rop = [connection synchronousRemoteObjectProxy];
   if (!rop) {
     // No GUI connection. Fail immediately rather than leaving the caller's reply
     // uninvoked, which would stall its fail-closed timeout for the full duration.

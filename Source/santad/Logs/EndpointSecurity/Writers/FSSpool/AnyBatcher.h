@@ -17,9 +17,9 @@
 
 #include <vector>
 
-#include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/binaryproto.pb.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "telemetry/v1.pb.h"
 
 namespace fsspool {
 
@@ -37,7 +37,7 @@ class AnyBatcher {
 
  private:
   std::string type_url_;
-  santa::fsspool::binaryproto::LogBatch cache_;
+  santa::telemetry::v1::LogBatch cache_;
 };
 
 }  // namespace fsspool

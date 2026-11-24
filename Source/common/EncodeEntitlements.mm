@@ -62,16 +62,12 @@ void EncodeEntitlementsCommon(NSDictionary* entitlements, BOOL entitlements_filt
                               void (^EncodeInitBlock)(NSUInteger count, bool is_filtered),
                               void (^EncodeEntitlementBlock)(NSString* entitlement,
                                                              NSString* value)) {
-  NSDictionary* standardized_entitlements =
-      StandardizedNestedObjects(entitlements, kMaxEncodeObjectLevels);
-  __block int num_objects_to_encode =
-      (int)std::min(kMaxEncodeObjectEntries, standardized_entitlements.count);
+  __block int num_objects_to_encode = (int)std::min(kMaxEncodeObjectEntries, entitlements.count);
 
-  EncodeInitBlock(
-      num_objects_to_encode,
-      entitlements_filtered != NO || num_objects_to_encode != standardized_entitlements.count);
+  EncodeInitBlock(num_objects_to_encode,
+                  entitlements_filtered != NO || num_objects_to_encode != entitlements.count);
 
-  [standardized_entitlements enumerateKeysAndObjectsUsingBlock:^(id key, id obj, BOOL* stop) {
+  [entitlements enumerateKeysAndObjectsUsingBlock:^(id key, id raw_obj, BOOL* stop) {
     if (num_objects_to_encode-- == 0) {
       *stop = YES;
       return;
@@ -81,6 +77,17 @@ void EncodeEntitlementsCommon(NSDictionary* entitlements, BOOL entitlements_filt
       LOGW(@"Skipping entitlement key with unexpected key type: %@", key);
       return;
     }
+
+    // Most entitlement values are booleans. Checking the CF type, rather than
+    // NSNumber, keeps numbers such as @1 encoding as numbers.
+    if (CFGetTypeID((__bridge CFTypeRef)raw_obj) == CFBooleanGetTypeID()) {
+      EncodeEntitlementBlock(key, [raw_obj boolValue] ? @"true" : @"false");
+      return;
+    }
+
+    // Only the values that get encoded are standardized. The top-level
+    // dictionary counts as one of the levels.
+    id obj = StandardizedNestedObjects(raw_obj, kMaxEncodeObjectLevels - 1);
 
     NSError* err;
     NSData* json_data;

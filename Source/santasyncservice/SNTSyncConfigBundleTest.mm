@@ -39,6 +39,8 @@
 @property NSNumber* blockNetworkMount;
 @property NSString* bannedNetworkMountBlockMessage;
 @property NSArray<NSString*>* allowedNetworkMountHosts;
+@property NSString* bannedBlockMessage;
+@property NSString* unknownBlockMessage;
 @property NSString* bannedUSBBlockMessage;
 @property NSString* remountUSBBlockMessage;
 @property NSNumber* enableBundles;
@@ -91,6 +93,8 @@
   XCTAssertNil(bundle.blockNetworkMount);
   XCTAssertNil(bundle.bannedNetworkMountBlockMessage);
   XCTAssertNil(bundle.allowedNetworkMountHosts);
+  XCTAssertNil(bundle.bannedBlockMessage);
+  XCTAssertNil(bundle.unknownBlockMessage);
   XCTAssertNil(bundle.bannedUSBBlockMessage);
   XCTAssertNil(bundle.remountUSBBlockMessage);
   XCTAssertNil(bundle.enableBundles);
@@ -192,9 +196,13 @@
                         syncState.bannedNetworkMountBlockMessage);
   XCTAssertEqualObjects(bundle.allowedNetworkMountHosts, syncState.allowedNetworkMountHosts);
 
+  syncState.bannedBlockMessage = @"Ask IT before installing apps";
+  syncState.unknownBlockMessage = @"Request approval for new apps";
   syncState.bannedUSBBlockMessage = @"USB storage is blocked";
   syncState.remountUSBBlockMessage = @"";
   bundle = PostflightConfigBundle(syncState);
+  XCTAssertEqualObjects(bundle.bannedBlockMessage, @"Ask IT before installing apps");
+  XCTAssertEqualObjects(bundle.unknownBlockMessage, @"Request approval for new apps");
   XCTAssertEqualObjects(bundle.bannedUSBBlockMessage, @"USB storage is blocked");
   XCTAssertEqualObjects(bundle.remountUSBBlockMessage, @"");
 

@@ -132,7 +132,33 @@ static int NATSSSLVerifyCallback(int preverifyOk, void* ctx) {
 #endif
 }
 
+// The closure passed to every NATS callback is a token, not a pointer to the
+// client. nats.c runs callbacks on its own threads, and Close/Destroy only queue
+// the disconnected and closed callbacks, so a callback can run after the client
+// is released. Tokens are never reused and this table holds clients weakly, so
+// a late callback finds nil and returns. Each client removes its own entry in
+// -dealloc, so no per-client memory outlives the client, however late nats.c
+// runs a callback.
+//
+// The callbacks run their bodies in an @autoreleasepool. nats.c threads have no
+// pool, and the async callback thread lives as long as the process, so without
+// one the client returned here could be autoreleased onto that thread and never
+// freed.
+static NSMapTable<NSNumber*, SNTPushClientNATS*>* NATSClients() {
+  static NSMapTable* clients = [NSMapTable strongToWeakObjectsMapTable];
+  return clients;
+}
+
+SNTPushClientNATS* SNTPushClientNATSFromClosure(void* closure) {
+  NSMapTable* clients = NATSClients();
+  @synchronized(clients) {
+    return [clients objectForKey:@((uintptr_t)closure)];
+  }
+}
+
 @interface SNTPushClientNATS ()
+// This client's token in NATSClients(), passed to nats.c as the callback closure.
+@property(nonatomic, readonly) void* natsClosure;
 @property(weak) id<SNTPushNotificationsSyncDelegate> syncDelegate;
 // Transport-agnostic command execution shared with the HTTP sync command drain.
 @property(nonatomic) SNTSantaCommandHandler* commandHandler;
@@ -149,7 +175,9 @@ static int NATSSSLVerifyCallback(int preverifyOk, void* ctx) {
 @property(nonatomic, readwrite) NSUInteger fullSyncInterval;
 @property(atomic) BOOL isShuttingDown;
 // Push notification configuration from preflight
-@property(nonatomic, copy) NSString* pushServer;
+// Atomic: the NATS callback threads read it for logging while
+// configureWithPushServer: replaces it on connectionQueue.
+@property(atomic, copy) NSString* pushServer;
 // nkey
 @property(nonatomic, copy) NSString* pushToken;
 @property(nonatomic, copy) NSString* jwt;
@@ -187,6 +215,13 @@ static int NATSSSLVerifyCallback(int preverifyOk, void* ctx) {
     _previousNonces = [NSMutableSet set];
     _lastRotationTime = time(nullptr);
 
+    static uintptr_t lastToken;
+    NSMapTable* clients = NATSClients();
+    @synchronized(clients) {
+      _natsClosure = (void*)++lastToken;
+      [clients setObject:self forKey:@((uintptr_t)_natsClosure)];
+    }
+
     // Don't connect immediately - wait for preflight to provide configuration
     LOGI(@"NATS push client: Initialized, waiting for preflight configuration");
   }
@@ -194,6 +229,11 @@ static int NATSSSLVerifyCallback(int preverifyOk, void* ctx) {
 }
 
 - (void)dealloc {
+  NSMapTable* clients = NATSClients();
+  @synchronized(clients) {
+    [clients removeObjectForKey:@((uintptr_t)_natsClosure)];
+  }
+
   // Don't call disconnect here to avoid race conditions
   // Cleanup should be done explicitly before dealloc
   if (self.conn && self.isConnected) {
@@ -470,12 +510,12 @@ static int NATSSSLVerifyCallback(int preverifyOk, void* ctx) {
     natsOptions_SetMaxReconnect(opts, -1);  // Infinite reconnects
 
     // Set error callback to catch subscription violations and other errors
-    natsOptions_SetErrorHandler(opts, &errorHandler, (__bridge void*)self);
+    natsOptions_SetErrorHandler(opts, &errorHandler, self.natsClosure);
 
     // Set connection callbacks for better monitoring
-    natsOptions_SetDisconnectedCB(opts, &disconnectedCallback, (__bridge void*)self);
-    natsOptions_SetReconnectedCB(opts, &reconnectedCallback, (__bridge void*)self);
-    natsOptions_SetClosedCB(opts, &closedCallback, (__bridge void*)self);
+    natsOptions_SetDisconnectedCB(opts, &disconnectedCallback, self.natsClosure);
+    natsOptions_SetReconnectedCB(opts, &reconnectedCallback, self.natsClosure);
+    natsOptions_SetClosedCB(opts, &closedCallback, self.natsClosure);
 
     // Create connection
     natsConnection* conn = NULL;
@@ -669,7 +709,7 @@ static int NATSSSLVerifyCallback(int preverifyOk, void* ctx) {
 
       natsSubscription* tagSub = NULL;
       status = natsConnection_Subscribe(&tagSub, self.conn, [tag UTF8String], &messageHandler,
-                                        (__bridge void*)self);
+                                        self.natsClosure);
 
       if (status != NATS_OK) {
         LOGE(@"NATS: Failed to subscribe to tag topic %@: %s", tag, natsStatus_GetText(status));
@@ -691,7 +731,7 @@ static int NATSSSLVerifyCallback(int preverifyOk, void* ctx) {
 
     natsSubscription* commandsSub = NULL;
     status = natsConnection_Subscribe(&commandsSub, self.conn, [commandsTopic UTF8String],
-                                      &commandMessageHandler, (__bridge void*)self);
+                                      &commandMessageHandler, self.natsClosure);
 
     if (status != NATS_OK) {
       LOGE(@"NATS: Failed to subscribe to commands topic %@: %s (non-fatal, continuing)",
@@ -752,38 +792,37 @@ static int NATSSSLVerifyCallback(int preverifyOk, void* ctx) {
 
 // NATS message handler
 static void messageHandler(natsConnection* nc, natsSubscription* sub, natsMsg* msg, void* closure) {
-  if (!closure || !msg) {
+  @autoreleasepool {
+    if (!msg) return;
+
+    SNTPushClientNATS* self = SNTPushClientNATSFromClosure(closure);
+    if (!self || self.isShuttingDown) {
+      natsMsg_Destroy(msg);
+      return;
+    }
+
+    const char* subject = natsMsg_GetSubject(msg);
+    const char* data = natsMsg_GetData(msg);
+    int dataLen = natsMsg_GetDataLength(msg);
+
+    NSString* msgSubject = subject ? @(subject) : @"<unknown>";
+    // Copy the (optionally present) payload out of the NATS-owned message before
+    // it is destroyed. For tag subjects this is an encoded SyncRequest proto.
+    NSData* payload = (data && dataLen > 0) ? [NSData dataWithBytes:data length:dataLen] : nil;
+
+    LOGD(@"NATS: Received message on subject '%@' (%d byte payload)", msgSubject, dataLen);
+
+    // Process on message queue to serialize handling of messages and gurantee we
+    // avoid blocking the NATS managed thread. Then call back to the main thread
+    // to trigger the sync. Also force serialization of the sync call to avoid
+    // thundering herd.
+    //
+    // IMPORTANT: Do not touch the nats objects in this block they are owned by
+    // the nats library and will be destroyed after this block.
+    [self handlePushNotificationForSubject:msgSubject withPayload:payload];
+
     natsMsg_Destroy(msg);
-    return;
   }
-
-  SNTPushClientNATS* self = (__bridge SNTPushClientNATS*)closure;
-  if (!self || self.isShuttingDown) {
-    natsMsg_Destroy(msg);
-    return;
-  }
-
-  const char* subject = natsMsg_GetSubject(msg);
-  const char* data = natsMsg_GetData(msg);
-  int dataLen = natsMsg_GetDataLength(msg);
-
-  NSString* msgSubject = subject ? @(subject) : @"<unknown>";
-  // Copy the (optionally present) payload out of the NATS-owned message before
-  // it is destroyed. For tag subjects this is an encoded SyncRequest proto.
-  NSData* payload = (data && dataLen > 0) ? [NSData dataWithBytes:data length:dataLen] : nil;
-
-  LOGD(@"NATS: Received message on subject '%@' (%d byte payload)", msgSubject, dataLen);
-
-  // Process on message queue to serialize handling of messages and gurantee we
-  // avoid blocking the NATS managed thread. Then call back to the main thread
-  // to trigger the sync. Also force serialization of the sync call to avoid
-  // thundering herd.
-  //
-  // IMPORTANT: Do not touch the nats objects in this block they are owned by
-  // the nats library and will be destroyed after this block.
-  [self handlePushNotificationForSubject:msgSubject withPayload:payload];
-
-  natsMsg_Destroy(msg);
 }
 
 // Publish a command response to the reply topic
@@ -845,167 +884,177 @@ static NSString* GetNATSLastError(natsConnection* nc) {
 
 // NATS error handler callback
 static void errorHandler(natsConnection* nc, natsSubscription* sub, natsStatus err, void* closure) {
-  if (!closure) return;
+  @autoreleasepool {
+    SNTPushClientNATS* self = SNTPushClientNATSFromClosure(closure);
+    if (!self) return;
 
-  SNTPushClientNATS* self = (__bridge SNTPushClientNATS*)closure;
-  const char* statusText = natsStatus_GetText(err);
-  const char* subSubject = sub ? natsSubscription_GetSubject(sub) : "unknown";
+    const char* statusText = natsStatus_GetText(err);
+    const char* subSubject = sub ? natsSubscription_GetSubject(sub) : "unknown";
 
-  // Get the detailed last error from the connection (safely copied to NSString)
-  NSString* connLastError = GetNATSLastError(nc);
+    // Get the detailed last error from the connection (safely copied to NSString)
+    NSString* connLastError = GetNATSLastError(nc);
 
-  // Log with server context and both error sources
-  NSString* errorDetail =
-      connLastError.length > 0 && (!statusText || ![connLastError isEqualToString:@(statusText)])
-          ? [NSString stringWithFormat:@"%s - %@", statusText ?: "unknown", connLastError]
-          : [NSString stringWithFormat:@"%s", statusText ?: "unknown"];
+    // Log with server context and both error sources
+    NSString* errorDetail =
+        connLastError.length > 0 && (!statusText || ![connLastError isEqualToString:@(statusText)])
+            ? [NSString stringWithFormat:@"%s - %@", statusText ?: "unknown", connLastError]
+            : [NSString stringWithFormat:@"%s", statusText ?: "unknown"];
 
-  LOGE(@"NATS Error on %@: %@ (status: %d) on subscription: %s", self.pushServer ?: @"server",
-       errorDetail, err, subSubject);
+    LOGE(@"NATS Error on %@: %@ (status: %d) on subscription: %s", self.pushServer ?: @"server",
+         errorDetail, err, subSubject);
 
-  // Check for permission/subscription violations.
-  // NATS doesn't expose a specific permission violation status code, so we check the error text.
-  //
-  // We only schedule a manual reconnection if the connection has been closed by the server.
-  // This is because:
-  // 1. A "closed" connection is a terminal state - the NATS library will NOT automatically
-  //    reconnect from this state, so we must handle it ourselves.
-  // 2. A "disconnected" connection is transient - NATS handles reconnection automatically.
-  // 3. Subscription errors on an open connection are non-fatal - the connection remains
-  //    usable for other subscriptions, so no reconnection is needed.
-  if (err == NATS_ERR || (statusText && strstr(statusText, "violation")) ||
-      (statusText && strstr(statusText, "Permitted")) ||
-      [connLastError containsString:@"violation"] || [connLastError containsString:@"Permitted"]) {
-    LOGE(@"NATS: Permission/Subscription violation on %@ subject: %s", self.pushServer ?: @"server",
-         subSubject);
+    // Check for permission/subscription violations.
+    // NATS doesn't expose a specific permission violation status code, so we check the error text.
+    //
+    // We only schedule a manual reconnection if the connection has been closed by the server.
+    // This is because:
+    // 1. A "closed" connection is a terminal state - the NATS library will NOT automatically
+    //    reconnect from this state, so we must handle it ourselves.
+    // 2. A "disconnected" connection is transient - NATS handles reconnection automatically.
+    // 3. Subscription errors on an open connection are non-fatal - the connection remains
+    //    usable for other subscriptions, so no reconnection is needed.
+    if (err == NATS_ERR || (statusText && strstr(statusText, "violation")) ||
+        (statusText && strstr(statusText, "Permitted")) ||
+        [connLastError containsString:@"violation"] ||
+        [connLastError containsString:@"Permitted"]) {
+      LOGE(@"NATS: Permission/Subscription violation on %@ subject: %s",
+           self.pushServer ?: @"server", subSubject);
 
-    // Permission errors on subscriptions don't necessarily mean the connection is dead.
-    // The connection may still be alive and other subscriptions may work.
-    // We just log the failure and continue - the subscription that failed won't receive messages.
-    // If the server actually closes the connection due to policy violations,
-    // the disconnected or closed callbacks will handle that separately.
+      // Permission errors on subscriptions don't necessarily mean the connection is dead.
+      // The connection may still be alive and other subscriptions may work.
+      // We just log the failure and continue - the subscription that failed won't receive messages.
+      // If the server actually closes the connection due to policy violations,
+      // the disconnected or closed callbacks will handle that separately.
 
-    // Verify if the connection is actually closed despite the permission error
-    dispatch_async(self.connectionQueue, ^{
-      if (self.conn && natsConnection_IsClosed(self.conn)) {
-        self.lastConnectionError = @"Permission violation - connection closed by server";
-        LOGE(@"NATS: Connection to %@ was closed by server due to permissions error, "
-             @"cleaning up and scheduling reconnect",
-             self.pushServer ?: @"server");
-        self.isConnected = NO;
-        natsConnection_Destroy(self.conn);
-        self.conn = NULL;
-        [self scheduleConnectionRetry];
-      } else {
-        LOGD(@"NATS: Connection to %@ still alive despite subscription error on %s, continuing",
-             self.pushServer ?: @"server", subSubject);
-      }
-    });
+      // Verify if the connection is actually closed despite the permission error
+      dispatch_async(self.connectionQueue, ^{
+        if (self.conn && natsConnection_IsClosed(self.conn)) {
+          self.lastConnectionError = @"Permission violation - connection closed by server";
+          LOGE(@"NATS: Connection to %@ was closed by server due to permissions error, "
+               @"cleaning up and scheduling reconnect",
+               self.pushServer ?: @"server");
+          self.isConnected = NO;
+          natsConnection_Destroy(self.conn);
+          self.conn = NULL;
+          [self scheduleConnectionRetry];
+        } else {
+          LOGD(@"NATS: Connection to %@ still alive despite subscription error on %s, continuing",
+               self.pushServer ?: @"server", subSubject);
+        }
+      });
+    }
   }
 }
 
 // NATS disconnected callback
 static void disconnectedCallback(natsConnection* nc, void* closure) {
-  if (!closure) return;
-  SNTPushClientNATS* self = (__bridge SNTPushClientNATS*)closure;
+  @autoreleasepool {
+    SNTPushClientNATS* self = SNTPushClientNATSFromClosure(closure);
+    if (!self) return;
 
-  // Get last error from NATS (safely copied to NSString for use in async block)
-  NSString* lastError = GetNATSLastError(nc);
+    // Get last error from NATS (safely copied to NSString for use in async block)
+    NSString* lastError = GetNATSLastError(nc);
 
-  NSString* errorInfo =
-      lastError.length > 0 ? [NSString stringWithFormat:@" - %@", lastError] : @"";
-  LOGW(@"NATS: Disconnected from %@%@", self.pushServer ?: @"server", errorInfo);
+    NSString* errorInfo =
+        lastError.length > 0 ? [NSString stringWithFormat:@" - %@", lastError] : @"";
+    LOGW(@"NATS: Disconnected from %@%@", self.pushServer ?: @"server", errorInfo);
 
-  dispatch_async(self.connectionQueue, ^{
-    // Ignore callbacks from a connection we have already replaced (see
-    // closedCallback). During NATS auto-reconnect the connection object is
-    // reused, so this still matches our current connection.
-    if (nc != self.conn) return;
+    dispatch_async(self.connectionQueue, ^{
+      // Ignore callbacks from a connection we have already replaced (see
+      // closedCallback). During NATS auto-reconnect the connection object is
+      // reused, so this still matches our current connection.
+      if (nc != self.conn) return;
 
-    if (lastError.length > 0) {
-      self.lastConnectionError = lastError;
-    }
-    self.isConnected = NO;
-  });
+      if (lastError.length > 0) {
+        self.lastConnectionError = lastError;
+      }
+      self.isConnected = NO;
+    });
+  }
 }
 
 // NATS reconnected callback
 static void reconnectedCallback(natsConnection* nc, void* closure) {
-  if (!closure) return;
-  SNTPushClientNATS* self = (__bridge SNTPushClientNATS*)closure;
-  LOGI(@"NATS: Reconnected to %@", self.pushServer ?: @"server");
-  dispatch_async(self.connectionQueue, ^{
-    // Ignore callbacks from a connection we have already replaced (see
-    // closedCallback). During NATS auto-reconnect the connection object is
-    // reused, so this still matches our current connection.
-    if (nc != self.conn) return;
+  @autoreleasepool {
+    SNTPushClientNATS* self = SNTPushClientNATSFromClosure(closure);
+    if (!self) return;
+    LOGI(@"NATS: Reconnected to %@", self.pushServer ?: @"server");
+    dispatch_async(self.connectionQueue, ^{
+      // Ignore callbacks from a connection we have already replaced (see
+      // closedCallback). During NATS auto-reconnect the connection object is
+      // reused, so this still matches our current connection.
+      if (nc != self.conn) return;
 
-    self.isConnected = YES;
-    self.lastConnectionError = nil;
+      self.isConnected = YES;
+      self.lastConnectionError = nil;
 
-    // Trigger sync with jitter to avoid thundering herd
-    // We might have missed push notifications while disconnected
-    if (!self.isShuttingDown) {
-      // Calculate jitter: random delay between 0 and 600 seconds (10 minutes)
-      uint32_t jitterSeconds = arc4random_uniform(601);
+      // Trigger sync with jitter to avoid thundering herd
+      // We might have missed push notifications while disconnected
+      if (!self.isShuttingDown) {
+        // Calculate jitter: random delay between 0 and 600 seconds (10 minutes)
+        uint32_t jitterSeconds = arc4random_uniform(601);
 
-      LOGI(@"NATS: Scheduling sync after reconnect with %u second jitter delay", jitterSeconds);
+        LOGI(@"NATS: Scheduling sync after reconnect with %u second jitter delay", jitterSeconds);
 
-      dispatch_after(dispatch_time(DISPATCH_TIME_NOW, jitterSeconds * NSEC_PER_SEC),
-                     dispatch_get_main_queue(), ^{
-                       if (!self.isShuttingDown && self.isConnected) {
-                         LOGI(@"NATS: Triggering sync after reconnection (jitter delay completed)");
-                         [self.syncDelegate sync];
-                       }
-                     });
-    }
-  });
+        dispatch_after(
+            dispatch_time(DISPATCH_TIME_NOW, jitterSeconds * NSEC_PER_SEC),
+            dispatch_get_main_queue(), ^{
+              if (!self.isShuttingDown && self.isConnected) {
+                LOGI(@"NATS: Triggering sync after reconnection (jitter delay completed)");
+                [self.syncDelegate sync];
+              }
+            });
+      }
+    });
+  }
 }
 
 // NATS closed callback
 static void closedCallback(natsConnection* nc, void* closure) {
-  if (!closure) return;
-  SNTPushClientNATS* self = (__bridge SNTPushClientNATS*)closure;
+  @autoreleasepool {
+    SNTPushClientNATS* self = SNTPushClientNATSFromClosure(closure);
+    if (!self) return;
 
-  // Get last error from NATS (safely copied to NSString for use in async block)
-  NSString* lastError = GetNATSLastError(nc);
+    // Get last error from NATS (safely copied to NSString for use in async block)
+    NSString* lastError = GetNATSLastError(nc);
 
-  NSString* errorInfo =
-      lastError.length > 0 ? [NSString stringWithFormat:@" - %@", lastError] : @"";
-  LOGI(@"NATS: Connection to %@ closed%@", self.pushServer ?: @"server", errorInfo);
+    NSString* errorInfo =
+        lastError.length > 0 ? [NSString stringWithFormat:@" - %@", lastError] : @"";
+    LOGI(@"NATS: Connection to %@ closed%@", self.pushServer ?: @"server", errorInfo);
 
-  dispatch_async(self.connectionQueue, ^{
-    // Ignore callbacks from a connection we have already replaced or destroyed;
-    // act only on the connection that is currently ours. nc is compared by
-    // identity only (never dereferenced here), so this is safe even if the
-    // replaced connection has since been freed. Without this guard, a late
-    // closed callback from a prior connection could destroy the live one.
-    if (nc != self.conn) {
-      LOGD(@"NATS: Ignoring closed callback from a replaced connection");
-      return;
-    }
+    dispatch_async(self.connectionQueue, ^{
+      // Ignore callbacks from a connection we have already replaced or destroyed;
+      // act only on the connection that is currently ours. nc is compared by
+      // identity only (never dereferenced here), so this is safe even if the
+      // replaced connection has since been freed. Without this guard, a late
+      // closed callback from a prior connection could destroy the live one.
+      if (nc != self.conn) {
+        LOGD(@"NATS: Ignoring closed callback from a replaced connection");
+        return;
+      }
 
-    if (lastError.length > 0) {
-      self.lastConnectionError = lastError;
-    }
-    self.isConnected = NO;
+      if (lastError.length > 0) {
+        self.lastConnectionError = lastError;
+      }
+      self.isConnected = NO;
 
-    // If we're not shutting down, schedule a reconnection attempt.
-    // The closed callback fires when the connection is permanently closed and
-    // NATS won't automatically reconnect, so we handle it ourselves. (nc ==
-    // self.conn here, so self.conn is the just-closed, non-NULL connection.)
-    if (!self.isShuttingDown) {
-      LOGI(@"NATS: Connection to %@ closed unexpectedly, cleaning up and scheduling reconnect",
-           self.pushServer ?: @"server");
+      // If we're not shutting down, schedule a reconnection attempt.
+      // The closed callback fires when the connection is permanently closed and
+      // NATS won't automatically reconnect, so we handle it ourselves. (nc ==
+      // self.conn here, so self.conn is the just-closed, non-NULL connection.)
+      if (!self.isShuttingDown) {
+        LOGI(@"NATS: Connection to %@ closed unexpectedly, cleaning up and scheduling reconnect",
+             self.pushServer ?: @"server");
 
-      // Clean up the closed connection
-      natsConnection_Destroy(self.conn);
-      self.conn = NULL;
+        // Clean up the closed connection
+        natsConnection_Destroy(self.conn);
+        self.conn = NULL;
 
-      // Schedule reconnection with exponential backoff
-      [self scheduleConnectionRetry];
-    }
-  });
+        // Schedule reconnection with exponential backoff
+        [self scheduleConnectionRetry];
+      }
+    });
+  }
 }
 
 // Schedule a connection retry with exponential backoff and jitter

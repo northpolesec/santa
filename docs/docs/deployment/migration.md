@@ -92,7 +92,7 @@ that you installed:
 
 ```shell
 $ santactl version
-santad          | 2025.3 (build 94, commit 63bc558d)
-santactl        | 2025.3 (build 94, commit 63bc558d)
-SantaGUI        | 2025.3 (build 94, commit 63bc558d)
+santad          | 2025.3 (build 94)
+santactl        | 2025.3 (build 94)
+SantaGUI        | 2025.3 (build 94)
 ```

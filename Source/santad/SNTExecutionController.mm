@@ -1330,6 +1330,17 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
     });
   }
 
+  // A block without its own message uses UnknownBlockMessage or BannedBlockMessage, which a
+  // sync server can set. The GUI can't read synced values from its own process, so resolve the
+  // message here and pass it on as the custom message, choosing as
+  // +[SNTBlockMessage attributedBlockMessageForEvent:customMessage:] does. Hold-and-ask blocks
+  // keep their own message.
+  NSString* customMsg = cd.customMsg;
+  if (!customMsg.length && !cd.holdAndAsk) {
+    customMsg = se.decision == SNTEventStateBlockUnknown ? config.unknownBlockMessage
+                                                         : config.bannedBlockMessage;
+  }
+
   if (!cd.silentBlockTTY) {
     _ttyWriter->Write(targetProc, ^NSString* {
       if (cd.holdAndAsk) {
@@ -1344,7 +1355,7 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
 
       // Let the user know what happened on the terminal
       NSAttributedString* s = [SNTBlockMessage attributedBlockMessageForEvent:se
-                                                                customMessage:cd.customMsg];
+                                                                customMessage:customMsg];
 
       NSMutableString* msg = [NSMutableString stringWithCapacity:1024];
       // Escape sequences `\033[1m` and `\033[0m` begin/end bold lettering
@@ -1376,7 +1387,7 @@ static BOOL DecisionIsCompiler(SNTEventState decision) {
   if (!cd.silentBlockGUI || cd.holdAndAsk) {
     // Let the user know what happened in the GUI.
     [self.notifierQueue addEvent:se
-               withCustomMessage:cd.customMsg
+               withCustomMessage:customMsg
                        customURL:cd.customURL ?: config.eventDetailURL
            eventDetailButtonText:cd.eventDetailButtonText
                      configState:configState

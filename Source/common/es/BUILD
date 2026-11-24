@@ -57,7 +57,7 @@ objc_library(
         ":EndpointSecurityMessage",
         "//Source/common:Platform",
         "//Source/common:TelemetryEventMap",
-        "//Source/common/processtree:process_tree_cc_proto",
+        "@northpolesec_protos//telemetry:v1_cc_proto",
     ],
 )
 
@@ -225,6 +225,7 @@ santa_unit_test(
         "EndpointSecurity",
     ],
     deps = [
+        ":ESMetricsObserver",
         ":EndpointSecurityClient",
         ":EndpointSecurityEnrichedTypes",
         ":EndpointSecurityMessage",

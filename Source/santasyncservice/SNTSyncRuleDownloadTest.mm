@@ -497,6 +497,8 @@ extern SNTNetworkFlowRule* NetworkFlowRuleFromProto(const ::pbv2::NetworkFlowRul
   add->set_rule_id(42);
   add->set_action(::pbv2::NetworkFlowRule::ACTION_DENY);
   add->set_direction(::pbv2::NETWORK_FLOW_DIRECTION_OUTGOING);
+  // santanetd's validator rejects a rule without at least one matcher.
+  add->add_ports()->set_low(443);
 
   SNTNetworkFlowRule* rule = NetworkFlowRuleFromProto(nr);
   XCTAssertNotNil(rule);

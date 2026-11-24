@@ -20,7 +20,9 @@
 #import <Foundation/Foundation.h>
 #include <dispatch/dispatch.h>
 
+#include <array>
 #include <atomic>
+#include <limits>
 #include <memory>
 #include <string>
 
@@ -40,9 +42,6 @@ enum class FileAccessMetricStatus {
   kBlockedUser,
 };
 
-using EventCountTuple = std::tuple<Processor, es_event_type_t, EventDisposition>;
-using EventTimesTuple = std::tuple<Processor, es_event_type_t>;
-using EventStatsTuple = std::tuple<Processor, es_event_type_t>;
 using FileAccessMetricsPolicyVersion = std::string;
 using FileAccessMetricsPolicyName = std::string;
 using FileAccessEventCountTuple =
@@ -72,9 +71,9 @@ class Metrics : public ESMetricsObserver, public std::enable_shared_from_this<Me
   void Export();
   void Export(void (^reply)(BOOL));
 
-  // Used for tracking event sequence numbers to determine if drops occured
-  void UpdateEventStats(Processor processor, es_event_type_t event_type, uint64_t seq_num,
-                        uint64_t global_seq_num) override;
+  // Adds drops that an ES client detected from gaps in its sequence numbers
+  void RecordDrops(Processor processor, es_event_type_t event_type, int64_t event_drops,
+                   int64_t global_drops) override;
 
   void SetEventMetrics(Processor processor, EventDisposition disposition, int64_t nanos,
                        es_event_type_t event_type) override;
@@ -88,10 +87,10 @@ class Metrics : public ESMetricsObserver, public std::enable_shared_from_this<Me
   friend class santa::MetricsPeer;
 
  private:
-  struct SequenceStats {
-    uint64_t next_seq_num = 0;
-    int64_t drops = 0;
-  };
+  static constexpr size_t kNumProcessors = static_cast<size_t>(Processor::kCount);
+  static constexpr size_t kNumDispositions = static_cast<size_t>(EventDisposition::kCount);
+  // Marks a processing time that was not set since the last flush.
+  static constexpr int64_t kNoEventTime = std::numeric_limits<int64_t>::min();
 
   void FlushMetrics();
   void ExportSerialized(SNTMetricSet* metric_set);
@@ -118,11 +117,18 @@ class Metrics : public ESMetricsObserver, public std::enable_shared_from_this<Me
   dispatch_queue_t events_q_;
 
   // Small caches for storing event metrics between metrics export operations
-  absl::flat_hash_map<EventCountTuple, int64_t> event_counts_cache_;
-  absl::flat_hash_map<EventTimesTuple, int64_t> event_times_cache_;
   std::atomic<int64_t> rate_limit_counts_cache_;
   absl::flat_hash_map<FileAccessEventCountTuple, int64_t> faa_event_counts_cache_;
-  absl::flat_hash_map<EventStatsTuple, SequenceStats> drop_cache_;
+
+  // Written inline by ES clients and processing queues; drained by FlushMetrics.
+  // Column ES_EVENT_TYPE_LAST holds drops of the client's global sequence number.
+  std::array<std::array<std::atomic<int64_t>, ES_EVENT_TYPE_LAST + 1>, kNumProcessors>
+      drop_cache_{};
+  std::array<std::array<std::array<std::atomic<int64_t>, kNumDispositions>, ES_EVENT_TYPE_LAST>,
+             kNumProcessors>
+      event_counts_cache_{};
+  std::array<std::array<std::atomic<int64_t>, ES_EVENT_TYPE_LAST>, kNumProcessors>
+      event_times_cache_;  // filled with kNoEventTime in the constructor
 };
 
 }  // namespace santa

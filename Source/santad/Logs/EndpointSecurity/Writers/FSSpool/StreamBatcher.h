@@ -58,12 +58,9 @@ class StreamBatcher {
 
     coded_output_->WriteLittleEndian32(kStreamBatcherMagic);
 
-    santa::Xxhash64 hash;
-    hash.Update(bytes.data(), bytes.size());
-    hash.Digest([&](const uint8_t* buf, size_t length) {
-      assert(length == sizeof(uint64_t));
-      coded_output_->WriteRaw(buf, (int)length);
-    });
+    santa::Xxhash64::canonical_type digest =
+        santa::Xxhash64::CanonicalDigestOneShot(bytes.data(), bytes.size());
+    coded_output_->WriteRaw(digest.digest, sizeof(digest.digest));
 
     // Note: Protobuf library is inconsistent on size parameters. Casts are
     // intentionally for different types.
@@ -117,12 +114,9 @@ class StreamBatcher<::santa::Unit> {
 
     coded_output_->WriteLittleEndian32(kStreamBatcherMagic);
 
-    santa::Xxhash64 hash;
-    hash.Update(bytes.data(), bytes.size());
-    hash.Digest([&](const uint8_t* buf, size_t length) {
-      assert(length == sizeof(uint64_t));
-      coded_output_->WriteRaw(buf, (int)length);
-    });
+    santa::Xxhash64::canonical_type digest =
+        santa::Xxhash64::CanonicalDigestOneShot(bytes.data(), bytes.size());
+    coded_output_->WriteRaw(digest.digest, sizeof(digest.digest));
 
     coded_output_->WriteVarint32(static_cast<uint32_t>(bytes.size()));
     coded_output_->WriteRaw(bytes.data(), static_cast<int>(bytes.size()));

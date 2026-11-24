@@ -28,11 +28,13 @@
 #include <thread>
 
 #include "Source/common/processtree/annotations/annotator.h"
+#include "Source/common/processtree/annotations/cel.h"
+#include "Source/common/processtree/annotations/originator.h"
 #include "Source/common/processtree/process.h"
 #include "Source/common/processtree/process_tree_test_helpers.h"
 #include "absl/synchronization/mutex.h"
 
-namespace ptpb = ::santa::pb::v1::process_tree;
+namespace ptpb = ::santa::telemetry::v1;
 
 namespace santa::santad::process_tree {
 
@@ -271,6 +273,53 @@ using namespace santa::santad::process_tree;
   shell = *self.tree->Get(shell_exec_pid);
   annotation = self.tree->GetAnnotation<TestAnnotator>(*shell);
   XCTAssertTrue(annotation.has_value());
+}
+
+- (void)testExportMergesOriginatorAndCEL {
+  const struct Pid pid = {.pid = 2, .pidversion = 2};
+  self.tree->HandleFork(1, self.initProc, pid);
+  auto proc = *self.tree->Get(pid);
+
+  auto originator = std::make_shared<OriginatorAnnotator>(ptpb::Annotations::LOGIN);
+  self.tree->AnnotateProcess(*proc, originator);
+  AddCELAnnotation(*self.tree, pid, "b", {.fork = false, .exec = false});
+  AddCELAnnotation(*self.tree, pid, "a", {.fork = false, .exec = false});
+
+  auto exported = self.tree->ExportAnnotations(pid);
+  XCTAssertTrue(exported.has_value());
+  XCTAssertTrue(exported->has_originator());
+  XCTAssertEqual(exported->originator(), ptpb::Annotations::LOGIN);
+  XCTAssertEqual(exported->cel_size(), 2);
+  XCTAssertEqual(exported->cel(0), "a");
+  XCTAssertEqual(exported->cel(1), "b");
+}
+
+// The tree merges annotators in hash order, so the merge must not depend on order. Merge the two
+// Proto() results by hand in both orders.
+- (void)testAnnotationMergeIsOrderIndependent {
+  auto originatorProto = OriginatorAnnotator(ptpb::Annotations::LOGIN).Proto();
+  CELAnnotator::EntryMap entries = {{"b", {.fork = false, .exec = false}},
+                                    {"a", {.fork = false, .exec = false}}};
+  auto celProto = CELAnnotator(std::move(entries)).Proto();
+  XCTAssertTrue(originatorProto.has_value());
+  XCTAssertTrue(celProto.has_value());
+
+  ptpb::Annotations originatorThenCEL;
+  originatorThenCEL.MergeFrom(*originatorProto);
+  originatorThenCEL.MergeFrom(*celProto);
+
+  ptpb::Annotations celThenOriginator;
+  celThenOriginator.MergeFrom(*celProto);
+  celThenOriginator.MergeFrom(*originatorProto);
+
+  for (const ptpb::Annotations* merged : {&originatorThenCEL, &celThenOriginator}) {
+    XCTAssertTrue(merged->has_originator());
+    XCTAssertEqual(merged->originator(), ptpb::Annotations::LOGIN);
+    XCTAssertEqual(merged->cel_size(), 2);
+    XCTAssertEqual(merged->cel(0), "a");
+    XCTAssertEqual(merged->cel(1), "b");
+  }
+  XCTAssertEqual(originatorThenCEL.SerializeAsString(), celThenOriginator.SerializeAsString());
 }
 
 - (void)testUpdateAnnotation {

@@ -611,6 +611,14 @@ void HandleV2Responses(const ::pbv2::PreflightResponse& resp, SNTSyncState* sync
         StringToNSString(resp.banned_network_mount_block_message());
   }
 
+  if (resp.has_banned_block_message()) {
+    syncState.bannedBlockMessage = StringToNSString(resp.banned_block_message());
+  }
+
+  if (resp.has_unknown_block_message()) {
+    syncState.unknownBlockMessage = StringToNSString(resp.unknown_block_message());
+  }
+
   if (resp.has_banned_removable_media_block_message()) {
     syncState.bannedUSBBlockMessage = StringToNSString(resp.banned_removable_media_block_message());
   }

@@ -77,7 +77,7 @@ using santa::SpoolPeer;
   // Ensure the manually created type url isn't modified
   fsspool::AnyBatcher batcher;
   XCTAssertTrue(batcher.InitializeBatch(-1).ok());  // Fake fd, not needed
-  std::string wantTypeUrl("type.googleapis.com/santa.pb.v1.SantaMessage");
+  std::string wantTypeUrl("type.googleapis.com/santa.telemetry.v1.SantaMessage");
   XCTAssertCppStringEqual(batcher.TypeURL(), wantTypeUrl);
 }
 

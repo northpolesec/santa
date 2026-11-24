@@ -150,9 +150,9 @@ everything _should_ work but we cannot offer support for it.
 You can check that Santa is installed and running using `santactl`:
 
 ```shell title="santactl version"
-santad          | 2025.3 (build 97, commit 10bdfcc2)
-santactl        | 2025.3 (build 97, commit 10bdfcc2)
-SantaGUI        | 2025.3 (build 97, commit 10bdfcc2)
+santad          | 2025.3 (build 97)
+santactl        | 2025.3 (build 97)
+SantaGUI        | 2025.3 (build 97)
 ```
 
 ```shell title="santactl status"

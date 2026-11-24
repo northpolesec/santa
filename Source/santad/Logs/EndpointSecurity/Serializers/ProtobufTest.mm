@@ -28,7 +28,6 @@
 #include <uuid/uuid.h>
 #include <cstddef>
 #include <cstring>
-#include <set>
 
 #include "Source/common/Platform.h"
 #import "Source/common/SNTCachedDecision.h"
@@ -40,14 +39,13 @@
 #include "Source/common/es/Enricher.h"
 #include "Source/common/es/Message.h"
 #include "Source/common/es/MockEndpointSecurityAPI.h"
-#include "Source/common/santa.pb.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Protobuf.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Serializer.h"
 #import "Source/santad/SNTDecisionCache.h"
 #include "absl/status/status.h"
 #include "google/protobuf/any.pb.h"
 #include "google/protobuf/timestamp.pb.h"
-#import "src/santanetd/SNDProcessFlows.h"
+#include "telemetry/v1.pb.h"
 
 using google::protobuf::Timestamp;
 using JsonPrintOptions = google::protobuf::json::PrintOptions;
@@ -61,7 +59,7 @@ using santa::Message;
 using santa::Protobuf;
 using santa::Serializer;
 
-namespace pbv1 = ::santa::pb::v1;
+namespace pbv1 = ::santa::telemetry::v1;
 
 namespace santa {
 extern void EncodeCodeSignature(::pbv1::CodeSignature* pb_code_sig, const es_cdhash_t cdhash,
@@ -542,6 +540,216 @@ void SerializeAndCheckNonESEvents(
   };
 
   XCTAssertNotEqual(serializeClose(), serializeClose());
+
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+}
+
+// Serializes an unlink of `path` and returns the serializer's output.
+- (std::string)serializeUnlinkOfPath:(const char*)path json:(bool)json {
+  std::shared_ptr<MockEndpointSecurityAPI> mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+
+  es_file_t procFile = MakeESFile("foo", MakeStat(100));
+  es_file_t target = MakeESFile(path, MakeStat(300));
+  es_file_t parent = MakeESFile("/Users/x", MakeStat(400));
+  es_process_t proc = MakeESProcess(&procFile, MakeAuditToken(12, 34), MakeAuditToken(56, 78));
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_UNLINK, &proc);
+  esMsg.event.unlink.target = &target;
+  esMsg.event.unlink.parent_dir = &parent;
+
+  std::shared_ptr<Serializer> bs = Protobuf::Create(mockESApi, self.mockDecisionCache, json);
+  std::vector<uint8_t> vec = bs->SerializeMessage(Enricher().Enrich(Message(mockESApi, &esMsg)));
+
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+  return std::string(vec.begin(), vec.end());
+}
+
+- (void)testSerializeMessageJSONReplacesBytesNotValidUTF8InPath {
+  std::string serialized = [self serializeUnlinkOfPath:"/Users/x/bad\xFFname" json:true];
+
+  ::pbv1::SantaMessage santaMsg;
+  JsonParseOptions options;
+  options.ignore_unknown_fields = true;
+  XCTAssertTrue(JsonStringToMessage(serialized, &santaMsg, options).ok());
+  XCTAssertEqual(santaMsg.unlink().target().path(), "/Users/x/bad\xEF\xBF\xBDname");
+}
+
+// Each maximal invalid subsequence becomes one U+FFFD, the same way ICU reads
+// the bytes when matching FileChangesRegex.
+- (void)testSerializeMessageReplacesEachInvalidSequenceWithOneReplacementCharacter {
+#define FFFD "\xEF\xBF\xBD"
+  std::vector<std::pair<std::string, std::string>> cases = {
+      {"\xE2\x82", FFFD},  // truncated 3-byte sequence
+      {"\xE2\x82"
+       "x",
+       FFFD "x"},                                 // truncated, then ASCII
+      {"\xF0\x9F\x98", FFFD},                     // truncated 4-byte sequence
+      {"\xFF", FFFD},                             // never valid
+      {"\xC0\xAF", FFFD FFFD},                    // overlong lead
+      {"\xE0\x80\x80", FFFD FFFD FFFD},           // overlong 3-byte sequence
+      {"\xED\xA0\x80", FFFD FFFD FFFD},           // surrogate
+      {"\xF4\x90\x80\x80", FFFD FFFD FFFD FFFD},  // above U+10FFFF
+      {"\xE2(\xA1", FFFD "(" FFFD},               // lead, ASCII, stray continuation
+      {"\xE2\x82\xAC", "\xE2\x82\xAC"},           // valid, unchanged
+  };
+#undef FFFD
+
+  for (const auto& [suffix, want] : cases) {
+    std::string path = "/Users/x/" + suffix;
+    std::string serialized = [self serializeUnlinkOfPath:path.c_str() json:false];
+    ::pbv1::SantaMessage santaMsg;
+    XCTAssertTrue(santaMsg.ParseFromString(serialized));
+    XCTAssertEqual(santaMsg.unlink().target().path(), "/Users/x/" + want);
+  }
+}
+
+// Serializes the event that `setup` fills in, and parses the result.
+- (::pbv1::SantaMessage)serializeEvent:(es_event_type_t)eventType
+                                 setup:(void (^)(es_message_t* esMsg))setup {
+  std::shared_ptr<MockEndpointSecurityAPI> mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+
+  es_file_t procFile = MakeESFile("foo", MakeStat(100));
+  es_process_t proc = MakeESProcess(&procFile, MakeAuditToken(12, 34), MakeAuditToken(56, 78));
+  es_message_t esMsg = MakeESMessage(eventType, &proc);
+  setup(&esMsg);
+
+  std::shared_ptr<Serializer> bs = Protobuf::Create(mockESApi, self.mockDecisionCache, false);
+  std::vector<uint8_t> vec = bs->SerializeMessage(Enricher().Enrich(Message(mockESApi, &esMsg)));
+
+  ::pbv1::SantaMessage santaMsg;
+  XCTAssertTrue(santaMsg.ParseFromString(std::string(vec.begin(), vec.end())));
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+  return santaMsg;
+}
+
+// Serializes a failed login with the given user name and failure message, and
+// parses the result.
+- (::pbv1::SantaMessage)serializeLoginWithUsername:(const char*)username
+                                    failureMessage:(const char*)failureMessage {
+  __block es_event_login_login_t login = {.success = false,
+                                          .failure_message = MakeESStringToken(failureMessage),
+                                          .username = MakeESStringToken(username),
+                                          .has_uid = false};
+  return [self serializeEvent:ES_EVENT_TYPE_NOTIFY_LOGIN_LOGIN
+                        setup:^(es_message_t* esMsg) {
+                          esMsg->event.login_login = &login;
+                        }];
+}
+
+- (void)testSerializeMessageReplacesBytesNotValidUTF8InUserName {
+  ::pbv1::SantaMessage santaMsg = [self serializeLoginWithUsername:"bad\xFFuser"
+                                                    failureMessage:"failed"];
+  XCTAssertEqual(santaMsg.login_logout().login().user().name(), "bad\xEF\xBF\xBDuser");
+}
+
+- (void)testSerializeMessageKeepsBytesFieldsUnchanged {
+  ::pbv1::SantaMessage santaMsg = [self serializeLoginWithUsername:"user"
+                                                    failureMessage:"bad\xFFmessage"];
+  XCTAssertEqual(santaMsg.login_logout().login().failure_message(), "bad\xFFmessage");
+
+  __block es_event_screensharing_attach_t attach = {
+      .success = true,
+      .source_address_type = ES_ADDRESS_TYPE_NAMED_SOCKET,
+      .source_address = MakeESStringToken("bad\xFF"
+                                          "address"),
+      .viewer_appleid = MakeESStringToken("bad\xFFviewer"),
+      .authentication_type = MakeESStringToken("bad\xFFtype"),
+      .authentication_username = MakeESStringToken("user"),
+      .session_username = MakeESStringToken("user"),
+  };
+  santaMsg = [self serializeEvent:ES_EVENT_TYPE_NOTIFY_SCREENSHARING_ATTACH
+                            setup:^(es_message_t* esMsg) {
+                              esMsg->event.screensharing_attach = &attach;
+                            }];
+  const ::pbv1::ScreenSharingAttach& pbAttach = santaMsg.screen_sharing().attach();
+  XCTAssertEqual(pbAttach.source().address(), "bad\xFF"
+                                              "address");
+  XCTAssertEqual(pbAttach.viewer(), "bad\xFFviewer");
+  XCTAssertEqual(pbAttach.authentication_type(), "bad\xFFtype");
+}
+
+- (void)testSerializeMessageReplacesBytesNotValidUTF8InNewPath {
+  __block es_file_t source = MakeESFile("/Users/x/a", MakeStat(300));
+  __block es_file_t dir = MakeESFile("/Users/x", MakeStat(400));
+  ::pbv1::SantaMessage santaMsg =
+      [self serializeEvent:ES_EVENT_TYPE_NOTIFY_RENAME
+                     setup:^(es_message_t* esMsg) {
+                       esMsg->event.rename.source = &source;
+                       esMsg->event.rename.destination_type = ES_DESTINATION_TYPE_NEW_PATH;
+                       esMsg->event.rename.destination.new_path.dir = &dir;
+                       esMsg->event.rename.destination.new_path.filename =
+                           MakeESStringToken("bad\xFFname");
+                     }];
+  XCTAssertEqual(santaMsg.rename().target(), "/Users/x/bad\xEF\xBF\xBDname");
+}
+
+- (void)testSerializeMessageReplacesBytesNotValidUTF8InStringToken {
+  __block es_event_xp_malware_detected_t xp = {
+      .signature_version = MakeESStringToken("sig_ver"),
+      .malware_identifier = MakeESStringToken("mal_id"),
+      .incident_identifier = MakeESStringToken("inc_id"),
+      .detected_path = MakeESStringToken("/Users/x/bad\xFFname"),
+  };
+  ::pbv1::SantaMessage santaMsg = [self serializeEvent:ES_EVENT_TYPE_NOTIFY_XP_MALWARE_DETECTED
+                                                 setup:^(es_message_t* esMsg) {
+                                                   esMsg->event.xp_malware_detected = &xp;
+                                                 }];
+  XCTAssertEqual(santaMsg.xprotect().detected().detected_path(), "/Users/x/bad\xEF\xBF\xBDname");
+}
+
+- (void)testSerializeAllowlistReplacesBytesNotValidUTF8InTargetPath {
+  std::shared_ptr<MockEndpointSecurityAPI> mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+
+  es_file_t procFile = MakeESFile("foo", MakeStat(100));
+  es_process_t proc = MakeESProcess(&procFile, MakeAuditToken(12, 34), MakeAuditToken(56, 78));
+  es_file_t closeFile = MakeESFile("/Users/x/close_file", MakeStat(300));
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_CLOSE, &proc);
+  esMsg.event.close.target = &closeFile;
+
+  std::shared_ptr<Serializer> bs = Protobuf::Create(mockESApi, self.mockDecisionCache, false);
+  std::vector<uint8_t> vec =
+      bs->SerializeAllowlist(Message(mockESApi, &esMsg), "hash_value", "/Users/x/bad\xFFname");
+
+  ::pbv1::SantaMessage santaMsg;
+  XCTAssertTrue(santaMsg.ParseFromString(std::string(vec.begin(), vec.end())));
+  XCTAssertEqual(santaMsg.allowlist().target().path(), "/Users/x/bad\xEF\xBF\xBDname");
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+}
+
+// User and group names from account lookups go into `string` fields too, so
+// bytes that are not valid UTF-8 are replaced.
+- (void)testSerializeMessageReplacesBytesNotValidUTF8InAccountNames {
+  std::shared_ptr<MockEndpointSecurityAPI> mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+
+  es_file_t procFile = MakeESFile("foo", MakeStat(100));
+  es_process_t proc = MakeESProcess(&procFile, MakeAuditToken(12, 34), MakeAuditToken(56, 78));
+  es_file_t closeFile = MakeESFile("/Users/x/close_file", MakeStat(300));
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_CLOSE, &proc);
+  esMsg.event.close.target = &closeFile;
+
+  auto name = [](const char* s) { return std::make_optional(std::make_shared<std::string>(s)); };
+  santa::EnrichedProcess instigator(name("euser\xFF"), name("egroup\xFF"), name("ruser\xFF"),
+                                    name("rgroup\xFF"), santa::EnrichedFile(), std::nullopt);
+  santa::EnrichedFile target(name("fuser\xFF"), name("fgroup\xFF"), std::nullopt);
+  auto enrichedMsg = std::make_unique<EnrichedMessage>(
+      santa::EnrichedClose(Message(mockESApi, &esMsg), std::move(instigator), std::move(target)));
+
+  std::shared_ptr<Serializer> bs = Protobuf::Create(mockESApi, self.mockDecisionCache, false);
+  std::vector<uint8_t> vec = bs->SerializeMessage(std::move(enrichedMsg));
+
+  ::pbv1::SantaMessage santaMsg;
+  XCTAssertTrue(santaMsg.ParseFromString(std::string(vec.begin(), vec.end())));
+  const ::pbv1::ProcessInfoLight& pbProc = santaMsg.close().instigator();
+  XCTAssertEqual(pbProc.effective_user().name(), "euser\xEF\xBF\xBD");
+  XCTAssertEqual(pbProc.effective_group().name(), "egroup\xEF\xBF\xBD");
+  XCTAssertEqual(pbProc.real_user().name(), "ruser\xEF\xBF\xBD");
+  XCTAssertEqual(pbProc.real_group().name(), "rgroup\xEF\xBF\xBD");
+  const ::pbv1::Stat& pbStat = santaMsg.close().target().stat();
+  XCTAssertEqual(pbStat.user().name(), "fuser\xEF\xBF\xBD");
+  XCTAssertEqual(pbStat.group().name(), "fgroup\xEF\xBF\xBD");
 
   XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
 }
@@ -2273,100 +2481,6 @@ void SerializeAndCheckNonESEvents(
   XCTAssertTrue(santaMsg2.ParseFromString(std::string(vec.begin(), vec.end())));
   XCTAssertTrue(santaMsg2.has_file_access());
   XCTAssertFalse(santaMsg2.file_access().has_rule_id());
-}
-
-- (void)testSerializeNetworkFlowsAndDNSActivitySkipAnEmptyProcess {
-  // The stub populates nothing, so neither kind produces a message.
-  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
-  std::shared_ptr<Serializer> bs = Protobuf::Create(mockESApi, nil);
-  SNDProcessFlows* processFlows = [[SNDProcessFlows alloc] init];
-  XCTAssertTrue(bs->SerializeNetworkFlows(processFlows, {}, {}, nil).empty());
-  XCTAssertTrue(bs->SerializeDNSActivity(processFlows, {}, {}, nil).empty());
-}
-
-- (void)testActivityMessagesAreSplitBySizeWithDNSFirst {
-  auto serializer = Protobuf::Create(std::make_shared<MockEndpointSecurityAPI>(), nil);
-  pbv1::DNSActivity::Process questions;
-  pbv1::NetworkActivity::Process connections;
-  questions.mutable_process()->mutable_id()->set_pid(123);
-  connections.mutable_process()->mutable_id()->set_pid(123);
-  questions.set_questions_dropped(7);
-  // The original reproducer: legal legacy answers expanding to 240 KB each.
-  // New collectors omit these before expansion; the sender also handles old ones.
-  for (int i = 0; i < 18; ++i) {
-    auto* q = questions.add_questions();
-    q->set_id(std::to_string(i));
-    q->mutable_close_time()->set_seconds(100 + i);
-    q->add_answers()->set_data(std::string(240015, 'x'));
-  }
-  auto* flow = connections.add_flows();
-  flow->set_id("connection");
-  flow->mutable_start_time()->set_seconds(108);
-  flow->mutable_start_time()->set_nanos(1);
-  std::vector<pbv1::SantaMessage> messages;
-  serializer->SerializeNetworkActivityProtos(
-      connections, questions, {90, 0}, {135, 0}, [&](std::vector<uint8_t> bytes) {
-        XCTAssertLessThanOrEqual(bytes.size(), 1u << 20);
-        pbv1::SantaMessage message;
-        XCTAssertTrue(message.ParseFromArray(bytes.data(), static_cast<int>(bytes.size())));
-        messages.push_back(std::move(message));
-      });
-  XCTAssertGreaterThan(messages.size(), 5u);
-  size_t questionCount = 0, flowCount = 0;
-  uint64_t dropped = 0;
-  bool seenNetwork = false;
-  std::set<std::string> eventIDs;
-  for (const auto& m : messages) {
-    XCTAssertEqual(m.event_time().seconds(), 90);
-    XCTAssertEqual(m.processed_time().seconds(), 135);
-    XCTAssertTrue(eventIDs.insert(m.event_id()).second);
-    for (const auto& p : m.dns_activity().processes()) {
-      XCTAssertFalse(seenNetwork);
-      XCTAssertEqual(p.process().id().pid(), 123);
-      dropped += p.questions_dropped();
-      if (p.questions_dropped() > 0) XCTAssertEqual(p.questions_size(), 0);
-      for (const auto& q : p.questions()) {
-        XCTAssertEqual(q.id(), std::to_string(questionCount++));
-      }
-    }
-    for (const auto& p : m.network_activity().processes()) {
-      seenNetwork = true;
-      flowCount += p.flows_size();
-    }
-  }
-  XCTAssertEqual(questionCount, 18u);
-  XCTAssertEqual(flowCount, 1u);
-  XCTAssertEqual(dropped, 7u);
-}
-
-- (void)testAnOversizedQuestionIsDroppedAndCounted {
-  auto serializer = Protobuf::Create(std::make_shared<MockEndpointSecurityAPI>(), nil);
-  pbv1::DNSActivity::Process questions;
-  questions.mutable_process()->mutable_id()->set_pid(123);
-  questions.set_questions_dropped(2);
-  for (int i = 0; i < 3; ++i)
-    questions.add_questions()->set_id(std::to_string(i));
-  questions.mutable_questions(1)->add_answers()->set_data(std::string(1 << 20, 'x'));
-  std::vector<pbv1::SantaMessage> messages;
-  serializer->SerializeNetworkActivityProtos(
-      {}, questions, {90, 0}, {135, 0}, [&](std::vector<uint8_t> bytes) {
-        XCTAssertLessThanOrEqual(bytes.size(), 1u << 20);
-        pbv1::SantaMessage message;
-        XCTAssertTrue(message.ParseFromArray(bytes.data(), static_cast<int>(bytes.size())));
-        messages.push_back(std::move(message));
-      });
-  std::vector<std::string> ids;
-  uint64_t dropped = 0;
-  for (const auto& m : messages) {
-    for (const auto& p : m.dns_activity().processes()) {
-      dropped += p.questions_dropped();
-      if (p.questions_dropped() > 0) XCTAssertEqual(p.questions_size(), 0);
-      for (const auto& q : p.questions())
-        ids.push_back(q.id());
-    }
-  }
-  XCTAssertTrue(ids == (std::vector<std::string>{"0", "2"}));
-  XCTAssertEqual(dropped, 3u);
 }
 
 @end

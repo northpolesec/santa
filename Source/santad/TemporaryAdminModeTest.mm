@@ -135,6 +135,9 @@ static uint64_t MakeDeadline(uint64_t want) {
 @interface TemporaryAdminModeTest : XCTestCase
 @property id mockConfigurator;
 @property id mockNotQueue;
+// The uid whose session registered the GUI, as reported by the notification queue. Tests that
+// request for another uid set this first.
+@property uid_t notifierOwner;
 @end
 
 @implementation TemporaryAdminModeTest
@@ -143,6 +146,11 @@ static uint64_t MakeDeadline(uint64_t want) {
   self.mockConfigurator = OCMClassMock([SNTConfigurator class]);
   OCMStub([self.mockConfigurator configurator]).andReturn(self.mockConfigurator);
   self.mockNotQueue = OCMClassMock([SNTNotificationQueue class]);
+  self.notifierOwner = 501;
+  OCMStub([self.mockNotQueue notifierOwnerUID]).andDo(^(NSInvocation* inv) {
+    uid_t owner = self.notifierOwner;
+    [inv setReturnValue:&owner];
+  });
 }
 
 // Stub an available on-demand policy that requires a justification.
@@ -156,14 +164,21 @@ static uint64_t MakeDeadline(uint64_t want) {
       .andReturn([NSURL URLWithString:@"https://foo.workshop.cloud"]);
 }
 
-- (void)stubAuthReply:(BOOL)authed reason:(NSString*)reason {
-  // setUp configures a policy with requireJustification:YES, so RequestAuthorization passes YES.
+// Stub the GUI's reply to the authorization request, and check that the request is for `uid`, the
+// uid the queue's owner check gates on. The uid is checked in the action rather than matched, so a
+// wrong one fails here at once instead of leaving BeginGrant to wait out its auth timeout.
+- (void)stubAuthReply:(BOOL)authed reason:(NSString*)reason forUID:(uid_t)uid {
   OCMStub([self.mockNotQueue
-      authorizeTemporaryAdminModeRequiringJustification:YES
-                                                  reply:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(
-                                                                                         authed),
-                                                                                     reason,
-                                                                                     nil])]);
+              authorizeTemporaryAdminModeForUID:0
+                         requiringJustification:YES
+                                          reply:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(authed),
+                                                                             reason, nil])])
+      .ignoringNonObjectArgs()
+      .andDo(^(NSInvocation* inv) {
+        uid_t target;
+        [inv getArgument:&target atIndex:2];
+        XCTAssertEqual(target, uid);
+      });
 }
 
 // Builds a persisted TAM session-state dict for reconciliation tests.
@@ -205,7 +220,7 @@ static uint64_t MakeDeadline(uint64_t want) {
 
 - (void)testGrantAddsMemberAndEmitsEnter {
   [self stubPolicyAvailable];
-  [self stubAuthReply:YES reason:@"need to install"];
+  [self stubAuthReply:YES reason:@"need to install" forUID:501];
   auto fakeOwned = std::make_unique<FakeAdminGroupMembership>();
   FakeAdminGroupMembership* fake = fakeOwned.get();
   NSMutableArray<SNTStoredTemporaryAdminModeAuditEvent*>* events = [NSMutableArray array];
@@ -253,7 +268,7 @@ static uint64_t MakeDeadline(uint64_t want) {
 
 - (void)testSecondUserRefused {
   [self stubPolicyAvailable];
-  [self stubAuthReply:YES reason:@"reason"];
+  [self stubAuthReply:YES reason:@"reason" forUID:501];
   auto fakeOwned = std::make_unique<FakeAdminGroupMembership>();
   NSMutableArray* events = [NSMutableArray array];
   auto tam = santa::TemporaryAdminMode::Create(
@@ -265,6 +280,8 @@ static uint64_t MakeDeadline(uint64_t want) {
   NSError* err = nil;
   XCTAssertEqual(tam->RequestMinutes(@5, 501, @"alice", &err), 5u);  // first user grants
 
+  // The second user now owns the GUI (as after a fast user switch) and is still refused.
+  self.notifierOwner = 502;
   err = nil;
   XCTAssertEqual(tam->RequestMinutes(@5, 502, @"bob", &err), 0u);  // second user refused
   XCTAssertEqual(err.code, SNTErrorCodeTAMSessionAlreadyActive);
@@ -272,9 +289,79 @@ static uint64_t MakeDeadline(uint64_t want) {
                  SNTTemporaryAdminModeDeniedReasonSessionAlreadyActive);
 }
 
+// The authorization prompt is answered in the session that registered the GUI (uid 501 here).
+// A request for any other uid must be refused before that GUI is asked, with its own error and a
+// Denied audit event, and must leave no session or membership behind.
+- (void)testRequestFromAUserWhoDoesNotOwnTheGUIIsRefusedBeforeAuthorization {
+  [self stubPolicyAvailable];
+  OCMReject([self.mockNotQueue authorizeTemporaryAdminModeForUID:0
+                                          requiringJustification:NO
+                                                           reply:[OCMArg any]])
+      .ignoringNonObjectArgs();
+  auto fakeOwned = std::make_unique<FakeAdminGroupMembership>();
+  FakeAdminGroupMembership* fake = fakeOwned.get();
+  NSMutableArray* events = [NSMutableArray array];
+  auto tam = santa::TemporaryAdminMode::Create(
+      (SNTConfigurator*)self.mockConfigurator, (SNTNotificationQueue*)self.mockNotQueue,
+      std::move(fakeOwned), ^(SNTStoredTemporaryAdminModeAuditEvent* e) {
+        [events addObject:e];
+      });
+
+  NSError* err = nil;
+  XCTAssertEqual(tam->RequestMinutes(@5, 502, @"bob", &err), 0u);
+  XCTAssertEqual(err.code, SNTErrorCodeTAMRequesterMismatch);
+  XCTAssertEqualObjects(err.localizedDescription,
+                        @"Admin Mode can only be requested by the user signed in to the session "
+                        @"that is running Santa.");
+  XCTAssertFalse(fake->IsMember(502));
+  XCTAssertFalse(tam->SecondsRemaining().has_value());
+  XCTAssertEqual(events.count, 1u);
+  XCTAssertTrue(
+      [events.lastObject isKindOfClass:[SNTStoredTemporaryAdminModeDeniedAuditEvent class]]);
+  XCTAssertEqual(((SNTStoredTemporaryAdminModeDeniedAuditEvent*)events.lastObject).reason,
+                 SNTTemporaryAdminModeDeniedReasonNotEligible);
+  XCTAssertEqualObjects(((SNTStoredTemporaryAdminModeDeniedAuditEvent*)events.lastObject).username,
+                        @"bob");
+
+  // With no GUI registered there is no owner: still refused, with its own code and message.
+  self.notifierOwner = kSNTNotifierNoOwner;
+  err = nil;
+  XCTAssertEqual(tam->RequestMinutes(@5, 502, @"bob", &err), 0u);
+  XCTAssertEqual(err.code, SNTErrorCodeTAMNoGUI);
+  XCTAssertEqualObjects(err.localizedDescription,
+                        @"The Santa app is not running or not connected, so Admin Mode cannot "
+                        @"show its authorization prompt.");
+  XCTAssertFalse(fake->IsMember(502));
+  XCTAssertEqual(events.count, 2u);
+  XCTAssertEqual(((SNTStoredTemporaryAdminModeDeniedAuditEvent*)events.lastObject).reason,
+                 SNTTemporaryAdminModeDeniedReasonNotEligible);
+  OCMVerifyAll(self.mockNotQueue);
+}
+
+// The same user is granted once their own session owns the GUI (the self-service case): the
+// check binds the target to the approver, it does not privilege any particular uid.
+- (void)testRequestFromTheUserWhoOwnsTheGUIIsGrantedToThatUser {
+  [self stubPolicyAvailable];
+  [self stubAuthReply:YES reason:@"need to install" forUID:502];
+  self.notifierOwner = 502;
+  auto fakeOwned = std::make_unique<FakeAdminGroupMembership>();
+  FakeAdminGroupMembership* fake = fakeOwned.get();
+  auto tam = santa::TemporaryAdminMode::Create((SNTConfigurator*)self.mockConfigurator,
+                                               (SNTNotificationQueue*)self.mockNotQueue,
+                                               std::move(fakeOwned),
+                                               ^(SNTStoredTemporaryAdminModeAuditEvent* e){
+                                               });
+
+  NSError* err = nil;
+  XCTAssertEqual(tam->RequestMinutes(@5, 502, @"bob", &err), 5u);
+  XCTAssertNil(err);
+  XCTAssertTrue(fake->IsMember(502));
+  XCTAssertFalse(fake->IsMember(501));
+}
+
 - (void)testAuthFailEmitsDenied {
   [self stubPolicyAvailable];
-  [self stubAuthReply:NO reason:@""];
+  [self stubAuthReply:NO reason:@"" forUID:501];
   auto fakeOwned = std::make_unique<FakeAdminGroupMembership>();
   FakeAdminGroupMembership* fake = fakeOwned.get();
   NSMutableArray* events = [NSMutableArray array];
@@ -296,7 +383,7 @@ static uint64_t MakeDeadline(uint64_t want) {
 // An unresolvable / AD account fails cleanly via AddMember -> kApplyFailed.
 - (void)testApplyFailedFailsClean {
   [self stubPolicyAvailable];
-  [self stubAuthReply:YES reason:@"reason"];
+  [self stubAuthReply:YES reason:@"reason" forUID:501];
   auto fakeOwned = std::make_unique<FakeAdminGroupMembership>();
   FakeAdminGroupMembership* fake = fakeOwned.get();
   fake->fail_add_ = true;  // simulate a directory user that cannot be committed locally
@@ -320,7 +407,7 @@ static uint64_t MakeDeadline(uint64_t want) {
 // the record would leave the user permanently elevated across a daemon restart.
 - (void)testFailedRefreshKeepsLiveSessionRecord {
   [self stubPolicyAvailable];
-  [self stubAuthReply:YES reason:@"reason"];
+  [self stubAuthReply:YES reason:@"reason" forUID:501];
   __block NSDictionary* lastPersisted = nil;
   OCMStub([self.mockConfigurator persistTimedSessionState:[OCMArg any] forKey:@"TempAdmin"])
       .andDo(^(NSInvocation* inv) {
@@ -357,7 +444,7 @@ static uint64_t MakeDeadline(uint64_t want) {
 // AddMember is left able to succeed, so the refusal below is the guard alone.
 - (void)testRefreshRefusedWhenUidReusedMidSession {
   [self stubPolicyAvailable];
-  [self stubAuthReply:YES reason:@"reason"];
+  [self stubAuthReply:YES reason:@"reason" forUID:501];
   __block NSDictionary* lastPersisted = nil;
   OCMStub([self.mockConfigurator persistTimedSessionState:[OCMArg any] forKey:@"TempAdmin"])
       .andDo(^(NSInvocation* inv) {
@@ -391,7 +478,7 @@ static uint64_t MakeDeadline(uint64_t want) {
 
 - (void)testGrantRefusedWhileTeardownRetryPending {
   [self stubPolicyAvailable];
-  [self stubAuthReply:YES reason:@"need to install"];
+  [self stubAuthReply:YES reason:@"need to install" forUID:502];
   auto fakeOwned = std::make_unique<FakeAdminGroupMembership>();
   FakeAdminGroupMembership* fake = fakeOwned.get();
   auto tam = santa::TemporaryAdminMode::Create((SNTConfigurator*)self.mockConfigurator,
@@ -410,9 +497,10 @@ static uint64_t MakeDeadline(uint64_t want) {
 
   // Granting now would overwrite the residue and orphan uid 501's stuck
   // elevation forever; the grant must be refused instead.
+  self.notifierOwner = 502;
   NSError* err = nil;
   XCTAssertEqual(tam->RequestMinutes(@5, 502, @"bob", &err), 0u);
-  XCTAssertNotNil(err);
+  XCTAssertEqual(err.code, SNTErrorCodeTAMNoPolicy);  // BeginGrant's kNotEligible, after auth
   XCTAssertFalse(fake->IsMember(502));
 }
 
@@ -425,11 +513,12 @@ static uint64_t MakeDeadline(uint64_t want) {
   [self stubPolicyAvailable];
   __block std::shared_ptr<santa::TemporaryAdminMode> tam;
   __block int call = 0;
-  OCMStub([self.mockNotQueue authorizeTemporaryAdminModeRequiringJustification:YES
-                                                                         reply:[OCMArg any]])
+  OCMStub([self.mockNotQueue authorizeTemporaryAdminModeForUID:501
+                                        requiringJustification:YES
+                                                         reply:[OCMArg any]])
       .andDo(^(NSInvocation* inv) {
         __unsafe_unretained void (^reply)(BOOL, NSString*) = nil;
-        [inv getArgument:&reply atIndex:3];
+        [inv getArgument:&reply atIndex:4];
         call++;
         if (call == 2) {
           // Same thread; safe. lock_ is not held during the auth window and
@@ -1013,7 +1102,7 @@ static uint64_t MakeDeadline(uint64_t want) {
 // from the admin group, and emits a Leave audit with the specified reason.
 - (void)testEndForUserEventEndsMatchingSession {
   [self stubPolicyAvailable];
-  [self stubAuthReply:YES reason:@"install something"];
+  [self stubAuthReply:YES reason:@"install something" forUID:501];
   auto fakeOwned = std::make_unique<FakeAdminGroupMembership>();
   FakeAdminGroupMembership* fake = fakeOwned.get();
   NSMutableArray<SNTStoredTemporaryAdminModeAuditEvent*>* events = [NSMutableArray array];
@@ -1045,7 +1134,7 @@ static uint64_t MakeDeadline(uint64_t want) {
 // After EndForUserEvent the feature must remain available (no revoke policy written).
 - (void)testEndForUserEventDoesNotWriteRevokePolicy {
   [self stubPolicyAvailable];
-  [self stubAuthReply:YES reason:@"install something"];
+  [self stubAuthReply:YES reason:@"install something" forUID:501];
   auto fakeOwned = std::make_unique<FakeAdminGroupMembership>();
   NSMutableArray<SNTStoredTemporaryAdminModeAuditEvent*>* events = [NSMutableArray array];
   auto tam = santa::TemporaryAdminMode::Create(
@@ -1070,7 +1159,7 @@ static uint64_t MakeDeadline(uint64_t want) {
 // different username is a no-op.
 - (void)testEndForUserEventWrongUidIsNoOp {
   [self stubPolicyAvailable];
-  [self stubAuthReply:YES reason:@"reason"];
+  [self stubAuthReply:YES reason:@"reason" forUID:501];
   auto fakeOwned = std::make_unique<FakeAdminGroupMembership>();
   FakeAdminGroupMembership* fake = fakeOwned.get();
   NSMutableArray<SNTStoredTemporaryAdminModeAuditEvent*>* events = [NSMutableArray array];
@@ -1119,7 +1208,7 @@ static uint64_t MakeDeadline(uint64_t want) {
 // A second EndForUserEvent after the first returns false and does not emit a second Leave audit.
 - (void)testEndForUserEventIdempotent {
   [self stubPolicyAvailable];
-  [self stubAuthReply:YES reason:@"reason"];
+  [self stubAuthReply:YES reason:@"reason" forUID:501];
   auto fakeOwned = std::make_unique<FakeAdminGroupMembership>();
   NSMutableArray<SNTStoredTemporaryAdminModeAuditEvent*>* events = [NSMutableArray array];
   auto tam = santa::TemporaryAdminMode::Create(
@@ -1144,7 +1233,7 @@ static uint64_t MakeDeadline(uint64_t want) {
 // EndForUserEvent with SNTTemporaryAdminModeLeaveReasonSessionEnded flows the reason through.
 - (void)testEndForUserEventSessionEndedReason {
   [self stubPolicyAvailable];
-  [self stubAuthReply:YES reason:@"logout test"];
+  [self stubAuthReply:YES reason:@"logout test" forUID:501];
   auto fakeOwned = std::make_unique<FakeAdminGroupMembership>();
   NSMutableArray<SNTStoredTemporaryAdminModeAuditEvent*>* events = [NSMutableArray array];
   auto tam = santa::TemporaryAdminMode::Create(
@@ -1170,7 +1259,7 @@ static uint64_t MakeDeadline(uint64_t want) {
 // the transient-directory-failure case where getpwnam yields no uid.
 - (void)testEndForUserEventNameMatchWhenUidUnresolved {
   [self stubPolicyAvailable];
-  [self stubAuthReply:YES reason:@"reason"];
+  [self stubAuthReply:YES reason:@"reason" forUID:501];
   auto fakeOwned = std::make_unique<FakeAdminGroupMembership>();
   FakeAdminGroupMembership* fake = fakeOwned.get();
   NSMutableArray<SNTStoredTemporaryAdminModeAuditEvent*>* events = [NSMutableArray array];
@@ -1191,7 +1280,7 @@ static uint64_t MakeDeadline(uint64_t want) {
 // uid does not match but the username does (local-vs-directory uid collision) -> revokes.
 - (void)testEndForUserEventNameMatchWhenUidDiffers {
   [self stubPolicyAvailable];
-  [self stubAuthReply:YES reason:@"reason"];
+  [self stubAuthReply:YES reason:@"reason" forUID:501];
   auto fakeOwned = std::make_unique<FakeAdminGroupMembership>();
   FakeAdminGroupMembership* fake = fakeOwned.get();
   NSMutableArray<SNTStoredTemporaryAdminModeAuditEvent*>* events = [NSMutableArray array];
@@ -1212,7 +1301,7 @@ static uint64_t MakeDeadline(uint64_t want) {
 // The username match is case-insensitive (login name vs canonical pw_name can differ in case).
 - (void)testEndForUserEventNameMatchIsCaseInsensitive {
   [self stubPolicyAvailable];
-  [self stubAuthReply:YES reason:@"reason"];
+  [self stubAuthReply:YES reason:@"reason" forUID:501];
   auto fakeOwned = std::make_unique<FakeAdminGroupMembership>();
   FakeAdminGroupMembership* fake = fakeOwned.get();
   NSMutableArray<SNTStoredTemporaryAdminModeAuditEvent*>* events = [NSMutableArray array];
@@ -1233,7 +1322,7 @@ static uint64_t MakeDeadline(uint64_t want) {
 // Neither key resolvable/matching (uid 0, empty username) -> no-op even with an active session.
 - (void)testEndForUserEventNoKeyIsNoOp {
   [self stubPolicyAvailable];
-  [self stubAuthReply:YES reason:@"reason"];
+  [self stubAuthReply:YES reason:@"reason" forUID:501];
   auto fakeOwned = std::make_unique<FakeAdminGroupMembership>();
   FakeAdminGroupMembership* fake = fakeOwned.get();
   NSMutableArray<SNTStoredTemporaryAdminModeAuditEvent*>* events = [NSMutableArray array];
@@ -1257,7 +1346,7 @@ static uint64_t MakeDeadline(uint64_t want) {
 // Local bit the revert paths need after a daemon restart.
 - (void)testGrantPersistsTargetAndIdentityBeforeElevation {
   [self stubPolicyAvailable];
-  [self stubAuthReply:YES reason:@"need to install"];
+  [self stubAuthReply:YES reason:@"need to install" forUID:501];
   NSMutableArray* writes = [NSMutableArray array];
   OCMStub([self.mockConfigurator persistTimedSessionState:[OCMArg any] forKey:@"TempAdmin"])
       .andDo(^(NSInvocation* inv) {
@@ -1296,7 +1385,7 @@ static uint64_t MakeDeadline(uint64_t want) {
 
 - (void)testFailedElevationClearsProvisionalState {
   [self stubPolicyAvailable];
-  [self stubAuthReply:YES reason:@"need to install"];
+  [self stubAuthReply:YES reason:@"need to install" forUID:501];
   NSMutableArray* writes = [NSMutableArray array];
   OCMStub([self.mockConfigurator persistTimedSessionState:[OCMArg any] forKey:@"TempAdmin"])
       .andDo(^(NSInvocation* inv) {

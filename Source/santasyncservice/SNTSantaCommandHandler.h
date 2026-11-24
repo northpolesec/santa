@@ -25,7 +25,8 @@
 /// queue acknowledgment) stay with the callers.
 ///
 /// Per-command execution lives in one category (and file) per command:
-/// SNTSantaCommandHandler+Kill and SNTSantaCommandHandler+EventUpload.
+/// SNTSantaCommandHandler+Kill, +EventUpload, +BinaryUpload, +PackageInventory
+/// and +AIAccountInventory.
 @interface SNTSantaCommandHandler : NSObject
 
 /// The delegate providing the daemon connection and event-upload machinery.

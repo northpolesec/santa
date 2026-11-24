@@ -49,7 +49,7 @@
 
   // Setup mock connection to return mock proxy
   OCMStub([self.mockConnection remoteObjectProxy]).andReturn(self.mockProxy);
-  self.sut.notifierConnection = self.mockConnection;
+  [self.sut setNotifierConnection:self.mockConnection ownerUID:501];
 }
 
 - (void)testAddEventBasic {
@@ -311,17 +311,19 @@
 // synchronously with (NO, @"") rather than leaving it uninvoked — otherwise the
 // daemon-side grant stalls its full fail-closed timeout.
 - (void)testAuthorizeTemporaryAdminModeNoConnectionFailsClosed {
-  self.sut.notifierConnection = nil;
+  [self.sut setNotifierConnection:nil ownerUID:501];
+  XCTAssertEqual(self.sut.notifierOwnerUID, kSNTNotifierNoOwner);
 
   __block BOOL replied = NO;
   __block BOOL gotAuthed = YES;
   __block NSString* gotReason = nil;
-  [self.sut authorizeTemporaryAdminModeRequiringJustification:YES
-                                                        reply:^(BOOL authed, NSString* reason) {
-                                                          replied = YES;
-                                                          gotAuthed = authed;
-                                                          gotReason = reason;
-                                                        }];
+  [self.sut authorizeTemporaryAdminModeForUID:501
+                       requiringJustification:YES
+                                        reply:^(BOOL authed, NSString* reason) {
+                                          replied = YES;
+                                          gotAuthed = authed;
+                                          gotReason = reason;
+                                        }];
 
   XCTAssertTrue(replied);  // invoked synchronously, no stall
   XCTAssertFalse(gotAuthed);
@@ -338,14 +340,231 @@
 
   __block BOOL replied = NO;
   __block BOOL gotAuthed = YES;
-  [self.sut authorizeTemporaryAdminModeRequiringJustification:YES
-                                                        reply:^(BOOL authed, NSString* reason) {
-                                                          replied = YES;
-                                                          gotAuthed = authed;
-                                                        }];
+  [self.sut authorizeTemporaryAdminModeForUID:501
+                       requiringJustification:YES
+                                        reply:^(BOOL authed, NSString* reason) {
+                                          replied = YES;
+                                          gotAuthed = authed;
+                                        }];
 
   XCTAssertTrue(replied);  // fail-fast via the replied guard
   XCTAssertFalse(gotAuthed);
+}
+
+#pragma mark - Temporary Admin Mode: the prompt only vouches for the connection's owner
+
+// The GUI was registered from uid 501's session. A grant for any other uid is refused without
+// the GUI being asked.
+- (void)testAuthorizeTemporaryAdminModeForAnotherUserNeverReachesTheGUI {
+  OCMStub([self.mockConnection synchronousRemoteObjectProxy]).andReturn(self.mockProxy);
+  OCMReject([self.mockProxy authorizeTemporaryAdminModeRequiringJustification:YES
+                                                                        reply:[OCMArg any]]);
+  OCMReject([self.mockProxy authorizeTemporaryAdminModeRequiringJustification:NO
+                                                                        reply:[OCMArg any]]);
+
+  __block BOOL replied = NO;
+  __block BOOL gotAuthed = YES;
+  __block NSString* gotReason = nil;
+  [self.sut authorizeTemporaryAdminModeForUID:502
+                       requiringJustification:YES
+                                        reply:^(BOOL authed, NSString* reason) {
+                                          replied = YES;
+                                          gotAuthed = authed;
+                                          gotReason = reason;
+                                        }];
+
+  XCTAssertTrue(replied);  // synchronously, so the grant fails fast
+  XCTAssertFalse(gotAuthed);
+  XCTAssertEqualObjects(gotReason, @"");
+  OCMVerifyAll(self.mockProxy);
+}
+
+- (void)testAuthorizeTemporaryAdminModeForTheOwnerReachesTheGUI {
+  OCMStub([self.mockConnection synchronousRemoteObjectProxy]).andReturn(self.mockProxy);
+  OCMStub([self.mockProxy
+      authorizeTemporaryAdminModeRequiringJustification:YES
+                                                  reply:([OCMArg invokeBlockWithArgs:@YES,
+                                                                                     @"reason",
+                                                                                     nil])]);
+
+  __block BOOL gotAuthed = NO;
+  __block NSString* gotReason = nil;
+  [self.sut authorizeTemporaryAdminModeForUID:501
+                       requiringJustification:YES
+                                        reply:^(BOOL authed, NSString* reason) {
+                                          gotAuthed = authed;
+                                          gotReason = reason;
+                                        }];
+
+  XCTAssertTrue(gotAuthed);
+  XCTAssertEqualObjects(gotReason, @"reason");
+}
+
+// Replacing the connection (a GUI registered from another session, as on a fast user switch)
+// replaces its owner with it, and the two are read together.
+- (void)testReplacingTheNotifierReplacesItsOwner {
+  id otherConnection = OCMClassMock([MOLXPCConnection class]);
+  id otherProxy = OCMProtocolMock(@protocol(SNTNotifierXPC));
+  OCMStub([otherConnection remoteObjectProxy]).andReturn(otherProxy);
+  OCMStub([otherConnection synchronousRemoteObjectProxy]).andReturn(otherProxy);
+  OCMStub([self.mockConnection synchronousRemoteObjectProxy]).andReturn(self.mockProxy);
+
+  [self.sut setNotifierConnection:otherConnection ownerUID:502];
+  XCTAssertEqual(self.sut.notifierConnection, otherConnection);
+  XCTAssertEqual(self.sut.notifierOwnerUID, 502u);
+
+  // uid 501 owned the previous connection; it must not be asked on either GUI now.
+  OCMReject([self.mockProxy authorizeTemporaryAdminModeRequiringJustification:NO
+                                                                        reply:[OCMArg any]]);
+  OCMReject([otherProxy authorizeTemporaryAdminModeRequiringJustification:NO reply:[OCMArg any]]);
+  __block BOOL gotAuthed = YES;
+  [self.sut authorizeTemporaryAdminModeForUID:501
+                       requiringJustification:NO
+                                        reply:^(BOOL authed, NSString* reason) {
+                                          gotAuthed = authed;
+                                        }];
+  XCTAssertFalse(gotAuthed);
+  OCMVerifyAll(self.mockProxy);
+  OCMVerifyAll(otherProxy);
+}
+
+// An invalidation of a connection that has already been replaced must not drop its successor
+// (nor the successor's owner), but must answer the notifications still waiting on the dead
+// connection: XPC drops their replies, and a held execution would otherwise stay stopped.
+- (void)testStaleInvalidationDoesNotDropTheReplacementNotifier {
+  __block void (^firstHandler)(void) = nil;
+  id firstConnection = OCMClassMock([MOLXPCConnection class]);
+  id firstProxy = OCMProtocolMock(@protocol(SNTNotifierXPC));
+  OCMStub([firstConnection remoteObjectProxy]).andReturn(firstProxy);
+  OCMStub([firstConnection setInvalidationHandler:[OCMArg checkWithBlock:^BOOL(id handler) {
+                             firstHandler = [handler copy];
+                             return YES;
+                           }]]);
+  [self.sut setNotifierConnection:firstConnection ownerUID:501];
+  XCTAssertNotNil(firstHandler);
+
+  // One notification is sent to each GUI, and neither GUI answers.
+  __block int firstReplies = 0;
+  __block BOOL firstAnswer = YES;
+  [self.sut addEvent:[[SNTStoredExecutionEvent alloc] init]
+          withCustomMessage:nil
+                  customURL:nil
+      eventDetailButtonText:nil
+                configState:nil
+                   andReply:^(BOOL authenticated) {
+                     firstReplies++;
+                     firstAnswer = authenticated;
+                   }];
+  [self.sut setNotifierConnection:self.mockConnection ownerUID:502];
+  __block int secondReplies = 0;
+  [self.sut addEvent:[[SNTStoredExecutionEvent alloc] init]
+          withCustomMessage:nil
+                  customURL:nil
+      eventDetailButtonText:nil
+                configState:nil
+                   andReply:^(BOOL authenticated) {
+                     secondReplies++;
+                   }];
+
+  firstHandler();
+
+  XCTAssertEqual(self.sut.notifierConnection, self.mockConnection);
+  XCTAssertEqual(self.sut.notifierOwnerUID, 502u);
+  XCTAssertEqual(firstReplies, 1);
+  XCTAssertFalse(firstAnswer);
+  XCTAssertEqual(secondReplies, 0);  // still the replacement GUI's to answer
+}
+
+// A notifier whose connection hands out a proxy that keeps each notification's reply, so the test
+// can answer it later as the GUI would.
+- (id)connectionKeepingReply:(__strong NotificationReplyBlock*)reply
+         invalidationHandler:(__strong void (^*)(void))handler {
+  id connection = OCMClassMock([MOLXPCConnection class]);
+  id proxy = OCMProtocolMock(@protocol(SNTNotifierXPC));
+  OCMStub([connection remoteObjectProxy]).andReturn(proxy);
+  OCMStub([connection setInvalidationHandler:[OCMArg checkWithBlock:^BOOL(id h) {
+                        *handler = [h copy];
+                        return YES;
+                      }]]);
+  OCMStub([proxy postBlockNotification:OCMOCK_ANY
+                     withCustomMessage:OCMOCK_ANY
+                             customURL:OCMOCK_ANY
+                 eventDetailButtonText:OCMOCK_ANY
+                           configState:OCMOCK_ANY
+                              andReply:OCMOCK_ANY])
+      .andDo(^(NSInvocation* inv) {
+        void (^__unsafe_unretained r)(BOOL);
+        [inv getArgument:&r atIndex:7];
+        *reply = [r copy];
+      });
+  return connection;
+}
+
+// When the current GUI's connection dies, only the notifications sent over it are answered. A GUI
+// that was replaced but is still alive (a fast user switch) keeps its prompt, and its user's
+// answer is the one that counts. Whichever answer comes first wins: a reply never runs twice.
+- (void)testInvalidationAnswersOnlyItsOwnNotificationsAndEachOnlyOnce {
+  NotificationReplyBlock guiAnswerA = nil, guiAnswerB = nil;
+  void (^handlerA)(void) = nil, (^handlerB)(void) = nil;
+  id connA = [self connectionKeepingReply:&guiAnswerA invalidationHandler:&handlerA];
+  id connB = [self connectionKeepingReply:&guiAnswerB invalidationHandler:&handlerB];
+
+  __block int repliesA = 0, repliesB = 0, repliesC = 0;
+  __block BOOL answerA = NO, answerC = YES;
+  [self.sut setNotifierConnection:connA ownerUID:501];
+  [self.sut addEvent:[[SNTStoredExecutionEvent alloc] init]
+          withCustomMessage:nil
+                  customURL:nil
+      eventDetailButtonText:nil
+                configState:nil
+                   andReply:^(BOOL authenticated) {
+                     repliesA++;
+                     answerA = authenticated;
+                   }];
+  [self.sut setNotifierConnection:connB ownerUID:502];
+  [self.sut addEvent:[[SNTStoredExecutionEvent alloc] init]
+          withCustomMessage:nil
+                  customURL:nil
+      eventDetailButtonText:nil
+                configState:nil
+                   andReply:^(BOOL authenticated) {
+                     repliesB++;
+                   }];
+  XCTAssertNotNil(guiAnswerA);
+  XCTAssertNotNil(guiAnswerB);
+
+  // B, the current GUI, dies: its own prompt is answered NO, and A's is left open.
+  handlerB();
+  XCTAssertNil(self.sut.notifierConnection);
+  XCTAssertEqual(repliesB, 1);
+  XCTAssertEqual(repliesA, 0);
+
+  // With no GUI connected, a new notification is answered NO at once, and A's is still left open.
+  [self.sut addEvent:[[SNTStoredExecutionEvent alloc] init]
+          withCustomMessage:nil
+                  customURL:nil
+      eventDetailButtonText:nil
+                configState:nil
+                   andReply:^(BOOL authenticated) {
+                     repliesC++;
+                     answerC = authenticated;
+                   }];
+  XCTAssertEqual(repliesC, 1);
+  XCTAssertFalse(answerC);
+  XCTAssertEqual(repliesA, 0);
+
+  // A's user approves: that answer is the one that counts.
+  guiAnswerA(YES);
+  XCTAssertEqual(repliesA, 1);
+  XCTAssertTrue(answerA);
+
+  // Answers that arrive after the notification was already answered run nothing.
+  guiAnswerB(YES);
+  handlerA();
+  guiAnswerA(NO);
+  XCTAssertEqual(repliesB, 1);
+  XCTAssertEqual(repliesA, 1);
+  XCTAssertTrue(answerA);
 }
 
 @end

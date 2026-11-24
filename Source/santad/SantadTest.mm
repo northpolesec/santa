@@ -37,9 +37,11 @@
 #import "Source/santad/EventProviders/SNTEndpointSecurityAuthorizer.h"
 #import "Source/santad/Metrics.h"
 #include "Source/santad/ProcessControl.h"
+#import "Source/santad/SNTDaemonControlController.h"
 #import "Source/santad/SNTDatabaseController.h"
 #import "Source/santad/SNTDecisionCache.h"
 #import "Source/santad/SNTExecutionController.h"
+#include "Source/santad/Santad.h"
 #include "Source/santad/SantadDeps.h"
 
 using santa::Message;
@@ -93,6 +95,10 @@ static const char* kBlockedCDHash = "7218eddfee4d3eba4873dedf22d1391d79aea25f";
 - (void)manipulatePID:(pid_t)pid withControl:(int)control;
 @end
 
+@interface SNTDaemonControlController (Testing)
+@property(readonly, copy) void (^flushCacheBlock)(santa::FlushCacheMode, santa::FlushCacheReason);
+@end
+
 @interface SantadTest : XCTestCase
 @property id mockSNTDatabaseController;
 @end
@@ -107,6 +113,57 @@ static const char* kBlockedCDHash = "7218eddfee4d3eba4873dedf22d1391d79aea25f";
 - (void)tearDown {
   [self.mockSNTDatabaseController stopMocking];
   [super tearDown];
+}
+
+- (void)testCompilerInvalidationPreservesApprovalCooldowns {
+  auto flusher = std::make_shared<santa::ESCacheFlusher>(santa::ESCacheClearStrategy::kEveryClient);
+  std::shared_ptr<santa::AuthResultCache> cache = santa::AuthResultCache::Create(flusher, nil);
+  id execController = OCMClassMock([SNTExecutionController class]);
+  __block NSUInteger approvalFlushes = 0;
+  OCMStub([execController flushAuthApprovalCache]).andDo(^(NSInvocation*) {
+    ++approvalFlushes;
+  });
+
+  id configurator = OCMClassMock([SNTConfigurator class]);
+  OCMStub([configurator configurator]).andReturn(configurator);
+  // Capture the application's real callback and stop before starting daemon services.
+  id connection = OCMClassMock([MOLXPCConnection class]);
+  __block void (^flush)(santa::FlushCacheMode, santa::FlushCacheReason);
+  NSException* stop = [NSException exceptionWithName:@"StopAfterCallbackCapture"
+                                              reason:nil
+                                            userInfo:nil];
+  OCMStub(
+      [connection setExportedObject:[OCMArg checkWithBlock:^BOOL(SNTDaemonControlController* dc) {
+                    flush = dc.flushCacheBlock;
+                    return YES;
+                  }]])
+      .andThrow(stop);
+  @try {
+    SantadMain(nullptr, flusher, nullptr, nullptr, nullptr, nullptr, cache, connection, nil, nil,
+               nil, nil, execController, nullptr, nullptr, nullptr, nullptr, nullptr);
+    XCTFail(@"Expected daemon initialization to stop after capturing the callback");
+  } @catch (NSException* exception) {
+    XCTAssertEqual(exception, stop);
+  } @finally {
+    [connection stopMocking];
+  }
+  XCTAssertNotNil(flush);
+  if (flush) {
+    santa::ExecTarget target{};
+    uint64_t token = cache->Reserve(target, {});
+    XCTAssertTrue(cache->AddToCache(target, SNTActionRespondAllowCompiler, nil, token));
+
+    flush(santa::FlushCacheMode::kCompilerDecisionsOnly, santa::FlushCacheReason::kRulesChanged);
+    XCTAssertEqual(cache->CheckCache(target).action, SNTActionUnset);
+    XCTAssertEqual(approvalFlushes, 0);
+
+    flush(santa::FlushCacheMode::kAllCaches, santa::FlushCacheReason::kRulesChanged);
+    XCTAssertEqual(approvalFlushes, 1);
+
+    flush(santa::FlushCacheMode::kNonRootOnly, santa::FlushCacheReason::kFilesystemUnmounted);
+    XCTAssertEqual(approvalFlushes, 2);
+  }
+  [execController stopMocking];
 }
 
 - (BOOL)checkBinaryExecution:(NSString*)binaryName

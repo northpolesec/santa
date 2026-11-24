@@ -194,6 +194,33 @@ static es_file_t MakeESFile(NSString* path, const struct stat* sb) {
                         @"5e089b65a1e7a4696d84a34510710b6993d1de21250c41daaec63d9981083eba");
 }
 
+- (void)testSHA256CachesFailure {
+  NSString* path = [self writeScratchFileNamed:@"hash-failure" bytes:8192];
+  NSData* contents = [NSData dataWithContentsOfFile:path];
+  SNTFileInfo* sut = [[SNTFileInfo alloc] initWithPath:path];
+  XCTAssertNotNil(sut);
+
+  NSFileHandle* handle = [NSFileHandle fileHandleForWritingAtPath:path];
+  XCTAssertNotNil(handle);
+  [handle truncateFileAtOffset:1];
+  XCTAssertNil(sut.SHA256);
+
+  // Restore the same inode: replacing the path would leave sut's descriptor truncated.
+  [handle seekToFileOffset:0];
+  [handle writeData:contents];
+  XCTAssertNil(sut.SHA256);
+  XCTAssertEqualObjects(sut.SHA1, @"35b6795ca20d6dc0aff8c7c110c96cd1070b8c38");
+  XCTAssertNil(sut.SHA256);
+
+  SNTFileInfo* restored = [[SNTFileInfo alloc] initWithPath:path];
+  NSString* expected = @"f8ca02c69621dd84cd1212ebfd7d6cdc9ba6ad658854f29567723531912d1a35";
+  XCTAssertEqualObjects(restored.SHA256, expected);
+
+  [handle truncateFileAtOffset:1];
+  XCTAssertEqualObjects(restored.SHA256, expected);
+  [handle closeFile];
+}
+
 - (void)testExecutable {
   SNTFileInfo* sut = [[SNTFileInfo alloc] initWithPath:@"/sbin/launchd"];
 

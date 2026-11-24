@@ -26,6 +26,7 @@ objc_library(
     name = "SNTSantaCommandHandler",
     srcs = [
         "SNTSantaCommandHandler.mm",
+        "SNTSantaCommandHandler+AIAccountInventory.mm",
         "SNTSantaCommandHandler+BinaryUpload.mm",
         "SNTSantaCommandHandler+EventUpload.mm",
         "SNTSantaCommandHandler+Kill.mm",
@@ -33,6 +34,7 @@ objc_library(
     ],
     hdrs = [
         "SNTSantaCommandHandler.h",
+        "SNTSantaCommandHandler+AIAccountInventory.h",
         "SNTSantaCommandHandler+BinaryUpload.h",
         "SNTSantaCommandHandler+EventUpload.h",
         "SNTSantaCommandHandler+Kill.h",

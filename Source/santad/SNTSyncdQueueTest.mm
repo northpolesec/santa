@@ -109,6 +109,7 @@
   // Add an event, it should be dispatched to the sync service for upload.
   SNTStoredExecutionEvent* se = [[SNTStoredExecutionEvent alloc] init];
   se.fileSHA256 = @"123";
+  se.decision = SNTEventStateBlockBinary;
   [sut addStoredEvent:se];
   OCMVerify(times(1), [sut dispatchBlockOnSyncdQueue:[OCMArg any]]);
 
@@ -118,6 +119,13 @@
   }
   OCMVerify(times(1), [sut dispatchBlockOnSyncdQueue:[OCMArg any]]);
 
+  // A new decision for the same binary is uploaded, once. For example, BLOCK_UNKNOWN after the
+  // binary's block rule is removed is what starts an approval in Workshop.
+  se.decision = SNTEventStateBlockUnknown;
+  [sut addStoredEvent:se];
+  [sut addStoredEvent:se];
+  OCMVerify(times(2), [sut dispatchBlockOnSyncdQueue:[OCMArg any]]);
+
   // Do it all again for SNTStoredFileAccessEvent
   SNTStoredFileAccessEvent* fe = [[SNTStoredFileAccessEvent alloc] init];
   fe.ruleName = @"MyRule";
@@ -125,13 +133,59 @@
   fe.process.fileSHA256 = @"123";
 
   [sut addStoredEvent:fe];
-  OCMVerify(times(2), [sut dispatchBlockOnSyncdQueue:[OCMArg any]]);
+  OCMVerify(times(3), [sut dispatchBlockOnSyncdQueue:[OCMArg any]]);
 
   // Add the same event many times, they all should be dropped.
   for (int i = 0; i < 10; ++i) {
     [sut addStoredEvent:fe];
   }
-  OCMVerify(times(2), [sut dispatchBlockOnSyncdQueue:[OCMArg any]]);
+  OCMVerify(times(3), [sut dispatchBlockOnSyncdQueue:[OCMArg any]]);
+}
+
+- (void)testAddBundleEventBackoffIsPerDecision {
+  SNTSyncdQueue* sut = [[SNTSyncdQueue alloc] initWithCacheSize:1024];
+
+  id mockConnection = OCMClassMock([MOLXPCConnection class]);
+  id mockProxy = OCMProtocolMock(@protocol(SNTSyncServiceXPC));
+  OCMStub([mockConnection remoteObjectProxy]).andReturn(mockProxy);
+  sut.syncConnection = mockConnection;
+
+  __block void (^replyBlock)(SNTBundleEventAction) = nil;
+  OCMStub([mockProxy postBundleEventToSyncServer:[OCMArg any]
+                                           reply:[OCMArg checkWithBlock:^BOOL(id obj) {
+                                             replyBlock = obj;
+                                             return YES;
+                                           }]]);
+  void (^uploadBundleEvent)(SNTStoredExecutionEvent*) = ^(SNTStoredExecutionEvent* se) {
+    [sut addBundleEvent:se
+                  reply:^(SNTBundleEventAction action){
+                  }];
+    dispatch_sync(sut.syncdQueue, ^{
+                  });
+  };
+
+  SNTStoredExecutionEvent* se = [[SNTStoredExecutionEvent alloc] init];
+  se.fileSHA256 = @"abc123";
+  se.fileBundleHash = @"bundle123";
+  se.decision = SNTEventStateBlockBinary;
+  uploadBundleEvent(se);
+  OCMVerify(times(1), [mockProxy postBundleEventToSyncServer:[OCMArg any] reply:[OCMArg any]]);
+
+  // The server asks for the related events, which are uploaded.
+  replyBlock(SNTBundleEventActionSendEvents);
+  [sut addBundleEvents:@[ se ] withBundleHash:se.fileBundleHash];
+  dispatch_sync(sut.syncdQueue, ^{
+                });
+  OCMVerify(times(1), [mockProxy postEventsToSyncServer:[OCMArg any] reply:[OCMArg any]]);
+
+  // A repeat of the same decision stays backed off, also after the related events went out.
+  uploadBundleEvent(se);
+  OCMVerify(times(1), [mockProxy postBundleEventToSyncServer:[OCMArg any] reply:[OCMArg any]]);
+
+  // A new decision for the bundle is uploaded at once.
+  se.decision = SNTEventStateBlockUnknown;
+  uploadBundleEvent(se);
+  OCMVerify(times(2), [mockProxy postBundleEventToSyncServer:[OCMArg any] reply:[OCMArg any]]);
 }
 
 - (void)testAddEventsRemovesBackoffOnFailure {

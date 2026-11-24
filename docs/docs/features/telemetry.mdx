@@ -346,12 +346,12 @@ The `EventLogType` key determines how event logs are stored:
 - **protobuf**: Uses a maildir-like format on disk
 
    The format of protobuf messages is available in the [proto
-   schema](https://github.com/northpolesec/santa/blob/main/Source/common/santa.proto).
+   schema](https://github.com/northpolesec/protos/blob/main/telemetry/v1.proto).
 
 - **json**: Writes one JSON object per line to a file
 
    The format of protobuf messages is available in the [proto
-   schema](https://github.com/northpolesec/santa/blob/main/Source/common/santa.proto).
+   schema](https://github.com/northpolesec/protos/blob/main/telemetry/v1.proto).
 
    JSON logs are created by first creating protobuf messages and then converting
    to JSON. Because JSON output requires this conversion, it is a less
@@ -366,6 +366,63 @@ The `EventLogType` key determines how event logs are stored:
 Applies when using the `file` or `json` log types.
 
 - `EventLogPath`: Path for filelog/JSON output (default: `/var/db/santa/santa.log`)
+
+#### Log File Permissions
+
+The log and its rotated archives have the owner `root:wheel` and the mode
+`0644`, so every account on the Mac can read the log.
+
+:::warning
+
+An upcoming release changes the default mode to `0600`, so that only root can
+read the log. If a tool that does not run as root reads the log, for example a
+log shipper, change the newsyslog file as described below before you upgrade.
+To keep the mode `0644`, make any change to the file, for example add a
+comment.
+
+:::
+
+newsyslog rotates the log with the settings in
+`/etc/newsyslog.d/com.northpolesec.santa.newsyslog.conf`. newsyslog applies the
+owner, group, and mode in that file to each new log and to each archive.
+
+To change who can read the log, change the owner, group, and mode in the
+newsyslog file. For example, `root:wheel 600` lets only root read the log, and
+`root:logshipper 640` lets members of the `logshipper` group read it. Always
+give a group: if the group is empty, newsyslog uses the group `admin`.
+
+Then rotate the log to apply the new owner, group, and mode to the files that
+exist now:
+
+```shell
+sudo newsyslog -F /var/db/santa/santa.log
+```
+
+If you set `EventLogPath`, use that path instead, after you add a line for it
+to the newsyslog file. Without that line, newsyslog uses its built-in rule,
+which keeps only 3 archives.
+
+The rotation applies them to the new log and to each archive. A process that
+opened the log before the rotation does not get new events from the old file.
+
+Santa installs and upgrades do not overwrite a newsyslog file that you changed.
+Santa replaces the file only when it is missing or is a copy that an earlier
+version of Santa installed.
+
+To go back to the newsyslog file that Santa manages, copy the file from the
+Santa bundle and rotate the log:
+
+```shell
+sudo cp /Applications/Santa.app/Contents/Library/SystemExtensions/com.northpolesec.santa.daemon.systemextension/Contents/Resources/com.northpolesec.santa.newsyslog.conf /etc/newsyslog.d/
+sudo newsyslog -F /var/db/santa/santa.log
+```
+
+Santa then treats the file as its own and updates it in later releases. The
+file from the Santa bundle rotates only `/var/db/santa/santa.log`. If you set
+`EventLogPath`, remove it and restart the Mac before you copy the file. Santa
+reads `EventLogPath` only when it starts.
+
+If you change `EventLogPath`, add a line for the new path to the newsyslog file.
 
 ### Protobuf-based Options
 

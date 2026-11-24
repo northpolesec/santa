@@ -17,6 +17,7 @@
 
 #include "Source/common/es/ESMetricsObserver.h"
 #include "Source/common/es/EndpointSecurityAPI.h"
+#include "Source/common/es/Message.h"
 #include "Source/common/processtree/process_tree.h"
 
 @interface SNTEndpointSecurityTreeAwareClient : SNTEndpointSecurityClient
@@ -27,4 +28,12 @@
                     processor:(santa::Processor)processor
                   processTree:
                       (std::shared_ptr<santa::santad::process_tree::ProcessTree>)processTree;
+
+// Retains, for the message's lifetime, the processes that handling it may look
+// up in the tree.
+- (void)attachProcessToken:(santa::Message&)esMsg;
+
+// Defaults to true. A subclass that returns false must call
+// attachProcessToken: before its first tree read.
+- (bool)attachesProcessTokenEagerly;
 @end

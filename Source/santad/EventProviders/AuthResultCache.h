@@ -100,6 +100,7 @@ struct CachedAuthResult {
 enum class FlushCacheMode {
   kNonRootOnly,
   kAllCaches,
+  kCompilerDecisionsOnly,
 };
 
 enum class FlushCacheReason {
@@ -131,11 +132,9 @@ enum class FlushCacheReason {
 // out-of-band invalidation path is strictly weaker than the check on the hit.
 class AuthResultCache {
  public:
-  // Santa currently only flushes caches when new DENY rules are added, not
-  // ALLOW rules. This means cache_deny_time_ms should be low enough so that if a
-  // previously denied binary is allowed, it can be re-executed by the user in a
-  // timely manner. But the value should be high enough to allow the cache to be
-  // effective in the event the binary is executed in rapid succession.
+  // Plain ALLOW rule updates retain cached denials. Keep cache_deny_time_ms low
+  // enough that a newly allowed binary can be retried promptly, but high enough
+  // to cache repeated denied executions.
   static std::unique_ptr<AuthResultCache> Create(
       std::shared_ptr<santa::ESCacheFlusher> es_cache_flusher, SNTMetricSet* metric_set,
       uint64_t cache_deny_time_ms = 1500);
@@ -167,7 +166,8 @@ class AuthResultCache {
   // Clears the local caches synchronously. kAllCaches also requests an
   // asynchronous ES cache clear through the shared ESCacheFlusher, so callers
   // do not need to clear the ES cache themselves. kNonRootOnly does not clear
-  // the ES cache.
+  // the ES cache. kCompilerDecisionsOnly removes compiler decisions and in-flight
+  // request markers from both local caches without clearing ES or counting a flush.
   virtual void FlushCache(FlushCacheMode mode, FlushCacheReason reason);
 
   virtual NSArray<NSNumber*>* CacheCounts();

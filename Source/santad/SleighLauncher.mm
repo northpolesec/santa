@@ -34,11 +34,25 @@
 #import "Source/common/SNTSystemInfo.h"
 #include "Source/common/String.h"
 #include "commands/v1.pb.h"
+#include "common/aiaccountinventory.pb.h"
 #include "common/packageinventory.pb.h"
 #include "common/signals.pb.h"
 #include "telemetry/sleighconfig.pb.h"
 
 namespace santa {
+
+namespace {
+
+void PopulateSignedPost(::santa::telemetry::v1::SignedPost* signed_post,
+                        const std::string& signed_post_url,
+                        const std::map<std::string, std::string>& form_values) {
+  signed_post->set_url(signed_post_url);
+  for (const auto& [key, value] : form_values) {
+    (*signed_post->mutable_form_values())[key] = value;
+  }
+}
+
+}  // namespace
 
 std::unique_ptr<SleighLauncher> SleighLauncher::Create(std::string sleigh_path) {
   if (sleigh_path.empty()) {
@@ -180,14 +194,35 @@ absl::StatusOr<::santa::telemetry::v1::SleighSignalScanResponse> SleighLauncher:
 absl::Status SleighLauncher::LaunchPackageInventoryScan(
     const ::santa::common::v1::PackageInventoryScan& scan, const std::string& signed_post_url,
     const std::map<std::string, std::string>& form_values) {
+  absl::StatusOr<std::string> serialized =
+      SerializePackageInventoryScanConfig(scan, signed_post_url, form_values);
+  if (!serialized.ok()) {
+    return serialized.status();
+  }
+  return RunFilesystemScan(*serialized, scan.has_max_duration() ? &scan.max_duration() : nullptr);
+}
+
+absl::Status SleighLauncher::LaunchAIAccountInventoryScan(
+    const ::santa::common::v1::AIAccountInventoryScan& scan, const std::string& signed_post_url,
+    const std::map<std::string, std::string>& form_values) {
+  absl::StatusOr<std::string> serialized =
+      SerializeAIAccountInventoryScanConfig(scan, signed_post_url, form_values);
+  if (!serialized.ok()) {
+    return serialized.status();
+  }
+  return RunFilesystemScan(*serialized, scan.has_max_duration() ? &scan.max_duration() : nullptr);
+}
+
+absl::Status SleighLauncher::RunFilesystemScan(const std::string& serialized,
+                                               const ::google::protobuf::Duration* max_duration) {
   // An absent or explicitly zero duration is unbounded in the command proto,
   // so apply Santa's default safety limit. Otherwise let Sleigh reach its own
   // deadline first by giving the child a one-minute outer margin.
   uint32_t timeout_seconds = 30 * 60;
-  if (scan.has_max_duration()) {
-    const auto& duration = scan.max_duration();
+  if (max_duration) {
+    const auto& duration = *max_duration;
     if (duration.seconds() < 0 || duration.nanos() < 0 || duration.nanos() >= NSEC_PER_SEC) {
-      return absl::InvalidArgumentError("invalid package inventory max_duration");
+      return absl::InvalidArgumentError("invalid scan max_duration");
     }
 
     if (duration.seconds() > 0 || duration.nanos() > 0) {
@@ -195,25 +230,19 @@ absl::Status SleighLauncher::LaunchPackageInventoryScan(
           static_cast<uint64_t>(duration.seconds()) + (duration.nanos() > 0 ? 1 : 0);
       constexpr uint64_t kTimeoutMarginSeconds = 60;
       if (rounded_seconds > std::numeric_limits<uint32_t>::max() - kTimeoutMarginSeconds) {
-        return absl::InvalidArgumentError("package inventory max_duration is too large");
+        return absl::InvalidArgumentError("scan max_duration is too large");
       }
       timeout_seconds = static_cast<uint32_t>(rounded_seconds + kTimeoutMarginSeconds);
     }
   }
 
-  absl::StatusOr<std::string> serialized =
-      SerializePackageInventoryScanConfig(scan, signed_post_url, form_values);
-  if (!serialized.ok()) {
-    return serialized.status();
-  }
-
   // No input fds: Sleigh walks the filesystem itself. There's no proto response
   // (results go straight to the presigned POST), so success/failure is Sleigh's
   // exit code — but we capture stdout+stderr (merge_stderr) so a failing scan
-  // logs why. Package inventory is the one Sleigh operation that walks paths
-  // itself instead of receiving root-opened descriptors, so retain santad's
-  // credentials to support all_users and protected explicit roots.
-  return RunSleigh(*serialized, /*input_fds=*/{}, timeout_seconds, /*capture_stdout=*/true,
+  // logs why. Inventory scans are the Sleigh operations that walk paths
+  // themselves instead of receiving root-opened descriptors, so retain santad's
+  // credentials to read every user home and protected explicit roots.
+  return RunSleigh(serialized, /*input_fds=*/{}, timeout_seconds, /*capture_stdout=*/true,
                    /*merge_stderr=*/true, ChildCredentialMode::kRetain)
       .status();
 }
@@ -506,11 +535,7 @@ absl::StatusOr<std::string> SleighLauncher::SerializeBinaryUploadConfig(
     binary_upload->add_filter_expressions(expr);
   }
 
-  auto* signed_post = binary_upload->mutable_signed_post();
-  signed_post->set_url(signed_post_url);
-  for (const auto& [key, value] : form_values) {
-    (*signed_post->mutable_form_values())[key] = value;
-  }
+  PopulateSignedPost(binary_upload->mutable_signed_post(), signed_post_url, form_values);
 
   std::string serialized;
   if (!config.SerializeToString(&serialized)) {
@@ -556,12 +581,25 @@ absl::StatusOr<std::string> SleighLauncher::SerializePackageInventoryScanConfig(
 
   auto* package_inventory_scan = config.mutable_package_inventory_scan();
   *package_inventory_scan->mutable_scan() = scan;
+  PopulateSignedPost(package_inventory_scan->mutable_signed_post(), signed_post_url, form_values);
 
-  auto* signed_post = package_inventory_scan->mutable_signed_post();
-  signed_post->set_url(signed_post_url);
-  for (const auto& [key, value] : form_values) {
-    (*signed_post->mutable_form_values())[key] = value;
+  std::string serialized;
+  if (!config.SerializeToString(&serialized)) {
+    return absl::UnknownError("Failed to serialize SleighConfig proto");
   }
+  return serialized;
+}
+
+absl::StatusOr<std::string> SleighLauncher::SerializeAIAccountInventoryScanConfig(
+    const ::santa::common::v1::AIAccountInventoryScan& scan, const std::string& signed_post_url,
+    const std::map<std::string, std::string>& form_values) {
+  ::santa::telemetry::v1::SleighConfig config;
+  PopulateHostInfo(&config);
+
+  auto* ai_account_inventory_scan = config.mutable_ai_account_inventory_scan();
+  *ai_account_inventory_scan->mutable_scan() = scan;
+  PopulateSignedPost(ai_account_inventory_scan->mutable_signed_post(), signed_post_url,
+                     form_values);
 
   std::string serialized;
   if (!config.SerializeToString(&serialized)) {

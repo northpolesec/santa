@@ -29,18 +29,22 @@ enum class Processor {
   kTamperResistance,
   kDataFileAccessAuthorizer,
   kProcessFileAccessAuthorizer,
+  kCount,  // Not a processor. Must stay last.
 };
 
 enum class EventDisposition {
   kProcessed = 0,
   kDropped,
+  kCount,  // Not a disposition. Must stay last.
 };
 
 class ESMetricsObserver {
  public:
   virtual ~ESMetricsObserver() = default;
-  virtual void UpdateEventStats(Processor processor, es_event_type_t event_type,
-                                uint64_t seq_num, uint64_t global_seq_num) = 0;
+  // Called only when a client sees a gap in either sequence number. Both
+  // deltas are non-negative.
+  virtual void RecordDrops(Processor processor, es_event_type_t event_type,
+                           int64_t event_drops, int64_t global_drops) = 0;
   virtual void SetEventMetrics(Processor processor,
                                EventDisposition disposition, int64_t nanos,
                                es_event_type_t event_type) = 0;

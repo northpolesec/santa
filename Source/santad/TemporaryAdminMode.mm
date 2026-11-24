@@ -87,6 +87,30 @@ uint32_t TemporaryAdminMode::RequestMinutes(NSNumber* requested_duration, uid_t 
     return 0;
   }
 
+  // The authorization prompt is answered in the session that registered the GUI, and the grant
+  // goes to `uid`. Those must be the same account, so a request from any other uid is refused
+  // before the GUI is asked. The queue re-checks against the connection it actually uses.
+  // These checks run before the session and admin-membership checks on purpose: a requester who
+  // does not own the GUI is refused without touching session state, and without learning whether
+  // another user holds a session.
+  uid_t owner = [notification_queue_ notifierOwnerUID];
+  if (owner == kSNTNotifierNoOwner) {
+    [SNTError populateError:err
+                   withCode:SNTErrorCodeTAMNoGUI
+                     format:@"The Santa app is not running or not connected, so Admin Mode "
+                            @"cannot show its authorization prompt."];
+    EmitDenied(username, SNTTemporaryAdminModeDeniedReasonNotEligible);
+    return 0;
+  }
+  if (owner != uid) {
+    [SNTError populateError:err
+                   withCode:SNTErrorCodeTAMRequesterMismatch
+                     format:@"Admin Mode can only be requested by the user signed in to the "
+                            @"session that is running Santa."];
+    EmitDenied(username, SNTTemporaryAdminModeDeniedReasonNotEligible);
+    return 0;
+  }
+
   // TAM-specific pre-checks (single session / natural admin). Atomic with the grant
   // below because grant_mutex_ is held across the whole method.
   bool is_refresh = false;
@@ -394,14 +418,22 @@ void TemporaryAdminMode::WriteRevokePolicy() {
 }
 
 void TemporaryAdminMode::RequestAuthorization(void (^reply)(BOOL, NSString*)) {
+  // BeginGrant runs this off lock_, so the target is re-read under it. If a teardown zeroed it
+  // before the prompt, uid 0 owns no GUI, so the queue refuses without prompting and the grant
+  // ends as kAuthFailed. A teardown during the prompt is refused later, by ApplyEffect.
+  uid_t uid;
+  {
+    absl::MutexLock lock(lock_);
+    uid = target_uid_;
+  }
   // Tell the GUI whether the policy requires a free-text reason so it only prompts
   // when configured to. The daemon still enforces the requirement (an empty reason
   // is rejected with kJustificationRequired when PolicyRequiresJustification() is true).
-  [notification_queue_
-      authorizeTemporaryAdminModeRequiringJustification:PolicyRequiresJustification()
-                                                  reply:^(BOOL ok, NSString* reason) {
-                                                    reply(ok, reason);
-                                                  }];
+  [notification_queue_ authorizeTemporaryAdminModeForUID:uid
+                                  requiringJustification:PolicyRequiresJustification()
+                                                   reply:^(BOOL ok, NSString* reason) {
+                                                     reply(ok, reason);
+                                                   }];
 }
 
 NSDictionary* TemporaryAdminMode::ExtraStateToPersist() {

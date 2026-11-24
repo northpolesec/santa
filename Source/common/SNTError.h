@@ -80,6 +80,13 @@ typedef NS_ENUM(NSInteger, SNTErrorCode) {
   SNTErrorCodeTAMNoConsoleUser = 915,
   SNTErrorCodeTAMSessionAlreadyActive = 916,
   SNTErrorCodeTAMJustificationRequired = 917,
+  // The requesting uid is not the user whose session registered the GUI that would show the
+  // authorization prompt, so nobody who could approve the request is the user it would elevate.
+  SNTErrorCodeTAMRequesterMismatch = 918,
+  // No GUI is registered to show the authorization prompt: it is not running, or it has not
+  // reconnected yet (for example just after santad restarts). Also used for a GUI registered
+  // without a peer audit token, which XPC always supplies.
+  SNTErrorCodeTAMNoGUI = 919,
 
   // User authorization errors
   SNTErrorCodeAuthorizationMethodUnavailable = 1010,

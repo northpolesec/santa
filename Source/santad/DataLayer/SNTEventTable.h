@@ -18,6 +18,7 @@
 
 @class SNTNotificationMessage;
 @class SNTStoredEvent;
+@class SNTStoredExecutionEvent;
 @class SNTStoredSignalReport;
 
 ///
@@ -56,11 +57,13 @@
 - (NSUInteger)pendingEventsCount;
 
 ///
-///  Delete a single event from the database using its index.
+///  Store the bundle flow's bundle-hashed copy of a block event. It updates the waiting row of the
+///  same event in place. If that row is gone, for example because a sync uploaded it, the copy is
+///  stored again, at most once per binary per block backoff window.
 ///
-///  @param index the event ID.
+///  @param event the event, with its bundle hash set.
 ///
-- (void)deleteEventWithId:(NSNumber*)index;
+- (void)storeBundleHashedEvent:(SNTStoredExecutionEvent*)event;
 
 ///
 ///  Delete multiple events from the database with an array of IDs.

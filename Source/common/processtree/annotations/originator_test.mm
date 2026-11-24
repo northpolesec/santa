@@ -18,11 +18,11 @@
 
 #include "Source/common/processtree/annotations/originator.h"
 #include "Source/common/processtree/process.h"
-#include "Source/common/processtree/process_tree.pb.h"
 #include "Source/common/processtree/process_tree_test_helpers.h"
+#include "telemetry/v1.pb.h"
 
 using namespace santa::santad::process_tree;
-namespace ptpb = ::santa::pb::v1::process_tree;
+namespace ptpb = ::santa::telemetry::v1;
 
 @interface OriginatorAnnotatorTest : XCTestCase
 @property std::shared_ptr<ProcessTreeTestPeer> tree;
@@ -75,6 +75,28 @@ namespace ptpb = ::santa::pb::v1::process_tree;
   auto descendant_annotation_opt = self.tree->GetAnnotation<OriginatorAnnotator>(*shell);
   XCTAssertTrue(descendant_annotation_opt.has_value());
   XCTAssertEqual(*descendant_annotation_opt, *annotation_opt);
+}
+
+- (void)testProtoSetsLogin {
+  auto proto = OriginatorAnnotator(ptpb::Annotations::LOGIN).Proto();
+  XCTAssertTrue(proto.has_value());
+  XCTAssertTrue(proto->has_originator());
+  XCTAssertEqual(proto->originator(), ptpb::Annotations::LOGIN);
+}
+
+- (void)testProtoOmitsUnspecifiedOriginator {
+  // UNSPECIFIED must never be serialized, as with the previous implicit-presence field.
+  auto proto = OriginatorAnnotator().Proto();
+  XCTAssertTrue(proto.has_value());
+  XCTAssertFalse(proto->has_originator());
+
+  // The same holds for the merged result of a tree export of a process that only carries an
+  // UNSPECIFIED originator.
+  self.tree->AnnotateProcess(*self.initProc, std::make_shared<OriginatorAnnotator>());
+  auto exported = self.tree->ExportAnnotations(self.initProc->pid_);
+  XCTAssertTrue(exported.has_value());
+  XCTAssertFalse(exported->has_originator());
+  XCTAssertEqual(exported->ByteSizeLong(), 0u);
 }
 
 @end

@@ -127,16 +127,16 @@
   "entitlements_filtered": false,
   "entitlements": [
    {
-    "key": "key_with_arr_val_multitype",
-    "value": "[\"v1\",\"v2\",\"v3\",123,\"2023-11-07T17:00:02.000Z\"]"
+    "key": "key_with_arr_val",
+    "value": "[\"v1\",\"v2\",\"v3\"]"
    },
    {
     "key": "key_with_data_val",
     "value": "\"SGVsbG8gV29ybGQ=\""
    },
    {
-    "key": "key_with_str_val",
-    "value": "\"bar\""
+    "key": "key_with_arr_val_multitype",
+    "value": "[\"v1\",\"v2\",\"v3\",123,\"2023-11-07T17:00:02.000Z\"]"
    },
    {
     "key": "key_with_arr_val_nested",
@@ -159,8 +159,8 @@
     "value": "1234"
    },
    {
-    "key": "key_with_arr_val",
-    "value": "[\"v1\",\"v2\",\"v3\"]"
+    "key": "key_with_str_val",
+    "value": "\"bar\""
    }
   ]
  }

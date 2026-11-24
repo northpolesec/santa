@@ -30,12 +30,12 @@
 
 #include "Source/common/processtree/annotations/annotator.h"
 #include "Source/common/processtree/process.h"
-#include "Source/common/processtree/process_tree.pb.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/synchronization/mutex.h"
+#include "telemetry/v1.pb.h"
 
 namespace santa::santad::process_tree {
 
@@ -244,9 +244,8 @@ PidList ProcessTree::RetainProcess(const PidList& pids) {
   PidList retained;
   absl::ReaderMutexLock lock(mtx_);
   for (const struct Pid& p : pids) {
-    auto proc = GetLocked(p);
-    if (proc) {
-      (*proc)->refcnt_.fetch_add(1, std::memory_order_relaxed);
+    if (auto it = map_.find(p); it != map_.end()) {
+      it->second->refcnt_.fetch_add(1, std::memory_order_relaxed);
       retained.push_back(p);
     }
   }
@@ -261,10 +260,10 @@ void ProcessTree::ReleaseProcess(const PidList& pids) {
   {
     absl::ReaderMutexLock lock(mtx_);
     for (const struct Pid& p : pids) {
-      auto proc = GetLocked(p);
-      if (proc &&
-          (*proc)->refcnt_.fetch_sub(1, std::memory_order_relaxed) == 1 &&
-          (*proc)->tombstoned_) {
+      if (auto it = map_.find(p);
+          it != map_.end() &&
+          it->second->refcnt_.fetch_sub(1, std::memory_order_relaxed) == 1 &&
+          it->second->tombstoned_) {
         to_erase.push_back(p);
       }
     }
@@ -281,10 +280,11 @@ void ProcessTree::ReleaseProcess(const PidList& pids) {
     // Re-verify: between the two lock holds the process may have been
     // retained again, already erased by a concurrent releaser, or erased
     // and a fresh process re-inserted under the same pid.
-    auto proc = GetLocked(p);
-    if (proc && (*proc)->refcnt_.load(std::memory_order_relaxed) == 0 &&
-        (*proc)->tombstoned_) {
-      map_.erase(p);
+    if (auto it = map_.find(p);
+        it != map_.end() &&
+        it->second->refcnt_.load(std::memory_order_relaxed) == 0 &&
+        it->second->tombstoned_) {
+      map_.erase(it);
     }
   }
 }
@@ -325,7 +325,7 @@ void ProcessTree::AnnotateProcess(const Process& p,
   it->second->annotations_.emplace(std::type_index(typeid(x)), std::move(a));
 }
 
-std::optional<::santa::pb::v1::process_tree::Annotations>
+std::optional<::santa::telemetry::v1::Annotations>
 ProcessTree::ExportAnnotations(const Pid p) {
   // Copy the handles out under the lock, then build the proto after releasing
   // it. Proto() is virtual, allocates, and runs once per process per logged
@@ -345,7 +345,7 @@ ProcessTree::ExportAnnotations(const Pid p) {
     }
   }
 
-  ::santa::pb::v1::process_tree::Annotations a;
+  ::santa::telemetry::v1::Annotations a;
   for (const auto& annotation : annotations) {
     if (auto x = annotation->Proto(); x) a.MergeFrom(*x);
   }

@@ -150,7 +150,7 @@ class ProcessTree {
   std::optional<std::shared_ptr<const T>> GetAnnotation(struct Pid p) const;
 
   // Get the fully merged proto form of all annotations on the given process.
-  std::optional<::santa::pb::v1::process_tree::Annotations> ExportAnnotations(
+  std::optional<::santa::telemetry::v1::Annotations> ExportAnnotations(
       struct Pid p);
 
   // Atomically get the slice of Processes going from the given process "up"

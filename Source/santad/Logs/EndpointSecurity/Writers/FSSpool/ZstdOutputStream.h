@@ -26,10 +26,14 @@ class ZstdOutputStream : public google::protobuf::io::ZeroCopyOutputStream {
   // Matches the Gzip default buffer size
   static constexpr size_t kDefaultBufferSize = 64 * 1024;
 
+  // A non-zero src_size_hint is the expected uncompressed size of the stream.
+  // zstd sizes its window and match tables to it, which shrinks the context
+  // when the stream is smaller than zstd's default window. Input beyond the
+  // hint still compresses correctly.
   static std::unique_ptr<ZstdOutputStream> Create(
       google::protobuf::io::ZeroCopyOutputStream* output,
       int compression_level = ZSTD_CLEVEL_DEFAULT,
-      size_t buffer_size = kDefaultBufferSize);
+      size_t buffer_size = kDefaultBufferSize, size_t src_size_hint = 0);
 
   ZstdOutputStream(google::protobuf::io::ZeroCopyOutputStream* output,
                    ZSTD_CStream* cstream,

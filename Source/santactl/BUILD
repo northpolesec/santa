@@ -31,10 +31,9 @@ objc_library(
         "//Source/common:SNTLogging",
         "//Source/common:SNTXxhash",
         "//Source/common:ScopedFile",
-        "//Source/common:santa_cc_proto",
         "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:SpoolBatchers",
-        "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:binaryproto_cc_proto",
         "@abseil-cpp//absl/status:statusor",
+        "@northpolesec_protos//telemetry:v1_cc_proto",
         "@protobuf//src/google/protobuf/json",
         "@zstd",
     ],
@@ -321,10 +320,7 @@ macos_command_line_application(
         "--force",
         "--options library,kill,runtime",
     ],
-    infoplists = [
-        "Info.plist",
-        "//Source/common:CommitHash",
-    ],
+    infoplists = ["Info.plist"],
     minimum_os_version = SANTA_MINIMUM_OS_VERSION,
     provisioning_profile = select({
         "//:adhoc_build": None,
@@ -355,6 +351,16 @@ santa_unit_test(
         "//Source/common:SNTXPCControlInterface",
         "//Source/common:SigningIDHelpers",
         "@OCMock",
+    ],
+)
+
+santa_unit_test(
+    name = "SNTCommandVersionTest",
+    srcs = ["Commands/SNTCommandVersionTest.mm"],
+    deps = [
+        ":SNTCommandVersion",
+        ":santactl_cmd",
+        "//Source/common:MOLXPCConnection",
     ],
 )
 
@@ -430,6 +436,7 @@ test_suite(
         ":SNTCommandRuleTest",
         ":SNTCommandSandboxTest",
         ":SNTCommandTest",
+        ":SNTCommandVersionTest",
     ],
     visibility = ["//:santa_package_group"],
 )

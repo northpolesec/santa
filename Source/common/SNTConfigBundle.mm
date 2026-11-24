@@ -35,6 +35,8 @@
 @property NSNumber* blockNetworkMount;
 @property NSString* bannedNetworkMountBlockMessage;
 @property NSArray<NSString*>* allowedNetworkMountHosts;
+@property NSString* bannedBlockMessage;
+@property NSString* unknownBlockMessage;
 @property NSString* bannedUSBBlockMessage;
 @property NSString* remountUSBBlockMessage;
 @property NSNumber* enableBundles;
@@ -82,6 +84,8 @@
   ENCODE(coder, blockNetworkMount);
   ENCODE(coder, bannedNetworkMountBlockMessage);
   ENCODE(coder, allowedNetworkMountHosts);
+  ENCODE(coder, bannedBlockMessage);
+  ENCODE(coder, unknownBlockMessage);
   ENCODE(coder, bannedUSBBlockMessage);
   ENCODE(coder, remountUSBBlockMessage);
   ENCODE(coder, enableBundles);
@@ -125,6 +129,8 @@
     DECODE(decoder, blockNetworkMount, NSNumber);
     DECODE(decoder, bannedNetworkMountBlockMessage, NSString);
     DECODE_ARRAY(decoder, allowedNetworkMountHosts, NSString);
+    DECODE(decoder, bannedBlockMessage, NSString);
+    DECODE(decoder, unknownBlockMessage, NSString);
     DECODE(decoder, bannedUSBBlockMessage, NSString);
     DECODE(decoder, remountUSBBlockMessage, NSString);
     DECODE(decoder, enableBundles, NSNumber);
@@ -229,6 +235,18 @@
 - (void)allowedNetworkMountHosts:(void (^)(NSArray<NSString*>*))block {
   if (self.allowedNetworkMountHosts) {
     block(self.allowedNetworkMountHosts);
+  }
+}
+
+- (void)bannedBlockMessage:(void (^)(NSString*))block {
+  if (self.bannedBlockMessage) {
+    block(self.bannedBlockMessage);
+  }
+}
+
+- (void)unknownBlockMessage:(void (^)(NSString*))block {
+  if (self.unknownBlockMessage) {
+    block(self.unknownBlockMessage);
   }
 }
 

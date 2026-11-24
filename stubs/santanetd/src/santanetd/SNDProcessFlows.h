@@ -21,10 +21,8 @@
 // access to the Network Extension repo.
 //
 // Santa only accesses SNDProcessFlows via processFlows.processInfo in
-// Serializer.mm. All other methods are used inside
-// PopulateNetworkActivityProcess, PopulateDNSActivityProcess,
-// FormatNetworkFlowsBasicString, and FormatDNSActivityBasicString, which are
-// stubbed as no-ops.
+// Serializer.mm. All other methods are used inside SerializeNetworkActivity
+// and FormatNetworkActivityBasicString, which are stubbed as no-ops.
 @interface SNDProcessFlows : NSObject <NSSecureCoding>
 
 @property(nonatomic, readonly) SNDProcessInfo* processInfo;

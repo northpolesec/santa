@@ -102,7 +102,28 @@ using santa::Processor;
     default: break;
   }
 
-  // Now enumerate the processes that processing this event might require access to...
+  // The caller drops events added only to keep the tree current, so nothing
+  // reads the tree for them.
+  if ([self eventWasAdded:esMsg->event_type]) {
+    return true;
+  }
+
+  if ([self attachesProcessTokenEagerly]) {
+    [self attachProcessToken:esMsg];
+  }
+  return false;
+}
+
+- (bool)attachesProcessTokenEagerly {
+  return true;
+}
+
+- (void)attachProcessToken:(Message&)esMsg {
+  if (!_processTree) {
+    return;
+  }
+
+  // Enumerate the processes that processing this event might require access to...
   santa::santad::process_tree::PidList pids;
   pids.emplace_back(santa::santad::process_tree::PidFromAuditToken(esMsg->process->audit_token));
   switch (esMsg->event_type) {
@@ -120,8 +141,6 @@ using santa::Processor;
 
   // ...and create the token for those.
   esMsg.SetProcessToken(santa::santad::process_tree::ProcessToken(_processTree, std::move(pids)));
-
-  return [self eventWasAdded:esMsg->event_type];
 }
 
 @end

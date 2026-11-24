@@ -68,6 +68,7 @@ static const uint32_t kMaxFatArchCount =
 @property SantaVnode vnode;
 @property NSString* fileOwnerHomeDir;
 @property NSString* sha256Storage;
+@property BOOL sha256Attempted;
 
 // Cached properties
 @property NSBundle* bundleRef;
@@ -319,11 +320,11 @@ static const uint32_t kMaxFatArchCount =
 }
 
 - (NSString*)SHA256 {
-  // Memoize the value
-  if (!self.sha256Storage) {
+  if (!self.sha256Attempted) {
     NSString* sha256;
     [self hashSHA1:NULL SHA256:&sha256];
     self.sha256Storage = sha256;
+    self.sha256Attempted = YES;
   }
   return self.sha256Storage;
 }

@@ -271,6 +271,12 @@
 /* Reason shown when the group membership change fails */
 "the admin group membership change failed" = "no se pudo cambiar la pertenencia al grupo de administradores";
 
+/* Reason shown when the requesting user does not own the registered Santa GUI */
+"the Santa prompt currently belongs to another user's session" = "el aviso de Santa pertenece actualmente a la sesión de otro usuario";
+
+/* Reason shown when the daemon has no registered Santa GUI to show the prompt */
+"Santa has not finished connecting" = "Santa aún no ha terminado de conectarse";
+
 /* No comment provided by engineer. */
 "The event upload failed. Please check your network connection and try again." = "Error al cargar el evento. Por favor, verifique su conexión de red e inténtelo de nuevo.";
 

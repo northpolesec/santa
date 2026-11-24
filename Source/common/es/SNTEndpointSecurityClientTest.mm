@@ -22,6 +22,7 @@
 #include <mach/mach_time.h>
 
 #include <memory>
+#include <vector>
 
 #include "Source/common/AuditUtilities.h"
 #import "Source/common/SNTCommonEnums.h"
@@ -29,6 +30,7 @@
 #import "Source/common/SystemResources.h"
 #include "Source/common/TestUtils.h"
 #include "Source/common/es/Client.h"
+#include "Source/common/es/ESMetricsObserver.h"
 #include "Source/common/es/EnrichedTypes.h"
 #include "Source/common/es/Message.h"
 #include "Source/common/es/MockEndpointSecurityAPI.h"
@@ -40,6 +42,7 @@ using santa::EnrichedClose;
 using santa::EnrichedFile;
 using santa::EnrichedMessage;
 using santa::EnrichedProcess;
+using santa::EventDisposition;
 using santa::Message;
 using santa::Processor;
 using santa::SetPairPathAndType;
@@ -58,6 +61,68 @@ using santa::WatchItemPathType;
 @property(nonatomic) int64_t minAllowedHeadroom;
 @property(nonatomic) int64_t maxAllowedHeadroom;
 @end
+
+// Processes every message it is given.
+@interface SNTEndpointSecurityClientProcessAll : SNTEndpointSecurityClient
+@end
+
+@implementation SNTEndpointSecurityClientProcessAll
+- (void)handleMessage:(Message&&)esMsg
+    recordEventMetrics:(void (^)(EventDisposition disposition))recordEventMetrics {
+  recordEventMetrics(EventDisposition::kProcessed);
+}
+@end
+
+namespace {
+
+struct RecordedDrops {
+  Processor processor;
+  es_event_type_t event_type;
+  int64_t event_drops;
+  int64_t global_drops;
+};
+
+// Records the calls a client makes to its metrics observer.
+class FakeMetricsObserver : public santa::ESMetricsObserver {
+ public:
+  void RecordDrops(Processor processor, es_event_type_t event_type, int64_t event_drops,
+                   int64_t global_drops) override {
+    drops.push_back({processor, event_type, event_drops, global_drops});
+  }
+
+  void SetEventMetrics(Processor processor, EventDisposition disposition, int64_t nanos,
+                       es_event_type_t event_type) override {
+    dispositions.push_back(disposition);
+  }
+
+  std::vector<RecordedDrops> drops;
+  std::vector<EventDisposition> dispositions;
+};
+
+using ESMessageHandler = void (^)(es_client_t*, Message);
+
+// Establishes the client and returns the ES handler block it registered.
+ESMessageHandler EstablishClient(SNTEndpointSecurityClient* client,
+                                 MockEndpointSecurityAPI& mockESApi) {
+  ESMessageHandler handler = nil;
+  EXPECT_CALL(mockESApi, NewClient)
+      .WillOnce(testing::DoAll(testing::SaveArg<0>(&handler),
+                               testing::Return(Client(nullptr, ES_NEW_CLIENT_RESULT_SUCCESS))));
+  EXPECT_CALL(mockESApi, MuteProcess).WillOnce(testing::Return(true));
+  [client establishClientOrDie];
+  return handler;
+}
+
+void Deliver(ESMessageHandler handler, std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
+             es_message_t* esMsg, es_event_type_t eventType, uint64_t seqNum,
+             uint64_t globalSeqNum) {
+  esMsg->event_type = eventType;
+  esMsg->seq_num = seqNum;
+  esMsg->global_seq_num = globalSeqNum;
+  handler(nullptr, Message(mockESApi, esMsg));
+}
+
+}  // namespace
 
 @interface SNTEndpointSecurityClientTest : XCTestCase
 @end
@@ -82,6 +147,143 @@ using santa::WatchItemPathType;
   // Second time succeeds
   XCTAssertThrows([client establishClientOrDie]);
   XCTAssertNoThrow([client establishClientOrDie]);
+
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+}
+
+- (void)testDropDetection {
+  es_file_t file = MakeESFile("foo");
+  es_process_t proc = MakeESProcess(&file);
+  proc.is_es_client = false;
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_EXEC, &proc);
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+  auto metrics = std::make_shared<FakeMetricsObserver>();
+
+  SNTEndpointSecurityClient* client =
+      [[SNTEndpointSecurityClientProcessAll alloc] initWithESAPI:mockESApi
+                                                         metrics:metrics
+                                                       processor:Processor::kRecorder];
+  ESMessageHandler handler = EstablishClient(client, *mockESApi);
+  XCTAssertNotNil(handler);
+
+  // Consecutive sequence numbers are not drops
+  Deliver(handler, mockESApi, &esMsg, ES_EVENT_TYPE_NOTIFY_EXEC, 0, 0);
+  Deliver(handler, mockESApi, &esMsg, ES_EVENT_TYPE_NOTIFY_EXEC, 1, 1);
+  Deliver(handler, mockESApi, &esMsg, ES_EVENT_TYPE_NOTIFY_EXEC, 2, 2);
+  XCTAssertEqual(metrics->drops.size(), 0);
+
+  // A jump in both numbers reports the gap in each
+  Deliver(handler, mockESApi, &esMsg, ES_EVENT_TYPE_NOTIFY_EXEC, 12, 12);
+  XCTAssertEqual(metrics->drops.size(), 1);
+  XCTAssertEqual(metrics->drops[0].processor, Processor::kRecorder);
+  XCTAssertEqual(metrics->drops[0].event_type, ES_EVENT_TYPE_NOTIFY_EXEC);
+  XCTAssertEqual(metrics->drops[0].event_drops, 9);
+  XCTAssertEqual(metrics->drops[0].global_drops, 9);
+
+  // A second event type starts at 0 while the global number continues
+  Deliver(handler, mockESApi, &esMsg, ES_EVENT_TYPE_NOTIFY_FORK, 0, 13);
+  XCTAssertEqual(metrics->drops.size(), 1);
+
+  // A gap in only the global number
+  Deliver(handler, mockESApi, &esMsg, ES_EVENT_TYPE_NOTIFY_FORK, 1, 20);
+  XCTAssertEqual(metrics->drops.size(), 2);
+  XCTAssertEqual(metrics->drops[1].event_type, ES_EVENT_TYPE_NOTIFY_FORK);
+  XCTAssertEqual(metrics->drops[1].event_drops, 0);
+  XCTAssertEqual(metrics->drops[1].global_drops, 6);
+
+  // Numbers lower than expected are not drops, and tracking resyncs to them
+  Deliver(handler, mockESApi, &esMsg, ES_EVENT_TYPE_NOTIFY_EXEC, 5, 15);
+  Deliver(handler, mockESApi, &esMsg, ES_EVENT_TYPE_NOTIFY_EXEC, 6, 16);
+  XCTAssertEqual(metrics->drops.size(), 2);
+
+  // A lower event number does not offset a global gap reported with it
+  Deliver(handler, mockESApi, &esMsg, ES_EVENT_TYPE_NOTIFY_FORK, 0, 30);
+  XCTAssertEqual(metrics->drops.size(), 3);
+  XCTAssertEqual(metrics->drops[2].event_drops, 0);
+  XCTAssertEqual(metrics->drops[2].global_drops, 13);
+
+  // A lower global number does not offset an event gap reported with it
+  Deliver(handler, mockESApi, &esMsg, ES_EVENT_TYPE_NOTIFY_EXEC, 10, 5);
+  XCTAssertEqual(metrics->drops.size(), 4);
+  XCTAssertEqual(metrics->drops[3].event_drops, 3);
+  XCTAssertEqual(metrics->drops[3].global_drops, 0);
+
+  // Both numbers resynced
+  Deliver(handler, mockESApi, &esMsg, ES_EVENT_TYPE_NOTIFY_FORK, 1, 6);
+  Deliver(handler, mockESApi, &esMsg, ES_EVENT_TYPE_NOTIFY_EXEC, 11, 7);
+  XCTAssertEqual(metrics->drops.size(), 4);
+
+  // Every message records its event metrics exactly once
+  XCTAssertEqual(metrics->dispositions.size(), 12);
+  for (EventDisposition d : metrics->dispositions) {
+    XCTAssertEqual(d, EventDisposition::kProcessed);
+  }
+
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+}
+
+- (void)testDropDetectionFirstMessage {
+  es_file_t file = MakeESFile("foo");
+  es_process_t proc = MakeESProcess(&file);
+  proc.is_es_client = false;
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_EXEC, &proc);
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+  auto metrics = std::make_shared<FakeMetricsObserver>();
+
+  SNTEndpointSecurityClient* client =
+      [[SNTEndpointSecurityClientProcessAll alloc] initWithESAPI:mockESApi
+                                                         metrics:metrics
+                                                       processor:Processor::kRecorder];
+  ESMessageHandler handler = EstablishClient(client, *mockESApi);
+
+  // Tracking starts at 0, so a client's first message counts its whole
+  // sequence number as drops
+  Deliver(handler, mockESApi, &esMsg, ES_EVENT_TYPE_NOTIFY_EXEC, 123, 123);
+  XCTAssertEqual(metrics->drops.size(), 1);
+  XCTAssertEqual(metrics->drops[0].event_drops, 123);
+  XCTAssertEqual(metrics->drops[0].global_drops, 123);
+
+  XCTAssertEqual(metrics->dispositions.size(), 1);
+  XCTAssertEqual(metrics->dispositions[0], EventDisposition::kProcessed);
+
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+}
+
+- (void)testDropDetectionPerClient {
+  es_file_t file = MakeESFile("foo");
+  es_process_t proc = MakeESProcess(&file);
+  proc.is_es_client = false;
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_EXEC, &proc);
+
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+  auto metrics = std::make_shared<FakeMetricsObserver>();
+
+  // Two clients with the same processor share one observer
+  SNTEndpointSecurityClient* client1 =
+      [[SNTEndpointSecurityClientProcessAll alloc] initWithESAPI:mockESApi
+                                                         metrics:metrics
+                                                       processor:Processor::kRecorder];
+  SNTEndpointSecurityClient* client2 =
+      [[SNTEndpointSecurityClientProcessAll alloc] initWithESAPI:mockESApi
+                                                         metrics:metrics
+                                                       processor:Processor::kRecorder];
+  ESMessageHandler handler1 = EstablishClient(client1, *mockESApi);
+  ESMessageHandler handler2 = EstablishClient(client2, *mockESApi);
+
+  // Each client tracks its own sequence numbers
+  Deliver(handler1, mockESApi, &esMsg, ES_EVENT_TYPE_NOTIFY_EXEC, 0, 0);
+  Deliver(handler1, mockESApi, &esMsg, ES_EVENT_TYPE_NOTIFY_EXEC, 1, 1);
+  Deliver(handler1, mockESApi, &esMsg, ES_EVENT_TYPE_NOTIFY_EXEC, 2, 2);
+  Deliver(handler2, mockESApi, &esMsg, ES_EVENT_TYPE_NOTIFY_EXEC, 0, 0);
+  Deliver(handler1, mockESApi, &esMsg, ES_EVENT_TYPE_NOTIFY_EXEC, 3, 3);
+  Deliver(handler2, mockESApi, &esMsg, ES_EVENT_TYPE_NOTIFY_EXEC, 1, 1);
+  XCTAssertEqual(metrics->drops.size(), 0);
+  XCTAssertEqual(metrics->dispositions.size(), 6);
 
   XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
 }

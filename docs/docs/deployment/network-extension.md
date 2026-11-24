@@ -76,10 +76,10 @@ output includes a Network Extension section:
 You can also run `santactl version` to view version information:
 
 ```text title="santactl version"
-santad               | 2026.3 (build 187, commit 47a21b0d)
-santactl             | 2026.3 (build 187, commit 47a21b0d)
-SantaGUI             | 2026.3 (build 187, commit 47a21b0d)
-santanetd (BETA)     | 2026.3 (build 187, commit 2149a1ce)
+santad               | 2026.3 (build 187)
+santactl             | 2026.3 (build 187)
+SantaGUI             | 2026.3 (build 187)
+santanetd (BETA)     | 2026.3 (build 187)
 ```
 
 If a newer version of the network extension is available, it will be noted in the

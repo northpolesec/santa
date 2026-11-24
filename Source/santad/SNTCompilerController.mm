@@ -29,7 +29,6 @@
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTFileInfo.h"
 #import "Source/common/SNTLogging.h"
-#import "Source/common/SNTRule.h"
 #import "Source/common/SNTStrengthify.h"
 #import "Source/common/SNTTimer.h"
 #include "Source/common/String.h"
@@ -363,41 +362,19 @@ static constexpr uint32_t kCompilerMarkSweepIntervalSeconds = 300;
 
   // Check if this file is an executable.
   if (targetFile.isExecutable) {
-    // Check if there is an existing (non-transitive) rule for this file.  We leave existing rules
-    // alone, so that a allowlist or blocklist rule can't be overwritten by a transitive one.
-    SNTRuleTable* ruleTable = [SNTDatabaseController ruleTable];
-    SNTRule* prevRule =
-        [ruleTable executionRuleForIdentifiers:(struct RuleIdentifiers){
-                                                   .binarySHA256 = targetFile.SHA256,
-                                               }];
-    // Note: Don't overwrite existing rules, unless it was a transitive rule which is allowed
-    // in order to have timestamps updated.
-    if (!prevRule || prevRule.state == SNTRuleStateAllowTransitive) {
-      // Construct a new transitive allowlist rule for the executable.
-      SNTRule* rule = [[SNTRule alloc] initWithIdentifier:targetFile.SHA256
-                                                    state:SNTRuleStateAllowTransitive
-                                                     type:SNTRuleTypeBinary];
-
-      if (!rule) {
-        LOGW(@"Failed to create transitive rule: %@ (SHA-256: %@)", targetFile.path,
-             targetFile.SHA256);
-      } else {
-        // Add the new rule to the rules database.
-        NSArray<NSError*>* errors;
-        if (![ruleTable addExecutionRules:@[ rule ]
-                              ruleCleanup:SNTRuleCleanupNone
-                                   errors:&errors]) {
-          for (NSError* error in errors) {
-            LOGE(@"Unable to add new transitive rule to database: %@", error.localizedDescription);
-          }
-        } else {
-          logger->LogAllowlist(esMsg, santa::NSStringToUTF8StringView(targetFile.SHA256),
-                               santa::NSStringToUTF8StringView(targetFile.path));
-          if (_pendingExecCoordinator) {
-            _pendingExecCoordinator->NotifyRuleCreated(
-                santa::NSStringToUTF8String(targetFile.SHA256));
-          }
+    NSString* sha256 = targetFile.SHA256;
+    if (!sha256) {
+      LOGW(@"Unable to hash compiler output for transitive rule: %@", targetFile.path);
+    } else {
+      NSError* error;
+      if ([[SNTDatabaseController ruleTable] addTransitiveRuleForSHA256:sha256 error:&error]) {
+        logger->LogAllowlist(esMsg, santa::NSStringToUTF8StringView(sha256),
+                             santa::NSStringToUTF8StringView(targetFile.path));
+        if (_pendingExecCoordinator) {
+          _pendingExecCoordinator->NotifyRuleCreated(santa::NSStringToUTF8String(sha256));
         }
+      } else if (error) {
+        LOGE(@"Unable to add new transitive rule to database: %@", error.localizedDescription);
       }
     }
   }

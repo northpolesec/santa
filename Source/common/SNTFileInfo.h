@@ -137,7 +137,10 @@ typedef NS_ENUM(NSInteger, SNTFileInfoIdentityVerification) {
 - (NSString*)SHA1;
 
 ///
-///  @return SHA-256 hash of this binary.
+///  The first result, including failure, is cached for this instance. Create a new
+///  SNTFileInfo to retry after a failure.
+///
+///  @return SHA-256 hash of this binary, or nil if hashing failed.
 ///
 - (NSString*)SHA256;
 

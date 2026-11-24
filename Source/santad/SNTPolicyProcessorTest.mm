@@ -644,7 +644,6 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     id partialRuleTable = OCMPartialMock(ruleTable);
     OCMStub([partialRuleTable criticalSystemBinaries]).andReturn(@{});
 
-    NSMutableArray<SNTRule*>* rules = [NSMutableArray array];
     SNTRule* compilerRule = [[SNTRule alloc] initWithDictionary:@{
       @"rule_type" : @"SIGNINGID",
       @"identifier" : kSigningID,
@@ -652,19 +651,16 @@ BOOL RuleIdentifiersAreEqual(struct RuleIdentifiers r1, struct RuleIdentifiers r
     }
                                                           error:nil];
     XCTAssertNotNil(compilerRule, @"invalid test rule dictionary");
-    [rules addObject:compilerRule];
-
-    if (withTransitiveRule.boolValue) {
-      [rules addObject:[[SNTRule alloc] initWithIdentifier:kSHA256
-                                                     state:SNTRuleStateAllowTransitive
-                                                      type:SNTRuleTypeBinary]];
-    }
-
     NSArray<NSError*>* errs;
-    XCTAssertTrue([ruleTable addExecutionRules:rules ruleCleanup:SNTRuleCleanupNone errors:&errs]);
+    XCTAssertTrue([ruleTable addExecutionRules:@[ compilerRule ]
+                                   ruleCleanup:SNTRuleCleanupNone
+                                        errors:&errs]);
     XCTAssertNil(errs);
     // Only the database query is under test; keep static rules out of it.
     [ruleTable updateStaticRules:nil];
+    if (withTransitiveRule.boolValue) {
+      XCTAssertTrue([ruleTable addTransitiveRuleForSHA256:kSHA256 error:nil]);
+    }
 
     id mockConfigurator = OCMClassMock([SNTConfigurator class]);
     OCMStub([mockConfigurator clientMode]).andReturn(SNTClientModeLockdown);

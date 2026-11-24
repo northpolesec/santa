@@ -36,6 +36,8 @@
 @property NSNumber* blockNetworkMount;
 @property NSString* bannedNetworkMountBlockMessage;
 @property NSArray<NSString*>* allowedNetworkMountHosts;
+@property NSString* bannedBlockMessage;
+@property NSString* unknownBlockMessage;
 @property NSString* bannedUSBBlockMessage;
 @property NSString* remountUSBBlockMessage;
 @property NSNumber* enableBundles;
@@ -89,6 +91,8 @@ SNTConfigBundle* PostflightConfigBundle(SNTSyncState* syncState) {
   bundle.blockNetworkMount = syncState.blockNetworkMount;
   bundle.bannedNetworkMountBlockMessage = syncState.bannedNetworkMountBlockMessage;
   bundle.allowedNetworkMountHosts = syncState.allowedNetworkMountHosts;
+  bundle.bannedBlockMessage = syncState.bannedBlockMessage;
+  bundle.unknownBlockMessage = syncState.unknownBlockMessage;
   bundle.bannedUSBBlockMessage = syncState.bannedUSBBlockMessage;
   bundle.remountUSBBlockMessage = syncState.remountUSBBlockMessage;
   bundle.enableBundles = syncState.enableBundles;

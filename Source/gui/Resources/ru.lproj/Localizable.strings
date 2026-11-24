@@ -271,6 +271,12 @@
 /* Reason shown when the group membership change fails */
 "the admin group membership change failed" = "не удалось изменить членство в группе администраторов";
 
+/* Reason shown when the requesting user does not own the registered Santa GUI */
+"the Santa prompt currently belongs to another user's session" = "запрос Santa сейчас принадлежит сеансу другого пользователя";
+
+/* Reason shown when the daemon has no registered Santa GUI to show the prompt */
+"Santa has not finished connecting" = "Santa ещё не завершила подключение";
+
 /* No comment provided by engineer. */
 "The event upload failed. Please check your network connection and try again." = "Не удалось отправить событие. Пожалуйста, проверьте подключение к сети и попробуйте снова.";
 

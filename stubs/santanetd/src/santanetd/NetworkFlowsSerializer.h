@@ -15,36 +15,35 @@
 #ifndef SANTA_STUBS_SANTANETD_SRC_SANTANETD_NETWORKFLOWSSERIALIZER_H
 #define SANTA_STUBS_SANTANETD_SRC_SANTANETD_NETWORKFLOWSSERIALIZER_H
 
+#include <functional>
 #include <string>
+#include <vector>
 
 #include "google/protobuf/arena.h"
 
 // Forward declare for stub
-namespace santa::pb::v1 {
-class NetworkActivity_Process;
-class DNSActivity_Process;
-}  // namespace santa::pb::v1
+namespace santa::telemetry::v1 {
+class SantaMessage;
+}  // namespace santa::telemetry::v1
 
 @class SNDProcessFlows;
 @class SNTCachedDecision;
 
 namespace santanetd {
 
-void PopulateNetworkActivityProcess(google::protobuf::Arena* arena,
-                                    ::santa::pb::v1::NetworkActivity_Process* process,
-                                    SNDProcessFlows* processFlows, SNTCachedDecision* cd);
+using NewSantaMessage =
+    std::function<::santa::telemetry::v1::SantaMessage*(google::protobuf::Arena*)>;
+using WriteSantaMessage = std::function<void(::santa::telemetry::v1::SantaMessage*)>;
 
-// Returns "" when the process has no flows.
-std::string FormatNetworkFlowsBasicString(SNDProcessFlows* processFlows, SNTCachedDecision* cd);
+// Writes nothing.
+void SerializeNetworkActivity(SNDProcessFlows* processFlows, SNTCachedDecision* cd, bool network,
+                              bool dns, const NewSantaMessage& newMessage,
+                              const WriteSantaMessage& write);
 
-// Fills process, questions, and questions_dropped for one process entry.
-// questions_dropped is set only when above zero.
-void PopulateDNSActivityProcess(google::protobuf::Arena* arena,
-                                ::santa::pb::v1::DNSActivity_Process* process,
-                                SNDProcessFlows* processFlows, SNTCachedDecision* cd);
-
-// Returns "" when the process has no questions.
-std::string FormatDNSActivityBasicString(SNDProcessFlows* processFlows, SNTCachedDecision* cd);
+// Returns no entries.
+std::vector<std::string> FormatNetworkActivityBasicString(SNDProcessFlows* processFlows,
+                                                          SNTCachedDecision* cd, bool network,
+                                                          bool dns);
 
 }  // namespace santanetd
 

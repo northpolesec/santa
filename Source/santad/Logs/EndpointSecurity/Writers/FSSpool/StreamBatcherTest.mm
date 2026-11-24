@@ -75,7 +75,10 @@
       });
   ::fsspool::ZstdStreamBatcher zstdStream(
       ^(google::protobuf::io::ZeroCopyOutputStream* raw_stream) {
-        return ::fsspool::ZstdOutputStream::Create(raw_stream);
+        // Hint below kFileSize so input past the hint must still round-trip.
+        return ::fsspool::ZstdOutputStream::Create(raw_stream, ZSTD_CLEVEL_DEFAULT,
+                                                   ::fsspool::ZstdOutputStream::kDefaultBufferSize,
+                                                   kFileSize / 4);
       });
 
   // Check that completing and re-initialization produces expected content across multiple rounds

@@ -23,8 +23,8 @@
 // merits rather than inheriting the earlier answer from the cache.
 //
 // Every test here drives whole executions through the authorizer and asserts on
-// the Endpoint Security response. No test flushes the cache: correct
-// enforcement must not depend on a global flush or a daemon restart.
+// the Endpoint Security response. Contextual decisions re-evaluate without a
+// flush. Administrative updates exercise the daemon's cache invalidation.
 
 #include <EndpointSecurity/EndpointSecurity.h>
 #import <OCMock/OCMock.h>
@@ -53,6 +53,8 @@
 #import "Source/santad/EventProviders/SNTEndpointSecurityAuthorizer.h"
 #include "Source/santad/ProcessControl.h"
 #import "Source/santad/SNTCompilerController.h"
+#import "Source/santad/SNTDaemonControlController.h"
+#import "Source/santad/SNTDatabaseController.h"
 #import "Source/santad/SNTDecisionCache.h"
 #import "Source/santad/SNTExecutionController.h"
 #import "Source/santad/SNTPolicyProcessor.h"
@@ -68,6 +70,13 @@ using santa::Message;
 - (void)processMessage:(Message)msg;
 @end
 
+static NSString* const kCompilerSHA256 =
+    @"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+static NSString* const kCompilerCDHash = @"0000000000000000000000000000000000000000";
+static NSString* const kCompilerSigningID = @"ABCDEFGHIJ:com.example.compiler";
+static NSString* const kOtherSHA256 =
+    @"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+
 // Only argv differs between the matching and the non-matching invocation.
 static NSString* const kCompilerCELExpr =
     @"size(args) > 1 && args[1] == '--build' ? ALLOWLIST_COMPILER : BLOCKLIST";
@@ -81,6 +90,10 @@ static const std::vector<std::string> kBlockedArgs = {"clang", "--link"};
 @property(readwrite) SNTRuleState state;
 @property(readwrite) SNTRuleType type;
 @property(readwrite) NSString* celExpr;
+@end
+
+@interface SNTRuleTable (Testing)
++ (NSArray<NSString*>*)criticalSystemBinaryPaths;
 @end
 
 @interface CompilerAuthorizationScopeTest : XCTestCase
@@ -125,10 +138,12 @@ static const std::vector<std::string> kBlockedArgs = {"clang", "--link"};
       .ignoringNonObjectArgs()
       .andReturn(self.mockFileInfo);
   OCMStub([self.mockFileInfo isMachO]).andReturn(YES);
-  OCMStub([self.mockFileInfo SHA256]).andReturn(@"a");
+  OCMStub([self.mockFileInfo SHA256]).andReturn(kCompilerSHA256);
+  __weak CompilerAuthorizationScopeTest* weakSelf = self;
   OCMStub([self.mockFileInfo codesignCheckerWithError:[OCMArg setTo:nil]])
       .andDo(^(NSInvocation* inv) {
-        self->_staticValidationCount++;
+        CompilerAuthorizationScopeTest* test = weakSelf;
+        if (test) test->_staticValidationCount++;
       })
       .andReturn(self.mockCodesignChecker);
 
@@ -150,14 +165,18 @@ static const std::vector<std::string> kBlockedArgs = {"clang", "--link"};
   // authority.
   self.mockCompilerController = OCMStrictClassMock([SNTCompilerController class]);
 
+  [self configureExecutionWithRuleTable:self.mockRuleDatabase];
+}
+
+- (void)configureExecutionWithRuleTable:(SNTRuleTable*)ruleTable {
   std::shared_ptr<santa::EntitlementsFilter> entitlementsFilter =
       santa::EntitlementsFilter::Create(@[], @[]);
   SNTPolicyProcessor* policyProcessor =
-      [[SNTPolicyProcessor alloc] initWithRuleTable:self.mockRuleDatabase
+      [[SNTPolicyProcessor alloc] initWithRuleTable:ruleTable
                                  entitlementsFilter:entitlementsFilter];
 
   self.execController = [[SNTExecutionController alloc]
-           initWithRuleTable:self.mockRuleDatabase
+           initWithRuleTable:ruleTable
                   eventTable:self.mockEventDatabase
                notifierQueue:nil
                   syncdQueue:nil
@@ -208,11 +227,20 @@ static const std::vector<std::string> kBlockedArgs = {"clang", "--link"};
 - (es_auth_result_t)runExecWithArgs:(std::vector<std::string>)args
                                 dev:(uint64_t)dev
                                 ino:(uint64_t)ino {
+  return [self runExecWithArgs:args dev:dev ino:ino pid:12];
+}
+
+- (es_auth_result_t)runExecWithArgs:(std::vector<std::string>)args
+                                dev:(uint64_t)dev
+                                ino:(uint64_t)ino
+                                pid:(pid_t)pid {
   es_file_t file = MakeESFile("instigator");
   es_process_t proc = MakeESProcess(&file);
   es_file_t fileExec = MakeESFile("clang", {.st_dev = (dev_t)dev, .st_ino = ino});
-  es_process_t procExec = MakeESProcess(&fileExec, MakeAuditToken(12, 23), MakeAuditToken(34, 45));
+  es_process_t procExec = MakeESProcess(&fileExec, MakeAuditToken(pid, 23), MakeAuditToken(34, 45));
   procExec.is_platform_binary = false;
+  procExec.signing_id = MakeESStringToken("com.example.compiler");
+  procExec.team_id = MakeESStringToken("ABCDEFGHIJ");
   procExec.codesigning_flags = CS_SIGNED | CS_VALID | CS_KILL;
   es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_AUTH_EXEC, &proc, ActionType::Auth);
   esMsg.event.exec.target = &procExec;
@@ -294,6 +322,135 @@ static const std::vector<std::string> kBlockedArgs = {"clang", "--link"};
   XCTAssertEqual([self runExecWithArgs:kAuthorizedArgs dev:12 ino:34], ES_AUTH_RESULT_ALLOW);
 
   XCTAssertTrue(OCMVerifyAll(self.mockCompilerController));
+}
+
+// Rule matching, persistence, policy evaluation and invalidation are real. Only
+// host identity/ES inputs and the compiler-mark sink use the fixture's mocks.
+- (void)testAdministrativeRuleUpdatesReevaluateCompilerPermission {
+  OCMStub([self.mockRuleDatabase criticalSystemBinaryPaths]).andReturn(@[]);
+  SNTRuleTable* ruleTable =
+      [[SNTRuleTable alloc] initWithDatabaseQueue:[[FMDatabaseQueue alloc] init]];
+  [self configureExecutionWithRuleTable:ruleTable];
+
+  id mockDatabaseController = OCMClassMock([SNTDatabaseController class]);
+  OCMStub([mockDatabaseController ruleTable]).andReturn(ruleTable);
+  [self addTeardownBlock:^{
+    [mockDatabaseController stopMocking];
+  }];
+
+  auto cache = _authResultCache;
+  SNTDaemonControlController* daemon = [[SNTDaemonControlController alloc]
+      initWithNotificationQueue:nil
+                     syncdQueue:nil
+              netExtensionQueue:nil
+                         logger:nullptr
+                     watchItems:nullptr
+            sandboxExpectations:std::make_shared<santa::SandboxExpectations>()
+                flushCacheBlock:^(santa::FlushCacheMode mode, santa::FlushCacheReason reason) {
+                  cache->FlushCache(mode, reason);
+                }
+                cacheCountBlock:nil
+                checkCacheBlock:nil
+             metricsExportBlock:nil
+         binaryUploadController:nullptr];
+
+  void (^addRules)(NSArray<SNTRule*>*, SNTRuleCleanup) =
+      ^(NSArray<SNTRule*>* rules, SNTRuleCleanup cleanup) {
+        __block BOOL replied = NO;
+        [daemon databaseRuleAddExecutionRules:rules
+                              fileAccessRules:@[]
+                             networkFlowRules:@[]
+                                      signals:@[]
+                                  ruleCleanup:cleanup
+                                       source:SNTRuleAddSourceSyncService
+                                        reply:^(BOOL success, NSArray<NSError*>* errors) {
+                                          XCTAssertTrue(success);
+                                          XCTAssertEqual(errors.count, 0);
+                                          replied = YES;
+                                        }];
+        XCTAssertTrue(replied);
+      };
+
+  NSMutableArray<NSNumber*>* compilerPids = [NSMutableArray array];
+  OCMStub([self.mockCompilerController setProcess:MakeAuditToken(0, 0) isCompiler:true])
+      .ignoringNonObjectArgs()
+      .andDo(^(NSInvocation* inv) {
+        const audit_token_t* token;
+        bool isCompiler;
+        [inv getArgument:&token atIndex:2];
+        [inv getArgument:&isCompiler atIndex:3];
+        XCTAssertTrue(isCompiler);
+        [compilerPids addObject:@(audit_token_to_pid(*token))];
+      });
+
+  const struct {
+    SNTRuleType compilerType;
+    SNTRuleState compilerState;
+    SNTRuleType newAllowType;
+    bool remainsCompiler;
+  } cases[] = {
+      {SNTRuleTypeSigningID, SNTRuleStateAllowCompiler, SNTRuleTypeBinary, false},
+      {SNTRuleTypeSigningID, SNTRuleStateAllowCompiler, SNTRuleTypeCDHash, false},
+      {SNTRuleTypeBinary, SNTRuleStateAllowCompiler, SNTRuleTypeCDHash, false},
+      {SNTRuleTypeBinary, SNTRuleStateAllowCompiler, SNTRuleTypeBinary, false},
+      {SNTRuleTypeBinary, SNTRuleStateCEL, SNTRuleTypeBinary, false},
+      {SNTRuleTypeBinary, SNTRuleStateCELv2, SNTRuleTypeBinary, false},
+      {SNTRuleTypeSigningID, SNTRuleStateAllowCompiler, SNTRuleTypeBinary, true},
+  };
+  NSDictionary<NSNumber*, NSString*>* identifiers = @{
+    @(SNTRuleTypeCDHash) : kCompilerCDHash,
+    @(SNTRuleTypeBinary) : kCompilerSHA256,
+    @(SNTRuleTypeSigningID) : kCompilerSigningID,
+  };
+  santa::ExecTarget probe{};
+  probe.key.vnode = SantaVnode{.fsid = 12, .fileid = 34};
+
+  pid_t pid = 100;
+  for (const auto& testCase : cases) {
+    [compilerPids removeAllObjects];
+    NSString* expression =
+        (testCase.compilerState == SNTRuleStateCEL || testCase.compilerState == SNTRuleStateCELv2)
+            ? @"ALLOWLIST_COMPILER"
+            : nil;
+    SNTRule* compilerRule =
+        [[SNTRule alloc] initWithIdentifier:identifiers[@(testCase.compilerType)]
+                                      state:testCase.compilerState
+                                       type:testCase.compilerType
+                                  customMsg:nil
+                                  customURL:nil
+                      eventDetailButtonText:nil
+                                    celExpr:expression
+                             seatbeltPolicy:nil
+                                     ruleId:0];
+    XCTAssertNotNil(compilerRule);
+    addRules(@[ compilerRule ], SNTRuleCleanupAll);
+
+    pid_t warmPid = pid++;
+    XCTAssertEqual([self runExecWithArgs:kAuthorizedArgs dev:12 ino:34 pid:warmPid],
+                   ES_AUTH_RESULT_ALLOW);
+    XCTAssertEqualObjects(compilerPids, (@[ @(warmPid) ]));
+    XCTAssertEqual(cache->CheckCache(probe).action, SNTActionRespondAllowCompiler);
+
+    SNTRule* allowRule = [[SNTRule alloc]
+        initWithIdentifier:testCase.remainsCompiler ? kOtherSHA256
+                                                    : identifiers[@(testCase.newAllowType)]
+                     state:SNTRuleStateAllow
+                      type:testCase.newAllowType];
+    addRules(@[ allowRule ], SNTRuleCleanupNone);
+
+    pid_t freshPid = pid++;
+    int validationsBeforeExec = _staticValidationCount;
+    XCTAssertEqual([self runExecWithArgs:kAuthorizedArgs dev:12 ino:34 pid:freshPid],
+                   ES_AUTH_RESULT_ALLOW);
+    NSArray<NSNumber*>* expectedCompilerPids =
+        testCase.remainsCompiler ? @[ @(warmPid), @(freshPid) ] : @[ @(warmPid) ];
+    XCTAssertEqualObjects(compilerPids, expectedCompilerPids);
+    XCTAssertEqual(cache->CheckCache(probe).action, testCase.remainsCompiler
+                                                        ? SNTActionRespondAllowCompiler
+                                                        : SNTActionRespondAllow);
+    XCTAssertGreaterThan(_staticValidationCount, validationsBeforeExec,
+                         @"the administrative update must cause a fresh policy evaluation");
+  }
 }
 
 @end

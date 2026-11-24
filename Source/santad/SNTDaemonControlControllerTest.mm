@@ -32,8 +32,14 @@
 #import "Source/common/SNTRule.h"
 #import "Source/common/SNTRuleIdentifiers.h"
 #import "Source/common/SNTSandboxExecRequest.h"
+#import "Source/common/SNTStoredExecutionEvent.h"
+#import "Source/common/SNTTemporaryAdminPolicy.h"
+#import "Source/common/SNTXPCNotifierInterface.h"
+#import "Source/santad/DataLayer/SNTEventTable.h"
 #import "Source/santad/DataLayer/SNTRuleTable.h"
+#include "Source/santad/Logs/EndpointSecurity/MockLogger.h"
 #import "Source/santad/SNTDatabaseController.h"
+#import "Source/santad/SNTNotificationQueue.h"
 #include "Source/santad/SandboxExpectations.h"
 
 using santa::SandboxExpectations;
@@ -44,11 +50,12 @@ static NSString* const kBinarySHA256 =
     @"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 static NSString* const kTeamID = @"ABCDEFGHIJ";
 static NSString* const kSigningID = @"ABCDEFGHIJ:com.example.tool";
+static NSString* const kCDHash = @"0102030405060708090a0b0c0d0e0f1011121314";
 
-// Expose seatbeltPolicy readwrite so tests can simulate the (technically
-// unreachable-from-prod) "SEATBELT rule with empty policy" state.
+// Expose rule fields so tests can exercise invalid policies and expressions.
 @interface SNTRule ()
 @property(readwrite) NSString* seatbeltPolicy;
+@property(readwrite) NSString* celExpr;
 @end
 
 // Expose the bundle's private backing properties so tests can build a bundle
@@ -57,6 +64,8 @@ static NSString* const kSigningID = @"ABCDEFGHIJ:com.example.tool";
 @property NSNumber* clientMode;
 @property NSNumber* executableIntegrityPolicy;
 @property NSNumber* disableExecutableIntegrityRecheck;
+@property NSString* bannedBlockMessage;
+@property NSString* unknownBlockMessage;
 @property NSString* bannedUSBBlockMessage;
 @property NSString* remountUSBBlockMessage;
 @end
@@ -65,12 +74,14 @@ static NSString* const kSigningID = @"ABCDEFGHIJ:com.example.tool";
 - (BOOL)shouldRejectManualRuleChangeAddingRules:(BOOL)addingRules;
 @property(readonly) dispatch_queue_t binaryUploadQ;
 @property(readonly) dispatch_queue_t packageInventoryQ;
+@property(copy) void (^flushCacheBlock)(santa::FlushCacheMode, santa::FlushCacheReason);
 @end
 
 @interface SNTDaemonControlControllerTest : XCTestCase
 @property id mockDatabaseController;
 @property id mockRuleTable;
 @property id mockMOLXPC;
+@property id mockRuleConfigurator;
 @property SNTDaemonControlController* sut;
 @end
 
@@ -92,10 +103,14 @@ static NSString* const kSigningID = @"ABCDEFGHIJ:com.example.tool";
   // connection is currently dispatching (the default in unit tests).
   self.mockMOLXPC = OCMClassMock([MOLXPCConnection class]);
 
-  self.sut = [[SNTDaemonControlController alloc] initWithNotificationQueue:nil
+  self.sut = [self controllerWithLogger:nullptr];
+}
+
+- (SNTDaemonControlController*)controllerWithLogger:(std::shared_ptr<santa::Logger>)logger {
+  return [[SNTDaemonControlController alloc] initWithNotificationQueue:nil
       syncdQueue:nil
       netExtensionQueue:nil
-      logger:nullptr
+      logger:logger
       watchItems:nullptr
       sandboxExpectations:_sandboxExpectations
       flushCacheBlock:^(santa::FlushCacheMode, santa::FlushCacheReason) {
@@ -111,12 +126,43 @@ static NSString* const kSigningID = @"ABCDEFGHIJ:com.example.tool";
       binaryUploadController:nullptr];
 }
 
+- (void)testSyncBundleEventStoresTheBundleHashedEvent {
+  // A real logger, because syncBundleEvent: logs the related events.
+  SNTDaemonControlController* sut = [self controllerWithLogger:std::make_shared<MockLogger>()];
+  SNTEventTable* mockEventTable = OCMClassMock([SNTEventTable class]);
+  OCMStub([self.mockDatabaseController eventTable]).andReturn(mockEventTable);
+
+  SNTStoredExecutionEvent* event = [[SNTStoredExecutionEvent alloc] init];
+  event.fileSHA256 = @"abc123";
+  event.fileBundleHash = @"bundlehash";
+  OCMExpect([mockEventTable storeBundleHashedEvent:event]);
+
+  [sut syncBundleEvent:event relatedEvents:@[]];
+
+  OCMVerifyAll((id)mockEventTable);
+}
+
 - (void)tearDown {
   self.sut = nil;
   [self.mockDatabaseController stopMocking];
   [self.mockRuleTable stopMocking];
   [self.mockMOLXPC stopMocking];
+  [self.mockRuleConfigurator stopMocking];
   [super tearDown];
+}
+
+- (SNTRuleTable*)useInMemoryRuleTable {
+  // Keep database initialization independent of the host's managed configuration.
+  self.mockRuleConfigurator = OCMClassMock([SNTConfigurator class]);
+  OCMStub([self.mockRuleConfigurator configurator]).andReturn(self.mockRuleConfigurator);
+  [self.mockRuleTable stopMocking];
+  self.mockRuleTable = nil;
+  SNTRuleTable* ruleTable =
+      [[SNTRuleTable alloc] initWithDatabaseQueue:[[FMDatabaseQueue alloc] init]];
+  [self.mockDatabaseController stopMocking];
+  self.mockDatabaseController = OCMClassMock([SNTDatabaseController class]);
+  OCMStub([self.mockDatabaseController ruleTable]).andReturn(ruleTable);
+  return ruleTable;
 }
 
 // Build a request with valid shape: identifiers set.
@@ -358,6 +404,205 @@ static NSString* const kSigningID = @"ABCDEFGHIJ:com.example.tool";
   XCTAssertEqual(forwarded.count, 1u);
   XCTAssertEqualObjects(forwarded.firstObject.ruleName, @"rule-101");
   XCTAssertEqual(forwarded.firstObject.ruleId, 101);
+}
+
+- (void)testExecutionRuleUpdatesInvalidateAfterCommitBeforeReply {
+  using santa::FlushCacheMode;
+  using santa::FlushCacheReason;
+  SNTRuleTable* ruleTable = [self useInMemoryRuleTable];
+  auto makeRule = [](SNTRuleType type, SNTRuleState state) {
+    NSString* identifier = type == SNTRuleTypeBinary   ? kBinarySHA256
+                           : type == SNTRuleTypeCDHash ? kCDHash
+                                                       : kSigningID;
+    return
+        [[SNTRule alloc] initWithIdentifier:identifier
+                                      state:state
+                                       type:type
+                                  customMsg:nil
+                                  customURL:nil
+                      eventDetailButtonText:nil
+                                  timestamp:0
+                                    comment:nil
+                                    celExpr:(state == SNTRuleStateCEL || state == SNTRuleStateCELv2)
+                                                ? @"ALLOWLIST_COMPILER"
+                                                : nil
+                             seatbeltPolicy:nil
+                                     ruleId:0
+                                      error:nil];
+  };
+  const struct {
+    SNTRuleType oldType;
+    SNTRuleState oldState;
+    SNTRuleType newType;
+    SNTRuleState newState;
+    FlushCacheMode mode;
+  } cases[] = {
+      {SNTRuleTypeSigningID, SNTRuleStateAllowCompiler, SNTRuleTypeBinary, SNTRuleStateAllow,
+       FlushCacheMode::kCompilerDecisionsOnly},
+      {SNTRuleTypeSigningID, SNTRuleStateAllowCompiler, SNTRuleTypeCDHash, SNTRuleStateAllow,
+       FlushCacheMode::kCompilerDecisionsOnly},
+      {SNTRuleTypeBinary, SNTRuleStateAllowCompiler, SNTRuleTypeCDHash, SNTRuleStateAllow,
+       FlushCacheMode::kCompilerDecisionsOnly},
+      {SNTRuleTypeBinary, SNTRuleStateAllowCompiler, SNTRuleTypeBinary, SNTRuleStateAllow,
+       FlushCacheMode::kCompilerDecisionsOnly},
+      {SNTRuleTypeBinary, SNTRuleStateCEL, SNTRuleTypeBinary, SNTRuleStateAllow,
+       FlushCacheMode::kCompilerDecisionsOnly},
+      {SNTRuleTypeSigningID, SNTRuleStateCELv2, SNTRuleTypeSigningID, SNTRuleStateAllow,
+       FlushCacheMode::kCompilerDecisionsOnly},
+      {SNTRuleTypeBinary, SNTRuleStateBlock, SNTRuleTypeBinary, SNTRuleStateBlock,
+       FlushCacheMode::kCompilerDecisionsOnly},
+      {SNTRuleTypeBinary, SNTRuleStateAllow, SNTRuleTypeBinary, SNTRuleStateBlock,
+       FlushCacheMode::kAllCaches},
+      {SNTRuleTypeBinary, SNTRuleStateAllowCompiler, SNTRuleTypeBinary, SNTRuleStateRemove,
+       FlushCacheMode::kAllCaches},
+  };
+  for (const auto& testCase : cases) {
+    NSArray<NSError*>* errors;
+    XCTAssertTrue([ruleTable addExecutionRules:@[ makeRule(testCase.oldType, testCase.oldState) ]
+                                   ruleCleanup:SNTRuleCleanupAll
+                                        errors:&errors]);
+    XCTAssertNil(errors);
+    SNTRule* newRule = makeRule(testCase.newType, testCase.newState);
+    __block NSUInteger flushCount = 0;
+    __block BOOL replied = NO;
+    self.sut.flushCacheBlock = ^(FlushCacheMode mode, FlushCacheReason reason) {
+      ++flushCount;
+      XCTAssertFalse(replied);
+      XCTAssertEqual(mode, testCase.mode);
+      XCTAssertEqual(reason, FlushCacheReason::kRulesChanged);
+      SNTRule* stored = [ruleTable executionRuleForIdentifiers:{.cdhash = kCDHash,
+                                                                .binarySHA256 = kBinarySHA256,
+                                                                .signingID = kSigningID}];
+      if (testCase.newState == SNTRuleStateRemove) {
+        XCTAssertNil(stored);
+      } else {
+        XCTAssertEqual(stored.type, newRule.type);
+        XCTAssertEqual(stored.state, newRule.state);
+        XCTAssertEqualObjects(stored.identifier, newRule.identifier);
+      }
+    };
+    [self.sut databaseRuleAddExecutionRules:@[ newRule ]
+                            fileAccessRules:@[]
+                           networkFlowRules:@[]
+                                    signals:@[]
+                                ruleCleanup:SNTRuleCleanupNone
+                                     source:SNTRuleAddSourceSyncService
+                                      reply:^(BOOL success, NSArray<NSError*>* writeErrors) {
+                                        XCTAssertTrue(success);
+                                        XCTAssertNil(writeErrors);
+                                        XCTAssertEqual(flushCount, 1u);
+                                        replied = YES;
+                                      }];
+    XCTAssertTrue(replied);
+    XCTAssertEqual(flushCount, 1u);
+  }
+}
+
+- (void)testRuleUpdatesWithoutExecutionRulesKeepExistingFlushTriggers {
+  [self useInMemoryRuleTable];
+  const struct {
+    NSArray<SNTFileAccessRule*>* fileAccessRules;
+    NSArray<SNTNetworkFlowRule*>* networkRules;
+    NSArray<SNTSignal*>* signals;
+    SNTRuleCleanup cleanup;
+    BOOL flush;
+    BOOL success;
+  } cases[] = {
+      {@[], @[], @[], SNTRuleCleanupNone, NO, NO},
+      {@[ [[SNTFileAccessRule alloc] initRemoveRuleWithName:@"unused"] ], @[], @[],
+       SNTRuleCleanupNone, YES, YES},
+      {@[], @[ [[SNTNetworkFlowRule alloc] initRemoveRuleWithName:@"unused"] ], @[],
+       SNTRuleCleanupNone, NO, YES},
+      {@[], @[], @[ [[SNTSignal alloc] initRemoveRuleWithName:@"unused"] ], SNTRuleCleanupNone, NO,
+       YES},
+      {@[], @[], @[], SNTRuleCleanupAll, YES, YES},
+  };
+  for (const auto& testCase : cases) {
+    __block NSUInteger flushCount = 0;
+    self.sut.flushCacheBlock = ^(santa::FlushCacheMode mode, santa::FlushCacheReason reason) {
+      ++flushCount;
+      XCTAssertEqual(mode, santa::FlushCacheMode::kAllCaches);
+      XCTAssertEqual(reason, santa::FlushCacheReason::kRulesChanged);
+    };
+    __block BOOL replied = NO;
+    [self.sut databaseRuleAddExecutionRules:@[]
+                            fileAccessRules:testCase.fileAccessRules
+                           networkFlowRules:testCase.networkRules
+                                    signals:testCase.signals
+                                ruleCleanup:testCase.cleanup
+                                     source:SNTRuleAddSourceSyncService
+                                      reply:^(BOOL success, NSArray<NSError*>* errors) {
+                                        XCTAssertEqual(success, testCase.success);
+                                        if (success) {
+                                          XCTAssertNil(errors);
+                                        } else {
+                                          XCTAssertEqual(errors.count, 1u);
+                                          XCTAssertEqual(errors.firstObject.code,
+                                                         SNTErrorCodeEmptyRuleArray);
+                                        }
+                                        XCTAssertEqual(flushCount, testCase.flush ? 1u : 0u);
+                                        replied = YES;
+                                      }];
+    XCTAssertTrue(replied);
+  }
+}
+
+- (void)testFailedAndPartiallyAcceptedUpdatesStillInvalidate {
+  using santa::FlushCacheMode;
+  SNTRuleTable* ruleTable = [self useInMemoryRuleTable];
+  SNTRule* oldRule = [self binaryRuleWithState:SNTRuleStateAllowCompiler seatbeltPolicy:nil];
+  SNTRule* allowRule = [self binaryRuleWithState:SNTRuleStateAllow seatbeltPolicy:nil];
+  SNTRule* blockRule = [self binaryRuleWithState:SNTRuleStateBlock seatbeltPolicy:nil];
+  SNTRule* invalidCEL = [self binaryRuleWithState:SNTRuleStateCEL seatbeltPolicy:nil];
+  invalidCEL.celExpr = @"(";
+  SNTNetworkFlowRule* invalidNetwork =
+      [[SNTNetworkFlowRule alloc] initAddRuleWithName:@"invalid" ruleId:1 protoBlob:[NSData data]];
+  const struct {
+    NSArray<SNTRule*>* executionRules;
+    NSArray<SNTNetworkFlowRule*>* networkRules;
+    BOOL success;
+    SNTErrorCode error;
+    SNTRuleState storedState;
+    FlushCacheMode mode;
+  } cases[] = {
+      {@[ allowRule ], @[ invalidNetwork ], NO, SNTErrorCodeRuleInvalid, SNTRuleStateAllowCompiler,
+       FlushCacheMode::kCompilerDecisionsOnly},
+      {@[ blockRule ], @[ invalidNetwork ], NO, SNTErrorCodeRuleInvalid, SNTRuleStateAllowCompiler,
+       FlushCacheMode::kAllCaches},
+      {@[ allowRule, invalidCEL ], @[], YES, SNTErrorCodeRuleInvalidCELExpression,
+       SNTRuleStateAllow, FlushCacheMode::kAllCaches},
+  };
+  for (const auto& testCase : cases) {
+    NSArray<NSError*>* errors;
+    XCTAssertTrue([ruleTable addExecutionRules:@[ oldRule ]
+                                   ruleCleanup:SNTRuleCleanupAll
+                                        errors:&errors]);
+    XCTAssertNil(errors);
+    __block NSUInteger flushCount = 0;
+    self.sut.flushCacheBlock = ^(FlushCacheMode mode, santa::FlushCacheReason reason) {
+      ++flushCount;
+      XCTAssertEqual(mode, testCase.mode);
+      XCTAssertEqual(reason, santa::FlushCacheReason::kRulesChanged);
+      SNTRule* stored = [ruleTable executionRuleForIdentifiers:{.binarySHA256 = kBinarySHA256}];
+      XCTAssertEqual(stored.state, testCase.storedState);
+    };
+    __block BOOL replied = NO;
+    [self.sut
+        databaseRuleAddExecutionRules:testCase.executionRules
+                      fileAccessRules:@[]
+                     networkFlowRules:testCase.networkRules
+                              signals:@[]
+                          ruleCleanup:SNTRuleCleanupNone
+                               source:SNTRuleAddSourceSyncService
+                                reply:^(BOOL success, NSArray<NSError*>* writeErrors) {
+                                  XCTAssertEqual(success, testCase.success);
+                                  XCTAssertEqual(writeErrors.count, 1u);
+                                  XCTAssertEqual(writeErrors.firstObject.code, testCase.error);
+                                  XCTAssertEqual(flushCount, 1u);
+                                  replied = YES;
+                                }];
+    XCTAssertTrue(replied);
+  }
 }
 
 // ---- databaseRulesHash: returns four hashes --------------------------
@@ -643,6 +888,26 @@ static NSString* const kSigningID = @"ABCDEFGHIJ:com.example.tool";
   }
 }
 
+- (void)testUpdateSyncSettingsAppliesBlockMessages {
+  id cfg = [self mockConfiguratorForSyncSettings];
+  OCMExpect([cfg setSyncServerBannedBlockMessage:@"Ask IT before installing apps"]);
+  OCMExpect([cfg setSyncServerUnknownBlockMessage:@"Request approval for new apps"]);
+
+  SNTConfigBundle* bundle = [[SNTConfigBundle alloc] init];
+  bundle.bannedBlockMessage = @"Ask IT before installing apps";
+  bundle.unknownBlockMessage = @"Request approval for new apps";
+
+  __block BOOL replied = NO;
+  [self.sut updateSyncSettings:bundle
+                         reply:^{
+                           replied = YES;
+                         }];
+
+  XCTAssertTrue(replied);
+  OCMVerifyAll(cfg);
+  [cfg stopMocking];
+}
+
 - (void)testUpdateSyncSettingsAppliesUSBBlockMessages {
   id cfg = [self mockConfiguratorForSyncSettings];
   OCMExpect([cfg setSyncServerBannedUSBBlockMessage:@"USB storage is blocked"]);
@@ -666,6 +931,8 @@ static NSString* const kSigningID = @"ABCDEFGHIJ:com.example.tool";
 
 - (void)testUpdateSyncSettingsWithoutUSBBlockMessagesLeavesThemAlone {
   id cfg = [self mockConfiguratorForSyncSettings];
+  OCMReject([cfg setSyncServerBannedBlockMessage:[OCMArg any]]);
+  OCMReject([cfg setSyncServerUnknownBlockMessage:[OCMArg any]]);
   OCMReject([cfg setSyncServerBannedUSBBlockMessage:[OCMArg any]]);
   OCMReject([cfg setSyncServerRemountUSBBlockMessage:[OCMArg any]]);
   // The bundle still carries another key, so the batch demonstrably ran.
@@ -683,6 +950,173 @@ static NSString* const kSigningID = @"ABCDEFGHIJ:com.example.tool";
   XCTAssertTrue(replied);
   OCMVerifyAll(cfg);
   [cfg stopMocking];
+}
+
+#pragma mark - Temporary Admin Mode: requester / approver binding
+
+// An audit token whose uid fields all name `uid`. MakeStubAuditToken only sets
+// pid/pidversion, which reads as euid 0 and is refused as "already an
+// administrator" before any prompt.
+static audit_token_t MakeAuditTokenForUID(uid_t uid, pid_t pid) {
+  return audit_token_t{
+      .val = {uid, uid, 20, uid, 20, (unsigned int)pid, 100, 1},
+  };
+}
+
+// A uid that no account on a developer machine resolves to, so the real
+// admin-group read in RequestMinutes answers "not a member" and the request
+// reaches the authorization step.
+static const uid_t kUnknownLocalUser = 0x7fff1001;
+
+- (id)mockConfiguratorWithOnDemandAdminPolicy {
+  id cfg = OCMClassMock([SNTConfigurator class]);
+  OCMStub([cfg configurator]).andReturn(cfg);
+  OCMStub([cfg temporaryAdminPolicy])
+      .andReturn([[SNTTemporaryAdminPolicy alloc] initOnDemandMinutes:60
+                                                      defaultDuration:5
+                                                 requireJustification:NO]);
+  OCMStub([cfg isSyncV2Enabled]).andReturn(YES);
+  OCMStub([cfg syncBaseURL]).andReturn([NSURL URLWithString:@"https://foo.workshop.cloud"]);
+  return cfg;
+}
+
+- (SNTDaemonControlController*)controllerWithNotificationQueue:(SNTNotificationQueue*)queue {
+  return [[SNTDaemonControlController alloc] initWithNotificationQueue:queue
+      syncdQueue:nil
+      netExtensionQueue:nil
+      logger:nullptr
+      watchItems:nullptr
+      sandboxExpectations:_sandboxExpectations
+      flushCacheBlock:^(santa::FlushCacheMode, santa::FlushCacheReason) {
+      }
+      cacheCountBlock:^NSArray<NSNumber*>*() {
+        return @[];
+      }
+      checkCacheBlock:^SNTAction(SantaVnode) {
+        return SNTActionRespondAllow;
+      }
+      metricsExportBlock:^(void (^)(BOOL)) {
+      }
+      binaryUploadController:nullptr];
+}
+
+// A GUI notifier that records whether it was asked to authorize Admin Mode and
+// always denies, so no test can reach the real admin-group write even on a
+// build where the request is wrongly let through.
+- (id)denyingNotifierRecordingAsked:(BOOL*)asked {
+  id notifier = OCMProtocolMock(@protocol(SNTNotifierXPC));
+  OCMStub([notifier authorizeTemporaryAdminModeRequiringJustification:NO reply:[OCMArg any]])
+      .andDo(^(NSInvocation* inv) {
+        *asked = YES;
+        __unsafe_unretained void (^reply)(BOOL, NSString*) = nil;
+        [inv getArgument:&reply atIndex:3];
+        reply(NO, @"");
+      });
+  return notifier;
+}
+
+- (SNTNotificationQueue*)queueWithNotifierConnection:(id)connection ownerUID:(uid_t)uid {
+  SNTNotificationQueue* queue = [[SNTNotificationQueue alloc]
+      initWithRingBuffer:std::make_unique<santa::RingBuffer<NSMutableDictionary*>>(3)];
+  [queue setNotifierConnection:connection ownerUID:uid];
+  return queue;
+}
+
+// The notifier connection. Reuses the one MOLXPCConnection class mock: a second
+// class mock of the same class would take over its class-method stubs, and the
+// peer audit token stub with them.
+- (id)connectionVendingNotifier:(id)notifier {
+  OCMStub([self.mockMOLXPC synchronousRemoteObjectProxy]).andReturn(notifier);
+  OCMStub([self.mockMOLXPC remoteObjectProxy]).andReturn(notifier);
+  return self.mockMOLXPC;
+}
+
+// The daemon elevates the uid of the XPC peer that sent the request, and the
+// authorization prompt is shown by the GUI registered in one user's session. A
+// request from any other uid is refused before that GUI is asked.
+- (void)testTemporaryAdminModeRequestFromAnotherUserIsRefusedBeforeTheGUIIsAsked {
+  // Stays active until the test ends; OCMock stops the class mock itself.
+  id cfg __attribute__((unused)) = [self mockConfiguratorWithOnDemandAdminPolicy];
+
+  // The GUI registered from the console user's session (uid 501).
+  BOOL guiAsked = NO;
+  id notifierConn = [self connectionVendingNotifier:[self denyingNotifierRecordingAsked:&guiAsked]];
+  SNTDaemonControlController* dc = [self
+      controllerWithNotificationQueue:[self queueWithNotifierConnection:notifierConn ownerUID:501]];
+
+  // The request arrives from a different, non-admin local account.
+  audit_token_t tok = MakeAuditTokenForUID(kUnknownLocalUser, 4242);
+  OCMStub([self.mockMOLXPC currentPeerAuditToken]).andReturn(tok);
+
+  __block uint32_t gotMinutes = 99;
+  __block NSError* gotErr = nil;
+  [dc requestTemporaryAdminModeWithDurationMinutes:@5
+                                             reply:^(uint32_t minutes, NSError* err) {
+                                               gotMinutes = minutes;
+                                               gotErr = err;
+                                             }];
+
+  XCTAssertFalse(guiAsked, @"the console user's GUI was asked to approve uid %u's request",
+                 kUnknownLocalUser);
+  XCTAssertEqual(gotMinutes, 0u);
+  XCTAssertEqual(gotErr.code, SNTErrorCodeTAMRequesterMismatch, @"%@", gotErr);
+
+  // The controller's timed sessions observe `cfg` through KVO, so it is torn down here, while
+  // the mock is still active.
+  dc = nil;
+}
+
+// The self-service case still works: the user whose session registered the GUI is the one
+// asking, so the GUI is asked. (The stub denies, so the real group write is never reached.)
+- (void)testTemporaryAdminModeRequestFromTheGUIOwnerReachesTheGUI {
+  id cfg __attribute__((unused)) = [self mockConfiguratorWithOnDemandAdminPolicy];
+
+  BOOL guiAsked = NO;
+  id notifierConn = [self connectionVendingNotifier:[self denyingNotifierRecordingAsked:&guiAsked]];
+  SNTDaemonControlController* dc =
+      [self controllerWithNotificationQueue:[self queueWithNotifierConnection:notifierConn
+                                                                     ownerUID:kUnknownLocalUser]];
+
+  audit_token_t tok = MakeAuditTokenForUID(kUnknownLocalUser, 4242);
+  OCMStub([self.mockMOLXPC currentPeerAuditToken]).andReturn(tok);
+
+  __block NSError* gotErr = nil;
+  [dc requestTemporaryAdminModeWithDurationMinutes:@5
+                                             reply:^(uint32_t minutes, NSError* err) {
+                                               gotErr = err;
+                                             }];
+
+  XCTAssertTrue(guiAsked);
+  XCTAssertEqual(gotErr.code, SNTErrorCodeTAMAuthFailed, @"%@", gotErr);
+
+  dc = nil;
+}
+
+// Registering the GUI listener records the registering peer's euid as the owner the prompts
+// will vouch for. (The connection to the dummy endpoint times out after two seconds; the
+// recording does not depend on it succeeding.)
+- (void)testSetNotificationListenerRecordsThePeerUIDAsTheNotifierOwner {
+  id queue = OCMClassMock([SNTNotificationQueue class]);
+  SNTDaemonControlController* dc = [self controllerWithNotificationQueue:queue];
+
+  audit_token_t tok = MakeAuditTokenForUID(501, 4242);
+  OCMStub([self.mockMOLXPC currentPeerAuditToken]).andReturn(tok);
+
+  [dc setNotificationListener:[NSXPCListener anonymousListener].endpoint];
+
+  OCMVerify([queue setNotifierConnection:[OCMArg isNotNil] ownerUID:501]);
+}
+
+// Without a peer audit token (the real currentPeerAuditToken returns a zeroed token when no XPC
+// connection is dispatching, as here), the connection is recorded with no owner rather than as
+// root's, so nothing relies on uid 0 being refused elsewhere.
+- (void)testSetNotificationListenerWithoutPeerTokenRecordsNoOwner {
+  id queue = OCMClassMock([SNTNotificationQueue class]);
+  SNTDaemonControlController* dc = [self controllerWithNotificationQueue:queue];
+
+  [dc setNotificationListener:[NSXPCListener anonymousListener].endpoint];
+
+  OCMVerify([queue setNotifierConnection:[OCMArg isNotNil] ownerUID:kSNTNotifierNoOwner]);
 }
 
 @end

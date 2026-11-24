@@ -23,6 +23,8 @@
 #include <sys/qos.h>
 
 #include <algorithm>
+#include <array>
+#include <cassert>
 #include <memory>
 #include <optional>
 #include <set>
@@ -63,6 +65,10 @@ using santa::Processor;
   dispatch_queue_t _authQueue;
   dispatch_queue_t _notifyQueue;
   Processor _processor;
+  // Next expected ES sequence numbers for this client. Only the ES handler
+  // block reads or writes these, and ES invokes it strictly serially.
+  std::array<uint64_t, ES_EVENT_TYPE_LAST> _nextSeqNum;
+  uint64_t _nextGlobalSeqNum;
 }
 
 - (instancetype)initWithESAPI:(std::shared_ptr<EndpointSecurityAPI>)esApi
@@ -74,6 +80,8 @@ using santa::Processor;
     _metrics = std::move(metrics);
     _configurator = [SNTConfigurator configurator];
     _processor = processor;
+    _nextSeqNum.fill(0);
+    _nextGlobalSeqNum = 0;
 
     // Default event processing budget is 80% of the deadline time
     _defaultBudget = 0.8;
@@ -142,17 +150,28 @@ using santa::Processor;
   }
 
   self->_esClient = self->_esApi->NewClient(^(es_client_t* c, Message esMsg) {
-    int64_t processingStart = clock_gettime_nsec_np(CLOCK_MONOTONIC);
+    uint64_t processingStart = mach_absolute_time();
 
-    // Update event stats BEFORE calling into the processor class to ensure
-    // sequence numbers are processed in order.
-    self->_metrics->UpdateEventStats(self->_processor, esMsg->event_type, esMsg->seq_num,
-                                     esMsg->global_seq_num);
+    // Check for drops BEFORE calling into the processor class. ES invokes this
+    // block strictly serially, so sequence numbers are processed in order.
+    es_event_type_t eventType = esMsg->event_type;
+    assert(eventType < ES_EVENT_TYPE_LAST);
+    if (eventType < ES_EVENT_TYPE_LAST) {
+      // A sequence number lower than expected counts as no drops; tracking
+      // resyncs to it below.
+      int64_t eventDrops = std::max<int64_t>(0, esMsg->seq_num - self->_nextSeqNum[eventType]);
+      int64_t globalDrops = std::max<int64_t>(0, esMsg->global_seq_num - self->_nextGlobalSeqNum);
+      self->_nextSeqNum[eventType] = esMsg->seq_num + 1;
+      self->_nextGlobalSeqNum = esMsg->global_seq_num + 1;
+      if (eventDrops > 0 || globalDrops > 0) {
+        self->_metrics->RecordDrops(self->_processor, eventType, eventDrops, globalDrops);
+      }
+    }
 
     if ([self handleContextMessage:esMsg]) {
-      int64_t processingEnd = clock_gettime_nsec_np(CLOCK_MONOTONIC);
+      int64_t processingNanos = MachTimeToNanos(mach_absolute_time() - processingStart);
       self->_metrics->SetEventMetrics(self->_processor, EventDisposition::kProcessed,
-                                      processingEnd - processingStart, esMsg->event_type);
+                                      processingNanos, esMsg->event_type);
       return;
     }
 
@@ -160,14 +179,14 @@ using santa::Processor;
     if ([self shouldHandleMessage:esMsg]) {
       [self handleMessage:std::move(esMsg)
           recordEventMetrics:^(EventDisposition disposition) {
-            int64_t processingEnd = clock_gettime_nsec_np(CLOCK_MONOTONIC);
-            self->_metrics->SetEventMetrics(self->_processor, disposition,
-                                            processingEnd - processingStart, event_type);
+            int64_t processingNanos = MachTimeToNanos(mach_absolute_time() - processingStart);
+            self->_metrics->SetEventMetrics(self->_processor, disposition, processingNanos,
+                                            event_type);
           }];
     } else {
-      int64_t processingEnd = clock_gettime_nsec_np(CLOCK_MONOTONIC);
-      self->_metrics->SetEventMetrics(self->_processor, EventDisposition::kDropped,
-                                      processingEnd - processingStart, event_type);
+      int64_t processingNanos = MachTimeToNanos(mach_absolute_time() - processingStart);
+      self->_metrics->SetEventMetrics(self->_processor, EventDisposition::kDropped, processingNanos,
+                                      event_type);
     }
   });
 

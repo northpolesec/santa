@@ -120,10 +120,16 @@
 ///
 - (SNTRule*)executionRuleForIdentifiers:(struct RuleIdentifiers)identifiers useCache:(BOOL)useCache;
 
+/// Insert a transitive Binary rule or refresh its timestamp without replacing configured rules.
+/// Returns YES if a row was written, or NO if a configured Binary rule prevented the write.
+/// Invalid input and database failures return NO and populate error. Other outcomes clear error.
+- (BOOL)addTransitiveRuleForSHA256:(NSString*)sha256 error:(NSError**)error;
+
 ///
 ///  Add an array of execution rules, file access rules, and network flow rules to the database.
 ///  All rules across all three types are applied within a single transaction; the transaction
 ///  is aborted if any rule fails to apply.
+///  Transitive execution rules must use addTransitiveRuleForSHA256:error: instead.
 ///
 ///  @param executionRules Array of SNTRule objects to add.
 ///  @param fileAccessRules Array of SNTFileAccessRule objects to add.
@@ -150,10 +156,9 @@
                    errors:(NSArray<NSError*>**)errors;
 
 ///
-///  Checks the given array of rules to see if adding any of them to the rules database would
-///  require the kernel's decision cache to be flushed.  This should happen if
-///     1. any of the rules is not a SNTRuleStateWhitelist
-///     2. a SNTRuleStateWhitelist rule is replacing a SNTRuleStateWhitelistCompiler rule.
+///  Checks whether a rule batch requires a full decision-cache flush because it removes rules
+///  or contains new or changed non-allow rules. Large non-allow batches flush conservatively.
+///  The daemon separately invalidates cached compiler decisions for other execution-rule updates.
 ///
 ///  @param rules Array of SNTRule that may be added to database.
 ///  @return YES if kernel cache should be flushed after adding the new rules.
