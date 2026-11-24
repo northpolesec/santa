@@ -198,6 +198,8 @@ static NSString* const kMachineIDPlistFileKey = @"MachineIDPlist";
 static NSString* const kMachineIDPlistKeyKey = @"MachineIDKey";
 
 static NSString* const kEnableStandalonePasswordFallbackKey = @"EnableStandalonePasswordFallback";
+static NSString* const kEnableStandaloneSecurityKeyAuthorizationKey =
+    @"EnableStandaloneSecurityKeyAuthorization";
 static NSString* const kEnableSilentModeKey = @"EnableSilentMode";
 static NSString* const kEnableSilentTTYModeKey = @"EnableSilentTTYMode";
 static NSString* const kAboutTextKey = @"AboutText";
@@ -423,6 +425,7 @@ static NSString* const kPushTokenChainKey = @"PushTokenChain";
       kAntiSuspendSigningIDsKey : array,
       kAllowDelegatedSignalsKey : number,
       kEnableStandalonePasswordFallbackKey : number,
+      kEnableStandaloneSecurityKeyAuthorizationKey : number,
       kEnableSilentModeKey : number,
       kEnableSilentTTYModeKey : number,
       kAboutTextKey : string,
@@ -664,6 +667,10 @@ static SNTConfigurator* sharedConfigurator = nil;
 }
 
 + (NSSet*)keyPathsForValuesAffectingEnableStandalonePasswordFallback {
+  return [self configStateSet];
+}
+
++ (NSSet*)keyPathsForValuesAffectingEnableStandaloneSecurityKeyAuthorization {
   return [self configStateSet];
 }
 
@@ -1425,6 +1432,11 @@ static SNTConfigurator* sharedConfigurator = nil;
 - (BOOL)enableStandalonePasswordFallback {
   NSNumber* number = self.configState[kEnableStandalonePasswordFallbackKey];
   return number ? [number boolValue] : YES;
+}
+
+- (BOOL)enableStandaloneSecurityKeyAuthorization {
+  NSNumber* number = self.configState[kEnableStandaloneSecurityKeyAuthorizationKey];
+  return number ? [number boolValue] : NO;
 }
 
 - (BOOL)enableSilentMode {

@@ -28,6 +28,7 @@
 // session is active.
 @property(readonly) BOOL inTemporaryMonitorMode;
 @property(readonly) BOOL failClosed;
+@property(readonly) BOOL enableStandaloneSecurityKeyAuthorization;
 @property(readonly) SNTExecutableIntegrityPolicy executableIntegrityPolicy;
 @property(readonly) BOOL enableNotificationSilences;
 @property(readonly) NSString* eventDetailText;

@@ -833,12 +833,15 @@ static void ApplyCodesignValidationFailure(SNTCachedDecision* cd, OSStatus statu
   switch (configState.clientMode) {
     case SNTClientModeMonitor: cd.decision = SNTEventStateAllowUnknown; return cd;
     case SNTClientModeStandalone:
-      // Standalone has no expression to name a method, so accept either. Where
-      // no key is attached this is Touch ID, exactly as before; where one is,
-      // the user gets the choice. That matters most on the desktop and
-      // clamshell Macs that have no Touch ID at all.
+      // Standalone has no expression to name a method, so it uses Touch ID (or
+      // a password with EnableStandalonePasswordFallback). A touch on any
+      // attached security key proves presence, not identity, so presence is
+      // only accepted when the admin opted in with
+      // EnableStandaloneSecurityKeyAuthorization.
       cd.holdAndAsk = YES;
-      cd.authorizationMethod = SNTAuthorizationMethodPresence;
+      cd.authorizationMethod = configState.enableStandaloneSecurityKeyAuthorization
+                                   ? SNTAuthorizationMethodPresence
+                                   : SNTAuthorizationMethodTouchID;
       [[fallthrough]];
     case SNTClientModeLockdown: cd.decision = SNTEventStateBlockUnknown; return cd;
     default: cd.decision = SNTEventStateBlockUnknown; return cd;
