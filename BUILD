@@ -13,6 +13,7 @@ exports_files([
     "Conf/install_services.sh",
     "Conf/com.northpolesec.santa.bundleservice.plist",
     "Conf/com.northpolesec.santa.metricservice.plist",
+    "Conf/com.northpolesec.santa.newsyslog.conf",
     "Conf/com.northpolesec.santa.plist",
     "Conf/com.northpolesec.santa.syncservice.plist",
 ])
@@ -146,7 +147,6 @@ genrule(
         "Conf/com.northpolesec.santa.metricservice.plist",
         "Conf/com.northpolesec.santa.syncservice.plist",
         "Conf/com.northpolesec.santa.plist",
-        "Conf/com.northpolesec.santa.newsyslog.conf",
         "Conf/Package/Distribution.xml",
         "Conf/Package/notarization_tool.sh",
         "Conf/Package/package.sh",
@@ -264,6 +264,7 @@ test_suite(
         "//Source/santad:unit_tests",
         "//Source/santametricservice:unit_tests",
         "//Source/santasyncservice:unit_tests",
+        "@santanetd//src/santanetd:unit_tests",
 
         # Trigger a build of one-off utils. This won't run anything but helps ensure
         # code changes don't break them.
@@ -278,5 +279,6 @@ refresh_compile_commands(
     # code.
     targets = {
         "//Source/...": "",
+        "@santanetd//src/...": "",
     },
 )

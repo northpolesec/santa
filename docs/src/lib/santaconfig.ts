@@ -196,6 +196,7 @@ confirmed, under every value of this key and in every client mode.`,
         { value: "event_upload" },
         { value: "binary_upload", versionAdded: "2026.7" },
         { value: "package_inventory", versionAdded: "2026.7" },
+        { value: "ai_account_inventory", versionAdded: "2026.10" },
       ],
       versionAdded: "2026.3",
     },
@@ -320,14 +321,18 @@ The following sequences will be replaced in the final URL:
     {
       key: "UnknownBlockMessage",
       description: `In Lockdown/Standalone mode this is the message shown to the user when an unknown binary is blocked.
-        If this message is not configured a reasonable default is provided`,
+        If this message is not configured a reasonable default is provided.
+        Workshop can set this for hosts running Santa 2026.10 or later.`,
       type: "string",
+      syncConfigurable: true,
     },
     {
       key: "BannedBlockMessage",
       description: `This is the message shown to the user when a binary is blocked because of a rule if that rule
-        doesn't provide a custom message. If this is not configured a reasonable default is provided`,
+        doesn't provide a custom message. If this is not configured a reasonable default is provided.
+        Workshop can set this for hosts running Santa 2026.10 or later.`,
       type: "string",
+      syncConfigurable: true,
     },
     {
       key: "ModeNotificationMonitor",

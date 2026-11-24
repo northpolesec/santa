@@ -486,6 +486,8 @@
   XCTAssertNil(self.syncState.removableMediaAction);
   XCTAssertNil(self.syncState.bannedUSBBlockMessage);
   XCTAssertNil(self.syncState.remountUSBBlockMessage);
+  XCTAssertNil(self.syncState.bannedBlockMessage);
+  XCTAssertNil(self.syncState.unknownBlockMessage);
 }
 
 - (void)testPreflightOverrideFileAccessAction {
@@ -512,6 +514,41 @@
 
   XCTAssertTrue([sut sync]);
   XCTAssertNil(self.syncState.overrideFileAccessAction);
+}
+
+- (void)preflightBlockMessages:(NSString*)msg {
+  [self setupDefaultDaemonConnResponses];
+  SNTSyncPreflight* sut = [[SNTSyncPreflight alloc] initWithState:self.syncState];
+
+  NSString* json = [NSString
+      stringWithFormat:@"{\"client_mode\": \"LOCKDOWN\", \"batch_size\": 100, "
+                       @"\"banned_block_message\": \"%@\", \"unknown_block_message\": \"%@\"}",
+                       msg, msg];
+  [self stubRequestBody:[json dataUsingEncoding:NSUTF8StringEncoding]
+               response:nil
+                  error:nil
+          validateBlock:nil];
+
+  XCTAssertTrue([sut sync]);
+  if (self.syncState.isSyncV2) {
+    XCTAssertEqualObjects(self.syncState.bannedBlockMessage, msg);
+    XCTAssertEqualObjects(self.syncState.unknownBlockMessage, msg);
+  } else {
+    // Sync v1 has no such field, so the key is ignored.
+    XCTAssertNil(self.syncState.bannedBlockMessage);
+    XCTAssertNil(self.syncState.unknownBlockMessage);
+  }
+}
+
+- (void)testPreflightBlockMessages {
+  [self preflightBlockMessages:@"Ask IT before installing apps"];
+}
+
+- (void)testPreflightEmptyBlockMessages {
+  // An empty message is kept: it removes the message synced earlier.
+  // ponytail: the only test that an explicit "" on the wire reaches sync state as @"" (not nil);
+  // the bundle and configurator tests start from @"" and can't catch a dropped clear.
+  [self preflightBlockMessages:@""];
 }
 
 - (void)testPreflightUSBBlockMessages {

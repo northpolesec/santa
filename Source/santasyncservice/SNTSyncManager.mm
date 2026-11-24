@@ -663,11 +663,12 @@ static const uint8_t kMaxEnqueuedSyncs = 2;
     } else if (!syncState.isSyncV2 && self.pushNotifications &&
                [self.pushNotifications isKindOfClass:[SNTPushClientNATS class]]) {
       // Token chain no longer valid — tear down NATS client.
-      // The NATS C library holds unretained pointers to the client via __bridge
-      // callbacks, so we must disconnect (which destroys the C-level connection)
-      // before the object is deallocated. disconnectWithCompletion: dispatches
-      // async onto connectionQueue and the block's implicit capture of self (the
-      // NATS client) keeps it alive until cleanup completes.
+      // Disconnect so the C-level connection and its threads are destroyed;
+      // releasing the client alone would leave them running. NATS callbacks
+      // that arrive afterwards see a nil client and return.
+      // disconnectWithCompletion: dispatches async onto connectionQueue and the
+      // block's implicit capture of self (the NATS client) keeps it alive until
+      // cleanup completes.
       LOGI(@"Sync v2 no longer active, tearing down NATS push client");
       [(SNTPushClientNATS*)self.pushNotifications disconnectWithCompletion:nil];
       self.pushNotifications = nil;

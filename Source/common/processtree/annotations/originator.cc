@@ -22,10 +22,10 @@
 
 #include "Source/common/processtree/process.h"
 #include "Source/common/processtree/process_tree.h"
-#include "Source/common/processtree/process_tree.pb.h"
 #include "absl/container/flat_hash_map.h"
+#include "telemetry/v1.pb.h"
 
-namespace ptpb = ::santa::pb::v1::process_tree;
+namespace ptpb = ::santa::telemetry::v1;
 
 namespace santa::santad::process_tree {
 
@@ -62,7 +62,12 @@ void OriginatorAnnotator::AnnotateExec(ProcessTree& tree,
 
 std::optional<ptpb::Annotations> OriginatorAnnotator::Proto() const {
   auto annotation = ptpb::Annotations();
-  annotation.set_originator(originator_);
+  // UNSPECIFIED is the prototype's value, not an annotation; leave the field
+  // unset so it is not serialized.
+  if (originator_ !=
+      ptpb::Annotations::Originator::Annotations_Originator_UNSPECIFIED) {
+    annotation.set_originator(originator_);
+  }
   return annotation;
 }
 

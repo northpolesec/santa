@@ -6,4 +6,11 @@
 /bin/launchctl remove com.northpolesec.santa.migration || true
 /bin/rm -rf /var/db/santa/migration
 
+# Save the newsyslog config for postinstall, which explains why. Keep an earlier
+# saved copy if the config is missing: an install that failed after the payload
+# step left it there.
+NEWSYSLOG_CONF="/private/etc/newsyslog.d/com.northpolesec.santa.newsyslog.conf"
+NEWSYSLOG_CONF_SAVED="/private/var/db/santa/newsyslog.conf.preinstall"
+[[ -f "${NEWSYSLOG_CONF}" ]] && /bin/cp -p "${NEWSYSLOG_CONF}" "${NEWSYSLOG_CONF_SAVED}"
+
 exit 0

@@ -23,7 +23,9 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "commands/v1.pb.h"
+#include "common/aiaccountinventory.pb.h"
 #include "common/packageinventory.pb.h"
+#include "google/protobuf/duration.pb.h"
 #include "telemetry/sleighconfig.pb.h"
 
 namespace santa {
@@ -99,6 +101,14 @@ class SleighLauncher {
       const std::string& signed_post_url,
       const std::map<std::string, std::string>& form_values);
 
+  // AI account inventory scan: report the accounts AI assistants are signed in
+  // with across every user home. Same launch and timeout semantics as
+  // LaunchPackageInventoryScan.
+  virtual absl::Status LaunchAIAccountInventoryScan(
+      const ::santa::common::v1::AIAccountInventoryScan& scan,
+      const std::string& signed_post_url,
+      const std::map<std::string, std::string>& form_values);
+
  protected:
   // Verifies the Sleigh binary's code signature before exec. Returns Ok when
   // the signature is acceptable (and, in DEBUG builds, always — Sleigh is
@@ -135,6 +145,17 @@ class SleighLauncher {
       const ::santa::common::v1::PackageInventoryScan& scan,
       const std::string& signed_post_url,
       const std::map<std::string, std::string>& form_values);
+
+  absl::StatusOr<std::string> SerializeAIAccountInventoryScanConfig(
+      const ::santa::common::v1::AIAccountInventoryScan& scan,
+      const std::string& signed_post_url,
+      const std::map<std::string, std::string>& form_values);
+
+  // Runs a scan where Sleigh walks the filesystem itself and uploads its own
+  // results, bounding it by max_duration (or a default) plus a margin.
+  absl::Status RunFilesystemScan(
+      const std::string& serialized,
+      const ::google::protobuf::Duration* max_duration);
 
   // Forks Sleigh, writes the serialized config to its stdin, optionally
   // captures its stdout, and waits up to timeout_secs (SIGKILL on timeout).

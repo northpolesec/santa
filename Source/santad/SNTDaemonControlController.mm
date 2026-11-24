@@ -217,9 +217,9 @@ static NSString* StaticDecisionForRule(SNTRule* rule, BOOL enableTransitiveRules
         "com.northpolesec.santa.binaryupload.xpc", DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL,
         dispatch_get_global_queue(QOS_CLASS_UTILITY, 0));
 
-    // Package inventory scans are serialized with each other but not with NATS
-    // binary uploads, so a long-running sync command does not wait behind
-    // unrelated work already queued by another transport.
+    // Package and AI account inventory scans are serialized with each other but
+    // not with NATS binary uploads, so a long-running sync command does not wait
+    // behind unrelated work already queued by another transport.
     _packageInventoryQ = dispatch_queue_create_with_target(
         "com.northpolesec.santa.packageinventory.xpc", DISPATCH_QUEUE_SERIAL_WITH_AUTORELEASE_POOL,
         dispatch_get_global_queue(QOS_CLASS_UTILITY, 0));
@@ -306,6 +306,41 @@ static NSString* StaticDecisionForRule(SNTRule* rule, BOOL enableTransitiveRules
       // Nothing left to reply with: the reply *is* the serialized response. The
       // caller treats a nil reply as an internal error.
       LOGE(@"Package inventory: failed to serialize PackageInventoryResponse");
+      reply(nil);
+      return;
+    }
+    reply([NSData dataWithBytes:serialized.data() length:serialized.size()]);
+  });
+}
+
+// Runs a Sleigh AI account inventory scan
+// (santa.commands.v1.AIAccountInventoryRequest) on the inventory queue, like
+// runPackageInventory:. reply carries a serialized AIAccountInventoryResponse.
+- (void)runAIAccountInventory:(NSData*)serializedRequest reply:(void (^)(NSData*))reply {
+  dispatch_async(_packageInventoryQ, ^{
+    ::santa::commands::v1::AIAccountInventoryResponse response;
+    ::santa::commands::v1::AIAccountInventoryRequest request;
+    if (request.ParseFromArray(serializedRequest.bytes, (int)serializedRequest.length)) {
+      std::map<std::string, std::string> form_values;
+      for (const auto& [key, value] : request.signed_post().form_values()) {
+        form_values[key] = value;
+      }
+
+      auto launcher =
+          santa::SleighLauncher::Create(std::string(santa::SleighLauncher::kDefaultSleighPath));
+      absl::Status status = launcher->LaunchAIAccountInventoryScan(
+          request.scan(), request.signed_post().url(), form_values);
+      if (!status.ok()) {
+        LOGE(@"AI account inventory scan failed: %s", std::string(status.message()).c_str());
+        response.set_error(::santa::commands::v1::AIAccountInventoryResponse::ERROR_INTERNAL);
+      }
+    } else {
+      LOGE(@"AI account inventory: failed to parse AIAccountInventoryRequest");
+      response.set_error(::santa::commands::v1::AIAccountInventoryResponse::ERROR_INTERNAL);
+    }
+    std::string serialized;
+    if (!response.SerializeToString(&serialized)) {
+      LOGE(@"AI account inventory: failed to serialize AIAccountInventoryResponse");
       reply(nil);
       return;
     }
@@ -408,9 +443,7 @@ static NSString* StaticDecisionForRule(SNTRule* rule, BOOL enableTransitiveRules
 
   SNTRuleTable* ruleTable = [SNTDatabaseController ruleTable];
 
-  // If any rules are added that are not plain allowlist rules, then flush decision cache.
-  // In particular, the addition of allowlist compiler rules should cause a cache flush.
-  // We also flush cache if a allowlist compiler rule is replaced with a allowlist rule.
+  // New or changed non-allow rules require a full flush.
   BOOL flushCache = ((cleanupType != SNTRuleCleanupNone) || (fileAccessRules.count > 0) ||
                      [ruleTable addedRulesShouldFlushDecisionCache:executionRules]);
 
@@ -431,6 +464,9 @@ static NSString* StaticDecisionForRule(SNTRule* rule, BOOL enableTransitiveRules
     if (self.flushCacheBlock) {
       self.flushCacheBlock(FlushCacheMode::kAllCaches, FlushCacheReason::kRulesChanged);
     }
+  } else if (executionRules.count > 0 && self.flushCacheBlock) {
+    // Even an ordinary allow can supersede a cached compiler decision.
+    self.flushCacheBlock(FlushCacheMode::kCompilerDecisionsOnly, FlushCacheReason::kRulesChanged);
   }
 
   reply(success, errors);
@@ -780,6 +816,14 @@ static NSString* StaticDecisionForRule(SNTRule* rule, BOOL enableTransitiveRules
       [configurator setSyncServerAllowedNetworkMountHosts:val];
     }];
 
+    [result bannedBlockMessage:^(NSString* val) {
+      [configurator setSyncServerBannedBlockMessage:val];
+    }];
+
+    [result unknownBlockMessage:^(NSString* val) {
+      [configurator setSyncServerUnknownBlockMessage:val];
+    }];
+
     [result bannedUSBBlockMessage:^(NSString* val) {
       [configurator setSyncServerBannedUSBBlockMessage:val];
     }];
@@ -947,12 +991,25 @@ static NSString* StaticDecisionForRule(SNTRule* rule, BOOL enableTransitiveRules
 #pragma mark GUI Ops
 
 - (void)setNotificationListener:(NSXPCListenerEndpoint*)listener {
+  // The GUI registers its own listener, so the peer is the GUI process and its euid is the user
+  // whose session answers every prompt sent over this connection. Recorded from the audit token,
+  // never from the payload: Temporary Admin Mode may only elevate this user. Without a token the
+  // connection has no owner, so no request can match it and the mode fails closed.
+  audit_token_t peer = [MOLXPCConnection currentPeerAuditToken];
+  uid_t ownerUID = kSNTNotifierNoOwner;
+  if (audit_token_to_pid(peer) == 0) {
+    LOGW(@"GUI listener registered without a peer audit token; Temporary Admin Mode prompts will "
+         @"not be issued over this connection.");
+  } else {
+    ownerUID = audit_token_to_euid(peer);
+  }
+
   // This will leak the underlying NSXPCConnection when "fast user switching" occurs.
   // It is not worth the trouble to fix. Maybe future self will feel differently.
   MOLXPCConnection* c = [[MOLXPCConnection alloc] initClientWithListener:listener];
   c.remoteInterface = [SNTXPCNotifierInterface notifierInterface];
   [c resume];
-  self.notQueue.notifierConnection = c;
+  [self.notQueue setNotifierConnection:c ownerUID:ownerUID];
 }
 
 #pragma mark syncd Ops
@@ -996,11 +1053,10 @@ static NSString* StaticDecisionForRule(SNTRule* rule, BOOL enableTransitiveRules
           relatedEvents:(NSArray<SNTStoredExecutionEvent*>*)events {
   SNTEventTable* eventTable = [SNTDatabaseController eventTable];
 
-  // Delete the event cached by the execution controller.
-  [eventTable deleteEventWithId:event.idx];
-
-  // Add the updated event.
-  [eventTable addStoredEvent:event];
+  // Add the bundle data to the event the execution controller stored, or store it again if a sync
+  // already uploaded that event. A repeat copy within the block backoff is dropped, so closing and
+  // reopening block windows does not upload one copy each.
+  [eventTable storeBundleHashedEvent:event];
 
   // Log all of the generated bundle events.
   self->_logger->LogBundleHashingEvents(events);
@@ -1092,9 +1148,11 @@ static BOOL CloneBundleTree(NSString* src, NSString* dst) {
 
     // BSD file flags are carried over by the clone. An attacker-set SF_IMMUTABLE
     // would survive into /Applications/Santa.app and then make every future
-    // install fail when it tries to remove the bundle, so reject any flags at all.
-    // Nothing in a Santa bundle sets them.
-    if (sb.st_flags != 0) {
+    // install fail when it tries to remove the bundle, so reject every flag
+    // except UF_COMPRESSED. installd compresses pkgs delivered by the MDM
+    // InstallEnterpriseApplication command, and reads of a compressed file return
+    // the same bytes the signature covers.
+    if ((sb.st_flags & ~UF_COMPRESSED) != 0) {
       LOGE(@"Bundle entry has file flags set: %@ (flags=0x%x)", entry, sb.st_flags);
       return NO;
     }
@@ -1494,8 +1552,9 @@ static BOOL CloneBundleTree(NSString* src, NSString* dst) {
 
 - (void)requestTemporaryAdminModeWithDurationMinutes:(NSNumber*)requestedDuration
                                                reply:(void (^)(uint32_t, NSError*))reply {
-  // The target is the connecting peer (the console user's GUI), resolved from the
-  // XPC audit token — never trusted from the GUI payload.
+  // The target is the connecting peer, resolved from the XPC audit token and never trusted from
+  // the payload. RequestMinutes refuses unless this uid is the one whose session registered the
+  // GUI, so the user who approves is the user who is elevated.
   audit_token_t peer = [MOLXPCConnection currentPeerAuditToken];
   uid_t uid = audit_token_to_euid(peer);
   NSError* err = nil;

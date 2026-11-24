@@ -16,6 +16,7 @@
 #import <Foundation/Foundation.h>
 #import <OCMock/OCMock.h>
 #import <XCTest/XCTest.h>
+#import <objc/runtime.h>
 
 #import "Source/common/SNTCommonEnums.h"
 #import "Source/common/SNTConfigState.h"
@@ -811,13 +812,13 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
 
 #pragma mark - keyPathsForValuesAffecting wiring
 
-// Each of these key paths is observed by santad (Santad.mm) so that runtime
-// config changes take effect. They are computed from configState, so they only
-// fire if a correctly-named keyPathsForValuesAffecting<Key> declares the
-// dependency. A missing or misnamed declaration silently breaks the watcher
-// (e.g. the property renamed allowlist->allowed while the dependency method
-// did not), so assert each fires exactly once when configState is replaced --
-// the same setter path taken on a config reload.
+// santad observes key paths like these so that runtime config changes take
+// effect. They are computed from configState, so they only fire if a
+// correctly-named keyPathsForValuesAffecting<Key> declares the dependency. A
+// missing or misnamed declaration silently breaks the watcher (e.g. the
+// property renamed allowlist->allowed while the dependency method did not), so
+// assert each fires exactly once when configState is replaced -- the same
+// setter path taken on a config reload.
 - (void)testConfigStateChangeNotifiesDerivedKeyObservers {
   SNTConfigurator* cfg = [[SNTConfigurator alloc] init];
   SNTKVORecordingObserver* observer = [[SNTKVORecordingObserver alloc] init];
@@ -828,7 +829,10 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
     @"dnsUpstreamTimeoutSecs",
     @"enableSilentTTYMode",
     @"exportMetrics",
+    @"fileChangesPrefixFilters",
+    @"fileChangesRegex",
     @"metricExportInterval",
+    @"overrideFileAccessAction",
   ];
 
   for (NSString* keyPath in keyPaths) {
@@ -845,7 +849,12 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
     @"DNSUpstreamTimeoutSeconds" : @(30.0),
     @"EnableSilentTTYMode" : @YES,
     @"ExportMetrics" : @YES,
+    @"FileChangesPrefixFilters" : @[ @"/private/tmp/" ],
+    @"FileChangesRegex" : [NSRegularExpression regularExpressionWithPattern:@"^/Users/"
+                                                                    options:0
+                                                                      error:NULL],
     @"MetricExportInterval" : @123,
+    @"OverrideFileAccessAction" : @"disable",
   } mutableCopy];
 
   for (NSString* keyPath in keyPaths) {
@@ -860,10 +869,10 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
   }
 }
 
-// allowedPathRegex/blockedPathRegex fall back from syncState to configState, so
-// their keyPathsForValuesAffecting methods depend on syncState too. The
-// configState test above can't catch a regression that drops syncState from
-// those declarations, so exercise the syncState half here.
+// Some keys (e.g. allowedPathRegex, blockedPathRegex) fall back from syncState
+// to configState, so their keyPathsForValuesAffecting methods depend on
+// syncState too. The configState test above can't catch a regression that drops
+// syncState from those declarations, so exercise the syncState half here.
 - (void)testSyncStateChangeNotifiesSyncDerivedKeyObservers {
   SNTConfigurator* cfg = [[SNTConfigurator alloc] init];
   SNTKVORecordingObserver* observer = [[SNTKVORecordingObserver alloc] init];
@@ -872,6 +881,7 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
     @"allowedPathRegex",
     @"blockedPathRegex",
     @"disableExecutableIntegrityRecheck",
+    @"overrideFileAccessAction",
   ];
 
   for (NSString* keyPath in keyPaths) {
@@ -886,6 +896,7 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
     @"AllowedPathRegex" : @"a",
     @"BlockedPathRegex" : @"b",
     @"DisableExecutableIntegrityRecheck" : @YES,
+    @"OverrideFileAccessAction" : @"disable",
   } mutableCopy];
 
   for (NSString* keyPath in keyPaths) {
@@ -898,6 +909,38 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
                    @"keyPathsForValuesAffecting<Key> in SNTConfigurator.mm.",
                    keyPath, (unsigned long)[observer.firedKeyPaths countForObject:keyPath]);
   }
+}
+
+// KVO looks up keyPathsForValuesAffecting<Key> by the property name, so a
+// method whose suffix names no property is never called. Check every such
+// method on SNTConfigurator against the properties instances respond to.
+- (void)testEveryKeyPathsForValuesAffectingMethodNamesAProperty {
+  NSString* prefix = @"keyPathsForValuesAffecting";
+  SNTConfigurator* cfg = [[SNTConfigurator alloc] init];
+
+  unsigned int count = 0;
+  Method* methods = class_copyMethodList(object_getClass([SNTConfigurator class]), &count);
+  NSUInteger checked = 0;
+  for (unsigned int i = 0; i < count; i++) {
+    NSString* name = NSStringFromSelector(method_getName(methods[i]));
+    if (![name hasPrefix:prefix] || name.length == prefix.length) continue;
+    checked++;
+
+    NSString* key = [name substringFromIndex:prefix.length];
+    // KVO capitalizes the first letter of the key, so a lowercase suffix is
+    // never looked up.
+    XCTAssertTrue(
+        [[NSCharacterSet uppercaseLetterCharacterSet] characterIsMember:[key characterAtIndex:0]],
+        @"+%@ suffix must start with an uppercase letter", name);
+    NSString* lowered = [[[key substringToIndex:1] lowercaseString]
+        stringByAppendingString:[key substringFromIndex:1]];
+    XCTAssertTrue([cfg respondsToSelector:NSSelectorFromString(lowered)] ||
+                      [cfg respondsToSelector:NSSelectorFromString(key)],
+                  @"+%@ names no SNTConfigurator property ('%@' or '%@')", name, lowered, key);
+  }
+  free(methods);
+
+  XCTAssertGreaterThan(checked, (NSUInteger)0);
 }
 
 // Patterns from a sync server must be normalized the same way as ones from the
@@ -1049,6 +1092,82 @@ typedef BOOL (^StateFileAccessAuthorizer)(void);
   XCTAssertEqual(cfg.overrideFileAccessAction, SNTOverrideFileAccessActionAuditOnly);
 
   XCTAssertTrue([self.fileMgr removeItemAtPath:plistPath error:nil]);
+}
+
+#pragma mark - Banned block message tests
+
+- (void)testBlockMessagesPreferSyncOverProfile {
+  NSString* plistPath = [NSString stringWithFormat:@"%@/block-messages.plist", self.testDir];
+  SNTConfigurator* cfg = [self configuratorWithEmptySyncStateAtPath:plistPath];
+  // Start from a known profile state; the host's managed preferences may set these keys.
+  [cfg.configState removeObjectForKey:@"BannedBlockMessage"];
+  [cfg.configState removeObjectForKey:@"UnknownBlockMessage"];
+  XCTAssertNil(cfg.bannedBlockMessage);
+  XCTAssertNil(cfg.unknownBlockMessage);
+
+  cfg.configState[@"BannedBlockMessage"] = @"Profile banned";
+  cfg.configState[@"UnknownBlockMessage"] = @"Profile unknown";
+  XCTAssertEqualObjects(cfg.bannedBlockMessage, @"Profile banned");
+  XCTAssertEqualObjects(cfg.unknownBlockMessage, @"Profile unknown");
+
+  [cfg setSyncServerBannedBlockMessage:@"Sync banned"];
+  [cfg setSyncServerUnknownBlockMessage:@"Sync unknown"];
+  XCTAssertEqualObjects(cfg.bannedBlockMessage, @"Sync banned");
+  XCTAssertEqualObjects(cfg.unknownBlockMessage, @"Sync unknown");
+
+  // An empty or whitespace-only sync message removes the synced value, so the profile governs
+  [cfg setSyncServerBannedBlockMessage:@" \n\t"];
+  [cfg setSyncServerUnknownBlockMessage:@""];
+  XCTAssertNil(cfg.syncState[@"BannedBlockMessage"]);
+  XCTAssertNil(cfg.syncState[@"UnknownBlockMessage"]);
+  XCTAssertEqualObjects(cfg.bannedBlockMessage, @"Profile banned");
+  XCTAssertEqualObjects(cfg.unknownBlockMessage, @"Profile unknown");
+}
+
+- (void)testEmptySyncedEventDetailRemovesTheSyncedValue {
+  NSString* plistPath = [NSString stringWithFormat:@"%@/event-detail.plist", self.testDir];
+  SNTConfigurator* cfg = [self configuratorWithEmptySyncStateAtPath:plistPath];
+  cfg.configState[@"EventDetailURL"] = @"https://profile.example.com";
+  cfg.configState[@"EventDetailText"] = @"Profile text";
+
+  [cfg setSyncServerEventDetailURL:@"https://sync.example.com"];
+  [cfg setSyncServerEventDetailText:@"Sync text"];
+  XCTAssertEqualObjects(cfg.eventDetailURL, @"https://sync.example.com");
+  XCTAssertEqualObjects(cfg.eventDetailText, @"Sync text");
+
+  // An empty value removes the synced value rather than overriding the profile with nothing.
+  [cfg setSyncServerEventDetailURL:@""];
+  [cfg setSyncServerEventDetailText:@" "];
+  XCTAssertNil(cfg.syncState[@"EventDetailURL"]);
+  XCTAssertNil(cfg.syncState[@"EventDetailText"]);
+  XCTAssertEqualObjects(cfg.eventDetailURL, @"https://profile.example.com");
+  XCTAssertEqualObjects(cfg.eventDetailText, @"Profile text");
+}
+
+- (void)testEmptyEventDetailPersistedBeforeUpgradeDoesNotHideTheProfile {
+  // Earlier versions stored empty synced values. A server that now omits the field never calls
+  // the setter, so the getters must ignore those leftovers.
+  [self runMigrationTestsWithSyncState:@{@"EventDetailURL" : @"", @"EventDetailText" : @" "}
+                              verifier:^(SNTConfigurator* cfg) {
+                                cfg.configState[@"EventDetailURL"] = @"https://profile.example.com";
+                                cfg.configState[@"EventDetailText"] = @"Profile text";
+                                XCTAssertEqualObjects(cfg.eventDetailURL,
+                                                      @"https://profile.example.com");
+                                XCTAssertEqualObjects(cfg.eventDetailText, @"Profile text");
+                              }];
+}
+
+- (void)testSyncedBlockMessagesSurviveARestart {
+  NSString* plistPath =
+      [NSString stringWithFormat:@"%@/banned-block-message-restart.plist", self.testDir];
+  SNTConfigurator* cfg = [self configuratorWithEmptySyncStateAtPath:plistPath];
+  [cfg setSyncServerBannedBlockMessage:@"Sync banned"];
+  [cfg setSyncServerUnknownBlockMessage:@"Sync unknown"];
+
+  // A second configurator over the same file stands in for the next launch.
+  SNTConfigurator* restarted = [self configuratorWithEmptySyncStateAtPath:plistPath];
+  XCTAssertEqualObjects(restarted.syncState[@"BannedBlockMessage"], @"Sync banned");
+  XCTAssertEqualObjects(restarted.syncState[@"UnknownBlockMessage"], @"Sync unknown");
 }
 
 #pragma mark - Removable media message tests

@@ -27,20 +27,43 @@
 #import "Source/common/SNTStoredTemporaryMonitorModeAuditEvent.h"
 #include "Source/common/SantaCache.h"
 #include "Source/common/String.h"
+#include "Source/common/SystemResources.h"
 
 static const uint32_t kEventTableCurrentVersion = 6;
 // 4 hour cache
 static const NSTimeInterval kUnactionableEventCacheTimeSeconds = (60 * 60 * 4);
+// A binary that keeps being blocked stores at most one block event per decision per window. The
+// unique index only dedups until an upload drains the table, and syncs can be frequent (each rule
+// change pushes one), so without this every sync would upload another block. Matches the
+// immediate-upload backoff in SNTSyncdQueue.
+static const NSTimeInterval kBlockEventCacheTimeSeconds = (60 * 10);
 // Deduplicate repeated firings of the same signal to at most one per name per 10 minutes.
 static const NSTimeInterval kSignalReportDedupWindowSeconds = (60 * 10);
 
 @interface SNTEventTable ()
 // This property is only set once, safe to be nonatomic
 @property(nonatomic) NSTimeInterval unactionableEventCacheTimeSeconds;
+@property(nonatomic) NSTimeInterval blockEventCacheTimeSeconds;
 @end
+
+// The block backoff key of a block execution event, or nil for any other event. Block events are
+// throttled per binary and decision, so a new decision for the binary (for example BLOCK_UNKNOWN
+// after its block rule is removed) is still stored. The bundle flow's bundle-hashed copy gets a
+// window of its own, so it is still stored when the unhashed event already started one. Only the
+// bundle flow sets fileBundleHash on a block event.
+static NSString* BlockBackoffKey(SNTStoredEvent* event) {
+  if (![event isKindOfClass:[SNTStoredExecutionEvent class]]) return nil;
+  SNTStoredExecutionEvent* se = (SNTStoredExecutionEvent*)event;
+  if ((se.decision & SNTEventStateBlock) == 0) return nil;
+  NSString* key =
+      [NSString stringWithFormat:@"%@|%llu", [se uniqueID], (unsigned long long)se.decision];
+  return se.fileBundleHash.length ? [key stringByAppendingFormat:@"|%@", se.fileBundleHash] : key;
+}
 
 @implementation SNTEventTable {
   std::unique_ptr<SantaCache<std::string, NSDate*>> _storeBackoff;
+  // Separate from _storeBackoff: allows and blocks of the same binary share a uniqueID.
+  std::unique_ptr<SantaCache<std::string, uint64_t>> _blockStoreBackoff;
   std::unique_ptr<SantaCache<std::string, NSDate*>> _signalReportBackoff;
 }
 
@@ -50,8 +73,10 @@ static const NSTimeInterval kSignalReportDedupWindowSeconds = (60 * 10);
 
 - (uint32_t)initializeDatabase:(FMDatabase*)db fromVersion:(uint32_t)version {
   _storeBackoff = std::make_unique<SantaCache<std::string, NSDate*>>(2048);
+  _blockStoreBackoff = std::make_unique<SantaCache<std::string, uint64_t>>(2048);
   _signalReportBackoff = std::make_unique<SantaCache<std::string, NSDate*>>(2048);
   self.unactionableEventCacheTimeSeconds = kUnactionableEventCacheTimeSeconds;
+  self.blockEventCacheTimeSeconds = kBlockEventCacheTimeSeconds;
 
   int newVersion = 0;
 
@@ -155,6 +180,12 @@ static const NSTimeInterval kSignalReportDedupWindowSeconds = (60 * 10);
       continue;
     }
 
+    // Only read here: the window starts once the row is written, below.
+    NSString* blockKey = BlockBackoffKey(event);
+    if (blockKey && [self blockBackoffActiveForKey:blockKey]) {
+      continue;
+    }
+
     NSData* eventData = [NSKeyedArchiver archivedDataWithRootObject:event
                                               requiringSecureCoding:YES
                                                               error:nil];
@@ -171,7 +202,17 @@ static const NSTimeInterval kSignalReportDedupWindowSeconds = (60 * 10);
                                       @"VALUES (?, ?, ?) "
                                       @"ON CONFLICT(uniqueid) DO NOTHING",
                                       event.idx, [event uniqueID], eventData];
-          if (!success) *stop = YES;
+          if (!success) {
+            *stop = YES;
+            return;
+          }
+          // ON CONFLICT reports success without writing. Start the block window only when a row
+          // was written, so a block that conflicts with a pending row of the same binary, or
+          // fails, does not hold back the next one.
+          NSString* blockKey = BlockBackoffKey(event);
+          if (blockKey && [db changes] > 0) {
+            [self startBlockBackoffForKey:blockKey];
+          }
         }];
   }];
 
@@ -188,6 +229,47 @@ static const NSTimeInterval kSignalReportDedupWindowSeconds = (60 * 10);
     _storeBackoff->set(santa::NSStringToUTF8String(hash), now);
     return NO;
   }
+}
+
+// Whether a block event with this key (see BlockBackoffKey) was stored within the block backoff
+// window. The clock is monotonic, so a wall clock change cannot stretch the window. 0 means no
+// backoff: without that check, every block in the first window after boot would be dropped.
+- (BOOL)blockBackoffActiveForKey:(NSString*)key {
+  uint64_t start = _blockStoreBackoff->get(santa::NSStringToUTF8String(key));
+  return start &&
+         GetCurrentUptime() - start < (uint64_t)(self.blockEventCacheTimeSeconds * NSEC_PER_SEC);
+}
+
+// Starts the block backoff window for this key. A window that is already running is left alone.
+- (void)startBlockBackoffForKey:(NSString*)key {
+  if ([self blockBackoffActiveForKey:key]) return;
+  _blockStoreBackoff->set(santa::NSStringToUTF8String(key), GetCurrentUptime());
+}
+
+- (void)storeBundleHashedEvent:(SNTStoredExecutionEvent*)event {
+  if (![self isValidStoredEvent:event]) return;
+  NSData* eventData = [NSKeyedArchiver archivedDataWithRootObject:event
+                                            requiringSecureCoding:YES
+                                                            error:nil];
+  if (!eventData) return;
+
+  __block BOOL updated = NO;
+  [self inDatabase:^(FMDatabase* db) {
+    // Matching uniqueid as well as idx means a caller can only update the row of the same binary.
+    updated = [db executeUpdate:@"UPDATE events SET eventdata=? WHERE idx=? AND uniqueid=?",
+                                eventData, event.idx, [event uniqueID]] &&
+              [db changes] > 0;
+  }];
+
+  if (updated) {
+    // Start the hashed window, so a repeat copy is not stored after this row is uploaded.
+    NSString* blockKey = BlockBackoffKey(event);
+    if (blockKey) [self startBlockBackoffForKey:blockKey];
+    return;
+  }
+
+  // The row was already uploaded, or never stored. Store the copy, subject to the hashed window.
+  [self addStoredEvent:event];
 }
 
 #pragma mark Querying/Retreiving
@@ -248,12 +330,6 @@ static const NSTimeInterval kSignalReportDedupWindowSeconds = (60 * 10);
 }
 
 #pragma mark Deleting
-
-- (void)deleteEventWithId:(NSNumber*)index {
-  [self inDatabase:^(FMDatabase* db) {
-    [db executeUpdate:@"DELETE FROM events WHERE idx=?", index];
-  }];
-}
 
 - (void)deleteEventsWithIds:(NSArray*)indexes {
   [self inDatabase:^(FMDatabase* db) {

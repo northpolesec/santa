@@ -29,9 +29,9 @@
 #import "Source/common/SNTCachedDecision.h"
 #include "Source/common/SNTXxhash.h"
 #include "Source/common/es/EndpointSecurityAPI.h"
-#include "Source/common/santa.pb.h"
 #include "Source/santad/Logs/EndpointSecurity/Serializers/Serializer.h"
 #import "Source/santad/SNTDecisionCache.h"
+#include "telemetry/v1.pb.h"
 
 #if !HAVE_MACOS_15
 // Note: This type alias did not exist until the macOS 15 SDK.
@@ -84,19 +84,9 @@ class Protobuf : public Serializer {
   std::vector<uint8_t> SerializeMessage(const santa::EnrichedTCCModification&) override;
 #endif  // HAVE_MACOS_15_4
 
-  std::vector<uint8_t> SerializeNetworkFlows(SNDProcessFlows*, struct timespec, struct timespec,
-                                             SNTCachedDecision*) override;
-  std::vector<uint8_t> SerializeDNSActivity(SNDProcessFlows*, struct timespec, struct timespec,
-                                            SNTCachedDecision*) override;
-
   void SerializeNetworkActivities(SNDProcessFlows*, struct timespec, struct timespec,
                                   SNTCachedDecision*, bool network, bool dns,
                                   const ActivityWriter&) override;
-
-  // The proto boundary is also usable without the optional Network Extension.
-  void SerializeNetworkActivityProtos(const ::santa::pb::v1::NetworkActivity::Process&,
-                                      const ::santa::pb::v1::DNSActivity::Process&, struct timespec,
-                                      struct timespec, const ActivityWriter&);
 
   std::vector<uint8_t> SerializeFileAccess(
       const std::string& policy_version, const std::string& policy_name, const santa::Message& msg,
@@ -113,16 +103,16 @@ class Protobuf : public Serializer {
   std::vector<uint8_t> SerializeDiskDisappeared(NSDictionary*) override;
 
  private:
-  ::santa::pb::v1::SantaMessage* CreateDefaultProto(google::protobuf::Arena* arena);
-  ::santa::pb::v1::SantaMessage* CreateDefaultProto(google::protobuf::Arena* arena,
-                                                    const santa::EnrichedEventType& msg);
-  ::santa::pb::v1::SantaMessage* CreateDefaultProto(google::protobuf::Arena* arena,
-                                                    const santa::Message& msg);
-  ::santa::pb::v1::SantaMessage* CreateDefaultProto(google::protobuf::Arena* arena,
-                                                    struct timespec event_time,
-                                                    struct timespec processed_time);
+  ::santa::telemetry::v1::SantaMessage* CreateDefaultProto(google::protobuf::Arena* arena);
+  ::santa::telemetry::v1::SantaMessage* CreateDefaultProto(google::protobuf::Arena* arena,
+                                                           const santa::EnrichedEventType& msg);
+  ::santa::telemetry::v1::SantaMessage* CreateDefaultProto(google::protobuf::Arena* arena,
+                                                           const santa::Message& msg);
+  ::santa::telemetry::v1::SantaMessage* CreateDefaultProto(google::protobuf::Arena* arena,
+                                                           struct timespec event_time,
+                                                           struct timespec processed_time);
 
-  std::vector<uint8_t> FinalizeProto(::santa::pb::v1::SantaMessage* santa_msg);
+  std::vector<uint8_t> FinalizeProto(::santa::telemetry::v1::SantaMessage* santa_msg);
 
   std::vector<uint8_t> SerializeMessageLaunchItemAdd(const santa::EnrichedLaunchItem&);
   std::vector<uint8_t> SerializeMessageLaunchItemRemove(const santa::EnrichedLaunchItem&);

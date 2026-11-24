@@ -27,12 +27,14 @@
 #include <sys/proc_info.h>
 #include <sys/wait.h>
 #include <time.h>
+#include <unicode/utf8.h>
 
 #include <optional>
 #include <string_view>
 
 #include "Source/common/AuditUtilities.h"
 #include "Source/common/EncodeEntitlements.h"
+#include "Source/common/EventArena.h"
 #import "Source/common/SNTCachedDecision.h"
 #import "Source/common/SNTCommonEnums.h"
 #include "Source/common/SNTLogging.h"
@@ -46,13 +48,14 @@
 #include "absl/status/status.h"
 #include "google/protobuf/timestamp.pb.h"
 #import "src/santanetd/NetworkFlowsSerializer.h"
+#include "utf8_validity.h"
 
 using google::protobuf::Arena;
 using google::protobuf::Timestamp;
 using JsonPrintOptions = google::protobuf::json::PrintOptions;
 using google::protobuf::json::MessageToJsonString;
 
-namespace pbv1 = ::santa::pb::v1;
+namespace pbv1 = ::santa::telemetry::v1;
 
 namespace santa {
 
@@ -93,17 +96,40 @@ static inline void EncodeProcessID(pbv1::ProcessID* proc_id, const audit_token_t
   proc_id->set_pidversion(Pidversion(tok));
 }
 
+// proto3 `string` fields must hold valid UTF-8, or parsers reject the message.
+// Valid input is appended as is. Otherwise each invalid sequence is replaced
+// with one U+FFFD, the same way ICU reads the bytes when matching
+// FileChangesRegex.
+static inline void AppendUTF8(std::string* dst, std::string_view src) {
+  while (!src.empty()) {
+    size_t valid = utf8_range::SpanStructurallyValid(src);
+    dst->append(src.substr(0, valid));
+    src.remove_prefix(valid);
+    if (src.empty()) break;
+
+    // U8_NEXT_OR_FFFD skips one invalid sequence, as Unicode recommends (ICU
+    // 60 and later). A sequence is at most 4 bytes, so 4 is enough length.
+    int32_t skip = 0;
+    UChar32 c;
+    U8_NEXT_OR_FFFD(reinterpret_cast<const uint8_t*>(src.data()), skip,
+                    static_cast<int32_t>(std::min<size_t>(src.size(), 4)), c);
+    dst->append("\xEF\xBF\xBD");
+    src.remove_prefix(skip);
+  }
+}
+
 static inline void EncodePath(std::string* buf, const es_file_t* dir,
                               const es_string_token_t file) {
-  buf->append(std::string_view(dir->path.data, dir->path.length));
+  AppendUTF8(buf, std::string_view(dir->path.data, dir->path.length));
   buf->append("/");
-  buf->append(std::string_view(file.data, file.length));
+  AppendUTF8(buf, std::string_view(file.data, file.length));
 }
 
 static inline void EncodePath(std::string* buf, const es_file_t* es_file) {
-  buf->append(std::string_view(es_file->path.data, es_file->path.length));
+  AppendUTF8(buf, std::string_view(es_file->path.data, es_file->path.length));
 }
 
+// For proto `string` fields. NSString always converts to valid UTF-8.
 template <typename F>
 static inline void EncodeString(F&& lazy_f, NSString* value) {
   if (value) {
@@ -111,17 +137,27 @@ static inline void EncodeString(F&& lazy_f, NSString* value) {
   }
 }
 
+// For proto `string` fields. Bytes that are not valid UTF-8 are replaced.
 template <typename F>
 static inline void EncodeString(F&& lazy_f, std::string_view value) {
+  if (value.length() > 0) {
+    AppendUTF8(lazy_f(), value);
+  }
+}
+
+// For proto `bytes` fields. Bytes are copied as is.
+template <typename F>
+static inline void EncodeBytes(F&& lazy_f, std::string_view value) {
   if (value.length() > 0) {
     lazy_f()->append(value);
   }
 }
 
+// For proto `string` fields. Bytes that are not valid UTF-8 are replaced.
 template <typename F>
 static inline void EncodeStringToken(F&& lazy_f, es_string_token_t tok) {
   if (tok.length > 0) {
-    lazy_f()->append(StringTokenToStringView(tok));
+    AppendUTF8(lazy_f(), StringTokenToStringView(tok));
   }
 }
 
@@ -129,7 +165,7 @@ static inline void EncodeUserInfo(::pbv1::UserInfo* pb_user_info, uid_t uid,
                                   const std::optional<std::shared_ptr<std::string>>& name) {
   pb_user_info->set_uid(uid);
   if (name.has_value()) {
-    pb_user_info->set_name(*name->get());
+    AppendUTF8(pb_user_info->mutable_name(), **name);
   }
 }
 
@@ -142,7 +178,7 @@ static inline void EncodeUserInfo(F&& lazy_f, std::optional<uid_t> uid,
       pb_user_info->set_uid(uid.value());
     }
     if (name.length() > 0) {
-      pb_user_info->set_name(name.data(), name.length());
+      AppendUTF8(pb_user_info->mutable_name(), name);
     }
   }
 }
@@ -157,7 +193,7 @@ static inline void EncodeGroupInfo(::pbv1::GroupInfo* pb_group_info, gid_t gid,
                                    const std::optional<std::shared_ptr<std::string>>& name) {
   pb_group_info->set_gid(gid);
   if (name.has_value()) {
-    pb_group_info->set_name(*name->get());
+    AppendUTF8(pb_group_info->mutable_name(), **name);
   }
 }
 
@@ -206,7 +242,7 @@ static inline void EncodeFileInfoLight(::pbv1::FileInfoLight* pb_file, const es_
 
 template <typename F>
 static inline void EncodeAnnotations(F&& lazy_f, const EnrichedProcess& enriched_proc) {
-  if (std::optional<pbv1::process_tree::Annotations> proc_annotations = enriched_proc.annotations();
+  if (std::optional<pbv1::Annotations> proc_annotations = enriched_proc.annotations();
       proc_annotations) {
     *lazy_f() = *proc_annotations;
   }
@@ -487,7 +523,10 @@ std::vector<uint8_t> Protobuf::FinalizeProto(::pbv1::SantaMessage* santa_msg) {
       LOGE(@"Failed to convert protobuf to JSON: %s", status.ToString().c_str());
     }
 
-    std::vector<uint8_t> vec(json.begin(), json.end());
+    // Reserve room for the trailing newline so the vector is allocated once.
+    std::vector<uint8_t> vec;
+    vec.reserve(json.length() + 1);
+    vec.insert(vec.end(), json.begin(), json.end());
     // Add a newline to the end of the JSON row.
     vec.push_back('\n');
     return vec;
@@ -499,8 +538,8 @@ std::vector<uint8_t> Protobuf::FinalizeProto(::pbv1::SantaMessage* santa_msg) {
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedClose& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
 
   ::pbv1::Close* pb_close = santa_msg->mutable_close();
 
@@ -512,8 +551,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedClose& msg) {
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedExchange& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
 
   ::pbv1::Exchangedata* pb_exchangedata = santa_msg->mutable_exchangedata();
 
@@ -541,8 +580,8 @@ void EncodeEntitlements(::pbv1::Execution* pb_exec, SNTCachedDecision* cd) {
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedExec& msg, SNTCachedDecision* cd) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
 
   ::pbv1::Execution* pb_exec = santa_msg->mutable_execution();
 
@@ -639,8 +678,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedExec& msg, SNTCach
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedExit& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
 
   ::pbv1::Exit* pb_exit = santa_msg->mutable_exit();
 
@@ -651,8 +690,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedExit& msg) {
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedFork& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
 
   ::pbv1::Fork* pb_fork = santa_msg->mutable_fork();
 
@@ -663,8 +702,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedFork& msg) {
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedLink& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
 
   ::pbv1::Link* pb_link = santa_msg->mutable_link();
   EncodeProcessInfoLight(pb_link->mutable_instigator(), msg);
@@ -676,8 +715,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedLink& msg) {
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedRename& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
 
   ::pbv1::Rename* pb_rename = santa_msg->mutable_rename();
   EncodeProcessInfoLight(pb_rename->mutable_instigator(), msg);
@@ -695,8 +734,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedRename& msg) {
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedUnlink& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
 
   ::pbv1::Unlink* pb_unlink = santa_msg->mutable_unlink();
   EncodeProcessInfoLight(pb_unlink->mutable_instigator(), msg);
@@ -706,8 +745,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedUnlink& msg) {
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedCSInvalidated& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
 
   ::pbv1::CodesigningInvalidated* pb_cs_invalidated = santa_msg->mutable_codesigning_invalidated();
   EncodeProcessInfoLight(pb_cs_invalidated->mutable_instigator(), msg);
@@ -727,8 +766,8 @@ static ::pbv1::ProcSuspendResume::Type GetProcSuspendResumeType(
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedProcSuspendResume& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
 
   ::pbv1::ProcSuspendResume* pb_psr = santa_msg->mutable_proc_suspend_resume();
   EncodeProcessInfoLight(pb_psr->mutable_instigator(), msg);
@@ -742,8 +781,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedProcSuspendResume&
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedClone& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
 
   ::pbv1::Clone* pb_clone = santa_msg->mutable_clone();
   EncodeProcessInfoLight(pb_clone->mutable_instigator(), msg);
@@ -754,8 +793,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedClone& msg) {
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedCopyfile& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
 
   ::pbv1::Copyfile* pb_copyfile = santa_msg->mutable_copyfile();
   EncodeProcessInfoLight(pb_copyfile->mutable_instigator(), msg);
@@ -800,7 +839,7 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedCopyfile& msg) {
 
 static inline void EncodeSocketAddress(::pbv1::SocketAddress* pb_socket_addr, std::string_view addr,
                                        es_address_type_t type) {
-  EncodeString([pb_socket_addr] { return pb_socket_addr->mutable_address(); }, addr);
+  EncodeBytes([pb_socket_addr] { return pb_socket_addr->mutable_address(); }, addr);
   pb_socket_addr->set_type(GetSocketAddressType(type));
 }
 
@@ -810,8 +849,8 @@ static inline void EncodeUserInfo(F&& lazy_f, const es_string_token_t& name) {
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedLoginWindowSessionLogin& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
   ::pbv1::LoginWindowSessionLogin* pb_lw_login =
       santa_msg->mutable_login_window_session()->mutable_login();
 
@@ -826,8 +865,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedLoginWindowSession
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedLoginWindowSessionLogout& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
   ::pbv1::LoginWindowSessionLogout* pb_lw_logout =
       santa_msg->mutable_login_window_session()->mutable_logout();
 
@@ -842,8 +881,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedLoginWindowSession
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedLoginWindowSessionLock& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
   ::pbv1::LoginWindowSessionLock* pb_lw_lock =
       santa_msg->mutable_login_window_session()->mutable_lock();
 
@@ -857,8 +896,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedLoginWindowSession
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedLoginWindowSessionUnlock& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
   ::pbv1::LoginWindowSessionUnlock* pb_lw_unlock =
       santa_msg->mutable_login_window_session()->mutable_unlock();
 
@@ -873,8 +912,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedLoginWindowSession
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedScreenSharingAttach& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
   ::pbv1::ScreenSharingAttach* pb_attach = santa_msg->mutable_screen_sharing()->mutable_attach();
 
   EncodeProcessInfoLight(pb_attach->mutable_instigator(), msg);
@@ -884,10 +923,10 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedScreenSharingAttac
   EncodeSocketAddress(pb_attach->mutable_source(),
                       StringTokenToStringView(msg->event.screensharing_attach->source_address),
                       msg->event.screensharing_attach->source_address_type);
-  EncodeString([pb_attach] { return pb_attach->mutable_viewer(); },
-               StringTokenToStringView(msg->event.screensharing_attach->viewer_appleid));
-  EncodeString([pb_attach] { return pb_attach->mutable_authentication_type(); },
-               StringTokenToStringView(msg->event.screensharing_attach->authentication_type));
+  EncodeBytes([pb_attach] { return pb_attach->mutable_viewer(); },
+              StringTokenToStringView(msg->event.screensharing_attach->viewer_appleid));
+  EncodeBytes([pb_attach] { return pb_attach->mutable_authentication_type(); },
+              StringTokenToStringView(msg->event.screensharing_attach->authentication_type));
   EncodeUserInfo([pb_attach] { return pb_attach->mutable_authentication_user(); },
                  msg->event.screensharing_attach->authentication_username);
   EncodeUserInfo([pb_attach] { return pb_attach->mutable_session_user(); },
@@ -901,16 +940,16 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedScreenSharingAttac
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedScreenSharingDetach& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
   ::pbv1::ScreenSharingDetach* pb_detach = santa_msg->mutable_screen_sharing()->mutable_detach();
 
   EncodeProcessInfoLight(pb_detach->mutable_instigator(), msg);
   EncodeSocketAddress(pb_detach->mutable_source(),
                       StringTokenToStringView(msg->event.screensharing_detach->source_address),
                       msg->event.screensharing_detach->source_address_type);
-  EncodeString([pb_detach] { return pb_detach->mutable_viewer(); },
-               StringTokenToStringView(msg->event.screensharing_detach->viewer_appleid));
+  EncodeBytes([pb_detach] { return pb_detach->mutable_viewer(); },
+              StringTokenToStringView(msg->event.screensharing_detach->viewer_appleid));
 
   pb_detach->mutable_graphical_session()->set_id(
       msg->event.screensharing_detach->graphical_session_id);
@@ -919,8 +958,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedScreenSharingDetac
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedOpenSSHLogin& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
   ::pbv1::OpenSSHLogin* pb_ssh_login = santa_msg->mutable_open_ssh()->mutable_login();
 
   EncodeProcessInfoLight(pb_ssh_login->mutable_instigator(), msg);
@@ -940,8 +979,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedOpenSSHLogin& msg)
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedOpenSSHLogout& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
   ::pbv1::OpenSSHLogout* pb_ssh_logout = santa_msg->mutable_open_ssh()->mutable_logout();
 
   EncodeProcessInfoLight(pb_ssh_logout->mutable_instigator(), msg);
@@ -956,15 +995,15 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedOpenSSHLogout& msg
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedLoginLogin& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
   ::pbv1::Login* pb_login = santa_msg->mutable_login_logout()->mutable_login();
 
   EncodeProcessInfoLight(pb_login->mutable_instigator(), msg);
   pb_login->set_success(msg->event.login_login->success);
 
-  EncodeString([pb_login] { return pb_login->mutable_failure_message(); },
-               StringTokenToStringView(msg->event.login_login->failure_message));
+  EncodeBytes([pb_login] { return pb_login->mutable_failure_message(); },
+              StringTokenToStringView(msg->event.login_login->failure_message));
   EncodeUserInfo([pb_login] { return pb_login->mutable_user(); },
                  msg->event.login_login->has_uid
                      ? std::make_optional<uid_t>(msg->event.login_login->uid.uid)
@@ -975,8 +1014,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedLoginLogin& msg) {
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedLoginLogout& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
   ::pbv1::Logout* pb_logout = santa_msg->mutable_login_logout()->mutable_logout();
 
   EncodeProcessInfoLight(pb_logout->mutable_instigator(), msg);
@@ -1010,8 +1049,8 @@ static inline void EncodeEventInstigatorOrFallback(const EnrichedEventWithInstig
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedAuthenticationOD& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
 
   ::pbv1::Authentication* pb_auth = santa_msg->mutable_authentication();
   pb_auth->set_success(msg->event.authentication->success);
@@ -1041,8 +1080,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedAuthenticationOD& 
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedAuthenticationTouchID& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
 
   ::pbv1::Authentication* pb_auth = santa_msg->mutable_authentication();
   pb_auth->set_success(msg->event.authentication->success);
@@ -1064,8 +1103,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedAuthenticationTouc
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedAuthenticationToken& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
 
   ::pbv1::Authentication* pb_auth = santa_msg->mutable_authentication();
   pb_auth->set_success(msg->event.authentication->success);
@@ -1097,8 +1136,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedAuthenticationToke
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedAuthenticationAutoUnlock& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
 
   ::pbv1::Authentication* pb_auth = santa_msg->mutable_authentication();
   pb_auth->set_success(msg->event.authentication->success);
@@ -1130,8 +1169,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedAuthenticationAuto
 
 std::vector<uint8_t> Protobuf::SerializeMessageLaunchItemAdd(const EnrichedLaunchItem& msg) {
   assert(msg->event_type == ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_ADD);
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
 
   const es_event_btm_launch_item_add_t* btm = msg->event.btm_launch_item_add;
 
@@ -1168,8 +1207,8 @@ std::vector<uint8_t> Protobuf::SerializeMessageLaunchItemAdd(const EnrichedLaunc
 
 std::vector<uint8_t> Protobuf::SerializeMessageLaunchItemRemove(const EnrichedLaunchItem& msg) {
   assert(msg->event_type == ES_EVENT_TYPE_NOTIFY_BTM_LAUNCH_ITEM_REMOVE);
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
 
   const es_event_btm_launch_item_remove_t* btm = msg->event.btm_launch_item_remove;
 
@@ -1216,8 +1255,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedLaunchItem& msg) {
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedXProtectDetected& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
 
   ::pbv1::XProtect* pb_xp = santa_msg->mutable_xprotect();
   ::pbv1::XProtectDetected* pb_xp_detected = pb_xp->mutable_detected();
@@ -1238,8 +1277,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedXProtectDetected& 
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedXProtectRemediated& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
 
   ::pbv1::XProtect* pb_xp = santa_msg->mutable_xprotect();
   ::pbv1::XProtectRemediated* pb_xp_remediated = pb_xp->mutable_remediated();
@@ -1291,8 +1330,8 @@ static inline void EncodeFileInfo(::pbv1::FileInfo* pb_file, es_string_token_t p
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedGatekeeperOverride& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
   ::pbv1::GatekeeperOverride* pb_gk = santa_msg->mutable_gatekeeper_override();
   es_event_gatekeeper_user_override_t* gk = msg->event.gatekeeper_user_override;
 
@@ -1402,8 +1441,8 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedGatekeeperOverride
 }
 
 std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedTCCModification& msg) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
 
   const es_event_tcc_modify_t* tcc = msg->event.tcc_modify;
 
@@ -1431,122 +1470,12 @@ std::vector<uint8_t> Protobuf::SerializeMessage(const EnrichedTCCModification& m
 
 #endif  // HAVE_MACOS_15_4
 
-std::vector<uint8_t> Protobuf::SerializeNetworkFlows(SNDProcessFlows* processFlows,
-                                                     struct timespec window_start,
-                                                     struct timespec window_end,
-                                                     SNTCachedDecision* cd) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, window_start, window_end);
-  auto* process = santa_msg->mutable_network_activity()->add_processes();
-  santanetd::PopulateNetworkActivityProcess(&arena, process, processFlows, cd);
-  // A process with no connections in the window produces no message.
-  if (process->flows_size() == 0) {
-    return {};
-  }
-  return FinalizeProto(santa_msg);
-}
-
-std::vector<uint8_t> Protobuf::SerializeDNSActivity(SNDProcessFlows* processFlows,
-                                                    struct timespec window_start,
-                                                    struct timespec window_end,
-                                                    SNTCachedDecision* cd) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, window_start, window_end);
-  auto* process = santa_msg->mutable_dns_activity()->add_processes();
-  santanetd::PopulateDNSActivityProcess(&arena, process, processFlows, cd);
-  // A process with no questions in the window produces no message.
-  if (process->questions_size() == 0 && process->questions_dropped() == 0) {
-    return {};
-  }
-  return FinalizeProto(santa_msg);
-}
-
 void Protobuf::SerializeNetworkActivities(SNDProcessFlows* flows, struct timespec start,
                                           struct timespec end, SNTCachedDecision* cd, bool network,
                                           bool dns, const ActivityWriter& write) {
-  Arena arena;
-  // The collector may allocate on the arena, so its targets live there too.
-  auto* connections = Arena::Create<pbv1::NetworkActivity::Process>(&arena);
-  auto* questions = Arena::Create<pbv1::DNSActivity::Process>(&arena);
-  if (network) santanetd::PopulateNetworkActivityProcess(&arena, connections, flows, cd);
-  if (dns) santanetd::PopulateDNSActivityProcess(&arena, questions, flows, cd);
-  SerializeNetworkActivityProtos(*connections, *questions, start, end, write);
-}
-
-void Protobuf::SerializeNetworkActivityProtos(const pbv1::NetworkActivity::Process& connections,
-                                              const pbv1::DNSActivity::Process& questions,
-                                              struct timespec start, struct timespec end,
-                                              const ActivityWriter& write) {
-  // sleigh rejects a message over 4 MiB (pkg/parquet/protodelim.go, maxSize).
-  // 1 MiB keeps every chunk well under that as the schema grows.
-  constexpr size_t kMaxActivityMessageBytes = 1 << 20;
-  std::unique_ptr<Arena> chunkArena;
-  pbv1::SantaMessage* chunk = nullptr;
-  size_t size = 0;
-  bool kind = false;
-  uint64_t dropped = questions.questions_dropped();
-  auto flush = [&] {
-    if (chunk && (kind ? (chunk->dns_activity().processes(0).questions_size() > 0 ||
-                          chunk->dns_activity().processes(0).questions_dropped() > 0)
-                       : chunk->network_activity().processes(0).flows_size() > 0)) {
-      // The conservative running size includes every repeated-field envelope.
-      // Keep an exact final guard as the schema evolves.
-      if (chunk->ByteSizeLong() <= kMaxActivityMessageBytes) {
-        write(FinalizeProto(chunk));
-      } else {
-        // The questions in a discarded DNS chunk count as dropped.
-        if (kind) dropped += chunk->dns_activity().processes(0).questions_size();
-        LOGE(@"Network activity message exceeds its byte budget");
-      }
-    }
-    chunk = nullptr;
-    chunkArena.reset();
-  };
-  auto begin = [&](bool isDNS) {
-    chunkArena = std::make_unique<Arena>();
-    chunk = CreateDefaultProto(chunkArena.get(), start, end);
-    kind = isDNS;
-    if (isDNS) {
-      auto* p = chunk->mutable_dns_activity()->add_processes();
-      if (questions.has_process()) *p->mutable_process() = questions.process();
-    } else {
-      auto* p = chunk->mutable_network_activity()->add_processes();
-      if (connections.has_process()) *p->mutable_process() = connections.process();
-    }
-    size = chunk->ByteSizeLong() + 32;  // enclosing length prefixes may grow
-  };
-  // Make room for one row in the open chunk, or in a new chunk of this kind.
-  // False if the row does not fit an empty chunk.
-  auto fit = [&](bool isDNS, size_t rowSize) {
-    if (chunk && size + rowSize + 16 > kMaxActivityMessageBytes) flush();
-    if (!chunk) begin(isDNS);
-    if (size + rowSize + 16 > kMaxActivityMessageBytes) {
-      // Defensive for incompatible/older collectors. Their oversized question
-      // cannot poison the stream or hide subsequent ordinary events.
-      if (isDNS) ++dropped;
-      LOGW(@"Omitting an oversized network activity row");
-      return false;
-    }
-    size += rowSize + 16;
-    return true;
-  };
-  for (const auto& q : questions.questions()) {
-    if (fit(true, q.ByteSizeLong()))
-      *chunk->mutable_dns_activity()->mutable_processes(0)->add_questions() = q;
-  }
-  flush();
-  // Loss is a process/window metric, emitted once in its own summary message.
-  // It is not repeated across chunks or question rows.
-  if (dropped) {
-    begin(true);
-    chunk->mutable_dns_activity()->mutable_processes(0)->set_questions_dropped(dropped);
-    flush();
-  }
-  for (const auto& f : connections.flows()) {
-    if (fit(false, f.ByteSizeLong()))
-      *chunk->mutable_network_activity()->mutable_processes(0)->add_flows() = f;
-  }
-  flush();
+  santanetd::SerializeNetworkActivity(
+      flows, cd, network, dns, [&](Arena* arena) { return CreateDefaultProto(arena, start, end); },
+      [&](::pbv1::SantaMessage* msg) { write(FinalizeProto(msg)); });
 }
 
 std::vector<uint8_t> Protobuf::SerializeFileAccess(
@@ -1554,8 +1483,8 @@ std::vector<uint8_t> Protobuf::SerializeFileAccess(
     const EnrichedProcess& enriched_process, size_t target_index,
     std::optional<santa::EnrichedFile> enriched_event_target, FileAccessPolicyDecision decision,
     std::string_view operation_id, int64_t rule_id) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena, msg);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get(), msg);
 
   ::pbv1::FileAccess* file_access = santa_msg->mutable_file_access();
 
@@ -1587,8 +1516,8 @@ std::vector<uint8_t> Protobuf::SerializeFileAccess(
 
 std::vector<uint8_t> Protobuf::SerializeAllowlist(const Message& msg, const std::string_view hash,
                                                   const std::string_view target_path) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get());
 
   const es_file_t* es_file = santa::GetAllowListTargetFile(msg);
 
@@ -1608,14 +1537,16 @@ std::vector<uint8_t> Protobuf::SerializeAllowlist(const Message& msg, const std:
   // The real path might not match the path that was used in `EncodeFileInfo`. This is because
   // we know the stat information will be appropriate, but the path might've been built from
   // components in the ES message.
-  *pb_allowlist->mutable_target()->mutable_path() = std::string(target_path);
+  std::string* pb_target_path = pb_allowlist->mutable_target()->mutable_path();
+  pb_target_path->clear();
+  AppendUTF8(pb_target_path, target_path);
 
   return FinalizeProto(santa_msg);
 }
 
 std::vector<uint8_t> Protobuf::SerializeBundleHashingEvent(SNTStoredExecutionEvent* event) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get());
 
   ::pbv1::Bundle* pb_bundle = santa_msg->mutable_bundle();
 
@@ -1682,8 +1613,8 @@ static void EncodeDisk(::pbv1::Disk* pb_disk, ::pbv1::Disk_Action action, NSDict
 }
 
 std::vector<uint8_t> Protobuf::SerializeDiskAppeared(NSDictionary* props, bool allowed) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get());
 
   EncodeDisk(santa_msg->mutable_disk(),
              allowed ? ::pbv1::Disk::ACTION_APPEARED : ::pbv1::Disk::ACTION_BLOCKED, props,
@@ -1693,8 +1624,8 @@ std::vector<uint8_t> Protobuf::SerializeDiskAppeared(NSDictionary* props, bool a
 }
 
 std::vector<uint8_t> Protobuf::SerializeDiskDisappeared(NSDictionary* props) {
-  Arena arena;
-  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(&arena);
+  EventArena arena;
+  ::pbv1::SantaMessage* santa_msg = CreateDefaultProto(arena.get());
 
   EncodeDisk(santa_msg->mutable_disk(), ::pbv1::Disk::ACTION_DISAPPEARED, props, true);
 

@@ -14,20 +14,32 @@
 
 #include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/ZstdOutputStream.h"
 
+#include <algorithm>
 #include <climits>
 #include <cstdint>
 #include <iostream>
 
+// ZSTD_c_srcSizeHint is in zstd's experimental API. That is safe here because
+// zstd is linked statically from a pinned version. zstd.h is written to be
+// included again after this define, which exposes the experimental section.
+#define ZSTD_STATIC_LINKING_ONLY
+#include "zstd.h"
+
 namespace fsspool {
 
 std::unique_ptr<ZstdOutputStream> ZstdOutputStream::Create(
-    google::protobuf::io::ZeroCopyOutputStream* output, int compression_level, size_t buffer_size) {
+    google::protobuf::io::ZeroCopyOutputStream* output, int compression_level, size_t buffer_size,
+    size_t src_size_hint) {
   ZSTD_CStream* cstream = ZSTD_createCStream();
   if (!cstream) {
     return nullptr;
   }
 
   size_t result = ZSTD_initCStream(cstream, compression_level);
+  if (!ZSTD_isError(result) && src_size_hint > 0) {
+    result = ZSTD_CCtx_setParameter(cstream, ZSTD_c_srcSizeHint,
+                                    static_cast<int>(std::min<size_t>(src_size_hint, INT_MAX)));
+  }
   if (ZSTD_isError(result)) {
     ZSTD_freeCStream(cstream);
     return nullptr;

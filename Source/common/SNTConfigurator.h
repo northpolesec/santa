@@ -580,7 +580,8 @@
 @property(nullable, readonly, nonatomic) NSString* eventDetailURL;
 
 ///
-///  Set the EventDetailURL as received from a sync server.
+///  Set the EventDetailURL as received from a sync server. A nil, empty, or whitespace-only
+///  value removes the synced value, so the configuration profile applies again.
 ///
 - (void)setSyncServerEventDetailURL:(nullable NSString*)eventDetailURL;
 
@@ -590,7 +591,8 @@
 @property(nullable, readonly, nonatomic) NSString* eventDetailText;
 
 ///
-///  Set the EventDetailText as received from a sync server.
+///  Set the EventDetailText as received from a sync server. A nil, empty, or whitespace-only
+///  value removes the synced value, so the configuration profile applies again.
 ///
 - (void)setSyncServerEventDetailText:(nullable NSString*)eventDetailText;
 
@@ -643,16 +645,30 @@
 
 ///
 ///  In lockdown mode this is the message shown to the user when an unknown binary
-///  is blocked. If this message is not configured, a reasonable default is provided.
+///  is blocked. A value from a sync server takes precedence over the configuration
+///  profile. If neither is set, a reasonable default is provided.
 ///
 @property(nullable, readonly, nonatomic) NSString* unknownBlockMessage;
 
 ///
+///  Set the message to be shown when an unknown binary is blocked, as received from a
+///  sync server. A nil, empty, or whitespace-only message removes the synced value.
+///
+- (void)setSyncServerUnknownBlockMessage:(nullable NSString*)msg;
+
+///
 ///  This is the message shown to the user when a binary is blocked because of a rule,
-///  if that rule doesn't provide a custom message. If this is not configured, a reasonable
-///  default is provided.
+///  if that rule doesn't provide a custom message. A value from a sync server takes
+///  precedence over the configuration profile. If neither is set, a reasonable default
+///  is provided.
 ///
 @property(nullable, readonly, nonatomic) NSString* bannedBlockMessage;
+
+///
+///  Set the message to be shown when a binary is blocked because of a rule, as received
+///  from a sync server. A nil, empty, or whitespace-only message removes the synced value.
+///
+- (void)setSyncServerBannedBlockMessage:(nullable NSString*)msg;
 
 ///
 /// This is the message shown to the user when a USB storage device's mount is denied.
@@ -1286,7 +1302,7 @@ extern NSString* _Nonnull const kStateTempAdminTargetUIDKey;
 ///
 ///  If set, only the listed command types will be accepted from the sync server.
 ///  Command names are lowercase strings matching proto field names: "kill", "ping",
-///  "event_upload", "binary_upload", "package_inventory".
+///  "event_upload", "binary_upload", "package_inventory", "ai_account_inventory".
 ///  When unset (nil), all commands are allowed.
 ///
 ///  This is a forced config key (MDM only) — not settable via sync server.

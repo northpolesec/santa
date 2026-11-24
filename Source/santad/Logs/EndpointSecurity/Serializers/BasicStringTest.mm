@@ -81,22 +81,17 @@ std::string BasicStringSerializeMessage(es_message_t* esMsg) {
 }
 
 // Records the decision the base class passes to the serializer.
-class NetworkFlowsCapturingBasicString : public BasicString {
+class NetworkActivityCapturingBasicString : public BasicString {
  public:
   using BasicString::BasicString;
-  using Serializer::SerializeDNSActivity;
-  using Serializer::SerializeNetworkFlows;
+  // The override below hides the non-virtual overload that looks up the decision.
+  using Serializer::SerializeNetworkActivities;
 
-  std::vector<uint8_t> SerializeNetworkFlows(SNDProcessFlows* pf, struct timespec start,
-                                             struct timespec end, SNTCachedDecision* cd) override {
+  void SerializeNetworkActivities(SNDProcessFlows* pf, struct timespec start, struct timespec end,
+                                  SNTCachedDecision* cd, bool network, bool dns,
+                                  const ActivityWriter& write) override {
     captured_cd = cd;
-    return BasicString::SerializeNetworkFlows(pf, start, end, cd);
-  }
-
-  std::vector<uint8_t> SerializeDNSActivity(SNDProcessFlows* pf, struct timespec start,
-                                            struct timespec end, SNTCachedDecision* cd) override {
-    captured_cd = cd;
-    return BasicString::SerializeDNSActivity(pf, start, end, cd);
+    BasicString::SerializeNetworkActivities(pf, start, end, cd, network, dns, write);
   }
 
   SNTCachedDecision* captured_cd;
@@ -1567,7 +1562,7 @@ class NetworkFlowsCapturingBasicString : public BasicString {
   }
 }
 
-- (void)testSerializeNetworkFlowsOmitsUnconfirmedDecision {
+- (void)testSerializeNetworkActivitiesOmitsUnconfirmedDecision {
   SantaVnode vnode = {.fsid = 1, .fileid = 2};
   id processInfo = OCMClassMock([SNDProcessInfo class]);
   OCMStub([(SNDProcessInfo*)processInfo vnode]).andReturn(vnode);
@@ -1581,31 +1576,15 @@ class NetworkFlowsCapturingBasicString : public BasicString {
       .andReturn(cd);
 
   auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
-  NetworkFlowsCapturingBasicString bs(mockESApi, self.mockDecisionCache, false);
+  NetworkActivityCapturingBasicString bs(mockESApi, self.mockDecisionCache, false);
+  auto ignore = [](std::vector<uint8_t>) {};
 
-  bs.SerializeNetworkFlows(processFlows, {}, {});
+  bs.SerializeNetworkActivities(processFlows, {}, {}, true, true, ignore);
   XCTAssertEqual(bs.captured_cd, cd);
 
   cd.identityMismatched = YES;
-  bs.SerializeNetworkFlows(processFlows, {}, {});
+  bs.SerializeNetworkActivities(processFlows, {}, {}, true, true, ignore);
   XCTAssertNil(bs.captured_cd);
-
-  cd.identityMismatched = NO;
-  bs.SerializeDNSActivity(processFlows, {}, {});
-  XCTAssertEqual(bs.captured_cd, cd);
-
-  cd.identityMismatched = YES;
-  bs.SerializeDNSActivity(processFlows, {}, {});
-  XCTAssertNil(bs.captured_cd);
-}
-
-- (void)testSerializeNetworkFlowsAndDNSActivitySkipAnEmptyProcess {
-  // The stub formats nothing for a process, so neither kind produces a line.
-  id processFlows = OCMClassMock([SNDProcessFlows class]);
-  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
-  std::shared_ptr<Serializer> bs = BasicString::Create(mockESApi, nil, false);
-  XCTAssertTrue(bs->SerializeNetworkFlows(processFlows, {}, {}, nil).empty());
-  XCTAssertTrue(bs->SerializeDNSActivity(processFlows, {}, {}, nil).empty());
 }
 
 - (void)testGetModeString {

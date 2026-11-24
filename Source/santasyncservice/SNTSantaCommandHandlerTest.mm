@@ -20,6 +20,7 @@
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTXPCControlInterface.h"
 #import "Source/santasyncservice/SNTPushNotifications.h"
+#import "Source/santasyncservice/SNTSantaCommandHandler+AIAccountInventory.h"
 #import "Source/santasyncservice/SNTSantaCommandHandler+BinaryUpload.h"
 #import "Source/santasyncservice/SNTSantaCommandHandler+EventUpload.h"
 #import "Source/santasyncservice/SNTSantaCommandHandler+Kill.h"
@@ -209,6 +210,51 @@ namespace pbv1 = ::santa::commands::v1;
                                                   errorMessage:&errorMessage];
 
   XCTAssertEqual(response->error(), ::pbv1::PackageInventoryResponse::ERROR_INTERNAL);
+  XCTAssertEqual(errorMessage, "no daemon connection");
+}
+
+- (void)testExecuteQueuedCommandAIAccountInventoryRejectedWhenNotAllowed {
+  OCMStub([self.mockConfigurator allowedSantaCommands]).andReturn(@[ @"package_inventory" ]);
+
+  ::pbv1::QueuedCommand command;
+  command.set_command_id(24);
+  command.mutable_ai_account_inventory()->mutable_scan()->set_run_id("run");
+
+  ::pbv1::CommandResult* result = [self.handler executeQueuedCommand:command onArena:self.arena];
+
+  XCTAssertEqual(result->command_id(), 24);
+  XCTAssertEqual(result->host_status(), ::pbv1::CommandResult::HOST_STATUS_REJECTED);
+  XCTAssertGreaterThan(result->error_message().size(), 0u);
+  XCTAssertEqual(result->result_case(), ::pbv1::CommandResult::RESULT_NOT_SET);
+}
+
+- (void)testExecuteQueuedCommandAIAccountInventoryReportsTypedResult {
+  OCMStub([self.mockConfigurator allowedSantaCommands]).andReturn(@[ @"ai_account_inventory" ]);
+
+  ::pbv1::QueuedCommand command;
+  command.set_command_id(25);
+  command.mutable_ai_account_inventory();
+
+  ::pbv1::CommandResult* result = [self.handler executeQueuedCommand:command onArena:self.arena];
+
+  // No daemon connection in tests, so the scan fails but still reports its typed result.
+  XCTAssertEqual(result->command_id(), 25);
+  XCTAssertEqual(result->host_status(), ::pbv1::CommandResult::HOST_STATUS_COMPLETE);
+  XCTAssertEqual(result->result_case(), ::pbv1::CommandResult::kAiAccountInventory);
+  XCTAssertEqual(result->ai_account_inventory().error(),
+                 ::pbv1::AIAccountInventoryResponse::ERROR_INTERNAL);
+  XCTAssertEqual(result->error_message(), "no daemon connection");
+}
+
+- (void)testHandleAIAccountInventoryWithoutDaemonConnectionFails {
+  ::pbv1::AIAccountInventoryRequest request;
+  std::string errorMessage;
+
+  auto* response = [self.handler handleAIAccountInventoryRequest:request
+                                                         onArena:self.arena
+                                                    errorMessage:&errorMessage];
+
+  XCTAssertEqual(response->error(), ::pbv1::AIAccountInventoryResponse::ERROR_INTERNAL);
   XCTAssertEqual(errorMessage, "no daemon connection");
 }
 
@@ -411,6 +457,10 @@ namespace pbv1 = ::santa::commands::v1;
   ::pbv1::QueuedCommand packageInventory;
   packageInventory.mutable_package_inventory();
   XCTAssertTrue([SNTSantaCommandHandler shouldPostDeliveredAckForCommand:packageInventory]);
+
+  ::pbv1::QueuedCommand aiAccountInventory;
+  aiAccountInventory.mutable_ai_account_inventory();
+  XCTAssertTrue([SNTSantaCommandHandler shouldPostDeliveredAckForCommand:aiAccountInventory]);
 
   ::pbv1::QueuedCommand unset;
   XCTAssertFalse([SNTSantaCommandHandler shouldPostDeliveredAckForCommand:unset]);

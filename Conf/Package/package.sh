@@ -54,12 +54,10 @@ fi
 
 echo "creating app pkg"
 /bin/mkdir -p "${APP_PKG_ROOT}/var/db/santa/migration" \
-  "${APP_PKG_ROOT}/Library/LaunchDaemons" \
-  "${APP_PKG_ROOT}/private/etc/newsyslog.d"
+  "${APP_PKG_ROOT}/Library/LaunchDaemons"
 /bin/cp -vXR "${APP_BUNDLE}" "${APP_PKG_ROOT}/var/db/santa/migration/"
 /bin/cp -vX "${RELEASE_ROOT}/conf/migration.sh" "${APP_PKG_ROOT}/var/db/santa/migration/"
 /bin/cp -vX "${RELEASE_ROOT}/conf/com.northpolesec.santa.migration.plist" "${APP_PKG_ROOT}/Library/LaunchDaemons/com.northpolesec.santa-migration.plist"
-/bin/cp -vX "${RELEASE_ROOT}/conf/com.northpolesec.santa.newsyslog.conf" "${APP_PKG_ROOT}/private/etc/newsyslog.d/"
 /bin/cp -vXL "${RELEASE_ROOT}/conf/preinstall" "${APP_PKG_SCRIPTS}/"
 /bin/cp -vXL "${RELEASE_ROOT}/conf/postinstall" "${APP_PKG_SCRIPTS}/"
 /bin/chmod +x "${APP_PKG_SCRIPTS}/"*
@@ -83,6 +81,14 @@ readonly APP_VERSION
   --component-plist "${SCRATCH}/component.plist" \
   --scripts "${APP_PKG_SCRIPTS}" \
   "${PKG_OUT_DIR}/app.pkg"
+
+# Disable the filesystem compression installd applies to MDM-delivered pkgs.
+/usr/sbin/pkgutil --expand "${PKG_OUT_DIR}/app.pkg" "${SCRATCH}/app_pkg_exp"
+/usr/bin/sed -i '' 's/<pkg-info /<pkg-info useHFSPlusCompression="false" /' "${SCRATCH}/app_pkg_exp/PackageInfo"
+/usr/bin/grep -q 'useHFSPlusCompression="false"' "${SCRATCH}/app_pkg_exp/PackageInfo" ||
+  die "failed to disable compression in PackageInfo"
+/bin/rm "${PKG_OUT_DIR}/app.pkg"
+/usr/sbin/pkgutil --flatten "${SCRATCH}/app_pkg_exp" "${PKG_OUT_DIR}/app.pkg"
 
 # Build dev distribution package if instructed.
 if [ -n "${BUILD_DEV_DISTRIBUTION_PKG}" ]; then

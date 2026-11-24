@@ -24,8 +24,8 @@
 
 #include "Source/common/processtree/annotations/annotator.h"
 #include "Source/common/processtree/process.h"
-#include "Source/common/processtree/process_tree.pb.h"
 #include "absl/container/flat_hash_map.h"
+#include "telemetry/v1.pb.h"
 
 namespace santa::santad::process_tree {
 
@@ -78,8 +78,7 @@ class CELAnnotator : public Annotator {
   std::shared_ptr<const Annotator> Propagate(bool across_exec) const override;
   bool PropagatesWholly(bool across_exec) const override;
 
-  std::optional<::santa::pb::v1::process_tree::Annotations> Proto()
-      const override;
+  std::optional<::santa::telemetry::v1::Annotations> Proto() const override;
 
   bool Has(std::string_view name) const { return entries_.contains(name); }
   const EntryMap& entries() const { return entries_; }

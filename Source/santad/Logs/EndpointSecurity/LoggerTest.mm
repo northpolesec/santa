@@ -103,10 +103,10 @@ class MockSerializer : public Empty {
               (override));
   MOCK_METHOD(std::vector<uint8_t>, SerializeDiskAppeared, (NSDictionary*, bool), (override));
   MOCK_METHOD(std::vector<uint8_t>, SerializeDiskDisappeared, (NSDictionary*), (override));
-  MOCK_METHOD(std::vector<uint8_t>, SerializeNetworkFlows,
-              (SNDProcessFlows*, struct timespec, struct timespec, SNTCachedDecision*), (override));
-  MOCK_METHOD(std::vector<uint8_t>, SerializeDNSActivity,
-              (SNDProcessFlows*, struct timespec, struct timespec, SNTCachedDecision*), (override));
+  MOCK_METHOD(void, SerializeNetworkActivities,
+              (SNDProcessFlows*, struct timespec, struct timespec, SNTCachedDecision*, bool, bool,
+               const santa::Serializer::ActivityWriter&),
+              (override));
 
   MOCK_METHOD(std::vector<uint8_t>, SerializeFileAccess,
               (const std::string& policy_version, const std::string& policy_name,
@@ -350,54 +350,40 @@ class MockSleighLauncher : public santa::SleighLauncher {
   XCTBubbleMockVerifyAndClearExpectations(mockWriter.get());
 }
 
-- (void)testLogNetworkFlowsWritesOneMessagePerKey {
-  // Each key writes its own message, DNS first. An empty serialization is not written.
+- (void)testLogNetworkFlowsPassesEachKeyAndWritesEachMessage {
+  // The keys reach the serializer, and each message it produces reaches the writer in order.
   struct timespec ts = {0, 0};
-  const std::vector<uint8_t> dns = {'d'};
-  const std::vector<uint8_t> flows = {'f'};
+  const std::vector<uint8_t> first = {'1'};
+  const std::vector<uint8_t> second = {'2'};
   struct Case {
     TelemetryEvent mask;
-    bool wantDNS;
-    bool wantFlows;
+    bool network;
+    bool dns;
   };
-  for (const Case& c : std::vector<Case>{{TelemetryEvent::kDNSActivity, true, false},
-                                         {TelemetryEvent::kNetworkActivity, false, true},
+  for (const Case& c : std::vector<Case>{{TelemetryEvent::kDNSActivity, false, true},
+                                         {TelemetryEvent::kNetworkActivity, true, false},
                                          {TelemetryEvent::kEverything, true, true},
                                          {TelemetryEvent::kNone, false, false},
                                          {TelemetryEvent::kExecution, false, false}}) {
     auto mockSerializer = std::make_shared<MockSerializer>();
     auto mockWriter = std::make_shared<MockWriter>();
-    if (c.wantDNS) {
-      EXPECT_CALL(*mockSerializer, SerializeDNSActivity).WillOnce(Return(dns));
-    } else {
-      EXPECT_CALL(*mockSerializer, SerializeDNSActivity).Times(0);
-    }
-    if (c.wantFlows) {
-      EXPECT_CALL(*mockSerializer, SerializeNetworkFlows).WillOnce(Return(flows));
-    } else {
-      EXPECT_CALL(*mockSerializer, SerializeNetworkFlows).Times(0);
-    }
-    {
+    if (c.network || c.dns) {
+      EXPECT_CALL(*mockSerializer,
+                  SerializeNetworkActivities(::testing::_, ::testing::_, ::testing::_, ::testing::_,
+                                             c.network, c.dns, ::testing::_))
+          .WillOnce([&](SNDProcessFlows*, struct timespec, struct timespec, SNTCachedDecision*,
+                        bool, bool, const santa::Serializer::ActivityWriter& write) {
+            write(first);
+            write(second);
+          });
       ::testing::InSequence seq;
-      if (c.wantDNS) EXPECT_CALL(*mockWriter, Write(::testing::Eq(dns)));
-      if (c.wantFlows) EXPECT_CALL(*mockWriter, Write(::testing::Eq(flows)));
+      EXPECT_CALL(*mockWriter, Write(::testing::Eq(first)));
+      EXPECT_CALL(*mockWriter, Write(::testing::Eq(second)));
+    } else {
+      EXPECT_CALL(*mockSerializer, SerializeNetworkActivities).Times(0);
+      EXPECT_CALL(*mockWriter, Write).Times(0);
     }
-    if (!c.wantDNS && !c.wantFlows) EXPECT_CALL(*mockWriter, Write).Times(0);
     Logger(nil, nil, c.mask, 1, 1, 1, mockSerializer, mockWriter).LogNetworkFlows(nil, ts, ts);
-    XCTBubbleMockVerifyAndClearExpectations(mockSerializer.get());
-    XCTBubbleMockVerifyAndClearExpectations(mockWriter.get());
-  }
-
-  for (const auto& [dnsOut, flowsOut] :
-       std::vector<std::pair<std::vector<uint8_t>, std::vector<uint8_t>>>{{{}, flows}, {dns, {}}}) {
-    auto mockSerializer = std::make_shared<MockSerializer>();
-    auto mockWriter = std::make_shared<MockWriter>();
-    EXPECT_CALL(*mockSerializer, SerializeDNSActivity).WillOnce(Return(dnsOut));
-    EXPECT_CALL(*mockSerializer, SerializeNetworkFlows).WillOnce(Return(flowsOut));
-    EXPECT_CALL(*mockWriter, Write(::testing::Eq(dnsOut.empty() ? flowsOut : dnsOut)));
-    EXPECT_CALL(*mockWriter, Write(::testing::IsEmpty())).Times(0);
-    Logger(nil, nil, TelemetryEvent::kEverything, 1, 1, 1, mockSerializer, mockWriter)
-        .LogNetworkFlows(nil, ts, ts);
     XCTBubbleMockVerifyAndClearExpectations(mockSerializer.get());
     XCTBubbleMockVerifyAndClearExpectations(mockWriter.get());
   }

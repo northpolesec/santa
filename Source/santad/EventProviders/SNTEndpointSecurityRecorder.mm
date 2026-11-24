@@ -19,10 +19,18 @@
 #import "Source/santad/SNTLoginWindowSessionHandlerProtocol.h"
 
 #include <EndpointSecurity/EndpointSecurity.h>
+#include <unicode/uregex.h>
+#include <unicode/utext.h>
+
+#include <memory>
+#include <string_view>
+#include <vector>
 
 #include "Source/common/Platform.h"
 #import "Source/common/SNTConfigurator.h"
+#import "Source/common/SNTKVOManager.h"
 #import "Source/common/SNTLogging.h"
+#import "Source/common/SNTStrengthify.h"
 #include "Source/common/String.h"
 #include "Source/common/TelemetryEventMap.h"
 #include "Source/common/es/ESMetricsObserver.h"
@@ -30,6 +38,7 @@
 #include "Source/common/es/Message.h"
 #include "Source/common/processtree/process_tree.h"
 #import "Source/santad/SNTDecisionCache.h"
+#include "absl/synchronization/mutex.h"
 
 using santa::EndpointSecurityAPI;
 using santa::EnrichedMessage;
@@ -41,6 +50,84 @@ using santa::PrefixTree;
 using santa::Unit;
 using santa::santad::process_tree::ProcessTree;
 
+namespace {
+
+// ICU form of FileChangesRegex, matched directly against UTF-8 path bytes.
+// ICU reads bytes that are not valid UTF-8 as U+FFFD, so such paths are still
+// evaluated. ICU keeps match state in the regex object, so callers must not
+// match from two threads at once.
+class FileChangesMatcher {
+ public:
+  // Returns nullptr if the ICU regex cannot be set up.
+  static std::unique_ptr<FileChangesMatcher> Create(NSRegularExpression* re);
+  ~FileChangesMatcher();
+  FileChangesMatcher(const FileChangesMatcher&) = delete;
+  FileChangesMatcher& operator=(const FileChangesMatcher&) = delete;
+
+  bool Matches(std::string_view path);
+
+ private:
+  explicit FileChangesMatcher(URegularExpression* re) : re_(re) {}
+
+  URegularExpression* re_;
+  // Reused for every path, so matching does not allocate.
+  UText text_ = UTEXT_INITIALIZER;
+  // Open on "". re_ and text_ refer to it between matches.
+  UText empty_ = UTEXT_INITIALIZER;
+};
+
+std::unique_ptr<FileChangesMatcher> FileChangesMatcher::Create(NSRegularExpression* re) {
+  NSString* pattern = re.pattern;
+  std::vector<UChar> chars(pattern.length);
+  [pattern getCharacters:reinterpret_cast<unichar*>(chars.data())
+                   range:NSMakeRange(0, pattern.length)];
+
+  UErrorCode status = U_ZERO_ERROR;
+  // re.options is not read. Flags 0 match the options:0 that SNTConfigurator
+  // compiles FileChangesRegex with (expressionForPattern:). If those options
+  // change, the flags here must change to match.
+  URegularExpression* uregex =
+      uregex_open(chars.data(), static_cast<int32_t>(chars.size()), 0, nullptr, &status);
+  if (U_FAILURE(status)) {
+    if (uregex) uregex_close(uregex);
+    return nullptr;
+  }
+
+  // The destructor releases whatever was opened.
+  std::unique_ptr<FileChangesMatcher> matcher(new FileChangesMatcher(uregex));
+  utext_openUTF8(&matcher->empty_, "", 0, &status);
+  utext_openUTF8(&matcher->text_, "", 0, &status);
+  uregex_setUText(uregex, &matcher->empty_, &status);
+  if (U_FAILURE(status)) {
+    return nullptr;
+  }
+  return matcher;
+}
+
+FileChangesMatcher::~FileChangesMatcher() {
+  uregex_close(re_);
+  utext_close(&text_);
+  utext_close(&empty_);
+}
+
+bool FileChangesMatcher::Matches(std::string_view path) {
+  UErrorCode status = U_ZERO_ERROR;
+  utext_openUTF8(&text_, path.data(), static_cast<int64_t>(path.size()), &status);
+  uregex_setUText(re_, &text_, &status);
+  bool found = U_SUCCESS(status) && uregex_find(re_, 0, &status) && U_SUCCESS(status);
+
+  // The regex keeps a reference to the path bytes, which belong to the
+  // message. Point it back at "" so nothing refers to them after this returns.
+  // ICU calls do nothing when the status already holds an error, so use a
+  // fresh one.
+  UErrorCode reset = U_ZERO_ERROR;
+  uregex_setUText(re_, &empty_, &reset);
+  utext_openUTF8(&text_, "", 0, &reset);
+  return found;
+}
+
+}  // namespace
+
 @interface SNTEndpointSecurityRecorder ()
 @property SNTCompilerController* compilerController;
 @property(nonatomic, strong) id<SNTLoginWindowSessionHandler> loginWindowSessionHandler;
@@ -51,6 +138,11 @@ using santa::santad::process_tree::ProcessTree;
   std::shared_ptr<Enricher> _enricher;
   std::shared_ptr<Logger> _logger;
   std::shared_ptr<PrefixTree<Unit>> _prefixTree;
+
+  SNTKVOManager* _fileChangesRegexKVO;
+  absl::Mutex _fileChangesMu;
+  // Guarded by _fileChangesMu. Null when no FileChangesRegex is configured.
+  std::unique_ptr<FileChangesMatcher> _fileChangesMatcher;
 }
 
 - (instancetype)initWithESAPI:(std::shared_ptr<EndpointSecurityAPI>)esApi
@@ -73,6 +165,23 @@ using santa::santad::process_tree::ProcessTree;
     _prefixTree = prefixTree;
     _configurator = [SNTConfigurator configurator];
 
+    // Watch before reading so a change in between is not missed.
+    WEAKIFY(self);
+    _fileChangesRegexKVO = [[SNTKVOManager alloc]
+        initWithObject:_configurator
+              selector:@selector(fileChangesRegex)
+                  type:[NSRegularExpression class]
+              callback:^(NSRegularExpression* oldValue, NSRegularExpression* newValue) {
+                // Every config reload builds a new NSRegularExpression, so
+                // compare patterns to skip recompiling an unchanged one.
+                if (oldValue == newValue || [oldValue.pattern isEqualToString:newValue.pattern]) {
+                  return;
+                }
+                STRONGIFY(self);
+                [self setFileChangesRegex:newValue];
+              }];
+    [self setFileChangesRegex:_configurator.fileChangesRegex];
+
     [self establishClientOrDie];
   }
   return self;
@@ -80,6 +189,17 @@ using santa::santad::process_tree::ProcessTree;
 
 - (NSString*)description {
   return @"Recorder";
+}
+
+- (void)setFileChangesRegex:(NSRegularExpression*)re {
+  std::unique_ptr<FileChangesMatcher> matcher = re ? FileChangesMatcher::Create(re) : nullptr;
+  if (re && !matcher) {
+    LOGE(@"Failed to compile FileChangesRegex \"%@\" with ICU. File changes will not be logged.",
+         re.pattern);
+  }
+
+  absl::MutexLock lock(_fileChangesMu);
+  _fileChangesMatcher = std::move(matcher);
 }
 
 - (void)handleMessage:(Message&&)esMsg
@@ -105,10 +225,18 @@ using santa::santad::process_tree::ProcessTree;
     default: break;
   }
 
+  bool recordDrop = false;
+  bool willLog = [self willLogMessage:esMsg recordDrop:&recordDrop];
+  if (willLog) {
+    // The compiler controller can spend a while hashing, so the token must
+    // exist before it runs.
+    [self attachProcessToken:esMsg];
+  }
+
   [self.compilerController handleEvent:esMsg withLogger:self->_logger];
 
-  // Taken before the Recorder's own filters, so a mark outlives its hold only
-  // if its NOTIFY_EXEC never reaches this handler.
+  // Taken before any of the Recorder's drop returns, so a mark outlives its
+  // hold only if its NOTIFY_EXEC never reaches this handler.
   bool heldExecution =
       esMsg->event_type == ES_EVENT_TYPE_NOTIFY_EXEC &&
       [[SNTDecisionCache sharedCache] takeHeldExecution:esMsg->event.exec.target->audit_token];
@@ -129,10 +257,10 @@ using santa::santad::process_tree::ProcessTree;
     default: break;
   }
 
-  // The logger will take care of this, but we check early so we
-  // don't do any unnecessary work
-  if (!_logger->ShouldLog(santa::ESEventToTelemetryEvent(esMsg->event_type))) {
-    recordEventMetrics(EventDisposition::kDropped);
+  if (!willLog) {
+    if (recordDrop) {
+      recordEventMetrics(EventDisposition::kDropped);
+    }
     return;
   }
 
@@ -150,6 +278,43 @@ using santa::santad::process_tree::ProcessTree;
     }
   }
 
+  // Enrich the message inline with the ES handler block to capture enrichment
+  // data as close to the source event as possible.
+  std::unique_ptr<EnrichedMessage> enrichedMessage = _enricher->Enrich(std::move(esMsg));
+
+  if (!enrichedMessage) {
+    recordEventMetrics(EventDisposition::kDropped);
+    return;
+  }
+
+  // Asynchronously log the message
+  [self processEnrichedMessage:std::move(enrichedMessage)
+                       handler:^(std::unique_ptr<EnrichedMessage> msg) {
+                         self->_logger->Log(std::move(msg));
+                         recordEventMetrics(EventDisposition::kProcessed);
+                       }];
+}
+
+// The Enricher is the Recorder's only tree reader, so the Recorder builds its
+// token in handleMessage: once it knows the message will be logged.
+- (bool)attachesProcessTokenEagerly {
+  return false;
+}
+
+// Whether handleMessage: will log the message, before the exec hold checks.
+// Has no side effects, so it can run before the compiler controller. Sets
+// *recordDrop when the drop counts toward metrics.
+// ponytail: recordDrop is an out-param, not a recordEventMetrics call, because
+// recording the drop here would stop the processing-time metric before the
+// compiler controller runs.
+- (bool)willLogMessage:(Message&)esMsg recordDrop:(bool*)recordDrop {
+  // The logger will take care of this, but we check early so we
+  // don't do any unnecessary work
+  if (!_logger->ShouldLog(santa::ESEventToTelemetryEvent(esMsg->event_type))) {
+    *recordDrop = true;
+    return false;
+  }
+
   switch (esMsg->event_type) {
     case ES_EVENT_TYPE_NOTIFY_CLONE: OS_FALLTHROUGH;
     case ES_EVENT_TYPE_NOTIFY_CLOSE: OS_FALLTHROUGH;
@@ -159,15 +324,15 @@ using santa::santad::process_tree::ProcessTree;
     case ES_EVENT_TYPE_NOTIFY_RENAME: OS_FALLTHROUGH;
     case ES_EVENT_TYPE_NOTIFY_UNLINK: {
       // Only log file changes that match the given regex. When no regex is
-      // configured these events are never logged, so bail before inspecting
-      // any targets.
-      NSRegularExpression* fileChangesRegex = [self.configurator fileChangesRegex];
-      if (!fileChangesRegex) {
+      // configured, or it failed to compile, these events are never logged, so
+      // bail before inspecting any targets.
+      absl::MutexLock lock(self->_fileChangesMu);
+      if (!self->_fileChangesMatcher) {
         // Note: Do not record metrics in this case. These are not considered "drops"
         // because this is not a failure case.
         // TODO(mlw): Consider changes to configuration that would allow muting paths
         // to filter on the kernel side rather than in user space.
-        return;
+        return false;
       }
 
       // Events like rename, clone, copyfile, exchangedata, and link have more than
@@ -184,13 +349,7 @@ using santa::santad::process_tree::ProcessTree;
           continue;
         }
 
-        NSString* targetPath = santa::StringToNSString(path);
-        // Paths that are not valid UTF-8 fail to convert. Treat these as a regex miss.
-        if (targetPath &&
-            [fileChangesRegex rangeOfFirstMatchInString:targetPath
-                                                options:0
-                                                  range:NSMakeRange(0, targetPath.length)]
-                    .location != NSNotFound) {
+        if (self->_fileChangesMatcher->Matches(path)) {
           shouldLog = true;
           break;
         }
@@ -199,10 +358,8 @@ using santa::santad::process_tree::ProcessTree;
       if (!shouldLog) {
         // Note: Only prefix filtered events are recorded as drops. Regex misses are
         // not considered a failure case.
-        if (prefixFiltered) {
-          recordEventMetrics(EventDisposition::kDropped);
-        }
-        return;
+        *recordDrop = prefixFiltered;
+        return false;
       }
 
       break;
@@ -211,21 +368,7 @@ using santa::santad::process_tree::ProcessTree;
     default: break;
   }
 
-  // Enrich the message inline with the ES handler block to capture enrichment
-  // data as close to the source event as possible.
-  std::unique_ptr<EnrichedMessage> enrichedMessage = _enricher->Enrich(std::move(esMsg));
-
-  if (!enrichedMessage) {
-    recordEventMetrics(EventDisposition::kDropped);
-    return;
-  }
-
-  // Asynchronously log the message
-  [self processEnrichedMessage:std::move(enrichedMessage)
-                       handler:^(std::unique_ptr<EnrichedMessage> msg) {
-                         self->_logger->Log(std::move(msg));
-                         recordEventMetrics(EventDisposition::kProcessed);
-                       }];
+  return true;
 }
 
 - (void)enable {

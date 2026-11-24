@@ -30,13 +30,13 @@
 #import "Source/common/SNTLogging.h"
 #import "Source/common/SNTMetricSet.h"
 #include "Source/common/ScopedFile.h"
-#include "Source/common/santa.pb.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/fsspool.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/Writer.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 #include "absl/status/status.h"
 #include "absl/strings/string_view.h"
+#include "telemetry/v1.pb.h"
 
 // Forward declarations
 namespace santa {

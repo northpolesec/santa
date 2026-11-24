@@ -22,6 +22,10 @@
 @interface MOLXPCConnectionTest : XCTestCase
 @end
 
+@interface MOLXPCConnection (Testing)
+- (BOOL)finishHandshake;
+@end
+
 @protocol DummyXPCProtocol
 @end
 
@@ -117,12 +121,22 @@
   XCTestExpectation* exp2 = [self expectationWithDescription:@"Client Accepted"];
   MOLXPCConnection* sutClient = [[MOLXPCConnection alloc] initClientWithListener:listener.endpoint
                                                           codeSigningRequirement:nil];
+  sutClient.remoteInterface = [self deepThoughtInterface];
   sutClient.acceptedHandler = ^{
     [exp2 fulfill];
   };
   [sutClient resume];
 
   [self waitForExpectationsWithTimeout:2.0 handler:NULL];
+
+  XCTAssertTrue(sutClient.isConnected);
+  [sutClient invalidate];
+  XCTAssertFalse(sutClient.isConnected);
+
+  // A handshake reply that lands after a timeout or an invalidation must not
+  // mark the dead connection connected again.
+  XCTAssertFalse([sutClient finishHandshake]);
+  XCTAssertFalse(sutClient.isConnected);
 }
 
 - (void)testConnectionInterruption {
@@ -136,16 +150,26 @@
   __block XCTestExpectation* exp1 = [self expectationWithDescription:@"Client Invalidated"];
   MOLXPCConnection* sutClient = [[MOLXPCConnection alloc] initClientWithListener:listener.endpoint
                                                           codeSigningRequirement:nil];
+  sutClient.remoteInterface = [self deepThoughtInterface];
   sutClient.invalidationHandler = ^{
     [exp1 fulfill];
     exp1 = nil;  // prevent multiple fulfill violation
   };
   [sutClient resume];
+  XCTAssertTrue(sutClient.isConnected);
 
   [sutServer invalidate];
   sutServer = nil;
 
   [self waitForExpectationsWithTimeout:1.0 handler:NULL];
+
+  XCTAssertFalse(sutClient.isConnected);
+  XCTAssertNil(sutClient.remoteObjectProxy);
+  // Invalidation must not change the live connection's remoteObjectInterface.
+  // Another thread may be building a proxy from it, and a change mid-build
+  // yields a proxy that recognizes no selectors.
+  NSXPCConnection* conn = [sutClient valueForKey:@"currentConnection"];
+  XCTAssertEqual(conn.remoteObjectInterface, [self deepThoughtInterface]);
 }
 
 - (void)testSynchronous {

@@ -93,6 +93,8 @@
 @property NSNumber* blockNetworkMount;
 @property NSString* bannedNetworkMountBlockMessage;
 @property NSArray<NSString*>* allowedNetworkMountHosts;
+@property NSString* bannedBlockMessage;
+@property NSString* unknownBlockMessage;
 @property NSString* bannedUSBBlockMessage;
 @property NSString* remountUSBBlockMessage;
 @property NSString* overrideFileAccessAction;

@@ -19,7 +19,7 @@
 #include <memory>
 #include <optional>
 
-#include "Source/common/processtree/process_tree.pb.h"
+#include "telemetry/v1.pb.h"
 
 namespace santa::santad::process_tree {
 
@@ -75,8 +75,7 @@ class Annotator {
   // Propagate().
   virtual bool PropagatesWholly(bool across_exec) const { return false; }
 
-  virtual std::optional<::santa::pb::v1::process_tree::Annotations> Proto()
-      const = 0;
+  virtual std::optional<::santa::telemetry::v1::Annotations> Proto() const = 0;
 };
 
 }  // namespace santa::santad::process_tree

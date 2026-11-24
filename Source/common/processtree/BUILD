@@ -1,5 +1,3 @@
-load("@protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
-load("@protobuf//bazel:proto_library.bzl", "proto_library")
 load("@rules_cc//cc:defs.bzl", "cc_library", "objc_library")
 load("//:helper.bzl", "santa_unit_test")
 
@@ -33,7 +31,6 @@ objc_library(
     ],
     deps = [
         ":process",
-        ":process_tree_cc_proto",
         "//Source/common:CSOpsHelper",
         "//Source/common:ScopedMachPort",
         "//Source/common:SystemResources",
@@ -44,17 +41,8 @@ objc_library(
         "@abseil-cpp//absl/status",
         "@abseil-cpp//absl/status:statusor",
         "@abseil-cpp//absl/synchronization",
+        "@northpolesec_protos//telemetry:v1_cc_proto",
     ],
-)
-
-proto_library(
-    name = "process_tree_proto",
-    srcs = ["process_tree.proto"],
-)
-
-cc_proto_library(
-    name = "process_tree_cc_proto",
-    deps = [":process_tree_proto"],
 )
 
 objc_library(
@@ -91,6 +79,9 @@ santa_unit_test(
         ":process",
         ":process_tree_test_helpers",
         "//Source/common/processtree/annotations:annotator",
+        "//Source/common/processtree/annotations:cel",
+        "//Source/common/processtree/annotations:originator",
         "@abseil-cpp//absl/synchronization",
+        "@northpolesec_protos//telemetry:v1_cc_proto",
     ],
 )

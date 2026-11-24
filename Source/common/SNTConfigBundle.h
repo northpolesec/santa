@@ -38,6 +38,8 @@
 - (void)blockNetworkMount:(void (^)(BOOL))block;
 - (void)bannedNetworkMountBlockMessage:(void (^)(NSString*))block;
 - (void)allowedNetworkMountHosts:(void (^)(NSArray<NSString*>*))block;
+- (void)bannedBlockMessage:(void (^)(NSString*))block;
+- (void)unknownBlockMessage:(void (^)(NSString*))block;
 - (void)bannedUSBBlockMessage:(void (^)(NSString*))block;
 - (void)remountUSBBlockMessage:(void (^)(NSString*))block;
 - (void)enableBundles:(void (^)(BOOL))block;

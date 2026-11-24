@@ -100,6 +100,8 @@ using santa::FakeAdminGroupMembership;
   self.mockConfigurator = OCMClassMock([SNTConfigurator class]);
   OCMStub([self.mockConfigurator configurator]).andReturn(self.mockConfigurator);
   self.mockNotQueue = OCMClassMock([SNTNotificationQueue class]);
+  // The GUI is registered from the session of the user these tests elevate (getuid()).
+  OCMStub([self.mockNotQueue notifierOwnerUID]).andReturn(getuid());
 }
 
 // Stub an available on-demand policy.
@@ -115,11 +117,10 @@ using santa::FakeAdminGroupMembership;
 
 - (void)stubAuthReply:(BOOL)authed reason:(NSString*)reason {
   OCMStub([self.mockNotQueue
-      authorizeTemporaryAdminModeRequiringJustification:YES
-                                                  reply:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(
-                                                                                         authed),
-                                                                                     reason,
-                                                                                     nil])]);
+      authorizeTemporaryAdminModeForUID:getuid()
+                 requiringJustification:YES
+                                  reply:([OCMArg invokeBlockWithArgs:OCMOCK_VALUE(authed), reason,
+                                                                     nil])]);
 }
 
 // Build a real TemporaryAdminMode backed by a FakeAdminGroupMembership.

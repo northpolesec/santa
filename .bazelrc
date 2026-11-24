@@ -84,3 +84,7 @@ build:ubsan --copt="-DUNDEFINED_SANITIZER=1"
 build:ubsan --copt="-fno-sanitize=function" --copt="-fno-sanitize=vptr"
 build:ubsan --linkopt="-fsanitize=undefined"
 build:ubsan --test_env="UBSAN_OPTIONS=log_path=/tmp/san_out"
+
+# Private modules. The file is absent from public snapshots, which then build
+# against stubs/ instead.
+try-import %workspace%/Source/internal/internal.bazelrc

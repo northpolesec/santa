@@ -18,6 +18,7 @@
 #import "Source/common/SNTConfigurator.h"
 #import "Source/common/SNTSyncConstants.h"
 #import "Source/common/SNTSystemInfo.h"
+#import "Source/santasyncservice/SNTPushClientNATS+Commands.h"
 #import "Source/santasyncservice/SNTPushClientNATS.h"
 #import "Source/santasyncservice/SNTPushNotifications.h"
 #import "Source/santasyncservice/SNTSyncState.h"
@@ -74,6 +75,7 @@ static X509* CreateCertWithDNSSANBytes(const char* data, size_t len) {
 
 // Expose private methods for testing
 @interface SNTPushClientNATS (Testing)
+@property(nonatomic, readonly) void* natsClosure;
 @property(nonatomic) natsConnection* conn;
 @property(nonatomic, readwrite) BOOL isConnected;
 @property(nonatomic) dispatch_source_t connectionRetryTimer;
@@ -133,6 +135,19 @@ static X509* CreateCertWithDNSSANBytes(const char* data, size_t len) {
   XCTAssertEqual(self.client.fullSyncInterval, kDefaultPushNotificationsFullSyncInterval);
   XCTAssertFalse(self.client.isConnected);
   XCTAssertTrue(self.client.conn == NULL);
+}
+
+// NATS callbacks can run after the client is released. They must resolve the
+// closure to nil then, not to a dangling pointer.
+- (void)testCallbackClosureDoesNotOutliveClient {
+  void* closure = NULL;
+  @autoreleasepool {
+    SNTPushClientNATS* client =
+        [[SNTPushClientNATS alloc] initWithSyncDelegate:self.mockSyncDelegate];
+    closure = client.natsClosure;
+    XCTAssertEqual(SNTPushClientNATSFromClosure(closure), client);
+  }
+  XCTAssertNil(SNTPushClientNATSFromClosure(closure));
 }
 
 #pragma mark - Connection Tests

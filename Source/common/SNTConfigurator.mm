@@ -370,6 +370,8 @@ static NSString* const kPushTokenChainKey = @"PushTokenChain";
       kBlockNetworkMountKey : number,
       kBannedNetworkMountBlockMessage : string,
       kAllowedNetworkMountHosts : array,
+      kBannedBlockMessage : string,
+      kUnknownBlockMessage : string,
       kBannedUSBBlockMessage : string,
       kRemountUSBBlockMessage : string,
       kFullSyncLastSuccess : date,
@@ -629,7 +631,7 @@ static SNTConfigurator* sharedConfigurator = nil;
   return [self configStateSet];
 }
 
-+ (NSSet*)keyPathsForValuesAffectingFileChangesPrefixFiltersKey {
++ (NSSet*)keyPathsForValuesAffectingFileChangesPrefixFilters {
   return [self configStateSet];
 }
 
@@ -702,11 +704,11 @@ static SNTConfigurator* sharedConfigurator = nil;
 }
 
 + (NSSet*)keyPathsForValuesAffectingUnknownBlockMessage {
-  return [self configStateSet];
+  return [self syncAndConfigStateSet];
 }
 
 + (NSSet*)keyPathsForValuesAffectingBannedBlockMessage {
-  return [self configStateSet];
+  return [self syncAndConfigStateSet];
 }
 
 + (NSSet*)keyPathsForValuesAffectingModeNotificationMonitor {
@@ -929,10 +931,6 @@ static SNTConfigurator* sharedConfigurator = nil;
   return [self syncAndConfigStateSet];
 }
 
-+ (NSSet*)keyPathsForValuesAffectingUsbBlockMessage {
-  return [self configStateSet];
-}
-
 + (NSSet*)keyPathsForValuesAffectingBlockNetworkMount {
   return [self syncStateSet];
 }
@@ -945,7 +943,7 @@ static SNTConfigurator* sharedConfigurator = nil;
   return [self syncStateSet];
 }
 
-+ (NSSet*)keyPathsForValuesAffectingOverrideFileAccessActionKey {
++ (NSSet*)keyPathsForValuesAffectingOverrideFileAccessAction {
   return [self syncAndConfigStateSet];
 }
 
@@ -1448,19 +1446,21 @@ static SNTConfigurator* sharedConfigurator = nil;
 }
 
 - (NSString*)eventDetailURL {
-  return self.syncState[kEventDetailURLKey] ?: self.configState[kEventDetailURLKey];
+  return SyncMessageOrNil(self.syncState[kEventDetailURLKey])
+             ?: self.configState[kEventDetailURLKey];
 }
 
 - (void)setSyncServerEventDetailURL:(NSString*)eventDetailURL {
-  [self updateSyncStateForKey:kEventDetailURLKey value:eventDetailURL];
+  [self updateSyncStateForKey:kEventDetailURLKey value:SyncMessageOrNil(eventDetailURL)];
 }
 
 - (NSString*)eventDetailText {
-  return self.syncState[kEventDetailTextKey] ?: self.configState[kEventDetailTextKey];
+  return SyncMessageOrNil(self.syncState[kEventDetailTextKey])
+             ?: self.configState[kEventDetailTextKey];
 }
 
 - (void)setSyncServerEventDetailText:(NSString*)eventDetailText {
-  [self updateSyncStateForKey:kEventDetailTextKey value:eventDetailText];
+  [self updateSyncStateForKey:kEventDetailTextKey value:SyncMessageOrNil(eventDetailText)];
 }
 
 - (NSString*)fileAccessEventDetailURL {
@@ -1486,11 +1486,19 @@ static SNTConfigurator* sharedConfigurator = nil;
 }
 
 - (NSString*)unknownBlockMessage {
-  return self.configState[kUnknownBlockMessage];
+  return self.syncState[kUnknownBlockMessage] ?: self.configState[kUnknownBlockMessage];
+}
+
+- (void)setSyncServerUnknownBlockMessage:(NSString*)msg {
+  [self updateSyncStateForKey:kUnknownBlockMessage value:SyncMessageOrNil(msg)];
 }
 
 - (NSString*)bannedBlockMessage {
-  return self.configState[kBannedBlockMessage];
+  return self.syncState[kBannedBlockMessage] ?: self.configState[kBannedBlockMessage];
+}
+
+- (void)setSyncServerBannedBlockMessage:(NSString*)msg {
+  [self updateSyncStateForKey:kBannedBlockMessage value:SyncMessageOrNil(msg)];
 }
 
 - (NSString*)bannedUSBBlockMessage {

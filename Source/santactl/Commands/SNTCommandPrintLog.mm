@@ -28,17 +28,16 @@
 #include "Source/common/SNTLogging.h"
 #import "Source/common/SNTXxhash.h"
 #include "Source/common/ScopedFile.h"
-#include "Source/common/santa.pb.h"
 #import "Source/santactl/SNTCommand.h"
 #import "Source/santactl/SNTCommandController.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/AnyBatcher.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/StreamBatcher.h"
-#include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/binaryproto.pb.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_format.h"
 #include "google/protobuf/any.pb.h"
 #include "google/protobuf/io/coded_stream.h"
 #include "google/protobuf/io/zero_copy_stream_impl.h"
+#include "telemetry/v1.pb.h"
 
 #define ZSTD_STATIC_LINKING_ONLY
 #include "zstd.h"
@@ -46,8 +45,8 @@
 using JsonPrintOptions = google::protobuf::json::PrintOptions;
 using google::protobuf::json::MessageToJsonString;
 using santa::ScopedFile;
-using santa::fsspool::binaryproto::LogBatch;
-namespace pbv1 = ::santa::pb::v1;
+using santa::telemetry::v1::LogBatch;
+namespace pbv1 = ::santa::telemetry::v1;
 
 // Semi-arbitrary max compressed file size that will be operated upon.
 // The current implementation decompresses in memory. This variable
@@ -156,14 +155,9 @@ class StreamMessageSource : public MessageSource {
     }
 
     if (expected_hash != 0) {
-      santa::Xxhash64 xxhash;
-      xxhash.Update(msg_buf.data(), msg_buf.size());
-      __block uint64_t got_hash;
-      xxhash.Digest(^(const uint8_t* buf, size_t size) {
-        got_hash = *(uint64_t*)buf;
-      });
-
-      if (got_hash != expected_hash) {
+      santa::Xxhash64::canonical_type got_hash =
+          santa::Xxhash64::CanonicalDigestOneShot(msg_buf.data(), msg_buf.size());
+      if (memcmp(got_hash.digest, &expected_hash, sizeof(expected_hash)) != 0) {
         return absl::InternalError("Message corruption detected");
       }
     }

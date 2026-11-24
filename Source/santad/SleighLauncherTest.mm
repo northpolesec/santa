@@ -24,6 +24,7 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "commands/v1.pb.h"
+#include "common/aiaccountinventory.pb.h"
 #include "common/packageinventory.pb.h"
 #include "telemetry/sleighconfig.pb.h"
 
@@ -191,6 +192,45 @@ class TestableSleighLauncher : public santa::SleighLauncher {
 
   absl::Status s =
       launcher.LaunchPackageInventoryScan(scan, "https://example.com/post", {{"key", "inv/x"}});
+
+  XCTAssertTrue(absl::IsInvalidArgument(s));
+}
+
+// LaunchAIAccountInventoryScan writes a SleighConfig with the
+// ai_account_inventory_scan command to Sleigh's stdin.
+- (void)testLaunchAIAccountInventoryScanSerializesConfig {
+  NSString* capture = [NSTemporaryDirectory()
+      stringByAppendingPathComponent:[NSString
+                                         stringWithFormat:@"ai-%@", [[NSUUID UUID] UUIDString]]];
+  NSString* stub = [self writeStubWithBody:[NSString stringWithFormat:@"cat > '%@'\n", capture]];
+  TestableSleighLauncher launcher(stub.UTF8String);
+
+  ::santa::common::v1::AIAccountInventoryScan scan;
+  scan.set_run_id("run-1");
+  scan.mutable_max_duration()->set_seconds(120);
+
+  absl::Status s =
+      launcher.LaunchAIAccountInventoryScan(scan, "https://example.com/post", {{"key", "ai/x"}});
+  XCTAssertTrue(s.ok());
+
+  NSData* captured = [NSData dataWithContentsOfFile:capture];
+  ::santa::telemetry::v1::SleighConfig config;
+  XCTAssertTrue(config.ParseFromArray(captured.bytes, (int)captured.length));
+  XCTAssertTrue(config.has_ai_account_inventory_scan());
+  XCTAssertEqual(config.ai_account_inventory_scan().scan().run_id(), "run-1");
+  XCTAssertEqual(config.ai_account_inventory_scan().scan().max_duration().seconds(), 120);
+  XCTAssertEqual(config.ai_account_inventory_scan().signed_post().url(),
+                 "https://example.com/post");
+  XCTAssertEqual(config.ai_account_inventory_scan().signed_post().form_values().at("key"), "ai/x");
+}
+
+- (void)testLaunchAIAccountInventoryScanRejectsInvalidDuration {
+  TestableSleighLauncher launcher("/nonexistent/sleigh");
+  ::santa::common::v1::AIAccountInventoryScan scan;
+  scan.mutable_max_duration()->set_nanos(-1);
+
+  absl::Status s =
+      launcher.LaunchAIAccountInventoryScan(scan, "https://example.com/post", {{"key", "ai/x"}});
 
   XCTAssertTrue(absl::IsInvalidArgument(s));
 }

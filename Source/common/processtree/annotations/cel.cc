@@ -24,10 +24,10 @@
 
 #include "Source/common/processtree/process.h"
 #include "Source/common/processtree/process_tree.h"
-#include "Source/common/processtree/process_tree.pb.h"
 #include "internal/utf8.h"
+#include "telemetry/v1.pb.h"
 
-namespace ptpb = ::santa::pb::v1::process_tree;
+namespace ptpb = ::santa::telemetry::v1;
 
 namespace santa::santad::process_tree {
 

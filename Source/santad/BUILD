@@ -65,6 +65,7 @@ objc_library(
         "//Source/common:SNTStoredTemporaryMonitorModeAuditEvent",
         "//Source/common:SantaCache",
         "//Source/common:String",
+        "//Source/common:SystemResources",
     ],
 )
 
@@ -158,7 +159,6 @@ objc_library(
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTFileInfo",
         "//Source/common:SNTLogging",
-        "//Source/common:SNTRule",
         "//Source/common:SNTStrengthify",
         "//Source/common:SNTTimer",
         "//Source/common:String",
@@ -667,6 +667,9 @@ santa_unit_test(
         "//Source/common:TestUtils",
         "//Source/common/es:EndpointSecurityMessage",
         "//Source/common/es:MockEndpointSecurityAPI",
+        "//Source/common/processtree:process_tree",
+        "//Source/common/processtree:process_tree_test_helpers",
+        "//Source/common/processtree/annotations:annotator",
         "@OCMock",
         "@googletest//:gtest",
     ],
@@ -676,6 +679,9 @@ objc_library(
     name = "SNTEndpointSecurityRecorder",
     srcs = ["EventProviders/SNTEndpointSecurityRecorder.mm"],
     hdrs = ["EventProviders/SNTEndpointSecurityRecorder.h"],
+    sdk_dylibs = [
+        "icucore",
+    ],
     deps = [
         ":EndpointSecurityLogger",
         ":SNTCompilerController",
@@ -684,7 +690,9 @@ objc_library(
         "//Source/common:Platform",
         "//Source/common:PrefixTree",
         "//Source/common:SNTConfigurator",
+        "//Source/common:SNTKVOManager",
         "//Source/common:SNTLogging",
+        "//Source/common:SNTStrengthify",
         "//Source/common:String",
         "//Source/common:TelemetryEventMap",
         "//Source/common:Unit",
@@ -695,6 +703,7 @@ objc_library(
         "//Source/common/es:EndpointSecurityMessage",
         "//Source/common/es:SNTEndpointSecurityEventHandler",
         "//Source/common/processtree:process_tree",
+        "@abseil-cpp//absl/synchronization",
     ],
 )
 
@@ -990,6 +999,7 @@ objc_library(
         ":SNTDecisionCache",
         "//Source/common:AuditUtilities",
         "//Source/common:EncodeEntitlements",
+        "//Source/common:EventArena",
         "//Source/common:Platform",
         "//Source/common:SNTCachedDecision",
         "//Source/common:SNTConfigurator",
@@ -998,10 +1008,11 @@ objc_library(
         "//Source/common:SNTSystemInfo",
         "//Source/common:SNTXxhash",
         "//Source/common:String",
-        "//Source/common:santa_cc_proto",
         "//Source/common/es:EndpointSecurityAPI",
         "@abseil-cpp//absl/status",
+        "@northpolesec_protos//telemetry:v1_cc_proto",
         "@protobuf//src/google/protobuf/json",
+        "@protobuf//third_party/utf8_range:utf8_validity",
         "@santanetd//src/santanetd:NetworkFlowsSerializer",
     ],
 )
@@ -1043,11 +1054,11 @@ objc_library(
         "//Source/common:SNTLogging",
         "//Source/common:SNTMetricSet",
         "//Source/common:ScopedFile",
-        "//Source/common:santa_cc_proto",
         "//Source/santad/Logs/EndpointSecurity/Writers/FSSpool:fsspool",
         "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/container:flat_hash_set",
         "@abseil-cpp//absl/strings",
+        "@northpolesec_protos//telemetry:v1_cc_proto",
     ],
 )
 
@@ -1075,6 +1086,7 @@ objc_library(
         "@abseil-cpp//absl/cleanup:cleanup",
         "@abseil-cpp//absl/status:statusor",
         "@northpolesec_protos//commands:v1_cc_proto",
+        "@northpolesec_protos//common:aiaccountinventory_cc_proto",
         "@northpolesec_protos//common:packageinventory_cc_proto",
         "@northpolesec_protos//common:signals_cc_proto",
         "@northpolesec_protos//telemetry:sleighconfig_cc_proto",
@@ -1107,6 +1119,7 @@ santa_unit_test(
         ":SleighLauncher",
         "@abseil-cpp//absl/status:statusor",
         "@northpolesec_protos//commands:v1_cc_proto",
+        "@northpolesec_protos//common:aiaccountinventory_cc_proto",
         "@northpolesec_protos//common:packageinventory_cc_proto",
         "@northpolesec_protos//telemetry:sleighconfig_cc_proto",
     ],
@@ -1306,18 +1319,25 @@ santa_unit_test(
     name = "SNTDaemonControlControllerTest",
     srcs = ["SNTDaemonControlControllerTest.mm"],
     deps = [
+        ":MockLogger",
         ":SNTDaemonControlController",
         ":SNTDatabaseController",
+        ":SNTEventTable",
+        ":SNTNotificationQueue",
         ":SNTRuleTable",
         ":SandboxExpectations",
         "//Source/common:AuditUtilities",
         "//Source/common:MOLXPCConnection",
         "//Source/common:SNTConfigBundle",
+        "//Source/common:SNTConfigurator",
         "//Source/common:SNTError",
         "//Source/common:SNTNetworkFlowRule",
         "//Source/common:SNTRule",
         "//Source/common:SNTRuleIdentifiers",
         "//Source/common:SNTSandboxExecRequest",
+        "//Source/common:SNTStoredExecutionEvent",
+        "//Source/common:SNTTemporaryAdminPolicy",
+        "//Source/common:SNTXPCNotifierInterface",
         "@OCMock",
     ],
 )
@@ -1587,10 +1607,7 @@ macos_bundle(
         # By default builds get their entitlements from the provisioning profile.
         "//conditions:default": None,
     }),
-    infoplists = [
-        "Info.plist",
-        "//Source/common:CommitHash",
-    ],
+    infoplists = ["Info.plist"],
     linkopts = ["-execute"],
     minimum_os_version = SANTA_MINIMUM_OS_VERSION,
     provisioning_profile = select({
@@ -1600,6 +1617,7 @@ macos_bundle(
     resources = [
         "//:Conf/com.northpolesec.santa.bundleservice.plist",
         "//:Conf/com.northpolesec.santa.metricservice.plist",
+        "//:Conf/com.northpolesec.santa.newsyslog.conf",
         "//:Conf/com.northpolesec.santa.plist",
         "//:Conf/com.northpolesec.santa.syncservice.plist",
         "//:Conf/install_services.sh",
@@ -1743,11 +1761,14 @@ santa_unit_test(
     ],
     tags = ["exclusive"],
     deps = [
+        ":AuthResultCache",
         ":Metrics",
         ":ProcessControl",
+        ":SNTDaemonControlController",
         ":SNTDatabaseController",
         ":SNTDecisionCache",
         ":SNTEndpointSecurityAuthorizer",
+        ":Santad",
         ":SantadDeps",
         "//Source/common:MOLCertificate",
         "//Source/common:MOLCodesignChecker",
@@ -1755,6 +1776,7 @@ santa_unit_test(
         "//Source/common:SNTConfigurator",
         "//Source/common:SystemResources",
         "//Source/common:TestUtils",
+        "//Source/common/es:ESCacheFlusher",
         "//Source/common/es:EndpointSecurityMessage",
         "//Source/common/es:MockEndpointSecurityAPI",
         "//Source/common/es:SNTEndpointSecurityClient",
@@ -1788,7 +1810,6 @@ santa_unit_test(
     deps = [
         ":EndpointSecuritySanitizableString",
         "//Source/common:TestUtils",
-        "@OCMock",
     ],
 )
 
@@ -1850,7 +1871,6 @@ santa_unit_test(
         "//Source/common:SNTConfigurator",
         "//Source/common:SNTStoredExecutionEvent",
         "//Source/common:TestUtils",
-        "//Source/common:santa_cc_proto",
         "//Source/common/es:EndpointSecurityEnrichedTypes",
         "//Source/common/es:EndpointSecurityEnricher",
         "//Source/common/es:EndpointSecurityMessage",
@@ -1858,8 +1878,8 @@ santa_unit_test(
         "@OCMock",
         "@abseil-cpp//absl/status",
         "@googletest//:gtest",
+        "@northpolesec_protos//telemetry:v1_cc_proto",
         "@protobuf//src/google/protobuf/json",
-        "@santanetd//src/santanetd:SNDProcessFlows",
     ],
 )
 
@@ -1957,6 +1977,20 @@ santa_unit_test(
     ],
 )
 
+# Concurrency stress test for the atomic per-message metric cells in Metrics.
+# Runs plainly in the suite; the nightly sanitizer job also runs tests tagged
+# "concurrency" under TSAN.
+santa_unit_test(
+    name = "MetricsConcurrencyTest",
+    srcs = ["MetricsConcurrencyTest.mm"],
+    tags = ["concurrency"],
+    deps = [
+        ":Metrics",
+        "//Source/common:SNTMetricSet",
+        "//Source/common/es:ESMetricsObserver",
+    ],
+)
+
 santa_unit_test(
     name = "MetricsTest",
     srcs = ["MetricsTest.mm"],
@@ -2001,6 +2035,8 @@ santa_unit_test(
         ":EntitlementsFilter",
         ":ProcessControl",
         ":SNTCompilerController",
+        ":SNTDaemonControlController",
+        ":SNTDatabaseController",
         ":SNTDecisionCache",
         ":SNTEndpointSecurityAuthorizer",
         ":SNTEventTable",
@@ -2205,6 +2241,9 @@ santa_unit_test(
         "//Source/common/es:EndpointSecurityMessage",
         "//Source/common/es:MockEndpointSecurityAPI",
         "//Source/common/es:MockEnricher",
+        "//Source/common/processtree:process_tree",
+        "//Source/common/processtree:process_tree_test_helpers",
+        "//Source/common/processtree/annotations:annotator",
         "@OCMock",
         "@googletest//:gtest",
     ],
@@ -2264,6 +2303,8 @@ santa_unit_test(
     ],
     deps = [
         ":EndpointSecurityLogger",
+        ":EndpointSecuritySerializerEmpty",
+        ":EndpointSecurityWriterNull",
         ":PendingExecCoordinator",
         ":SNTCompilerController",
         ":SNTDatabaseController",
@@ -2303,6 +2344,7 @@ test_suite(
         ":EntitlementsFilterTest",
         ":FAAPolicyProcessorTest",
         ":KillingMachineTest",
+        ":MetricsConcurrencyTest",
         ":MetricsTest",
         ":PendingExecCoordinatorTest",
         ":ProcessControlTest",

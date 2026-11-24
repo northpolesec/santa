@@ -137,8 +137,8 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
   // identifier sets that matched no row, so repeat executions of the same unruled binary skip the
   // query entirely. Only the SQL lookup is cached -- the static rules are an in-memory dictionary
   // and are checked on every call. Keyed on every identifier the query binds, so an entry is only
-  // reused for an identical query. Entries are only ever cleared wholesale, by
-  // `addExecutionRules:...:errors:` -- there is no per-entry invalidation.
+  // reused for an identical query. Rule writes clear entries wholesale; there is no per-entry
+  // invalidation.
   std::unique_ptr<SantaCache<ExecutionRuleMissCacheKey, bool>> _executionRuleMissCache;
 }
 @property MOLCodesignChecker* santadCSInfo;
@@ -825,12 +825,55 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
   return YES;
 }
 
+- (BOOL)addTransitiveRuleForSHA256:(NSString*)sha256 error:(NSError**)error {
+  if (error) *error = nil;
+
+  SNTRule* rule = [[SNTRule alloc] initWithIdentifier:sha256
+                                                state:SNTRuleStateAllowTransitive
+                                                 type:SNTRuleTypeBinary];
+  if (!rule) {
+    [SNTError populateError:error
+                   withCode:SNTErrorCodeRuleInvalidIdentifier
+                     format:@"Invalid SHA-256 for transitive rule"];
+    return NO;
+  }
+
+  SNTRule* staticRule = self.cachedStaticRules[rule.identifier];
+  if (staticRule.type == SNTRuleTypeBinary && staticRule.state != SNTRuleStateAllowTransitive) {
+    return NO;
+  }
+
+  [rule resetTimestamp];
+  __block BOOL written = NO;
+  __block NSError* writeError;
+  [self inDatabase:^(FMDatabase* db) {
+    if (![db executeUpdate:
+                 @"INSERT INTO execution_rules (identifier, state, type, timestamp) "
+                 @"VALUES (?, ?, ?, ?) "
+                 @"ON CONFLICT(identifier, type) DO UPDATE SET timestamp=excluded.timestamp "
+                 @"WHERE execution_rules.state=?",
+                 rule.identifier, @(rule.state), @(rule.type), @(rule.timestamp),
+                 @(SNTRuleStateAllowTransitive)]) {
+      writeError =
+          [SNTError createErrorWithCode:SNTErrorCodeInsertOrReplaceRuleFailed
+                                message:@"A database error occurred while writing a transitive rule"
+                                 detail:[db lastErrorMessage]];
+      return;
+    }
+    written = [db changes] > 0;
+    if (written) self->_executionRuleMissCache->clear();
+  }];
+  if (error) *error = writeError;
+  return written;
+}
+
 - (BOOL)addExecutionRules:(NSArray<SNTRule*>*)executionRules
                      toDB:(FMDatabase*)db
                    errors:(NSMutableArray<NSError*>*)errors {
   for (SNTRule* rule in executionRules) {
     if (![rule isKindOfClass:[SNTRule class]] || rule.identifier.length == 0 ||
-        rule.state == SNTRuleStateUnknown || rule.type == SNTRuleTypeUnknown) {
+        rule.state == SNTRuleStateUnknown || rule.state == SNTRuleStateAllowTransitive ||
+        rule.type == SNTRuleTypeUnknown) {
       [errors
           addObject:[SNTError createErrorWithCode:SNTErrorCodeRuleInvalid
                                           message:@"Execution rule array contained invalid entry"
@@ -1082,13 +1125,12 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
     }
   }
 
+  // Plain allows only require invalidating compiler decisions, which the caller handles.
+  if (nonAllowRuleCount == 0) return NO;
+
   // Check newly synced rules for any blocking rules. If any are found, check
   // in the db to see if they already exist. If they're not found or were
   // previously allow rules flush the cache.
-  //
-  // If all rules in the array are allowlist rules,  look for allowlist rules
-  // where there is a previously existing allowlist compiler rule for the same
-  // identifier.  If so we find such a rule, then cache should be flushed.
   __block BOOL flushDecisionCache = NO;
 
   [self inTransaction:^(FMDatabase* db, BOOL* rollback) {
@@ -1103,21 +1145,6 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
                     @"SELECT COUNT(*) FROM execution_rules WHERE identifier=? AND type=? AND "
                     @"state=? AND (cel_expr IS NULL OR cel_expr=?) LIMIT 1",
                     rule.identifier, @(rule.type), @(rule.state), rule.celExpr] == 0) {
-          flushDecisionCache = YES;
-          return;
-        }
-      } else {
-        // At this point we know the rule is an allowlist rule. Check if it's
-        // overriding a compiler rule.
-
-        // Skip certificate and TeamID rules as they cannot be compiler rules.
-        if (rule.type == SNTRuleTypeCertificate || rule.type == SNTRuleTypeTeamID) continue;
-
-        if ([db longForQuery:@"SELECT COUNT(*) FROM execution_rules WHERE identifier=? AND type "
-                             @"IN (?, ?, ?)"
-                             @" AND state=? LIMIT 1",
-                             rule.identifier, @(SNTRuleTypeCDHash), @(SNTRuleTypeBinary),
-                             @(SNTRuleTypeSigningID), @(SNTRuleStateAllowCompiler)] > 0) {
           flushDecisionCache = YES;
           return;
         }

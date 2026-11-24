@@ -1,7 +1,6 @@
 # Santa
 
 [![license](https://img.shields.io/github/license/northpolesec/santa?style=flat-square&color=lightgray)](https://github.com/northpolesec/santa/blob/main/LICENSE)
-[![CI](https://img.shields.io/github/actions/workflow/status/northpolesec/santa/ci.yml?style=flat-square&label=CI)](https://github.com/northpolesec/santa/actions/workflows/ci.yml)
 [![latest release](https://img.shields.io/github/v/release/northpolesec/santa.svg?style=flat-square)](https://github.com/northpolesec/santa/releases/latest)
 [![latest release date](https://img.shields.io/github/release-date/northpolesec/santa?display_date=published_at&style=flat-square&color=007ec6)](https://github.com/northpolesec/santa/releases/latest)
 [![downloads](https://img.shields.io/github/downloads/northpolesec/santa/latest/total?style=flat-square&color=007ec6)](https://github.com/northpolesec/santa/releases/latest)
@@ -22,7 +21,7 @@ It is named Santa because it keeps track of binaries that are naughty or nice.
 # Docs
 
 The Santa docs are stored in the
-[Docs](https://github.com/northpolesec/santa/blob/main/docs) directory and are published
+[Docs](https://github.com/northpolesec/santa/tree/main/docs) directory and are published
 at https://northpole.dev.
 
 The docs include deployment options, details on how parts of Santa work and

@@ -36,6 +36,8 @@
 @property NSNumber* blockNetworkMount;
 @property NSString* bannedNetworkMountBlockMessage;
 @property NSArray<NSString*>* allowedNetworkMountHosts;
+@property NSString* bannedBlockMessage;
+@property NSString* unknownBlockMessage;
 @property NSString* bannedUSBBlockMessage;
 @property NSString* remountUSBBlockMessage;
 @property NSNumber* enableBundles;
@@ -333,6 +335,14 @@
     XCTFail(@"This shouldn't be called");
   }];
 
+  [bundle bannedBlockMessage:^(NSString* val) {
+    XCTFail(@"This shouldn't be called");
+  }];
+
+  [bundle unknownBlockMessage:^(NSString* val) {
+    XCTFail(@"This shouldn't be called");
+  }];
+
   [bundle bannedUSBBlockMessage:^(NSString* val) {
     XCTFail(@"This shouldn't be called");
   }];
@@ -541,6 +551,37 @@
     unsetFired = YES;
   }];
   XCTAssertFalse(unsetFired);
+}
+
+- (void)testBlockMessagesRoundTrip {
+  for (NSString* msg in @[ @"Ask IT before installing apps", @"" ]) {
+    SNTConfigBundle* set = [[SNTConfigBundle alloc] init];
+    // An empty message is carried rather than dropped: it tells the daemon to
+    // remove the synced value.
+    set.bannedBlockMessage = msg;
+    set.unknownBlockMessage = msg;
+
+    NSError* error = nil;
+    NSData* data = [NSKeyedArchiver archivedDataWithRootObject:set
+                                         requiringSecureCoding:YES
+                                                         error:&error];
+    XCTAssertNil(error);
+    SNTConfigBundle* decoded = [NSKeyedUnarchiver unarchivedObjectOfClass:[SNTConfigBundle class]
+                                                                 fromData:data
+                                                                    error:&error];
+    XCTAssertNil(error);
+
+    __block NSString* banned = nil;
+    __block NSString* unknown = nil;
+    [decoded bannedBlockMessage:^(NSString* val) {
+      banned = val;
+    }];
+    [decoded unknownBlockMessage:^(NSString* val) {
+      unknown = val;
+    }];
+    XCTAssertEqualObjects(banned, msg);
+    XCTAssertEqualObjects(unknown, msg);
+  }
 }
 
 - (void)testUSBBlockMessagesRoundTrip {

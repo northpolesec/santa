@@ -57,3 +57,7 @@ objc_library(
         ":SNDProcessInfo",
     ],
 )
+
+# The real module's tests are part of //:unit_tests. A test_suite with no
+# tests listed collects every test in its package, and this package has none.
+test_suite(name = "unit_tests")

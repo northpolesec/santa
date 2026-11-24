@@ -149,17 +149,10 @@ REGISTER_COMMAND_NAME(@"version")
 }
 
 - (NSString*)composeVersionWithShortVersion:(NSString*)productVersion
-                                fullVersion:(NSString*)fullVersion
-                                 commitHash:(NSString*)commitHash {
+                                fullVersion:(NSString*)fullVersion {
   if (!fullVersion.length) return @"";
   NSString* buildVersion = [[fullVersion componentsSeparatedByString:@"."] lastObject];
-
-  if (commitHash.length > 8) {
-    commitHash = [commitHash substringToIndex:8];
-  }
-
-  return [NSString
-      stringWithFormat:@"%@ (build %@, commit %@)", productVersion, buildVersion, commitHash];
+  return [NSString stringWithFormat:@"%@ (build %@)", productVersion, buildVersion];
 }
 
 // Compose a version string from a plist dictionary whose values are read type-safely. Used for
@@ -171,14 +164,12 @@ REGISTER_COMMAND_NAME(@"version")
     return [value isKindOfClass:[NSString class]] ? value : nil;
   };
   return [self composeVersionWithShortVersion:string(@"CFBundleShortVersionString")
-                                  fullVersion:string(@"CFBundleVersion")
-                                   commitHash:string(@"SNTCommitHash")];
+                                  fullVersion:string(@"CFBundleVersion")];
 }
 
 - (NSString*)composeVersionsFromFileInfo:(SNTFileInfo*)fileInfo {
   return [self composeVersionWithShortVersion:[fileInfo bundleShortVersionString]
-                                  fullVersion:[fileInfo bundleVersion]
-                                   commitHash:[fileInfo infoPlistStringForKey:@"SNTCommitHash"]];
+                                  fullVersion:[fileInfo bundleVersion]];
 }
 
 - (NSString*)santadVersion {

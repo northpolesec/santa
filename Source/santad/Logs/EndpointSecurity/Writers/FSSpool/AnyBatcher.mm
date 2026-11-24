@@ -14,9 +14,9 @@
 
 #include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/AnyBatcher.h"
 
-#include "Source/common/santa.pb.h"
 #include "Source/santad/Logs/EndpointSecurity/Writers/FSSpool/fsspool_platform_specific.h"
 #include "absl/strings/str_cat.h"
+#include "telemetry/v1.pb.h"
 
 static const char* kTypeGoogleApisComPrefix = "type.googleapis.com/";
 static constexpr int kReservedBatchSize = 2048;
@@ -25,7 +25,7 @@ namespace fsspool {
 
 AnyBatcher::AnyBatcher() {
   type_url_ = absl::StrCat(kTypeGoogleApisComPrefix,
-                           ::santa::pb::v1::SantaMessage::descriptor()->full_name());
+                           ::santa::telemetry::v1::SantaMessage::descriptor()->full_name());
 }
 
 absl::Status AnyBatcher::InitializeBatch(int fd) {
@@ -55,7 +55,7 @@ absl::StatusOr<size_t> AnyBatcher::CompleteBatch(int fd) {
 
   absl::Status status = WriteBuffer(fd, msg);
 
-  cache_ = santa::fsspool::binaryproto::LogBatch();
+  cache_ = santa::telemetry::v1::LogBatch();
   cache_.mutable_records()->Reserve(kReservedBatchSize);
 
   return msg.size();

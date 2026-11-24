@@ -22,6 +22,7 @@
 #import <XCTest/XCTest.h>
 #include <dispatch/dispatch.h>
 
+#include <array>
 #include <map>
 #include <memory>
 
@@ -30,10 +31,7 @@
 #import "Source/common/SNTMetricSet.h"
 #include "Source/common/TestUtils.h"
 
-using santa::EventCountTuple;
 using santa::EventDisposition;
-using santa::EventStatsTuple;
-using santa::EventTimesTuple;
 using santa::FileAccessEventCountTuple;
 using santa::Processor;
 
@@ -60,10 +58,9 @@ class MetricsPeer : public Metrics {
   using Metrics::events_q_;
   using Metrics::faa_event_counts_cache_;
   using Metrics::interval_;
+  using Metrics::kNoEventTime;
   using Metrics::rate_limit_counts_cache_;
   using Metrics::running_;
-
-  using Metrics::SequenceStats;
 
   // Drain the events queue to ensure all async blocks have completed
   void DrainEventQueue() {
@@ -275,42 +272,38 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
   std::shared_ptr<MetricsPeer> metrics = CreateBasicMetricsPeer(self.q, ^(Metrics*){
                                                                 });
 
-  // Initial maps are empty
-  XCTAssertEqual(metrics->event_counts_cache_.size(), 0);
-  XCTAssertEqual(metrics->event_times_cache_.size(), 0);
+  auto& counts = metrics->event_counts_cache_[static_cast<size_t>(Processor::kAuthorizer)];
+  auto& times = metrics->event_times_cache_[static_cast<size_t>(Processor::kAuthorizer)];
+  size_t processed = static_cast<size_t>(EventDisposition::kProcessed);
+
+  // Cells are initially empty
+  XCTAssertEqual(counts[ES_EVENT_TYPE_AUTH_EXEC][processed].load(), 0);
+  XCTAssertEqual(times[ES_EVENT_TYPE_AUTH_EXEC].load(), MetricsPeer::kNoEventTime);
 
   metrics->SetEventMetrics(Processor::kAuthorizer, EventDisposition::kProcessed, nanos,
                            ES_EVENT_TYPE_AUTH_EXEC);
-  metrics->DrainEventQueue();
 
-  // Check sizes after setting metrics once
-  XCTAssertEqual(metrics->event_counts_cache_.size(), 1);
-  XCTAssertEqual(metrics->event_times_cache_.size(), 1);
+  // Check cells after setting metrics once
+  XCTAssertEqual(counts[ES_EVENT_TYPE_AUTH_EXEC][processed].load(), 1);
+  XCTAssertEqual(times[ES_EVENT_TYPE_AUTH_EXEC].load(), nanos);
 
-  metrics->SetEventMetrics(Processor::kAuthorizer, EventDisposition::kProcessed, nanos,
+  // A later time replaces the earlier one
+  metrics->SetEventMetrics(Processor::kAuthorizer, EventDisposition::kProcessed, nanos * 3,
                            ES_EVENT_TYPE_AUTH_EXEC);
 
   metrics->SetEventMetrics(Processor::kAuthorizer, EventDisposition::kProcessed, nanos * 2,
                            ES_EVENT_TYPE_AUTH_OPEN);
 
-  metrics->DrainEventQueue();
+  XCTAssertEqual(counts[ES_EVENT_TYPE_AUTH_EXEC][processed].load(), 2);
+  XCTAssertEqual(times[ES_EVENT_TYPE_AUTH_EXEC].load(), nanos * 3);
+  XCTAssertEqual(counts[ES_EVENT_TYPE_AUTH_OPEN][processed].load(), 1);
+  XCTAssertEqual(times[ES_EVENT_TYPE_AUTH_OPEN].load(), nanos * 2);
 
-  // Re-check expected counts. One was an update, so should only be 2 items
-  XCTAssertEqual(metrics->event_counts_cache_.size(), 2);
-  XCTAssertEqual(metrics->event_times_cache_.size(), 2);
-
-  // Check map values
-  EventCountTuple ecExec{Processor::kAuthorizer, ES_EVENT_TYPE_AUTH_EXEC,
-                         EventDisposition::kProcessed};
-  EventCountTuple ecOpen{Processor::kAuthorizer, ES_EVENT_TYPE_AUTH_OPEN,
-                         EventDisposition::kProcessed};
-  EventTimesTuple etExec{Processor::kAuthorizer, ES_EVENT_TYPE_AUTH_EXEC};
-  EventTimesTuple etOpen{Processor::kAuthorizer, ES_EVENT_TYPE_AUTH_OPEN};
-
-  XCTAssertEqual(metrics->event_counts_cache_[ecExec], 2);
-  XCTAssertEqual(metrics->event_counts_cache_[ecOpen], 1);
-  XCTAssertEqual(metrics->event_times_cache_[etExec], nanos);
-  XCTAssertEqual(metrics->event_times_cache_[etOpen], nanos * 2);
+  // Untouched cells are still empty
+  XCTAssertEqual(
+      counts[ES_EVENT_TYPE_AUTH_EXEC][static_cast<size_t>(EventDisposition::kDropped)].load(), 0);
+  XCTAssertEqual(counts[ES_EVENT_TYPE_AUTH_UNLINK][processed].load(), 0);
+  XCTAssertEqual(times[ES_EVENT_TYPE_AUTH_UNLINK].load(), MetricsPeer::kNoEventTime);
 }
 
 - (void)testAddRateLimitingMetrics {
@@ -367,68 +360,39 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
   XCTAssertEqual(metrics->faa_event_counts_cache_[ruleXyz], 1);
 }
 
-- (void)testUpdateEventStats {
+- (void)testRecordDrops {
   std::shared_ptr<MetricsPeer> metrics = CreateBasicMetricsPeer(self.q, ^(Metrics*){
                                                                 });
 
-  EventStatsTuple eventStats{Processor::kRecorder, ES_EVENT_TYPE_NOTIFY_EXEC};
-  EventStatsTuple globalStats{Processor::kRecorder, ES_EVENT_TYPE_LAST};
+  auto& row = metrics->drop_cache_[static_cast<size_t>(Processor::kRecorder)];
 
-  // Map does not initially contain entries
-  XCTAssertEqual(0, metrics->drop_cache_.size());
+  // Cells initially hold no drops
+  XCTAssertEqual(0, row[ES_EVENT_TYPE_NOTIFY_EXEC].load());
+  XCTAssertEqual(0, row[ES_EVENT_TYPE_LAST].load());
 
-  metrics->UpdateEventStats(Processor::kRecorder, ES_EVENT_TYPE_NOTIFY_EXEC, 0, 0);
-  metrics->DrainEventQueue();
+  // Both the event and the global cell record their drops
+  metrics->RecordDrops(Processor::kRecorder, ES_EVENT_TYPE_NOTIFY_EXEC, 9, 9);
+  XCTAssertEqual(9, row[ES_EVENT_TYPE_NOTIFY_EXEC].load());
+  XCTAssertEqual(9, row[ES_EVENT_TYPE_LAST].load());
 
-  // After the first update, 2 entries exist, one for the event, and one for global
-  XCTAssertEqual(2, metrics->drop_cache_.size());
-  XCTAssertEqual(1, metrics->drop_cache_[eventStats].next_seq_num);
-  XCTAssertEqual(0, metrics->drop_cache_[eventStats].drops);
-  XCTAssertEqual(1, metrics->drop_cache_[globalStats].next_seq_num);
-  XCTAssertEqual(0, metrics->drop_cache_[globalStats].drops);
-
-  // Increment sequence numbers by 1 and check that no drop was detected
-  metrics->UpdateEventStats(Processor::kRecorder, ES_EVENT_TYPE_NOTIFY_EXEC, 1, 1);
-  metrics->DrainEventQueue();
-
-  XCTAssertEqual(2, metrics->drop_cache_.size());
-  XCTAssertEqual(2, metrics->drop_cache_[eventStats].next_seq_num);
-  XCTAssertEqual(0, metrics->drop_cache_[eventStats].drops);
-  XCTAssertEqual(2, metrics->drop_cache_[globalStats].next_seq_num);
-  XCTAssertEqual(0, metrics->drop_cache_[globalStats].drops);
-
-  // Now increment sequence numbers by a large amount to trigger drop detection
-  metrics->UpdateEventStats(Processor::kRecorder, ES_EVENT_TYPE_NOTIFY_EXEC, 11, 11);
-  metrics->DrainEventQueue();
-
-  XCTAssertEqual(2, metrics->drop_cache_.size());
-  XCTAssertEqual(12, metrics->drop_cache_[eventStats].next_seq_num);
-  XCTAssertEqual(9, metrics->drop_cache_[eventStats].drops);
-  XCTAssertEqual(12, metrics->drop_cache_[globalStats].next_seq_num);
-  XCTAssertEqual(9, metrics->drop_cache_[globalStats].drops);
+  // Only global drops leave the event cell unchanged
+  metrics->RecordDrops(Processor::kRecorder, ES_EVENT_TYPE_NOTIFY_EXEC, 0, 4);
+  XCTAssertEqual(9, row[ES_EVENT_TYPE_NOTIFY_EXEC].load());
+  XCTAssertEqual(13, row[ES_EVENT_TYPE_LAST].load());
 }
 
 - (void)testFlushMetrics {
-  id mockEventProcessingTimes = OCMClassMock([SNTMetricInt64Gauge class]);
-  id mockEventCounts = OCMClassMock([SNTMetricCounter class]);
+  id mockEventProcessingTimes = OCMStrictClassMock([SNTMetricInt64Gauge class]);
+  id mockEventCounts = OCMStrictClassMock([SNTMetricCounter class]);
+  id mockRateLimitCounts = OCMStrictClassMock([SNTMetricCounter class]);
+  id mockFAAEventCounts = OCMStrictClassMock([SNTMetricCounter class]);
+  id mockDropCounts = OCMStrictClassMock([SNTMetricCounter class]);
   int64_t nanos = 1234;
-
-  OCMStub([mockEventCounts incrementBy:0 forFieldValues:[OCMArg any]])
-      .ignoringNonObjectArgs()
-      .andDo(^(NSInvocation* inv) {
-        dispatch_semaphore_signal(self.sema);
-      });
-
-  OCMStub([(SNTMetricInt64Gauge*)mockEventProcessingTimes set:nanos forFieldValues:[OCMArg any]])
-      .ignoringNonObjectArgs()
-      .andDo(^(NSInvocation* inv) {
-        dispatch_semaphore_signal(self.sema);
-      });
 
   dispatch_source_t timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, self.q);
   auto metrics =
       std::make_shared<MetricsPeer>(self.q, timer, 100, mockEventProcessingTimes, mockEventCounts,
-                                    mockEventCounts, mockEventCounts, mockEventCounts, nil,
+                                    mockRateLimitCounts, mockFAAEventCounts, mockDropCounts, nil,
                                     ^(santa::Metrics* m){
                                         // This block intentionally left blank
                                     });
@@ -437,51 +401,100 @@ std::shared_ptr<MetricsPeer> CreateBasicMetricsPeer(dispatch_queue_t q, void (^b
                            ES_EVENT_TYPE_AUTH_EXEC);
   metrics->SetEventMetrics(Processor::kAuthorizer, EventDisposition::kProcessed, nanos * 2,
                            ES_EVENT_TYPE_AUTH_OPEN);
-  metrics->UpdateEventStats(Processor::kRecorder, ES_EVENT_TYPE_NOTIFY_EXEC, 123, 123);
+  metrics->RecordDrops(Processor::kRecorder, ES_EVENT_TYPE_NOTIFY_EXEC, 123, 123);
   metrics->AddRateLimitingMetrics(123);
   metrics->SetFileAccessEventMetrics("v1.0", "rule_abc", FileAccessMetricStatus::kOK,
                                      ES_EVENT_TYPE_AUTH_OPEN, FileAccessPolicyDecision::kDenied);
   metrics->DrainEventQueue();
 
-  // First ensure we have the expected map sizes
-  XCTAssertEqual(metrics->event_counts_cache_.size(), 2);
-  XCTAssertEqual(metrics->event_times_cache_.size(), 2);
+  // First ensure we have the expected cached values
+  auto& counts = metrics->event_counts_cache_[static_cast<size_t>(Processor::kAuthorizer)];
+  auto& times = metrics->event_times_cache_[static_cast<size_t>(Processor::kAuthorizer)];
+  auto& dropRow = metrics->drop_cache_[static_cast<size_t>(Processor::kRecorder)];
+  size_t processed = static_cast<size_t>(EventDisposition::kProcessed);
+  XCTAssertEqual(counts[ES_EVENT_TYPE_AUTH_EXEC][processed].load(), 1);
+  XCTAssertEqual(counts[ES_EVENT_TYPE_AUTH_OPEN][processed].load(), 1);
+  XCTAssertEqual(times[ES_EVENT_TYPE_AUTH_EXEC].load(), nanos);
+  XCTAssertEqual(times[ES_EVENT_TYPE_AUTH_OPEN].load(), nanos * 2);
+  XCTAssertEqual(dropRow[ES_EVENT_TYPE_NOTIFY_EXEC].load(), 123);
+  XCTAssertEqual(dropRow[ES_EVENT_TYPE_LAST].load(), 123);
   XCTAssertEqual(metrics->rate_limit_counts_cache_.load(), 123);
   XCTAssertEqual(metrics->faa_event_counts_cache_.size(), 1);
-  XCTAssertEqual(metrics->drop_cache_.size(), 2);
 
-  EventStatsTuple eventStats{Processor::kRecorder, ES_EVENT_TYPE_NOTIFY_EXEC};
-  EventStatsTuple globalStats{Processor::kRecorder, ES_EVENT_TYPE_LAST};
-  XCTAssertEqual(metrics->drop_cache_[eventStats].next_seq_num, 124);
-  XCTAssertEqual(metrics->drop_cache_[eventStats].drops, 123);
-  XCTAssertEqual(metrics->drop_cache_[globalStats].next_seq_num, 124);
-  XCTAssertEqual(metrics->drop_cache_[globalStats].drops, 123);
+  // The strict mocks fail on any call not expected here
+  OCMExpect([mockEventCounts incrementBy:1
+                          forFieldValues:(@[ @"Authorizer", @"AuthExec", @"Processed" ])]);
+  OCMExpect([mockEventCounts incrementBy:1
+                          forFieldValues:(@[ @"Authorizer", @"AuthOpen", @"Processed" ])]);
+  OCMExpect([(SNTMetricInt64Gauge*)mockEventProcessingTimes set:nanos
+                                                 forFieldValues:(@[ @"Authorizer", @"AuthExec" ])]);
+  OCMExpect([(SNTMetricInt64Gauge*)mockEventProcessingTimes set:nanos * 2
+                                                 forFieldValues:(@[ @"Authorizer", @"AuthOpen" ])]);
+  OCMExpect([mockDropCounts incrementBy:123 forFieldValues:(@[ @"Recorder", @"NotifyExec" ])]);
+  OCMExpect([mockDropCounts incrementBy:123 forFieldValues:(@[ @"Recorder", @"Global" ])]);
+  OCMExpect([mockRateLimitCounts incrementBy:123 forFieldValues:(@[])]);
+  OCMExpect([mockFAAEventCounts
+         incrementBy:1
+      forFieldValues:(@[ @"v1.0", @"access", @"rule_abc", @"OK", @"AuthOpen", @"Denied" ])]);
 
   metrics->FlushMetrics();
 
-  // Expected call count is 8:
-  // 2: event counts
-  // 2: event times
-  // 1: rate limit
-  // 1: FAA
-  // 2: drops (1 event, 1 global)
-  int expectedCalls = 8;
-  for (int i = 0; i < expectedCalls; i++) {
-    XCTAssertSemaTrue(self.sema, 5, "Failed waiting for metrics to flush");
-  }
+  OCMVerifyAll(mockEventProcessingTimes);
+  OCMVerifyAll(mockEventCounts);
+  OCMVerifyAll(mockRateLimitCounts);
+  OCMVerifyAll(mockFAAEventCounts);
+  OCMVerifyAll(mockDropCounts);
 
-  // After a flush, map sizes should be reset to 0
-  XCTAssertEqual(metrics->event_counts_cache_.size(), 0);
-  XCTAssertEqual(metrics->event_times_cache_.size(), 0);
+  // After a flush, cached values should be reset
+  XCTAssertEqual(counts[ES_EVENT_TYPE_AUTH_EXEC][processed].load(), 0);
+  XCTAssertEqual(counts[ES_EVENT_TYPE_AUTH_OPEN][processed].load(), 0);
+  XCTAssertEqual(times[ES_EVENT_TYPE_AUTH_EXEC].load(), MetricsPeer::kNoEventTime);
+  XCTAssertEqual(times[ES_EVENT_TYPE_AUTH_OPEN].load(), MetricsPeer::kNoEventTime);
+  XCTAssertEqual(dropRow[ES_EVENT_TYPE_NOTIFY_EXEC].load(), 0);
+  XCTAssertEqual(dropRow[ES_EVENT_TYPE_LAST].load(), 0);
   XCTAssertEqual(metrics->rate_limit_counts_cache_.load(), 0);
   XCTAssertEqual(metrics->faa_event_counts_cache_.size(), 0);
-  // Note: The drop_cache_ should not be reset back to size 0. Instead, each
-  // entry has the sequence number left intact, but drop counts reset to 0.
-  XCTAssertEqual(metrics->drop_cache_.size(), 2);
-  XCTAssertEqual(metrics->drop_cache_[eventStats].next_seq_num, 124);
-  XCTAssertEqual(metrics->drop_cache_[eventStats].drops, 0);
-  XCTAssertEqual(metrics->drop_cache_[globalStats].next_seq_num, 124);
-  XCTAssertEqual(metrics->drop_cache_[globalStats].drops, 0);
+}
+
+- (void)testFlushMetricsReportsOnlyNewDrops {
+  id mockEventProcessingTimes = OCMStrictClassMock([SNTMetricInt64Gauge class]);
+  id mockEventCounts = OCMStrictClassMock([SNTMetricCounter class]);
+  id mockRateLimitCounts = OCMStrictClassMock([SNTMetricCounter class]);
+  id mockFAAEventCounts = OCMStrictClassMock([SNTMetricCounter class]);
+  id mockDropCounts = OCMStrictClassMock([SNTMetricCounter class]);
+
+  dispatch_source_t timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, self.q);
+  auto metrics =
+      std::make_shared<MetricsPeer>(self.q, timer, 100, mockEventProcessingTimes, mockEventCounts,
+                                    mockRateLimitCounts, mockFAAEventCounts, mockDropCounts, nil,
+                                    ^(santa::Metrics* m){
+                                        // This block intentionally left blank
+                                    });
+
+  // The rate limit count is reported on every flush, even when zero
+  OCMExpect([mockRateLimitCounts incrementBy:0 forFieldValues:(@[])]);
+  OCMExpect([mockDropCounts incrementBy:123 forFieldValues:(@[ @"Recorder", @"NotifyExec" ])]);
+  OCMExpect([mockDropCounts incrementBy:123 forFieldValues:(@[ @"Recorder", @"Global" ])]);
+
+  metrics->RecordDrops(Processor::kRecorder, ES_EVENT_TYPE_NOTIFY_EXEC, 123, 123);
+  metrics->FlushMetrics();
+
+  OCMVerifyAll(mockRateLimitCounts);
+  OCMVerifyAll(mockDropCounts);
+
+  // The second flush reports only the drops recorded since the first
+  OCMExpect([mockRateLimitCounts incrementBy:0 forFieldValues:(@[])]);
+  OCMExpect([mockDropCounts incrementBy:5 forFieldValues:(@[ @"Recorder", @"NotifyExec" ])]);
+  OCMExpect([mockDropCounts incrementBy:2 forFieldValues:(@[ @"Recorder", @"Global" ])]);
+
+  metrics->RecordDrops(Processor::kRecorder, ES_EVENT_TYPE_NOTIFY_EXEC, 5, 2);
+  metrics->FlushMetrics();
+
+  OCMVerifyAll(mockEventProcessingTimes);
+  OCMVerifyAll(mockEventCounts);
+  OCMVerifyAll(mockRateLimitCounts);
+  OCMVerifyAll(mockFAAEventCounts);
+  OCMVerifyAll(mockDropCounts);
 }
 
 @end

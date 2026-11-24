@@ -7,6 +7,15 @@
 # If the target volume is not /, do nothing
 [[ $3 != "/" ]] && exit 0
 
+# Restore the newsyslog config that preinstall saved. Older packages installed
+# the config, so Installer deletes it when it upgrades from one of them, even if
+# an admin changed it. install_services.sh decides whether to replace it.
+NEWSYSLOG_CONF="/private/etc/newsyslog.d/com.northpolesec.santa.newsyslog.conf"
+NEWSYSLOG_CONF_SAVED="/private/var/db/santa/newsyslog.conf.preinstall"
+[[ -f "${NEWSYSLOG_CONF_SAVED}" && ! -e "${NEWSYSLOG_CONF}" ]] && /bin/mv "${NEWSYSLOG_CONF_SAVED}" "${NEWSYSLOG_CONF}"
+# Keep the saved copy if the restore failed, so the next install can retry it.
+[[ -e "${NEWSYSLOG_CONF}" ]] && /bin/rm -f "${NEWSYSLOG_CONF_SAVED}"
+
 # Check if an unsupported version of Santa is running.
 GOOGLE_SANTA_ACTIVATED="$(/usr/bin/systemextensionsctl list com.apple.system_extension.endpoint_security |
                           /usr/bin/grep -E '^.+EQHXZ8M8AV.+com\.google\.santa\.daemon.+activated.+$')"

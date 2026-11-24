@@ -14,6 +14,7 @@
 /// limitations under the License.
 
 #include <EndpointSecurity/ESTypes.h>
+#include <Kernel/kern/cs_blobs.h>
 #import <OCMock/OCMock.h>
 #import <XCTest/XCTest.h>
 #include <gmock/gmock.h>
@@ -23,6 +24,7 @@
 #include <memory>
 #include <optional>
 #include <set>
+#include <vector>
 
 #include "Source/common/Platform.h"
 #include "Source/common/PrefixTree.h"
@@ -37,6 +39,9 @@
 #include "Source/common/es/Message.h"
 #include "Source/common/es/MockEndpointSecurityAPI.h"
 #include "Source/common/es/MockEnricher.h"
+#include "Source/common/processtree/annotations/annotator.h"
+#include "Source/common/processtree/process_tree.h"
+#include "Source/common/processtree/process_tree_test_helpers.h"
 #import "Source/santad/EventProviders/SNTEndpointSecurityRecorder.h"
 #include "Source/santad/Logs/EndpointSecurity/MockLogger.h"
 #include "Source/santad/Metrics.h"
@@ -50,6 +55,15 @@ using santa::PrefixTree;
 using santa::Processor;
 using santa::TelemetryEvent;
 using santa::Unit;
+using santa::santad::process_tree::Annotator;
+using santa::santad::process_tree::ExitAndDrain;
+using santa::santad::process_tree::Pid;
+using santa::santad::process_tree::ProcessTreeTestPeer;
+
+@interface SNTEndpointSecurityRecorder (Testing)
+- (bool)willLogMessage:(Message&)esMsg recordDrop:(bool*)recordDrop;
+- (void)setFileChangesRegex:(NSRegularExpression*)re;
+@end
 
 @interface SNTEndpointSecurityRecorderTest : XCTestCase
 @property id mockConfigurator;
@@ -510,6 +524,7 @@ es_file_t targetFileMissesRegex = MakeESFile("/foo/misses");
 es_file_t dirFoo = MakeESFile("/foo");
 es_file_t targetFileMatchesRegexFiltered = MakeESFile("/foo/matches/filtered");
 es_file_t targetFileMatchesRegexInvalidUTF8 = MakeESFile("/foo/matches\xff\xfe");
+es_file_t targetFileMissesRegexInvalidUTF8 = MakeESFile("/bar/misses\xff\xfe");
 constexpr const char* kFilteredPrefix = "/foo/matches/";
 
 // Handles a file change event built by `setup` and verifies the outcome. A
@@ -605,20 +620,20 @@ constexpr const char* kFilteredPrefix = "/foo/matches/";
       }
                disposition:std::nullopt];
 
-  // CLOSE: path is not valid UTF-8, treated as a regex miss
+  // CLOSE: path is not valid UTF-8 and matches the regex
   [self
       checkFileChangeEvent:^(es_message_t* esMsg, std::shared_ptr<PrefixTree<Unit>> prefixTree) {
         esMsg->event_type = ES_EVENT_TYPE_NOTIFY_CLOSE;
         esMsg->event.close.modified = true;
         esMsg->event.close.target = &targetFileMatchesRegexInvalidUTF8;
       }
-               disposition:std::nullopt];
+               disposition:EventDisposition::kProcessed];
 
-  // RENAME: source is not valid UTF-8, destination matches
+  // RENAME: source is not valid UTF-8 and misses regex, destination matches
   [self
       checkFileChangeEvent:^(es_message_t* esMsg, std::shared_ptr<PrefixTree<Unit>> prefixTree) {
         esMsg->event_type = ES_EVENT_TYPE_NOTIFY_RENAME;
-        esMsg->event.rename.source = &targetFileMatchesRegexInvalidUTF8;
+        esMsg->event.rename.source = &targetFileMissesRegexInvalidUTF8;
         esMsg->event.rename.destination_type = ES_DESTINATION_TYPE_EXISTING_FILE;
         esMsg->event.rename.destination.existing_file = &targetFileMatchesAlsoRegex;
       }
@@ -899,6 +914,319 @@ constexpr const char* kFilteredPrefix = "/foo/matches/";
 
   [mockCC stopMocking];
   [mockDecisionCache stopMocking];
+}
+
+static const Pid kTokenTestPid = {.pid = 2, .pidversion = 2};
+
+typedef void (^TokenTestConfigBlock)(es_message_t* esMsg,
+                                     std::shared_ptr<PrefixTree<Unit>> prefixTree);
+
+// ponytail: one test for each way the Recorder drops a message, so a filter
+// moved below attachProcessToken: fails here. The older tests assert only that
+// Enrich isn't called, which stays true either way. The exec test checks that
+// the token outlives the held-exec checks between attachProcessToken: and
+// Enrich.
+// Runs a message from kTokenTestPid through the Recorder the way
+// establishClientOrDie does, with a process tree, then checks whether a token
+// held the process. When `expectHeld`, the check runs inside Enrich. Otherwise
+// it runs after handleMessage: returns, while the message is still alive.
+- (void)checkTokenHeld:(BOOL)expectHeld
+         telemetryMask:(TelemetryEvent)telemetryMask
+             configure:(TokenTestConfigBlock)configure {
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsESNewClient();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+  EXPECT_CALL(*mockESApi, ExecArgCount).WillRepeatedly(testing::Return(0));
+
+  // grace=1 so one later event is enough to drain.
+  std::vector<std::unique_ptr<Annotator>> annotators{};
+  auto tree = std::make_shared<ProcessTreeTestPeer>(std::move(annotators), 1);
+  auto init = tree->InsertInit();
+  tree->HandleFork(10, init, kTokenTestPid);
+
+  es_file_t file = MakeESFile("foo");
+  es_process_t proc =
+      MakeESProcess(&file, MakeAuditToken(kTokenTestPid.pid, kTokenTestPid.pidversion));
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_UNLINK, &proc);
+  esMsg.mach_time = 20;
+
+  auto prefixTree = std::make_shared<PrefixTree<Unit>>();
+  configure(&esMsg, prefixTree);
+
+  auto mockEnricher = std::make_shared<santa::MockEnricher>();
+  auto mockLogger = std::make_shared<MockLogger>();
+  mockLogger->SetTelemetryMask(telemetryMask);
+  EXPECT_CALL(*mockLogger, Log).Times(0);
+
+  bool heldAtEnrich = false;
+  if (expectHeld) {
+    // Returning no enriched message ends handling without logging.
+    EXPECT_CALL(*mockEnricher, Enrich).WillOnce([&heldAtEnrich, tree](Message&&) {
+      ExitAndDrain(*tree, kTokenTestPid);
+      heldAtEnrich = tree->Get(kTokenTestPid).has_value();
+      return std::unique_ptr<EnrichedMessage>();
+    });
+  } else {
+    EXPECT_CALL(*mockEnricher, Enrich).Times(0);
+  }
+
+  id mockDecisionCache = OCMClassMock([SNTDecisionCache class]);
+  OCMStub([mockDecisionCache sharedCache]).andReturn(mockDecisionCache);
+  OCMStub([mockDecisionCache cachedDecisionForFile:{}]).ignoringNonObjectArgs().andReturn(nil);
+
+  id mockCC = OCMClassMock([SNTCompilerController class]);
+
+  SNTEndpointSecurityRecorder* recorderClient =
+      [[SNTEndpointSecurityRecorder alloc] initWithESAPI:mockESApi
+                                                 metrics:nullptr
+                                                  logger:mockLogger
+                                                enricher:mockEnricher
+                                      compilerController:mockCC
+                               loginWindowSessionHandler:nil
+                                              prefixTree:prefixTree
+                                             processTree:tree];
+
+  {
+    Message msg(mockESApi, &esMsg);
+    XCTAssertFalse([recorderClient handleContextMessage:msg]);
+    [recorderClient handleMessage:std::move(msg)
+               recordEventMetrics:^(EventDisposition d){
+               }];
+
+    if (expectHeld) {
+      XCTAssertTrue(heldAtEnrich, @"no token held the process at Enrich");
+    } else {
+      ExitAndDrain(*tree, kTokenTestPid);
+      XCTAssertFalse(tree->Get(kTokenTestPid).has_value(),
+                     @"a token held the process of a message that is not logged");
+    }
+  }
+
+  if (expectHeld) {
+    // The message, and its token, are gone.
+    XCTAssertFalse(tree->Get(kTokenTestPid).has_value());
+  }
+
+  XCTBubbleMockVerifyAndClearExpectations(mockEnricher.get());
+  XCTBubbleMockVerifyAndClearExpectations(mockLogger.get());
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+
+  [mockCC stopMocking];
+  [mockDecisionCache stopMocking];
+}
+
+- (void)testNoTokenForUnmodifiedClose {
+  [self checkTokenHeld:NO
+         telemetryMask:TelemetryEvent::kEverything
+             configure:^(es_message_t* esMsg, std::shared_ptr<PrefixTree<Unit>> prefixTree) {
+               esMsg->event_type = ES_EVENT_TYPE_NOTIFY_CLOSE;
+               esMsg->event.close.modified = false;
+               esMsg->event.close.was_mapped_writable = false;
+               esMsg->event.close.target = &targetFileMatchesRegex;
+             }];
+}
+
+- (void)testNoTokenWithoutFileChangesRegex {
+  // OCMock uses the first matching stub, so replace the configurator mock from
+  // setUp rather than stubbing fileChangesRegex again.
+  [self.mockConfigurator stopMocking];
+  self.mockConfigurator = OCMClassMock([SNTConfigurator class]);
+  OCMStub([self.mockConfigurator configurator]).andReturn(self.mockConfigurator);
+  OCMStub([self.mockConfigurator fileChangesRegex]).andReturn(nil);
+
+  [self checkTokenHeld:NO
+         telemetryMask:TelemetryEvent::kEverything
+             configure:^(es_message_t* esMsg, std::shared_ptr<PrefixTree<Unit>> prefixTree) {
+               esMsg->event.unlink.target = &targetFileMatchesRegex;
+             }];
+}
+
+- (void)testNoTokenForRegexMiss {
+  [self checkTokenHeld:NO
+         telemetryMask:TelemetryEvent::kEverything
+             configure:^(es_message_t* esMsg, std::shared_ptr<PrefixTree<Unit>> prefixTree) {
+               esMsg->event.unlink.target = &targetFileMissesRegex;
+             }];
+}
+
+- (void)testNoTokenForPrefixFilteredPath {
+  [self checkTokenHeld:NO
+         telemetryMask:TelemetryEvent::kEverything
+             configure:^(es_message_t* esMsg, std::shared_ptr<PrefixTree<Unit>> prefixTree) {
+               esMsg->event.unlink.target = &targetFileMatchesRegex;
+               prefixTree->InsertPrefix("/foo", Unit{});
+             }];
+}
+
+- (void)testNoTokenWhenTelemetryExcludesEvent {
+  [self checkTokenHeld:NO
+         telemetryMask:santa::TelemetryConfigToBitmask(@[ @"execution" ])
+             configure:^(es_message_t* esMsg, std::shared_ptr<PrefixTree<Unit>> prefixTree) {
+               esMsg->event.unlink.target = &targetFileMatchesRegex;
+             }];
+}
+
+- (void)testTokenHeldForFileEventMatchingRegex {
+  [self checkTokenHeld:YES
+         telemetryMask:TelemetryEvent::kEverything
+             configure:^(es_message_t* esMsg, std::shared_ptr<PrefixTree<Unit>> prefixTree) {
+               esMsg->event.unlink.target = &targetFileMatchesRegex;
+             }];
+}
+
+- (void)testTokenHeldForExec {
+  static es_file_t execFile = MakeESFile("bar");
+  static es_process_t execProc = MakeESProcess(&execFile, MakeAuditToken(kTokenTestPid.pid, 3));
+  execProc.codesigning_flags = CS_ADHOC;
+
+  [self checkTokenHeld:YES
+         telemetryMask:TelemetryEvent::kEverything
+             configure:^(es_message_t* esMsg, std::shared_ptr<PrefixTree<Unit>> prefixTree) {
+               esMsg->event_type = ES_EVENT_TYPE_NOTIFY_EXEC;
+               esMsg->event.exec.target = &execProc;
+             }];
+}
+
+#pragma mark - FileChangesRegex matching
+
+static NSRegularExpression* Regex(NSString* pattern) {
+  return [NSRegularExpression regularExpressionWithPattern:pattern options:0 error:NULL];
+}
+
+// Builds a Recorder that logs every event type and runs `block` with it.
+- (void)withRecorder:(void (^)(SNTEndpointSecurityRecorder* recorder,
+                               std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
+                               std::shared_ptr<PrefixTree<Unit>> prefixTree))block {
+  auto mockESApi = std::make_shared<MockEndpointSecurityAPI>();
+  mockESApi->SetExpectationsESNewClient();
+  mockESApi->SetExpectationsRetainReleaseMessage();
+  auto mockLogger = std::make_shared<MockLogger>();
+  mockLogger->SetTelemetryMask(TelemetryEvent::kEverything);
+  auto prefixTree = std::make_shared<PrefixTree<Unit>>();
+
+  SNTEndpointSecurityRecorder* recorder =
+      [[SNTEndpointSecurityRecorder alloc] initWithESAPI:mockESApi
+                                                 metrics:nullptr
+                                                  logger:mockLogger
+                                                enricher:nullptr
+                                      compilerController:nil
+                               loginWindowSessionHandler:nil
+                                              prefixTree:prefixTree
+                                             processTree:nullptr];
+  block(recorder, mockESApi, prefixTree);
+
+  XCTBubbleMockVerifyAndClearExpectations(mockESApi.get());
+}
+
+// Returns whether the Recorder would log an unlink of `path`.
+static bool WillLogUnlink(SNTEndpointSecurityRecorder* recorder,
+                          std::shared_ptr<MockEndpointSecurityAPI> mockESApi, const char* path,
+                          bool* recordDrop) {
+  es_file_t procFile = MakeESFile("foo");
+  es_process_t proc = MakeESProcess(&procFile);
+  es_file_t target = MakeESFile(path);
+  es_file_t parent = MakeESFile("/");
+  es_message_t esMsg = MakeESMessage(ES_EVENT_TYPE_NOTIFY_UNLINK, &proc);
+  esMsg.event.unlink.target = &target;
+  esMsg.event.unlink.parent_dir = &parent;
+  Message msg(mockESApi, &esMsg);
+  bool unused = false;
+  return [recorder willLogMessage:msg recordDrop:recordDrop ? recordDrop : &unused];
+}
+
+- (void)testFileChangesRegexAgreesWithNSRegularExpression {
+  NSArray<NSString*>* patterns = @[
+    @"^/(?!(?:private/tmp|Library/(?:Caches|Managed Installs/Logs|(?:Managed )?Preferences))/)",
+    @"^/Users/",
+    @"^.*\\.txt$",
+    @"^/users/",
+    @"^(?i)/USERS/",
+    @"^/Users/x/résumé",
+    @"^/Users/x/.{3}$",
+  ];
+  std::vector<const char*> paths = {
+      "/Users/x/a.txt",
+      "/Users/x/a.TXT",
+      "/users/x",
+      "/Library/Caches/x",
+      "/Library/Managed Preferences/x",
+      "/private/tmp/x",
+      "/private/var/x",
+      "/Users/x/foo bar",
+      "/Users/x/r\xC3\xA9sum\xC3\xA9.pdf",
+      "/Users/x/\xE2\x82\xAC",
+      "/Users/x/\xE6\x97\xA5\xE6\x9C\xAC.txt",
+      "/Users/x/\xF0\x9F\x98\x80",
+      "/Users/x/\xF0\x9F\x98\x80"
+      "ab",
+      "/Users/x/\xE6\x97\xA5\xE6\x9C\xAC\xE8\xAA\x9E",
+      "/a",
+  };
+
+  [self withRecorder:^(SNTEndpointSecurityRecorder* recorder,
+                       std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
+                       std::shared_ptr<PrefixTree<Unit>> prefixTree) {
+    for (NSString* pattern in patterns) {
+      NSRegularExpression* re = Regex(pattern);
+      XCTAssertNotNil(re, @"%@", pattern);
+      [recorder setFileChangesRegex:re];
+      for (const char* path : paths) {
+        NSString* nsPath = @(path);
+        bool want = [re rangeOfFirstMatchInString:nsPath
+                                          options:0
+                                            range:NSMakeRange(0, nsPath.length)]
+                        .location != NSNotFound;
+        XCTAssertEqual(WillLogUnlink(recorder, mockESApi, path, nullptr), want,
+                       @"pattern %@, path %@", pattern, nsPath);
+      }
+    }
+  }];
+}
+
+- (void)testFileChangesRegexMatchesPathNotValidUTF8 {
+  [self withRecorder:^(SNTEndpointSecurityRecorder* recorder,
+                       std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
+                       std::shared_ptr<PrefixTree<Unit>> prefixTree) {
+    [recorder setFileChangesRegex:Regex(@"^/Users/")];
+    XCTAssertTrue(WillLogUnlink(recorder, mockESApi, "/Users/x/bad\xFFname", nullptr));
+    XCTAssertTrue(WillLogUnlink(recorder, mockESApi, "/Users/x/trunc\xE2\x82", nullptr));
+    XCTAssertFalse(WillLogUnlink(recorder, mockESApi, "/private/tmp/bad\xFFname", nullptr));
+
+    // The byte that is not valid UTF-8 is read as U+FFFD.
+    [recorder setFileChangesRegex:Regex(@"^/Users/x/bad\\x{FFFD}name$")];
+    XCTAssertTrue(WillLogUnlink(recorder, mockESApi, "/Users/x/bad\xFFname", nullptr));
+  }];
+}
+
+- (void)testPrefixFilteredPathNotValidUTF8IsDropped {
+  [self withRecorder:^(SNTEndpointSecurityRecorder* recorder,
+                       std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
+                       std::shared_ptr<PrefixTree<Unit>> prefixTree) {
+    [recorder setFileChangesRegex:Regex(@"^/Users/")];
+    prefixTree->InsertPrefix("/Users/x/", Unit{});
+    bool recordDrop = false;
+    XCTAssertFalse(WillLogUnlink(recorder, mockESApi, "/Users/x/bad\xFFname", &recordDrop));
+    XCTAssertTrue(recordDrop);
+  }];
+}
+
+- (void)testSetFileChangesRegexReplacesPattern {
+  [self withRecorder:^(SNTEndpointSecurityRecorder* recorder,
+                       std::shared_ptr<MockEndpointSecurityAPI> mockESApi,
+                       std::shared_ptr<PrefixTree<Unit>> prefixTree) {
+    // Starts with the pattern from setUp.
+    XCTAssertTrue(WillLogUnlink(recorder, mockESApi, "/foo/matches", nullptr));
+    XCTAssertFalse(WillLogUnlink(recorder, mockESApi, "/Users/x/a", nullptr));
+
+    [recorder setFileChangesRegex:Regex(@"^/Users/")];
+    XCTAssertFalse(WillLogUnlink(recorder, mockESApi, "/foo/matches", nullptr));
+    XCTAssertTrue(WillLogUnlink(recorder, mockESApi, "/Users/x/a", nullptr));
+
+    [recorder setFileChangesRegex:nil];
+    bool recordDrop = false;
+    XCTAssertFalse(WillLogUnlink(recorder, mockESApi, "/Users/x/a", &recordDrop));
+    XCTAssertFalse(recordDrop);
+  }];
 }
 
 @end

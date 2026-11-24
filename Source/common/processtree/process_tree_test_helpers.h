@@ -45,6 +45,15 @@ class ProcessTreeTestPeer : public ProcessTree {
   }
 };
 
+// Exits `pid` at timestamp 1000, then forks a child of init at 2000 so
+// DrainRemovals runs. In a tree with a removal grace of 1 tick, `pid` is
+// erased unless something still retains it.
+inline void ExitAndDrain(ProcessTree& tree, struct Pid pid) {
+  tree.HandleExit(1000, **tree.Get(pid));
+  tree.HandleFork(2000, *tree.Get({.pid = 1, .pidversion = 1}),
+                  {.pid = 99, .pidversion = 99});
+}
+
 }  // namespace santa::santad::process_tree
 
 #endif  // SANTA_COMMON_PROCESSTREE_PROCESSTREETESTHELPERS_H

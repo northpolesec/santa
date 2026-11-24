@@ -52,6 +52,7 @@ NSString* GenerateRandomHexStringWithSHA256Length() {
 @interface SNTEventTable (Testing)
 - (SNTStoredEvent*)eventFromResultSet:(FMResultSet*)rs;
 @property NSTimeInterval unactionableEventCacheTimeSeconds;
+@property NSTimeInterval blockEventCacheTimeSeconds;
 @end
 
 /// This test case actually tests SNTEventTable and SNTStoredEvent.
@@ -131,6 +132,9 @@ NSString* GenerateRandomHexStringWithSHA256Length() {
 
 - (void)testUniqueIndexActionable {
   XCTAssertEqual(self.sut.pendingEventsCount, 0);
+
+  // Disable the block backoff so the unique index is what dedups.
+  self.sut.blockEventCacheTimeSeconds = 0;
 
   SNTStoredExecutionEvent* event = [self createTestEvent];
   XCTAssertTrue([self.sut addStoredEvent:event]);
@@ -245,7 +249,7 @@ NSString* GenerateRandomHexStringWithSHA256Length() {
   XCTAssertEqual(self.sut.pendingEventsCount, 1);
 
   // Delete everything
-  [self.sut deleteEventWithId:origId];
+  [self.sut deleteEventsWithIds:@[ origId ]];
   XCTAssertEqual(self.sut.pendingEventsCount, 0);
 
   // Attempt to reinsert an unactionable event before the backoff time
@@ -261,6 +265,117 @@ NSString* GenerateRandomHexStringWithSHA256Length() {
   event.idx = @(arc4random());
   XCTAssertTrue([self.sut addStoredEvent:event]);
   XCTAssertEqual(self.sut.pendingEventsCount, 1);
+}
+
+- (void)testBlockBackoff {
+  // Longer than any uptime, so a binary with no backoff yet is stored even right after boot.
+  self.sut.blockEventCacheTimeSeconds = 100.0 * 365 * 24 * 60 * 60;
+
+  SNTStoredExecutionEvent* block = [self createTestEvent];
+  XCTAssertTrue([self.sut addStoredEvent:block]);
+
+  // Drain the table as an upload does. A repeat block of the same binary is not stored, or every
+  // sync would upload another copy.
+  [self.sut deleteEventsWithIds:@[ block.idx ]];
+  block.idx = @(arc4random());
+  XCTAssertFalse([self.sut addStoredEvent:block]);
+  XCTAssertEqual(self.sut.pendingEventsCount, 0);
+
+  // A new decision for the binary has a window of its own. For example, BLOCK_UNKNOWN after the
+  // binary's block rule is removed is what starts an approval in Workshop.
+  block.decision = SNTEventStateBlockUnknown;
+  XCTAssertTrue([self.sut addStoredEvent:block]);
+  XCTAssertEqual(self.sut.pendingEventsCount, 1);
+  [self.sut deleteEventsWithIds:@[ block.idx ]];
+  block.idx = @(arc4random());
+  XCTAssertFalse([self.sut addStoredEvent:block]);
+  XCTAssertEqual(self.sut.pendingEventsCount, 0);
+
+  // A bundle's related events are not blocks, so they are not throttled.
+  SNTStoredExecutionEvent* related = [self createTestEvent];
+  related.fileSHA256 = block.fileSHA256;
+  related.decision = SNTEventStateBundleBinary;
+  XCTAssertTrue([self.sut addStoredEvent:related]);
+  XCTAssertEqual(self.sut.pendingEventsCount, 1);
+  [self.sut deleteEventsWithIds:@[ related.idx ]];
+
+  // Allows and blocks of the same binary share a uniqueID but not a backoff, so the binary's blocks
+  // above do not hide its allow.
+  SNTStoredExecutionEvent* allow = [self createTestEvent];
+  allow.fileSHA256 = block.fileSHA256;
+  allow.decision = SNTEventStateAllowBinary;
+  XCTAssertTrue([self.sut addStoredEvent:allow]);
+  XCTAssertEqual(self.sut.pendingEventsCount, 1);
+  [self.sut deleteEventsWithIds:@[ allow.idx ]];
+
+  // A block that conflicts with a pending row of the same binary writes nothing, so it does not
+  // start its window: once that row is uploaded, the next block is stored.
+  SNTStoredExecutionEvent* pendingAllow = [self createTestEvent];
+  pendingAllow.decision = SNTEventStateAllowBinary;
+  XCTAssertTrue([self.sut addStoredEvent:pendingAllow]);
+  SNTStoredExecutionEvent* blockAfterAllow = [self createTestEvent];
+  blockAfterAllow.fileSHA256 = pendingAllow.fileSHA256;
+  XCTAssertTrue([self.sut addStoredEvent:blockAfterAllow]);
+  XCTAssertEqual(self.sut.pendingEventsCount, 1);
+  [self.sut deleteEventsWithIds:@[ pendingAllow.idx ]];
+  blockAfterAllow.idx = @(arc4random());
+  XCTAssertTrue([self.sut addStoredEvent:blockAfterAllow]);
+  XCTAssertEqual(self.sut.pendingEventsCount, 1);
+  SNTStoredExecutionEvent* stored = [self.sut pendingEvents].firstObject;
+  XCTAssertEqual(stored.decision, SNTEventStateBlockBinary);
+
+  // The backoff ends after its window.
+  self.sut.blockEventCacheTimeSeconds = 1;
+  SleepMS(1100);
+  [self.sut deleteEventsWithIds:@[ blockAfterAllow.idx ]];
+  block.idx = @(arc4random());
+  XCTAssertTrue([self.sut addStoredEvent:block]);
+  XCTAssertEqual(self.sut.pendingEventsCount, 1);
+}
+
+- (void)testStoreBundleHashedEvent {
+  // A row that is still waiting is updated in place.
+  SNTStoredExecutionEvent* waiting = [self createTestEvent];
+  XCTAssertTrue([self.sut addStoredEvent:waiting]);
+  waiting.fileBundleHash = @"bundlehash";
+  [self.sut storeBundleHashedEvent:waiting];
+  XCTAssertEqual(self.sut.pendingEventsCount, 1);
+  SNTStoredExecutionEvent* stored = [self.sut pendingEvents].firstObject;
+  XCTAssertEqualObjects(stored.idx, waiting.idx);
+  XCTAssertEqualObjects(stored.fileBundleHash, @"bundlehash");
+
+  // The update starts the hashed window: once the row is uploaded, a repeat hashed copy (another
+  // block window for the same binary) is not stored.
+  [self.sut deleteEventsWithIds:@[ waiting.idx ]];
+  waiting.idx = @(arc4random());
+  [self.sut storeBundleHashedEvent:waiting];
+  XCTAssertEqual(self.sut.pendingEventsCount, 0);
+
+  // A row that a sync already uploaded is stored again with its bundle hash, so the hashed event
+  // still reaches the server.
+  SNTStoredExecutionEvent* synced = [self createTestEvent];
+  XCTAssertTrue([self.sut addStoredEvent:synced]);
+  [self.sut deleteEventsWithIds:@[ synced.idx ]];
+  synced.fileBundleHash = @"bundlehash";
+  [self.sut storeBundleHashedEvent:synced];
+  XCTAssertEqual(self.sut.pendingEventsCount, 1);
+  XCTAssertEqualObjects([[self.sut pendingEvents].firstObject fileBundleHash], @"bundlehash");
+
+  // A repeat hashed copy within the window is not.
+  [self.sut deleteEventsWithIds:@[ synced.idx ]];
+  synced.idx = @(arc4random());
+  [self.sut storeBundleHashedEvent:synced];
+  XCTAssertEqual(self.sut.pendingEventsCount, 0);
+
+  // The update only changes the row of the same binary.
+  SNTStoredExecutionEvent* other = [self createTestEvent];
+  XCTAssertTrue([self.sut addStoredEvent:other]);
+  SNTStoredExecutionEvent* wrongBinary = [self createTestEvent];
+  wrongBinary.idx = other.idx;
+  wrongBinary.fileBundleHash = @"bundlehash";
+  [self.sut storeBundleHashedEvent:wrongBinary];
+  XCTAssertEqual(self.sut.pendingEventsCount, 1);
+  XCTAssertNil([[self.sut pendingEvents].firstObject fileBundleHash]);
 }
 
 - (void)testRetrieveExecutionEvent {
@@ -323,22 +438,6 @@ NSString* GenerateRandomHexStringWithSHA256Length() {
       (SNTStoredTemporaryMonitorModeLeaveAuditEvent*)storedEvent;
   XCTAssertEqualObjects(tmmLeave.uuid, @"leave_uuid");
   XCTAssertEqual(tmmLeave.reason, SNTTemporaryMonitorModeLeaveReasonSessionExpired);
-}
-
-- (void)testDeleteEventWithId {
-  SNTStoredEvent* newEvent = [self createTestEvent];
-  [self.sut addStoredEvent:newEvent];
-  XCTAssertEqual(self.sut.pendingEventsCount, 1);
-
-  [self.sut deleteEventWithId:newEvent.idx];
-  XCTAssertEqual(self.sut.pendingEventsCount, 0);
-
-  SNTStoredEvent* newEvent2 = [self createTestFileAccessEvent];
-  [self.sut addStoredEvent:newEvent2];
-  XCTAssertEqual(self.sut.pendingEventsCount, 1);
-
-  [self.sut deleteEventWithId:newEvent2.idx];
-  XCTAssertEqual(self.sut.pendingEventsCount, 0);
 }
 
 - (void)testDeleteEventsWithIds {

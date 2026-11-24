@@ -21,6 +21,7 @@
 #include <time.h>
 
 #include <memory>
+#include <utility>
 #include <vector>
 
 #include <mach/machine.h>
@@ -167,7 +168,11 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
 
 - (void)testFlushCache {
   auto flusher = std::make_shared<ESCacheFlusher>(ESCacheClearStrategy::kEveryClient);
-  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(flusher, nil);
+  SNTMetricSet* metricSet = [[SNTMetricSet alloc] initWithHostname:@"test" username:@"test"];
+  SNTMetricCounter* flushCount = [metricSet counterWithName:@"flush_count"
+                                                 fieldNames:@[ @"Reason" ]
+                                                   helpText:@"Cache flushes"];
+  auto cache = std::make_shared<AuthResultCache>(flusher, flushCount);
 
   auto clientAPI = std::make_shared<MockEndpointSecurityAPI>();
   SNTEndpointSecurityClient* client =
@@ -193,23 +198,33 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
   santa::ExecTarget rootTarget = MakeTarget(RootDevno(), 111);
   santa::ExecTarget nonrootTarget = MakeTarget(RootDevno() + 123, 111);
 
-  XCTAssertNotEqual(cache->Reserve(rootTarget, {}), 0);
-  XCTAssertNotEqual(cache->Reserve(nonrootTarget, {}), 0);
+  uint64_t rootToken = cache->Reserve(rootTarget, {});
+  uint64_t nonrootToken = cache->Reserve(nonrootTarget, {});
+  XCTAssertNotEqual(rootToken, 0);
+  XCTAssertNotEqual(nonrootToken, 0);
+  XCTAssertTrue(cache->AddToCache(rootTarget, SNTActionRespondAllow, nil, rootToken));
+  XCTAssertTrue(cache->AddToCache(nonrootTarget, SNTActionRespondAllow, nil, nonrootToken));
 
   AssertCacheCounts(cache, 1, 1);
+
+  // A selective invalidation retains ordinary allows and does not count as a flush.
+  cache->FlushCache(FlushCacheMode::kCompilerDecisionsOnly, FlushCacheReason::kRulesChanged);
+  AssertCacheCounts(cache, 1, 1);
+  XCTAssertEqual([flushCount getCountForFieldValues:@[ @"RulesChanged" ]], 0);
 
   // Flush non-root only
   cache->FlushCache(FlushCacheMode::kNonRootOnly, FlushCacheReason::kClientModeChanged);
 
   AssertCacheCounts(cache, 1, 0);
+  XCTAssertEqual([flushCount getCountForFieldValues:@[ @"ClientModeChanged" ]], 1);
 
   // Add back the non-root file
   XCTAssertNotEqual(cache->Reserve(nonrootTarget, {}), 0);
 
   AssertCacheCounts(cache, 1, 1);
 
-  // Registered after the non-root flush and cleared last, so once it is cleared
-  // any invalidation requested by the non-root flush has also run.
+  // Registered after the selective and non-root flushes and cleared last, so once
+  // it is cleared any invalidation requested by those earlier calls has also run.
   flusher->AddClient(lastClient);
 
   // Flush all caches. Local caches clear synchronously, and the ES caches are
@@ -217,11 +232,63 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
   cache->FlushCache(FlushCacheMode::kAllCaches, FlushCacheReason::kClientModeChanged);
 
   AssertCacheCounts(cache, 0, 0);
+  XCTAssertEqual([flushCount getCountForFieldValues:@[ @"ClientModeChanged" ]], 2);
 
   XCTAssertSemaTrue(sema, 5, "ClearCache wasn't called within expected time window");
 
   XCTBubbleMockVerifyAndClearExpectations(clientAPI.get());
   XCTBubbleMockVerifyAndClearExpectations(lastAPI.get());
+}
+
+- (void)testCompilerFlushPreservesOtherEntries {
+  auto flusher = std::make_shared<ESCacheFlusher>(ESCacheClearStrategy::kEveryClient);
+  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(flusher, nil, 600000);
+  std::vector<santa::ExecTarget> evicted;
+  std::vector<std::pair<santa::ExecTarget, santa::CachedAuthResult>> retained;
+  SNTCachedDecision* cd = [[SNTCachedDecision alloc] init];
+  cd.sha256 = @"confirmed-hash";
+  cd.heldForTransitiveRule = YES;
+
+  for (uint64_t devno : {RootDevno(), RootDevno() + 123}) {
+    for (cpu_type_t cpu : {CPU_TYPE_ARM64, CPU_TYPE_X86_64}) {
+      santa::ExecTarget compiler = MakeTarget(devno, 111, cpu);
+      uint64_t compilerToken = cache->Reserve(compiler, {});
+      XCTAssertNotEqual(compilerToken, 0);
+      XCTAssertTrue(cache->AddToCache(compiler, SNTActionRespondAllowCompiler, cd, compilerToken));
+      evicted.push_back(compiler);
+
+      santa::ExecTarget pending = MakeTarget(devno, 222, cpu);
+      XCTAssertNotEqual(cache->Reserve(pending, {}), 0);
+      evicted.push_back(pending);
+
+      uint64_t ino = 333;
+      for (SNTAction action : {SNTActionRespondAllow, SNTActionRespondDeny,
+                               SNTActionRespondAllowNoCache, SNTActionRespondHold}) {
+        santa::ExecTarget target = MakeTarget(devno, ino++, cpu);
+        uint64_t token = cache->Reserve(target, {});
+        XCTAssertNotEqual(token, 0);
+        XCTAssertTrue(cache->AddToCache(target, action, cd, token));
+        XCTAssertEqual(cache->CheckCache(target).action, action);
+        retained.push_back({target, cache->CheckCache(target)});
+      }
+    }
+  }
+
+  AssertCacheCounts(cache, 12, 12);
+  cache->FlushCache(FlushCacheMode::kCompilerDecisionsOnly, FlushCacheReason::kRulesChanged);
+  AssertCacheCounts(cache, 8, 8);
+
+  for (const auto& target : evicted) {
+    XCTAssertEqual(cache->CheckCache(target).action, SNTActionUnset);
+  }
+  for (const auto& [target, before] : retained) {
+    santa::CachedAuthResult after = cache->CheckCache(target);
+    XCTAssertEqual(after.action, before.action);
+    XCTAssertEqual(after.timestamp, before.timestamp);
+    XCTAssertTrue(after.identity == before.identity);
+    XCTAssertEqualObjects(after.sha256, before.sha256);
+    XCTAssertEqualObjects(after.cached_decision, before.cached_decision);
+  }
 }
 
 - (void)testCacheStateMachine {
@@ -524,22 +591,31 @@ static inline void AssertCacheCounts(std::shared_ptr<AuthResultCache> cache, uin
 
 - (void)testPublishRequiresTheCurrentReservation {
   auto flusher = std::make_shared<ESCacheFlusher>(ESCacheClearStrategy::kEveryClient);
-  std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(flusher, nil);
+  for (FlushCacheMode mode : {FlushCacheMode::kAllCaches, FlushCacheMode::kCompilerDecisionsOnly}) {
+    for (SNTAction action : {SNTActionRespondAllow, SNTActionRespondAllowCompiler}) {
+      std::shared_ptr<AuthResultCache> cache = AuthResultCache::Create(flusher, nil);
+      santa::ExecTarget a = MakeTarget(RootDevno(), 333);
+      uint64_t r1 = cache->Reserve(a, {});
+      XCTAssertNotEqual(r1, 0);
 
-  santa::ExecTarget a = MakeTarget(RootDevno(), 333);
-  uint64_t r1 = cache->Reserve(a, {});
-  XCTAssertNotEqual(r1, 0);
+      cache->FlushCache(mode, FlushCacheReason::kRulesChanged);
 
-  cache->FlushCache(FlushCacheMode::kAllCaches, FlushCacheReason::kRulesChanged);
+      // An evaluation started before invalidation cannot repopulate an empty slot.
+      XCTAssertFalse(cache->AddToCache(a, action, nil, r1));
+      XCTAssertEqual(cache->CheckCache(a).action, SNTActionUnset);
 
-  uint64_t r2 = cache->Reserve(a, {});
-  XCTAssertNotEqual(r2, 0);
-  XCTAssertNotEqual(r2, r1);
+      uint64_t r2 = cache->Reserve(a, {});
+      XCTAssertNotEqual(r2, 0);
+      XCTAssertNotEqual(r2, r1);
 
-  XCTAssertFalse(cache->AddToCache(a, SNTActionRespondAllow, nil, r1));
-  XCTAssertEqual(cache->CheckCache(a).action, SNTActionRequestBinary);
-  XCTAssertTrue(cache->AddToCache(a, SNTActionRespondAllow, nil, r2));
-  XCTAssertEqual(cache->CheckCache(a).action, SNTActionRespondAllow);
+      // Nor can it overwrite the reservation of a later evaluation.
+      XCTAssertFalse(cache->AddToCache(a, action, nil, r1));
+      XCTAssertEqual(cache->CheckCache(a).action, SNTActionRequestBinary);
+      XCTAssertEqual(cache->CheckCache(a).timestamp, r2);
+      XCTAssertTrue(cache->AddToCache(a, action, nil, r2));
+      XCTAssertEqual(cache->CheckCache(a).action, action);
+    }
+  }
 }
 
 - (void)testReplantedMarkerBlocksTheOriginalPublish {

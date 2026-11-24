@@ -17,6 +17,8 @@
 
 #import <Security/Security.h>
 
+#include <atomic>
+
 #import "Source/common/ScopedCFTypeRef.h"
 
 // Private NSXPCConnection selector that returns the kernel-stamped audit
@@ -70,7 +72,16 @@ static NSString* const kDefaultCodeSigningRequirement =
 @property NSXPCConnection* currentConnection;
 @end
 
-@implementation MOLXPCConnection
+/// Client connection state. kDead is terminal, so a handshake reply that races
+/// a timeout or an invalidation cannot mark a dead connection connected.
+enum class MOLXPCClientState { kConnecting, kConnected, kDead };
+
+@implementation MOLXPCConnection {
+  // isConnected reads this, never currentConnection.remoteObjectInterface: the
+  // handlers must not change that interface while another thread may be
+  // building a proxy from it.
+  std::atomic<MOLXPCClientState> _state;
+}
 
 // Snapshot a block property into a local variable and call it if non-nil.
 // This avoids a TOCTOU race where the property could be nilled by another
@@ -222,12 +233,7 @@ static NSString* CopyDefaultCodeSigningRequirement(void) {
     self.currentConnection.remoteObjectInterface = self.validationInterface;
     self.currentConnection.interruptionHandler = self.currentConnection.invalidationHandler = ^{
       STRONGIFY(self);
-      // If the remoteObjectInterface is still the validation interface, do not nil it out.
-      // This ensures that the currentConnections's remoteObjectProxy doesn't return an
-      // object that doesn't conform to `MOLXPCConnectionProtocol`.
-      if (self.currentConnection.remoteObjectInterface != self.validationInterface) {
-        self.currentConnection.remoteObjectInterface = nil;
-      }
+      [self markDead];
       SafeCallBlock(self.invalidationHandler);
     };
     if (self.codeSigningRequirement) {
@@ -240,8 +246,9 @@ static NSString* CopyDefaultCodeSigningRequirement(void) {
       [self.currentConnection suspend];
       self.currentConnection.remoteObjectInterface = self.remoteInterface;
       [self.currentConnection resume];
+      BOOL live = [self finishHandshake];
       dispatch_semaphore_signal(sema);
-      SafeCallBlock(self.acceptedHandler);
+      if (live) SafeCallBlock(self.acceptedHandler);
     }];
     if (dispatch_semaphore_wait(sema, dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC))) {
       // This is unusual - as we're not inside a block - but necessary in case the caller sets an
@@ -251,7 +258,7 @@ static NSString* CopyDefaultCodeSigningRequirement(void) {
       STRONGIFY(self);
 
       // Connection was not established in a reasonable time, invalidate.
-      self.currentConnection.remoteObjectInterface = nil;  // ensure clients don't try to use it.
+      [self markDead];  // ensure clients don't try to use it.
       [self.currentConnection invalidate];
     }
   }
@@ -319,14 +326,29 @@ static NSString* CopyDefaultCodeSigningRequirement(void) {
 }
 
 - (BOOL)isConnected {
-  return self.currentConnection.remoteObjectInterface &&
-         self.currentConnection.remoteObjectInterface == self.remoteInterface;
+  return _state.load() == MOLXPCClientState::kConnected;
+}
+
+/// Marks the handshake complete. Returns NO, and leaves the state alone, if the
+/// connection already timed out or was invalidated.
+- (BOOL)finishHandshake {
+  MOLXPCClientState expected = MOLXPCClientState::kConnecting;
+  return _state.compare_exchange_strong(expected, self.remoteInterface
+                                                      ? MOLXPCClientState::kConnected
+                                                      : MOLXPCClientState::kConnecting);
+}
+
+// ponytail: a method, not a direct store, because the blocks call it after
+// STRONGIFY, which does not return on nil, and messaging nil is safe.
+- (void)markDead {
+  _state.store(MOLXPCClientState::kDead);
 }
 
 #pragma mark Connection tear-down
 
 - (void)invalidate {
   if (self.currentConnection) {
+    [self markDead];
     [self.currentConnection invalidate];
     self.currentConnection = nil;
   } else if (self.listenerObject) {

@@ -113,7 +113,9 @@ void SantadMain(std::shared_ptr<EndpointSecurityAPI> esapi,
           sandboxExpectations:sandbox_expectations
           flushCacheBlock:^(FlushCacheMode mode, FlushCacheReason reason) {
             auth_result_cache->FlushCache(mode, reason);
-            [exec_controller flushAuthApprovalCache];
+            if (mode != FlushCacheMode::kCompilerDecisionsOnly) {
+              [exec_controller flushAuthApprovalCache];
+            }
           }
           cacheCountBlock:^NSArray<NSNumber*>*() {
             return auth_result_cache->CacheCounts();

@@ -19,8 +19,8 @@
 
 #include "Source/common/processtree/annotations/cel.h"
 #include "Source/common/processtree/process.h"
-#include "Source/common/processtree/process_tree.pb.h"
 #include "Source/common/processtree/process_tree_test_helpers.h"
+#include "telemetry/v1.pb.h"
 
 using namespace santa::santad::process_tree;
 

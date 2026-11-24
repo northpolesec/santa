@@ -1,5 +1,3 @@
-load("@protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
-load("@protobuf//bazel:proto_library.bzl", "proto_library")
 load("@rules_cc//cc:defs.bzl", "cc_library", "objc_library")
 load("//:helper.bzl", "santa_unit_test")
 
@@ -10,21 +8,6 @@ package(
 )
 
 licenses(["notice"])
-
-proto_library(
-    name = "santa_proto",
-    srcs = ["santa.proto"],
-    deps = [
-        "//Source/common/processtree:process_tree_proto",
-        "@protobuf//:any_proto",
-        "@protobuf//:timestamp_proto",
-    ],
-)
-
-cc_proto_library(
-    name = "santa_cc_proto",
-    deps = [":santa_proto"],
-)
 
 objc_library(
     name = "PowerMonitor",
@@ -347,6 +330,12 @@ objc_library(
         ":MOLCodesignChecker",
         ":SNTCommonEnums",
     ],
+)
+
+cc_library(
+    name = "EventArena",
+    hdrs = ["EventArena.h"],
+    deps = ["@protobuf"],
 )
 
 objc_library(
@@ -1475,18 +1464,6 @@ objc_library(
         "@OCMock",
         "@googletest//:gtest",
     ],
-)
-
-genrule(
-    name = "CommitHash",
-    outs = ["CommitHash.plist"],
-    cmd = """
-    STABLE_GIT_COMMIT=$$(awk '/STABLE_GIT_COMMIT/ { print $$2 }' bazel-out/stable-status.txt)
-    defaults write $${PWD}/$(@) SNTCommitHash -string $${STABLE_GIT_COMMIT:-unset}
-    """,
-    local = True,
-    message = "Generating CommitHash.plist",
-    stamp = 1,
 )
 
 objc_library(

@@ -17,6 +17,7 @@
 
 #include <EndpointSecurity/ESTypes.h>
 
+#include <cassert>
 #include <memory>
 
 #include "Source/common/Platform.h"
@@ -189,6 +190,15 @@ NSString* const EventDispositionToString(EventDisposition d) {
   }
 }
 
+// Processor::kUnknown is not a valid metrics processor.
+static bool IsValidProcessor(Processor processor) {
+  return processor > Processor::kUnknown && processor < Processor::kCount;
+}
+
+static bool IsValidDisposition(EventDisposition disposition) {
+  return disposition >= EventDisposition::kProcessed && disposition < EventDisposition::kCount;
+}
+
 NSString* const FileAccessMetricStatusToString(FileAccessMetricStatus status) {
   switch (status) {
     case FileAccessMetricStatus::kOK: return kFileAccessMetricStatusOK;
@@ -284,6 +294,12 @@ Metrics::Metrics(dispatch_queue_t q, dispatch_source_t timer_source, uint64_t in
       metric_set_(metric_set),
       run_on_first_start_(run_on_first_start),
       rate_limit_counts_cache_(0) {
+  for (auto& row : event_times_cache_) {
+    for (auto& cell : row) {
+      cell.store(kNoEventTime, std::memory_order_relaxed);
+    }
+  }
+
   SetInterval(interval_);
 
   events_q_ = dispatch_queue_create("com.northpolesec.santa.santametricsservice.events_q",
@@ -340,20 +356,29 @@ void Metrics::ExportSerialized(SNTMetricSet* metric_set, void (^reply)(BOOL)) {
 
 void Metrics::FlushMetrics() {
   dispatch_sync(events_q_, ^{
-    for (const auto& kv : event_counts_cache_) {
-      NSString* processorName = ProcessorToString(std::get<Processor>(kv.first));
-      NSString* eventName = EventTypeToString(std::get<es_event_type_t>(kv.first));
-      NSString* dispositionName = EventDispositionToString(std::get<EventDisposition>(kv.first));
-
-      [event_counts_ incrementBy:kv.second
-                  forFieldValues:@[ processorName, eventName, dispositionName ]];
-    }
-
-    for (const auto& kv : event_times_cache_) {
-      NSString* processorName = ProcessorToString(std::get<Processor>(kv.first));
-      NSString* eventName = EventTypeToString(std::get<es_event_type_t>(kv.first));
-
-      [event_processing_times_ set:kv.second forFieldValues:@[ processorName, eventName ]];
+    for (size_t p = 1; p < kNumProcessors; p++) {  // 0 is Processor::kUnknown
+      NSString* proc = ProcessorToString(static_cast<Processor>(p));
+      for (size_t e = 0; e < ES_EVENT_TYPE_LAST; e++) {
+        auto event = [&] { return EventTypeToString(static_cast<es_event_type_t>(e)); };
+        for (size_t d = 0; d < kNumDispositions; d++) {
+          int64_t n = event_counts_cache_[p][e][d].exchange(0, std::memory_order_relaxed);
+          if (n > 0) {
+            [event_counts_ incrementBy:n
+                        forFieldValues:@[
+                          proc, event(), EventDispositionToString(static_cast<EventDisposition>(d))
+                        ]];
+          }
+        }
+        int64_t t = event_times_cache_[p][e].exchange(kNoEventTime, std::memory_order_relaxed);
+        if (t != kNoEventTime) [event_processing_times_ set:t forFieldValues:@[ proc, event() ]];
+      }
+      for (size_t e = 0; e <= ES_EVENT_TYPE_LAST; e++) {
+        int64_t n = drop_cache_[p][e].exchange(0, std::memory_order_relaxed);
+        if (n > 0) {
+          [drop_counts_ incrementBy:n
+                     forFieldValues:@[ proc, EventTypeToString(static_cast<es_event_type_t>(e)) ]];
+        }
+      }
     }
 
     // NB: Must use exchange here to atomically fetch the old value and reset the count. Doing
@@ -376,24 +401,7 @@ void Metrics::FlushMetrics() {
           ]];
     }
 
-    for (auto& [key, stats] : drop_cache_) {
-      if (stats.drops > 0) {
-        NSString* processorName = ProcessorToString(std::get<Processor>(key));
-        NSString* eventName = EventTypeToString(std::get<es_event_type_t>(key));
-
-        [drop_counts_ incrementBy:stats.drops forFieldValues:@[ processorName, eventName ]];
-
-        // Reset drops to 0, but leave sequence number intact. Sequence numbers
-        // must persist so that accurate drops can be counted.
-        stats.drops = 0;
-      }
-    }
-
-    // Reset the maps so the next cycle begins with a clean state
-    // IMPORTANT: Do not reset drop_cache_, the sequence numbers must persist
-    // for accurate accounting
-    event_counts_cache_ = {};
-    event_times_cache_ = {};
+    // Reset the map so the next cycle begins with a clean state
     faa_event_counts_cache_ = {};
   });
 }
@@ -438,46 +446,40 @@ void Metrics::StopPoll() {
 
 void Metrics::SetEventMetrics(Processor processor, EventDisposition disposition, int64_t nanos,
                               es_event_type_t event_type) {
-  dispatch_async(events_q_, ^{
-    event_counts_cache_[EventCountTuple{processor, event_type, disposition}]++;
-    event_times_cache_[EventTimesTuple{processor, event_type}] = nanos;
-  });
+  bool valid = IsValidProcessor(processor) && IsValidDisposition(disposition) &&
+               event_type < ES_EVENT_TYPE_LAST;
+  assert(valid);
+  if (!valid) return;
+
+  size_t p = static_cast<size_t>(processor);
+  event_counts_cache_[p][event_type][static_cast<size_t>(disposition)].fetch_add(
+      1, std::memory_order_relaxed);
+  event_times_cache_[p][event_type].store(nanos, std::memory_order_relaxed);
 }
 
-void Metrics::UpdateEventStats(Processor processor, es_event_type_t event_type, uint64_t seq_num,
-                               uint64_t global_seq_num) {
-  dispatch_async(events_q_, ^{
-    EventStatsTuple event_stats_key{processor, event_type};
-    // NB: Using the invalid event type ES_EVENT_TYPE_LAST to store drop counts
-    // based on the global sequence number.
-    EventStatsTuple global_stats_key{processor, ES_EVENT_TYPE_LAST};
+void Metrics::RecordDrops(Processor processor, es_event_type_t event_type, int64_t event_drops,
+                          int64_t global_drops) {
+  bool valid = IsValidProcessor(processor) && event_type < ES_EVENT_TYPE_LAST && event_drops >= 0 &&
+               global_drops >= 0;
+  assert(valid);
+  if (!valid) return;
 
-    SequenceStats old_event_stats = drop_cache_[event_stats_key];
-    SequenceStats old_global_stats = drop_cache_[global_stats_key];
+  auto& row = drop_cache_[static_cast<size_t>(processor)];
+  if (event_drops > 0) row[event_type].fetch_add(event_drops, std::memory_order_relaxed);
+  if (global_drops > 0) {
+    row[ES_EVENT_TYPE_LAST].fetch_add(global_drops, std::memory_order_relaxed);
+  }
 
-    // Sequence number should always increment by 1.
-    // Drops detected if there is a difference between the current sequence
-    // number and the expected sequence number
-    int64_t new_event_drops = seq_num - old_event_stats.next_seq_num;
-    int64_t new_global_drops = global_seq_num - old_global_stats.next_seq_num;
-
-    // Only log one or the other, prefer the event specific log.
-    // For higher volume event types, we'll normally see the event-specific log eventually
-    // For lower volume event types, we may only see the global drop message
-    if (new_event_drops > 0) {
-      LOGD(@"Drops detected for client: %@, event: %@, drops: %llu", ProcessorToString(processor),
-           EventTypeToString(event_type), new_event_drops);
-    } else if (new_global_drops > 0) {
-      LOGD(@"Drops detected globally for client: %@, drops: %llu", ProcessorToString(processor),
-           new_global_drops);
-    }
-
-    drop_cache_[event_stats_key] = SequenceStats{.next_seq_num = seq_num + 1,
-                                                 .drops = old_event_stats.drops + new_event_drops};
-
-    drop_cache_[global_stats_key] = SequenceStats{
-        .next_seq_num = global_seq_num + 1, .drops = old_global_stats.drops + new_global_drops};
-  });
+  // Only log one or the other, prefer the event specific log.
+  // For higher volume event types, we'll normally see the event-specific log eventually
+  // For lower volume event types, we may only see the global drop message
+  if (event_drops > 0) {
+    LOGD(@"Drops detected for client: %@, event: %@, drops: %llu", ProcessorToString(processor),
+         EventTypeToString(event_type), event_drops);
+  } else if (global_drops > 0) {
+    LOGD(@"Drops detected globally for client: %@, drops: %llu", ProcessorToString(processor),
+         global_drops);
+  }
 }
 
 void Metrics::AddRateLimitingMetrics(int64_t events_rate_limited_count) {

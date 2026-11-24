@@ -97,6 +97,14 @@ typedef NS_ENUM(NSInteger, SNTRuleAddSource) {
                       reply:(void (^)(NSData* serializedResponse))reply;
 
 ///
+///  Run a Sleigh AI account inventory scan described by a serialized
+///  santa.commands.v1.AIAccountInventoryRequest. reply receives a serialized
+///  santa.commands.v1.AIAccountInventoryResponse.
+///
+- (void)runAIAccountInventory:(NSData*)serializedRequest
+                        reply:(void (^)(NSData* serializedResponse))reply;
+
+///
 /// Control Ops
 ///
 - (void)installSantaApp:(NSString*)appPath reply:(void (^)(BOOL))reply;

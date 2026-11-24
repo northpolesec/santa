@@ -258,6 +258,18 @@ SantaCache<AuthResultKey, CachedAuthResult>* AuthResultCache::CacheForVnodeID(Sa
 }
 
 void AuthResultCache::FlushCache(FlushCacheMode mode, FlushCacheReason reason) {
+  if (mode == FlushCacheMode::kCompilerDecisionsOnly) {
+    // Compiler decisions never reach the ES cache. Remove their in-flight
+    // reservations too, so an evaluation of the previous rules cannot republish one.
+    auto isCompilerOrRequest = [](const AuthResultKey&, CachedAuthResult& entry) {
+      return entry.action == SNTActionRespondAllowCompiler ||
+             entry.action == SNTActionRequestBinary;
+    };
+    root_cache_->remove_if(isCompilerOrRequest);
+    nonroot_cache_->remove_if(isCompilerOrRequest);
+    return;
+  }
+
   nonroot_cache_->clear();
   if (mode == FlushCacheMode::kAllCaches) {
     root_cache_->clear();

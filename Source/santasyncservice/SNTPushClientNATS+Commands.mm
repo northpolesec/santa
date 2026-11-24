@@ -12,6 +12,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 
+#import "Source/santasyncservice/SNTPushClientNATS+Commands.h"
 #import "Source/santasyncservice/SNTPushClientNATS.h"
 
 #include <CommonCrypto/CommonHMAC.h>
@@ -416,10 +417,14 @@ static void CommandMessageHandlerImpl(natsConnection* nc, natsSubscription* sub,
 
 __BEGIN_DECLS
 
-// NATS-compatible wrapper that converts void *closure to SNTPushClientNATS *
+// NATS-compatible wrapper that converts void *closure to SNTPushClientNATS *.
+// Runs in an @autoreleasepool because NATS threads have none (see
+// SNTPushClientNATSFromClosure).
 void commandMessageHandler(natsConnection* nc, natsSubscription* sub, natsMsg* msg, void* closure) {
-  SNTPushClientNATS* self = (__bridge SNTPushClientNATS*)closure;
-  CommandMessageHandlerImpl(nc, sub, msg, self);
+  @autoreleasepool {
+    SNTPushClientNATS* self = SNTPushClientNATSFromClosure(closure);
+    CommandMessageHandlerImpl(nc, sub, msg, self);
+  }
 }
 
 __END_DECLS

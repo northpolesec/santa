@@ -22,7 +22,8 @@ struct SantaVnode;
 //
 // Santa only accesses SNDProcessInfo via [processFlows.processInfo vnode]
 // in Serializer.mm. All other property access happens inside
-// PopulateNetworkActivityProcess which is stubbed as a no-op.
+// SerializeNetworkActivity and FormatNetworkActivityBasicString, which are
+// stubbed as no-ops.
 @interface SNDProcessInfo : NSObject <NSSecureCoding>
 
 - (SantaVnode)vnode;

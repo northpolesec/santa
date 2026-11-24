@@ -155,15 +155,8 @@ std::vector<uint8_t> Empty::SerializeMessage(const EnrichedTCCModification&) {
 
 #endif  // HAVE_MACOS_15_4
 
-std::vector<uint8_t> Empty::SerializeNetworkFlows(SNDProcessFlows*, struct timespec,
-                                                  struct timespec, SNTCachedDecision*) {
-  return {};
-}
-
-std::vector<uint8_t> Empty::SerializeDNSActivity(SNDProcessFlows*, struct timespec, struct timespec,
-                                                 SNTCachedDecision*) {
-  return {};
-}
+void Empty::SerializeNetworkActivities(SNDProcessFlows*, struct timespec, struct timespec,
+                                       SNTCachedDecision*, bool, bool, const ActivityWriter&) {}
 
 std::vector<uint8_t> Empty::SerializeFileAccess(
     const std::string& policy_version, const std::string& policy_name, const Message& msg,

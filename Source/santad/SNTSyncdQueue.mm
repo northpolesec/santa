@@ -304,7 +304,16 @@ static constexpr NSTimeInterval kDefaultClearSyncStateGracePeriod = 600;
   if (!event) {
     return;
   }
-  [self addEvents:@[ event ] withBackoffHashKey:[event uniqueID]];
+  // Execution events add their decision to the key, so a new decision for the binary (for example
+  // BLOCK_UNKNOWN after its block rule is removed) is still uploaded at once. This matches the
+  // block backoff key in SNTEventTable.
+  NSString* key = [event uniqueID];
+  if ([event isKindOfClass:[SNTStoredExecutionEvent class]]) {
+    key = [key
+        stringByAppendingFormat:@"|%llu",
+                                (unsigned long long)((SNTStoredExecutionEvent*)event).decision];
+  }
+  [self addEvents:@[ event ] withBackoffHashKey:key];
 }
 
 - (void)addBundleEvents:(NSArray<SNTStoredExecutionEvent*>*)events
@@ -332,14 +341,17 @@ static constexpr NSTimeInterval kDefaultClearSyncStateGracePeriod = 600;
 }
 
 - (void)addBundleEvent:(SNTStoredExecutionEvent*)event reply:(void (^)(SNTBundleEventAction))reply {
-  if ([self backoffForPrimaryHash:event.fileBundleHash]) return;
+  // Keyed by bundle and decision, so a new decision for the bundle is still uploaded at once.
+  NSString* key =
+      [event.fileBundleHash stringByAppendingFormat:@"|%llu", (unsigned long long)event.decision];
+  if ([self backoffForPrimaryHash:key]) return;
   [self dispatchBlockOnSyncdQueue:^{
     [self.syncConnection.remoteObjectProxy
         postBundleEventToSyncServer:event
                               reply:^(SNTBundleEventAction action) {
-                                // Remove the backoff entry for the initial block event. The same
-                                // event will be included in the related events synced using
-                                // addEvents:isFromBundle:.
+                                // The server wants the related events. They are keyed by the plain
+                                // bundle hash (-addBundleEvents:withBundleHash:), so clear that key
+                                // to let them through even if they were sent within the backoff.
                                 if (action == SNTBundleEventActionSendEvents) {
                                   _uploadBackoff->remove(
                                       santa::NSStringToUTF8String(event.fileBundleHash));
@@ -371,7 +383,8 @@ static constexpr NSTimeInterval kDefaultClearSyncStateGracePeriod = 600;
 }
 
 // The event upload is skipped if an event has been initiated for it in the last 10 minutes.
-// The passed-in hash is fileBundleHash for a bundle event, or fileSHA256 for a normal event.
+// The passed-in key is the event's backoff key: see -addStoredEvent:, -addBundleEvent:reply: and
+// -addBundleEvents:withBundleHash:.
 // Returns YES if backoff is needed, NO otherwise.
 - (BOOL)backoffForPrimaryHash:(NSString*)hash {
   NSDate* backoff = _uploadBackoff->get(santa::NSStringToUTF8String(hash));
