@@ -1506,9 +1506,11 @@ static struct RuleIdentifiers UnruledIdentifiers() {
 - (void)testFileAccessRulesHashIsOrderIndependent {
   SNTFileAccessRule* first = [self _exampleFileAccessAddRuleWithName:@"first"];
   SNTFileAccessRule* second = [self _exampleFileAccessAddRuleWithName:@"second"];
+  NSArray<SNTFileAccessRule*>* inOrder = @[ first, second ];
+  NSArray<SNTFileAccessRule*>* reversed = @[ second, first ];
 
   XCTAssertTrue([self.sut addExecutionRules:@[]
-                            fileAccessRules:@[ first, second ]
+                            fileAccessRules:inOrder
                            networkFlowRules:nil
                                     signals:nil
                                 ruleCleanup:SNTRuleCleanupAll
@@ -1516,7 +1518,7 @@ static struct RuleIdentifiers UnruledIdentifiers() {
   NSString* rulesHash = [self.sut hashOfHashes].fileAccessRulesHash;
 
   XCTAssertTrue([self.sut addExecutionRules:@[]
-                            fileAccessRules:@[ second, first ]
+                            fileAccessRules:reversed
                            networkFlowRules:nil
                                     signals:nil
                                 ruleCleanup:SNTRuleCleanupAll
