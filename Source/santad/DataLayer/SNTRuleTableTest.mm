@@ -1453,8 +1453,8 @@ static struct RuleIdentifiers UnruledIdentifiers() {
                   ruleCleanup:SNTRuleCleanupAll
                        errors:nil];
   SNTRuleTableRulesHash* rulesHash = [self.sut hashOfHashes];
-  XCTAssertEqualObjects(rulesHash.executionRulesHash, @"a6cb5171bbb8895820d61e395592b293");
-  XCTAssertEqualObjects(rulesHash.fileAccessRulesHash, @"010a7393bae8f2e97c296063dd2f39cf");
+  XCTAssertEqualObjects(rulesHash.executionRulesHash, @"6d3c65e112fcdd8d13cc1fee689eef2c");
+  XCTAssertEqualObjects(rulesHash.fileAccessRulesHash, @"52e18b791dbcd722de71b4d6eb6c0459");
   NSString* nfHashWithRules = rulesHash.networkFlowRulesHash;
   XCTAssertEqual(nfHashWithRules.length, 32u);
 
@@ -1462,8 +1462,8 @@ static struct RuleIdentifiers UnruledIdentifiers() {
   SNTRule* transitiveRule = [self _exampleTransitiveRule];
   XCTAssertTrue([self.sut addTransitiveRuleForSHA256:transitiveRule.identifier error:nil]);
   rulesHash = [self.sut hashOfHashes];
-  XCTAssertEqualObjects(rulesHash.executionRulesHash, @"a6cb5171bbb8895820d61e395592b293");
-  XCTAssertEqualObjects(rulesHash.fileAccessRulesHash, @"010a7393bae8f2e97c296063dd2f39cf");
+  XCTAssertEqualObjects(rulesHash.executionRulesHash, @"6d3c65e112fcdd8d13cc1fee689eef2c");
+  XCTAssertEqualObjects(rulesHash.fileAccessRulesHash, @"52e18b791dbcd722de71b4d6eb6c0459");
   XCTAssertEqualObjects(rulesHash.networkFlowRulesHash, nfHashWithRules);
 
   // Add remove rules. The hashes should change.
@@ -1482,6 +1482,46 @@ static struct RuleIdentifiers UnruledIdentifiers() {
   XCTAssertEqualObjects(rulesHash.executionRulesHash, @"d4dd223bafbdda2c36bb0513dfabb38b");
   XCTAssertEqualObjects(rulesHash.fileAccessRulesHash, @"146f85d95d0d21d5c04d048b2b69f908");
   XCTAssertNotEqualObjects(rulesHash.networkFlowRulesHash, nfHashWithRules);
+}
+
+- (void)testExecutionRulesHashIsOrderIndependent {
+  NSArray<SNTRule*>* rules =
+      @[ [self _exampleBinaryRule], [self _exampleCertRule], [self _exampleTeamIDRule] ];
+
+  XCTAssertTrue([self.sut addExecutionRules:rules ruleCleanup:SNTRuleCleanupAll errors:nil]);
+  NSString* rulesHash = [self.sut hashOfHashes].executionRulesHash;
+
+  XCTAssertTrue([self.sut addExecutionRules:rules.reverseObjectEnumerator.allObjects
+                                ruleCleanup:SNTRuleCleanupAll
+                                     errors:nil]);
+  XCTAssertEqualObjects([self.sut hashOfHashes].executionRulesHash, rulesHash);
+
+  // Re-sending a rule the table already holds replaces its row, moving it to the end.
+  XCTAssertTrue([self.sut addExecutionRules:@[ [self _exampleTeamIDRule] ]
+                                ruleCleanup:SNTRuleCleanupNone
+                                     errors:nil]);
+  XCTAssertEqualObjects([self.sut hashOfHashes].executionRulesHash, rulesHash);
+}
+
+- (void)testFileAccessRulesHashIsOrderIndependent {
+  SNTFileAccessRule* first = [self _exampleFileAccessAddRuleWithName:@"first"];
+  SNTFileAccessRule* second = [self _exampleFileAccessAddRuleWithName:@"second"];
+
+  XCTAssertTrue([self.sut addExecutionRules:@[]
+                            fileAccessRules:@[ first, second ]
+                           networkFlowRules:nil
+                                    signals:nil
+                                ruleCleanup:SNTRuleCleanupAll
+                                     errors:nil]);
+  NSString* rulesHash = [self.sut hashOfHashes].fileAccessRulesHash;
+
+  XCTAssertTrue([self.sut addExecutionRules:@[]
+                            fileAccessRules:@[ second, first ]
+                           networkFlowRules:nil
+                                    signals:nil
+                                ruleCleanup:SNTRuleCleanupAll
+                                     errors:nil]);
+  XCTAssertEqualObjects([self.sut hashOfHashes].fileAccessRulesHash, rulesHash);
 }
 
 #pragma mark Network Flow Rules

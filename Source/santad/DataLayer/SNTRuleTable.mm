@@ -1333,8 +1333,11 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
 
   // Indexed-column access keeps this loop cheap; column order matches the SELECT below.
   // Columns: 0=identifier, 1=state, 2=type, 3=cel_expr, 4=seatbelt_policy.
+  // Sorted so the hash depends only on the rules held, not the order they were written: INSERT OR
+  // REPLACE moves a re-sent rule to the end, and a clean sync writes rules in the server's order.
   FMResultSet* rs = [db executeQuery:@"SELECT identifier, state, type, cel_expr, seatbelt_policy "
-                                     @"FROM execution_rules WHERE state != ?",
+                                     @"FROM execution_rules WHERE state != ? "
+                                     @"ORDER BY identifier ASC, type ASC",
                                      @(SNTRuleStateAllowTransitive)];
   while ([rs next]) {
     NSString* identifier = [rs stringForColumnIndex:0];
@@ -1369,8 +1372,9 @@ static void addPathsFromDefaultMuteSet(NSMutableSet* criticalPaths) {
   santa::Xxhash128 hash;
 
   // Indexed-column access keeps this loop cheap; column order matches the SELECT below.
-  // Columns: 0=name, 1=rule_data.
-  FMResultSet* rs = [db executeQuery:@"SELECT name, rule_data FROM file_access_rules"];
+  // Columns: 0=name, 1=rule_data. Sorted for the same reason as the execution rules hash.
+  FMResultSet* rs =
+      [db executeQuery:@"SELECT name, rule_data FROM file_access_rules ORDER BY name ASC"];
   while ([rs next]) {
     NSString* name = [rs stringForColumnIndex:0];
     NSData* blob = [rs dataNoCopyForColumnIndex:1];
